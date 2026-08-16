@@ -1,0 +1,1048 @@
+openapi: 3.1.0
+info:
+  title: Nabd HMS API
+  version: "1.0"
+  description: >
+    Foundation-layer contract (Auth, RBAC/Staff, Tenant/Branch, Patients, Audit).
+    See README.md for conventions. Deny-by-default authorization: every
+    operation below declares x-required-permission; the gateway rejects
+    anything not explicitly granted.
+servers:
+  - url: https://api.nabd.health/v1
+    description: production
+  - url: https://api.staging.nabd.health/v1
+    description: staging
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Staff
+  - name: Roles
+  - name: Tenants
+  - name: Patients
+  - name: Queue
+  - name: Audit
+
+paths:
+  # ---------------------------------------------------------------- Auth
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: "PIN login (step 1 of 2 when MFA is enforced). NFR-06: no SSO, no hardware keys, no password — PIN/WhatsApp-OTP/authenticator app are the only three methods."
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantSlug, email, pin]
+              properties:
+                tenantSlug: { type: string, description: "Clinic subdomain/code; disambiguates the same email across two tenants" }
+                email: { type: string, format: email }
+                pin: { type: string, pattern: "^[0-9]{4,6}$" }
+      responses:
+        "200":
+          description: PIN accepted; MFA challenge issued if enforced for this role
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TokenPair"
+                  - $ref: "#/components/schemas/MfaChallenge"
+        "401":
+          description: Invalid credentials (identical timing/body for unknown vs. wrong-PIN — no user enumeration)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: Account locked (exponential backoff in effect)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /auth/otp/request:
+    post:
+      tags: [Auth]
+      summary: "WhatsApp OTP login, step 1 — sends a 6-digit code. ponytail: delivery is mocked/logged until the Messaging Platform epic (E17) integrates the real WhatsApp Business API."
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantSlug, mobilePhone]
+              properties:
+                tenantSlug: { type: string }
+                mobilePhone: { type: string }
+      responses:
+        "202": { description: "Always 202 regardless of whether the tenant/mobile is known — no enumeration" }
+
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: WhatsApp OTP login, step 2 — also marks the staff member's mobile as verified (NB-041)
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantSlug, mobilePhone, code]
+              properties:
+                tenantSlug: { type: string }
+                mobilePhone: { type: string }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200":
+          description: TokenPair, or an MfaChallenge if MFA is enforced for this role
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TokenPair"
+                  - $ref: "#/components/schemas/MfaChallenge"
+        "401":
+          description: Wrong/expired code or unknown tenant+mobile (identical shape — no enumeration)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: Account locked (exponential backoff in effect)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /auth/mfa/verify:
+    post:
+      tags: [Auth]
+      summary: Complete login with TOTP/SMS code, or mint a short-lived step-up token on an existing session
+      security:
+        - bearerAuth: []
+        - {}
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeId, code]
+              properties:
+                challengeId: { type: string, description: "Opaque signed token, not a UUID" }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200":
+          description: TokenPair (login flow) or a step-up token (already-authenticated flow)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TokenPair"
+                  - $ref: "#/components/schemas/StepUpToken"
+        "401":
+          description: Wrong code, expired challenge, or 5th failed attempt (challenge burned)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Exchange a refresh token for a new access/refresh pair
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: New pair issued; old refresh token invalidated
+          content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
+        "401":
+          description: Reused/revoked refresh token — entire session family revoked as a compromise signal
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current session
+      x-required-permission: authenticated
+      responses:
+        "204": { description: Session revoked }
+
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      summary: List this user's active sessions (device, IP, last-seen)
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Session" }
+
+  /auth/sessions/{id}:
+    delete:
+      tags: [Auth]
+      summary: Remotely revoke a specific session (e.g. lost device)
+      x-required-permission: authenticated
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+      responses:
+        "204": { description: "Revoked; denied within 60s per NB-032" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # NB-046 (PIN reset & account recovery): specced, not yet implemented in the backend.
+  /auth/pin-reset/request:
+    post:
+      tags: [Auth]
+      summary: Start PIN reset (rate-limited, no enumeration) — NOT YET IMPLEMENTED
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties: { email: { type: string, format: email } }
+      responses:
+        "202": { description: "Always 202 regardless of whether the email exists" }
+
+  /auth/pin-reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Complete PIN reset with the emailed token — NOT YET IMPLEMENTED
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPin]
+              properties:
+                token: { type: string }
+                newPin: { type: string, pattern: "^[0-9]{4,6}$" }
+      responses:
+        "204": { description: PIN changed; all sessions revoked }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  # --------------------------------------------------------------- Staff
+  /staff:
+    get:
+      tags: [Staff]
+      summary: List staff for the caller's tenant
+      x-required-permission: staff:view
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { $ref: "#/components/responses/StaffPage" }
+    post:
+      tags: [Staff]
+      summary: Invite a new staff member (creates an invited/pending record, sends invite email)
+      x-required-permission: staff:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffInviteRequest" }
+      responses:
+        "201": { $ref: "#/components/responses/StaffCreated" }
+        "409": { description: Email already on this tenant, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /staff/{id}:
+    get:
+      tags: [Staff]
+      x-required-permission: staff:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Staff", content: { application/json: { schema: { $ref: "#/components/schemas/Staff" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Staff]
+      summary: Update role, scope (own-patients-only vs. all), or field-level grants
+      x-required-permission: staff:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StaffPatch" } } }
+      responses:
+        "200": { description: "Staff", content: { application/json: { schema: { $ref: "#/components/schemas/Staff" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /staff/{id}/suspend:
+    post:
+      tags: [Staff]
+      summary: Immediately suspend staff and kill all live sessions
+      x-required-permission: staff:delete
+      x-step-up: true
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties: { reason: { type: string, minLength: 3 } }
+      responses:
+        "204": { description: "Suspended; sessions killed < 30s, audit event written" }
+
+  /staff/invitations/{token}/accept:
+    post:
+      tags: [Staff]
+      summary: First-sign-in — accept invite, set PIN (accepting the link is the email-verification step), enrol MFA if required
+      security: []
+      x-required-permission: public
+      parameters: [{ $ref: "#/components/parameters/PathToken" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties: { pin: { type: string, pattern: "^[0-9]{4,6}$" } }
+      responses:
+        "200": { description: "TokenPair", content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+        "410": { description: "Invite expired (>72h) or already used", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  # --------------------------------------------------------------- Roles
+  /roles:
+    get:
+      tags: [Roles]
+      summary: List built-in and custom roles for the tenant
+      x-required-permission: staff:view
+      responses:
+        "200": { description: "List of Role", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Role" } } } } }
+    post:
+      tags: [Roles]
+      summary: Create a custom role from the permission matrix (module x action)
+      x-required-permission: staff:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/RoleWrite" } } }
+      responses:
+        "201": { description: "Role", content: { application/json: { schema: { $ref: "#/components/schemas/Role" } } } }
+
+  /roles/{id}:
+    get:
+      tags: [Roles]
+      x-required-permission: staff:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Role", content: { application/json: { schema: { $ref: "#/components/schemas/Role" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Roles]
+      x-required-permission: staff:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/RoleWrite" } } }
+      responses:
+        "200": { description: "Role", content: { application/json: { schema: { $ref: "#/components/schemas/Role" } } } }
+        "400":
+          description: Attempted edit of a built-in role, or a grant beyond the editor's own permissions (privilege escalation blocked)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  # ------------------------------------------------------------ Tenants
+  /tenants/{id}:
+    get:
+      tags: [Tenants]
+      summary: Tenant profile (region, plan, residency)
+      x-required-permission: setup:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Tenant", content: { application/json: { schema: { $ref: "#/components/schemas/Tenant" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /tenants/{id}/branches:
+    get:
+      tags: [Tenants]
+      x-required-permission: setup:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "List of Branch", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Branch" } } } } }
+    post:
+      tags: [Tenants]
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/BranchWrite" } } }
+      responses:
+        "201": { description: "Branch", content: { application/json: { schema: { $ref: "#/components/schemas/Branch" } } } }
+
+  # ------------------------------------------------------------ Patients
+  /patients:
+    get:
+      tags: [Patients]
+      summary: List/search patients (row-scoped — a doctor with "own patients only" sees only their own)
+      x-required-permission: patients:view
+      parameters:
+        - name: q
+          in: query
+          description: Free-text match on name (any script), phone, MRN or token
+          schema: { type: string }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200": { $ref: "#/components/responses/PatientPage" }
+    post:
+      tags: [Patients]
+      summary: Register a patient
+      x-required-permission: patients:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PatientWrite" } } }
+      responses:
+        "201": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
+        "409":
+          description: Likely-duplicate match found (phone/name/DOB fuzzy match) — client should offer merge instead of blind create
+          content: { application/json: { schema: { type: object, properties: { candidates: { type: array, items: { $ref: "#/components/schemas/PatientMatchCandidate" } } } } } }
+
+  /patients/{id}:
+    get:
+      tags: [Patients]
+      summary: Patient 360 (identity, allergies, active packages, balance, last visit)
+      x-required-permission: patients:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "PatientDetail", content: { application/json: { schema: { $ref: "#/components/schemas/PatientDetail" } } } }
+        "404":
+          description: >
+            Not found OR exists but out of the caller's row-level scope
+            (e.g. another doctor's patient) — always 404, never 403, so an
+            ID probe can't be used to confirm a patient exists (NB-041).
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    patch:
+      tags: [Patients]
+      x-required-permission: patients:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PatientWrite" } } }
+      responses:
+        "200": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /patients/{id}/merge:
+    post:
+      tags: [Patients]
+      summary: Merge a duplicate into this patient (supervisor action, reversible for 30 days)
+      x-required-permission: patients:delete
+      x-step-up: true
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [duplicatePatientId]
+              properties:
+                duplicatePatientId: { type: string, format: uuid }
+      responses:
+        "200": { description: "PatientDetail", content: { application/json: { schema: { $ref: "#/components/schemas/PatientDetail" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /patients/merges/{mergeId}/undo:
+    post:
+      tags: [Patients]
+      summary: Reverse a merge — only within its 30-day window (NB-072)
+      x-required-permission: patients:delete
+      x-step-up: true
+      parameters:
+        - name: mergeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204": { description: Reversed }
+        "404": { description: "Merge doesn't exist, already reversed, or past the 30-day window", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /patients/{id}/consent/withdraw:
+    post:
+      tags: [Patients]
+      summary: Withdraw a consent — removes the patient from every consent-gated read path immediately (NB-053)
+      x-required-permission: patients:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consentType: { type: string, enum: [treatment, data_processing, messaging], default: data_processing }
+      responses:
+        "204": { description: Withdrawn }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # --------------------------------------------------------------- Queue
+  /doctors/{id}/working-hours:
+    get:
+      tags: [Queue]
+      summary: Weekly recurring availability template for a doctor
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Working hours", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WorkingHours" } } } } }
+    post:
+      tags: [Queue]
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHoursWrite" } } }
+      responses:
+        "201": { description: "Working hours block created", content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHours" } } } }
+
+  /doctors/{id}/leave:
+    get:
+      tags: [Queue]
+      summary: Blocked date ranges for a doctor (leave)
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Leave ranges", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DoctorLeave" } } } } }
+    post:
+      tags: [Queue]
+      summary: "Block a date range; existing bookings in that range are not auto-cancelled (NB-074 — reschedule flagging deferred)"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DoctorLeaveWrite" } } }
+      responses:
+        "201": { description: "Leave recorded", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorLeave" } } } }
+
+  /doctors/{id}/availability:
+    get:
+      tags: [Queue]
+      summary: Bookable slots for a doctor on a given date (working hours minus leave minus already-booked slots)
+      x-required-permission: queue:view
+      parameters:
+        - $ref: "#/components/parameters/PathId"
+        - name: date
+          in: query
+          required: true
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Available slot start times
+          content: { application/json: { schema: { type: array, items: { type: string, format: date-time } } } }
+
+  /appointments:
+    get:
+      tags: [Queue]
+      x-required-permission: queue:view
+      parameters:
+        - name: doctorId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: patientId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Page of appointments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Appointment" } }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+    post:
+      tags: [Queue]
+      summary: "Book a slot — concurrency-safe: a DB constraint, not an app-level check, prevents double-booking (NB-067)"
+      x-required-permission: queue:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentWrite" } } }
+      responses:
+        "201": { description: "Booked", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "409": { description: "Slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /appointments/{id}:
+    get:
+      tags: [Queue]
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Appointment", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /appointments/{id}/cancel:
+    post:
+      tags: [Queue]
+      summary: "Reason mandatory; slot released immediately (NB-072)"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 3 } } }
+      responses:
+        "200": { description: "Cancelled", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /appointments/{id}/reschedule:
+    post:
+      tags: [Queue]
+      summary: Cancels the original and books a new slot atomically
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [newStartTime], properties: { newStartTime: { type: string, format: date-time } } }
+      responses:
+        "200": { description: "New appointment", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "New slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /queue/check-in:
+    post:
+      tags: [Queue]
+      summary: "Issues a token — scheduled (appointmentId given) or walk-in (patientId + doctorId only) (NB-068)"
+      x-required-permission: queue:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CheckInRequest" } } }
+      responses:
+        "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+
+  /queue:
+    get:
+      tags: [Queue]
+      summary: Today's queue (Arrivals screen)
+      x-required-permission: queue:view
+      parameters:
+        - name: doctorId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        "200": { description: "Queue entries", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/QueueEntry" } } } } }
+
+  /queue/{id}/status:
+    patch:
+      tags: [Queue]
+      summary: "State machine transition — illegal transitions rejected, every transition audited (NB-069)"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties: { status: { type: string, enum: [waiting, vitals_pending, vitals_done, in_consult, checkout_pending, completed, no_show] } }
+      responses:
+        "200": { description: "Updated", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "400": { description: "Illegal transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /queue/{id}/reorder:
+    post:
+      tags: [Queue]
+      summary: "Priority flag with mandatory reason; reorders the queue (NB-068/NB-092)"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [priority, reason]
+              properties: { priority: { type: boolean }, reason: { type: string, minLength: 3 } }
+      responses:
+        "200": { description: "Updated", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # -------------------------------------------------------------- Audit
+  /audit-events:
+    get:
+      tags: [Audit]
+      summary: Search the immutable audit trail (Owner-facing, read-only)
+      x-required-permission: compliance:view
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: patientId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Page of audit events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Access token. Carries tenantId, staffId, roleId and permission set as
+        claims — the server trusts only these, never client-supplied
+        tenant/role headers.
+
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PathToken:
+      name: token
+      in: path
+      required: true
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Not found (or out of scope — see per-endpoint note)
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    BadRequest:
+      description: Validation failed
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    StaffPage:
+      description: Page of staff
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { type: array, items: { $ref: "#/components/schemas/Staff" } }
+              page: { $ref: "#/components/schemas/PageMeta" }
+    StaffCreated:
+      description: Invite created
+      content: { application/json: { schema: { $ref: "#/components/schemas/Staff" } } }
+    PatientPage:
+      description: Page of patients
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: { type: array, items: { $ref: "#/components/schemas/Patient" } }
+              page: { $ref: "#/components/schemas/PageMeta" }
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 7807
+      properties:
+        type: { type: string, format: uri, example: "https://api.nabd.health/errors/validation-failed" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+        traceId: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    PageMeta:
+      type: object
+      properties:
+        nextCursor: { type: [string, "null"] }
+        limit: { type: integer }
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, example: 900 }
+
+    MfaChallenge:
+      type: object
+      properties:
+        challengeId: { type: string, description: "Opaque signed token, not a UUID" }
+        method: { type: string, enum: [totp, sms] }
+        expiresIn: { type: integer, example: 300 }
+
+    StepUpToken:
+      type: object
+      properties:
+        stepUpToken: { type: string }
+        expiresIn: { type: integer, example: 300 }
+
+    Session:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        device: { type: string }
+        ip: { type: string }
+        lastSeenAt: { type: string, format: date-time }
+        current: { type: boolean }
+
+    StaffInviteRequest:
+      type: object
+      required: [email, name, mobilePhone, roleId]
+      properties:
+        email: { type: string, format: email }
+        name: { type: string }
+        mobilePhone: { type: string, description: "Required for WhatsApp OTP login and mobile verification (NB-041)" }
+        roleId: { type: string, format: uuid }
+        scope: { type: string, enum: [own_patients_only, all_clinic_patients], default: all_clinic_patients }
+
+    StaffPatch:
+      type: object
+      properties:
+        roleId: { type: string, format: uuid }
+        scope: { type: string, enum: [own_patients_only, all_clinic_patients] }
+        fieldGrants:
+          type: array
+          items: { type: string, example: "no_financial_fields" }
+
+    Staff:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        name: { type: string }
+        mobilePhone: { type: [string, "null"] }
+        roleId: { type: string, format: uuid }
+        status: { type: string, enum: [invited, active, suspended] }
+        scope: { type: string, enum: [own_patients_only, all_clinic_patients] }
+        emailVerified: { type: boolean }
+        mobileVerified: { type: boolean, description: "Patient data is unreachable until both this and emailVerified are true (NB-041)" }
+        lastSeenAt: { type: [string, "null"], format: date-time }
+
+    RoleWrite:
+      type: object
+      required: [name, grants]
+      properties:
+        name: { type: string }
+        grants:
+          type: array
+          description: One entry per module the role touches
+          items: { $ref: "#/components/schemas/ModuleGrant" }
+
+    Role:
+      allOf:
+        - $ref: "#/components/schemas/RoleWrite"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            builtIn: { type: boolean }
+
+    ModuleGrant:
+      type: object
+      required: [module]
+      properties:
+        module:
+          type: string
+          enum: [patients, queue, clinical, billing, packages, pharmacy, reports, staff, setup, compliance]
+        view: { type: boolean, default: false }
+        create: { type: boolean, default: false }
+        edit: { type: boolean, default: false }
+        delete: { type: boolean, default: false }
+        approve: { type: boolean, default: false }
+        refundDiscount: { type: boolean, default: false }
+        export: { type: boolean, default: false }
+
+    Tenant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        region: { type: string, enum: [IN, KSA] }
+        plan: { type: string }
+        status: { type: string, enum: [trial, active, suspended, offboarded] }
+
+    BranchWrite:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        address: { type: string }
+
+    Branch:
+      allOf:
+        - $ref: "#/components/schemas/BranchWrite"
+        - type: object
+          properties: { id: { type: string, format: uuid } }
+
+    PatientWrite:
+      type: object
+      required: [name, phone, dob, gender]
+      properties:
+        name: { type: string, description: "Stored/searched as-entered; any script" }
+        phone: { type: string }
+        dob: { type: string, format: date }
+        gender: { type: string, enum: [male, female, other] }
+        guardianId: { type: [string, "null"], format: uuid, description: "Required if patient is a minor" }
+        address: { type: string }
+        nationalId:
+          type: [string, "null"]
+          description: "Aadhaar/Iqama — column-level encrypted at rest (NB-140), never returned in list responses"
+
+    Patient:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mrn: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        dob: { type: string, format: date }
+        gender: { type: string, enum: [male, female, other] }
+        status: { type: string, enum: [active, merged] }
+
+    PatientDetail:
+      allOf:
+        - $ref: "#/components/schemas/Patient"
+        - type: object
+          properties:
+            allergies: { type: array, items: { type: string } }
+            chronicConditions: { type: array, items: { type: string } }
+            activePackages: { type: integer }
+            outstandingBalance: { type: number }
+            lastVisitAt: { type: [string, "null"], format: date-time }
+
+    PatientMatchCandidate:
+      type: object
+      properties:
+        patientId: { type: string, format: uuid }
+        name: { type: string }
+        phone: { type: string }
+        matchScore: { type: number }
+
+    WorkingHoursWrite:
+      type: object
+      required: [dayOfWeek, startTime, endTime]
+      properties:
+        dayOfWeek: { type: integer, minimum: 0, maximum: 6, description: "0=Sunday..6=Saturday" }
+        startTime: { type: string, example: "09:00" }
+        endTime: { type: string, example: "17:00" }
+        slotMinutes: { type: integer, default: 15, minimum: 1 }
+        maxPatients: { type: [integer, "null"], minimum: 1, description: "Session cap shared by scheduled + walk-in patients together; null = uncapped (NB-098)" }
+
+    WorkingHours:
+      allOf:
+        - $ref: "#/components/schemas/WorkingHoursWrite"
+        - type: object
+          properties: { id: { type: string, format: uuid } }
+
+    DoctorLeaveWrite:
+      type: object
+      required: [dateFrom, dateTo]
+      properties:
+        dateFrom: { type: string, format: date }
+        dateTo: { type: string, format: date }
+        reason: { type: string }
+
+    DoctorLeave:
+      allOf:
+        - $ref: "#/components/schemas/DoctorLeaveWrite"
+        - type: object
+          properties: { id: { type: string, format: uuid } }
+
+    AppointmentWrite:
+      type: object
+      required: [patientId, doctorId, startTime]
+      properties:
+        patientId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        startTime: { type: string, format: date-time }
+
+    Appointment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        startTime: { type: string, format: date-time }
+        endTime: { type: string, format: date-time }
+        status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+
+    CheckInRequest:
+      type: object
+      required: [patientId, doctorId]
+      properties:
+        appointmentId: { type: [string, "null"], format: uuid, description: "Omit for a walk-in" }
+        patientId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+
+    QueueEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        appointmentId: { type: [string, "null"], format: uuid }
+        patientId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        queueDate: { type: string, format: date }
+        tokenNumber: { type: integer }
+        status: { type: string, enum: [checked_in, waiting, vitals_pending, vitals_done, in_consult, checkout_pending, completed, no_show] }
+        priority: { type: boolean }
+        priorityReason: { type: [string, "null"] }
+
+    AuditEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        actorStaffId: { type: string, format: uuid }
+        action: { type: string, example: "patient.merge" }
+        resourceType: { type: string }
+        resourceId: { type: string }
+        before: { type: object, additionalProperties: true, nullable: true }
+        after: { type: object, additionalProperties: true, nullable: true }

@@ -1,0 +1,93 @@
+package com.nabd.hms.queue;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static com.nabd.hms.queue.QueueModels.AppointmentRow;
+
+@Repository
+class AppointmentRepository {
+
+    private static final String COLUMNS =
+            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at ";
+
+    private final JdbcTemplate jdbc;
+
+    AppointmentRepository(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    /** Throws DataIntegrityViolationException if the slot is already booked — see uq_appointments_doctor_slot. */
+    UUID insert(UUID tenantId, UUID patientId, UUID doctorId, Instant startTime, Instant endTime) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time) VALUES (?,?,?,?,?,?)",
+                id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime));
+        return id;
+    }
+
+    Optional<AppointmentRow> findById(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT " + COLUMNS + "FROM appointments WHERE tenant_id = ? AND id = ?",
+                mapper(), tenantId, id).stream().findFirst();
+    }
+
+    List<AppointmentRow> listPage(UUID tenantId, UUID doctorId, UUID patientId, LocalDate date,
+                                   int limit, Instant afterCreatedAt, UUID afterId) {
+        StringBuilder sql = new StringBuilder("SELECT " + COLUMNS + "FROM appointments WHERE tenant_id = ? ");
+        List<Object> params = new ArrayList<>();
+        params.add(tenantId);
+
+        if (doctorId != null) {
+            sql.append("AND doctor_id = ? ");
+            params.add(doctorId);
+        }
+        if (patientId != null) {
+            sql.append("AND patient_id = ? ");
+            params.add(patientId);
+        }
+        if (date != null) {
+            sql.append("AND start_time >= ? AND start_time < ? ");
+            params.add(Timestamp.from(date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant()));
+            params.add(Timestamp.from(date.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant()));
+        }
+        if (afterCreatedAt != null) {
+            sql.append("AND (created_at, id) > (?, ?) ");
+            params.add(Timestamp.from(afterCreatedAt));
+            params.add(afterId);
+        }
+        sql.append("ORDER BY created_at, id LIMIT ?");
+        params.add(limit);
+
+        return jdbc.query(sql.toString(), mapper(), params.toArray());
+    }
+
+    void cancel(UUID tenantId, UUID id, String reason) {
+        jdbc.update("UPDATE appointments SET status = 'cancelled', cancel_reason = ? " +
+                "WHERE tenant_id = ? AND id = ? AND status = 'scheduled'", reason, tenantId, id);
+    }
+
+    void markTerminal(UUID tenantId, UUID id, String status) {
+        jdbc.update("UPDATE appointments SET status = ? WHERE tenant_id = ? AND id = ? AND status = 'scheduled'",
+                status, tenantId, id);
+    }
+
+    private RowMapper<AppointmentRow> mapper() {
+        return (rs, i) -> new AppointmentRow(
+                UUID.fromString(rs.getString("id")),
+                UUID.fromString(rs.getString("tenant_id")),
+                UUID.fromString(rs.getString("patient_id")),
+                UUID.fromString(rs.getString("doctor_id")),
+                rs.getTimestamp("start_time").toInstant(),
+                rs.getTimestamp("end_time").toInstant(),
+                rs.getString("status"),
+                rs.getTimestamp("created_at").toInstant());
+    }
+}
