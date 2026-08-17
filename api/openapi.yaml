@@ -18,6 +18,7 @@ security:
 
 tags:
   - name: Auth
+  - name: Owners
   - name: Staff
   - name: Roles
   - name: Tenants
@@ -236,6 +237,90 @@ paths:
       responses:
         "204": { description: PIN changed; all sessions revoked }
         "400": { $ref: "#/components/responses/BadRequest" }
+
+  # ------------------------------------------------------------- Owners
+  # Owner is a top-level account (owns Brand(s), each with Clinic(s)) — not a
+  # row in any clinic's staff table. Login is a two-step handoff: PIN gets a
+  # short-lived pendingToken scoped only to listing/selecting a workspace;
+  # selecting a clinic mints a completely normal clinic access/refresh token
+  # pair, reusing every other endpoint in this spec unchanged. Brand-wide
+  # (multi-clinic) workspace selection isn't exposed yet — no dashboard
+  # endpoint consumes it, though the RLS layer underneath is already in place
+  # for when that lands.
+  /owners/auth/login:
+    post:
+      tags: [Owners]
+      summary: Owner PIN login, step 1 — issues a pendingToken, not a full session
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, pin]
+              properties:
+                email: { type: string, format: email }
+                pin: { type: string, pattern: "^[0-9]{4,6}$" }
+      responses:
+        "200":
+          description: PIN accepted; pendingToken can now list/select a workspace
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PendingWorkspaceToken" }
+        "401":
+          description: Invalid credentials (identical shape for unknown vs. wrong-PIN — no enumeration)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: Account locked (exponential backoff in effect)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/me/workspaces:
+    get:
+      tags: [Owners]
+      summary: List the caller's brands and the clinics under each
+      description: Requires a pendingToken from /owners/auth/login — the purpose claim, checked server-side, gates this, not a module:action permission.
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceList" }
+        "401":
+          description: Missing, invalid, or wrong-purpose token
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/workspaces/select:
+    post:
+      tags: [Owners]
+      summary: Enter one clinic's workspace — mints a normal clinic access/refresh token pair
+      description: >
+        The owner must actually own this clinic (via one of their brands) or this 404s, same
+        "don't confirm existence" rule as row-level scoping elsewhere in this spec. The resulting
+        token is indistinguishable in shape from a staff member's — every other endpoint in this
+        spec works unchanged from here on.
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clinicId]
+              properties:
+                clinicId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenPair" }
+        "401":
+          description: Missing, invalid, or wrong-purpose token
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # --------------------------------------------------------------- Staff
   /staff:
@@ -811,6 +896,35 @@ components:
         accessToken: { type: string }
         refreshToken: { type: string }
         expiresIn: { type: integer, example: 900 }
+
+    PendingWorkspaceToken:
+      type: object
+      description: Not a session — only usable against /owners/me/workspaces and /owners/workspaces/select.
+      properties:
+        pendingToken: { type: string }
+        expiresIn: { type: integer, example: 300 }
+
+    ClinicSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        slug: { type: string }
+        region: { type: string, enum: [IN, KSA] }
+        status: { type: string, enum: [trial, active, suspended, offboarded] }
+
+    BrandWorkspace:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        status: { type: string, enum: [active, suspended] }
+        clinics: { type: array, items: { $ref: "#/components/schemas/ClinicSummary" } }
+
+    WorkspaceList:
+      type: object
+      properties:
+        brands: { type: array, items: { $ref: "#/components/schemas/BrandWorkspace" } }
 
     MfaChallenge:
       type: object

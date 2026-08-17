@@ -23,8 +23,10 @@ class StaffRepository {
         this.jdbc = jdbc;
     }
 
+    // ::citext cast is load-bearing — see AuthRepository's class comment for why a bare "= ?"
+    // against a citext column silently falls back to case-sensitive text equality via JDBC.
     Optional<StaffRow> findByEmail(UUID tenantId, String email) {
-        return jdbc.query(baseSelect() + "WHERE s.tenant_id = ? AND s.email = ?",
+        return jdbc.query(baseSelect() + "WHERE s.tenant_id = ? AND s.email = ?::citext",
                 staffMapper(), tenantId, email).stream().findFirst();
     }
 

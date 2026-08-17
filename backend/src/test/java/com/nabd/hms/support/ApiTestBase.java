@@ -136,6 +136,12 @@ public abstract class ApiTestBase {
     protected record SeededTenant(UUID id, String slug) {
     }
 
+    protected record SeededOwner(UUID id, String email) {
+    }
+
+    protected record SeededBrand(UUID id, UUID ownerId, String name) {
+    }
+
     protected record SeededStaff(UUID id, UUID tenantId, String slug, String email, UUID roleId) {
     }
 
@@ -168,6 +174,38 @@ public abstract class ApiTestBase {
         jdbc.update("INSERT INTO tenants (id, slug, name, region, status) VALUES (?,?,?,?,?)",
                 id, slug, "Test Clinic " + slug, "IN", "active");
         return new SeededTenant(id, slug);
+    }
+
+    // owners/brands/tenants carry no RLS (see V6 migration) — plain inserts, no inTenantTx needed.
+
+    protected SeededOwner seedOwner(String email) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO owners (id, name, email, pin_hash, status) VALUES (?,?,?,?,'active')",
+                id, "Test Owner", email, pinEncoder.encode(STAFF_PIN));
+        return new SeededOwner(id, email);
+    }
+
+    protected SeededBrand seedBrand(SeededOwner owner, String name) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO brands (id, owner_id, name, status) VALUES (?,?,?,'active')", id, owner.id(), name);
+        return new SeededBrand(id, owner.id(), name);
+    }
+
+    /** A fresh clinic (with a full-access built-in role, so an owner entering it gets full permissions) under this brand. */
+    protected SeededTenant seedClinicInBrand(SeededBrand brand) {
+        SeededTenant tenant = seedTenant();
+        jdbc.update("UPDATE tenants SET brand_id = ? WHERE id = ?", brand.id(), tenant.id());
+        seedFullAccessRole(tenant.id());
+        return tenant;
+    }
+
+    protected String ownerLoginPendingToken(SeededOwner owner) {
+        ResponseEntity<Map> resp = http.postForEntity(url("/v1/owners/auth/login"), jsonBody(Map.of(
+                "email", owner.email(), "pin", STAFF_PIN)), Map.class);
+        if (resp.getStatusCode() != HttpStatus.OK) {
+            throw new IllegalStateException("seeded owner login failed: " + resp.getStatusCode() + " " + resp.getBody());
+        }
+        return (String) resp.getBody().get("pendingToken");
     }
 
     protected static ModuleGrant fullGrant(String module) {

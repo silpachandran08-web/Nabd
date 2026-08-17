@@ -21,6 +21,13 @@ import static com.nabd.hms.auth.AuthModels.Tenant;
  * TenantContext.set(tenantId) first, in the same transaction — that's what
  * actually enforces tenant isolation at the data layer (defense in depth
  * alongside the explicit tenant_id = ? filters below).
+ *
+ * Every comparison against a citext column (slug, email, mobile_phone) below casts its bound
+ * parameter with ::citext. Without it, a JDBC-bound "?" is sent as plain text, and Postgres falls
+ * back to text's case-SENSITIVE equality instead of citext's — the column being citext alone does
+ * NOT make the comparison case-insensitive. Found via the Owner login feature (which was the first
+ * code path exercised with a genuinely mixed-case value); staff/tenant lookups were already
+ * exposed to the same gap, just masked in practice by callers normalizing to lowercase first.
  */
 @Repository
 class AuthRepository {
@@ -33,7 +40,7 @@ class AuthRepository {
 
     Optional<Tenant> findTenantBySlug(String slug) {
         return jdbc.query(
-                "SELECT id, slug, status FROM tenants WHERE slug = ?",
+                "SELECT id, slug, status FROM tenants WHERE slug = ?::citext",
                 tenantMapper(), slug
         ).stream().findFirst();
     }
@@ -43,13 +50,13 @@ class AuthRepository {
                     "email_verified, mobile_verified, mfa_enabled, mfa_secret_enc ";
 
     Optional<Staff> findStaffByEmail(UUID tenantId, String email) {
-        return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND email = ?",
+        return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND email = ?::citext",
                 staffMapper(), tenantId, email
         ).stream().findFirst();
     }
 
     Optional<Staff> findStaffByMobile(UUID tenantId, String mobilePhone) {
-        return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND mobile_phone = ?",
+        return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND mobile_phone = ?::citext",
                 staffMapper(), tenantId, mobilePhone
         ).stream().findFirst();
     }
