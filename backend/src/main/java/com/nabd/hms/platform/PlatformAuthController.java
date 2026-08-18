@@ -6,6 +6,7 @@ import com.nabd.hms.auth.dto.SessionResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.platform.dto.OperatorLoginRequest;
+import com.nabd.hms.platform.dto.OperatorProfileResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -47,6 +48,11 @@ public class PlatformAuthController {
     @PostMapping("/refresh")
     public TokenPairResponse refresh(@Valid @RequestBody RefreshRequest req, HttpServletRequest http) {
         return service.refresh(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+    }
+
+    @GetMapping("/me")
+    public OperatorProfileResponse me(@AuthenticationPrincipal Jwt jwt) {
+        return service.getProfile(operatorId(jwt));
     }
 
     @PostMapping("/logout")

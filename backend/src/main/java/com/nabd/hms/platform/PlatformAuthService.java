@@ -11,6 +11,7 @@ import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.config.AuthProperties;
 import com.nabd.hms.platform.dto.OperatorLoginRequest;
+import com.nabd.hms.platform.dto.OperatorProfileResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -151,6 +152,12 @@ public class PlatformAuthService {
         log.info("operator logged out, session {}", sessionId);
     }
 
+    public OperatorProfileResponse getProfile(UUID operatorId) {
+        Operator operator = repo.findById(operatorId).orElseThrow(this::notFound);
+        return new OperatorProfileResponse(operator.id(), operator.name(), operator.email(), operator.role(),
+                PlatformPermissions.forRole(operator.role()));
+    }
+
     @Transactional
     public List<SessionResponse> listSessions(UUID operatorId, UUID currentSessionId) {
         return repo.listActiveSessions(operatorId).stream()
@@ -216,16 +223,13 @@ public class PlatformAuthService {
         Instant now = Instant.now();
         Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
-        // No "permissions" claim yet — the Surface x Role matrix (SaaS Operator Roles sheet) has no
-        // consuming endpoint anywhere in the codebase yet (Platform Console APIs are still just a
-        // design). Carrying "role" is enough for now; flattening a permissions list here would be
-        // speculative against a matrix nothing checks.
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(accessExp)
                 .subject(operator.id().toString())
                 .claim("role", operator.role())
+                .claim("permissions", PlatformPermissions.forRole(operator.role()))
                 .claim("sid", sessionId.toString())
                 .build();
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();

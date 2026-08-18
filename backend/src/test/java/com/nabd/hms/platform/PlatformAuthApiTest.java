@@ -161,6 +161,42 @@ class PlatformAuthApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    // ---- profile / permissions (NB-257) ----
+
+    @Test
+    void meReturnsProfileWithRoleScopedPermissions() {
+        SeededOperator operator = seedOperator("billing1@nabd.health", "billing", false);
+        String token = platformLoginAndGetAccessToken(operator);
+
+        ResponseEntity<Map> resp = exchange("/v1/platform/auth/me", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("role")).isEqualTo("billing");
+        assertThat((List<String>) resp.getBody().get("permissions"))
+                .containsExactlyInAnyOrder("command_centre:view", "clinics_fleet:view",
+                        "billing_revenue:view", "pricing_packaging:view");
+    }
+
+    @Test
+    void superAdminMeSeesAllFourteenSurfaces() {
+        SeededOperator operator = seedOperator("super1@nabd.health", "super_admin", false);
+        String token = platformLoginAndGetAccessToken(operator);
+
+        ResponseEntity<Map> resp = exchange("/v1/platform/auth/me", HttpMethod.GET, authed(token), Map.class);
+        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(14);
+    }
+
+    @Test
+    void accessTokenCarriesThePermissionsClaimForRole() throws Exception {
+        SeededOperator operator = seedOperator("support1@nabd.health", "support_engineer", false);
+        String token = platformLoginAndGetAccessToken(operator);
+
+        String[] parts = token.split("\\.");
+        Map<?, ?> claims = objectMapper.readValue(java.util.Base64.getUrlDecoder().decode(parts[1]), Map.class);
+        assertThat((List<String>) claims.get("permissions"))
+                .containsExactlyInAnyOrder("command_centre:view", "clinics_fleet:view", "tenant_detail:view",
+                        "support_tickets:view", "platform_health:view", "support_access:view");
+    }
+
     // ---- MFA challenge ----
 
     @Test
