@@ -75,6 +75,9 @@ public abstract class ApiTestBase {
             st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_session_by_token_hash(text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_staff_by_invite_token_hash(text) TO " + APP_ROLE);
+            st.execute("GRANT USAGE ON SCHEMA master TO " + APP_ROLE);
+            st.execute("GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA master TO " + APP_ROLE);
+            st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA master TO " + APP_ROLE);
         } catch (SQLException e) {
             throw new IllegalStateException("failed to bootstrap nabd_app role", e);
         }
@@ -142,6 +145,9 @@ public abstract class ApiTestBase {
     protected record SeededBrand(UUID id, UUID ownerId, String name) {
     }
 
+    protected record SeededOperator(UUID id, String email) {
+    }
+
     protected record SeededStaff(UUID id, UUID tenantId, String slug, String email, UUID roleId) {
     }
 
@@ -206,6 +212,26 @@ public abstract class ApiTestBase {
             throw new IllegalStateException("seeded owner login failed: " + resp.getStatusCode() + " " + resp.getBody());
         }
         return (String) resp.getBody().get("pendingToken");
+    }
+
+    // master.operators/sessions/login_attempts carry no RLS either (see V7 migration) — plain inserts.
+
+    protected SeededOperator seedOperator(String email, String role, boolean mfaEnabled) {
+        UUID id = UUID.randomUUID();
+        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET) : null;
+        jdbc.update("INSERT INTO master.operators (id, name, email, pin_hash, role, status, mfa_enabled, mfa_secret_enc) " +
+                        "VALUES (?,?,?,?,?,'active',?,?)",
+                id, "Test Operator", email, pinEncoder.encode(STAFF_PIN), role, mfaEnabled, mfaSecretEnc);
+        return new SeededOperator(id, email);
+    }
+
+    protected String platformLoginAndGetAccessToken(SeededOperator operator) {
+        ResponseEntity<Map> resp = http.postForEntity(url("/v1/platform/auth/login"), jsonBody(Map.of(
+                "email", operator.email(), "pin", STAFF_PIN)), Map.class);
+        if (resp.getStatusCode() != HttpStatus.OK) {
+            throw new IllegalStateException("seeded operator login failed: " + resp.getStatusCode() + " " + resp.getBody());
+        }
+        return (String) resp.getBody().get("accessToken");
     }
 
     protected static ModuleGrant fullGrant(String module) {

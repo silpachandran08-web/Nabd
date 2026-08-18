@@ -80,7 +80,10 @@ public class SecurityConfig {
                                 "/v1/auth/mfa/verify",
                                 "/v1/auth/refresh",
                                 "/v1/staff/invitations/*/accept",
-                                "/v1/owners/auth/login"
+                                "/v1/owners/auth/login",
+                                "/v1/platform/auth/login",
+                                "/v1/platform/auth/mfa/verify",
+                                "/v1/platform/auth/refresh"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
