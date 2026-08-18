@@ -71,7 +71,7 @@ public abstract class ApiTestBase {
              Statement st = c.createStatement()) {
             st.execute("CREATE ROLE " + APP_ROLE + " LOGIN PASSWORD '" + APP_ROLE_PW + "'");
             st.execute("GRANT USAGE ON SCHEMA public TO " + APP_ROLE);
-            st.execute("GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO " + APP_ROLE);
+            st.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO " + APP_ROLE);
             st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_session_by_token_hash(text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_staff_by_invite_token_hash(text) TO " + APP_ROLE);

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
@@ -18,8 +19,9 @@ import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
  * Executes exactly one provisioning step, in its own transaction, called through the Spring proxy
  * from {@link ProvisioningService} (never self-invoked — a self-call would silently skip @Transactional).
  * A step that fails rolls back everything it did this attempt — no half-created owner/brand/tenant
- * row survives a failed create_tenant step, which is also most of what NB-259's "no half-created
- * tenant" rollback guarantee needs; NB-259 still owns marking the *job* rolled_back on top of this.
+ * row survives a failed create_tenant step. {@link #undo} is the separate, job-level compensation
+ * NB-259 adds on top: when a LATER step fails fatally, it undoes the effects of every step that had
+ * already committed in an earlier, separate transaction.
  */
 @Service
 class ProvisioningStepRunner {
@@ -59,13 +61,70 @@ class ProvisioningStepRunner {
         }
     }
 
+    /** Compensates a step that already committed 'done' in an earlier transaction. Called in reverse step order. */
+    @Transactional
+    void undo(Job job, String stepName) {
+        switch (stepName) {
+            case "seed_masters" -> undoSeedMasters(job);
+            case "create_tenant" -> undoCreateTenant(job);
+            case "migrate_schema", "provision_whatsapp", "verify_invite_owner", "go_live" -> {
+                // nothing persisted by run() for these steps — see the comments there
+            }
+            default -> throw new IllegalStateException("unknown provisioning step " + stepName);
+        }
+    }
+
+    private void undoSeedMasters(Job job) {
+        UUID tenantId = job.createdTenantId();
+        if (tenantId == null) {
+            return;
+        }
+        tenantContext.set(tenantId);
+        repo.deleteBuiltInRole(tenantId);
+    }
+
+    /** Reverse FK order of createTenant: tenant (child of brand) before brand (child of owner) before owner. */
+    private void undoCreateTenant(Job job) {
+        // Clear the job's own FKs first — provisioning_jobs.created_*_id references these rows,
+        // so they can't be deleted while this job still points at them.
+        repo.setJobCreatedRefs(job.id(), null, null, null);
+        if (job.createdTenantId() != null) {
+            repo.deleteTenant(job.createdTenantId());
+        }
+        if (job.brandNewlyCreated() && job.createdBrandId() != null) {
+            repo.deleteBrand(job.createdBrandId());
+        }
+        if (job.ownerNewlyCreated() && job.createdOwnerId() != null) {
+            repo.deleteOwner(job.createdOwnerId());
+        }
+        log.info("provisioning job {} rolled back create_tenant (tenant {}, owner-newly-created={}, brand-newly-created={})",
+                job.id(), job.createdTenantId(), job.ownerNewlyCreated(), job.brandNewlyCreated());
+    }
+
     private void createTenant(Job job) {
-        UUID ownerId = repo.findOwnerByEmail(job.ownerEmail())
-                .orElseGet(() -> repo.insertOwner(job.ownerName(), job.ownerEmail()));
-        UUID brandId = repo.findBrandByOwnerAndName(ownerId, job.brandName())
-                .orElseGet(() -> repo.insertBrand(ownerId, job.brandName()));
+        Optional<UUID> existingOwner = repo.findOwnerByEmail(job.ownerEmail());
+        boolean ownerIsNew = existingOwner.isEmpty();
+        UUID ownerId = existingOwner.orElseGet(() -> repo.insertOwner(job.ownerName(), job.ownerEmail()));
+
+        // NB-002's region lock is irreversible and owner-wide: an owner's first clinic sets the
+        // region, every clinic after that must match. A brand-new owner has no prior region to
+        // conflict with. This must fail before anything is inserted, not after — see FatalProvisioningException.
+        if (!ownerIsNew) {
+            repo.findAnyRegionForOwner(ownerId).ifPresent(existingRegion -> {
+                if (!existingRegion.equals(job.region())) {
+                    throw new FatalProvisioningException("Owner already has a clinic in region " + existingRegion +
+                            "; cannot provision a new clinic in region " + job.region() + " for the same owner.");
+                }
+            });
+        }
+
+        Optional<UUID> existingBrand = repo.findBrandByOwnerAndName(ownerId, job.brandName());
+        boolean brandIsNew = existingBrand.isEmpty();
+        UUID brandId = existingBrand.orElseGet(() -> repo.insertBrand(ownerId, job.brandName()));
+
         UUID tenantId = repo.insertTenant(job.tenantSlug(), job.tenantName(), job.region(), brandId);
         repo.setJobCreatedRefs(job.id(), tenantId, ownerId, brandId);
+        repo.setJobCreationFlags(job.id(), ownerIsNew, brandIsNew);
         log.info("provisioning job {} created tenant {} (owner {}, brand {})", job.id(), tenantId, ownerId, brandId);
     }
 

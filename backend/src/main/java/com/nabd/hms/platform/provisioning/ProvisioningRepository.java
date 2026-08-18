@@ -24,7 +24,8 @@ class ProvisioningRepository {
 
     private static final String JOB_COLUMNS =
             "id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, brand_name, " +
-                    "status, created_tenant_id, created_owner_id, created_brand_id ";
+                    "status, created_tenant_id, created_owner_id, created_brand_id, " +
+                    "owner_newly_created, brand_newly_created ";
 
     void insertJob(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
                    String ownerEmail, String ownerName, String brandName) {
@@ -82,6 +83,11 @@ class ProvisioningRepository {
                 tenantId, ownerId, brandId, jobId);
     }
 
+    void setJobCreationFlags(UUID jobId, boolean ownerNewlyCreated, boolean brandNewlyCreated) {
+        jdbc.update("UPDATE master.provisioning_jobs SET owner_newly_created = ?, brand_newly_created = ? WHERE id = ?",
+                ownerNewlyCreated, brandNewlyCreated, jobId);
+    }
+
     void markStepRunning(UUID stepId) {
         jdbc.update("UPDATE master.provisioning_job_steps SET status = 'running', started_at = now(), error_detail = NULL WHERE id = ?", stepId);
     }
@@ -95,6 +101,10 @@ class ProvisioningRepository {
                 errorDetail, stepId);
     }
 
+    void markStepRolledBack(UUID stepId) {
+        jdbc.update("UPDATE master.provisioning_job_steps SET status = 'rolled_back' WHERE id = ?", stepId);
+    }
+
     // ---- owner/brand/tenant creation (public schema) — the provisioning flow V6's migration left for later ----
 
     Optional<UUID> findOwnerByEmail(String email) {
@@ -106,6 +116,13 @@ class ProvisioningRepository {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO owners (id, name, email, status) VALUES (?,?,?,'active')", id, name, email);
         return id;
+    }
+
+    /** Any one existing region tells us the owner's region lock (NB-002) — an owner never spans regions. */
+    Optional<String> findAnyRegionForOwner(UUID ownerId) {
+        return jdbc.query("SELECT t.region FROM tenants t JOIN brands b ON t.brand_id = b.id WHERE b.owner_id = ? LIMIT 1",
+                (rs, i) -> rs.getString("region"), ownerId
+        ).stream().findFirst();
     }
 
     Optional<UUID> findBrandByOwnerAndName(UUID ownerId, String name) {
@@ -140,6 +157,24 @@ class ProvisioningRepository {
         return count != null && count > 0;
     }
 
+    // ---- rollback (NB-259) — reverse of the creates above, same FK-ordering constraints ----
+
+    void deleteBuiltInRole(UUID tenantId) {
+        jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND built_in = true", tenantId);
+    }
+
+    void deleteTenant(UUID tenantId) {
+        jdbc.update("DELETE FROM tenants WHERE id = ?", tenantId);
+    }
+
+    void deleteBrand(UUID brandId) {
+        jdbc.update("DELETE FROM brands WHERE id = ?", brandId);
+    }
+
+    void deleteOwner(UUID ownerId) {
+        jdbc.update("DELETE FROM owners WHERE id = ?", ownerId);
+    }
+
     private RowMapper<Job> jobMapper() {
         return (rs, i) -> new Job(
                 UUID.fromString(rs.getString("id")),
@@ -153,7 +188,9 @@ class ProvisioningRepository {
                 rs.getString("status"),
                 uuidOrNull(rs.getString("created_tenant_id")),
                 uuidOrNull(rs.getString("created_owner_id")),
-                uuidOrNull(rs.getString("created_brand_id")));
+                uuidOrNull(rs.getString("created_brand_id")),
+                rs.getBoolean("owner_newly_created"),
+                rs.getBoolean("brand_newly_created"));
     }
 
     private RowMapper<JobStep> stepMapper() {

@@ -85,9 +85,32 @@ public class ProvisioningService {
         } catch (Exception e) {
             log.warn("provisioning job {} step {} failed", jobId, next.stepName(), e);
             repo.markStepFailed(next.id(), summarize(e));
-            repo.updateJobStatus(jobId, "failed");
+            if (e instanceof FatalProvisioningException) {
+                rollback(jobId, job);
+            } else {
+                repo.updateJobStatus(jobId, "failed"); // ordinary/transient failure — stays retryable via advance()
+            }
         }
         return toResponse(jobId);
+    }
+
+    /**
+     * A fatal failure (one retrying can never fix, e.g. the region lock) undoes every step that had
+     * already committed 'done' — in reverse step order, since seed_masters' role row is a child of
+     * create_tenant's tenant row and must go first. The step that actually failed stays 'failed';
+     * only the steps whose completed work gets undone become 'rolled_back'.
+     */
+    private void rollback(UUID jobId, Job job) {
+        List<JobStep> steps = repo.findSteps(jobId);
+        for (int i = steps.size() - 1; i >= 0; i--) {
+            JobStep step = steps.get(i);
+            if ("done".equals(step.status())) {
+                stepRunner.undo(job, step.stepName());
+                repo.markStepRolledBack(step.id());
+            }
+        }
+        repo.updateJobStatus(jobId, "rolled_back");
+        log.warn("provisioning job {} rolled back after a fatal failure", jobId);
     }
 
     private String summarize(Exception e) {

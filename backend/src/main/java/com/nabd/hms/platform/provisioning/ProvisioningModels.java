@@ -10,7 +10,8 @@ final class ProvisioningModels {
 
     record Job(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
                String ownerEmail, String ownerName, String brandName, String status,
-               UUID createdTenantId, UUID createdOwnerId, UUID createdBrandId) {
+               UUID createdTenantId, UUID createdOwnerId, UUID createdBrandId,
+               boolean ownerNewlyCreated, boolean brandNewlyCreated) {
     }
 
     record JobStep(UUID id, UUID jobId, String stepName, int stepOrder, String status,

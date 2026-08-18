@@ -2,6 +2,7 @@ package com.nabd.hms.platform.provisioning;
 
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,9 +11,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ProvisioningJobApiTest extends ApiTestBase {
+
+    @Autowired
+    private ProvisioningRepository provisioningRepo;
+    @Autowired
+    private ProvisioningStepRunner stepRunner;
 
     @Test
     void onlySuperAdminOrImplementationCanCreateAJob() {
@@ -120,6 +127,95 @@ class ProvisioningJobApiTest extends ApiTestBase {
         assertThat(steps.get(1).get("status")).isEqualTo("queued"); // migrate_schema never started
     }
 
+    // ---- NB-259: fatal failures roll back automatically, no half-created tenant ----
+
+    @Test
+    void aRegionMismatchForAnExistingOwnerRollsBackWithNoTenantCreated() {
+        String token = superAdminToken();
+        String ownerEmail = "region-owner@nabd.health";
+
+        UUID firstJob = createJob(token, "clinic-region-in", ownerEmail, "IN");
+        for (int i = 0; i < 6; i++) {
+            exchange("/v1/platform/provisioning-jobs/" + firstJob + "/advance", HttpMethod.POST, authed(token), Map.class);
+        }
+        ResponseEntity<Map> firstDone = exchange("/v1/platform/provisioning-jobs/" + firstJob, HttpMethod.GET, authed(token), Map.class);
+        assertThat(firstDone.getBody().get("status")).isEqualTo("done");
+
+        UUID secondJob = createJob(token, "clinic-region-ksa", ownerEmail, "KSA"); // same owner, different region
+        ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs/" + secondJob + "/advance",
+                HttpMethod.POST, authed(token), Map.class);
+
+        assertThat(resp.getBody().get("status")).isEqualTo("rolled_back");
+        assertThat(resp.getBody().get("createdTenantId")).isNull();
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) resp.getBody().get("steps");
+        assertThat(steps.get(0).get("status")).isEqualTo("failed");
+        assertThat(steps.get(0).get("errorDetail")).asString().contains("region");
+
+        Integer tenantCount = jdbc.queryForObject(
+                "SELECT count(*) FROM tenants WHERE slug = ?::citext", Integer.class, "clinic-region-ksa");
+        assertThat(tenantCount).isEqualTo(0);
+    }
+
+    /**
+     * The only fatal check today (the region lock) always fires on create_tenant, the very first
+     * step, so no real job ever reaches rollback with an earlier step already 'done' to undo. This
+     * exercises that exact path directly against the step runner — the same mechanism a future
+     * second fatal check on a later step would rely on — rather than leaving it unverified.
+     */
+    @Test
+    void undoingASeededTenantRemovesTheRoleTenantBrandAndOwnerItCreated() {
+        String token = superAdminToken();
+        UUID jobId = createJob(token, "clinic-undo", "undo-owner@nabd.health", "IN");
+        exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance", HttpMethod.POST, authed(token), Map.class); // create_tenant
+        exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance", HttpMethod.POST, authed(token), Map.class); // migrate_schema
+        exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance", HttpMethod.POST, authed(token), Map.class); // seed_masters
+
+        Job job = provisioningRepo.findJob(jobId).orElseThrow();
+        assertThat(job.createdTenantId()).isNotNull();
+        assertThat(job.ownerNewlyCreated()).isTrue();
+        assertThat(job.brandNewlyCreated()).isTrue();
+        UUID tenantId = job.createdTenantId();
+        UUID ownerId = job.createdOwnerId();
+        UUID brandId = job.createdBrandId();
+
+        stepRunner.undo(job, "seed_masters");
+        stepRunner.undo(job, "create_tenant");
+
+        Integer tenantCount = jdbc.queryForObject("SELECT count(*) FROM tenants WHERE id = ?", Integer.class, tenantId);
+        Integer brandCount = jdbc.queryForObject("SELECT count(*) FROM brands WHERE id = ?", Integer.class, brandId);
+        Integer ownerCount = jdbc.queryForObject("SELECT count(*) FROM owners WHERE id = ?", Integer.class, ownerId);
+        assertThat(tenantCount).isEqualTo(0);
+        assertThat(brandCount).isEqualTo(0);
+        assertThat(ownerCount).isEqualTo(0);
+    }
+
+    @Test
+    void undoingCreateTenantNeverDeletesAPreExistingOwnerOrBrand() {
+        String token = superAdminToken();
+        String sharedEmail = "shared-owner@nabd.health";
+
+        UUID firstJob = createJob(token, "clinic-shared-1", sharedEmail, "IN", "Shared Brand");
+        for (int i = 0; i < 3; i++) {
+            exchange("/v1/platform/provisioning-jobs/" + firstJob + "/advance", HttpMethod.POST, authed(token), Map.class);
+        }
+        Job firstJobState = provisioningRepo.findJob(firstJob).orElseThrow();
+        UUID ownerId = firstJobState.createdOwnerId();
+
+        UUID secondJob = createJob(token, "clinic-shared-2", sharedEmail, "IN", "Shared Brand"); // same owner AND brand name -> both pre-existing
+        exchange("/v1/platform/provisioning-jobs/" + secondJob + "/advance", HttpMethod.POST, authed(token), Map.class);
+        Job secondJobState = provisioningRepo.findJob(secondJob).orElseThrow();
+        assertThat(secondJobState.ownerNewlyCreated()).isFalse();
+        assertThat(secondJobState.brandNewlyCreated()).isFalse();
+
+        stepRunner.undo(secondJobState, "create_tenant");
+
+        Integer ownerCount = jdbc.queryForObject("SELECT count(*) FROM owners WHERE id = ?", Integer.class, ownerId);
+        assertThat(ownerCount).isEqualTo(1); // the owner the first job created must survive the second job's rollback
+        Integer secondTenantCount = jdbc.queryForObject(
+                "SELECT count(*) FROM tenants WHERE slug = ?::citext", Integer.class, "clinic-shared-2");
+        assertThat(secondTenantCount).isEqualTo(0);
+    }
+
     @Test
     void listAndGetRequireTheProvisioningAuthorityToo() {
         SeededOperator sre = seedOperator("sre-prov@nabd.health", "sre", false);
@@ -129,8 +225,16 @@ class ProvisioningJobApiTest extends ApiTestBase {
     }
 
     private UUID createJob(String token, String slug) {
+        return createJob(token, slug, "owner-" + slug + "@nabd.health", "IN");
+    }
+
+    private UUID createJob(String token, String slug, String ownerEmail, String region) {
+        return createJob(token, slug, ownerEmail, region, "Test Brand " + slug);
+    }
+
+    private UUID createJob(String token, String slug, String ownerEmail, String region, String brandName) {
         ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs", HttpMethod.POST,
-                authedJsonBody(token, jobRequest(slug)), Map.class);
+                authedJsonBody(token, jobRequest(slug, ownerEmail, region, brandName)), Map.class);
         return UUID.fromString((String) resp.getBody().get("id"));
     }
 
@@ -140,13 +244,17 @@ class ProvisioningJobApiTest extends ApiTestBase {
     }
 
     private Map<String, String> jobRequest(String slug) {
+        return jobRequest(slug, "owner-" + slug + "@nabd.health", "IN", "Test Brand " + slug);
+    }
+
+    private Map<String, String> jobRequest(String slug, String ownerEmail, String region, String brandName) {
         return Map.of(
                 "tenantSlug", slug,
                 "tenantName", "Test Clinic " + slug,
-                "region", "IN",
-                "ownerEmail", "owner-" + slug + "@nabd.health",
+                "region", region,
+                "ownerEmail", ownerEmail,
                 "ownerName", "Test Owner",
-                "brandName", "Test Brand " + slug
+                "brandName", brandName
         );
     }
 }
