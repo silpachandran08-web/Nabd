@@ -9,9 +9,14 @@ final class ProvisioningModels {
     }
 
     record Job(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
-               String ownerEmail, String ownerName, String brandName, String status,
+               String ownerEmail, String ownerName, String brandName, String status, String path,
                UUID createdTenantId, UUID createdOwnerId, UUID createdBrandId,
-               boolean ownerNewlyCreated, boolean brandNewlyCreated) {
+               boolean ownerNewlyCreated, boolean brandNewlyCreated,
+               Instant approvedAt, UUID approvedBy) {
+
+        boolean isGatedAndUnapproved() {
+            return "enterprise".equals(path) && approvedAt == null;
+        }
     }
 
     record JobStep(UUID id, UUID jobId, String stepName, int stepOrder, String status,

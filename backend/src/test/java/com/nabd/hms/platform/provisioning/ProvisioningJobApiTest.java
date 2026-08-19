@@ -216,6 +216,75 @@ class ProvisioningJobApiTest extends ApiTestBase {
         assertThat(secondTenantCount).isEqualTo(0);
     }
 
+    // ---- NB-260: self-serve vs enterprise paths — same engine, only the gate differs ----
+
+    @Test
+    void anEnterpriseJobDoesNotAdvanceUntilApproved() {
+        String token = superAdminToken();
+        UUID jobId = createEnterpriseJob(token, "clinic-ent-1");
+
+        ResponseEntity<Map> stillQueued = exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance",
+                HttpMethod.POST, authed(token), Map.class);
+        assertThat(stillQueued.getBody().get("status")).isEqualTo("queued");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) stillQueued.getBody().get("steps");
+        assertThat(steps).allMatch(s -> "queued".equals(s.get("status"))); // nothing ran — the gate held
+    }
+
+    @Test
+    void approvingAnEnterpriseJobLetsItRunToCompletion() {
+        String token = superAdminToken();
+        UUID jobId = createEnterpriseJob(token, "clinic-ent-2");
+
+        ResponseEntity<Map> approved = exchange("/v1/platform/provisioning-jobs/" + jobId + "/approve",
+                HttpMethod.POST, authed(token), Map.class);
+        assertThat(approved.getBody().get("approvedAt")).isNotNull();
+
+        Map<String, Object> body = null;
+        for (int i = 0; i < 6; i++) {
+            body = exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance", HttpMethod.POST, authed(token), Map.class).getBody();
+        }
+        assertThat(body.get("status")).isEqualTo("done");
+        assertThat(body.get("createdTenantId")).isNotNull(); // identical end state to a self-serve job (see next test)
+    }
+
+    @Test
+    void selfServeAndEnterpriseProduceIdenticalTenantStateOnceApproved() {
+        String token = superAdminToken();
+
+        UUID selfServeJob = createJob(token, "clinic-path-self");
+        Map<String, Object> selfServeResult = null;
+        for (int i = 0; i < 6; i++) {
+            selfServeResult = exchange("/v1/platform/provisioning-jobs/" + selfServeJob + "/advance", HttpMethod.POST, authed(token), Map.class).getBody();
+        }
+
+        UUID enterpriseJob = createEnterpriseJob(token, "clinic-path-ent");
+        exchange("/v1/platform/provisioning-jobs/" + enterpriseJob + "/approve", HttpMethod.POST, authed(token), Map.class);
+        Map<String, Object> enterpriseResult = null;
+        for (int i = 0; i < 6; i++) {
+            enterpriseResult = exchange("/v1/platform/provisioning-jobs/" + enterpriseJob + "/advance", HttpMethod.POST, authed(token), Map.class).getBody();
+        }
+
+        assertThat(enterpriseResult.get("status")).isEqualTo(selfServeResult.get("status")).isEqualTo("done");
+        List<Map<String, Object>> selfServeSteps = (List<Map<String, Object>>) selfServeResult.get("steps");
+        List<Map<String, Object>> enterpriseSteps = (List<Map<String, Object>>) enterpriseResult.get("steps");
+        assertThat(enterpriseSteps.stream().map(s -> s.get("status")).toList())
+                .isEqualTo(selfServeSteps.stream().map(s -> s.get("status")).toList());
+
+        UUID enterpriseTenantId = UUID.fromString((String) enterpriseResult.get("createdTenantId"));
+        String tenantStatus = jdbc.queryForObject("SELECT status FROM tenants WHERE id = ?", String.class, enterpriseTenantId);
+        assertThat(tenantStatus).isEqualTo("trial"); // same tenant state a self-serve job produces
+    }
+
+    @Test
+    void approvingASelfServeJobIsRejected() {
+        String token = superAdminToken();
+        UUID jobId = createJob(token, "clinic-self-approve");
+
+        ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs/" + jobId + "/approve",
+                HttpMethod.POST, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     @Test
     void listAndGetRequireTheProvisioningAuthorityToo() {
         SeededOperator sre = seedOperator("sre-prov@nabd.health", "sre", false);
@@ -238,6 +307,13 @@ class ProvisioningJobApiTest extends ApiTestBase {
         return UUID.fromString((String) resp.getBody().get("id"));
     }
 
+    private UUID createEnterpriseJob(String token, String slug) {
+        ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs", HttpMethod.POST,
+                authedJsonBody(token, jobRequest(slug, "owner-" + slug + "@nabd.health", "IN", "Test Brand " + slug, "enterprise")),
+                Map.class);
+        return UUID.fromString((String) resp.getBody().get("id"));
+    }
+
     private String superAdminToken() {
         SeededOperator operator = seedOperator("super-prov-" + UUID.randomUUID() + "@nabd.health", "super_admin", false);
         return platformLoginAndGetAccessToken(operator);
@@ -248,13 +324,18 @@ class ProvisioningJobApiTest extends ApiTestBase {
     }
 
     private Map<String, String> jobRequest(String slug, String ownerEmail, String region, String brandName) {
+        return jobRequest(slug, ownerEmail, region, brandName, "self_serve");
+    }
+
+    private Map<String, String> jobRequest(String slug, String ownerEmail, String region, String brandName, String path) {
         return Map.of(
                 "tenantSlug", slug,
                 "tenantName", "Test Clinic " + slug,
                 "region", region,
                 "ownerEmail", ownerEmail,
                 "ownerName", "Test Owner",
-                "brandName", brandName
+                "brandName", brandName,
+                "path", path
         );
     }
 }

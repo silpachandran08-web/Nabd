@@ -24,15 +24,24 @@ class ProvisioningRepository {
 
     private static final String JOB_COLUMNS =
             "id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, brand_name, " +
-                    "status, created_tenant_id, created_owner_id, created_brand_id, " +
-                    "owner_newly_created, brand_newly_created ";
+                    "status, path, created_tenant_id, created_owner_id, created_brand_id, " +
+                    "owner_newly_created, brand_newly_created, approved_at, approved_by ";
 
     void insertJob(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
-                   String ownerEmail, String ownerName, String brandName) {
+                   String ownerEmail, String ownerName, String brandName, String path) {
         jdbc.update("INSERT INTO master.provisioning_jobs " +
-                        "(id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, brand_name) " +
-                        "VALUES (?,?,?,?,?,?,?,?)",
-                id, requestedBy, tenantSlug, tenantName, region, ownerEmail, ownerName, brandName);
+                        "(id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, brand_name, path) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?)",
+                id, requestedBy, tenantSlug, tenantName, region, ownerEmail, ownerName, brandName, path);
+    }
+
+    /** Only meaningful for an enterprise-path job — self-serve jobs have nothing to gate. */
+    boolean approveJob(UUID jobId, UUID approvedBy) {
+        int rows = jdbc.update(
+                "UPDATE master.provisioning_jobs SET approved_at = now(), approved_by = ? " +
+                        "WHERE id = ? AND path = 'enterprise' AND approved_at IS NULL",
+                approvedBy, jobId);
+        return rows == 1;
     }
 
     void insertStep(UUID id, UUID jobId, String stepName, int stepOrder) {
@@ -176,21 +185,27 @@ class ProvisioningRepository {
     }
 
     private RowMapper<Job> jobMapper() {
-        return (rs, i) -> new Job(
-                UUID.fromString(rs.getString("id")),
-                UUID.fromString(rs.getString("requested_by")),
-                rs.getString("tenant_slug"),
-                rs.getString("tenant_name"),
-                rs.getString("region"),
-                rs.getString("owner_email"),
-                rs.getString("owner_name"),
-                rs.getString("brand_name"),
-                rs.getString("status"),
-                uuidOrNull(rs.getString("created_tenant_id")),
-                uuidOrNull(rs.getString("created_owner_id")),
-                uuidOrNull(rs.getString("created_brand_id")),
-                rs.getBoolean("owner_newly_created"),
-                rs.getBoolean("brand_newly_created"));
+        return (rs, i) -> {
+            Timestamp approvedAt = rs.getTimestamp("approved_at");
+            return new Job(
+                    UUID.fromString(rs.getString("id")),
+                    UUID.fromString(rs.getString("requested_by")),
+                    rs.getString("tenant_slug"),
+                    rs.getString("tenant_name"),
+                    rs.getString("region"),
+                    rs.getString("owner_email"),
+                    rs.getString("owner_name"),
+                    rs.getString("brand_name"),
+                    rs.getString("status"),
+                    rs.getString("path"),
+                    uuidOrNull(rs.getString("created_tenant_id")),
+                    uuidOrNull(rs.getString("created_owner_id")),
+                    uuidOrNull(rs.getString("created_brand_id")),
+                    rs.getBoolean("owner_newly_created"),
+                    rs.getBoolean("brand_newly_created"),
+                    approvedAt == null ? null : approvedAt.toInstant(),
+                    uuidOrNull(rs.getString("approved_by")));
+        };
     }
 
     private RowMapper<JobStep> stepMapper() {

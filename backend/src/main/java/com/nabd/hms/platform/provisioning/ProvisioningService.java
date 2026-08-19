@@ -45,11 +45,28 @@ public class ProvisioningService {
     public ProvisioningJobResponse createJob(CreateProvisioningJobRequest req, UUID requestedBy) {
         UUID jobId = UUID.randomUUID();
         repo.insertJob(jobId, requestedBy, req.tenantSlug().toLowerCase(), req.tenantName(), req.region(),
-                req.ownerEmail().toLowerCase(), req.ownerName(), req.brandName());
+                req.ownerEmail().toLowerCase(), req.ownerName(), req.brandName(), req.path());
         for (int i = 0; i < STEP_ORDER.size(); i++) {
             repo.insertStep(UUID.randomUUID(), jobId, STEP_ORDER.get(i), i + 1);
         }
-        log.info("provisioning job {} queued for tenant slug {} by operator {}", jobId, req.tenantSlug(), requestedBy);
+        log.info("provisioning job {} queued for tenant slug {} by operator {} (path {})",
+                jobId, req.tenantSlug(), requestedBy, req.path());
+        return toResponse(jobId);
+    }
+
+    /**
+     * Both paths run through the identical step engine below (SSA-01/SCS-01) — this is the only
+     * place they differ. Self-serve has no gate, so isGatedAndUnapproved() is always false for it.
+     */
+    public ProvisioningJobResponse approve(UUID jobId, UUID approvedBy) {
+        Job job = repo.findJob(jobId).orElseThrow(this::notFound);
+        if (!"enterprise".equals(job.path())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "not-enterprise-path", "Not an enterprise-path job",
+                    "Only enterprise-path jobs require approval; this job has no gate to approve.");
+        }
+        if (repo.approveJob(jobId, approvedBy)) {
+            log.info("provisioning job {} approved by operator {}", jobId, approvedBy);
+        }
         return toResponse(jobId);
     }
 
@@ -67,6 +84,9 @@ public class ProvisioningService {
     /** Runs the next incomplete step (a queued first attempt, or a retry of the step that last failed). Idempotent once done. */
     public ProvisioningJobResponse advance(UUID jobId) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
+        if (job.isGatedAndUnapproved()) {
+            return toResponse(jobId); // enterprise job awaiting approval — same no-op idiom as "already done"
+        }
         JobStep next = repo.findNextIncompleteStep(jobId).orElse(null);
         if (next == null) {
             return toResponse(jobId); // every step already done
@@ -127,7 +147,7 @@ public class ProvisioningService {
                         s.startedAt(), s.completedAt(), s.errorDetail()))
                 .toList();
         return new ProvisioningJobResponse(job.id(), job.tenantSlug(), job.tenantName(), job.region(),
-                job.status(), job.createdTenantId(), steps);
+                job.status(), job.path(), job.approvedAt(), job.createdTenantId(), steps);
     }
 
     private ApiException notFound() {

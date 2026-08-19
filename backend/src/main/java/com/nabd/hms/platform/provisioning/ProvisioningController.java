@@ -55,4 +55,9 @@ public class ProvisioningController {
     public ProvisioningJobResponse advance(@PathVariable UUID id) {
         return service.advance(id);
     }
+
+    @PostMapping("/{id}/approve")
+    public ProvisioningJobResponse approve(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return service.approve(id, UUID.fromString(jwt.getSubject()));
+    }
 }
