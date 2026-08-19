@@ -149,7 +149,7 @@ class ProvisioningRepository {
     /** Unique on slug — callers must translate the resulting DuplicateKeyException into a readable step failure. */
     UUID insertTenant(String slug, String name, String region, UUID brandId) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO tenants (id, slug, name, region, status, brand_id) VALUES (?,?,?,?,'trial',?)",
+        jdbc.update("INSERT INTO tenants (id, slug, name, region, status, brand_id) VALUES (?,?,?,?,'provisioning',?)",
                 id, slug, name, region, brandId);
         return id;
     }

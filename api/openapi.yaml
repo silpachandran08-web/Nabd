@@ -911,7 +911,7 @@ components:
         name: { type: string }
         slug: { type: string }
         region: { type: string, enum: [IN, KSA] }
-        status: { type: string, enum: [trial, active, suspended, offboarded] }
+        status: { type: string, enum: [provisioning, trialing, active, overdue, suspended, offboarding, offboarded] }
 
     BrandWorkspace:
       type: object
@@ -1021,7 +1021,7 @@ components:
         name: { type: string }
         region: { type: string, enum: [IN, KSA] }
         plan: { type: string }
-        status: { type: string, enum: [trial, active, suspended, offboarded] }
+        status: { type: string, enum: [provisioning, trialing, active, overdue, suspended, offboarding, offboarded] }
 
     BranchWrite:
       type: object

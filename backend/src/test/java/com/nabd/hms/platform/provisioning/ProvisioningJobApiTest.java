@@ -67,7 +67,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
 
         UUID tenantId = UUID.fromString((String) body.get("createdTenantId"));
         String status = jdbc.queryForObject("SELECT status FROM tenants WHERE id = ?", String.class, tenantId);
-        assertThat(status).isEqualTo("trial");
+        assertThat(status).isEqualTo("trialing");
         Integer roleCount = inTenantTx(tenantId, () -> jdbc.queryForObject(
                 "SELECT count(*) FROM roles WHERE tenant_id = ? AND built_in = true", Integer.class, tenantId));
         assertThat(roleCount).isEqualTo(1);
@@ -272,7 +272,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
 
         UUID enterpriseTenantId = UUID.fromString((String) enterpriseResult.get("createdTenantId"));
         String tenantStatus = jdbc.queryForObject("SELECT status FROM tenants WHERE id = ?", String.class, enterpriseTenantId);
-        assertThat(tenantStatus).isEqualTo("trial"); // same tenant state a self-serve job produces
+        assertThat(tenantStatus).isEqualTo("trialing"); // same tenant state a self-serve job produces
     }
 
     @Test

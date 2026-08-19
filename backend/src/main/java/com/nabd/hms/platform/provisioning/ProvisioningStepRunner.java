@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WabaProvisioningGateway;
+import com.nabd.hms.platform.tenant.TenantLifecycleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -32,13 +33,16 @@ class ProvisioningStepRunner {
     private final TenantContext tenantContext;
     private final WabaProvisioningGateway wabaGateway;
     private final ObjectMapper objectMapper;
+    private final TenantLifecycleService lifecycleService;
 
     ProvisioningStepRunner(ProvisioningRepository repo, TenantContext tenantContext,
-                            WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper) {
+                            WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
+                            TenantLifecycleService lifecycleService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.wabaGateway = wabaGateway;
         this.objectMapper = objectMapper;
+        this.lifecycleService = lifecycleService;
     }
 
     @Transactional
@@ -53,10 +57,7 @@ class ProvisioningStepRunner {
             case "seed_masters" -> seedMasters(job);
             case "provision_whatsapp" -> wabaGateway.provisionNumber(job.tenantSlug());
             case "verify_invite_owner" -> inviteOwner(job);
-            case "go_live" -> {
-                // Final checkpoint only: the tenant has been usable in 'trial' status since
-                // create_tenant. Promoting past 'trial' is NB-261's tenant-lifecycle job, not this one's.
-            }
+            case "go_live" -> goLive(job);
             default -> throw new IllegalStateException("unknown provisioning step " + stepName);
         }
     }
@@ -67,8 +68,14 @@ class ProvisioningStepRunner {
         switch (stepName) {
             case "seed_masters" -> undoSeedMasters(job);
             case "create_tenant" -> undoCreateTenant(job);
-            case "migrate_schema", "provision_whatsapp", "verify_invite_owner", "go_live" -> {
+            case "migrate_schema", "provision_whatsapp", "verify_invite_owner" -> {
                 // nothing persisted by run() for these steps — see the comments there
+            }
+            case "go_live" -> {
+                // go_live is structurally the last step — nothing can fail after it to trigger an
+                // undo of it, and its own transition() call already self-rolls-back on failure like
+                // every other step. tenant_lifecycle_events also cascades on tenant deletion (V11),
+                // so undoCreateTenant deleting the tenant can never hit an FK violation from this.
             }
             default -> throw new IllegalStateException("unknown provisioning step " + stepName);
         }
@@ -148,6 +155,14 @@ class ProvisioningStepRunner {
     private void inviteOwner(Job job) {
         // ponytail: logs instead of sending — no owner-invite channel (email/WhatsApp) built yet.
         log.info("[MOCK OWNER INVITE] would invite {} <{}> to tenant {}", job.ownerName(), job.ownerEmail(), job.tenantSlug());
+    }
+
+    private void goLive(Job job) {
+        UUID tenantId = job.createdTenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("go_live ran before create_tenant recorded a tenant id");
+        }
+        lifecycleService.transition(tenantId, "trialing", job.requestedBy(), "provisioning completed");
     }
 
     private static ModuleGrant fullGrant(String module) {
