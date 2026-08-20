@@ -21,6 +21,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/
 // no button" rule extends to "no page yet, no link yet" for the rest.
 const SURFACES: { permission: string; label: string; href: string }[] = [
   { permission: "clinics_fleet:view", label: "Clinic fleet", href: "/platform/fleet" },
+  { permission: "support_tickets:view", label: "Support tickets", href: "/platform/support" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
