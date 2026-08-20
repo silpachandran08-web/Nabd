@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import styles from "../../login/login.module.css";
 
 // Matches POST /v1/platform/auth/login's oneOf response and RFC 7807 Problem errors.
@@ -15,6 +16,7 @@ type Problem = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function PlatformLoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
@@ -22,13 +24,11 @@ export default function PlatformLoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tokens, setTokens] = useState<TokenPair | null>(null);
 
   function handleTokens(pair: TokenPair) {
-    // ponytail: no platform console exists yet to redirect into, so this is where the trail ends for now.
     localStorage.setItem("nabd_platform_access_token", pair.accessToken);
     localStorage.setItem("nabd_platform_refresh_token", pair.refreshToken);
-    setTokens(pair);
+    router.replace("/platform");
   }
 
   async function submitLogin(e: FormEvent) {
@@ -96,17 +96,6 @@ export default function PlatformLoginPage() {
     // 401 deliberately stays this generic — the backend gives the same shape for
     // unknown email and wrong PIN alike, so the UI must not narrow it further.
     setFormError(problem.detail || "Invalid credentials.");
-  }
-
-  if (tokens) {
-    return (
-      <main className={styles.page}>
-        <div className={styles.card}>
-          <h1 className={styles.title}>Signed in</h1>
-          <p className={styles.success}>Access token acquired. Nothing to land on yet.</p>
-        </div>
-      </main>
-    );
   }
 
   if (challenge) {
