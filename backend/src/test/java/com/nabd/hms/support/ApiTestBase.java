@@ -81,6 +81,7 @@ public abstract class ApiTestBase {
             st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_session_by_token_hash(text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_staff_by_invite_token_hash(text) TO " + APP_ROLE);
+            st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,bigint,int) TO " + APP_ROLE);
             st.execute("GRANT USAGE ON SCHEMA master TO " + APP_ROLE);
             st.execute("GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA master TO " + APP_ROLE);
             st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA master TO " + APP_ROLE);

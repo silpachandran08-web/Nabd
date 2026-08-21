@@ -23,6 +23,7 @@ const SURFACES: { permission: string; label: string; href: string }[] = [
   { permission: "clinics_fleet:view", label: "Clinic fleet", href: "/platform/fleet" },
   { permission: "support_tickets:view", label: "Support tickets", href: "/platform/support" },
   { permission: "support_access:view", label: "Support access", href: "/platform/access" },
+  { permission: "audit_compliance:view", label: "Audit log", href: "/platform/audit" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
