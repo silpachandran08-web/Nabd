@@ -22,6 +22,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/
 const SURFACES: { permission: string; label: string; href: string }[] = [
   { permission: "clinics_fleet:view", label: "Clinic fleet", href: "/platform/fleet" },
   { permission: "support_tickets:view", label: "Support tickets", href: "/platform/support" },
+  { permission: "support_access:view", label: "Support access", href: "/platform/access" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
