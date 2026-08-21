@@ -66,6 +66,12 @@ public abstract class ApiTestBase {
         bootstrapAppRole();
     }
 
+    /** Postgres superuser connection — for the rare test that needs to bypass nabd_app's grants
+     * entirely (e.g. simulating a direct-DB tamper nabd_app itself is structurally unable to do). */
+    protected static Connection superuserConnection() throws SQLException {
+        return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+    }
+
     private static void bootstrapAppRole() {
         try (Connection c = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              Statement st = c.createStatement()) {
