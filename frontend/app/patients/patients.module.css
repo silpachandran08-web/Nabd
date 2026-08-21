@@ -303,6 +303,33 @@
   border-bottom: 1px solid var(--nb-border-subtle);
 }
 
+.dueBanner {
+  background: rgba(240, 175, 69, 0.14);
+  border: 1px solid rgba(240, 175, 69, 0.3);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  margin-bottom: var(--nb-space-16);
+}
+
+.dueList {
+  margin-top: var(--nb-space-8);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dueRow {
+  display: flex;
+  gap: var(--nb-space-12);
+  font-size: 13px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.dueRow:hover {
+  text-decoration: underline;
+}
+
 .numberingToggle {
   display: flex;
   gap: var(--nb-space-8);

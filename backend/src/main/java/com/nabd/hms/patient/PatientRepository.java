@@ -79,6 +79,15 @@ class PatientRepository {
                 String.class, tenantId, patientId);
     }
 
+    /** NB-077: same narrow local-query pattern as findActiveAllergySubstances — chronic_conditions
+     * is owned by com.nabd.hms.clinical, this is just the one column the drawer needs. */
+    List<String> findActiveConditionNames(UUID tenantId, UUID patientId) {
+        return jdbc.queryForList(
+                "SELECT condition FROM chronic_conditions WHERE tenant_id = ? AND patient_id = ? AND status = 'active' " +
+                        "ORDER BY recorded_at DESC",
+                String.class, tenantId, patientId);
+    }
+
     boolean existsActive(UUID tenantId, UUID id) {
         Boolean exists = jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ? AND status = 'active')",

@@ -18,6 +18,13 @@ type Problem = { title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const POLL_MS = 15_000;
+// NB-143: a small fixed reason-code catalogue for this one call site — not NB-011's generic
+// shared reason-code service (doesn't exist), same "skip the generic service" trick used all
+// session for NB-008/NB-010.
+const PRIORITY_REASON_CODES = [
+  "Chest pain / cardiac symptoms", "Breathing difficulty", "Severe bleeding",
+  "High fever in infant", "Post-operative complication", "Severe pain", "Other",
+] as const;
 
 const STATUS_CLASS: Record<string, string> = {
   checked_in: styles.pillWaiting,
@@ -68,6 +75,11 @@ export default function ArrivalsPage() {
   const [vitalsForm, setVitalsForm] = useState({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
   const [vitalsError, setVitalsError] = useState<string | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
+
+  const [priorityEntryId, setPriorityEntryId] = useState<string | null>(null);
+  const [priorityReasonCode, setPriorityReasonCode] = useState<string>(PRIORITY_REASON_CODES[0]);
+  const [priorityOtherReason, setPriorityOtherReason] = useState("");
+  const [prioritySubmitting, setPrioritySubmitting] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [patientQuery, setPatientQuery] = useState("");
@@ -272,11 +284,27 @@ export default function ArrivalsPage() {
     }
   }
 
-  async function markPriority(id: string) {
-    const reason = window.prompt("Why does this patient need priority?");
+  function openPriorityModal(id: string) {
+    setPriorityEntryId(id);
+    setPriorityReasonCode(PRIORITY_REASON_CODES[0]);
+    setPriorityOtherReason("");
+  }
+
+  async function submitPriority(e: React.FormEvent) {
+    e.preventDefault();
+    if (!priorityEntryId) return;
+    const reason = priorityReasonCode === "Other" ? priorityOtherReason.trim() : priorityReasonCode;
     if (!reason) return;
-    const res = await authedFetch(`/queue/${id}/reorder`, { method: "POST", body: JSON.stringify({ priority: true, reason }) });
-    if (res?.ok) load();
+    setPrioritySubmitting(true);
+    try {
+      const res = await authedFetch(`/queue/${priorityEntryId}/reorder`, { method: "POST", body: JSON.stringify({ priority: true, reason }) });
+      if (res?.ok) {
+        setPriorityEntryId(null);
+        load();
+      }
+    } finally {
+      setPrioritySubmitting(false);
+    }
   }
 
   const filtered = tab === "all" ? rows : rows.filter((r) => bucketOf(r.status) === tab);
@@ -339,7 +367,7 @@ export default function ArrivalsPage() {
                           <td><span className={`${styles.pill} ${STATUS_CLASS[r.status] ?? ""}`}>{r.status.replace("_", " ")}</span></td>
                           <td>
                             {!r.priority && b === "waiting" && (
-                              <button className={styles.actionBtn} onClick={() => markPriority(r.id)}>Mark priority</button>
+                              <button className={styles.actionBtn} onClick={() => openPriorityModal(r.id)}>Mark priority</button>
                             )}
                             {r.status === "vitals_pending" && (
                               <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Record vitals</button>
@@ -478,6 +506,35 @@ export default function ArrivalsPage() {
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={() => setVitalsEntryId(null)}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save vitals"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {priorityEntryId && (
+        <div className={styles.overlay} onClick={() => setPriorityEntryId(null)}>
+          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitPriority}>
+            <h2 className={styles.modalTitle}>Mark priority</h2>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="priorityReason">Reason</label>
+              <select id="priorityReason" className={styles.select} value={priorityReasonCode}
+                onChange={(e) => setPriorityReasonCode(e.target.value)}>
+                {PRIORITY_REASON_CODES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            {priorityReasonCode === "Other" && (
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="priorityOther">Specify</label>
+                <input id="priorityOther" className={styles.input} value={priorityOtherReason}
+                  onChange={(e) => setPriorityOtherReason(e.target.value)} />
+              </div>
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setPriorityEntryId(null)}>Cancel</button>
+              <button type="submit" className={styles.submitBtn}
+                disabled={prioritySubmitting || (priorityReasonCode === "Other" && !priorityOtherReason.trim())}>
+                {prioritySubmitting ? "Saving…" : "Mark priority"}
+              </button>
             </div>
           </form>
         </div>

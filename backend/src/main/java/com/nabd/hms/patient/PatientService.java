@@ -104,7 +104,8 @@ public class PatientService {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         PatientRow row = repo.findVisibleById(tenantId, id, scopedToDoctorId).orElseThrow(this::notFound);
-        return toDetailResponse(row, repo.findLastVisitAt(tenantId, id).orElse(null), repo.findActiveAllergySubstances(tenantId, id));
+        return toDetailResponse(row, repo.findLastVisitAt(tenantId, id).orElse(null), repo.findActiveAllergySubstances(tenantId, id),
+                repo.findActiveConditionNames(tenantId, id));
     }
 
     @Transactional
@@ -141,7 +142,7 @@ public class PatientService {
         log.info("patient {} merged into {} by {} (tenant {})", req.duplicatePatientId(), survivorId, callerStaffId, tenantId);
         PatientRow row = repo.findById(tenantId, survivorId).orElseThrow(this::notFound);
         return toDetailResponse(row, repo.findLastVisitAt(tenantId, survivorId).orElse(null),
-                repo.findActiveAllergySubstances(tenantId, survivorId));
+                repo.findActiveAllergySubstances(tenantId, survivorId), repo.findActiveConditionNames(tenantId, survivorId));
     }
 
     /** Reverses a merge — only within the 30-day window (NB-072). */
@@ -201,9 +202,10 @@ public class PatientService {
         return new PatientResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(), row.status());
     }
 
-    private PatientDetailResponse toDetailResponse(PatientRow row, java.time.Instant lastVisitAt, List<String> allergies) {
+    private PatientDetailResponse toDetailResponse(PatientRow row, java.time.Instant lastVisitAt, List<String> allergies,
+                                                     List<String> chronicConditions) {
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
-                row.status(), allergies, List.of(), 0, 0.0, lastVisitAt);
+                row.status(), allergies, chronicConditions, 0, 0.0, lastVisitAt);
     }
 
     private ApiException notFound() {

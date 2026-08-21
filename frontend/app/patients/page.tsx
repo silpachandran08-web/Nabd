@@ -15,6 +15,8 @@ type PatientDetail = Patient & {
   lastVisitAt: string | null;
 };
 type Allergy = { id: string; substance: string; severity: string; reaction: string | null; active: boolean };
+type Condition = { id: string; condition: string; status: string; reviewDueDate: string | null };
+type DueCondition = { id: string; patientId: string; patientName: string; condition: string; reviewDueDate: string };
 type PrescriptionItem = { id: string; drugName: string; dosage: string | null; frequency: string | null; duration: string | null };
 type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
 type Encounter = { queueEntryId: string; occurredAt: string; diagnosis: string | null; assessment: string | null; medications: string | null };
@@ -72,6 +74,12 @@ export default function PatientsPage() {
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   const [newAllergy, setNewAllergy] = useState({ substance: "", severity: "moderate", reaction: "" });
   const [allergyBusy, setAllergyBusy] = useState(false);
+
+  const [conditions, setConditions] = useState<Condition[]>([]);
+  const [newCondition, setNewCondition] = useState({ condition: "", reviewDueDate: "" });
+  const [conditionBusy, setConditionBusy] = useState(false);
+  const [dueConditions, setDueConditions] = useState<DueCondition[]>([]);
+  const [showDue, setShowDue] = useState(false);
 
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [timeline, setTimeline] = useState<Encounter[]>([]);
@@ -147,11 +155,20 @@ export default function PatientsPage() {
     void Promise.resolve().then(() => load(""));
   }, [load]);
 
+  useEffect(() => {
+    void Promise.resolve().then(async () => {
+      const res = await authedFetch("/clinical/conditions/due");
+      if (res?.ok) setDueConditions(await res.json());
+    });
+  }, [authedFetch]);
+
   async function openDrawer(id: string) {
     setDrawerError(null);
     setDrawerPatient(null);
     setDrawerTab("overview");
     setAllergies([]);
+    setConditions([]);
+    setNewCondition({ condition: "", reviewDueDate: "" });
     setPrescriptions([]);
     setTimeline([]);
     setChart([]);
@@ -167,6 +184,7 @@ export default function PatientsPage() {
     }
     setDrawerPatient(await res.json());
     refreshAllergies(id);
+    refreshConditions(id);
 
     const rxRes = await authedFetch(`/clinical/patients/${id}/prescriptions`);
     if (rxRes?.ok) setPrescriptions(await rxRes.json());
@@ -211,6 +229,44 @@ export default function PatientsPage() {
       refreshAllergies(drawerPatient.id);
       const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
       if (pRes?.ok) setDrawerPatient(await pRes.json());
+    }
+  }
+
+  async function refreshConditions(patientId: string) {
+    const res = await authedFetch(`/clinical/patients/${patientId}/conditions`);
+    if (res?.ok) setConditions(await res.json());
+  }
+
+  async function addCondition() {
+    if (!drawerPatient || !newCondition.condition.trim()) return;
+    setConditionBusy(true);
+    try {
+      const res = await authedFetch(`/clinical/patients/${drawerPatient.id}/conditions`, {
+        method: "POST",
+        body: JSON.stringify({ condition: newCondition.condition, reviewDueDate: newCondition.reviewDueDate || null }),
+      });
+      if (res?.ok) {
+        setNewCondition({ condition: "", reviewDueDate: "" });
+        refreshConditions(drawerPatient.id);
+        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
+        if (pRes?.ok) setDrawerPatient(await pRes.json());
+        const dueRes = await authedFetch("/clinical/conditions/due");
+        if (dueRes?.ok) setDueConditions(await dueRes.json());
+      }
+    } finally {
+      setConditionBusy(false);
+    }
+  }
+
+  async function resolveCondition(id: string) {
+    if (!drawerPatient) return;
+    const res = await authedFetch(`/clinical/conditions/${id}/resolve`, { method: "PATCH" });
+    if (res?.ok) {
+      refreshConditions(drawerPatient.id);
+      const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
+      if (pRes?.ok) setDrawerPatient(await pRes.json());
+      const dueRes = await authedFetch("/clinical/conditions/due");
+      if (dueRes?.ok) setDueConditions(await dueRes.json());
     }
   }
 
@@ -295,6 +351,25 @@ export default function PatientsPage() {
           <p className={styles.subtitle}>Search the clinic&apos;s patient directory.</p>
         </div>
       </div>
+
+      {!forbidden && dueConditions.length > 0 && (
+        <div className={styles.dueBanner}>
+          <button className={styles.linkBtn} onClick={() => setShowDue((v) => !v)}>
+            {showDue ? "Hide" : "Show"} {dueConditions.length} chronic review{dueConditions.length === 1 ? "" : "s"} due
+          </button>
+          {showDue && (
+            <div className={styles.dueList}>
+              {dueConditions.map((d) => (
+                <div key={d.id} className={styles.dueRow} onClick={() => openDrawer(d.patientId)}>
+                  <span className={styles.patientName}>{d.patientName}</span>
+                  <span>{d.condition}</span>
+                  <span className={styles.muted}>due {new Date(d.reviewDueDate).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {!forbidden && (
         <form className={styles.searchBar} onSubmit={(e) => { e.preventDefault(); load(q); }}>
@@ -466,8 +541,22 @@ export default function PatientsPage() {
 
                 <div className={styles.section}>
                   <div className={styles.sectionLabel}>Chronic conditions</div>
-                  <div className={styles.sectionValue}>
-                    {drawerPatient.chronicConditions.length === 0 ? <span className={styles.muted}>None recorded</span> : drawerPatient.chronicConditions.join(", ")}
+                  {conditions.length === 0 ? (
+                    <div className={styles.muted}>None recorded</div>
+                  ) : (
+                    conditions.map((c) => (
+                      <div key={c.id} className={styles.allergyRow}>
+                        <span>{c.condition}{c.reviewDueDate ? ` · review due ${new Date(c.reviewDueDate).toLocaleDateString()}` : ""}</span>
+                        <button className={styles.linkBtn} onClick={() => resolveCondition(c.id)}>Resolve</button>
+                      </div>
+                    ))
+                  )}
+                  <div className={styles.allergyForm}>
+                    <input className={styles.smallInput} placeholder="Condition" value={newCondition.condition}
+                      onChange={(e) => setNewCondition((p) => ({ ...p, condition: e.target.value }))} />
+                    <input className={styles.smallInput} type="date" value={newCondition.reviewDueDate}
+                      onChange={(e) => setNewCondition((p) => ({ ...p, reviewDueDate: e.target.value }))} />
+                    <button className={styles.linkBtn} disabled={conditionBusy || !newCondition.condition.trim()} onClick={addCondition}>Add</button>
                   </div>
                 </div>
 
