@@ -22,6 +22,7 @@ tags:
   - name: Staff
   - name: Roles
   - name: Tenants
+  - name: Setup
   - name: Patients
   - name: Queue
   - name: Audit
@@ -469,6 +470,258 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/BranchWrite" } } }
       responses:
         "201": { description: "Branch", content: { application/json: { schema: { $ref: "#/components/schemas/Branch" } } } }
+
+  # --------------------------------------------------------------- Setup
+  /setup/checklist:
+    get:
+      tags: [Setup]
+      summary: Clinic setup wizard checklist
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Checklist items", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/SetupChecklistItem" } } } } }
+
+  /setup/checklist/{step}/skip:
+    post:
+      tags: [Setup]
+      summary: Mark a wizard step as skipped
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SetupProgressUpdate" } } }
+      responses:
+        "204": { description: "Step skipped" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /setup/checklist/{step}/complete:
+    post:
+      tags: [Setup]
+      summary: Mark a wizard step as done
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SetupProgressUpdate" } } }
+      responses:
+        "204": { description: "Step completed" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /setup/profile:
+    get:
+      tags: [Setup]
+      summary: Clinic profile
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Clinic profile", content: { application/json: { schema: { $ref: "#/components/schemas/ClinicProfile" } } } }
+    patch:
+      tags: [Setup]
+      summary: Update clinic profile
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ClinicProfileWrite" } } }
+      responses:
+        "200": { description: "Updated clinic profile", content: { application/json: { schema: { $ref: "#/components/schemas/ClinicProfile" } } } }
+
+  /setup/charges:
+    get:
+      tags: [Setup]
+      summary: Charge head / price master list
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Charge catalogue", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ChargeHead" } } } } }
+    post:
+      tags: [Setup]
+      summary: Add a charge head
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ChargeHeadWrite" } } }
+      responses:
+        "201": { description: "Created charge head", content: { application/json: { schema: { $ref: "#/components/schemas/ChargeHead" } } } }
+
+  /setup/charges/{id}:
+    patch:
+      tags: [Setup]
+      summary: Update a charge head
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ChargeHeadWrite" } } }
+      responses:
+        "200": { description: "Updated charge head", content: { application/json: { schema: { $ref: "#/components/schemas/ChargeHead" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /setup/policies:
+    get:
+      tags: [Setup]
+      summary: Simple policy settings
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Policies", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Policy" } } } } }
+
+  /setup/policies/{key}:
+    patch:
+      tags: [Setup]
+      summary: Update a policy value
+      x-required-permission: setup:edit
+      parameters: [{ name: key, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PolicyWrite" } } }
+      responses:
+        "200": { description: "Updated policy", content: { application/json: { schema: { $ref: "#/components/schemas/Policy" } } } }
+
+  /setup/consent-contact:
+    get:
+      tags: [Setup]
+      summary: Consent & privacy notice contact
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Consent contact", content: { application/json: { schema: { $ref: "#/components/schemas/ConsentContact" } } } }
+    patch:
+      tags: [Setup]
+      summary: Update consent & privacy notice contact
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ConsentContactWrite" } } }
+      responses:
+        "200": { description: "Updated consent contact", content: { application/json: { schema: { $ref: "#/components/schemas/ConsentContact" } } } }
+
+  /setup/holidays:
+    get:
+      tags: [Setup]
+      summary: Clinic-wide holidays
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Holidays", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ClinicHoliday" } } } } }
+    post:
+      tags: [Setup]
+      summary: Add a clinic holiday
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ClinicHolidayWrite" } } }
+      responses:
+        "201": { description: "Created holiday", content: { application/json: { schema: { $ref: "#/components/schemas/ClinicHoliday" } } } }
+
+  /setup/holidays/{id}:
+    delete:
+      tags: [Setup]
+      summary: Delete a clinic holiday
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Deleted" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /setup/shifts:
+    get:
+      tags: [Setup]
+      summary: Staff shift patterns
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Shifts", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/StaffShift" } } } } }
+    post:
+      tags: [Setup]
+      summary: Add a staff shift pattern
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StaffShiftWrite" } } }
+      responses:
+        "201": { description: "Created shift", content: { application/json: { schema: { $ref: "#/components/schemas/StaffShift" } } } }
+
+  /setup/payroll-export:
+    get:
+      tags: [Setup]
+      summary: Simple payroll export rows
+      x-required-permission: setup:view
+      parameters: [{ name: month, in: query, schema: { type: string, example: "2026-07" } }]
+      responses:
+        "200": { description: "Payroll rows", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PayrollExportRow" } } } } }
+
+  /setup/subscription:
+    get:
+      tags: [Setup]
+      summary: Tenant subscription & plan self-service summary
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Subscription summary", content: { application/json: { schema: { $ref: "#/components/schemas/SubscriptionSummary" } } } }
+
+  /setup/import-jobs:
+    get:
+      tags: [Setup]
+      summary: List recent import jobs
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Import jobs", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ImportJob" } } } } }
+    post:
+      tags: [Setup]
+      summary: Create a self-serve import job
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ImportJobRequest" } } }
+      responses:
+        "201": { description: "Created import job", content: { application/json: { schema: { $ref: "#/components/schemas/ImportJob" } } } }
+
+  /setup/export-jobs:
+    get:
+      tags: [Setup]
+      summary: List recent export jobs
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Export jobs", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ExportJob" } } } } }
+    post:
+      tags: [Setup]
+      summary: Create a self-serve export job
+      x-required-permission: setup:view
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ExportJobRequest" } } }
+      responses:
+        "201": { description: "Created export job", content: { application/json: { schema: { $ref: "#/components/schemas/ExportJob" } } } }
+
+  /setup/licences:
+    get:
+      tags: [Setup]
+      summary: Facility & clinician licence registry
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Licences", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Licence" } } } } }
+    post:
+      tags: [Setup]
+      summary: Add a licence
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LicenceWrite" } } }
+      responses:
+        "201": { description: "Created licence", content: { application/json: { schema: { $ref: "#/components/schemas/Licence" } } } }
+
+  /setup/licences/{id}:
+    patch:
+      tags: [Setup]
+      summary: Update a licence
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/LicenceWrite" } } }
+      responses:
+        "200": { description: "Updated licence", content: { application/json: { schema: { $ref: "#/components/schemas/Licence" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /setup/staff:
+    get:
+      tags: [Setup]
+      summary: Active staff list helper for shift/licence forms
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Active staff", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/StaffSummary" } } } } }
 
   # ------------------------------------------------------------ Patients
   /patients:
@@ -1160,3 +1413,229 @@ components:
         resourceId: { type: string }
         before: { type: object, additionalProperties: true, nullable: true }
         after: { type: object, additionalProperties: true, nullable: true }
+
+    SetupChecklistItem:
+      type: object
+      properties:
+        step: { type: string, enum: [welcome, profile, tax, doctors, schedule, charges, pharmacy, whatsapp, go_live] }
+        status: { type: string, enum: [pending, skipped, done] }
+        skippedAt: { type: [string, "null"], format: date-time }
+        doneAt: { type: [string, "null"], format: date-time }
+
+    SetupProgressUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [skipped, done] }
+
+    ClinicProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        region: { type: string, enum: [IN, KSA] }
+        timezone: { type: string }
+        taxId: { type: [string, "null"] }
+        taxIdType: { type: [string, "null"], enum: [GSTIN, VAT] }
+        whatsappNumber: { type: [string, "null"] }
+        specialties: { type: array, items: { type: string } }
+        status: { type: string }
+        setupCompletedAt: { type: [string, "null"], format: date-time }
+
+    ClinicProfileWrite:
+      type: object
+      required: [name, timezone]
+      properties:
+        name: { type: string }
+        timezone: { type: string }
+        taxIdType: { type: [string, "null"], enum: [GSTIN, VAT] }
+        taxId: { type: [string, "null"] }
+        whatsappNumber: { type: [string, "null"] }
+        specialties: { type: array, items: { type: string } }
+
+    ChargeHead:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        baseAmount: { type: number }
+        followUpAmount: { type: [number, "null"] }
+        emergencyAmount: { type: [number, "null"] }
+        taxCode: { type: [string, "null"] }
+        doctorOverride: { type: boolean }
+        active: { type: boolean }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: [string, "null"], format: date }
+        displayOrder: { type: integer }
+
+    ChargeHeadWrite:
+      type: object
+      required: [code, name, category, baseAmount, effectiveFrom]
+      properties:
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        baseAmount: { type: number, minimum: 0 }
+        followUpAmount: { type: [number, "null"], minimum: 0 }
+        emergencyAmount: { type: [number, "null"], minimum: 0 }
+        taxCode: { type: [string, "null"] }
+        doctorOverride: { type: boolean, default: false }
+        active: { type: boolean, default: true }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: [string, "null"], format: date }
+        displayOrder: { type: integer, default: 0 }
+
+    Policy:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        policyKey: { type: string }
+        value: { type: string }
+        version: { type: integer }
+
+    PolicyWrite:
+      type: object
+      required: [value]
+      properties:
+        value: { type: string }
+
+    ConsentContact:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string }
+        phone: { type: [string, "null"] }
+
+    ConsentContactWrite:
+      type: object
+      required: [name, email]
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: [string, "null"] }
+
+    ClinicHoliday:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        holidayDate: { type: string, format: date }
+        name: { type: string }
+        recurring: { type: boolean }
+
+    ClinicHolidayWrite:
+      type: object
+      required: [holidayDate, name]
+      properties:
+        holidayDate: { type: string, format: date }
+        name: { type: string }
+        recurring: { type: boolean, default: false }
+
+    StaffShift:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        staffId: { type: string, format: uuid }
+        staffName: { type: [string, "null"] }
+        patternJson: { type: string }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: [string, "null"], format: date }
+
+    StaffShiftWrite:
+      type: object
+      required: [staffId, patternJson, effectiveFrom]
+      properties:
+        staffId: { type: string, format: uuid }
+        patternJson: { type: string }
+        effectiveFrom: { type: string, format: date }
+        effectiveTo: { type: [string, "null"], format: date }
+
+    PayrollExportRow:
+      type: object
+      properties:
+        staffId: { type: string, format: uuid }
+        staffName: { type: string }
+        role: { type: string }
+        days: { type: integer }
+        hours: { type: number }
+        salary: { type: number }
+        notes: { type: string }
+
+    SubscriptionSummary:
+      type: object
+      properties:
+        plan: { type: string }
+        status: { type: string }
+        activePatientsUsed: { type: integer }
+        activePatientsLimit: { type: integer }
+        whatsappMessagesUsed: { type: integer }
+        whatsappMessagesLimit: { type: integer }
+        branchesUsed: { type: integer }
+        branchesLimit: { type: integer }
+
+    ImportJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        importType: { type: string, enum: [patients, appointments, invoices, charges] }
+        fileName: { type: string }
+        status: { type: string, enum: [pending, validating, importing, done, failed] }
+        resultUrl: { type: [string, "null"] }
+        errorMessage: { type: [string, "null"] }
+        createdAt: { type: [string, "null"], format: date-time }
+
+    ImportJobRequest:
+      type: object
+      required: [importType, fileName]
+      properties:
+        importType: { type: string, enum: [patients, appointments, invoices, charges] }
+        fileName: { type: string }
+
+    ExportJob:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        exportType: { type: string, enum: [full_tenant, patients, invoices, charges] }
+        status: { type: string, enum: [pending, running, done, failed] }
+        resultUrl: { type: [string, "null"] }
+        errorMessage: { type: [string, "null"] }
+        createdAt: { type: [string, "null"], format: date-time }
+
+    ExportJobRequest:
+      type: object
+      required: [exportType]
+      properties:
+        exportType: { type: string, enum: [full_tenant, patients, invoices, charges] }
+
+    Licence:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        licenceType: { type: string, enum: [clinician, facility] }
+        holderId: { type: [string, "null"], format: uuid }
+        holderName: { type: [string, "null"] }
+        number: { type: string }
+        issuingBody: { type: [string, "null"] }
+        expiryDate: { type: string, format: date }
+        region: { type: string, enum: [IN, KSA] }
+        status: { type: string, enum: [valid, expiring_soon, expired] }
+
+    LicenceWrite:
+      type: object
+      required: [licenceType, number, expiryDate, region]
+      properties:
+        licenceType: { type: string, enum: [clinician, facility] }
+        holderId: { type: [string, "null"], format: uuid }
+        holderName: { type: [string, "null"] }
+        number: { type: string }
+        issuingBody: { type: [string, "null"] }
+        expiryDate: { type: string, format: date }
+        region: { type: string, enum: [IN, KSA] }
+
+    StaffSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        roleName: { type: string }

@@ -245,9 +245,9 @@ public abstract class ApiTestBase {
         return new ModuleGrant(module, true, true, true, true, true, true, true);
     }
 
-    /** Owner-style role: full grants on staff/patients/queue, matching every @PreAuthorize in the controllers. */
+    /** Owner-style role: full grants on staff/patients/queue/setup, matching every @PreAuthorize in the controllers. */
     protected UUID seedFullAccessRole(UUID tenantId) {
-        return seedRole(tenantId, "Owner", true, fullGrant("staff"), fullGrant("patients"), fullGrant("queue"));
+        return seedRole(tenantId, "Owner", true, fullGrant("staff"), fullGrant("patients"), fullGrant("queue"), fullGrant("setup"));
     }
 
     protected UUID seedRole(UUID tenantId, String name, boolean builtIn, ModuleGrant... grants) {
