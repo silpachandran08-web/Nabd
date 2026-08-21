@@ -51,6 +51,7 @@ public class AppointmentService {
     @Transactional
     public AppointmentResponse book(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req) {
         tenantContext.set(tenantId);
+        requireNotHoliday(tenantId, req.startTime());
         enforceSessionCapacity(req.doctorId(), req.startTime());
         int slotMinutes = resolveSlotMinutes(req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
@@ -100,6 +101,7 @@ public class AppointmentService {
     public AppointmentResponse reschedule(UUID tenantId, UUID callerStaffId, UUID id, RescheduleRequest req) {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
+        requireNotHoliday(tenantId, req.newStartTime());
 
         repo.cancel(tenantId, id, "rescheduled");
         enforceSessionCapacity(current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot
@@ -133,6 +135,15 @@ public class AppointmentService {
         return scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time)
                 .map(WorkingHoursRow::slotMinutes)
                 .orElse(DEFAULT_SLOT_MINUTES);
+    }
+
+    /** NB-092: shared by book() and reschedule() — both routes to booking a slot go through here. */
+    private void requireNotHoliday(UUID tenantId, Instant start) {
+        LocalDate date = start.atZone(ZoneOffset.UTC).toLocalDate();
+        if (scheduleRepo.isClinicHoliday(tenantId, date)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "clinic-holiday", "Clinic closed",
+                    "The clinic is closed on " + date + ".");
+        }
     }
 
     /**

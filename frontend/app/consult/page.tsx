@@ -13,7 +13,7 @@ type QueueEntry = {
 type Row = QueueEntry & { patientName: string };
 type PatientDetail = {
   id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string;
-  allergies: string[]; chronicConditions: string[]; activePackages: number; outstandingBalance: number; lastVisitAt: string | null;
+  allergies: string[]; chronicConditions: string[]; activePackages: number; outstandingBalance?: number; lastVisitAt: string | null;
 };
 type Note = {
   id: string; queueEntryId: string; patientId: string; doctorId: string;

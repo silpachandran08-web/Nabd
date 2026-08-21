@@ -136,7 +136,7 @@ public class StaffService {
     public CallerInfo getCallerInfo(UUID tenantId, UUID staffId) {
         tenantContext.set(tenantId);
         StaffRow row = staffRepo.findById(tenantId, staffId).orElseThrow(this::notFound);
-        return new CallerInfo(row.scope(), row.emailVerified(), row.mobileVerified());
+        return new CallerInfo(row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants());
     }
 
     private StaffResponse toResponse(StaffRow row) {

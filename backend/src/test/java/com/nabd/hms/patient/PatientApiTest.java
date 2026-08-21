@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -132,6 +133,27 @@ class PatientApiTest extends ApiTestBase {
 
         ResponseEntity<Map> resp = exchange("/v1/patients/" + UUID.randomUUID(), HttpMethod.GET, authed(token), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    /** NB-052: a restricted custom field grant (not including "financial") makes outstandingBalance
+     * genuinely absent from the JSON — not present-but-zero, not merely hidden client-side. */
+    @Test
+    void restrictedFieldGrantOmitsOutstandingBalanceFromTheResponse() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff owner = seedStaff(tenant, roleId, "owner7b@a.com", "+919300000011", false);
+        SeededStaff restricted = seedStaff(tenant, roleId, "restricted1@a.com", "+919300000012", false);
+        String ownerToken = loginAndGetAccessToken(owner);
+        exchange("/v1/staff/" + restricted.id(), HttpMethod.PATCH, authedJsonBody(ownerToken, Map.of(
+                "fieldGrants", List.of("vitals"))), Map.class);
+        String patientId = registerPatient(ownerToken, "FieldGrant1", "+919888800011");
+
+        String restrictedToken = loginAndGetAccessToken(restricted);
+        ResponseEntity<Map> restrictedView = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(restrictedToken), Map.class);
+        assertThat(restrictedView.getBody()).doesNotContainKey("outstandingBalance");
+
+        ResponseEntity<Map> ownerView = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(ownerToken), Map.class);
+        assertThat(ownerView.getBody()).containsKey("outstandingBalance");
     }
 
     /** NB-074: lastVisitAt is real now — derived from a queue entry that actually reached 'completed'. */

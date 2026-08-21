@@ -27,6 +27,19 @@ class ScheduleRepository {
         this.jdbc = jdbc;
     }
 
+    /** NB-092: clinic_holidays already existed (CRUD via com.nabd.hms.setup) but nothing in
+     * scheduling ever consulted it — a holiday blocked nothing. recurring=true matches by
+     * month+day across any year (e.g. a fixed public holiday); non-recurring matches the exact date. */
+    boolean isClinicHoliday(UUID tenantId, LocalDate date) {
+        Boolean exists = jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM clinic_holidays WHERE tenant_id = ? AND (" +
+                        "  (NOT recurring AND holiday_date = ?) OR " +
+                        "  (recurring AND EXTRACT(MONTH FROM holiday_date) = ? AND EXTRACT(DAY FROM holiday_date) = ?)" +
+                        "))",
+                Boolean.class, tenantId, Date.valueOf(date), date.getMonthValue(), date.getDayOfMonth());
+        return Boolean.TRUE.equals(exists);
+    }
+
     List<WorkingHoursRow> listWorkingHours(UUID doctorId) {
         return jdbc.query(
                 "SELECT id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients " +

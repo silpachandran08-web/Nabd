@@ -104,8 +104,9 @@ public class PatientService {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         PatientRow row = repo.findVisibleById(tenantId, id, scopedToDoctorId).orElseThrow(this::notFound);
+        List<String> fieldGrants = staffService.getCallerInfo(tenantId, callerStaffId).fieldGrants();
         return toDetailResponse(row, repo.findLastVisitAt(tenantId, id).orElse(null), repo.findActiveAllergySubstances(tenantId, id),
-                repo.findActiveConditionNames(tenantId, id));
+                repo.findActiveConditionNames(tenantId, id), fieldGrants);
     }
 
     @Transactional
@@ -141,8 +142,9 @@ public class PatientService {
         repo.markMerged(tenantId, req.duplicatePatientId(), survivorId, callerStaffId);
         log.info("patient {} merged into {} by {} (tenant {})", req.duplicatePatientId(), survivorId, callerStaffId, tenantId);
         PatientRow row = repo.findById(tenantId, survivorId).orElseThrow(this::notFound);
+        List<String> fieldGrants = staffService.getCallerInfo(tenantId, callerStaffId).fieldGrants();
         return toDetailResponse(row, repo.findLastVisitAt(tenantId, survivorId).orElse(null),
-                repo.findActiveAllergySubstances(tenantId, survivorId), repo.findActiveConditionNames(tenantId, survivorId));
+                repo.findActiveAllergySubstances(tenantId, survivorId), repo.findActiveConditionNames(tenantId, survivorId), fieldGrants);
     }
 
     /** Reverses a merge — only within the 30-day window (NB-072). */
@@ -202,10 +204,16 @@ public class PatientService {
         return new PatientResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(), row.status());
     }
 
+    /** NB-052: outstandingBalance (the one financial field this response carries) is omitted from
+     * the JSON entirely — not zeroed, not merely hidden — for a staff member whose field grants are
+     * a non-empty custom restriction that doesn't include "financial". An empty grants list means no
+     * custom restriction (the default: full access). */
     private PatientDetailResponse toDetailResponse(PatientRow row, java.time.Instant lastVisitAt, List<String> allergies,
-                                                     List<String> chronicConditions) {
+                                                     List<String> chronicConditions, List<String> callerFieldGrants) {
+        boolean canSeeFinancial = callerFieldGrants.isEmpty() || callerFieldGrants.contains("financial");
+        Double outstandingBalance = canSeeFinancial ? 0.0 : null;
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
-                row.status(), allergies, chronicConditions, 0, 0.0, lastVisitAt);
+                row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt);
     }
 
     private ApiException notFound() {

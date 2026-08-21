@@ -108,4 +108,33 @@ class ScheduleApiTest extends ApiTestBase {
                 HttpMethod.GET, authed(token), List.class);
         assertThat(resp.getBody()).isEmpty();
     }
+
+    /** NB-092: clinic_holidays existed (CRUD only, via com.nabd.hms.setup) but nothing in scheduling
+     * ever consulted it before this — a holiday blocked neither availability nor booking. */
+    @Test
+    void availabilityIsEmptyOnAClinicHolidayAndBookingIsRejected() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "doc6@a.com", "+919400000006", false);
+        String token = loginAndGetAccessToken(doctor);
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        exchange("/v1/doctors/" + doctor.id() + "/working-hours", HttpMethod.POST,
+                authedJsonBody(token, Map.of("dayOfWeek", pgDayOfWeek(today), "startTime", "00:00:00",
+                        "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
+        exchange("/v1/setup/holidays", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "holidayDate", today.toString(), "name", "Test Holiday", "recurring", false)), Map.class);
+
+        ResponseEntity<List> availability = exchange("/v1/doctors/" + doctor.id() + "/availability?date=" + today,
+                HttpMethod.GET, authed(token), List.class);
+        assertThat(availability.getBody()).isEmpty();
+
+        ResponseEntity<Map> patientResp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Holiday Patient", "phone", "+919400000106", "dob", "1990-01-01", "gender", "male")), Map.class);
+        String patientId = (String) patientResp.getBody().get("id");
+        ResponseEntity<Map> booking = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", doctor.id().toString(),
+                "startTime", today.atTime(10, 0).toInstant(ZoneOffset.UTC).toString())), Map.class);
+        assertThat(booking.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(booking.getBody().get("type")).asString().contains("clinic-holiday");
+    }
 }

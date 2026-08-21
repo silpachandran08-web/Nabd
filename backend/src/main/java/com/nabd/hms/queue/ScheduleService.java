@@ -76,7 +76,7 @@ public class ScheduleService {
     @Transactional
     public List<Instant> availability(UUID tenantId, UUID doctorId, LocalDate date) {
         tenantContext.set(tenantId);
-        if (repo.isOnLeave(doctorId, date)) {
+        if (repo.isClinicHoliday(tenantId, date) || repo.isOnLeave(doctorId, date)) {
             return List.of();
         }
 

@@ -11,7 +11,7 @@ type PatientDetail = Patient & {
   allergies: string[];
   chronicConditions: string[];
   activePackages: number;
-  outstandingBalance: number;
+  outstandingBalance?: number; // NB-052: omitted entirely from the response when the caller's field grants restrict financial data
   lastVisitAt: string | null;
 };
 type Allergy = { id: string; substance: string; severity: string; reaction: string | null; active: boolean };
@@ -529,10 +529,12 @@ export default function PatientsPage() {
                     <div className={styles.sectionLabel}>Active packages</div>
                     <div className={styles.sectionValue}>{drawerPatient.activePackages}</div>
                   </div>
-                  <div className={styles.section}>
-                    <div className={styles.sectionLabel}>Outstanding balance</div>
-                    <div className={styles.sectionValue}>{drawerPatient.outstandingBalance.toFixed(2)}</div>
-                  </div>
+                  {drawerPatient.outstandingBalance !== undefined && (
+                    <div className={styles.section}>
+                      <div className={styles.sectionLabel}>Outstanding balance</div>
+                      <div className={styles.sectionValue}>{drawerPatient.outstandingBalance.toFixed(2)}</div>
+                    </div>
+                  )}
                   <div className={styles.section}>
                     <div className={styles.sectionLabel}>Phone</div>
                     <div className={styles.sectionValue}>{drawerPatient.phone}</div>
