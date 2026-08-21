@@ -83,7 +83,8 @@ public class QueueService {
         }
 
         int token = repo.nextTokenNumber(req.doctorId(), today);
-        UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), today, token);
+        String source = req.source() == null ? "walk_in" : req.source();
+        UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), today, token, source);
         log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",
                 callerStaffId, token, req.doctorId(), req.appointmentId() == null ? "walk-in" : "scheduled", id);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
@@ -145,7 +146,8 @@ public class QueueService {
 
     private QueueEntryResponse toResponse(QueueEntryRow row) {
         return new QueueEntryResponse(row.id(), row.appointmentId(), row.patientId(), row.doctorId(),
-                row.queueDate(), row.tokenNumber(), row.status(), row.priority(), row.priorityReason(), row.createdAt());
+                row.queueDate(), row.tokenNumber(), row.status(), row.priority(), row.priorityReason(),
+                row.source(), row.createdAt());
     }
 
     private ApiException notFound() {

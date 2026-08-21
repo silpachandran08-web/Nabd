@@ -16,7 +16,7 @@ import static com.nabd.hms.queue.QueueModels.QueueEntryRow;
 class QueueRepository {
 
     private static final String COLUMNS =
-            "id, appointment_id, patient_id, doctor_id, queue_date, token_number, status, priority, priority_reason, created_at ";
+            "id, appointment_id, patient_id, doctor_id, queue_date, token_number, status, priority, priority_reason, source, created_at ";
 
     private final JdbcTemplate jdbc;
 
@@ -41,11 +41,11 @@ class QueueRepository {
         return (max == null ? 0 : max) + 1;
     }
 
-    UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, LocalDate queueDate, int tokenNumber) {
+    UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, LocalDate queueDate, int tokenNumber, String source) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, queue_date, token_number) " +
-                        "VALUES (?,?,?,?,?,?,?)",
-                id, tenantId, appointmentId, patientId, doctorId, Date.valueOf(queueDate), tokenNumber);
+        jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, queue_date, token_number, source) " +
+                        "VALUES (?,?,?,?,?,?,?,?)",
+                id, tenantId, appointmentId, patientId, doctorId, Date.valueOf(queueDate), tokenNumber, source);
         return id;
     }
 
@@ -88,6 +88,7 @@ class QueueRepository {
                     rs.getString("status"),
                     rs.getBoolean("priority"),
                     rs.getString("priority_reason"),
+                    rs.getString("source"),
                     rs.getTimestamp("created_at").toInstant());
         };
     }

@@ -21,6 +21,7 @@ final class QueueModels {
     }
 
     record QueueEntryRow(UUID id, UUID appointmentId, UUID patientId, UUID doctorId, LocalDate queueDate,
-                          int tokenNumber, String status, boolean priority, String priorityReason, Instant createdAt) {
+                          int tokenNumber, String status, boolean priority, String priorityReason, String source,
+                          Instant createdAt) {
     }
 }

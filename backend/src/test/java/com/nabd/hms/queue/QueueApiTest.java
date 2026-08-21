@@ -50,6 +50,30 @@ class QueueApiTest extends ApiTestBase {
         assertThat(resp.getBody().get("status")).isEqualTo("checked_in");
         assertThat(((Number) resp.getBody().get("tokenNumber")).intValue()).isGreaterThan(0);
         assertThat(resp.getBody().get("createdAt")).isNotNull(); // NB-095: arrivals board needs this for the "Wait" column
+        assertThat(resp.getBody().get("source")).isEqualTo("walk_in"); // NB-079: default when omitted
+    }
+
+    @Test
+    void checkInCapturesAnExplicitSourceAndRejectsAnUnknownOne() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner1b@a.com", "+919600000011", false);
+        String token = loginAndGetAccessToken(staff);
+        addWorkingHours(token, staff.id(), null);
+        String patientId = registerPatient(token, "Q1b", "+919999910011");
+
+        ResponseEntity<Map> resp = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", staff.id().toString(), "source", "referral")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(resp.getBody().get("source")).isEqualTo("referral");
+
+        // a distinct dob avoids NB-060's fuzzy duplicate-candidate match against "Q1b" registered above
+        ResponseEntity<Map> reg2 = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Q1c", "phone", "+919999910012", "dob", "1975-06-15", "gender", "male")), Map.class);
+        String patientId2 = (String) reg2.getBody().get("id");
+        ResponseEntity<Map> rejected = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId2, "doctorId", staff.id().toString(), "source", "billboard")), Map.class);
+        assertThat(rejected.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST); // not one of the enforced single-axis values
     }
 
     @Test
