@@ -54,10 +54,15 @@ class SetupRepository {
 
     void updateProgress(UUID tenantId, String step, String status) {
         ensureProgressSeeded(tenantId);
-        String skipped = "skipped".equals(status) ? "now()" : null;
-        String done = "done".equals(status) ? "now()" : null;
-        jdbc.update("UPDATE clinic_setup_progress SET status = ?, skipped_at = " + skipped + ", done_at = " + done + ", updated_at = now() WHERE tenant_id = ? AND step = ?",
-                status, tenantId, step);
+        jdbc.update("""
+                UPDATE clinic_setup_progress
+                SET status = ?,
+                    skipped_at = CASE WHEN ? = 'skipped' THEN now() ELSE NULL END,
+                    done_at = CASE WHEN ? = 'done' THEN now() ELSE NULL END,
+                    updated_at = now()
+                WHERE tenant_id = ? AND step = ?
+                """,
+                status, status, status, tenantId, step);
     }
 
     private void ensureProgressSeeded(UUID tenantId) {
@@ -233,18 +238,23 @@ class SetupRepository {
 
     // ── Subscription ──
 
+    // ponytail: 'plan' is a fixed placeholder, not tenants.name — there's no plan/tier column
+    // anywhere in the schema yet (that's NB-269, pricing & packaging, not built). branches_used
+    // is correlated on tenants.brand_id directly: a brand-less tenant is its own one branch
+    // (brand_id = NULL never equals anything in a subquery, so the naive join undercounts to 0).
     SubscriptionSummary getSubscription(UUID tenantId) {
         return jdbc.query(
-                "SELECT name, status, " +
+                "SELECT status, " +
                         "(SELECT count(*) FROM patients WHERE tenant_id = tenants.id AND status = 'active') AS patients_used, " +
                         "500 AS patients_limit, " +
                         "0 AS messages_used, " +
                         "3000 AS messages_limit, " +
-                        "(SELECT count(*) FROM tenants WHERE brand_id = (SELECT brand_id FROM tenants WHERE id = ?)) AS branches_used, " +
+                        "CASE WHEN brand_id IS NULL THEN 1 " +
+                        "     ELSE (SELECT count(*) FROM tenants t2 WHERE t2.brand_id = tenants.brand_id) END AS branches_used, " +
                         "1 AS branches_limit " +
                         "FROM tenants WHERE id = ?",
                 (rs, i) -> new SubscriptionSummary(
-                        rs.getString("name"),
+                        "Standard",
                         rs.getString("status"),
                         rs.getLong("patients_used"),
                         rs.getLong("patients_limit"),
@@ -252,7 +262,7 @@ class SetupRepository {
                         rs.getLong("messages_limit"),
                         rs.getLong("branches_used"),
                         rs.getLong("branches_limit")
-                ), tenantId, tenantId).stream().findFirst().orElse(null);
+                ), tenantId).stream().findFirst().orElse(null);
     }
 
     record SubscriptionSummary(String plan, String status, long patientsUsed, long patientsLimit,

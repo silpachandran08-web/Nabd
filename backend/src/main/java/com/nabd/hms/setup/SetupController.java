@@ -18,9 +18,9 @@ import com.nabd.hms.setup.dto.PayrollExportRowResponse;
 import com.nabd.hms.setup.dto.PolicyResponse;
 import com.nabd.hms.setup.dto.PolicyWriteRequest;
 import com.nabd.hms.setup.dto.SetupChecklistItemResponse;
-import com.nabd.hms.setup.dto.SetupProgressUpdateRequest;
 import com.nabd.hms.setup.dto.StaffShiftResponse;
 import com.nabd.hms.setup.dto.StaffShiftWriteRequest;
+import com.nabd.hms.setup.dto.StaffSummaryResponse;
 import com.nabd.hms.setup.dto.SubscriptionSummaryResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -59,19 +59,20 @@ public class SetupController {
         return service.getChecklist(tenantId(jwt));
     }
 
+    // status is derived from the endpoint itself, never from a request body — a call to .../skip
+    // always skips and .../complete always completes, full stop.
+
     @PostMapping("/checklist/{step}/skip")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<Void> skipStep(@AuthenticationPrincipal Jwt jwt, @PathVariable String step,
-                                          @Valid @RequestBody SetupProgressUpdateRequest req) {
-        service.updateProgress(tenantId(jwt), step, req);
+    public ResponseEntity<Void> skipStep(@AuthenticationPrincipal Jwt jwt, @PathVariable String step) {
+        service.updateProgress(tenantId(jwt), step, "skipped");
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/checklist/{step}/complete")
     @PreAuthorize("hasAuthority('setup:edit')")
-    public ResponseEntity<Void> completeStep(@AuthenticationPrincipal Jwt jwt, @PathVariable String step,
-                                              @Valid @RequestBody SetupProgressUpdateRequest req) {
-        service.updateProgress(tenantId(jwt), step, req);
+    public ResponseEntity<Void> completeStep(@AuthenticationPrincipal Jwt jwt, @PathVariable String step) {
+        service.updateProgress(tenantId(jwt), step, "done");
         return ResponseEntity.noContent().build();
     }
 
@@ -250,7 +251,7 @@ public class SetupController {
 
     @GetMapping("/staff")
     @PreAuthorize("hasAuthority('setup:view')")
-    public List<SetupModels.StaffSummaryRow> staff(@AuthenticationPrincipal Jwt jwt) {
+    public List<StaffSummaryResponse> staff(@AuthenticationPrincipal Jwt jwt) {
         return service.listStaff(tenantId(jwt));
     }
 

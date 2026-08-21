@@ -62,7 +62,9 @@ export default function SetupWizardPage() {
       if (profileRes?.ok) setProfile(await profileRes.json());
       setLoading(false);
     }
-    init();
+    // Deferred to a microtask so the effect body itself never calls setState
+    // synchronously (react-hooks/set-state-in-effect) — init does, immediately.
+    void Promise.resolve().then(init);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,7 +117,6 @@ export default function SetupWizardPage() {
   };
 
   const currentStep = STEPS[stepIndex].key;
-  const currentStatus = checklist.find((c) => c.step === currentStep)?.status ?? "pending";
 
   const renderStep = () => {
     switch (currentStep) {
@@ -258,7 +259,7 @@ export default function SetupWizardPage() {
         <button className={styles.btn} onClick={prev} disabled={stepIndex === 0}>Back</button>
         <div style={{ display: "flex", gap: "12px" }}>
           {currentStep !== "go_live" && (
-            <button className={styles.btn} onClick={() => mark("skipped")}>Skip</button>
+            <button className={styles.btn} onClick={async () => { await mark("skipped"); next(); }}>Skip</button>
           )}
           {currentStep === "profile" || currentStep === "tax" ? (
             <button className={styles.btnPrimary} onClick={saveProfile}>Save & continue</button>

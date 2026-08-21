@@ -38,6 +38,41 @@ class SetupApiTest extends ApiTestBase {
     }
 
     @Test
+    void skipEndpointAlwaysSkipsRegardlessOfRequestBody() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner@a.com", "+919400000001", false);
+        String token = loginAndGetAccessToken(staff);
+
+        // A client claiming "done" in the body must not be able to mark a step done via .../skip.
+        ResponseEntity<Void> resp = exchange("/v1/setup/checklist/tax/skip", HttpMethod.POST,
+                authedJsonBody(token, Map.of("status", "done")), Void.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        ResponseEntity<List> checklist = exchange("/v1/setup/checklist", HttpMethod.GET, authed(token), List.class);
+        List<Map<String, Object>> items = checklist.getBody();
+        assertThat(items).anyMatch(i -> "tax".equals(i.get("step")) && "skipped".equals(i.get("status")));
+    }
+
+    @Test
+    void completingGoLiveMarksSetupCompletedOnTheProfile() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner@a.com", "+919400000001", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> before = exchange("/v1/setup/profile", HttpMethod.GET, authed(token), Map.class);
+        assertThat(before.getBody().get("setupCompletedAt")).isNull();
+
+        ResponseEntity<Void> resp = exchange("/v1/setup/checklist/go_live/complete", HttpMethod.POST,
+                authed(token), Void.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        ResponseEntity<Map> after = exchange("/v1/setup/profile", HttpMethod.GET, authed(token), Map.class);
+        assertThat(after.getBody().get("setupCompletedAt")).isNotNull();
+    }
+
+    @Test
     void profileCrud() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
@@ -157,15 +192,32 @@ class SetupApiTest extends ApiTestBase {
     }
 
     @Test
-    void subscriptionSummary() {
-        SeededTenant tenant = seedTenant();
+    void subscriptionSummaryIsNotTheTenantsNameAndBrandlessTenantCountsAsOneBranch() {
+        SeededTenant tenant = seedTenant(); // no brand_id — the common case (see V6)
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "owner@a.com", "+919400000001", false);
         String token = loginAndGetAccessToken(staff);
 
         ResponseEntity<Map> resp = exchange("/v1/setup/subscription", HttpMethod.GET, authed(token), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody().get("plan")).isEqualTo("Test Clinic " + tenant.slug());
+        assertThat(resp.getBody().get("plan")).isNotEqualTo(tenant.slug()).isEqualTo("Standard");
+        assertThat(resp.getBody().get("branchesUsed")).isEqualTo(1);
+    }
+
+    @Test
+    void branchesUsedCountsSiblingsSharingABrand() {
+        SeededOwner owner = seedOwner("brand-owner@a.com");
+        SeededBrand brand = seedBrand(owner, "Multi-Clinic Brand");
+        // seedClinicInBrand already seeds its own full-access "Owner" role per tenant.
+        SeededTenant clinicA = seedClinicInBrand(brand);
+        seedClinicInBrand(brand); // sibling clinic under the same brand
+        UUID roleId = inTenantTx(clinicA.id(), () -> jdbc.queryForObject(
+                "SELECT id FROM roles WHERE tenant_id = ? AND name = 'Owner'", UUID.class, clinicA.id()));
+        SeededStaff staff = seedStaff(clinicA, roleId, "owner@a.com", "+919400000001", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> resp = exchange("/v1/setup/subscription", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getBody().get("branchesUsed")).isEqualTo(2);
     }
 
     @Test

@@ -122,7 +122,9 @@ export default function SetupPage() {
   }, [authedFetch]);
 
   useEffect(() => {
-    loadAll();
+    // Deferred to a microtask so the effect body itself never calls setState
+    // synchronously (react-hooks/set-state-in-effect) — loadAll does, immediately.
+    void Promise.resolve().then(loadAll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

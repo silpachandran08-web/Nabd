@@ -20,9 +20,9 @@ import com.nabd.hms.setup.dto.PayrollExportRowResponse;
 import com.nabd.hms.setup.dto.PolicyResponse;
 import com.nabd.hms.setup.dto.PolicyWriteRequest;
 import com.nabd.hms.setup.dto.SetupChecklistItemResponse;
-import com.nabd.hms.setup.dto.SetupProgressUpdateRequest;
 import com.nabd.hms.setup.dto.StaffShiftResponse;
 import com.nabd.hms.setup.dto.StaffShiftWriteRequest;
+import com.nabd.hms.setup.dto.StaffSummaryResponse;
 import com.nabd.hms.setup.dto.SubscriptionSummaryResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,12 +63,17 @@ public class SetupService {
         return repo.listProgress(tenantId).stream().map(this::toChecklistItem).toList();
     }
 
+    /** status is 'skipped' or 'done', always derived from which endpoint the controller called —
+     * never taken from a client-supplied body, so a request to .../skip can't actually mark done. */
     @Transactional
-    public void updateProgress(UUID tenantId, String step, SetupProgressUpdateRequest req) {
+    public void updateProgress(UUID tenantId, String step, String status) {
         tenantContext.set(tenantId);
         validateStep(step);
-        repo.updateProgress(tenantId, step, req.status());
-        log.info("setup progress {} marked {} for tenant {}", step, req.status(), tenantId);
+        repo.updateProgress(tenantId, step, status);
+        if ("go_live".equals(step) && "done".equals(status)) {
+            repo.markSetupCompleted(tenantId);
+        }
+        log.info("setup progress {} marked {} for tenant {}", step, status, tenantId);
     }
 
     @Transactional
@@ -270,9 +275,11 @@ public class SetupService {
     }
 
     @Transactional
-    public List<SetupModels.StaffSummaryRow> listStaff(UUID tenantId) {
+    public List<StaffSummaryResponse> listStaff(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listStaff(tenantId);
+        return repo.listStaff(tenantId).stream()
+                .map(r -> new StaffSummaryResponse(r.id(), r.name(), r.roleName()))
+                .toList();
     }
 
     private void validateStep(String step) {
