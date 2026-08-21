@@ -34,14 +34,15 @@ class NoteRepository {
 
     /** Insert-or-update, but a no-op once signed — returns affected rows so the caller can tell. */
     int upsert(UUID tenantId, UUID queueEntryId, UUID patientId, UUID doctorId,
-               String subjective, String objective, String assessment, String plan) {
+               String subjective, String objective, String assessment, String plan, String diagnosis) {
         return jdbc.update(
-                "INSERT INTO clinical_notes (tenant_id, queue_entry_id, patient_id, doctor_id, subjective, objective, assessment, plan) " +
-                        "VALUES (?,?,?,?,?,?,?,?) " +
+                "INSERT INTO clinical_notes (tenant_id, queue_entry_id, patient_id, doctor_id, subjective, objective, assessment, plan, diagnosis) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?) " +
                         "ON CONFLICT (queue_entry_id) DO UPDATE SET subjective = EXCLUDED.subjective, " +
-                        "  objective = EXCLUDED.objective, assessment = EXCLUDED.assessment, plan = EXCLUDED.plan " +
+                        "  objective = EXCLUDED.objective, assessment = EXCLUDED.assessment, plan = EXCLUDED.plan, " +
+                        "  diagnosis = EXCLUDED.diagnosis " +
                         "  WHERE clinical_notes.status = 'draft'",
-                tenantId, queueEntryId, patientId, doctorId, subjective, objective, assessment, plan);
+                tenantId, queueEntryId, patientId, doctorId, subjective, objective, assessment, plan, diagnosis);
     }
 
     /** Idempotent — signing an already-signed note is a no-op, not an error. */
@@ -60,6 +61,7 @@ class NoteRepository {
                 rs.getString("objective"),
                 rs.getString("assessment"),
                 rs.getString("plan"),
+                rs.getString("diagnosis"),
                 rs.getString("status"),
                 rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant());

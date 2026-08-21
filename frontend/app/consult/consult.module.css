@@ -257,6 +257,11 @@
 }
 
 .signedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--nb-space-12);
   background: var(--nb-accent-tint);
   color: var(--nb-accent-500);
   border-radius: var(--nb-radius-md);
@@ -264,4 +269,89 @@
   margin-bottom: var(--nb-space-16);
   font-size: 13px;
   font-weight: 500;
+}
+
+.followUpControls {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  font-weight: 400;
+}
+
+.followUpInput {
+  height: 30px;
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-1);
+  color: var(--nb-text-primary);
+  padding: 0 var(--nb-space-8);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.input {
+  height: 36px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: 0 var(--nb-space-12);
+  color: var(--nb-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.input:disabled {
+  color: var(--nb-text-secondary);
+  cursor: not-allowed;
+}
+
+.rxHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--nb-space-12);
+}
+
+.rxTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+}
+
+.signedTag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
+}
+
+.rxHeaderActions {
+  display: flex;
+  gap: var(--nb-space-8);
+}
+
+.rxRow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr) auto;
+  gap: var(--nb-space-8);
+  margin-bottom: var(--nb-space-8);
+  align-items: center;
+}
+
+.removeBtn {
+  background: none;
+  border: none;
+  color: var(--nb-danger-500);
+  cursor: pointer;
+  font-size: 16px;
+  font-family: inherit;
+  line-height: 1;
 }

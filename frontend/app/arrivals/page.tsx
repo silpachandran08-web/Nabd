@@ -64,6 +64,11 @@ export default function ArrivalsPage() {
   // differ, and doing this during the initial render causes a hydration mismatch.
   const [dateLabel, setDateLabel] = useState("");
 
+  const [vitalsEntryId, setVitalsEntryId] = useState<string | null>(null);
+  const [vitalsForm, setVitalsForm] = useState({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
+  const [vitalsError, setVitalsError] = useState<string | null>(null);
+  const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
+
   const [showModal, setShowModal] = useState(false);
   const [patientQuery, setPatientQuery] = useState("");
   const [searchResults, setSearchResults] = useState<PatientOption[]>([]);
@@ -233,6 +238,40 @@ export default function ArrivalsPage() {
     }
   }
 
+  function openVitalsModal(entryId: string) {
+    setVitalsEntryId(entryId);
+    setVitalsForm({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
+    setVitalsError(null);
+  }
+
+  async function submitVitals(e: React.FormEvent) {
+    e.preventDefault();
+    if (!vitalsEntryId) return;
+    setVitalsError(null);
+    setVitalsSubmitting(true);
+    try {
+      const num = (v: string) => (v.trim() === "" ? null : Number(v));
+      const res = await authedFetch(`/clinical/vitals/${vitalsEntryId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          heightCm: num(vitalsForm.heightCm), weightKg: num(vitalsForm.weightKg),
+          bpSystolic: num(vitalsForm.bpSystolic), bpDiastolic: num(vitalsForm.bpDiastolic),
+          pulseBpm: num(vitalsForm.pulseBpm), tempCelsius: num(vitalsForm.tempCelsius), spo2Percent: num(vitalsForm.spo2Percent),
+        }),
+      });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save vitals." }));
+        setVitalsError(p.detail || "Couldn't save vitals.");
+        return;
+      }
+      setVitalsEntryId(null);
+      load();
+    } finally {
+      setVitalsSubmitting(false);
+    }
+  }
+
   async function markPriority(id: string) {
     const reason = window.prompt("Why does this patient need priority?");
     if (!reason) return;
@@ -301,6 +340,9 @@ export default function ArrivalsPage() {
                           <td>
                             {!r.priority && b === "waiting" && (
                               <button className={styles.actionBtn} onClick={() => markPriority(r.id)}>Mark priority</button>
+                            )}
+                            {r.status === "vitals_pending" && (
+                              <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Record vitals</button>
                             )}
                             {b === "checkout_pending" && (
                               <button className={styles.actionBtn} onClick={() => router.push(`/checkout/${r.id}`)}>Checkout</button>
@@ -406,6 +448,36 @@ export default function ArrivalsPage() {
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={submitting}>{submitting ? "Checking in…" : "Check in"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {vitalsEntryId && (
+        <div className={styles.overlay} onClick={() => setVitalsEntryId(null)}>
+          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitVitals}>
+            <h2 className={styles.modalTitle}>Record vitals</h2>
+            {([
+              ["heightCm", "Height (cm)"], ["weightKg", "Weight (kg)"],
+              ["bpSystolic", "BP systolic"], ["bpDiastolic", "BP diastolic"],
+              ["pulseBpm", "Pulse (bpm)"], ["tempCelsius", "Temp (°C)"], ["spo2Percent", "SpO2 (%)"],
+            ] as const).map(([key, label]) => (
+              <div className={styles.field} key={key}>
+                <label className={styles.label} htmlFor={key}>{label}</label>
+                <input
+                  id={key}
+                  type="number"
+                  step="any"
+                  className={styles.input}
+                  value={vitalsForm[key]}
+                  onChange={(e) => setVitalsForm((prev) => ({ ...prev, [key]: e.target.value }))}
+                />
+              </div>
+            ))}
+            {vitalsError && <div className={styles.formError} role="alert">{vitalsError}</div>}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setVitalsEntryId(null)}>Cancel</button>
+              <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save vitals"}</button>
             </div>
           </form>
         </div>

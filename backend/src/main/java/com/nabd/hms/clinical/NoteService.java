@@ -46,7 +46,7 @@ public class NoteService {
         QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
 
         int updated = repo.upsert(tenantId, queueEntryId, owner.patientId(), owner.doctorId(),
-                req.subjective(), req.objective(), req.assessment(), req.plan());
+                req.subjective(), req.objective(), req.assessment(), req.plan(), req.diagnosis());
         // A fresh insert always affects a row; 0 only happens when a signed row already blocked the update.
         if (updated == 0) {
             throw noteSigned();
@@ -65,7 +65,7 @@ public class NoteService {
 
     private NoteResponse toResponse(NoteRow n) {
         return new NoteResponse(n.id(), n.queueEntryId(), n.patientId(), n.doctorId(), n.subjective(),
-                n.objective(), n.assessment(), n.plan(), n.status(), n.signedAt(), n.updatedAt());
+                n.objective(), n.assessment(), n.plan(), n.diagnosis(), n.status(), n.signedAt(), n.updatedAt());
     }
 
     private ApiException notFound() {

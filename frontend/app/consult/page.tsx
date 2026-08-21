@@ -18,14 +18,21 @@ type PatientDetail = {
 type Note = {
   id: string; queueEntryId: string; patientId: string; doctorId: string;
   subjective: string | null; objective: string | null; assessment: string | null; plan: string | null;
-  status: string; signedAt: string | null; updatedAt: string;
+  diagnosis: string | null; status: string; signedAt: string | null; updatedAt: string;
 };
-type NoteDraft = { subjective: string; objective: string; assessment: string; plan: string };
+type NoteDraft = { subjective: string; objective: string; assessment: string; plan: string; diagnosis: string };
+type PrescriptionItem = {
+  id?: string; drugName: string; dosage: string; frequency: string; duration: string;
+  instructions: string; allergyOverrideReason: string;
+};
+type Prescription = { id: string; status: string; items: PrescriptionItem[] };
 type Problem = { title: string; detail: string };
+
+const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "", allergyOverrideReason: "" };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const AUTOSAVE_MS = 10_000;
-const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "" };
+const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
 
 const STATUS_CLASS: Record<string, string> = {
   checked_in: styles.pillWaiting,
@@ -73,6 +80,13 @@ export default function ConsultPage() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [completing, setCompleting] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  const [rxItems, setRxItems] = useState<PrescriptionItem[]>([]);
+  const [rxStatus, setRxStatus] = useState<"draft" | "signed">("draft");
+  const [rxSaving, setRxSaving] = useState(false);
+  const [rxError, setRxError] = useState<string | null>(null);
+  const [followUpDate, setFollowUpDate] = useState("");
+  const [followUpBusy, setFollowUpBusy] = useState(false);
+  const [followUpMessage, setFollowUpMessage] = useState<string | null>(null);
   const dirtyRef = useRef(dirty);
   const noteRef = useRef(note);
   useEffect(() => {
@@ -178,6 +192,11 @@ export default function ConsultPage() {
     setDirty(false);
     setLastSavedAt(null);
     setShellError(null);
+    setRxItems([]);
+    setRxStatus("draft");
+    setRxError(null);
+    setFollowUpDate("");
+    setFollowUpMessage(null);
 
     const pRes = await authedFetch(`/patients/${row.patientId}`);
     if (pRes?.ok) setActivePatient(await pRes.json());
@@ -185,8 +204,77 @@ export default function ConsultPage() {
     const nRes = await authedFetch(`/clinical/notes/${row.id}`);
     if (nRes?.status === 200) {
       const n: Note = await nRes.json();
-      setNote({ subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "" });
+      setNote({ subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "", diagnosis: n.diagnosis ?? "" });
       setNoteStatus(n.status as "draft" | "signed");
+    }
+
+    const rRes = await authedFetch(`/clinical/prescriptions/${row.id}`);
+    if (rRes?.status === 200) {
+      const rx: Prescription = await rRes.json();
+      setRxItems(rx.items.length > 0 ? rx.items.map((i) => ({ ...i, allergyOverrideReason: i.allergyOverrideReason ?? "" })) : [{ ...BLANK_RX_ITEM }]);
+      setRxStatus(rx.status as "draft" | "signed");
+    } else {
+      setRxItems([{ ...BLANK_RX_ITEM }]);
+    }
+  }
+
+  function updateRxItem(index: number, field: keyof PrescriptionItem, value: string) {
+    setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  }
+
+  function addRxItem() {
+    setRxItems((prev) => [...prev, { ...BLANK_RX_ITEM }]);
+  }
+
+  function removeRxItem(index: number) {
+    setRxItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function saveRx() {
+    if (!activeEntry) return;
+    setRxSaving(true);
+    setRxError(null);
+    try {
+      const items = rxItems.filter((i) => i.drugName.trim() !== "");
+      const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}`, { method: "PATCH", body: JSON.stringify({ items }) });
+      if (!res?.ok) {
+        const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't save prescription." }));
+        setRxError(p.detail || "Couldn't save prescription.");
+        return false;
+      }
+      const rx: Prescription = await res.json();
+      setRxItems(rx.items.length > 0 ? rx.items.map((i) => ({ ...i, allergyOverrideReason: i.allergyOverrideReason ?? "" })) : [{ ...BLANK_RX_ITEM }]);
+      return true;
+    } finally {
+      setRxSaving(false);
+    }
+  }
+
+  async function signRx() {
+    if (!activeEntry) return;
+    if (!(await saveRx())) return;
+    const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}/sign`, { method: "POST" });
+    if (res?.ok) setRxStatus("signed");
+  }
+
+  async function scheduleFollowUp() {
+    if (!activeEntry || !activePatient || !followUpDate) return;
+    setFollowUpBusy(true);
+    setFollowUpMessage(null);
+    try {
+      const startTime = new Date(`${followUpDate}T10:00:00`).toISOString();
+      const res = await authedFetch("/appointments", {
+        method: "POST",
+        body: JSON.stringify({ patientId: activePatient.id, doctorId: activeEntry.doctorId, startTime }),
+      });
+      if (!res?.ok) {
+        const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't schedule the follow-up." }));
+        setFollowUpMessage(p.detail || "Couldn't schedule the follow-up.");
+        return;
+      }
+      setFollowUpMessage(`Follow-up booked for ${followUpDate}.`);
+    } finally {
+      setFollowUpBusy(false);
     }
   }
 
@@ -223,7 +311,10 @@ export default function ConsultPage() {
         setShellError("Note signed, but couldn't move the patient to checkout. Try again.");
         return;
       }
-      closeShell();
+      setNoteStatus("signed");
+      setActiveEntry((prev) => (prev ? { ...prev, status: "checkout_pending" } : prev));
+      // Stay in the shell (don't auto-close): the signed banner below is also where the doctor
+      // schedules a follow-up (NB-116) — closing here would make that control unreachable.
     } finally {
       setCompleting(false);
     }
@@ -261,7 +352,19 @@ export default function ConsultPage() {
           </div>
         )}
 
-        {noteStatus === "signed" && <div className={styles.signedBanner}>This note is signed and locked.</div>}
+        {noteStatus === "signed" && (
+          <div className={styles.signedBanner}>
+            <span>This note is signed and locked.</span>
+            <span className={styles.followUpControls}>
+              Schedule a follow-up:
+              <input type="date" className={styles.followUpInput} value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
+              <button className={styles.actionBtn} onClick={scheduleFollowUp} disabled={followUpBusy || !followUpDate}>
+                {followUpBusy ? "Booking…" : "Schedule follow-up"}
+              </button>
+              {followUpMessage && <span>{followUpMessage}</span>}
+            </span>
+          </div>
+        )}
 
         <div className={styles.card} style={{ padding: "24px" }}>
           <div className={styles.noteGrid}>
@@ -277,7 +380,57 @@ export default function ConsultPage() {
                 />
               </div>
             ))}
+            <div className={styles.noteField}>
+              <label className={styles.noteLabel} htmlFor="diagnosis">diagnosis</label>
+              <input
+                id="diagnosis"
+                className={styles.input}
+                value={note.diagnosis}
+                disabled={noteStatus === "signed"}
+                onChange={(e) => updateField("diagnosis", e.target.value)}
+              />
+            </div>
           </div>
+        </div>
+
+        <div className={styles.card} style={{ padding: "24px", marginTop: "16px" }}>
+          <div className={styles.rxHeader}>
+            <h3 className={styles.rxTitle}>Prescription {rxStatus === "signed" && <span className={styles.signedTag}>signed</span>}</h3>
+            {rxStatus !== "signed" && (
+              <div className={styles.rxHeaderActions}>
+                <button className={styles.backBtn} onClick={saveRx} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
+                <button className={styles.completeBtn} onClick={signRx} disabled={rxSaving}>Sign prescription</button>
+              </div>
+            )}
+          </div>
+          {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
+          {rxItems.map((item, i) => {
+            const conflict = !!rxError && rxError.includes(item.drugName) && item.drugName.trim() !== "";
+            return (
+              <div className={styles.rxRow} key={i}>
+                <input className={styles.input} placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"}
+                  onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
+                <input className={styles.input} placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"}
+                  onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
+                <input className={styles.input} placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"}
+                  onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
+                <input className={styles.input} placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"}
+                  onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
+                <input className={styles.input} placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"}
+                  onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
+                {conflict && (
+                  <input className={styles.input} placeholder="Allergy override reason" value={item.allergyOverrideReason}
+                    onChange={(e) => updateRxItem(i, "allergyOverrideReason", e.target.value)} />
+                )}
+                {rxStatus !== "signed" && rxItems.length > 1 && (
+                  <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
+                )}
+              </div>
+            );
+          })}
+          {rxStatus !== "signed" && (
+            <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>
+          )}
         </div>
       </main>
     );

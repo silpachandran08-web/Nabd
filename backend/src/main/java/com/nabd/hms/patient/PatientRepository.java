@@ -69,6 +69,16 @@ class PatientRepository {
                 .stream().filter(java.util.Objects::nonNull).map(Timestamp::toInstant).findFirst();
     }
 
+    /** NB-107/108: real signal now that patient_allergies exists (com.nabd.hms.clinical owns writes
+     * to it; this is the same narrow local-query pattern CheckoutRepository uses for cross-package
+     * reads rather than reaching into that package's repository). */
+    List<String> findActiveAllergySubstances(UUID tenantId, UUID patientId) {
+        return jdbc.queryForList(
+                "SELECT substance FROM patient_allergies WHERE tenant_id = ? AND patient_id = ? AND active " +
+                        "ORDER BY recorded_at DESC",
+                String.class, tenantId, patientId);
+    }
+
     boolean existsActive(UUID tenantId, UUID id) {
         Boolean exists = jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ? AND status = 'active')",

@@ -9,8 +9,8 @@ final class NoteModels {
     }
 
     record NoteRow(UUID id, UUID queueEntryId, UUID patientId, UUID doctorId, String subjective,
-                    String objective, String assessment, String plan, String status, Instant signedAt,
-                    Instant updatedAt) {
+                    String objective, String assessment, String plan, String diagnosis, String status,
+                    Instant signedAt, Instant updatedAt) {
     }
 
     /** The queue entry's own patient/doctor — looked up server-side, never trusted from the client. */
