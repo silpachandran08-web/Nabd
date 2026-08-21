@@ -73,6 +73,48 @@ class PrescriptionApiTest extends ApiTestBase {
     }
 
     @Test
+    void prescribingADrugMatchingAModerateAllergyIsAllowedButCarriesAWarning() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc5b@a.com", "+919800020012", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P2b", "+919999960012");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Sulfa", "severity", "moderate", "reaction", "rash")), Map.class);
+        String queueEntryId = checkIn(token, patientId, doc.id());
+
+        ResponseEntity<Map> resp = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Sulfamethoxazole", "dosage", "400mg")))), Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK); // moderate never blocks (NB-107)
+        Map<?, ?> item = (Map<?, ?>) ((List<?>) resp.getBody().get("items")).get(0);
+        assertThat(item.get("allergyWarning")).asString().contains("Sulfa").contains("moderate");
+    }
+
+    @Test
+    void overridingASevereAllergyConflictIsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc5c@a.com", "+919800020013", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P2c", "+919999960013");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        String queueEntryId = checkIn(token, patientId, doc.id());
+
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Penicillin-VK", "dosage", "500mg",
+                        "allergyOverrideReason", "Desensitisation protocol under supervision")))), Map.class);
+
+        Map<String, Object> audited = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT action, actor_name, before, after FROM audit_log " +
+                        "WHERE tenant_id = ? AND action = 'prescription.allergy_override' ORDER BY created_at DESC LIMIT 1",
+                tenant.id()));
+        assertThat(audited.get("actor_name")).isEqualTo("Test Staff");
+        assertThat(audited.get("after").toString()).contains("Penicillin-VK").contains("Desensitisation protocol under supervision");
+    }
+
+    @Test
     void previousMedicinesOnlyReturnsSignedPrescriptions() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());

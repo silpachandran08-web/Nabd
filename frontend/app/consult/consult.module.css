@@ -355,3 +355,20 @@
   font-family: inherit;
   line-height: 1;
 }
+
+.rxWarning {
+  font-size: 11px;
+  color: #e0a63a;
+  margin: -4px 0 var(--nb-space-8);
+}
+
+.previousMeds {
+  margin-top: var(--nb-space-16);
+  padding-top: var(--nb-space-12);
+  border-top: 1px solid var(--nb-border-subtle);
+}
+
+.previousMedsRow {
+  font-size: 13px;
+  padding: 4px 0;
+}

@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
+import static com.nabd.hms.clinical.PrescriptionModels.ActorInfo;
 import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionItemRow;
 import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionRow;
 
@@ -25,6 +26,14 @@ class PrescriptionRepository {
         return jdbc.query("SELECT patient_id, doctor_id FROM queue_entries WHERE tenant_id = ? AND id = ?",
                 (rs, i) -> new QueueEntryOwner(UUID.fromString(rs.getString("patient_id")), UUID.fromString(rs.getString("doctor_id"))),
                 tenantId, queueEntryId).stream().findFirst();
+    }
+
+    /** NB-108: actor_name/actor_role snapshot for the audit row an allergy override writes. */
+    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
     }
 
     Optional<PrescriptionRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {

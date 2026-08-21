@@ -23,9 +23,9 @@ type Note = {
 type NoteDraft = { subjective: string; objective: string; assessment: string; plan: string; diagnosis: string };
 type PrescriptionItem = {
   id?: string; drugName: string; dosage: string; frequency: string; duration: string;
-  instructions: string; allergyOverrideReason: string;
+  instructions: string; allergyOverrideReason: string; allergyWarning?: string | null;
 };
-type Prescription = { id: string; status: string; items: PrescriptionItem[] };
+type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
 type Problem = { title: string; detail: string };
 
 const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "", allergyOverrideReason: "" };
@@ -87,6 +87,7 @@ export default function ConsultPage() {
   const [followUpDate, setFollowUpDate] = useState("");
   const [followUpBusy, setFollowUpBusy] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState<string | null>(null);
+  const [previousMeds, setPreviousMeds] = useState<Prescription[]>([]);
   const dirtyRef = useRef(dirty);
   const noteRef = useRef(note);
   useEffect(() => {
@@ -197,6 +198,12 @@ export default function ConsultPage() {
     setRxError(null);
     setFollowUpDate("");
     setFollowUpMessage(null);
+    setPreviousMeds([]);
+
+    // NB-105: previous medicines fetched right alongside everything else the pad needs, and
+    // rendered inside the same Prescription card below — no separate screen to visit.
+    const prevRxRes = await authedFetch(`/clinical/patients/${row.patientId}/prescriptions`);
+    if (prevRxRes?.ok) setPreviousMeds(await prevRxRes.json());
 
     const pRes = await authedFetch(`/patients/${row.patientId}`);
     if (pRes?.ok) setActivePatient(await pRes.json());
@@ -407,29 +414,48 @@ export default function ConsultPage() {
           {rxItems.map((item, i) => {
             const conflict = !!rxError && rxError.includes(item.drugName) && item.drugName.trim() !== "";
             return (
-              <div className={styles.rxRow} key={i}>
-                <input className={styles.input} placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"}
-                  onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
-                <input className={styles.input} placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"}
-                  onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
-                <input className={styles.input} placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"}
-                  onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
-                <input className={styles.input} placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"}
-                  onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
-                <input className={styles.input} placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"}
-                  onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
-                {conflict && (
-                  <input className={styles.input} placeholder="Allergy override reason" value={item.allergyOverrideReason}
-                    onChange={(e) => updateRxItem(i, "allergyOverrideReason", e.target.value)} />
-                )}
-                {rxStatus !== "signed" && rxItems.length > 1 && (
-                  <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
+              <div key={i}>
+                <div className={styles.rxRow}>
+                  <input className={styles.input} placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"}
+                    onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
+                  <input className={styles.input} placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"}
+                    onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
+                  <input className={styles.input} placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"}
+                    onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
+                  <input className={styles.input} placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"}
+                    onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
+                  <input className={styles.input} placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"}
+                    onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
+                  {conflict && (
+                    <input className={styles.input} placeholder="Allergy override reason" value={item.allergyOverrideReason}
+                      onChange={(e) => updateRxItem(i, "allergyOverrideReason", e.target.value)} />
+                  )}
+                  {rxStatus !== "signed" && rxItems.length > 1 && (
+                    <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
+                  )}
+                </div>
+                {/* NB-107: severity-scaled — only "severe" ever blocked the save (rxError above); a
+                    moderate/mild match still shows here as a passive warning. */}
+                {item.allergyWarning && !conflict && (
+                  <div className={styles.rxWarning}>⚠ Matches recorded allergy: {item.allergyWarning}</div>
                 )}
               </div>
             );
           })}
           {rxStatus !== "signed" && (
             <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>
+          )}
+
+          {previousMeds.length > 0 && (
+            <div className={styles.previousMeds}>
+              <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Previous medicines</div>
+              {previousMeds.map((rx) => (
+                <div key={rx.id} className={styles.previousMedsRow}>
+                  {rx.signedAt && <span className={styles.saveStatus}>{new Date(rx.signedAt).toLocaleDateString()} — </span>}
+                  {rx.items.map((i) => i.drugName).join(", ")}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </main>

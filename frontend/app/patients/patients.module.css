@@ -303,6 +303,12 @@
   border-bottom: 1px solid var(--nb-border-subtle);
 }
 
+.numberingToggle {
+  display: flex;
+  gap: var(--nb-space-8);
+  margin-bottom: var(--nb-space-12);
+}
+
 .toothGrid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);

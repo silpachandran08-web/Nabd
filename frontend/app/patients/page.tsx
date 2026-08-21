@@ -18,12 +18,24 @@ type Allergy = { id: string; substance: string; severity: string; reaction: stri
 type PrescriptionItem = { id: string; drugName: string; dosage: string | null; frequency: string | null; duration: string | null };
 type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
 type Encounter = { queueEntryId: string; occurredAt: string; diagnosis: string | null; assessment: string | null; medications: string | null };
-type Tooth = { toothNumber: number; status: string; note: string | null };
+type Tooth = { id: string; toothNumber: number; status: string; note: string | null; isSupernumerary: boolean };
+type ToothHistoryEntry = {
+  actorName: string; actorRole: string; action: string; before: string | null; after: string | null; occurredAt: string;
+};
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const FDI_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
   48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 const TOOTH_STATUSES = ["healthy", "decayed", "filled", "missing", "crown", "root_canal"] as const;
+// NB-122: the standard Universal Numbering System mapping for permanent teeth — a fixed notation
+// conversion (not clinical judgment), so it's safe to hardcode. Storage always stays keyed by FDI;
+// this only changes what's displayed.
+const FDI_TO_UNIVERSAL: Record<number, number> = {
+  18: 1, 17: 2, 16: 3, 15: 4, 14: 5, 13: 6, 12: 7, 11: 8,
+  21: 9, 22: 10, 23: 11, 24: 12, 25: 13, 26: 14, 27: 15, 28: 16,
+  38: 17, 37: 18, 36: 19, 35: 20, 34: 21, 33: 22, 32: 23, 31: 24,
+  41: 25, 42: 26, 43: 27, 44: 28, 45: 29, 46: 30, 47: 31, 48: 32,
+};
 
 function decodeJwt(token: string): Record<string, unknown> {
   try {
@@ -66,6 +78,15 @@ export default function PatientsPage() {
 
   const [chart, setChart] = useState<Tooth[]>([]);
   const [chartBusy, setChartBusy] = useState<number | null>(null);
+  const [numbering, setNumbering] = useState<"fdi" | "universal">("fdi");
+  const [newSupernumerary, setNewSupernumerary] = useState({ nearToothNumber: 11, status: "healthy", note: "" });
+  const [supernumeraryBusy, setSupernumeraryBusy] = useState<string | null>(null);
+  const [historyToothId, setHistoryToothId] = useState<string | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<ToothHistoryEntry[]>([]);
+
+  function toothLabel(fdiNumber: number): string {
+    return numbering === "universal" ? `#${FDI_TO_UNIVERSAL[fdiNumber]}` : String(fdiNumber);
+  }
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -134,6 +155,9 @@ export default function PatientsPage() {
     setPrescriptions([]);
     setTimeline([]);
     setChart([]);
+    setHistoryToothId(null);
+    setHistoryEntries([]);
+    setNewSupernumerary({ nearToothNumber: 11, status: "healthy", note: "" });
     setNewAllergy({ substance: "", severity: "moderate", reaction: "" });
     const res = await authedFetch(`/patients/${id}`);
     if (!res) return;
@@ -200,11 +224,67 @@ export default function PatientsPage() {
       });
       if (res?.ok) {
         const updated: Tooth = await res.json();
-        setChart((prev) => [...prev.filter((t) => t.toothNumber !== toothNumber), updated]);
+        setChart((prev) => [...prev.filter((t) => !(t.toothNumber === toothNumber && !t.isSupernumerary)), updated]);
       }
     } finally {
       setChartBusy(null);
     }
+  }
+
+  async function addSupernumerary() {
+    if (!drawerPatient) return;
+    setSupernumeraryBusy("new");
+    try {
+      const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary`, {
+        method: "POST",
+        body: JSON.stringify(newSupernumerary),
+      });
+      if (res?.ok) {
+        const added: Tooth = await res.json();
+        setChart((prev) => [...prev, added]);
+        setNewSupernumerary({ nearToothNumber: 11, status: "healthy", note: "" });
+      }
+    } finally {
+      setSupernumeraryBusy(null);
+    }
+  }
+
+  async function updateSupernumeraryStatus(id: string, status: string) {
+    if (!drawerPatient) return;
+    setSupernumeraryBusy(id);
+    try {
+      const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      if (res?.ok) {
+        const updated: Tooth = await res.json();
+        setChart((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      }
+    } finally {
+      setSupernumeraryBusy(null);
+    }
+  }
+
+  async function removeSupernumerary(id: string) {
+    if (!drawerPatient) return;
+    setSupernumeraryBusy(id);
+    try {
+      const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary/${id}`, {
+        method: "DELETE",
+      });
+      if (res?.ok) setChart((prev) => prev.filter((t) => t.id !== id));
+    } finally {
+      setSupernumeraryBusy(null);
+    }
+  }
+
+  async function openHistory(id: string) {
+    if (!drawerPatient) return;
+    setHistoryToothId(id);
+    setHistoryEntries([]);
+    const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/entries/${id}/history`);
+    if (res?.ok) setHistoryEntries(await res.json());
   }
 
   return (
@@ -280,24 +360,85 @@ export default function PatientsPage() {
                 )}
 
                 {drawerTab === "dental" && canDental ? (
-                  <div className={styles.toothGrid}>
-                    {FDI_TEETH.map((n) => {
-                      const tooth = chart.find((t) => t.toothNumber === n);
-                      return (
-                        <div key={n} className={styles.toothCell}>
-                          <span className={styles.toothNumber}>{n}</span>
-                          <select
-                            className={styles.toothSelect}
-                            value={tooth?.status ?? "healthy"}
-                            disabled={chartBusy === n}
-                            onChange={(e) => setToothStatus(n, e.target.value)}
-                          >
-                            {TOOTH_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-                          </select>
+                  <>
+                    <div className={styles.numberingToggle}>
+                      <button className={numbering === "fdi" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("fdi")}>FDI</button>
+                      <button className={numbering === "universal" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("universal")}>Universal</button>
+                    </div>
+
+                    <div className={styles.toothGrid}>
+                      {FDI_TEETH.map((n) => {
+                        const tooth = chart.find((t) => t.toothNumber === n && !t.isSupernumerary);
+                        return (
+                          <div key={n} className={styles.toothCell}>
+                            <span className={styles.toothNumber}>{toothLabel(n)}</span>
+                            <select
+                              className={styles.toothSelect}
+                              value={tooth?.status ?? "healthy"}
+                              disabled={chartBusy === n}
+                              onChange={(e) => setToothStatus(n, e.target.value)}
+                            >
+                              {TOOTH_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+                            </select>
+                            {tooth && (
+                              <button className={styles.linkBtn} style={{ fontSize: "10px" }} onClick={() => openHistory(tooth.id)}>History</button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className={styles.section}>
+                      <div className={styles.sectionLabel}>Supernumerary teeth</div>
+                      {chart.filter((t) => t.isSupernumerary).length === 0 ? (
+                        <div className={styles.muted}>None recorded</div>
+                      ) : (
+                        chart.filter((t) => t.isSupernumerary).map((t) => (
+                          <div key={t.id} className={styles.allergyRow}>
+                            <span>Near {toothLabel(t.toothNumber)}{t.note ? ` · ${t.note}` : ""}</span>
+                            <select className={styles.smallInput} value={t.status} disabled={supernumeraryBusy === t.id}
+                              onChange={(e) => updateSupernumeraryStatus(t.id, e.target.value)}>
+                              {TOOTH_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+                            </select>
+                            <button className={styles.linkBtn} onClick={() => openHistory(t.id)}>History</button>
+                            <button className={styles.linkBtn} disabled={supernumeraryBusy === t.id} onClick={() => removeSupernumerary(t.id)}>Remove</button>
+                          </div>
+                        ))
+                      )}
+                      <div className={styles.allergyForm}>
+                        <select className={styles.smallInput} value={newSupernumerary.nearToothNumber}
+                          onChange={(e) => setNewSupernumerary((p) => ({ ...p, nearToothNumber: Number(e.target.value) }))}>
+                          {FDI_TEETH.map((n) => <option key={n} value={n}>Near {toothLabel(n)}</option>)}
+                        </select>
+                        <select className={styles.smallInput} value={newSupernumerary.status}
+                          onChange={(e) => setNewSupernumerary((p) => ({ ...p, status: e.target.value }))}>
+                          {TOOTH_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+                        </select>
+                        <input className={styles.smallInput} placeholder="Note (optional)" value={newSupernumerary.note}
+                          onChange={(e) => setNewSupernumerary((p) => ({ ...p, note: e.target.value }))} />
+                        <button className={styles.linkBtn} disabled={supernumeraryBusy === "new"} onClick={addSupernumerary}>Add</button>
+                      </div>
+                    </div>
+
+                    {historyToothId && (
+                      <div className={styles.section}>
+                        <div className={styles.sectionLabel}>
+                          Tooth history <button className={styles.linkBtn} onClick={() => setHistoryToothId(null)}>Close</button>
                         </div>
-                      );
-                    })}
-                  </div>
+                        {historyEntries.length === 0 ? (
+                          <div className={styles.muted}>No changes recorded yet</div>
+                        ) : (
+                          historyEntries.map((h, i) => (
+                            <div key={i} className={styles.timelineRow}>
+                              <span className={styles.muted}>{new Date(h.occurredAt).toLocaleString()} — {h.actorName} ({h.actorRole})</span>
+                              <span>{h.action}</span>
+                              {h.after && <span className={styles.muted}>{h.after}</span>}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </>
                 ) : (
                 <>
                 <div className={drawerPatient.allergies.length === 0 ? styles.allergyBannerNone : styles.allergyBannerSome}>

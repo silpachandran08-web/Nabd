@@ -2,6 +2,8 @@ package com.nabd.hms.clinical;
 
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
 import com.nabd.hms.clinical.dto.PrescriptionUpsertRequest;
+import com.nabd.hms.common.RequestMeta;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,8 +38,8 @@ public class PrescriptionController {
     @PatchMapping("/prescriptions/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public PrescriptionResponse upsert(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
-                                        @Valid @RequestBody PrescriptionUpsertRequest req) {
-        return service.upsert(tenantId(jwt), queueEntryId, req.items());
+                                        @Valid @RequestBody PrescriptionUpsertRequest req, HttpServletRequest http) {
+        return service.upsert(tenantId(jwt), queueEntryId, staffId(jwt), RequestMeta.clientIp(http), req.items());
     }
 
     @PostMapping("/prescriptions/{queueEntryId}/sign")
@@ -54,5 +56,9 @@ public class PrescriptionController {
 
     private UUID tenantId(Jwt jwt) {
         return UUID.fromString(jwt.getClaimAsString("tenantId"));
+    }
+
+    private UUID staffId(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 }
