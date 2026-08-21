@@ -49,6 +49,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(resp.getBody().get("status")).isEqualTo("checked_in");
         assertThat(((Number) resp.getBody().get("tokenNumber")).intValue()).isGreaterThan(0);
+        assertThat(resp.getBody().get("createdAt")).isNotNull(); // NB-095: arrivals board needs this for the "Wait" column
     }
 
     @Test

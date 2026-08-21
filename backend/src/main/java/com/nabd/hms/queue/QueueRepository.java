@@ -16,7 +16,7 @@ import static com.nabd.hms.queue.QueueModels.QueueEntryRow;
 class QueueRepository {
 
     private static final String COLUMNS =
-            "id, appointment_id, patient_id, doctor_id, queue_date, token_number, status, priority, priority_reason ";
+            "id, appointment_id, patient_id, doctor_id, queue_date, token_number, status, priority, priority_reason, created_at ";
 
     private final JdbcTemplate jdbc;
 
@@ -87,7 +87,8 @@ class QueueRepository {
                     rs.getInt("token_number"),
                     rs.getString("status"),
                     rs.getBoolean("priority"),
-                    rs.getString("priority_reason"));
+                    rs.getString("priority_reason"),
+                    rs.getTimestamp("created_at").toInstant());
         };
     }
 }

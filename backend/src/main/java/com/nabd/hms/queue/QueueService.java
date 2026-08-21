@@ -145,7 +145,7 @@ public class QueueService {
 
     private QueueEntryResponse toResponse(QueueEntryRow row) {
         return new QueueEntryResponse(row.id(), row.appointmentId(), row.patientId(), row.doctorId(),
-                row.queueDate(), row.tokenNumber(), row.status(), row.priority(), row.priorityReason());
+                row.queueDate(), row.tokenNumber(), row.status(), row.priority(), row.priorityReason(), row.createdAt());
     }
 
     private ApiException notFound() {
