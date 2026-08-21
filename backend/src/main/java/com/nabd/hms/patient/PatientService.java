@@ -103,7 +103,8 @@ public class PatientService {
     public PatientDetailResponse get(UUID tenantId, UUID callerStaffId, UUID id) {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
-        return repo.findVisibleById(tenantId, id, scopedToDoctorId).map(this::toDetailResponse).orElseThrow(this::notFound);
+        PatientRow row = repo.findVisibleById(tenantId, id, scopedToDoctorId).orElseThrow(this::notFound);
+        return toDetailResponse(row, repo.findLastVisitAt(tenantId, id).orElse(null));
     }
 
     @Transactional
@@ -138,7 +139,8 @@ public class PatientService {
 
         repo.markMerged(tenantId, req.duplicatePatientId(), survivorId, callerStaffId);
         log.info("patient {} merged into {} by {} (tenant {})", req.duplicatePatientId(), survivorId, callerStaffId, tenantId);
-        return repo.findById(tenantId, survivorId).map(this::toDetailResponse).orElseThrow(this::notFound);
+        PatientRow row = repo.findById(tenantId, survivorId).orElseThrow(this::notFound);
+        return toDetailResponse(row, repo.findLastVisitAt(tenantId, survivorId).orElse(null));
     }
 
     /** Reverses a merge — only within the 30-day window (NB-072). */
@@ -198,9 +200,9 @@ public class PatientService {
         return new PatientResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(), row.status());
     }
 
-    private PatientDetailResponse toDetailResponse(PatientRow row) {
+    private PatientDetailResponse toDetailResponse(PatientRow row, java.time.Instant lastVisitAt) {
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
-                row.status(), List.of(), List.of(), 0, 0.0, null);
+                row.status(), List.of(), List.of(), 0, 0.0, lastVisitAt);
     }
 
     private ApiException notFound() {

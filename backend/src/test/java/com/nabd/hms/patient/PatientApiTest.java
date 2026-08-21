@@ -134,6 +134,32 @@ class PatientApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    /** NB-074: lastVisitAt is real now — derived from a queue entry that actually reached 'completed'. */
+    @Test
+    void getReflectsLastVisitAtFromACompletedQueueVisit() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc9@a.com", "+919300000010", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/doctors/" + doc.id() + "/working-hours", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "dayOfWeek", java.time.LocalDate.now(java.time.ZoneOffset.UTC).getDayOfWeek().getValue() % 7,
+                "startTime", "00:00:00", "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
+        String patientId = registerPatient(token, "LastVisit", "+919888800010");
+
+        ResponseEntity<Map> unvisited = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class);
+        assertThat(unvisited.getBody().get("lastVisitAt")).isNull();
+
+        ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", doc.id().toString())), Map.class);
+        String queueEntryId = (String) checkIn.getBody().get("id");
+        for (String next : new String[]{"waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending", "completed"}) {
+            exchange("/v1/queue/" + queueEntryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", next)), Map.class);
+        }
+
+        ResponseEntity<Map> visited = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class);
+        assertThat(visited.getBody().get("lastVisitAt")).isNotNull();
+    }
+
     @Test
     void patchUpdatesPatient() {
         SeededTenant tenant = seedTenant();

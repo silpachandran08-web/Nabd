@@ -1,0 +1,228 @@
+.page {
+  min-height: 100%;
+  padding: var(--nb-space-32);
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nb-space-16);
+  margin-bottom: var(--nb-space-16);
+}
+
+.title {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin: 0 0 var(--nb-space-4);
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+  margin: 0;
+}
+
+.searchBar {
+  margin-bottom: var(--nb-space-16);
+}
+
+.input {
+  height: 40px;
+  width: 100%;
+  max-width: 360px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: 0 var(--nb-space-12);
+  color: var(--nb-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.card {
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-lg);
+  overflow: hidden;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nb-text-tertiary);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  vertical-align: middle;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.row:hover td {
+  background: var(--nb-surface-2);
+}
+
+.patientName {
+  color: var(--nb-text-primary);
+  font-weight: 500;
+}
+
+.mrn {
+  display: block;
+  color: var(--nb-text-tertiary);
+  font-size: 12px;
+  margin-top: 1px;
+}
+
+.muted {
+  color: var(--nb-text-tertiary);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.pillActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
+.pillMerged { background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
+
+.state {
+  padding: var(--nb-space-32);
+  text-align: center;
+  color: var(--nb-text-secondary);
+  font-size: 14px;
+}
+
+.errorState {
+  composes: state;
+  color: var(--nb-danger-500);
+}
+
+/* Patient 360 drawer */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 10;
+}
+
+.drawer {
+  width: 420px;
+  max-width: 100%;
+  height: 100%;
+  background: var(--nb-surface-1);
+  border-left: 1px solid var(--nb-border-default);
+  padding: var(--nb-space-24);
+  overflow-y: auto;
+}
+
+.drawerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--nb-space-16);
+}
+
+.drawerName {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+
+.drawerMeta {
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+}
+
+.closeBtn {
+  height: 32px;
+  width: 32px;
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: transparent;
+  color: var(--nb-text-secondary);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.allergyBanner {
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12);
+  margin-bottom: var(--nb-space-16);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.allergyBannerNone {
+  composes: allergyBanner;
+  background: var(--nb-surface-3);
+  color: var(--nb-text-secondary);
+}
+
+.allergyBannerSome {
+  composes: allergyBanner;
+  background: var(--nb-danger-tint);
+  color: var(--nb-danger-500);
+}
+
+.section {
+  margin-bottom: var(--nb-space-16);
+}
+
+.sectionLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nb-text-tertiary);
+  margin-bottom: var(--nb-space-8);
+}
+
+.sectionValue {
+  font-size: 14px;
+  color: var(--nb-text-primary);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--nb-space-16);
+}

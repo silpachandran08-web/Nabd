@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * ponytail: allergies/chronicConditions/activePackages/outstandingBalance/lastVisitAt are stubbed
- * (empty/zero/null) — their source tables (Clinical Workspace, Packages, Billing) don't exist yet.
- * Wire these up as each of those epics lands; the shape is already correct per api/openapi.yaml.
+ * ponytail: allergies/chronicConditions/activePackages/outstandingBalance are still stubbed
+ * (empty/zero) — their source tables (allergy register, problem list, Packages, Billing) don't
+ * exist yet. lastVisitAt is real now (queue_entries.updated_at where status='completed', NB-074).
  */
 public record PatientDetailResponse(UUID id, String mrn, String name, String phone, LocalDate dob,
                                      String gender, String status, List<String> allergies,

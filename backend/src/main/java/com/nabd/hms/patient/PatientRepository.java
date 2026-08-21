@@ -60,6 +60,15 @@ class PatientRepository {
         ).stream().findFirst();
     }
 
+    /** NB-074: real signal now that queue_entries exists — the rest of the drawer (allergies,
+     * chronic conditions, packages, balance) stays stubbed until their own epics land. */
+    Optional<Instant> findLastVisitAt(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT max(updated_at) AS last_visit FROM queue_entries " +
+                        "WHERE tenant_id = ? AND patient_id = ? AND status = 'completed'",
+                (rs, i) -> rs.getTimestamp("last_visit"), tenantId, patientId)
+                .stream().filter(java.util.Objects::nonNull).map(Timestamp::toInstant).findFirst();
+    }
+
     boolean existsActive(UUID tenantId, UUID id) {
         Boolean exists = jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ? AND status = 'active')",

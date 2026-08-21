@@ -1,0 +1,327 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import styles from "./consult.module.css";
+
+// Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
+// and /v1/clinical/notes/{queueEntryId} (NoteController).
+type QueueEntry = {
+  id: string; appointmentId: string | null; patientId: string; doctorId: string;
+  queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
+};
+type Row = QueueEntry & { patientName: string };
+type PatientDetail = {
+  id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string;
+  allergies: string[]; chronicConditions: string[]; activePackages: number; outstandingBalance: number; lastVisitAt: string | null;
+};
+type Note = {
+  id: string; queueEntryId: string; patientId: string; doctorId: string;
+  subjective: string | null; objective: string | null; assessment: string | null; plan: string | null;
+  status: string; signedAt: string | null; updatedAt: string;
+};
+type NoteDraft = { subjective: string; objective: string; assessment: string; plan: string };
+type Problem = { title: string; detail: string };
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+const AUTOSAVE_MS = 10_000;
+const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "" };
+
+const STATUS_CLASS: Record<string, string> = {
+  checked_in: styles.pillWaiting,
+  waiting: styles.pillWaiting,
+  vitals_pending: styles.pillVitals,
+  vitals_done: styles.pillReady,
+  in_consult: styles.pillConsult,
+  checkout_pending: styles.pillDone,
+  completed: styles.pillDone,
+  no_show: styles.pillNoShow,
+};
+
+function decodeJwt(token: string): Record<string, unknown> {
+  try {
+    const payload = token.split(".")[1];
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
+    return JSON.parse(atob(padded));
+  } catch {
+    return {};
+  }
+}
+
+function age(dob: string): number {
+  const d = new Date(dob);
+  const now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) a--;
+  return a;
+}
+
+export default function ConsultPage() {
+  const router = useRouter();
+  const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
+
+  const [activeEntry, setActiveEntry] = useState<Row | null>(null);
+  const [activePatient, setActivePatient] = useState<PatientDetail | null>(null);
+  const [note, setNote] = useState<NoteDraft>(BLANK_DRAFT);
+  const [noteStatus, setNoteStatus] = useState<"draft" | "signed">("draft");
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [completing, setCompleting] = useState(false);
+  const [shellError, setShellError] = useState<string | null>(null);
+  const dirtyRef = useRef(dirty);
+  const noteRef = useRef(note);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+    noteRef.current = note;
+  }, [dirty, note]);
+
+  const authedFetch = useCallback(
+    async (path: string, init?: RequestInit) => {
+      const token = localStorage.getItem("nabd_access_token");
+      if (!token) {
+        router.replace("/login");
+        return null;
+      }
+      const res = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      });
+      if (res.status === 401) {
+        localStorage.removeItem("nabd_access_token");
+        router.replace("/login");
+        return null;
+      }
+      return res;
+    },
+    [router]
+  );
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const token = localStorage.getItem("nabd_access_token");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    const self = String(decodeJwt(token).sub ?? "");
+    try {
+      const res = await authedFetch(`/queue?doctorId=${self}`);
+      if (!res) return;
+      if (res.status === 403) {
+        setForbidden(true);
+        return;
+      }
+      if (!res.ok) {
+        setError("Couldn't load today's queue. Try again.");
+        return;
+      }
+      const entries: QueueEntry[] = await res.json();
+      const withNames = await Promise.all(entries.map(async (e) => {
+        const pRes = await authedFetch(`/patients/${e.patientId}`);
+        const name = pRes?.ok ? (await pRes.json()).name : "Unknown patient";
+        return { ...e, patientName: name };
+      }));
+      setRows(withNames);
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [authedFetch, router]);
+
+  useEffect(() => {
+    void Promise.resolve().then(load);
+  }, [load]);
+
+  async function saveNote(entryId: string) {
+    setSaving(true);
+    try {
+      const res = await authedFetch(`/clinical/notes/${entryId}`, { method: "PATCH", body: JSON.stringify(noteRef.current) });
+      if (res?.ok) {
+        setDirty(false);
+        setLastSavedAt(new Date());
+      }
+      return res;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Autosave every 10s while there are unsaved changes — cleared when the shell closes.
+  useEffect(() => {
+    if (!activeEntry) return;
+    const id = setInterval(() => {
+      if (dirtyRef.current) saveNote(activeEntry.id);
+    }, AUTOSAVE_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEntry?.id]);
+
+  async function startConsult(row: Row) {
+    const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
+    if (!res?.ok) return;
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: "in_consult" } : r)));
+    openConsult({ ...row, status: "in_consult" });
+  }
+
+  async function openConsult(row: Row) {
+    setActiveEntry(row);
+    setActivePatient(null);
+    setNote(BLANK_DRAFT);
+    setNoteStatus("draft");
+    setDirty(false);
+    setLastSavedAt(null);
+    setShellError(null);
+
+    const pRes = await authedFetch(`/patients/${row.patientId}`);
+    if (pRes?.ok) setActivePatient(await pRes.json());
+
+    const nRes = await authedFetch(`/clinical/notes/${row.id}`);
+    if (nRes?.status === 200) {
+      const n: Note = await nRes.json();
+      setNote({ subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "" });
+      setNoteStatus(n.status as "draft" | "signed");
+    }
+  }
+
+  function updateField(field: keyof NoteDraft, value: string) {
+    setNote((prev) => ({ ...prev, [field]: value }));
+    setDirty(true);
+  }
+
+  function closeShell() {
+    setActiveEntry(null);
+    load();
+  }
+
+  async function completeConsultation() {
+    if (!activeEntry) return;
+    setCompleting(true);
+    setShellError(null);
+    try {
+      // Always flush a save first — even an untouched note needs one draft row to exist before it
+      // can be signed, and this also catches the last few seconds of typing the 10s interval hasn't.
+      const saveRes = await saveNote(activeEntry.id);
+      if (!saveRes?.ok) {
+        setShellError("Couldn't save the note. Try again before completing.");
+        return;
+      }
+      const signRes = await authedFetch(`/clinical/notes/${activeEntry.id}/sign`, { method: "POST" });
+      if (!signRes?.ok) {
+        const p: Problem = await signRes?.json().catch(() => ({ title: "Error", detail: "Couldn't sign the note." }));
+        setShellError(p.detail || "Couldn't sign the note.");
+        return;
+      }
+      const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
+      if (!statusRes?.ok) {
+        setShellError("Note signed, but couldn't move the patient to checkout. Try again.");
+        return;
+      }
+      closeShell();
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  if (activeEntry) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.strip}>
+          <div className={styles.stripIdentity}>
+            <button className={styles.backBtn} onClick={closeShell}>← Queue</button>
+            {activePatient && (
+              <>
+                <span className={styles.stripName}>{activePatient.name}</span>
+                <span className={styles.stripMeta}>{activePatient.mrn} · {age(activePatient.dob)} · {activePatient.gender} · Token #{activeEntry.tokenNumber}</span>
+              </>
+            )}
+            <span className={`${styles.pill} ${STATUS_CLASS[activeEntry.status] ?? ""}`}>{activeEntry.status.replace("_", " ")}</span>
+          </div>
+          <div className={styles.stripActions}>
+            <span className={styles.saveStatus}>
+              {saving ? "Saving…" : dirty ? "Unsaved changes" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString()}` : ""}
+            </span>
+            <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || noteStatus === "signed"}>
+              {completing ? "Completing…" : "Complete consultation"}
+            </button>
+          </div>
+        </div>
+
+        {shellError && <div className={styles.errorState} role="alert">{shellError}</div>}
+
+        {activePatient && (
+          <div className={activePatient.allergies.length === 0 ? styles.allergyBannerNone : styles.allergyBannerSome}>
+            {activePatient.allergies.length === 0 ? "No known allergies" : `⚠ Allergies: ${activePatient.allergies.join(", ")}`}
+          </div>
+        )}
+
+        {noteStatus === "signed" && <div className={styles.signedBanner}>This note is signed and locked.</div>}
+
+        <div className={styles.card} style={{ padding: "24px" }}>
+          <div className={styles.noteGrid}>
+            {(["subjective", "objective", "assessment", "plan"] as const).map((field) => (
+              <div className={styles.noteField} key={field}>
+                <label className={styles.noteLabel} htmlFor={field}>{field}</label>
+                <textarea
+                  id={field}
+                  className={styles.textarea}
+                  value={note[field]}
+                  disabled={noteStatus === "signed"}
+                  onChange={(e) => updateField(field, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Consultation Workspace</h1>
+        <p className={styles.subtitle}>Today&apos;s queue.</p>
+      </div>
+
+      <div className={styles.card}>
+        {loading ? (
+          <div className={styles.state}>Loading…</div>
+        ) : forbidden ? (
+          <div className={styles.state}>Your role doesn&apos;t have access to the queue.</div>
+        ) : error ? (
+          <div className={styles.errorState}>{error}</div>
+        ) : rows.length === 0 ? (
+          <div className={styles.state}>No patients in today&apos;s queue.</div>
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr><th>Token</th><th>Patient</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className={styles.token}>{r.priority && <span className={styles.priorityDot} />}#{r.tokenNumber}</td>
+                    <td>{r.patientName}</td>
+                    <td><span className={`${styles.pill} ${STATUS_CLASS[r.status] ?? ""}`}>{r.status.replace("_", " ")}</span></td>
+                    <td>
+                      {r.status === "vitals_done" && <button className={styles.actionBtn} onClick={() => startConsult(r)}>Start consult</button>}
+                      {r.status === "in_consult" && <button className={styles.actionBtn} onClick={() => openConsult(r)}>Resume</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
