@@ -1,0 +1,202 @@
+.page {
+  min-height: 100%;
+  padding: var(--nb-space-32);
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--nb-space-16);
+  margin-bottom: var(--nb-space-24);
+}
+
+.title {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  margin: 0 0 var(--nb-space-4);
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+  margin: 0;
+}
+
+.formCard {
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-lg);
+  padding: var(--nb-space-16);
+  margin-bottom: var(--nb-space-16);
+  display: flex;
+  gap: var(--nb-space-12);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-8);
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--nb-text-tertiary);
+}
+
+.select,
+.input {
+  height: 40px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: 0 var(--nb-space-12);
+  color: var(--nb-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  min-width: 120px;
+}
+
+.checkboxField {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  height: 40px;
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+}
+
+.submit {
+  height: 40px;
+  padding: 0 var(--nb-space-16);
+  border: none;
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  background: var(--nb-surface-3);
+  color: var(--nb-text-disabled);
+  cursor: not-allowed;
+}
+
+.cancelBtn {
+  height: 40px;
+  padding: 0 var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: transparent;
+  color: var(--nb-text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.formError {
+  width: 100%;
+  background: var(--nb-danger-tint);
+  color: var(--nb-danger-500);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  font-size: 13px;
+}
+
+.card {
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-lg);
+  overflow: hidden;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nb-text-tertiary);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table tr:hover td {
+  background: var(--nb-surface-2);
+}
+
+.muted {
+  color: var(--nb-text-tertiary);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.pillActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
+.pillInactive { background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
+
+.actionBtn {
+  height: 28px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.state {
+  padding: var(--nb-space-32);
+  text-align: center;
+  color: var(--nb-text-secondary);
+  font-size: 14px;
+}
+
+.errorState {
+  composes: state;
+  color: var(--nb-danger-500);
+}

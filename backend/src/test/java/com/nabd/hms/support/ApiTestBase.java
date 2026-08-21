@@ -82,6 +82,7 @@ public abstract class ApiTestBase {
             st.execute("GRANT EXECUTE ON FUNCTION find_session_by_token_hash(text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_staff_by_invite_token_hash(text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,bigint,int) TO " + APP_ROLE);
+            st.execute("GRANT EXECUTE ON FUNCTION staff_counts_by_tenant() TO " + APP_ROLE);
             st.execute("GRANT USAGE ON SCHEMA master TO " + APP_ROLE);
             st.execute("GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA master TO " + APP_ROLE);
             st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA master TO " + APP_ROLE);
@@ -239,6 +240,16 @@ public abstract class ApiTestBase {
             throw new IllegalStateException("seeded operator login failed: " + resp.getStatusCode() + " " + resp.getBody());
         }
         return (String) resp.getBody().get("accessToken");
+    }
+
+    // master.plans/subscriptions/discount_requests carry no RLS (see V18 migration) — plain inserts.
+
+    protected UUID seedPlan(String code, int monthlyPriceCents, String currency, int seatLimit) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO master.plans (id, code, name, monthly_price_cents, currency, seat_limit, active) " +
+                        "VALUES (?,?,?,?,?,?,true)",
+                id, code, code, monthlyPriceCents, currency, seatLimit);
+        return id;
     }
 
     protected static ModuleGrant fullGrant(String module) {
