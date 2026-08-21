@@ -12,6 +12,7 @@ public record ChargeHeadResponse(
         BigDecimal followUpAmount,
         BigDecimal emergencyAmount,
         String taxCode,
+        BigDecimal taxRatePercent,
         boolean doctorOverride,
         boolean active,
         LocalDate effectiveFrom,

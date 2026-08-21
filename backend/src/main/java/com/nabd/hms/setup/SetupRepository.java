@@ -101,7 +101,7 @@ class SetupRepository {
     List<ChargeHeadRow> listCharges(UUID tenantId) {
         return jdbc.query(
                 "SELECT id, code, name, category, base_amount, follow_up_amount, emergency_amount, tax_code, " +
-                        "doctor_override, active, effective_from, effective_to, display_order " +
+                        "tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order " +
                         "FROM charge_catalogue WHERE tenant_id = ? ORDER BY display_order, name",
                 chargeMapper(), tenantId);
     }
@@ -109,7 +109,7 @@ class SetupRepository {
     Optional<ChargeHeadRow> findCharge(UUID tenantId, UUID id) {
         return jdbc.query(
                 "SELECT id, code, name, category, base_amount, follow_up_amount, emergency_amount, tax_code, " +
-                        "doctor_override, active, effective_from, effective_to, display_order " +
+                        "tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order " +
                         "FROM charge_catalogue WHERE tenant_id = ? AND id = ?",
                 chargeMapper(), tenantId, id).stream().findFirst();
     }
@@ -117,10 +117,10 @@ class SetupRepository {
     UUID insertCharge(UUID tenantId, ChargeHeadWriteRequest req) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, follow_up_amount, " +
-                        "emergency_amount, tax_code, doctor_override, active, effective_from, effective_to, display_order) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "emergency_amount, tax_code, tax_rate_percent, doctor_override, active, effective_from, effective_to, display_order) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id, tenantId, req.code(), req.name(), req.category(), req.baseAmount(), req.followUpAmount(),
-                req.emergencyAmount(), req.taxCode(), req.doctorOverride(), req.active(),
+                req.emergencyAmount(), req.taxCode(), req.taxRatePercentOrZero(), req.doctorOverride(), req.active(),
                 Date.valueOf(req.effectiveFrom()), req.effectiveTo() == null ? null : Date.valueOf(req.effectiveTo()),
                 req.displayOrder());
         return id;
@@ -128,10 +128,10 @@ class SetupRepository {
 
     void updateCharge(UUID tenantId, UUID id, ChargeHeadWriteRequest req) {
         jdbc.update("UPDATE charge_catalogue SET code = ?, name = ?, category = ?, base_amount = ?, follow_up_amount = ?, " +
-                        "emergency_amount = ?, tax_code = ?, doctor_override = ?, active = ?, effective_from = ?, " +
+                        "emergency_amount = ?, tax_code = ?, tax_rate_percent = ?, doctor_override = ?, active = ?, effective_from = ?, " +
                         "effective_to = ?, display_order = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
                 req.code(), req.name(), req.category(), req.baseAmount(), req.followUpAmount(),
-                req.emergencyAmount(), req.taxCode(), req.doctorOverride(), req.active(),
+                req.emergencyAmount(), req.taxCode(), req.taxRatePercentOrZero(), req.doctorOverride(), req.active(),
                 Date.valueOf(req.effectiveFrom()), req.effectiveTo() == null ? null : Date.valueOf(req.effectiveTo()),
                 req.displayOrder(), tenantId, id);
     }
@@ -386,6 +386,7 @@ class SetupRepository {
                 rs.getBigDecimal("follow_up_amount"),
                 rs.getBigDecimal("emergency_amount"),
                 rs.getString("tax_code"),
+                rs.getBigDecimal("tax_rate_percent"),
                 rs.getBoolean("doctor_override"),
                 rs.getBoolean("active"),
                 rs.getDate("effective_from").toLocalDate(),

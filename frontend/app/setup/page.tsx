@@ -10,7 +10,7 @@ type Problem = { title: string; detail: string };
 
 type ChecklistItem = { step: string; status: "pending" | "skipped" | "done"; skippedAt: string | null; doneAt: string | null };
 type Profile = { id: string; name: string; region: string; timezone: string; taxId: string | null; taxIdType: string | null; whatsappNumber: string | null; specialties: string[]; status: string; setupCompletedAt: string | null };
-type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; emergencyAmount: number | null; taxCode: string | null; doctorOverride: boolean; active: boolean; effectiveFrom: string; effectiveTo: string | null; displayOrder: number };
+type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; emergencyAmount: number | null; taxCode: string | null; taxRatePercent: number; doctorOverride: boolean; active: boolean; effectiveFrom: string; effectiveTo: string | null; displayOrder: number };
 type Policy = { id: string; policyKey: string; value: string; version: number };
 type ConsentContact = { name: string; email: string; phone: string | null };
 type Holiday = { id: string; holidayDate: string; name: string; recurring: boolean };
@@ -170,7 +170,9 @@ export default function SetupPage() {
     if (await patch("/setup/profile", body)) loadAll();
   };
 
-  const [newCharge, setNewCharge] = useState<Partial<Charge>>({ active: true, displayOrder: 0 });
+  // effectiveFrom has no visible input below — defaulted to today (matching the column's own
+  // CURRENT_DATE default) since addCharge()'s own guard requires it truthy to submit at all.
+  const [newCharge, setNewCharge] = useState<Partial<Charge>>({ active: true, displayOrder: 0, effectiveFrom: new Date().toISOString().slice(0, 10) });
   const addCharge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCharge.code || !newCharge.name || !newCharge.category || newCharge.baseAmount == null || !newCharge.effectiveFrom) return;
@@ -333,6 +335,10 @@ export default function SetupPage() {
                   <label className={styles.label}>Base amount</label>
                   <input className={styles.input} type="number" value={newCharge.baseAmount ?? ""} onChange={(e) => setNewCharge({ ...newCharge, baseAmount: Number(e.target.value) })} />
                 </div>
+                <div className={styles.field}>
+                  <label className={styles.label}>Tax rate %</label>
+                  <input className={styles.input} type="number" step="0.01" value={newCharge.taxRatePercent ?? ""} onChange={(e) => setNewCharge({ ...newCharge, taxRatePercent: Number(e.target.value) })} />
+                </div>
               </div>
               <div className={styles.actions}>
                 <button className={styles.btnPrimary} type="submit">Add charge</button>
@@ -341,7 +347,7 @@ export default function SetupPage() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Code</th><th>Name</th><th>Category</th><th>Base</th><th>Status</th><th></th></tr>
+                  <tr><th>Code</th><th>Name</th><th>Category</th><th>Base</th><th>Tax %</th><th>Status</th><th></th></tr>
                 </thead>
                 <tbody>
                   {charges.map((c) => (
@@ -350,6 +356,7 @@ export default function SetupPage() {
                       <td>{c.name}</td>
                       <td>{c.category}</td>
                       <td>{c.baseAmount}</td>
+                      <td>{c.taxRatePercent}</td>
                       <td><span className={`${styles.pill} ${c.active ? styles.pillActive : styles.pillInactive}`}>{c.active ? "active" : "inactive"}</span></td>
                       <td><button className={styles.smallBtn} onClick={() => toggleCharge(c)}>{c.active ? "Deactivate" : "Activate"}</button></td>
                     </tr>

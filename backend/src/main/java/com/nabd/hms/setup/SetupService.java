@@ -319,6 +319,7 @@ public class SetupService {
                 row.followUpAmount(),
                 row.emergencyAmount(),
                 row.taxCode(),
+                row.taxRatePercent(),
                 row.doctorOverride(),
                 row.active(),
                 row.effectiveFrom(),

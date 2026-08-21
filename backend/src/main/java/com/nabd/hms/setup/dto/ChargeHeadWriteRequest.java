@@ -15,10 +15,14 @@ public record ChargeHeadWriteRequest(
         @PositiveOrZero BigDecimal followUpAmount,
         @PositiveOrZero BigDecimal emergencyAmount,
         String taxCode,
+        @PositiveOrZero BigDecimal taxRatePercent,
         boolean doctorOverride,
         boolean active,
         @NotNull LocalDate effectiveFrom,
         LocalDate effectiveTo,
         int displayOrder
 ) {
+    public BigDecimal taxRatePercentOrZero() {
+        return taxRatePercent == null ? BigDecimal.ZERO : taxRatePercent;
+    }
 }

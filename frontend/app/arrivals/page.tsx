@@ -302,6 +302,9 @@ export default function ArrivalsPage() {
                             {!r.priority && b === "waiting" && (
                               <button className={styles.actionBtn} onClick={() => markPriority(r.id)}>Mark priority</button>
                             )}
+                            {b === "checkout_pending" && (
+                              <button className={styles.actionBtn} onClick={() => router.push(`/checkout/${r.id}`)}>Checkout</button>
+                            )}
                           </td>
                         </tr>
                       );

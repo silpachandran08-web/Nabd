@@ -19,7 +19,7 @@ final class SetupModels {
 
     record ChargeHeadRow(UUID id, String code, String name, String category,
                          BigDecimal baseAmount, BigDecimal followUpAmount, BigDecimal emergencyAmount,
-                         String taxCode, boolean doctorOverride, boolean active,
+                         String taxCode, BigDecimal taxRatePercent, boolean doctorOverride, boolean active,
                          LocalDate effectiveFrom, LocalDate effectiveTo, int displayOrder) {
     }
 
