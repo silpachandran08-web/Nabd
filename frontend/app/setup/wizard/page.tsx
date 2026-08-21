@@ -168,6 +168,7 @@ export default function SetupWizardPage() {
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Doctors</h2>
             <p className={styles.text}>Invite doctors from Staff & Access. Once added, their licence numbers can be recorded in the Licences tab.</p>
+            <button className={styles.btn} onClick={() => router.push("/staff")}>Open Staff & Access</button>
           </div>
         );
       case "schedule":

@@ -645,7 +645,10 @@ export default function SetupPage() {
           <h1 className={styles.title}>Clinic Setup & Administration</h1>
           <p className={styles.subtitle}>Configure the clinic before going live.</p>
         </div>
-        <button className={styles.wizardBtn} onClick={() => router.push("/setup/wizard")}>Open setup wizard</button>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button className={styles.wizardBtn} onClick={() => router.push("/staff")}>Staff & Access</button>
+          <button className={styles.wizardBtn} onClick={() => router.push("/setup/wizard")}>Open setup wizard</button>
+        </div>
       </div>
 
       <div className={styles.tabs}>
