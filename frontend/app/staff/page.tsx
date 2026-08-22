@@ -16,10 +16,55 @@ type Staff = {
   lastSeenAt: string | null;
 };
 type StaffPage = { data: Staff[]; page: { nextCursor: string | null; limit: number } };
-type Role = { id: string; name: string; builtIn: boolean };
+type ModuleGrant = {
+  module: string; view: boolean; create: boolean; edit: boolean; delete: boolean;
+  approve: boolean; refundDiscount: boolean; export: boolean;
+};
+type Role = { id: string; name: string; builtIn: boolean; grants: ModuleGrant[] };
 // GlobalExceptionHandler serializes RFC 7807 ProblemDetail — the machine-readable
 // error code lives in `type` (a "…/errors/<slug>" URI), not `title` (human text).
 type Problem = { type?: string; title: string; detail: string };
+
+type ActionKey = "view" | "create" | "edit" | "delete" | "approve" | "refundDiscount" | "export";
+type Grid = Record<string, Record<ActionKey, boolean>>;
+type Builder = { mode: "create" | "edit" | "view"; sourceId?: string; name: string; grid: Grid };
+
+// NB-049's module list — matches what every controller's @PreAuthorize actually checks.
+const MODULES: { key: string; label: string }[] = [
+  { key: "patients", label: "Patients" },
+  { key: "queue", label: "Queue & Appointments" },
+  { key: "clinical", label: "Clinical Records" },
+  { key: "billing", label: "Billing & Payments" },
+  { key: "packages", label: "Packages" },
+  { key: "pharmacy", label: "Pharmacy" },
+  { key: "reports", label: "Reports" },
+  { key: "staff", label: "Staff & Access" },
+  { key: "setup", label: "Clinic Setup" },
+  { key: "specialty_dental", label: "Specialty (Dental)" },
+  { key: "nursing", label: "Nursing" },
+];
+const ACTIONS: { key: ActionKey; label: string }[] = [
+  { key: "view", label: "View" },
+  { key: "create", label: "Create" },
+  { key: "edit", label: "Edit" },
+  { key: "delete", label: "Delete" },
+  { key: "approve", label: "Approve" },
+  { key: "refundDiscount", label: "Refund" },
+  { key: "export", label: "Export" },
+];
+
+function gridFromGrants(grants: ModuleGrant[]): Grid {
+  const grid = {} as Grid;
+  for (const m of MODULES) {
+    const g = grants.find((x) => x.module === m.key);
+    grid[m.key] = Object.fromEntries(ACTIONS.map((a) => [a.key, g ? g[a.key] : false])) as Record<ActionKey, boolean>;
+  }
+  return grid;
+}
+
+function grantsFromGrid(grid: Grid): ModuleGrant[] {
+  return MODULES.filter((m) => ACTIONS.some((a) => grid[m.key][a.key])).map((m) => ({ module: m.key, ...grid[m.key] }));
+}
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -65,6 +110,10 @@ export default function StaffAccessPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteFormError, setInviteFormError] = useState<string | null>(null);
   const [lastInvite, setLastInvite] = useState<{ name: string; link: string } | null>(null);
+
+  const [builder, setBuilder] = useState<Builder | null>(null);
+  const [builderError, setBuilderError] = useState<string | null>(null);
+  const [builderSubmitting, setBuilderSubmitting] = useState(false);
 
   const [stepUpFor, setStepUpFor] = useState<string | null>(null);
   const [stepUpCode, setStepUpCode] = useState("");
@@ -148,6 +197,61 @@ export default function StaffAccessPage() {
 
   function roleName(roleId: string): string {
     return roles.find((r) => r.id === roleId)?.name ?? "—";
+  }
+
+  function openNewRole() {
+    setBuilderError(null);
+    setBuilder({ mode: "create", name: "", grid: gridFromGrants([]) });
+  }
+
+  function openCloneRole(role: Role) {
+    setBuilderError(null);
+    setBuilder({ mode: "create", name: `${role.name} (copy)`, grid: gridFromGrants(role.grants) });
+  }
+
+  function openRole(role: Role, canEdit: boolean) {
+    setBuilderError(null);
+    setBuilder({ mode: role.builtIn || !canEdit ? "view" : "edit", sourceId: role.id, name: role.name, grid: gridFromGrants(role.grants) });
+  }
+
+  function toggleCell(moduleKey: string, actionKey: ActionKey) {
+    if (!builder || builder.mode === "view") return;
+    setBuilder({ ...builder, grid: { ...builder.grid, [moduleKey]: { ...builder.grid[moduleKey], [actionKey]: !builder.grid[moduleKey][actionKey] } } });
+  }
+
+  async function submitRole(e: React.FormEvent) {
+    e.preventDefault();
+    if (!builder || builder.mode === "view") return;
+    setBuilderError(null);
+    const name = builder.name.trim();
+    if (!name) {
+      setBuilderError("Name the role.");
+      return;
+    }
+    const grants = grantsFromGrid(builder.grid);
+    if (grants.length === 0) {
+      setBuilderError("Grant at least one permission.");
+      return;
+    }
+    setBuilderSubmitting(true);
+    try {
+      const isEdit = builder.mode === "edit";
+      const res = await authedFetch(isEdit ? `/roles/${builder.sourceId}` : "/roles", {
+        method: isEdit ? "PATCH" : "POST",
+        body: JSON.stringify({ name, grants }),
+      });
+      if (!res) return;
+      if (!res.ok) {
+        const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't save the role." }));
+        setBuilderError(body.detail || "Couldn't save the role.");
+        return;
+      }
+      const saved: Role = await res.json();
+      setRoles((prev) => (isEdit ? prev.map((r) => (r.id === saved.id ? saved : r)) : [...prev, saved]));
+      setBuilder(null);
+    } finally {
+      setBuilderSubmitting(false);
+    }
   }
 
   async function submitInvite(e: React.FormEvent) {
@@ -249,6 +353,7 @@ export default function StaffAccessPage() {
 
   const canInvite = permissions.includes("staff:create");
   const canSuspend = permissions.includes("staff:delete");
+  const canEditRoles = permissions.includes("staff:edit");
 
   return (
     <main className={styles.page}>
@@ -356,6 +461,109 @@ export default function StaffAccessPage() {
           </div>
         )}
       </div>
+
+      {!loading && !forbidden && (
+        <>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Roles</h2>
+            {canInvite && <button className={styles.actionBtn} onClick={openNewRole}>+ New role</button>}
+          </div>
+          <div className={styles.card}>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Name</th><th>Type</th><th></th></tr></thead>
+                <tbody>
+                  {roles.map((r) => (
+                    <tr key={r.id}>
+                      <td className={styles.staffName}>{r.name}</td>
+                      <td><span className={`${styles.pill} ${r.builtIn ? styles.pillBuiltIn : styles.pillCustom}`}>{r.builtIn ? "Built-in" : "Custom"}</span></td>
+                      <td>
+                        <button className={styles.actionBtn} onClick={() => openRole(r, canEditRoles)}>
+                          {r.builtIn || !canEditRoles ? "View" : "Edit"}
+                        </button>
+                        {canInvite && <button className={styles.actionBtn} style={{ marginLeft: "8px" }} onClick={() => openCloneRole(r)}>Clone</button>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {builder && (
+        <div className={styles.stepUpOverlay} onClick={() => setBuilder(null)}>
+          <form className={styles.roleModal} onClick={(e) => e.stopPropagation()} onSubmit={submitRole}>
+            <h2 className={styles.stepUpTitle}>
+              {builder.mode === "create" ? "New role" : builder.mode === "edit" ? "Edit role" : "Permissions"}
+            </h2>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="roleName">Role name</label>
+              <input
+                id="roleName"
+                className={styles.input}
+                style={{ width: "100%" }}
+                value={builder.name}
+                onChange={(e) => setBuilder({ ...builder, name: e.target.value })}
+                disabled={builder.mode === "view"}
+                required
+              />
+            </div>
+            <div className={styles.matrixWrap}>
+              <table className={styles.matrixTable}>
+                <thead>
+                  <tr>
+                    <th>Module</th>
+                    {ACTIONS.map((a) => <th key={a.key}>{a.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {MODULES.map((m) => (
+                    <tr key={m.key}>
+                      <td>{m.label}</td>
+                      {ACTIONS.map((a) => (
+                        <td key={a.key}>
+                          <input
+                            type="checkbox"
+                            checked={builder.grid[m.key][a.key]}
+                            disabled={builder.mode === "view"}
+                            onChange={() => toggleCell(m.key, a.key)}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {builderError && <div className={styles.formError} role="alert" style={{ marginTop: "12px" }}>{builderError}</div>}
+            <div className={styles.stepUpActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setBuilder(null)}>
+                {builder.mode === "view" ? "Close" : "Cancel"}
+              </button>
+              {builder.mode === "view" ? (
+                canInvite && (
+                  <button
+                    type="button"
+                    className={styles.submit}
+                    onClick={() => {
+                      const role = roles.find((r) => r.id === builder.sourceId);
+                      if (role) openCloneRole(role);
+                    }}
+                  >
+                    Clone this role
+                  </button>
+                )
+              ) : (
+                <button type="submit" className={styles.submit} disabled={builderSubmitting}>
+                  {builderSubmitting ? "Saving…" : builder.mode === "edit" ? "Save changes" : "Create role"}
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      )}
 
       {stepUpFor && (
         <div className={styles.stepUpOverlay}>

@@ -307,3 +307,81 @@
   color: var(--nb-text-disabled);
   cursor: not-allowed;
 }
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: var(--nb-space-24) 0 var(--nb-space-12);
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.pillBuiltIn { background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
+.pillCustom { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
+
+.roleModal {
+  width: 640px;
+  max-width: 92vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-lg);
+  padding: var(--nb-space-24);
+}
+
+.matrixWrap {
+  overflow-x: auto;
+  margin-top: var(--nb-space-16);
+}
+
+.matrixTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.matrixTable th {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--nb-text-tertiary);
+  padding: var(--nb-space-8);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  white-space: nowrap;
+}
+
+.matrixTable th:first-child {
+  text-align: left;
+}
+
+.matrixTable td {
+  text-align: center;
+  padding: var(--nb-space-8);
+  border-bottom: 1px solid var(--nb-border-subtle);
+}
+
+.matrixTable td:first-child {
+  text-align: left;
+  color: var(--nb-text-primary);
+  white-space: nowrap;
+}
+
+.matrixTable input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--nb-accent-500);
+  cursor: pointer;
+}
+
+.matrixTable input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
