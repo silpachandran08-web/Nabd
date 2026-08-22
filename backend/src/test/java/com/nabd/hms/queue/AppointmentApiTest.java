@@ -177,4 +177,47 @@ class AppointmentApiTest extends ApiTestBase {
         assertThat(resp.getBody().get("status")).isEqualTo("scheduled");
         assertThat(resp.getBody().get("id")).isNotEqualTo(id);
     }
+
+    // ---- NB-116: follow-up callback list ----
+
+    @Test
+    void callbackListSurfacesMissedFollowUpsButNotOrdinaryOrRecentAppointments() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner9@a.com", "+919500000009", false);
+        String token = loginAndGetAccessToken(staff);
+        addWorkingHours(token, staff.id(), null);
+
+        String noShowFollowUp = registerPatient(token, "Zephyr", "+919999900010");
+        String recentFollowUp = registerPatient(token, "Quokka", "+919999900011");
+        String ordinaryOldNoShow = registerPatient(token, "Wombat", "+919999900012");
+
+        UUID noShowFollowUpAppt = UUID.randomUUID();
+        UUID recentFollowUpAppt = UUID.randomUUID();
+        UUID ordinaryNoShowAppt = UUID.randomUUID();
+        Instant longAgo = Instant.now().minus(20, ChronoUnit.DAYS);
+        inTenantTx(tenant.id(), () -> {
+            jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, status, is_follow_up) " +
+                            "VALUES (?,?,?,?,?,?,'no_show',true)",
+                    noShowFollowUpAppt, tenant.id(), UUID.fromString(noShowFollowUp), staff.id(), java.sql.Timestamp.from(longAgo),
+                    java.sql.Timestamp.from(longAgo.plus(15, ChronoUnit.MINUTES)));
+            jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, status, is_follow_up) " +
+                            "VALUES (?,?,?,?,?,?,'scheduled',true)",
+                    recentFollowUpAppt, tenant.id(), UUID.fromString(recentFollowUp), staff.id(),
+                    java.sql.Timestamp.from(Instant.now().plus(1, ChronoUnit.DAYS)),
+                    java.sql.Timestamp.from(Instant.now().plus(1, ChronoUnit.DAYS).plus(15, ChronoUnit.MINUTES)));
+            jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, status, is_follow_up) " +
+                            "VALUES (?,?,?,?,?,?,'no_show',false)",
+                    ordinaryNoShowAppt, tenant.id(), UUID.fromString(ordinaryOldNoShow), staff.id(), java.sql.Timestamp.from(longAgo),
+                    java.sql.Timestamp.from(longAgo.plus(15, ChronoUnit.MINUTES)));
+        });
+
+        ResponseEntity<java.util.List> resp = exchange("/v1/appointments/callback-list", HttpMethod.GET, authed(token), java.util.List.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        java.util.List<?> body = resp.getBody();
+        assertThat(body).hasSize(1);
+        Map<?, ?> entry = (Map<?, ?>) body.get(0);
+        assertThat(entry.get("patientName")).isEqualTo("Zephyr");
+    }
 }

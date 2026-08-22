@@ -219,6 +219,9 @@ class NursingApiTest extends ApiTestBase {
         assertThat(((Number) order.getBody().get("baseAmount")).doubleValue()).isEqualTo(2500.00);
         String procedureId = (String) order.getBody().get("id");
 
+        exchange("/v1/nursing/procedure-orders/" + procedureId + "/consent", HttpMethod.POST,
+                authedJsonBody(token, Map.of("signedName", "P9")), Map.class);
+
         ResponseEntity<Map> completed = exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
                 authedJsonBody(token, Map.of("status", "completed")), Map.class);
         assertThat(completed.getBody().get("status")).isEqualTo("completed");
@@ -242,6 +245,56 @@ class NursingApiTest extends ApiTestBase {
         Boolean billed = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
                 "SELECT billed FROM procedure_orders WHERE id = ?", Boolean.class, UUID.fromString(procedureId)));
         assertThat(billed).isTrue();
+    }
+
+    @Test
+    void aProcedureCannotBeStartedWithoutRecordedConsentButCanStillBeCancelled() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "n10@a.com", "+919800020010", false);
+        String token = loginAndGetAccessToken(staff);
+        seedCharge(tenant, "RCT-2", "Root canal", 2500.00, 18.00);
+        String patientId = registerPatient(token, "P10", "+919999960010");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+
+        ResponseEntity<Map> order = exchange("/v1/nursing/procedure-orders", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "queueEntryId", queueEntryId, "chargeCode", "RCT-2")), Map.class);
+        String procedureId = (String) order.getBody().get("id");
+
+        ResponseEntity<Map> blocked = exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "prepped")), Map.class);
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(blocked.getBody().get("type")).asString().contains("consent-required");
+
+        ResponseEntity<Map> cancelled = exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "cancelled")), Map.class);
+        assertThat(cancelled.getBody().get("status")).isEqualTo("cancelled");
+    }
+
+    @Test
+    void recordingConsentUnblocksStartingTheProcedure() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "n11@a.com", "+919800020011", false);
+        String token = loginAndGetAccessToken(staff);
+        seedCharge(tenant, "RCT-3", "Root canal", 2500.00, 18.00);
+        String patientId = registerPatient(token, "P11", "+919999960011");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+
+        ResponseEntity<Map> order = exchange("/v1/nursing/procedure-orders", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "queueEntryId", queueEntryId, "chargeCode", "RCT-3")), Map.class);
+        String procedureId = (String) order.getBody().get("id");
+
+        ResponseEntity<Map> consented = exchange("/v1/nursing/procedure-orders/" + procedureId + "/consent", HttpMethod.POST,
+                authedJsonBody(token, Map.of("signedName", "P11")), Map.class);
+        assertThat(consented.getBody().get("consentSignedName")).isEqualTo("P11");
+        assertThat(consented.getBody().get("consentRecordedByName")).isEqualTo("Test Staff");
+        assertThat(consented.getBody().get("consentSignedAt")).isNotNull();
+
+        ResponseEntity<Map> prepped = exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "prepped")), Map.class);
+        assertThat(prepped.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(prepped.getBody().get("status")).isEqualTo("prepped");
     }
 
     // ---- NB-148: completed activity log ----

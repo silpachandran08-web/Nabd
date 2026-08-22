@@ -13,6 +13,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.reports.ReportsModels.ActorInfo;
+import static com.nabd.hms.reports.ReportsModels.DoctorPunctualityRow;
+import static com.nabd.hms.reports.ReportsModels.LeakageRow;
 import static com.nabd.hms.reports.ReportsModels.NoShowRiskRow;
 import static com.nabd.hms.reports.ReportsModels.SourceCount;
 import static com.nabd.hms.reports.ReportsModels.StaffCollectionRow;
@@ -125,6 +127,48 @@ class ReportsRepository {
                 (rs, i) -> new NoShowRiskRow(UUID.fromString(rs.getString("patient_id")), rs.getString("name"),
                         rs.getLong("no_show_count")),
                 tenantId, Date.valueOf(since), minPriorNoShows, tenantId, Date.valueOf(today));
+    }
+
+    /** NB-233: checkout's markProceduresBilled() flips billed=true for the whole visit unconditionally —
+     * this finds the gap where that trust was misplaced and the charge never made it onto an invoice. */
+    List<LeakageRow> billingLeakage(UUID tenantId, Instant since, BigDecimal minAmount) {
+        return jdbc.query("""
+                SELECT po.id, po.queue_entry_id, p.name AS patient_name, po.charge_code, po.charge_name,
+                       po.base_amount, po.completed_at
+                FROM procedure_orders po
+                JOIN patients p ON p.id = po.patient_id
+                WHERE po.tenant_id = ? AND po.status = 'completed' AND po.billed = true
+                  AND po.completed_at >= ? AND po.base_amount >= ?
+                  AND NOT EXISTS (
+                    SELECT 1 FROM invoice_line_items ili JOIN invoices inv ON inv.id = ili.invoice_id
+                    WHERE inv.tenant_id = po.tenant_id AND inv.queue_entry_id = po.queue_entry_id
+                      AND ili.charge_code = po.charge_code
+                  )
+                ORDER BY po.completed_at DESC
+                """,
+                (rs, i) -> new LeakageRow(UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("queue_entry_id")),
+                        rs.getString("patient_name"), rs.getString("charge_code"), rs.getString("charge_name"),
+                        rs.getBigDecimal("base_amount"), rs.getTimestamp("completed_at").toInstant()),
+                tenantId, Timestamp.from(since), minAmount);
+    }
+
+    /** NB-236: sameDayRepeatDays counts distinct announcement-days with 2+ delays for that doctor. */
+    List<DoctorPunctualityRow> doctorPunctuality(UUID tenantId, Instant since) {
+        return jdbc.query("""
+                SELECT doctor_id, s.name AS doctor_name, count(*) AS delay_count, avg(delay_minutes) AS avg_minutes,
+                       count(DISTINCT day) FILTER (WHERE day_count > 1) AS same_day_repeat_days
+                FROM (
+                  SELECT dd.doctor_id, dd.delay_minutes, date_trunc('day', dd.announced_at) AS day,
+                         count(*) OVER (PARTITION BY dd.doctor_id, date_trunc('day', dd.announced_at)) AS day_count
+                  FROM doctor_delays dd WHERE dd.tenant_id = ? AND dd.announced_at >= ?
+                ) x
+                JOIN staff s ON s.id = x.doctor_id
+                GROUP BY doctor_id, s.name
+                ORDER BY delay_count DESC
+                """,
+                (rs, i) -> new DoctorPunctualityRow(UUID.fromString(rs.getString("doctor_id")), rs.getString("doctor_name"),
+                        rs.getLong("delay_count"), rs.getDouble("avg_minutes"), rs.getLong("same_day_repeat_days")),
+                tenantId, Timestamp.from(since));
     }
 
     Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {

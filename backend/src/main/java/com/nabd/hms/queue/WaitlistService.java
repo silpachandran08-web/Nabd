@@ -111,7 +111,7 @@ public class WaitlistService {
         Instant end = entry.offeredSlotStart().plus(slotMinutes, ChronoUnit.MINUTES);
         UUID appointmentId;
         try {
-            appointmentId = appointmentRepo.insert(tenantId, entry.patientId(), entry.doctorId(), entry.offeredSlotStart(), end);
+            appointmentId = appointmentRepo.insert(tenantId, entry.patientId(), entry.doctorId(), entry.offeredSlotStart(), end, false);
         } catch (DataIntegrityViolationException e) {
             // vanishingly unlikely (the slot was free the moment it was offered) but never silently drop the claim
             throw new ApiException(HttpStatus.CONFLICT, "slot-unavailable", "Slot no longer available",

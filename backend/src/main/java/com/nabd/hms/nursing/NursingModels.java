@@ -20,7 +20,7 @@ final class NursingModels {
     record ProcedureOrderRow(UUID id, UUID queueEntryId, UUID patientId, UUID orderedBy, String chargeCode,
                               String chargeName, BigDecimal baseAmount, BigDecimal taxRatePercent, String prepNotes,
                               String consentNote, String status, boolean billed, UUID completedBy, Instant completedAt,
-                              Instant createdAt) {
+                              Instant createdAt, String consentSignedName, UUID consentRecordedBy, Instant consentSignedAt) {
     }
 
     record ActivityRow(String kind, String activity, UUID patientId, UUID staffId, Instant occurredAt) {

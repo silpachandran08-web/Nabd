@@ -4,6 +4,7 @@ import com.nabd.hms.nursing.dto.ActivityEntryResponse;
 import com.nabd.hms.nursing.dto.AdministerRequest;
 import com.nabd.hms.nursing.dto.AdministrationOrderRequest;
 import com.nabd.hms.nursing.dto.AdministrationOrderResponse;
+import com.nabd.hms.nursing.dto.ProcedureConsentRequest;
 import com.nabd.hms.nursing.dto.ProcedureNotesRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderResponse;
@@ -82,6 +83,12 @@ public class NursingController {
     @PreAuthorize("hasAuthority('nursing:edit')")
     public ProcedureOrderResponse updateProcedureStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody ProcedureStatusRequest req) {
         return procedureService.updateStatus(tenantId(jwt), staffId(jwt), id, req);
+    }
+
+    @PostMapping("/procedure-orders/{id}/consent")
+    @PreAuthorize("hasAuthority('nursing:edit')")
+    public ProcedureOrderResponse recordProcedureConsent(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody ProcedureConsentRequest req) {
+        return procedureService.recordConsent(tenantId(jwt), staffId(jwt), id, req);
     }
 
     @PatchMapping("/procedure-orders/{id}/notes")

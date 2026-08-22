@@ -10,6 +10,7 @@ import java.util.UUID;
 public record ProcedureOrderResponse(
         UUID id, UUID queueEntryId, UUID patientId, String patientName, String orderedByName, String chargeCode,
         String chargeName, BigDecimal baseAmount, BigDecimal taxRatePercent, String prepNotes, String consentNote,
-        String status, boolean billed, String completedByName, Instant completedAt, Instant createdAt
+        String status, boolean billed, String completedByName, Instant completedAt, Instant createdAt,
+        String consentSignedName, String consentRecordedByName, Instant consentSignedAt
 ) {
 }

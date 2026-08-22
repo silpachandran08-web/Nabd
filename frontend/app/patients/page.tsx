@@ -87,6 +87,8 @@ export default function PatientsPage() {
 
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [timeline, setTimeline] = useState<Encounter[]>([]);
+  const [timelineCursor, setTimelineCursor] = useState<string | null>(null);
+  const [timelineLoadingMore, setTimelineLoadingMore] = useState(false);
 
   const [chart, setChart] = useState<Tooth[]>([]);
   const [chartBusy, setChartBusy] = useState<number | null>(null);
@@ -175,6 +177,7 @@ export default function PatientsPage() {
     setNewCondition({ condition: "", reviewDueDate: "" });
     setPrescriptions([]);
     setTimeline([]);
+    setTimelineCursor(null);
     setChart([]);
     setHistoryToothId(null);
     setHistoryEntries([]);
@@ -193,12 +196,31 @@ export default function PatientsPage() {
     const rxRes = await authedFetch(`/clinical/patients/${id}/prescriptions`);
     if (rxRes?.ok) setPrescriptions(await rxRes.json());
 
-    const tlRes = await authedFetch(`/clinical/patients/${id}/timeline`);
-    if (tlRes?.ok) setTimeline(await tlRes.json());
+    const tlRes = await authedFetch(`/clinical/patients/${id}/timeline?limit=10`);
+    if (tlRes?.ok) {
+      const page = await tlRes.json();
+      setTimeline(page.data);
+      setTimelineCursor(page.page.nextCursor);
+    }
 
     if (canDental) {
       const chartRes = await authedFetch(`/specialty/dental/patients/${id}/chart`);
       if (chartRes?.ok) setChart(await chartRes.json());
+    }
+  }
+
+  async function loadMoreTimeline(patientId: string) {
+    if (!timelineCursor) return;
+    setTimelineLoadingMore(true);
+    try {
+      const res = await authedFetch(`/clinical/patients/${patientId}/timeline?limit=10&cursor=${encodeURIComponent(timelineCursor)}`);
+      if (res?.ok) {
+        const page = await res.json();
+        setTimeline((prev) => [...prev, ...page.data]);
+        setTimelineCursor(page.page.nextCursor);
+      }
+    } finally {
+      setTimelineLoadingMore(false);
     }
   }
 
@@ -655,6 +677,11 @@ export default function PatientsPage() {
                         {e.medications && <span className={styles.muted}>{e.medications}</span>}
                       </div>
                     ))
+                  )}
+                  {timelineCursor && drawerPatient && (
+                    <button className={styles.linkBtn} onClick={() => loadMoreTimeline(drawerPatient.id)} disabled={timelineLoadingMore}>
+                      {timelineLoadingMore ? "Loading…" : "Load more"}
+                    </button>
                   )}
                 </div>
                 </>

@@ -135,6 +135,35 @@ class PrescriptionApiTest extends ApiTestBase {
     }
 
     @Test
+    void aFavouriteRxSetCanBeSavedAndAppliedToADraftRerunningAllergyChecks() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc10@a.com", "+919800020005", false);
+        String token = loginAndGetAccessToken(doc);
+
+        ResponseEntity<Map> created = exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Common cold combo",
+                "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg", "frequency", "BD"),
+                        Map.of("drugName", "Cetirizine", "dosage", "10mg", "frequency", "OD")))), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String setId = (String) created.getBody().get("id");
+        assertThat((List<?>) created.getBody().get("items")).hasSize(2);
+
+        ResponseEntity<List> listed = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class);
+        assertThat(listed.getBody()).hasSize(1);
+
+        String patientId = registerPatient(token, "P4", "+919999960005");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Paracetamol", "severity", "severe", "reaction", "hives")), Map.class);
+        String queueEntryId = checkIn(token, patientId, doc.id());
+
+        ResponseEntity<Map> blocked = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/apply-set/" + setId,
+                HttpMethod.POST, authed(token), Map.class);
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(blocked.getBody().get("type")).asString().contains("allergy-conflict");
+    }
+
+    @Test
     void roleWithoutClinicalGrantIsForbidden() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedRole(tenant.id(), "FrontDeskOnly", false, fullGrant("queue"), fullGrant("patients"));

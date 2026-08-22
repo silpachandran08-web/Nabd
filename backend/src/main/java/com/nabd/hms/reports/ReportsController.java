@@ -1,11 +1,13 @@
 package com.nabd.hms.reports;
 
 import com.nabd.hms.common.RequestMeta;
+import com.nabd.hms.reports.dto.BillingLeakageResponse;
 import com.nabd.hms.reports.dto.DailyMoneyResponse;
+import com.nabd.hms.reports.dto.DoctorPunctualityResponse;
 import com.nabd.hms.reports.dto.NoShowRiskResponse;
 import com.nabd.hms.reports.dto.RetentionResponse;
 import com.nabd.hms.reports.dto.SourceBreakdownResponse;
-import com.nabd.hms.reports.dto.StaffPerformanceResponse;
+import com.nabd.hms.reports.dto.StaffPerformanceReport;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -46,9 +49,22 @@ public class ReportsController {
 
     @GetMapping("/staff-performance")
     @PreAuthorize("hasAuthority('reports:view')")
-    public List<StaffPerformanceResponse> staffPerformance(@AuthenticationPrincipal Jwt jwt,
-                                                             @RequestParam(defaultValue = "30") int days) {
-        return service.staffPerformance(tenantId(jwt), staffId(jwt), days);
+    public StaffPerformanceReport staffPerformance(@AuthenticationPrincipal Jwt jwt,
+                                                    @RequestParam(defaultValue = "30") int days) {
+        return service.staffPerformanceReport(tenantId(jwt), staffId(jwt), days);
+    }
+
+    @GetMapping("/billing-leakage")
+    @PreAuthorize("hasAuthority('reports:view')")
+    public BillingLeakageResponse billingLeakage(@AuthenticationPrincipal Jwt jwt,
+                                                  @RequestParam(defaultValue = "0") BigDecimal thresholdAmount) {
+        return service.billingLeakage(tenantId(jwt), thresholdAmount);
+    }
+
+    @GetMapping("/doctor-punctuality")
+    @PreAuthorize("hasAuthority('reports:view')")
+    public DoctorPunctualityResponse doctorPunctuality(@AuthenticationPrincipal Jwt jwt) {
+        return service.doctorPunctuality(tenantId(jwt));
     }
 
     @GetMapping("/retention")

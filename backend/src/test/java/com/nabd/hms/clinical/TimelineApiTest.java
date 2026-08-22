@@ -52,11 +52,12 @@ class TimelineApiTest extends ApiTestBase {
                 "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
-        ResponseEntity<List> timeline = exchange("/v1/clinical/patients/" + patientId + "/timeline", HttpMethod.GET, authed(token), List.class);
+        ResponseEntity<Map> timeline = exchange("/v1/clinical/patients/" + patientId + "/timeline", HttpMethod.GET, authed(token), Map.class);
 
         assertThat(timeline.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(timeline.getBody()).hasSize(1);
-        Map<?, ?> encounter = (Map<?, ?>) timeline.getBody().get(0);
+        List<?> data = (List<?>) timeline.getBody().get("data");
+        assertThat(data).hasSize(1);
+        Map<?, ?> encounter = (Map<?, ?>) data.get(0);
         assertThat(encounter.get("diagnosis")).isEqualTo("Viral URI");
         assertThat(encounter.get("medications")).isEqualTo("Paracetamol");
     }
@@ -70,8 +71,40 @@ class TimelineApiTest extends ApiTestBase {
         String patientId = registerPatient(token, "T2", "+919999970002");
         checkIn(token, patientId, doc.id());
 
-        ResponseEntity<List> timeline = exchange("/v1/clinical/patients/" + patientId + "/timeline", HttpMethod.GET, authed(token), List.class);
+        ResponseEntity<Map> timeline = exchange("/v1/clinical/patients/" + patientId + "/timeline", HttpMethod.GET, authed(token), Map.class);
 
-        assertThat(timeline.getBody()).isEmpty();
+        assertThat((List<?>) timeline.getBody().get("data")).isEmpty();
+    }
+
+    @Test
+    void timelinePaginatesNewestFirst() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc9@a.com", "+919800030003", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "T3", "+919999970003");
+
+        for (int i = 0; i < 3; i++) {
+            String queueEntryId = checkIn(token, patientId, doc.id());
+            exchange("/v1/clinical/notes/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                    "diagnosis", "Visit " + i)), Map.class);
+            moveTo(token, queueEntryId, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+            exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                    "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                            "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
+        }
+
+        ResponseEntity<Map> firstPage = exchange("/v1/clinical/patients/" + patientId + "/timeline?limit=2", HttpMethod.GET, authed(token), Map.class);
+        List<?> firstData = (List<?>) firstPage.getBody().get("data");
+        assertThat(firstData).hasSize(2);
+        Map<?, ?> pageMeta = (Map<?, ?>) firstPage.getBody().get("page");
+        String cursor = (String) pageMeta.get("nextCursor");
+        assertThat(cursor).isNotNull();
+
+        ResponseEntity<Map> secondPage = exchange("/v1/clinical/patients/" + patientId + "/timeline?limit=2&cursor=" + cursor,
+                HttpMethod.GET, authed(token), Map.class);
+        List<?> secondData = (List<?>) secondPage.getBody().get("data");
+        assertThat(secondData).hasSize(1);
+        assertThat(((Map<?, ?>) secondPage.getBody().get("page")).get("nextCursor")).isNull();
     }
 }

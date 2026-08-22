@@ -2,6 +2,7 @@ package com.nabd.hms.nursing;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.nursing.dto.ProcedureConsentRequest;
 import com.nabd.hms.nursing.dto.ProcedureNotesRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderResponse;
@@ -59,7 +60,20 @@ public class ProcedureService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "already-final", "Already final",
                     "This procedure is already " + row.status() + ".");
         }
+        if (!"cancelled".equals(req.status()) && row.consentSignedAt() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "consent-required", "Consent required",
+                    "Record the patient's signed consent before starting this procedure.");
+        }
         repo.updateProcedureStatus(tenantId, id, req.status(), "completed".equals(req.status()) ? staffId : null);
+        return toResponse(tenantId, repo.findProcedureOrder(tenantId, id).orElseThrow());
+    }
+
+    /** NB-119: gates updateStatus above — a typed name is this app's stand-in for a signature. */
+    @Transactional
+    public ProcedureOrderResponse recordConsent(UUID tenantId, UUID staffId, UUID id, ProcedureConsentRequest req) {
+        tenantContext.set(tenantId);
+        repo.findProcedureOrder(tenantId, id).orElseThrow(this::notFound);
+        repo.recordConsent(tenantId, id, req.signedName(), staffId);
         return toResponse(tenantId, repo.findProcedureOrder(tenantId, id).orElseThrow());
     }
 
@@ -75,9 +89,12 @@ public class ProcedureService {
         String patientName = repo.findPatientName(tenantId, row.patientId()).orElse("Unknown patient");
         String orderedByName = repo.findStaffName(tenantId, row.orderedBy()).orElse("Unknown staff");
         String completedByName = row.completedBy() == null ? null : repo.findStaffName(tenantId, row.completedBy()).orElse(null);
+        String consentRecordedByName = row.consentRecordedBy() == null ? null
+                : repo.findStaffName(tenantId, row.consentRecordedBy()).orElse(null);
         return new ProcedureOrderResponse(row.id(), row.queueEntryId(), row.patientId(), patientName, orderedByName,
                 row.chargeCode(), row.chargeName(), row.baseAmount(), row.taxRatePercent(), row.prepNotes(),
-                row.consentNote(), row.status(), row.billed(), completedByName, row.completedAt(), row.createdAt());
+                row.consentNote(), row.status(), row.billed(), completedByName, row.completedAt(), row.createdAt(),
+                row.consentSignedName(), consentRecordedByName, row.consentSignedAt());
     }
 
     private ApiException notFound() {

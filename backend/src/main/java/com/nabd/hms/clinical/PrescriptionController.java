@@ -1,5 +1,8 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.clinical.dto.DoseCalculationResponse;
+import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
+import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
 import com.nabd.hms.clinical.dto.PrescriptionUpsertRequest;
 import com.nabd.hms.common.RequestMeta;
@@ -14,8 +17,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -52,6 +57,32 @@ public class PrescriptionController {
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<PrescriptionResponse> previousForPatient(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
         return service.previousForPatient(tenantId(jwt), patientId);
+    }
+
+    @GetMapping("/patients/{patientId}/dose-calculator")
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public DoseCalculationResponse calculateDose(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+                                                  @RequestParam BigDecimal mgPerKg) {
+        return service.calculateDose(tenantId(jwt), patientId, mgPerKg);
+    }
+
+    @PostMapping("/rx-sets")
+    @PreAuthorize("hasAuthority('clinical:edit')")
+    public FavouriteRxSetResponse createSet(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FavouriteRxSetRequest req) {
+        return service.createSet(tenantId(jwt), staffId(jwt), req);
+    }
+
+    @GetMapping("/rx-sets")
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public List<FavouriteRxSetResponse> listSets(@AuthenticationPrincipal Jwt jwt) {
+        return service.listSets(tenantId(jwt), staffId(jwt));
+    }
+
+    @PostMapping("/prescriptions/{queueEntryId}/apply-set/{setId}")
+    @PreAuthorize("hasAuthority('clinical:edit')")
+    public PrescriptionResponse applySet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
+                                          @PathVariable UUID setId, HttpServletRequest http) {
+        return service.applySet(tenantId(jwt), queueEntryId, setId, staffId(jwt), RequestMeta.clientIp(http));
     }
 
     private UUID tenantId(Jwt jwt) {

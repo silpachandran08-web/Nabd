@@ -7,5 +7,5 @@ import java.util.UUID;
  * "severe" match is ever blocking (see PrescriptionService); moderate/mild are warning-only. */
 public record PrescriptionItemResponse(UUID id, String drugName, String dosage, String frequency, String duration,
                                         String instructions, String allergyOverrideReason, int displayOrder,
-                                        String allergyWarning) {
+                                        String allergyWarning, String pregnancyWarning, String controlledSubstanceWarning) {
 }

@@ -3,6 +3,7 @@ package com.nabd.hms.queue;
 import com.nabd.hms.queue.dto.AppointmentPage;
 import com.nabd.hms.queue.dto.AppointmentResponse;
 import com.nabd.hms.queue.dto.AppointmentWriteRequest;
+import com.nabd.hms.queue.dto.CallbackEntryResponse;
 import com.nabd.hms.queue.dto.CancelRequest;
 import com.nabd.hms.queue.dto.RescheduleRequest;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -48,6 +50,12 @@ public class AppointmentController {
     public ResponseEntity<AppointmentResponse> book(@AuthenticationPrincipal Jwt jwt,
                                                       @Valid @RequestBody AppointmentWriteRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.book(tenantId(jwt), staffId(jwt), req));
+    }
+
+    @GetMapping("/callback-list")
+    @PreAuthorize("hasAuthority('queue:view')")
+    public List<CallbackEntryResponse> callbackList(@AuthenticationPrincipal Jwt jwt) {
+        return service.callbackList(tenantId(jwt));
     }
 
     @GetMapping("/{id}")

@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.clinical.dto.PrescriptionItemRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -10,6 +11,8 @@ import java.util.UUID;
 
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
 import static com.nabd.hms.clinical.PrescriptionModels.ActorInfo;
+import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetItemRow;
+import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetRow;
 import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionItemRow;
 import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionRow;
 
@@ -26,6 +29,22 @@ class PrescriptionRepository {
         return jdbc.query("SELECT patient_id, doctor_id FROM queue_entries WHERE tenant_id = ? AND id = ?",
                 (rs, i) -> new QueueEntryOwner(UUID.fromString(rs.getString("patient_id")), UUID.fromString(rs.getString("doctor_id"))),
                 tenantId, queueEntryId).stream().findFirst();
+    }
+
+    record PatientProfile(String gender, java.time.LocalDate dob) {
+    }
+
+    /** NB-113: pregnancy/lactation warning needs sex + age; NB-111/NB-112 reuse dob for age too. */
+    Optional<PatientProfile> findPatientProfile(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT gender, dob FROM patients WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> new PatientProfile(rs.getString("gender"), rs.getDate("dob").toLocalDate()),
+                tenantId, patientId).stream().findFirst();
+    }
+
+    /** NB-111: India Schedule H/H1 vs KSA SFDA controlled-substance rules apply by tenant region. */
+    Optional<String> findTenantRegion(UUID tenantId) {
+        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region"), tenantId)
+                .stream().findFirst();
     }
 
     /** NB-108: actor_name/actor_role snapshot for the audit row an allergy override writes. */
@@ -78,6 +97,53 @@ class PrescriptionRepository {
     void sign(UUID tenantId, UUID prescriptionId) {
         jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
                 "WHERE tenant_id = ? AND id = ? AND status = 'draft'", tenantId, prescriptionId);
+    }
+
+    // ── favourite Rx sets (NB-114) ───────────────────────────────────────
+
+    UUID insertSet(UUID tenantId, UUID doctorId, String name) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO favourite_rx_sets (id, tenant_id, doctor_id, name) VALUES (?,?,?,?)",
+                id, tenantId, doctorId, name);
+        return id;
+    }
+
+    void insertSetItems(UUID tenantId, UUID setId, List<PrescriptionItemRequest> items) {
+        int order = 0;
+        for (PrescriptionItemRequest item : items) {
+            jdbc.update("INSERT INTO favourite_rx_set_items (tenant_id, set_id, drug_name, dosage, frequency, " +
+                            "instructions, duration, display_order) VALUES (?,?,?,?,?,?,?,?)",
+                    tenantId, setId, item.drugName(), item.dosage(), item.frequency(), item.instructions(),
+                    item.duration(), order++);
+        }
+    }
+
+    /** Sets visible to this doctor: their own plus every clinic default (doctor_id is null). */
+    List<FavouriteSetRow> listSets(UUID tenantId, UUID doctorId) {
+        return jdbc.query("SELECT id, doctor_id, name, created_at FROM favourite_rx_sets " +
+                        "WHERE tenant_id = ? AND (doctor_id = ? OR doctor_id IS NULL) ORDER BY name",
+                (rs, i) -> {
+                    String d = rs.getString("doctor_id");
+                    return new FavouriteSetRow(UUID.fromString(rs.getString("id")), d == null ? null : UUID.fromString(d),
+                            rs.getString("name"), rs.getTimestamp("created_at").toInstant());
+                }, tenantId, doctorId);
+    }
+
+    Optional<FavouriteSetRow> findSet(UUID tenantId, UUID setId) {
+        return jdbc.query("SELECT id, doctor_id, name, created_at FROM favourite_rx_sets WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> {
+                    String d = rs.getString("doctor_id");
+                    return new FavouriteSetRow(UUID.fromString(rs.getString("id")), d == null ? null : UUID.fromString(d),
+                            rs.getString("name"), rs.getTimestamp("created_at").toInstant());
+                }, tenantId, setId).stream().findFirst();
+    }
+
+    List<FavouriteSetItemRow> findSetItems(UUID tenantId, UUID setId) {
+        return jdbc.query("SELECT * FROM favourite_rx_set_items WHERE tenant_id = ? AND set_id = ? ORDER BY display_order",
+                (rs, i) -> new FavouriteSetItemRow(UUID.fromString(rs.getString("id")), rs.getString("drug_name"),
+                        rs.getString("dosage"), rs.getString("frequency"), rs.getString("duration"),
+                        rs.getString("instructions"), rs.getInt("display_order")),
+                tenantId, setId);
     }
 
     private RowMapper<PrescriptionRow> prescriptionMapper() {

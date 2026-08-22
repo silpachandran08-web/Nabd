@@ -110,12 +110,15 @@ class ReportsApiTest extends ApiTestBase {
         moveTo(docToken, e2, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         checkoutAndPay(docToken, e2, 700);
 
-        ResponseEntity<List> scoped = exchange("/v1/reports/staff-performance", HttpMethod.GET, authed(docToken), List.class);
-        assertThat(scoped.getBody()).hasSize(1);
-        assertThat(((Map<?, ?>) scoped.getBody().get(0)).get("staffId")).isEqualTo(doc.id().toString());
+        ResponseEntity<Map> scoped = exchange("/v1/reports/staff-performance", HttpMethod.GET, authed(docToken), Map.class);
+        List<?> scopedRows = (List<?>) scoped.getBody().get("rows");
+        assertThat(scopedRows).hasSize(1);
+        assertThat(((Map<?, ?>) scopedRows.get(0)).get("staffId")).isEqualTo(doc.id().toString());
+        assertThat(scoped.getBody().get("scopeNote")).asString().contains("only your own row");
 
-        ResponseEntity<List> unscoped = exchange("/v1/reports/staff-performance", HttpMethod.GET, authed(ownerToken), List.class);
-        assertThat(unscoped.getBody()).hasSize(2);
+        ResponseEntity<Map> unscoped = exchange("/v1/reports/staff-performance", HttpMethod.GET, authed(ownerToken), Map.class);
+        assertThat((List<?>) unscoped.getBody().get("rows")).hasSize(2);
+        assertThat(unscoped.getBody().get("scopeNote")).asString().contains("every staff member");
     }
 
     @Test
@@ -180,6 +183,100 @@ class ReportsApiTest extends ApiTestBase {
                         "ORDER BY created_at DESC LIMIT 1",
                 tenant.id()));
         assertThat(audited.get("after").toString()).contains("sources").contains("rowCount");
+    }
+
+    private void seedCharge(SeededTenant tenant, String code, String name, double amount) {
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "INSERT INTO charge_catalogue (tenant_id, code, name, category, base_amount, tax_rate_percent) VALUES (?,?,?,?,?,?)",
+                tenant.id(), code, name, "Procedure", amount, 0.0));
+    }
+
+    private String orderAndCompleteProcedure(String token, String queueEntryId, String chargeCode) {
+        ResponseEntity<Map> order = exchange("/v1/nursing/procedure-orders", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "queueEntryId", queueEntryId, "chargeCode", chargeCode)), Map.class);
+        String procedureId = (String) order.getBody().get("id");
+        exchange("/v1/nursing/procedure-orders/" + procedureId + "/consent", HttpMethod.POST,
+                authedJsonBody(token, Map.of("signedName", "Consent")), Map.class);
+        exchange("/v1/nursing/procedure-orders/" + procedureId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "completed")), Map.class);
+        return procedureId;
+    }
+
+    @Test
+    void billingLeakageFlagsACompletedProcedureNeverAddedToTheInvoiceButNotAProperlyBilledOne() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner16@a.com", "+919800060009", false);
+        String token = loginAndGetAccessToken(staff);
+        seedCharge(tenant, "LEAK-1", "Leaked procedure", 400.00);
+        seedCharge(tenant, "OK-1", "Billed procedure", 250.00);
+
+        String leakedPatient = registerPatient(token, "R7a", "+919999970111");
+        String leakedEntry = checkIn(token, leakedPatient, staff.id(), null);
+        orderAndCompleteProcedure(token, leakedEntry, "LEAK-1");
+        moveTo(token, leakedEntry, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        // checkout without adding LEAK-1's charge to the invoice — this is the leak
+        exchange("/v1/billing/checkout/" + leakedEntry, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
+
+        String billedPatient = registerPatient(token, "R7b", "+919999970112");
+        String billedEntry = checkIn(token, billedPatient, staff.id(), null);
+        orderAndCompleteProcedure(token, billedEntry, "OK-1");
+        moveTo(token, billedEntry, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        exchange("/v1/billing/checkout/" + billedEntry, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "OK-1", "chargeName", "Billed procedure", "category", "Procedure",
+                        "quantity", 1, "unitPrice", 250, "taxRatePercent", 0)))), Map.class);
+
+        ResponseEntity<Map> resp = exchange("/v1/reports/billing-leakage?thresholdAmount=0", HttpMethod.GET, authed(token), Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map> entries = (List<Map>) resp.getBody().get("entries");
+        assertThat(entries).extracting(e -> e.get("chargeCode")).containsExactly("LEAK-1");
+    }
+
+    @Test
+    void billingLeakageRespectsTheAmountThreshold() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner17@a.com", "+919800060010", false);
+        String token = loginAndGetAccessToken(staff);
+        seedCharge(tenant, "LEAK-2", "Small leak", 50.00);
+        String patientId = registerPatient(token, "R8", "+919999970113");
+        String entry = checkIn(token, patientId, staff.id(), null);
+        orderAndCompleteProcedure(token, entry, "LEAK-2");
+        moveTo(token, entry, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        exchange("/v1/billing/checkout/" + entry, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
+
+        ResponseEntity<Map> resp = exchange("/v1/reports/billing-leakage?thresholdAmount=100", HttpMethod.GET, authed(token), Map.class);
+
+        assertThat((List<?>) resp.getBody().get("entries")).isEmpty();
+    }
+
+    @Test
+    void doctorPunctualityAggregatesDelayCountAverageMinutesAndSameDayRepeatsAndStatesAccessNote() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner18@a.com", "+919800060011", false);
+        String token = loginAndGetAccessToken(staff);
+
+        exchange("/v1/doctors/" + staff.id() + "/delay", HttpMethod.POST,
+                authedJsonBody(token, Map.of("delayMinutes", 10)), Map.class);
+        exchange("/v1/doctors/" + staff.id() + "/delay/clear", HttpMethod.POST, authed(token), Map.class);
+        exchange("/v1/doctors/" + staff.id() + "/delay", HttpMethod.POST,
+                authedJsonBody(token, Map.of("delayMinutes", 20)), Map.class);
+
+        ResponseEntity<Map> resp = exchange("/v1/reports/doctor-punctuality", HttpMethod.GET, authed(token), Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("accessNote")).asString().contains("Owner-only");
+        List<Map> entries = (List<Map>) resp.getBody().get("entries");
+        Map entry = entries.stream().filter(e -> staff.id().toString().equals(e.get("doctorId"))).findFirst().orElseThrow();
+        assertThat(((Number) entry.get("delayCount")).longValue()).isEqualTo(2L);
+        assertThat(((Number) entry.get("avgDelayMinutes")).doubleValue()).isEqualTo(15.0);
+        assertThat(((Number) entry.get("sameDayRepeatDays")).longValue()).isEqualTo(1L);
     }
 
     @Test

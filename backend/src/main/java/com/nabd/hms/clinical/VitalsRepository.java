@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +30,18 @@ class VitalsRepository {
     Optional<VitalsRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
         return jdbc.query("SELECT * FROM vitals WHERE tenant_id = ? AND queue_entry_id = ?",
                 mapper(), tenantId, queueEntryId).stream().findFirst();
+    }
+
+    Optional<LocalDate> findPatientDob(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT dob FROM patients WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> rs.getDate("dob").toLocalDate(), tenantId, patientId).stream().findFirst();
+    }
+
+    /** NB-112: the paediatric dose calculator sources weight from here — the most recent vitals row for the patient, across any visit. */
+    Optional<BigDecimal> findLatestWeightKg(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT weight_kg FROM vitals WHERE tenant_id = ? AND patient_id = ? AND weight_kg IS NOT NULL " +
+                        "ORDER BY recorded_at DESC LIMIT 1",
+                (rs, i) -> rs.getBigDecimal("weight_kg"), tenantId, patientId).stream().findFirst();
     }
 
     /** Freely correctable — no signed/locked concept for vitals. */

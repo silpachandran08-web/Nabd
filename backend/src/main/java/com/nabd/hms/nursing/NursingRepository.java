@@ -126,7 +126,8 @@ class NursingRepository {
         return jdbc.query(
                 "SELECT p.id, p.queue_entry_id, p.patient_id, p.ordered_by, p.charge_code, p.charge_name, " +
                         "p.base_amount, p.tax_rate_percent, p.prep_notes, p.consent_note, p.status, p.billed, " +
-                        "p.completed_by, p.completed_at, p.created_at " +
+                        "p.completed_by, p.completed_at, p.created_at, p.consent_signed_name, p.consent_recorded_by, " +
+                        "p.consent_signed_at " +
                         "FROM procedure_orders p JOIN queue_entries q ON q.id = p.queue_entry_id " +
                         "WHERE p.tenant_id = ? AND q.queue_date = ? AND p.status != 'cancelled' ORDER BY p.created_at",
                 this::mapProcedure, tenantId, java.sql.Date.valueOf(day));
@@ -135,7 +136,8 @@ class NursingRepository {
     Optional<ProcedureOrderRow> findProcedureOrder(UUID tenantId, UUID id) {
         return jdbc.query(
                 "SELECT id, queue_entry_id, patient_id, ordered_by, charge_code, charge_name, base_amount, " +
-                        "tax_rate_percent, prep_notes, consent_note, status, billed, completed_by, completed_at, created_at " +
+                        "tax_rate_percent, prep_notes, consent_note, status, billed, completed_by, completed_at, created_at, " +
+                        "consent_signed_name, consent_recorded_by, consent_signed_at " +
                         "FROM procedure_orders WHERE tenant_id = ? AND id = ?",
                 this::mapProcedure, tenantId, id).stream().findFirst();
     }
@@ -154,15 +156,26 @@ class NursingRepository {
                 prepNotes, consentNote, tenantId, id);
     }
 
+    /** NB-119: a typed name stands in for a signature — no canvas/stylus capture exists in this app. */
+    void recordConsent(UUID tenantId, UUID id, String signedName, UUID recordedBy) {
+        jdbc.update("UPDATE procedure_orders SET consent_signed_name = ?, consent_recorded_by = ?, " +
+                        "consent_signed_at = now() WHERE tenant_id = ? AND id = ?",
+                signedName, recordedBy, tenantId, id);
+    }
+
     private ProcedureOrderRow mapProcedure(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
         String completedBy = rs.getString("completed_by");
         java.sql.Timestamp completedAt = rs.getTimestamp("completed_at");
+        String consentRecordedBy = rs.getString("consent_recorded_by");
+        java.sql.Timestamp consentSignedAt = rs.getTimestamp("consent_signed_at");
         return new ProcedureOrderRow(UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("queue_entry_id")),
                 UUID.fromString(rs.getString("patient_id")), UUID.fromString(rs.getString("ordered_by")),
                 rs.getString("charge_code"), rs.getString("charge_name"), rs.getBigDecimal("base_amount"),
                 rs.getBigDecimal("tax_rate_percent"), rs.getString("prep_notes"), rs.getString("consent_note"),
                 rs.getString("status"), rs.getBoolean("billed"), completedBy == null ? null : UUID.fromString(completedBy),
-                completedAt == null ? null : completedAt.toInstant(), rs.getTimestamp("created_at").toInstant());
+                completedAt == null ? null : completedAt.toInstant(), rs.getTimestamp("created_at").toInstant(),
+                rs.getString("consent_signed_name"), consentRecordedBy == null ? null : UUID.fromString(consentRecordedBy),
+                consentSignedAt == null ? null : consentSignedAt.toInstant());
     }
 
     // ── NB-148: completed activity — a read across three existing write paths, no new table ──

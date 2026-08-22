@@ -6,6 +6,7 @@ import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.dto.AppointmentPage;
 import com.nabd.hms.queue.dto.AppointmentResponse;
 import com.nabd.hms.queue.dto.AppointmentWriteRequest;
+import com.nabd.hms.queue.dto.CallbackEntryResponse;
 import com.nabd.hms.queue.dto.CancelRequest;
 import com.nabd.hms.queue.dto.PageMeta;
 import com.nabd.hms.queue.dto.RescheduleRequest;
@@ -58,7 +59,7 @@ public class AppointmentService {
         int slotMinutes = resolveSlotMinutes(req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
-            UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end);
+            UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end, req.isFollowUpOrDefault());
             log.info("appointment {} booked by {}: patient {} with doctor {} at {}",
                     id, callerStaffId, req.patientId(), req.doctorId(), req.startTime());
             return toResponse(repo.findById(tenantId, id).orElseThrow());
@@ -111,7 +112,7 @@ public class AppointmentService {
         int slotMinutes = resolveSlotMinutes(current.doctorId(), req.newStartTime());
         Instant newEnd = req.newStartTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
-            UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd);
+            UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp());
             log.info("appointment {} rescheduled to {} (new id {}) by {}", id, req.newStartTime(), newId, callerStaffId);
             waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
             return toResponse(repo.findById(tenantId, newId).orElseThrow());
@@ -124,6 +125,15 @@ public class AppointmentService {
 
     void markTerminal(UUID tenantId, UUID appointmentId, String status) {
         repo.markTerminal(tenantId, appointmentId, status);
+    }
+
+    /** NB-116: front-desk callback list — missed follow-ups only, not every no-show. */
+    @Transactional
+    public List<CallbackEntryResponse> callbackList(UUID tenantId) {
+        tenantContext.set(tenantId);
+        return repo.listCallbackList(tenantId).stream()
+                .map(c -> new CallbackEntryResponse(c.id(), c.patientId(), c.patientName(), c.doctorId(), c.startTime(), c.status()))
+                .toList();
     }
 
     private AppointmentRow requireScheduled(UUID tenantId, UUID id) {
@@ -175,7 +185,8 @@ public class AppointmentService {
     }
 
     private AppointmentResponse toResponse(AppointmentRow row) {
-        return new AppointmentResponse(row.id(), row.patientId(), row.doctorId(), row.startTime(), row.endTime(), row.status());
+        return new AppointmentResponse(row.id(), row.patientId(), row.doctorId(), row.startTime(), row.endTime(),
+                row.status(), row.isFollowUp());
     }
 
     private ApiException notFound() {

@@ -4,12 +4,25 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./reports.module.css";
 
-// E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/234/235/237.
+// E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
 type DailyMoney = { billedToday: number; collectedToday: number; outstandingTotal: number; invoiceCountToday: number; paymentCountToday: number };
 type SourceRow = { source: string; visitCount: number };
 type StaffRow = { staffId: string; staffName: string; collected: number; paymentCount: number };
+type StaffPerformanceReport = { scopeNote: string; rows: StaffRow[] };
 type Retention = { totalPatients: number; repeatPatients: number; repeatRatePercent: number; avgVisitsPerPatient: number };
 type NoShowRisk = { rule: string; entries: { patientId: string; patientName: string; priorNoShowCount: number }[] };
+type Liability = {
+  activePatientPackages: number; sessionsOwed: number; remainingListValue: number; remainingAllocatedValue: number;
+  inGracePeriod: number; expiringIn30Days: number; potentialExpiryLoss: number; refundsAwaitingApproval: number;
+};
+type BillingLeakage = {
+  rule: string; thresholdAmount: number;
+  entries: { procedureOrderId: string; patientName: string; chargeCode: string; chargeName: string; amount: number; completedAt: string }[];
+};
+type DoctorPunctuality = {
+  accessNote: string;
+  entries: { doctorId: string; doctorName: string; delayCount: number; avgDelayMinutes: number; sameDayRepeatDays: number }[];
+};
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -22,9 +35,13 @@ export default function ReportsPage() {
 
   const [dailyMoney, setDailyMoney] = useState<DailyMoney | null>(null);
   const [sources, setSources] = useState<SourceRow[]>([]);
-  const [staffPerf, setStaffPerf] = useState<StaffRow[]>([]);
+  const [staffPerf, setStaffPerf] = useState<StaffPerformanceReport | null>(null);
   const [retention, setRetention] = useState<Retention | null>(null);
   const [noShowRisk, setNoShowRisk] = useState<NoShowRisk | null>(null);
+  const [liability, setLiability] = useState<Liability | null>(null);
+  const [leakage, setLeakage] = useState<BillingLeakage | null>(null);
+  const [leakageThreshold, setLeakageThreshold] = useState("0");
+  const [punctuality, setPunctuality] = useState<DoctorPunctuality | null>(null);
 
   const authedFetch = useCallback(
     async (path: string) => {
@@ -48,10 +65,11 @@ export default function ReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes] = await Promise.all([
+      const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes, liabilityRes, leakageRes, punctualityRes] = await Promise.all([
         authedFetch("/reports/daily-money"), authedFetch("/reports/sources"),
         authedFetch("/reports/staff-performance"), authedFetch("/reports/retention"),
-        authedFetch("/reports/no-show-risk"),
+        authedFetch("/reports/no-show-risk"), authedFetch("/packages/liability"),
+        authedFetch("/reports/billing-leakage?thresholdAmount=0"), authedFetch("/reports/doctor-punctuality"),
       ]);
       if (!moneyRes) return;
       if (moneyRes.status === 403) {
@@ -67,12 +85,23 @@ export default function ReportsPage() {
       if (staffRes?.ok) setStaffPerf(await staffRes.json());
       if (retentionRes?.ok) setRetention(await retentionRes.json());
       if (riskRes?.ok) setNoShowRisk(await riskRes.json());
+      if (liabilityRes?.ok) setLiability(await liabilityRes.json());
+      if (leakageRes?.ok) setLeakage(await leakageRes.json());
+      if (punctualityRes?.ok) setPunctuality(await punctualityRes.json());
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   }, [authedFetch]);
+
+  const reloadLeakage = useCallback(
+    async (threshold: string) => {
+      const res = await authedFetch(`/reports/billing-leakage?thresholdAmount=${encodeURIComponent(threshold || "0")}`);
+      if (res?.ok) setLeakage(await res.json());
+    },
+    [authedFetch]
+  );
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -167,24 +196,115 @@ export default function ReportsPage() {
         )}
       </div>
 
-      <div className={styles.card + " " + styles.section}>
-        <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Staff collection & performance (last 30 days)</h3>
-          <button className={styles.exportBtn} onClick={() => exportCsv("staff-performance")}>Export CSV</button>
+      {staffPerf && (
+        <div className={styles.card + " " + styles.section}>
+          <div className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Staff collection & performance (last 30 days)</h3>
+            <button className={styles.exportBtn} onClick={() => exportCsv("staff-performance")}>Export CSV</button>
+          </div>
+          <div className={styles.rule}>{staffPerf.scopeNote}</div>
+          {staffPerf.rows.length === 0 ? (
+            <div className={styles.muted}>No payments recorded yet.</div>
+          ) : (
+            <table className={styles.table}>
+              <thead><tr><th>Staff</th><th>Collected</th><th>Payments</th></tr></thead>
+              <tbody>
+                {staffPerf.rows.map((s) => (
+                  <tr key={s.staffId}><td>{s.staffName}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
-        {staffPerf.length === 0 ? (
-          <div className={styles.muted}>No payments recorded yet.</div>
-        ) : (
-          <table className={styles.table}>
-            <thead><tr><th>Staff</th><th>Collected</th><th>Payments</th></tr></thead>
-            <tbody>
-              {staffPerf.map((s) => (
-                <tr key={s.staffId}><td>{s.staffName}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      )}
+
+      {liability && (
+        <div className={styles.card + " " + styles.section}>
+          <div className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Package liability</h3>
+          </div>
+          <div className={styles.grid}>
+            <div className={styles.statTile}>
+              <div className={styles.statLabel}>Active packages</div>
+              <div className={styles.statValue}>{liability.activePatientPackages}</div>
+              <div className={styles.statSub}>{liability.sessionsOwed} sessions owed</div>
+            </div>
+            <div className={styles.statTile}>
+              <div className={styles.statLabel}>Remaining value</div>
+              <div className={styles.statValue}>{money(liability.remainingAllocatedValue)}</div>
+              <div className={styles.statSub}>list price {money(liability.remainingListValue)}</div>
+            </div>
+            <div className={styles.statTile}>
+              <div className={styles.statLabel}>Expiring in 30 days</div>
+              <div className={styles.statValue}>{liability.expiringIn30Days}</div>
+              <div className={styles.statSub}>potential loss {money(liability.potentialExpiryLoss)}</div>
+            </div>
+            <div className={styles.statTile}>
+              <div className={styles.statLabel}>In grace period</div>
+              <div className={styles.statValue}>{liability.inGracePeriod}</div>
+              <div className={styles.statSub}>{liability.refundsAwaitingApproval} refunds awaiting approval</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {leakage && (
+        <div className={styles.card + " " + styles.section}>
+          <div className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Billing leakage alerts</h3>
+            <span>
+              Min amount:{" "}
+              <input
+                type="number"
+                min="0"
+                value={leakageThreshold}
+                onChange={(e) => setLeakageThreshold(e.target.value)}
+                onBlur={() => void reloadLeakage(leakageThreshold)}
+                style={{ width: "5rem" }}
+              />
+            </span>
+          </div>
+          <div className={styles.rule}>{leakage.rule}</div>
+          {leakage.entries.length === 0 ? (
+            <div className={styles.muted}>No billing leakage found.</div>
+          ) : (
+            <table className={styles.table}>
+              <thead><tr><th>Patient</th><th>Charge</th><th>Amount</th><th>Completed</th></tr></thead>
+              <tbody>
+                {leakage.entries.map((e) => (
+                  <tr key={e.procedureOrderId}>
+                    <td>{e.patientName}</td><td>{e.chargeName}</td><td>{money(e.amount)}</td>
+                    <td>{new Date(e.completedAt).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {punctuality && (
+        <div className={styles.card + " " + styles.section}>
+          <div className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Doctor punctuality (last 90 days)</h3>
+          </div>
+          <div className={styles.rule}>{punctuality.accessNote}</div>
+          {punctuality.entries.length === 0 ? (
+            <div className={styles.muted}>No delays announced.</div>
+          ) : (
+            <table className={styles.table}>
+              <thead><tr><th>Doctor</th><th>Delays</th><th>Avg minutes</th><th>Same-day repeats</th></tr></thead>
+              <tbody>
+                {punctuality.entries.map((e) => (
+                  <tr key={e.doctorId}>
+                    <td>{e.doctorName}</td><td>{e.delayCount}</td><td>{e.avgDelayMinutes}</td><td>{e.sameDayRepeatDays}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {noShowRisk && (
         <div className={styles.card + " " + styles.section}>

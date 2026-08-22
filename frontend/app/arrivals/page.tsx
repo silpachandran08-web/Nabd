@@ -15,6 +15,8 @@ type Row = QueueEntry & { patientName: string; patientMrn: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
 type StaffOption = { id: string; name: string };
 type Problem = { title: string; detail: string };
+// NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
+type CallbackEntry = { appointmentId: string; patientId: string; patientName: string; doctorId: string; startTime: string; status: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const POLL_MS = 15_000;
@@ -100,6 +102,7 @@ export default function ArrivalsPage() {
   const [delayMinutesInput, setDelayMinutesInput] = useState("15");
   const [delayReasonInput, setDelayReasonInput] = useState("");
   const [delayBusy, setDelayBusy] = useState(false);
+  const [callbackList, setCallbackList] = useState<CallbackEntry[]>([]);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -176,6 +179,13 @@ export default function ArrivalsPage() {
   useEffect(() => {
     void Promise.resolve().then(load);
   }, [load]);
+
+  useEffect(() => {
+    void Promise.resolve().then(async () => {
+      const res = await authedFetch("/appointments/callback-list");
+      if (res?.ok) setCallbackList(await res.json());
+    });
+  }, [authedFetch]);
 
   // NB-095: "live-updates without refresh" via polling — full push-based sync is NB-096, separate.
   useEffect(() => {
@@ -475,6 +485,23 @@ export default function ArrivalsPage() {
               ))
             )}
           </div>
+
+          {callbackList.length > 0 && (
+            <div className={styles.card}>
+              <div className={styles.sideTitle}>Follow-up callback list</div>
+              {callbackList.map((c) => (
+                <div key={c.appointmentId} className={styles.doctorRow} style={{ flexDirection: "column", alignItems: "stretch", gap: "2px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                    <span className={styles.doctorName}>{c.patientName}</span>
+                    <span className={styles.doctorCount}>{c.status === "no_show" ? "missed" : "overdue"}</span>
+                  </div>
+                  <span style={{ fontSize: "12px", color: "var(--nb-text-secondary)" }}>
+                    Follow-up was {new Date(c.startTime).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

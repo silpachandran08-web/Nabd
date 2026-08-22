@@ -24,6 +24,7 @@ type ProcedureOrder = {
   id: string; queueEntryId: string; patientId: string; patientName: string; orderedByName: string; chargeCode: string;
   chargeName: string; baseAmount: number; taxRatePercent: number; prepNotes: string | null; consentNote: string | null;
   status: string; billed: boolean; completedByName: string | null; completedAt: string | null; createdAt: string;
+  consentSignedName: string | null; consentRecordedByName: string | null; consentSignedAt: string | null;
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
 type Problem = { title: string; detail: string };
@@ -61,6 +62,7 @@ export default function NursingPage() {
   const [vitalsEntryId, setVitalsEntryId] = useState<string | null>(null);
   const [vitalsForm, setVitalsForm] = useState({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
   const [vitalsError, setVitalsError] = useState<string | null>(null);
+  const [vitalsFlags, setVitalsFlags] = useState<string[] | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
 
   const authedFetch = useCallback(
@@ -146,6 +148,13 @@ export default function NursingPage() {
     setVitalsEntryId(entryId);
     setVitalsForm({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
     setVitalsError(null);
+    setVitalsFlags(null);
+  }
+
+  function closeVitalsModal() {
+    setVitalsEntryId(null);
+    setVitalsFlags(null);
+    load();
   }
 
   async function submitVitals(e: React.FormEvent) {
@@ -169,8 +178,12 @@ export default function NursingPage() {
         setVitalsError(p.detail || "Couldn't save vitals.");
         return;
       }
-      setVitalsEntryId(null);
-      load();
+      const saved: { abnormalFlags: string[] } = await res.json();
+      if (saved.abnormalFlags.length > 0) {
+        setVitalsFlags(saved.abnormalFlags);
+      } else {
+        closeVitalsModal();
+      }
     } finally {
       setVitalsSubmitting(false);
     }
@@ -264,6 +277,23 @@ export default function NursingPage() {
       const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't update the procedure." }));
       setActionError(p.detail || "Couldn't update the procedure.");
     }
+    load();
+  }
+
+  // ── NB-119: signed consent gates starting the procedure ────────────────────
+  const [consentModal, setConsentModal] = useState<{ orderId: string; signedName: string } | null>(null);
+
+  async function submitConsent() {
+    if (!consentModal || !consentModal.signedName.trim()) return;
+    setActionError(null);
+    const res = await authedFetch(`/nursing/procedure-orders/${consentModal.orderId}/consent`, {
+      method: "POST", body: JSON.stringify({ signedName: consentModal.signedName }),
+    });
+    if (res && !res.ok) {
+      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record consent." }));
+      setActionError(p.detail || "Couldn't record consent.");
+    }
+    setConsentModal(null);
     load();
   }
 
@@ -413,7 +443,12 @@ export default function NursingPage() {
                       <tr key={p.id}>
                         <td>{p.patientName}</td>
                         <td>{p.chargeName}</td>
-                        <td className={styles.muted}>{p.consentNote ?? "—"}</td>
+                        <td className={styles.muted}>
+                          {p.consentSignedName ? `✓ signed by ${p.consentSignedName}` : "Not signed"}
+                          {!p.consentSignedName && (
+                            <>{" "}<button className={styles.smallBtn} onClick={() => setConsentModal({ orderId: p.id, signedName: "" })}>Record consent</button></>
+                          )}
+                        </td>
                         <td className={styles.muted}>{p.prepNotes ?? "—"}</td>
                         <td>
                           {p.status === "ordered" && <span className={styles.pillNeutral}>Not started</span>}
@@ -464,8 +499,22 @@ export default function NursingPage() {
         </>
       )}
 
-      {vitalsEntryId && (
-        <div className={styles.overlay} onClick={() => setVitalsEntryId(null)}>
+      {vitalsEntryId && vitalsFlags && (
+        <div className={styles.overlay} onClick={closeVitalsModal}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Vitals saved</h2>
+            <div className={styles.formError} role="alert">
+              {vitalsFlags.map((f) => <div key={f}>⚠ {f}</div>)}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.submitBtn} onClick={closeVitalsModal}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {vitalsEntryId && !vitalsFlags && (
+        <div className={styles.overlay} onClick={closeVitalsModal}>
           <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitVitals}>
             <h2 className={styles.modalTitle}>Record vitals</h2>
             {([
@@ -481,7 +530,7 @@ export default function NursingPage() {
             ))}
             {vitalsError && <div className={styles.formError} role="alert">{vitalsError}</div>}
             <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setVitalsEntryId(null)}>Cancel</button>
+              <button type="button" className={styles.cancelBtn} onClick={closeVitalsModal}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save vitals"}</button>
             </div>
           </form>
@@ -538,6 +587,23 @@ export default function NursingPage() {
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={() => setWitnessModal(null)}>Cancel</button>
               <button type="button" className={styles.submitBtn} disabled={!witnessModal.witnessId} onClick={submitAdminister}>Administer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {consentModal && (
+        <div className={styles.overlay} onClick={() => setConsentModal(null)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Record consent</h2>
+            <div className={styles.field}>
+              <label className={styles.label}>Patient&apos;s typed name (stands in for a signature)</label>
+              <input className={styles.input} value={consentModal.signedName}
+                onChange={(e) => setConsentModal({ ...consentModal, signedName: e.target.value })} />
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setConsentModal(null)}>Cancel</button>
+              <button type="button" className={styles.submitBtn} disabled={!consentModal.signedName.trim()} onClick={submitConsent}>Record consent</button>
             </div>
           </div>
         </div>

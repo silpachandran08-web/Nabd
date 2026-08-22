@@ -24,11 +24,25 @@ type NoteDraft = { subjective: string; objective: string; assessment: string; pl
 type PrescriptionItem = {
   id?: string; drugName: string; dosage: string; frequency: string; duration: string;
   instructions: string; allergyOverrideReason: string; allergyWarning?: string | null;
+  pregnancyWarning?: string | null; controlledSubstanceWarning?: string | null;
 };
 type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
 type Problem = { title: string; detail: string };
+type FavouriteRxSet = { id: string; doctorId: string | null; name: string; items: PrescriptionItem[] };
+type DoseResult = { weightKg: number; mgPerKg: number; totalDoseMg: number; ruleSource: string };
+type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis: string | null; createdAt: string };
 
 const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "", allergyOverrideReason: "" };
+
+// The API returns nullable dosage/frequency/duration/instructions (a favourite set commonly omits
+// duration) — every input below is a controlled component, so null must become "" before it renders.
+function normalizeRxItem(i: PrescriptionItem): PrescriptionItem {
+  return {
+    ...i,
+    dosage: i.dosage ?? "", frequency: i.frequency ?? "", duration: i.duration ?? "", instructions: i.instructions ?? "",
+    allergyOverrideReason: i.allergyOverrideReason ?? "",
+  };
+}
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const AUTOSAVE_MS = 10_000;
@@ -88,6 +102,16 @@ export default function ConsultPage() {
   const [followUpBusy, setFollowUpBusy] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState<string | null>(null);
   const [previousMeds, setPreviousMeds] = useState<Prescription[]>([]);
+  const [favouriteSets, setFavouriteSets] = useState<FavouriteRxSet[]>([]);
+  const [newSetName, setNewSetName] = useState("");
+  const [doseMgPerKg, setDoseMgPerKg] = useState("");
+  const [doseResult, setDoseResult] = useState<DoseResult | null>(null);
+  const [doseError, setDoseError] = useState<string | null>(null);
+  const [amendments, setAmendments] = useState<NoteAmendment[]>([]);
+  const [showAmendForm, setShowAmendForm] = useState(false);
+  const [amendReason, setAmendReason] = useState("");
+  const [amendDiagnosis, setAmendDiagnosis] = useState("");
+  const [amending, setAmending] = useState(false);
   const dirtyRef = useRef(dirty);
   const noteRef = useRef(note);
   useEffect(() => {
@@ -199,11 +223,23 @@ export default function ConsultPage() {
     setFollowUpDate("");
     setFollowUpMessage(null);
     setPreviousMeds([]);
+    setFavouriteSets([]);
+    setNewSetName("");
+    setDoseMgPerKg("");
+    setDoseResult(null);
+    setDoseError(null);
+    setAmendments([]);
+    setShowAmendForm(false);
+    setAmendReason("");
+    setAmendDiagnosis("");
 
     // NB-105: previous medicines fetched right alongside everything else the pad needs, and
     // rendered inside the same Prescription card below — no separate screen to visit.
     const prevRxRes = await authedFetch(`/clinical/patients/${row.patientId}/prescriptions`);
     if (prevRxRes?.ok) setPreviousMeds(await prevRxRes.json());
+
+    const setsRes = await authedFetch("/clinical/rx-sets");
+    if (setsRes?.ok) setFavouriteSets(await setsRes.json());
 
     const pRes = await authedFetch(`/patients/${row.patientId}`);
     if (pRes?.ok) setActivePatient(await pRes.json());
@@ -213,12 +249,16 @@ export default function ConsultPage() {
       const n: Note = await nRes.json();
       setNote({ subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "", diagnosis: n.diagnosis ?? "" });
       setNoteStatus(n.status as "draft" | "signed");
+      if (n.status === "signed") {
+        const aRes = await authedFetch(`/clinical/notes/${row.id}/amendments`);
+        if (aRes?.ok) setAmendments(await aRes.json());
+      }
     }
 
     const rRes = await authedFetch(`/clinical/prescriptions/${row.id}`);
     if (rRes?.status === 200) {
       const rx: Prescription = await rRes.json();
-      setRxItems(rx.items.length > 0 ? rx.items.map((i) => ({ ...i, allergyOverrideReason: i.allergyOverrideReason ?? "" })) : [{ ...BLANK_RX_ITEM }]);
+      setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
       setRxStatus(rx.status as "draft" | "signed");
     } else {
       setRxItems([{ ...BLANK_RX_ITEM }]);
@@ -250,7 +290,7 @@ export default function ConsultPage() {
         return false;
       }
       const rx: Prescription = await res.json();
-      setRxItems(rx.items.length > 0 ? rx.items.map((i) => ({ ...i, allergyOverrideReason: i.allergyOverrideReason ?? "" })) : [{ ...BLANK_RX_ITEM }]);
+      setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
       return true;
     } finally {
       setRxSaving(false);
@@ -264,6 +304,64 @@ export default function ConsultPage() {
     if (res?.ok) setRxStatus("signed");
   }
 
+  async function calculateDose() {
+    if (!activePatient || !doseMgPerKg) return;
+    setDoseError(null);
+    const res = await authedFetch(`/clinical/patients/${activePatient.id}/dose-calculator?mgPerKg=${doseMgPerKg}`);
+    if (!res?.ok) {
+      const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
+      setDoseError(p.detail || "Couldn't calculate dose.");
+      setDoseResult(null);
+      return;
+    }
+    setDoseResult(await res.json());
+  }
+
+  async function saveCurrentAsSet() {
+    if (!newSetName.trim()) return;
+    const items = rxItems.filter((i) => i.drugName.trim() !== "");
+    if (items.length === 0) return;
+    const res = await authedFetch("/clinical/rx-sets", { method: "POST", body: JSON.stringify({ name: newSetName, items }) });
+    if (res?.ok) {
+      setNewSetName("");
+      const setsRes = await authedFetch("/clinical/rx-sets");
+      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
+    }
+  }
+
+  async function applySet(setId: string) {
+    if (!activeEntry) return;
+    const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}/apply-set/${setId}`, { method: "POST" });
+    if (res?.ok) {
+      const rx: Prescription = await res.json();
+      setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
+      setRxError(null);
+    } else {
+      const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't apply set." }));
+      setRxError(p.detail || "Couldn't apply set.");
+    }
+  }
+
+  async function submitAmendment() {
+    if (!activeEntry || !amendReason.trim()) return;
+    setAmending(true);
+    try {
+      const res = await authedFetch(`/clinical/notes/${activeEntry.id}/amendments`, {
+        method: "POST",
+        body: JSON.stringify({ reason: amendReason, diagnosis: amendDiagnosis.trim() || undefined }),
+      });
+      if (res?.ok) {
+        setAmendReason("");
+        setAmendDiagnosis("");
+        setShowAmendForm(false);
+        const aRes = await authedFetch(`/clinical/notes/${activeEntry.id}/amendments`);
+        if (aRes?.ok) setAmendments(await aRes.json());
+      }
+    } finally {
+      setAmending(false);
+    }
+  }
+
   async function scheduleFollowUp() {
     if (!activeEntry || !activePatient || !followUpDate) return;
     setFollowUpBusy(true);
@@ -272,7 +370,7 @@ export default function ConsultPage() {
       const startTime = new Date(`${followUpDate}T10:00:00`).toISOString();
       const res = await authedFetch("/appointments", {
         method: "POST",
-        body: JSON.stringify({ patientId: activePatient.id, doctorId: activeEntry.doctorId, startTime }),
+        body: JSON.stringify({ patientId: activePatient.id, doctorId: activeEntry.doctorId, startTime, isFollowUp: true }),
       });
       if (!res?.ok) {
         const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't schedule the follow-up." }));
@@ -370,6 +468,39 @@ export default function ConsultPage() {
               </button>
               {followUpMessage && <span>{followUpMessage}</span>}
             </span>
+            <span className={styles.followUpControls}>
+              <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
+                {showAmendForm ? "Cancel amendment" : "Amend note"}
+              </button>
+            </span>
+          </div>
+        )}
+
+        {showAmendForm && (
+          <div className={styles.card} style={{ padding: "16px", marginTop: "8px" }}>
+            <div className={styles.noteField}>
+              <label className={styles.noteLabel} htmlFor="amendReason">Reason for amendment</label>
+              <input id="amendReason" className={styles.input} value={amendReason} onChange={(e) => setAmendReason(e.target.value)} />
+            </div>
+            <div className={styles.noteField} style={{ marginTop: "8px" }}>
+              <label className={styles.noteLabel} htmlFor="amendDiagnosis">Corrected diagnosis (optional)</label>
+              <input id="amendDiagnosis" className={styles.input} value={amendDiagnosis} onChange={(e) => setAmendDiagnosis(e.target.value)} />
+            </div>
+            <button className={styles.completeBtn} style={{ marginTop: "8px" }} onClick={submitAmendment} disabled={amending || !amendReason.trim()}>
+              {amending ? "Saving…" : "Save amendment"}
+            </button>
+          </div>
+        )}
+
+        {amendments.length > 0 && (
+          <div className={styles.card} style={{ padding: "16px", marginTop: "8px" }}>
+            <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Amendment history</div>
+            {amendments.map((a) => (
+              <div key={a.id} className={styles.previousMedsRow}>
+                <span className={styles.saveStatus}>{new Date(a.createdAt).toLocaleString()} — </span>
+                {a.reason}{a.diagnosis ? ` (diagnosis: ${a.diagnosis})` : ""}
+              </div>
+            ))}
           </div>
         )}
 
@@ -439,12 +570,54 @@ export default function ConsultPage() {
                 {item.allergyWarning && !conflict && (
                   <div className={styles.rxWarning}>⚠ Matches recorded allergy: {item.allergyWarning}</div>
                 )}
+                {item.pregnancyWarning && (
+                  <div className={styles.rxWarning}>⚠ {item.pregnancyWarning}</div>
+                )}
+                {item.controlledSubstanceWarning && (
+                  <div className={styles.rxWarning}>⚠ {item.controlledSubstanceWarning}</div>
+                )}
               </div>
             );
           })}
           {rxStatus !== "signed" && (
             <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>
           )}
+
+          <div className={styles.previousMeds}>
+            <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Weight-based dose calculator</div>
+            <div className={styles.rxRow}>
+              <input className={styles.input} placeholder="mg/kg" value={doseMgPerKg} onChange={(e) => setDoseMgPerKg(e.target.value)} />
+              <button type="button" className={styles.backBtn} onClick={calculateDose} disabled={!doseMgPerKg}>Calculate</button>
+              {doseResult && (
+                <span className={styles.saveStatus}>
+                  {doseResult.totalDoseMg} mg total ({doseResult.weightKg} kg × {doseResult.mgPerKg} mg/kg)
+                </span>
+              )}
+            </div>
+            {doseError && <div className={styles.errorState} role="alert">{doseError}</div>}
+          </div>
+
+          <div className={styles.previousMeds}>
+            <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>
+            {favouriteSets.length === 0 ? (
+              <div className={styles.saveStatus}>No saved sets yet.</div>
+            ) : (
+              favouriteSets.map((set) => (
+                <div key={set.id} className={styles.previousMedsRow}>
+                  <span>{set.name} ({set.items.map((i) => i.drugName).join(", ")})</span>{" "}
+                  {rxStatus !== "signed" && (
+                    <button type="button" className={styles.backBtn} onClick={() => applySet(set.id)}>Apply</button>
+                  )}
+                </div>
+              ))
+            )}
+            {rxStatus !== "signed" && (
+              <div className={styles.rxRow} style={{ marginTop: "8px" }}>
+                <input className={styles.input} placeholder="Save current items as set…" value={newSetName} onChange={(e) => setNewSetName(e.target.value)} />
+                <button type="button" className={styles.backBtn} onClick={saveCurrentAsSet} disabled={!newSetName.trim()}>Save set</button>
+              </div>
+            )}
+          </div>
 
           {previousMeds.length > 0 && (
             <div className={styles.previousMeds}>

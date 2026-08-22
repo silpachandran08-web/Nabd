@@ -4,9 +4,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.clinical.NoteModels.AmendmentRow;
+import static com.nabd.hms.clinical.NoteModels.ActorInfo;
 import static com.nabd.hms.clinical.NoteModels.NoteRow;
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
 
@@ -49,6 +52,34 @@ class NoteRepository {
     void sign(UUID tenantId, UUID queueEntryId) {
         jdbc.update("UPDATE clinical_notes SET status = 'signed', signed_at = now() " +
                 "WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'draft'", tenantId, queueEntryId);
+    }
+
+    // ── amendments (NB-104) ──────────────────────────────────────────────
+
+    UUID insertAmendment(UUID tenantId, UUID noteId, UUID amendedBy, String reason, String subjective,
+                          String objective, String assessment, String plan, String diagnosis) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO note_amendments (id, tenant_id, note_id, amended_by, reason, subjective, " +
+                        "objective, assessment, plan, diagnosis) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, noteId, amendedBy, reason, subjective, objective, assessment, plan, diagnosis);
+        return id;
+    }
+
+    List<AmendmentRow> listAmendments(UUID tenantId, UUID noteId) {
+        return jdbc.query("SELECT * FROM note_amendments WHERE tenant_id = ? AND note_id = ? ORDER BY created_at",
+                (rs, i) -> new AmendmentRow(
+                        UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("note_id")),
+                        UUID.fromString(rs.getString("amended_by")), rs.getString("reason"),
+                        rs.getString("subjective"), rs.getString("objective"), rs.getString("assessment"),
+                        rs.getString("plan"), rs.getString("diagnosis"), rs.getTimestamp("created_at").toInstant()),
+                tenantId, noteId);
+    }
+
+    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
     }
 
     private RowMapper<NoteRow> mapper() {

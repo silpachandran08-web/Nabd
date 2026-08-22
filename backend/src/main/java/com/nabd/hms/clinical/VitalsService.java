@@ -10,6 +10,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.VitalsModels.QueueEntrySnapshot;
@@ -37,7 +41,8 @@ public class VitalsService {
     @Transactional
     public VitalsResponse get(UUID tenantId, UUID queueEntryId) {
         tenantContext.set(tenantId);
-        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(this::notFound);
+        VitalsRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        return toResponse(tenantId, row);
     }
 
     @Transactional
@@ -52,13 +57,20 @@ public class VitalsService {
         if ("vitals_pending".equals(snapshot.status())) {
             queueService.updateStatus(tenantId, callerStaffId, queueEntryId, new QueueStatusUpdateRequest("vitals_done"));
         }
-        return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(this::notFound);
+        VitalsRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        return toResponse(tenantId, row);
     }
 
-    private VitalsResponse toResponse(VitalsRow v) {
+    private VitalsResponse toResponse(UUID tenantId, VitalsRow v) {
+        int ageYears = repo.findPatientDob(tenantId, v.patientId()).map(this::ageInYears).orElse(30);
+        List<String> flags = VitalsRanges.flags(v, ageYears);
         return new VitalsResponse(v.id(), v.queueEntryId(), v.patientId(), v.heightCm(), v.weightKg(),
                 v.bpSystolic(), v.bpDiastolic(), v.pulseBpm(), v.tempCelsius(), v.spo2Percent(),
-                v.recordedBy(), v.recordedAt());
+                v.recordedBy(), v.recordedAt(), flags);
+    }
+
+    private int ageInYears(LocalDate dob) {
+        return Period.between(dob, LocalDate.now(ZoneOffset.UTC)).getYears();
     }
 
     private ApiException notFound() {
