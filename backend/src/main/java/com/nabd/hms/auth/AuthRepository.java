@@ -97,6 +97,32 @@ class AuthRepository {
         ).stream().findFirst();
     }
 
+    /**
+     * NB-057: roles on loan to this staff member right now, via role_delegations — a narrow direct
+     * query into the staff/roles module's table rather than injecting RoleRepository across package
+     * boundaries (same convention as CheckoutRepository reading pharmacy/procedure_orders directly).
+     */
+    List<Role> findActiveDelegatedRoles(UUID staffId) {
+        return jdbc.query(
+                "SELECT r.id, r.tenant_id, r.name, r.grants::text AS grants_json " +
+                        "FROM role_delegations d JOIN roles r ON r.id = d.delegated_role_id " +
+                        "WHERE d.staff_id = ? AND d.revoked_at IS NULL AND d.starts_at <= now() AND d.expires_at > now()",
+                roleMapper(), staffId);
+    }
+
+    /**
+     * Closes out every delegation for this staff member that has passed its expires_at but was
+     * never revoked, returning the ids just closed — the caller audits exactly those. No scheduler
+     * exists to do this the instant a delegation lapses, so the next login/refresh (at most one
+     * access-token TTL later) is what notices and logs it — same shape as the lockout counter.
+     */
+    List<UUID> expireStaleDelegations(UUID staffId) {
+        return jdbc.query(
+                "UPDATE role_delegations SET revoked_at = expires_at, revoked_reason = 'expired' " +
+                        "WHERE staff_id = ? AND revoked_at IS NULL AND expires_at <= now() RETURNING id",
+                (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
+    }
+
     void recordLoginAttempt(UUID tenantId, UUID staffId, String email, String ip, boolean succeeded) {
         jdbc.update(
                 "INSERT INTO login_attempts (tenant_id, staff_id, email, ip_address, succeeded) VALUES (?,?,?,?::inet,?)",

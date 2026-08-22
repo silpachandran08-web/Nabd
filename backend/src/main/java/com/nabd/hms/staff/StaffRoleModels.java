@@ -15,4 +15,12 @@ final class StaffRoleModels {
 
     record RoleRow(UUID id, UUID tenantId, String name, boolean builtIn, String grantsJson) {
     }
+
+    /** NB-057: a bounded-time loan of another role's grants — e.g. covering a doctor's leave. */
+    record DelegationRow(UUID id, UUID staffId, UUID delegatedRoleId, String delegatedRoleName, UUID grantedBy,
+                          String reason, Instant startsAt, Instant expiresAt, Instant revokedAt, String revokedReason) {
+        boolean active() {
+            return revokedAt == null && expiresAt.isAfter(Instant.now());
+        }
+    }
 }

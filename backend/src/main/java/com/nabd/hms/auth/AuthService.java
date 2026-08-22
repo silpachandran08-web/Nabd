@@ -14,6 +14,7 @@ import com.nabd.hms.auth.dto.OtpRequestRequest;
 import com.nabd.hms.auth.dto.OtpVerifyRequest;
 import com.nabd.hms.common.AesGcmCipher;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.OpaqueTokens;
@@ -61,11 +62,12 @@ public class AuthService {
     private final AuthProperties props;
     private final ObjectMapper objectMapper;
     private final WhatsAppOtpSender otpSender;
+    private final AuditService auditService;
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, JwtDecoder jwtDecoder,
-                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender) {
+                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -76,6 +78,7 @@ public class AuthService {
         this.props = props;
         this.objectMapper = objectMapper;
         this.otpSender = otpSender;
+        this.auditService = auditService;
     }
 
     // noRollbackFor: recordLoginAttempt() below is the lockout counter's only durable state, and
@@ -356,7 +359,22 @@ public class AuthService {
     private TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent) {
         Role role = repo.findRole(staff.roleId())
                 .orElseThrow(() -> new IllegalStateException("role missing for staff " + staff.id()));
-        List<String> permissions = flattenGrants(role.grantsJson());
+        List<String> permissions = new java.util.ArrayList<>(flattenGrants(role.grantsJson()));
+
+        // NB-057: fold in any role currently on loan (e.g. covering a doctor's leave). Auditing
+        // an expiry here, not on a scheduler, is what "the expiry is audited" means without a
+        // background-job platform — see AuthRepository.expireStaleDelegations.
+        for (UUID expiredId : repo.expireStaleDelegations(staff.id())) {
+            auditService.record(staff.tenantId(), "system", null, "System", "System", null,
+                    "staff.delegation_expired", "role_delegation", expiredId, null, null);
+        }
+        for (Role delegated : repo.findActiveDelegatedRoles(staff.id())) {
+            for (String p : flattenGrants(delegated.grantsJson())) {
+                if (!permissions.contains(p)) {
+                    permissions.add(p);
+                }
+            }
+        }
 
         UUID sessionId = UUID.randomUUID();
         Instant now = Instant.now();

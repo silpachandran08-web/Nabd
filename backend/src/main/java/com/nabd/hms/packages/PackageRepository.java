@@ -370,7 +370,7 @@ class PackageRepository {
 
     private static final String REFUND_SELECT =
             "SELECT r.id, r.instance_id, p.name AS patient_name, i.package_name, r.reason, r.used_list_value, " +
-                    "r.refund_amount, r.amount_owed, r.status, r.credit_note_number, r.created_at " +
+                    "r.refund_amount, r.amount_owed, r.status, r.credit_note_number, r.requested_by, r.created_at " +
                     "FROM package_refunds r JOIN package_instances i ON i.id = r.instance_id " +
                     "JOIN patients p ON p.id = i.patient_id ";
 
@@ -379,7 +379,7 @@ class PackageRepository {
                 rs.getString("patient_name"), rs.getString("package_name"), rs.getString("reason"),
                 rs.getBigDecimal("used_list_value"), rs.getBigDecimal("refund_amount"),
                 rs.getBigDecimal("amount_owed"), rs.getString("status"), rs.getString("credit_note_number"),
-                rs.getTimestamp("created_at").toInstant());
+                UUID.fromString(rs.getString("requested_by")), rs.getTimestamp("created_at").toInstant());
     }
 
     long countPendingRefunds(UUID tenantId) {
@@ -391,6 +391,13 @@ class PackageRepository {
     String nextCreditNoteNumber(UUID tenantId) {
         long seq = jdbc.queryForObject("SELECT nextval('package_credit_note_seq')", Long.class);
         return "CN-" + String.format("%06d", seq);
+    }
+
+    Optional<com.nabd.hms.packages.PackageModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new com.nabd.hms.packages.PackageModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
     }
 
     void approveRefund(UUID tenantId, UUID id, UUID approvedBy, String creditNoteNumber) {

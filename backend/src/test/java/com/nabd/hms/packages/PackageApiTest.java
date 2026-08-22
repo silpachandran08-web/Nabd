@@ -269,7 +269,9 @@ class PackageApiTest extends ApiTestBase {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pkg10@a.com", "+919500000010", false);
+        SeededStaff approver = seedStaff(tenant, roleId, "pkg10b@a.com", "+919500000011", false);
         String token = loginAndGetAccessToken(staff);
+        String approverToken = loginAndGetAccessToken(approver);
         String patientId = registerPatient(token, "Approve Refund Patient");
         String packageId = createPackage(token, 2400.00, 90, "purchase_date");
         activate(token, packageId);
@@ -282,7 +284,12 @@ class PackageApiTest extends ApiTestBase {
         assertThat(requestResp.getBody().get("status")).isEqualTo("pending");
         String refundId = (String) requestResp.getBody().get("id");
 
-        ResponseEntity<Map> approveResp = exchange("/v1/packages/refunds/" + refundId + "/approve", HttpMethod.POST, authed(token), Map.class);
+        // NB-056 maker-checker: the requester cannot also be the approver.
+        ResponseEntity<Map> selfApprove = exchange("/v1/packages/refunds/" + refundId + "/approve", HttpMethod.POST, authed(token), Map.class);
+        assertThat(selfApprove.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(selfApprove.getBody().get("type")).asString().contains("self-approval-blocked");
+
+        ResponseEntity<Map> approveResp = exchange("/v1/packages/refunds/" + refundId + "/approve", HttpMethod.POST, authed(approverToken), Map.class);
         assertThat(approveResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(approveResp.getBody().get("status")).isEqualTo("approved");
         assertThat(approveResp.getBody().get("creditNoteNumber")).asString().startsWith("CN-");
@@ -295,6 +302,11 @@ class PackageApiTest extends ApiTestBase {
         ResponseEntity<Map> blockedRedeem = exchange("/v1/packages/instances/items/" + anyItemId + "/redeem", HttpMethod.POST, authed(token), Map.class);
         assertThat(blockedRedeem.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(blockedRedeem.getBody().get("type")).asString().contains("package-not-actionable");
+
+        Integer auditRows = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'package_refund' AND entity_id = ? AND action IN ('packages.refund_requested','packages.refund_approved')",
+                Integer.class, UUID.fromString(refundId)));
+        assertThat(auditRows).isEqualTo(2);
     }
 
     @Test

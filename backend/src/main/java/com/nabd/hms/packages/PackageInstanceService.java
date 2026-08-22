@@ -6,6 +6,7 @@ import com.nabd.hms.billing.dto.InvoiceResponse;
 import com.nabd.hms.billing.dto.LineItemRequest;
 import com.nabd.hms.billing.dto.PaymentRequest;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.packages.dto.ExpiringSoonResponse;
 import com.nabd.hms.packages.dto.ExtendRequest;
@@ -58,11 +59,14 @@ public class PackageInstanceService {
     private final PackageRepository repo;
     private final TenantContext tenantContext;
     private final CheckoutService checkoutService;
+    private final AuditService auditService;
 
-    PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService) {
+    PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
+                            AuditService auditService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.checkoutService = checkoutService;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -283,6 +287,7 @@ public class PackageInstanceService {
         RefundPreviewResponse preview = refundPreview(tenantId, id);
         UUID refundId = repo.insertRefund(tenantId, id, req.reason(), preview.usedListValue(),
                 preview.refundAmount(), preview.amountOwed(), staffId);
+        audit(tenantId, staffId, "packages.refund_requested", refundId, null, repo.findRefund(tenantId, refundId).orElseThrow());
         return toRefundResponse(repo.findRefund(tenantId, refundId).orElseThrow());
     }
 
@@ -303,12 +308,25 @@ public class PackageInstanceService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "refund-already-approved", "Already approved",
                     "This refund has already been approved.");
         }
+        // NB-056 maker-checker: whoever requested the refund cannot also be the one who approves it.
+        if (refund.requestedBy().equals(staffId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "self-approval-blocked", "Self-approval blocked",
+                    "A refund must be approved by someone other than whoever requested it.");
+        }
         String creditNoteNumber = repo.nextCreditNoteNumber(tenantId);
         repo.approveRefund(tenantId, refundId, staffId, creditNoteNumber);
         repo.updateInstanceStatus(tenantId, refund.instanceId(), "refunded");
         repo.insertEvent(tenantId, refund.instanceId(), "refunded",
                 "credit note " + creditNoteNumber + " · " + refund.refundAmount(), null, staffId);
-        return toRefundResponse(repo.findRefund(tenantId, refundId).orElseThrow());
+        RefundResponse approved = toRefundResponse(repo.findRefund(tenantId, refundId).orElseThrow());
+        audit(tenantId, staffId, "packages.refund_approved", refundId, refund, approved);
+        return approved;
+    }
+
+    private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
+        PackageModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+                action, "package_refund", entityId, before, after);
     }
 
     @Transactional

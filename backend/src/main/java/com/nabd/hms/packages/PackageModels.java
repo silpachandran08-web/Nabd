@@ -22,6 +22,10 @@ final class PackageModels {
     record PackageSettingsRow(BigDecimal priceFloorPercent) {
     }
 
+    /** NB-056: audit_log's actor_name/actor_role snapshot — same per-module pattern as Patient/Nursing. */
+    record ActorInfo(String name, String role) {
+    }
+
     record InstanceRow(UUID id, UUID packageId, UUID patientId, String patientName, UUID invoiceId,
                         String invoiceNumber, String packageName, BigDecimal soldPrice, BigDecimal soldTax,
                         String validityStarts, int validityDays, LocalDate validityStart, LocalDate validityEnd,
@@ -37,7 +41,7 @@ final class PackageModels {
 
     record RefundRow(UUID id, UUID instanceId, String patientName, String packageName, String reason,
                       BigDecimal usedListValue, BigDecimal refundAmount, BigDecimal amountOwed, String status,
-                      String creditNoteNumber, Instant createdAt) {
+                      String creditNoteNumber, UUID requestedBy, Instant createdAt) {
     }
 
     record LiabilityRow(long activePackages, long sessionsOwed, BigDecimal remainingListValue,
