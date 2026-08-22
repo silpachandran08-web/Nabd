@@ -762,6 +762,7 @@ export default function SetupPage() {
           <button className={styles.wizardBtn} onClick={() => router.push("/nursing")}>Nursing Worklist</button>
           <button className={styles.wizardBtn} onClick={() => router.push("/patients")}>Patients</button>
           <button className={styles.wizardBtn} onClick={() => router.push("/consult")}>Consultation Workspace</button>
+          <button className={styles.wizardBtn} onClick={() => router.push("/packages")}>Treatment Packages</button>
           <button className={styles.wizardBtn} onClick={() => router.push("/staff")}>Staff & Access</button>
           <button className={styles.wizardBtn} onClick={() => router.push("/reports")}>Owner Insights</button>
           <button className={styles.wizardBtn} onClick={() => router.push("/setup/wizard")}>Open setup wizard</button>

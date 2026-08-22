@@ -114,14 +114,25 @@ public class CheckoutService {
 
     @Transactional
     public InvoiceResponse otcCheckout(UUID tenantId, UUID staffId, CheckoutRequest req) {
+        return standaloneInvoice(tenantId, staffId, null, req, "OTC");
+    }
+
+    /** E14 Treatment Packages: a package sale is also a standalone invoice — no queue entry, but
+     * (unlike an OTC sale) a real patient. Reuses the same total/tax/round-off computation. */
+    @Transactional
+    public InvoiceResponse sellPackageInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req) {
+        return standaloneInvoice(tenantId, staffId, patientId, req, "package");
+    }
+
+    private InvoiceResponse standaloneInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req, String kind) {
         tenantContext.set(tenantId);
         Totals t = computeTotals(req);
         List<LineItemInput> items = req.lineItems().stream().map(this::toLineItemInput).toList();
 
-        UUID invoiceId = repo.insertInvoice(tenantId, null, null, null, t.subtotal(), t.discount(), t.tax(),
+        UUID invoiceId = repo.insertInvoice(tenantId, null, patientId, null, t.subtotal(), t.discount(), t.tax(),
                 t.roundOff(), t.total(), staffId);
         repo.insertLineItems(tenantId, invoiceId, items);
-        log.info("OTC invoice {} created by {} (tenant {}, total {})", invoiceId, staffId, tenantId, t.total());
+        log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }
