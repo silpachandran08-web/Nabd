@@ -14,4 +14,8 @@ final class PatientModels {
 
     record MatchCandidateRow(UUID id, String name, String phone, double matchScore) {
     }
+
+    /** NB-085/NB-127-style audit snapshot — same small per-module record as Dental/Prescription/Reports. */
+    record ActorInfo(String name, String role) {
+    }
 }

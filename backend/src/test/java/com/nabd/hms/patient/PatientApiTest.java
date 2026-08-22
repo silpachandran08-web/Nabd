@@ -273,11 +273,122 @@ class PatientApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
 
+    // ---- E09 Caregiver, Family & Guardianship ----
+
+    @Test
+    void registeringMinorWithGuardianGrantsConsentAndDetailShowsIt() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam1@a.com", "+919300000020", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatient(token, "Guardian One", "+919888800020");
+
+        ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Minor One", "phone", "+919888800021", "dob", java.time.LocalDate.now().minusYears(10).toString(),
+                "gender", "female", "guardianId", guardianId)), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String minorId = (String) resp.getBody().get("id");
+
+        ResponseEntity<Map> detail = exchange("/v1/patients/" + minorId, HttpMethod.GET, authed(token), Map.class);
+        assertThat(detail.getBody().get("isMinor")).isEqualTo(true);
+        assertThat(detail.getBody().get("guardianId")).isEqualTo(guardianId);
+        assertThat(detail.getBody().get("guardianName")).isEqualTo("Guardian One");
+        assertThat(detail.getBody().get("guardianConsentGrantedAt")).isNotNull();
+
+        Long grants = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM consents WHERE patient_id = ? AND consent_type = 'guardian_access' AND withdrawn_at IS NULL",
+                Long.class, UUID.fromString(minorId)));
+        assertThat(grants).isEqualTo(1);
+    }
+
+    @Test
+    void reassigningGuardianViaPatchWithdrawsOldConsentAndGrantsNew() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam2@a.com", "+919300000021", false);
+        String token = loginAndGetAccessToken(staff);
+        // distinct dobs — same dob + similar names would otherwise trip NB-060's fuzzy duplicate match
+        String guardian1 = registerPatientWithDob(token, "Guardian A", "+919888800022", "1975-01-01");
+        String guardian2 = registerPatientWithDob(token, "Guardian B", "+919888800023", "1978-06-15");
+        String dob = java.time.LocalDate.now().minusYears(8).toString();
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Minor Two", "phone", "+919888800024", "dob", dob, "gender", "male", "guardianId", guardian1)), Map.class);
+        String minorId = (String) created.getBody().get("id");
+
+        ResponseEntity<Map> patched = exchange("/v1/patients/" + minorId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "name", "Minor Two", "phone", "+919888800024", "dob", dob, "gender", "male", "guardianId", guardian2)), Map.class);
+        assertThat(patched.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // consents is an append-only event log (NB-053) — reassignment leaves 3 rows: the original
+        // grant, a withdrawal for guardian1, and a fresh grant for guardian2. Which guardian is
+        // *current* is patients.guardian_id, asserted via the API below, not a row count here.
+        Long withdrawalRows = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM consents WHERE patient_id = ? AND consent_type = 'guardian_access' AND withdrawn_at IS NOT NULL",
+                Long.class, UUID.fromString(minorId)));
+        assertThat(withdrawalRows).isEqualTo(1);
+
+        ResponseEntity<Map> detail = exchange("/v1/patients/" + minorId, HttpMethod.GET, authed(token), Map.class);
+        assertThat(detail.getBody().get("guardianId")).isEqualTo(guardian2);
+
+        Long auditRows = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_id = ? AND action IN ('patient.guardian_grant','patient.guardian_reassign')",
+                Long.class, UUID.fromString(minorId)));
+        assertThat(auditRows).isEqualTo(2); // initial grant at registration + reassignment
+    }
+
+    @Test
+    void adultWithGuardianOnFileAppearsInReviewsDueAndHandoverClearsIt() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam3@a.com", "+919300000022", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatient(token, "Guardian C", "+919888800025");
+        // 19 years old: an adult, but still carrying a guardian on file (nothing stops that at registration)
+        String dob = java.time.LocalDate.now().minusYears(19).toString();
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Newly Adult", "phone", "+919888800026", "dob", dob, "gender", "female", "guardianId", guardianId)), Map.class);
+        String patientId = (String) created.getBody().get("id");
+
+        ResponseEntity<List> due = exchange("/v1/patients/guardian-reviews-due", HttpMethod.GET, authed(token), List.class);
+        assertThat(due.getBody()).anyMatch(r -> patientId.equals(((Map<?, ?>) r).get("patientId")));
+
+        ResponseEntity<Map> handover = exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "name", "Newly Adult", "phone", "+919888800026", "dob", dob, "gender", "female")), Map.class);
+        assertThat(handover.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class);
+        assertThat(detail.getBody().get("guardianId")).isNull();
+        assertThat(detail.getBody().get("isMinor")).isEqualTo(false);
+
+        ResponseEntity<List> dueAfter = exchange("/v1/patients/guardian-reviews-due", HttpMethod.GET, authed(token), List.class);
+        assertThat(dueAfter.getBody()).noneMatch(r -> patientId.equals(((Map<?, ?>) r).get("patientId")));
+
+        Long revokeAudit = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_id = ? AND action = 'patient.guardian_revoke'",
+                Long.class, UUID.fromString(patientId)));
+        assertThat(revokeAudit).isEqualTo(1);
+    }
+
+    @Test
+    void guardianReviewsDueRequiresPatientsViewGrant() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedRole(tenant.id(), "NoPatients", false, fullGrant("queue"));
+        SeededStaff staff = seedStaff(tenant, roleId, "fam4@a.com", "+919300000023", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> resp = exchange("/v1/patients/guardian-reviews-due", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     // ---- helpers ----
 
     private String registerPatient(String token, String name, String phone) {
+        return registerPatientWithDob(token, name, phone, "1990-01-01");
+    }
+
+    private String registerPatientWithDob(String token, String name, String phone, String dob) {
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", name, "phone", phone, "dob", "1990-01-01", "gender", "male")), Map.class);
+                "name", name, "phone", phone, "dob", dob, "gender", "male")), Map.class);
         return (String) resp.getBody().get("id");
     }
 

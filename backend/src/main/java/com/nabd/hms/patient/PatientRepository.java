@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.patient.PatientModels.ActorInfo;
 import static com.nabd.hms.patient.PatientModels.MatchCandidateRow;
 import static com.nabd.hms.patient.PatientModels.PatientRow;
 
@@ -180,6 +181,38 @@ class PatientRepository {
     void withdrawConsent(UUID tenantId, UUID patientId, String consentType) {
         jdbc.update("INSERT INTO consents (tenant_id, patient_id, consent_type, withdrawn_at) VALUES (?,?,?,now())",
                 tenantId, patientId, consentType);
+    }
+
+    /** NB-081: the grant side of the same consents table NB-053 already reads (only withdrawal was
+     * modelled before). granted_at defaults to now(); withdrawn_at stays null — an active grant. */
+    void grantConsent(UUID tenantId, UUID patientId, String consentType) {
+        jdbc.update("INSERT INTO consents (tenant_id, patient_id, consent_type) VALUES (?,?,?)",
+                tenantId, patientId, consentType);
+    }
+
+    Optional<Instant> findActiveConsentGrantedAt(UUID tenantId, UUID patientId, String consentType) {
+        return jdbc.query(
+                "SELECT granted_at FROM consents WHERE tenant_id = ? AND patient_id = ? AND consent_type = ? " +
+                        "AND withdrawn_at IS NULL ORDER BY granted_at DESC LIMIT 1",
+                (rs, i) -> rs.getTimestamp("granted_at").toInstant(), tenantId, patientId, consentType)
+                .stream().findFirst();
+    }
+
+    /** NB-082: patients whose guardian link is still set despite having turned 18 — the "automatic"
+     * review task is this computed worklist, not a background job (none exists yet, NB-308). */
+    List<PatientRow> findGuardianReviewsDue(UUID tenantId) {
+        return jdbc.query("SELECT " + COLUMNS + "FROM patients WHERE tenant_id = ? AND status = 'active' " +
+                        "AND guardian_id IS NOT NULL AND dob <= CURRENT_DATE - INTERVAL '18 years' " +
+                        "ORDER BY dob",
+                patientMapper(), tenantId);
+    }
+
+    /** NB-085: audit_log's actor_name/actor_role snapshot — same per-module pattern as Dental. */
+    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
     }
 
     private RowMapper<PatientRow> patientMapper() {

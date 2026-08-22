@@ -13,6 +13,10 @@ type PatientDetail = Patient & {
   activePackages: number;
   outstandingBalance?: number; // NB-052: omitted entirely from the response when the caller's field grants restrict financial data
   lastVisitAt: string | null;
+  isMinor: boolean;
+  guardianId: string | null;
+  guardianName: string | null;
+  guardianConsentGrantedAt: string | null;
 };
 type Allergy = { id: string; substance: string; severity: string; reaction: string | null; active: boolean };
 type Condition = { id: string; condition: string; status: string; reviewDueDate: string | null };
@@ -255,6 +259,22 @@ export default function PatientsPage() {
       }
     } finally {
       setConditionBusy(false);
+    }
+  }
+
+  /** NB-085: revocation is just a normal patch clearing guardianId — PatientService audits the
+   * change (and withdraws the guardian_access consent) as part of that same write. */
+  async function revokeGuardian() {
+    if (!drawerPatient) return;
+    const res = await authedFetch(`/patients/${drawerPatient.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: drawerPatient.name, phone: drawerPatient.phone, dob: drawerPatient.dob, gender: drawerPatient.gender,
+      }),
+    });
+    if (res?.ok) {
+      const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
+      if (pRes?.ok) setDrawerPatient(await pRes.json());
     }
   }
 
@@ -540,6 +560,26 @@ export default function PatientsPage() {
                     <div className={styles.sectionValue}>{drawerPatient.phone}</div>
                   </div>
                 </div>
+
+                {drawerPatient.guardianId && (
+                  <div className={styles.section}>
+                    <div className={styles.sectionLabel}>Guardian / proxy</div>
+                    <div className={styles.allergyRow}>
+                      <span>
+                        {drawerPatient.guardianName ?? "Unknown"}
+                        {drawerPatient.guardianConsentGrantedAt
+                          ? ` · consent captured ${new Date(drawerPatient.guardianConsentGrantedAt).toLocaleDateString()}`
+                          : ""}
+                      </span>
+                      {!drawerPatient.isMinor && (
+                        <button className={styles.linkBtn} onClick={revokeGuardian}>Revoke access</button>
+                      )}
+                    </div>
+                    {drawerPatient.isMinor && (
+                      <div className={styles.muted}>A minor&apos;s guardian can&apos;t be removed — reassign instead, or wait for the automatic age-18 review.</div>
+                    )}
+                  </div>
+                )}
 
                 <div className={styles.section}>
                   <div className={styles.sectionLabel}>Chronic conditions</div>

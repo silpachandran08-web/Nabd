@@ -22,5 +22,6 @@ import java.util.UUID;
 public record PatientDetailResponse(UUID id, String mrn, String name, String phone, LocalDate dob,
                                      String gender, String status, List<String> allergies,
                                      List<String> chronicConditions, int activePackages,
-                                     Double outstandingBalance, Instant lastVisitAt) {
+                                     Double outstandingBalance, Instant lastVisitAt, boolean isMinor,
+                                     UUID guardianId, String guardianName, Instant guardianConsentGrantedAt) {
 }

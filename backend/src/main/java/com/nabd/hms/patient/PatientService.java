@@ -2,10 +2,12 @@ package com.nabd.hms.patient;
 
 import com.nabd.hms.common.AesGcmCipher;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.Cursor;
 import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.patient.dto.DuplicateCandidatesResponse;
+import com.nabd.hms.patient.dto.GuardianReviewResponse;
 import com.nabd.hms.patient.dto.MergeRequest;
 import com.nabd.hms.patient.dto.PageMeta;
 import com.nabd.hms.patient.dto.PatientDetailResponse;
@@ -25,8 +27,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
+import static com.nabd.hms.patient.PatientModels.ActorInfo;
 import static com.nabd.hms.patient.PatientModels.MatchCandidateRow;
 import static com.nabd.hms.patient.PatientModels.PatientRow;
 
@@ -34,20 +39,23 @@ import static com.nabd.hms.patient.PatientModels.PatientRow;
 public class PatientService {
 
     private static final Logger log = LoggerFactory.getLogger(PatientService.class);
+    private static final String GUARDIAN_ACCESS = "guardian_access";
 
     private final PatientRepository repo;
     private final TenantContext tenantContext;
     private final AesGcmCipher cipher;
     private final StepUpVerifier stepUpVerifier;
     private final StaffService staffService;
+    private final AuditService auditService;
 
     PatientService(PatientRepository repo, TenantContext tenantContext, AesGcmCipher cipher,
-                    StepUpVerifier stepUpVerifier, StaffService staffService) {
+                    StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.cipher = cipher;
         this.stepUpVerifier = stepUpVerifier;
         this.staffService = staffService;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -95,6 +103,9 @@ public class PatientService {
         byte[] nationalIdEnc = encryptOrNull(req.nationalId());
         UUID id = repo.insert(tenantId, req.name(), req.phone(), req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
+        if (req.guardianId() != null) {
+            grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId());
+        }
         log.info("patient {} registered by {} (tenant {})", id, callerStaffId, tenantId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
@@ -105,7 +116,7 @@ public class PatientService {
         tenantContext.set(tenantId);
         PatientRow row = repo.findVisibleById(tenantId, id, scopedToDoctorId).orElseThrow(this::notFound);
         List<String> fieldGrants = staffService.getCallerInfo(tenantId, callerStaffId).fieldGrants();
-        return toDetailResponse(row, repo.findLastVisitAt(tenantId, id).orElse(null), repo.findActiveAllergySubstances(tenantId, id),
+        return toDetailResponse(tenantId, row, repo.findLastVisitAt(tenantId, id).orElse(null), repo.findActiveAllergySubstances(tenantId, id),
                 repo.findActiveConditionNames(tenantId, id), fieldGrants);
     }
 
@@ -114,14 +125,59 @@ public class PatientService {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         // scoped out or genuinely absent look identical — both 404, never 403 (NB-051)
-        repo.findVisibleById(tenantId, id, scopedToDoctorId).filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+        PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
+                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
         validateGuardian(tenantId, req);
 
         byte[] nationalIdEnc = encryptOrNull(req.nationalId());
         repo.update(tenantId, id, req.name(), req.phone(), req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
+        // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
+        // the one place that needs to keep guardian_access consent (and the audit trail) in step —
+        // covers grant, revoke (new guardianId is null) and reassignment alike.
+        if (!Objects.equals(before.guardianId(), req.guardianId())) {
+            changeGuardian(tenantId, callerStaffId, id, before.guardianId(), req.guardianId());
+        }
         log.info("patient {} updated by {} (tenant {})", id, callerStaffId, tenantId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** NB-082: patients who've turned 18 but still have a guardian on file — the "automatic" part
+     * of the age-18 handover is this always-current computed worklist; staff perform the actual
+     * handover with a normal patch() clearing guardianId, which changeGuardian() already audits. */
+    @Transactional
+    public List<GuardianReviewResponse> guardianReviewsDue(UUID tenantId, UUID callerStaffId) {
+        requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        tenantContext.set(tenantId);
+        return repo.findGuardianReviewsDue(tenantId).stream()
+                .map(r -> new GuardianReviewResponse(r.id(), r.mrn(), r.name(), r.dob(), r.guardianId(),
+                        repo.findById(tenantId, r.guardianId()).map(PatientRow::name).orElse(null)))
+                .toList();
+    }
+
+    private void grantGuardianConsent(UUID tenantId, UUID callerStaffId, UUID patientId, UUID guardianId) {
+        repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS);
+        audit(tenantId, callerStaffId, "patient.guardian_grant", patientId, null, Map.of("guardianId", guardianId));
+    }
+
+    private void changeGuardian(UUID tenantId, UUID callerStaffId, UUID patientId, UUID oldGuardianId, UUID newGuardianId) {
+        if (oldGuardianId != null) {
+            repo.withdrawConsent(tenantId, patientId, GUARDIAN_ACCESS);
+        }
+        if (newGuardianId != null) {
+            repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS);
+        }
+        String action = newGuardianId == null ? "patient.guardian_revoke"
+                : oldGuardianId == null ? "patient.guardian_grant" : "patient.guardian_reassign";
+        audit(tenantId, callerStaffId, action, patientId,
+                Map.of("guardianId", oldGuardianId == null ? "" : oldGuardianId.toString()),
+                Map.of("guardianId", newGuardianId == null ? "" : newGuardianId.toString()));
+    }
+
+    private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+                action, "patient", entityId, before, after);
     }
 
     @Transactional
@@ -143,7 +199,7 @@ public class PatientService {
         log.info("patient {} merged into {} by {} (tenant {})", req.duplicatePatientId(), survivorId, callerStaffId, tenantId);
         PatientRow row = repo.findById(tenantId, survivorId).orElseThrow(this::notFound);
         List<String> fieldGrants = staffService.getCallerInfo(tenantId, callerStaffId).fieldGrants();
-        return toDetailResponse(row, repo.findLastVisitAt(tenantId, survivorId).orElse(null),
+        return toDetailResponse(tenantId, row, repo.findLastVisitAt(tenantId, survivorId).orElse(null),
                 repo.findActiveAllergySubstances(tenantId, survivorId), repo.findActiveConditionNames(tenantId, survivorId), fieldGrants);
     }
 
@@ -182,9 +238,14 @@ public class PatientService {
         return "own_patients_only".equals(caller.scope()) ? callerStaffId : null;
     }
 
+    /** NB-082/NB-089: the one age check every minor/guardian/marketing-block rule in this module
+     * builds on. */
+    private boolean isMinor(LocalDate dob) {
+        return Period.between(dob, LocalDate.now()).getYears() < 18;
+    }
+
     private void validateGuardian(UUID tenantId, PatientWriteRequest req) {
-        boolean isMinor = Period.between(req.dob(), LocalDate.now()).getYears() < 18;
-        if (isMinor && req.guardianId() == null) {
+        if (isMinor(req.dob()) && req.guardianId() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-required", "Guardian required",
                     "A minor cannot be registered without a guardian.");
         }
@@ -201,19 +262,25 @@ public class PatientService {
     }
 
     private PatientResponse toResponse(PatientRow row) {
-        return new PatientResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(), row.status());
+        return new PatientResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
+                row.status(), isMinor(row.dob()));
     }
 
     /** NB-052: outstandingBalance (the one financial field this response carries) is omitted from
      * the JSON entirely — not zeroed, not merely hidden — for a staff member whose field grants are
      * a non-empty custom restriction that doesn't include "financial". An empty grants list means no
      * custom restriction (the default: full access). */
-    private PatientDetailResponse toDetailResponse(PatientRow row, java.time.Instant lastVisitAt, List<String> allergies,
+    private PatientDetailResponse toDetailResponse(UUID tenantId, PatientRow row, java.time.Instant lastVisitAt, List<String> allergies,
                                                      List<String> chronicConditions, List<String> callerFieldGrants) {
         boolean canSeeFinancial = callerFieldGrants.isEmpty() || callerFieldGrants.contains("financial");
         Double outstandingBalance = canSeeFinancial ? 0.0 : null;
+        String guardianName = row.guardianId() == null ? null
+                : repo.findById(tenantId, row.guardianId()).map(PatientRow::name).orElse(null);
+        java.time.Instant guardianConsentGrantedAt = row.guardianId() == null ? null
+                : repo.findActiveConsentGrantedAt(tenantId, row.id(), GUARDIAN_ACCESS).orElse(null);
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
-                row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt);
+                row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt, isMinor(row.dob()),
+                row.guardianId(), guardianName, guardianConsentGrantedAt);
     }
 
     private ApiException notFound() {

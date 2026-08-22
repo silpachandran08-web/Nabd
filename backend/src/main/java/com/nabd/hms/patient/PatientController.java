@@ -1,6 +1,7 @@
 package com.nabd.hms.patient;
 
 import com.nabd.hms.patient.dto.DuplicateCandidatesResponse;
+import com.nabd.hms.patient.dto.GuardianReviewResponse;
 import com.nabd.hms.patient.dto.MergeRequest;
 import com.nabd.hms.patient.dto.PatientDetailResponse;
 import com.nabd.hms.patient.dto.PatientPage;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -42,6 +44,12 @@ public class PatientController {
                              @RequestParam(defaultValue = "20") int limit,
                              @RequestParam(required = false) String cursor) {
         return service.list(tenantId(jwt), staffId(jwt), q, limit, cursor);
+    }
+
+    @GetMapping("/guardian-reviews-due")
+    @PreAuthorize("hasAuthority('patients:view')")
+    public List<GuardianReviewResponse> guardianReviewsDue(@AuthenticationPrincipal Jwt jwt) {
+        return service.guardianReviewsDue(tenantId(jwt), staffId(jwt));
     }
 
     @PostMapping
