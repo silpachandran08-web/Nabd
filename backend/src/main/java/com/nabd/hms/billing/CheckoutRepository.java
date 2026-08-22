@@ -49,6 +49,23 @@ class CheckoutRepository {
                 tenantId);
     }
 
+    /** NB-146: a completed-but-unbilled procedure the nurse finished during this visit — surfaced so
+     * Fast Checkout can pre-load it, the same narrow-direct-query precedent as pharmacy stock (V25). */
+    List<ChargeRow> listPendingProcedures(UUID tenantId, UUID queueEntryId) {
+        return jdbc.query(
+                "SELECT id, charge_code, charge_name, base_amount, tax_rate_percent FROM procedure_orders " +
+                        "WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'completed' AND billed = false",
+                (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("charge_code"),
+                        rs.getString("charge_name"), "Procedure", rs.getBigDecimal("base_amount"), null,
+                        rs.getBigDecimal("tax_rate_percent")),
+                tenantId, queueEntryId);
+    }
+
+    void markProceduresBilled(UUID tenantId, UUID queueEntryId) {
+        jdbc.update("UPDATE procedure_orders SET billed = true WHERE tenant_id = ? AND queue_entry_id = ? " +
+                "AND status = 'completed' AND billed = false", tenantId, queueEntryId);
+    }
+
     // Not reaching into QueueRepository/PatientService (different packages) for these — same
     // narrow-direct-query precedent as CheckoutRepository.planExists() in the platform module.
     Optional<QueueEntryContext> findQueueEntryContext(UUID tenantId, UUID queueEntryId) {

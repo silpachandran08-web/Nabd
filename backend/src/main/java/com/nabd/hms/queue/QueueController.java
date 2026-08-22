@@ -43,8 +43,9 @@ public class QueueController {
     @PreAuthorize("hasAuthority('queue:view')")
     public List<QueueEntryResponse> list(@AuthenticationPrincipal Jwt jwt,
                                           @RequestParam(required = false) UUID doctorId,
-                                          @RequestParam(required = false) LocalDate date) {
-        return service.list(tenantId(jwt), doctorId, date);
+                                          @RequestParam(required = false) LocalDate date,
+                                          @RequestParam(defaultValue = "false") boolean priority) {
+        return service.list(tenantId(jwt), doctorId, date, priority);
     }
 
     @PatchMapping("/{id}/status")
@@ -59,6 +60,12 @@ public class QueueController {
     public QueueEntryResponse reorder(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                        @Valid @RequestBody QueueReorderRequest req) {
         return service.reorder(tenantId(jwt), staffId(jwt), id, req);
+    }
+
+    @PostMapping("/{id}/priority/acknowledge")
+    @PreAuthorize("hasAuthority('queue:edit')")
+    public QueueEntryResponse acknowledgePriority(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.acknowledgePriority(tenantId(jwt), staffId(jwt), id);
     }
 
     private UUID tenantId(Jwt jwt) {

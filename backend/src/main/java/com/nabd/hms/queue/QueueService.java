@@ -91,10 +91,10 @@ public class QueueService {
     }
 
     @Transactional
-    public List<QueueEntryResponse> list(UUID tenantId, UUID doctorId, LocalDate date) {
+    public List<QueueEntryResponse> list(UUID tenantId, UUID doctorId, LocalDate date, boolean priorityOnly) {
         tenantContext.set(tenantId);
         LocalDate day = date == null ? LocalDate.now(ZoneOffset.UTC) : date;
-        return repo.listForDay(tenantId, doctorId, day).stream().map(this::toResponse).toList();
+        return repo.listForDay(tenantId, doctorId, day, priorityOnly).stream().map(this::toResponse).toList();
     }
 
     @Transactional
@@ -121,8 +121,23 @@ public class QueueService {
     public QueueEntryResponse reorder(UUID tenantId, UUID callerStaffId, UUID id, QueueReorderRequest req) {
         tenantContext.set(tenantId);
         repo.findById(tenantId, id).orElseThrow(this::notFound);
-        repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null);
+        repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null, callerStaffId);
         log.info("queue entry {} priority set to {} by {} ({})", id, req.priority(), callerStaffId, req.reason());
+        return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** NB-143: the "alerts the doctor" half of the AC — a doctor (or anyone with queue:edit)
+     * acknowledging a flag they've seen, tracked and displayed, not just a passive dot. */
+    @Transactional
+    public QueueEntryResponse acknowledgePriority(UUID tenantId, UUID callerStaffId, UUID id) {
+        tenantContext.set(tenantId);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        if (!current.priority()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "not-flagged", "Not flagged",
+                    "This visit isn't flagged as priority.");
+        }
+        repo.acknowledgePriority(tenantId, id, callerStaffId);
+        log.info("queue entry {} priority acknowledged by {}", id, callerStaffId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
@@ -147,7 +162,8 @@ public class QueueService {
     private QueueEntryResponse toResponse(QueueEntryRow row) {
         return new QueueEntryResponse(row.id(), row.appointmentId(), row.patientId(), row.doctorId(),
                 row.queueDate(), row.tokenNumber(), row.status(), row.priority(), row.priorityReason(),
-                row.source(), row.createdAt());
+                row.priorityFlaggedBy(), row.priorityFlaggedAt(), row.priorityAcknowledgedBy(),
+                row.priorityAcknowledgedAt(), row.source(), row.createdAt());
     }
 
     private ApiException notFound() {

@@ -260,7 +260,7 @@ public abstract class ApiTestBase {
     protected UUID seedFullAccessRole(UUID tenantId) {
         return seedRole(tenantId, "Owner", true, fullGrant("staff"), fullGrant("patients"), fullGrant("queue"),
                 fullGrant("setup"), fullGrant("clinical"), fullGrant("billing"), fullGrant("specialty_dental"),
-                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"));
+                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing"));
     }
 
     protected UUID seedRole(UUID tenantId, String name, boolean builtIn, ModuleGrant... grants) {

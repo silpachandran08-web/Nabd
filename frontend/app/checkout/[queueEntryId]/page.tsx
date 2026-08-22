@@ -8,7 +8,7 @@ import styles from "../checkout.module.css";
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number };
 type CheckoutContext = {
   queueEntryId: string; patientName: string; doctorName: string; visitType: string;
-  followUpEligible: boolean; currency: string; charges: Charge[];
+  followUpEligible: boolean; currency: string; charges: Charge[]; pendingProcedures: Charge[];
 };
 type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
 type Payment = { id: string; method: string; amount: number; recordedAt: string };
@@ -84,7 +84,14 @@ export default function CheckoutPage() {
         setError("Couldn't load checkout details. Try again.");
         return;
       }
-      setContext(await ctxRes.json());
+      const ctx: CheckoutContext = await ctxRes.json();
+      setContext(ctx);
+      if (ctx.pendingProcedures.length > 0) {
+        setItems(ctx.pendingProcedures.map((c) => ({
+          chargeCode: c.code, chargeName: c.name, category: c.category, quantity: 1,
+          unitPrice: c.baseAmount, taxRatePercent: c.taxRatePercent,
+        })));
+      }
 
       const invRes = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`);
       if (invRes?.status === 200) {
