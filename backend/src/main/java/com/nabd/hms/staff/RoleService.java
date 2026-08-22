@@ -65,7 +65,7 @@ public class RoleService {
         requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
 
         UUID id = UUID.randomUUID();
-        repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()));
+        repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
         log.info("role {} '{}' created by {} (tenant {})", id, req.name(), callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
@@ -79,7 +79,7 @@ public class RoleService {
         }
         requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
 
-        repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()));
+        repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
         log.info("role {} updated by {} (tenant {})", id, callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
@@ -140,7 +140,7 @@ public class RoleService {
     }
 
     private RoleResponse toResponse(RoleRow row) {
-        return new RoleResponse(row.id(), row.name(), row.builtIn(), readGrants(row.grantsJson()));
+        return new RoleResponse(row.id(), row.name(), row.builtIn(), readGrants(row.grantsJson()), row.mfaRequired());
     }
 
     private List<ModuleGrant> readGrants(String json) {

@@ -96,6 +96,7 @@ export default function StaffAccessPage() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [breakGlass, setBreakGlass] = useState<{ id: string; staffId: string; staffName: string; reason: string; activatedAt: string; expiresAt: string }[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -170,6 +171,9 @@ export default function StaffAccessPage() {
 
       const rolesRes = await authedFetch("/roles");
       if (rolesRes?.ok) setRoles(await rolesRes.json());
+
+      const bgRes = await authedFetch("/auth/break-glass/active");
+      if (bgRes?.ok) setBreakGlass(await bgRes.json());
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -362,6 +366,7 @@ export default function StaffAccessPage() {
           <h1 className={styles.title}>Staff & Access</h1>
           <p className={styles.subtitle}>{staff.length} team member{staff.length === 1 ? "" : "s"}</p>
         </div>
+        <button className={styles.actionBtn} onClick={() => router.push("/account")}>My Account & Security</button>
       </div>
 
       {error && <div className={styles.formError} role="alert">{error}</div>}
@@ -489,6 +494,31 @@ export default function StaffAccessPage() {
               </table>
             </div>
           </div>
+
+          {breakGlass.length > 0 && (
+            <>
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>Emergency access — currently elevated</h2>
+              </div>
+              <div className={styles.card}>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead><tr><th>Staff</th><th>Reason</th><th>Activated</th><th>Expires</th></tr></thead>
+                    <tbody>
+                      {breakGlass.map((g) => (
+                        <tr key={g.id}>
+                          <td className={styles.staffName}>{g.staffName}</td>
+                          <td>{g.reason}</td>
+                          <td className={styles.muted}>{new Date(g.activatedAt).toLocaleString()}</td>
+                          <td className={styles.muted}>{new Date(g.expiresAt).toLocaleTimeString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 

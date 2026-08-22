@@ -139,3 +139,39 @@
   font-size: 14px;
   color: var(--nb-text-secondary);
 }
+
+.linkBtn {
+  display: block;
+  margin: var(--nb-space-16) auto 0;
+  background: none;
+  border: none;
+  color: var(--nb-accent-500);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.secretBox {
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  word-break: break-all;
+  margin-bottom: var(--nb-space-16);
+  color: var(--nb-text-primary);
+}
+
+.recoveryCodes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--nb-space-8);
+  background: var(--nb-surface-3);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  margin-bottom: var(--nb-space-16);
+}

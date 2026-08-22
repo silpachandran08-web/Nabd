@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import IdleLockGuard from "./IdleLockGuard";
 
 // DESIGN.md §2.1 — weights 400/500/600/700 only, Poppins is the only Latin family.
 const poppins = Poppins({
@@ -17,7 +18,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={poppins.variable}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <IdleLockGuard />
+      </body>
     </html>
   );
 }

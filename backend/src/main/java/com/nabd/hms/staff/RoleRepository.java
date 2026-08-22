@@ -24,25 +24,25 @@ class RoleRepository {
 
     List<RoleRow> list(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json FROM roles WHERE tenant_id = ? ORDER BY name",
+                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json, mfa_required FROM roles WHERE tenant_id = ? ORDER BY name",
                 roleMapper(), tenantId);
     }
 
     Optional<RoleRow> findById(UUID tenantId, UUID id) {
         return jdbc.query(
-                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json FROM roles WHERE tenant_id = ? AND id = ?",
+                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json, mfa_required FROM roles WHERE tenant_id = ? AND id = ?",
                 roleMapper(), tenantId, id
         ).stream().findFirst();
     }
 
-    void insert(UUID id, UUID tenantId, String name, String grantsJson) {
-        jdbc.update("INSERT INTO roles (id, tenant_id, name, built_in, grants) VALUES (?,?,?,false,?::jsonb)",
-                id, tenantId, name, grantsJson);
+    void insert(UUID id, UUID tenantId, String name, String grantsJson, boolean mfaRequired) {
+        jdbc.update("INSERT INTO roles (id, tenant_id, name, built_in, grants, mfa_required) VALUES (?,?,?,false,?::jsonb,?)",
+                id, tenantId, name, grantsJson, mfaRequired);
     }
 
-    void update(UUID tenantId, UUID id, String name, String grantsJson) {
-        jdbc.update("UPDATE roles SET name = ?, grants = ?::jsonb WHERE tenant_id = ? AND id = ? AND built_in = false",
-                name, grantsJson, tenantId, id);
+    void update(UUID tenantId, UUID id, String name, String grantsJson, boolean mfaRequired) {
+        jdbc.update("UPDATE roles SET name = ?, grants = ?::jsonb, mfa_required = ? WHERE tenant_id = ? AND id = ? AND built_in = false",
+                name, grantsJson, mfaRequired, tenantId, id);
     }
 
     record ActorInfo(String name, String role) {
@@ -133,6 +133,7 @@ class RoleRepository {
                 UUID.fromString(rs.getString("tenant_id")),
                 rs.getString("name"),
                 rs.getBoolean("built_in"),
-                rs.getString("grants_json"));
+                rs.getString("grants_json"),
+                rs.getBoolean("mfa_required"));
     }
 }

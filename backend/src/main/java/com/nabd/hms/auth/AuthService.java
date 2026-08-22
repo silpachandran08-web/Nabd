@@ -3,15 +3,24 @@ package com.nabd.hms.auth;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
+import com.nabd.hms.auth.dto.BreakGlassResponse;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
+import com.nabd.hms.auth.dto.MfaConfirmRequest;
+import com.nabd.hms.auth.dto.MfaConfirmResponse;
+import com.nabd.hms.auth.dto.MfaEnrollResponse;
+import com.nabd.hms.auth.dto.MfaSetupRequiredResponse;
 import com.nabd.hms.auth.dto.MfaVerifyRequest;
+import com.nabd.hms.auth.dto.PinResetConfirmRequest;
+import com.nabd.hms.auth.dto.PinResetRequestRequest;
 import com.nabd.hms.auth.dto.RefreshRequest;
 import com.nabd.hms.auth.dto.SessionResponse;
 import com.nabd.hms.auth.dto.StepUpTokenResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.auth.dto.OtpRequestRequest;
 import com.nabd.hms.auth.dto.OtpVerifyRequest;
+import com.nabd.hms.auth.dto.UnlockRequest;
 import com.nabd.hms.common.AesGcmCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -110,10 +119,41 @@ public class AuthService {
         repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, true);
         log.info("staff {} authenticated via PIN (tenant {})", staff.id(), tenant.id());
 
+        if (!staff.mfaEnabled() && mfaRequiredByPolicy(staff)) {
+            return issueMfaSetupRequired(staff);
+        }
         if (staff.mfaEnabled()) {
             return issueMfaChallenge(staff);
         }
         return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+    }
+
+    /**
+     * NB-042: "mandatory for Owner ... and anyone holding refund or discount rights" is a real-world
+     * description of which roles a clinic will assign this to, not a rule about role names or a
+     * heuristic over grants — a role's display name is free text (renamed on a whim), and this
+     * codebase's own "full access" test/seed roles hold every grant including refundDiscount, so
+     * either heuristic would gate roles that were never meant to require it. Enforcement is a plain
+     * per-role flag instead, set deliberately by whoever builds the role (see roles.mfa_required).
+     */
+    private boolean mfaRequiredByPolicy(Staff staff) {
+        Role role = repo.findRole(staff.roleId()).orElseThrow(() -> new IllegalStateException("role missing"));
+        return role.mfaRequired();
+    }
+
+    private MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
+        Instant now = Instant.now();
+        Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer(ISSUER)
+                .issuedAt(now)
+                .expiresAt(exp)
+                .subject(staff.id().toString())
+                .claim("purpose", "mfa_setup_required")
+                .claim("tenantId", staff.tenantId().toString())
+                .build();
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
+        return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
     }
 
     /** No enumeration: silently no-ops for an unknown tenant/mobile, but still returns as if sent. */
@@ -168,6 +208,9 @@ public class AuthService {
         repo.markMobileVerified(staff.id());
         log.info("staff {} authenticated via WhatsApp OTP, mobile verified (tenant {})", staff.id(), tenant.id());
 
+        if (!staff.mfaEnabled() && mfaRequiredByPolicy(staff)) {
+            return issueMfaSetupRequired(staff);
+        }
         if (staff.mfaEnabled()) {
             return issueMfaChallenge(staff);
         }
@@ -240,6 +283,136 @@ public class AuthService {
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         log.info("staff {} obtained a step-up token", staffId);
         return new StepUpTokenResponse(token, 300);
+    }
+
+    // ── MFA enrollment (NB-042) ──────────────────────────────────────────
+    // Works from either a normal access token (self-service, already logged in) or the
+    // mfa_setup_required token issued above (policy forced this staff member to enroll before
+    // getting a real session) — both carry sub+tenantId, which is all enroll/confirm need.
+
+    @Transactional
+    public MfaEnrollResponse enrollMfa(Jwt callerJwt) {
+        UUID staffId = UUID.fromString(callerJwt.getSubject());
+        tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
+        Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+
+        byte[] secret = totpService.generateSecret();
+        repo.setPendingMfaSecret(staffId, cipher.encrypt(secret));
+        log.info("staff {} started MFA enrollment", staffId);
+        return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd", staff.email()));
+    }
+
+    @Transactional
+    public MfaConfirmResponse confirmMfa(Jwt callerJwt, MfaConfirmRequest req) {
+        UUID staffId = UUID.fromString(callerJwt.getSubject());
+        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
+        tenantContext.set(tenantId);
+        Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+
+        if (staff.mfaSecretEnc() == null || !totpService.verify(cipher.decrypt(staff.mfaSecretEnc()), req.code(), Instant.now())) {
+            throw mfaFailed();
+        }
+        repo.enableMfa(staffId);
+        List<String> codes = new java.util.ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            String code = OpaqueTokens.generate().substring(0, 10).toUpperCase(java.util.Locale.ROOT);
+            repo.insertRecoveryCode(tenantId, staffId, OpaqueTokens.sha256Hex(code));
+            codes.add(code);
+        }
+        log.info("staff {} completed MFA enrollment, {} recovery codes issued", staffId, codes.size());
+        return new MfaConfirmResponse(codes);
+    }
+
+    // ── PIN reset (NB-046) ───────────────────────────────────────────────
+    // Same no-enumeration shape as requestOtp: always 202, identical timing/copy whether or not
+    // the tenant/mobile resolves, so an attacker can't use this endpoint to confirm an account exists.
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public void requestPinReset(PinResetRequestRequest req, String ip) {
+        enforceIpRateLimit(ip);
+        Tenant tenant = repo.findTenantBySlug(req.tenantSlug())
+                .filter(t -> !"offboarded".equals(t.status()) && !"suspended".equals(t.status()))
+                .orElse(null);
+        if (tenant == null) {
+            return;
+        }
+        tenantContext.set(tenant.id());
+        Staff staff = repo.findStaffByMobile(tenant.id(), req.mobilePhone()).orElse(null);
+        if (staff == null || !"active".equals(staff.status())) {
+            return;
+        }
+        String token = OpaqueTokens.generate();
+        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), Instant.now().plus(15, ChronoUnit.MINUTES));
+        otpSender.send(req.mobilePhone(), token);
+        log.info("PIN reset token issued to staff {} (tenant {})", staff.id(), tenant.id());
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public void confirmPinReset(PinResetConfirmRequest req, String ip) {
+        enforceIpRateLimit(ip);
+        Tenant tenant = repo.findTenantBySlug(req.tenantSlug())
+                .filter(t -> !"offboarded".equals(t.status()) && !"suspended".equals(t.status()))
+                .orElseThrow(this::invalidCredentials);
+        tenantContext.set(tenant.id());
+        Staff staff = repo.findStaffByMobile(tenant.id(), req.mobilePhone()).orElse(null);
+        if (staff == null) {
+            throw invalidCredentials();
+        }
+        boolean reset = repo.consumePinResetToken(staff.id(), OpaqueTokens.sha256Hex(req.token()), pinEncoder.encode(req.newPin()));
+        if (!reset) {
+            throw invalidCredentials();
+        }
+        log.info("staff {} completed PIN reset (tenant {})", staff.id(), tenant.id());
+    }
+
+    // ── break-glass (NB-048) ─────────────────────────────────────────────
+
+    @Transactional
+    public TokenPairResponse activateBreakGlass(Jwt callerJwt, BreakGlassActivateRequest req, String ip, String device, String userAgent) {
+        UUID staffId = UUID.fromString(callerJwt.getSubject());
+        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
+        tenantContext.set(tenantId);
+        Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+
+        Instant expiresAt = Instant.now().plus(30, ChronoUnit.MINUTES);
+        UUID grantId = repo.insertBreakGlass(tenantId, staffId, req.reason(), expiresAt);
+        auditService.record(tenantId, "staff", staffId, staff.name(), "break-glass", ip,
+                "auth.break_glass_activated", "break_glass_grant", grantId, null, java.util.Map.of("reason", req.reason(), "expiresAt", expiresAt.toString()));
+        log.warn("BREAK-GLASS activated by staff {} (tenant {}): {}", staffId, tenantId, req.reason());
+        return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+    }
+
+    @Transactional
+    public void deactivateBreakGlass(Jwt callerJwt, UUID grantId) {
+        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
+        tenantContext.set(tenantId);
+        repo.deactivateBreakGlass(tenantId, grantId);
+        auditService.record(tenantId, "staff", UUID.fromString(callerJwt.getSubject()), "", "", null,
+                "auth.break_glass_deactivated", "break_glass_grant", grantId, null, null);
+    }
+
+    /** Owner-visible "who's elevated right now" — the honest substitute for "notified in real time"
+     * without a push channel: visible the moment anyone with staff:view loads this. */
+    @Transactional
+    public List<BreakGlassResponse> listActiveBreakGlass(UUID tenantId) {
+        tenantContext.set(tenantId);
+        return repo.listActiveBreakGlass(tenantId).stream()
+                .map(r -> new BreakGlassResponse(r.id(), r.staffId(), r.staffName(), r.reason(), r.activatedAt(), r.expiresAt()))
+                .toList();
+    }
+
+    // ── idle-timeout unlock (NB-044) ─────────────────────────────────────
+    // Client-side lock only — the underlying session/access token is untouched, so draft state in
+    // the page (or already-autosaved backend rows) survives the lock exactly as if nothing happened.
+
+    @Transactional
+    public void unlock(Jwt callerJwt, UnlockRequest req) {
+        UUID staffId = UUID.fromString(callerJwt.getSubject());
+        tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
+        Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+        if (staff.pinHash() == null || !pinEncoder.matches(req.pin(), staff.pinHash())) {
+            throw invalidCredentials();
+        }
     }
 
     /** Called from StaffController right after a successful invite-accept — lands the new staff member logged in. */
@@ -374,6 +547,21 @@ public class AuthService {
                     permissions.add(p);
                 }
             }
+        }
+
+        // NB-048: same lazy expire-and-audit shape as delegation above.
+        for (UUID expiredId : repo.expireStaleBreakGlass(staff.id())) {
+            auditService.record(staff.tenantId(), "system", null, "System", "System", null,
+                    "auth.break_glass_expired", "break_glass_grant", expiredId, null, null);
+        }
+        if (repo.hasActiveBreakGlass(staff.id())) {
+            repo.findBuiltInOwnerRole(staff.tenantId()).ifPresent(ownerRole -> {
+                for (String p : flattenGrants(ownerRole.grantsJson())) {
+                    if (!permissions.contains(p)) {
+                        permissions.add(p);
+                    }
+                }
+            });
         }
 
         UUID sessionId = UUID.randomUUID();

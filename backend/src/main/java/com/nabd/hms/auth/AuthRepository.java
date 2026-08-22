@@ -90,10 +90,99 @@ class AuthRepository {
         jdbc.update("UPDATE staff SET mobile_verified = true WHERE id = ?", staffId);
     }
 
+    // ── MFA enrollment (NB-042) ──────────────────────────────────────────
+
+    /** Stores the secret but does NOT flip mfa_enabled — that only happens once confirm() verifies a real code. */
+    void setPendingMfaSecret(UUID staffId, byte[] encryptedSecret) {
+        jdbc.update("UPDATE staff SET mfa_secret_enc = ? WHERE id = ?", encryptedSecret, staffId);
+    }
+
+    void enableMfa(UUID staffId) {
+        jdbc.update("UPDATE staff SET mfa_enabled = true WHERE id = ?", staffId);
+    }
+
+    void insertRecoveryCode(UUID tenantId, UUID staffId, String codeHash) {
+        jdbc.update("INSERT INTO mfa_recovery_codes (tenant_id, staff_id, code_hash) VALUES (?,?,?)",
+                tenantId, staffId, codeHash);
+    }
+
+    /** Atomic check-and-consume — same shape as consumeWhatsAppOtp, so a code can never be used twice. */
+    boolean consumeRecoveryCode(UUID staffId, String codeHash) {
+        int rows = jdbc.update(
+                "UPDATE mfa_recovery_codes SET used_at = now() WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL",
+                staffId, codeHash);
+        return rows == 1;
+    }
+
+    // ── PIN reset (NB-046) ───────────────────────────────────────────────
+
+    void setPinResetToken(UUID staffId, String tokenHash, Instant expiresAt) {
+        jdbc.update("UPDATE staff SET pin_reset_token_hash = ?, pin_reset_expires_at = ? WHERE id = ?",
+                tokenHash, Timestamp.from(expiresAt), staffId);
+    }
+
+    /** Atomic check-and-consume, then set the new PIN in the same statement — no read-then-write race. */
+    boolean consumePinResetToken(UUID staffId, String tokenHash, String newPinHash) {
+        int rows = jdbc.update(
+                "UPDATE staff SET pin_hash = ?, pin_reset_token_hash = NULL, pin_reset_expires_at = NULL " +
+                        "WHERE id = ? AND pin_reset_token_hash = ? AND pin_reset_expires_at > now()",
+                newPinHash, staffId, tokenHash);
+        return rows == 1;
+    }
+
+    // ── break-glass (NB-048) ─────────────────────────────────────────────
+
+    UUID insertBreakGlass(UUID tenantId, UUID staffId, String reason, Instant expiresAt) {
+        return jdbc.queryForObject(
+                "INSERT INTO break_glass_grants (tenant_id, staff_id, reason, expires_at) VALUES (?,?,?,?) RETURNING id",
+                UUID.class, tenantId, staffId, reason, Timestamp.from(expiresAt));
+    }
+
+    boolean hasActiveBreakGlass(UUID staffId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM break_glass_grants WHERE staff_id = ? AND deactivated_at IS NULL AND expires_at > now()",
+                Integer.class, staffId);
+        return count != null && count > 0;
+    }
+
+    /** Same "detect and close on next read" shape as delegation expiry — see AuthService.mintTokenPair. */
+    List<UUID> expireStaleBreakGlass(UUID staffId) {
+        return jdbc.query(
+                "UPDATE break_glass_grants SET deactivated_at = expires_at, deactivated_reason = 'expired' " +
+                        "WHERE staff_id = ? AND deactivated_at IS NULL AND expires_at <= now() RETURNING id",
+                (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
+    }
+
+    void deactivateBreakGlass(UUID tenantId, UUID id) {
+        jdbc.update("UPDATE break_glass_grants SET deactivated_at = now(), deactivated_reason = 'manual' " +
+                "WHERE tenant_id = ? AND id = ? AND deactivated_at IS NULL", tenantId, id);
+    }
+
+    List<com.nabd.hms.auth.AuthModels.BreakGlassRow> listActiveBreakGlass(UUID tenantId) {
+        return jdbc.query(
+                "SELECT g.id, g.staff_id, s.name AS staff_name, g.reason, g.activated_at, g.expires_at " +
+                        "FROM break_glass_grants g JOIN staff s ON s.id = g.staff_id " +
+                        "WHERE g.tenant_id = ? AND g.deactivated_at IS NULL AND g.expires_at > now() " +
+                        "ORDER BY g.activated_at DESC",
+                (rs, i) -> new com.nabd.hms.auth.AuthModels.BreakGlassRow(
+                        UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("staff_id")),
+                        rs.getString("staff_name"), rs.getString("reason"),
+                        rs.getTimestamp("activated_at").toInstant(), rs.getTimestamp("expires_at").toInstant()),
+                tenantId);
+    }
+
     Optional<Role> findRole(UUID roleId) {
         return jdbc.query(
-                "SELECT id, tenant_id, name, grants::text AS grants_json FROM roles WHERE id = ?",
+                "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required FROM roles WHERE id = ?",
                 roleMapper(), roleId
+        ).stream().findFirst();
+    }
+
+    /** NB-048: break-glass elevates to whatever the tenant's built-in Owner role currently grants. */
+    Optional<Role> findBuiltInOwnerRole(UUID tenantId) {
+        return jdbc.query(
+                "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required FROM roles WHERE tenant_id = ? AND built_in = true",
+                roleMapper(), tenantId
         ).stream().findFirst();
     }
 
@@ -104,7 +193,7 @@ class AuthRepository {
      */
     List<Role> findActiveDelegatedRoles(UUID staffId) {
         return jdbc.query(
-                "SELECT r.id, r.tenant_id, r.name, r.grants::text AS grants_json " +
+                "SELECT r.id, r.tenant_id, r.name, r.grants::text AS grants_json, r.mfa_required " +
                         "FROM role_delegations d JOIN roles r ON r.id = d.delegated_role_id " +
                         "WHERE d.staff_id = ? AND d.revoked_at IS NULL AND d.starts_at <= now() AND d.expires_at > now()",
                 roleMapper(), staffId);
@@ -188,6 +277,14 @@ class AuthRepository {
         );
     }
 
+    /** NB-043: is this specific session still live? — the check that makes a revoke take effect on the very next request, not just at the access token's natural (15 min) expiry. */
+    boolean isSessionActive(UUID tenantId, UUID sessionId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sessions WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL AND expires_at > now()",
+                Integer.class, tenantId, sessionId);
+        return count != null && count > 0;
+    }
+
     void revokeSession(UUID sessionId, String reason) {
         jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND revoked_at IS NULL",
                 reason, sessionId);
@@ -238,7 +335,8 @@ class AuthRepository {
                 UUID.fromString(rs.getString("id")),
                 UUID.fromString(rs.getString("tenant_id")),
                 rs.getString("name"),
-                rs.getString("grants_json"));
+                rs.getString("grants_json"),
+                rs.getBoolean("mfa_required"));
     }
 
     private RowMapper<SessionRow> sessionMapper() {

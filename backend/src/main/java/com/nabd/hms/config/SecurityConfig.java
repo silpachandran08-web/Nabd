@@ -78,6 +78,8 @@ public class SecurityConfig {
                                 "/v1/auth/otp/request",
                                 "/v1/auth/otp/verify",
                                 "/v1/auth/mfa/verify",
+                                "/v1/auth/pin/reset-request",
+                                "/v1/auth/pin/reset-confirm",
                                 "/v1/auth/refresh",
                                 "/v1/staff/invitations/*/accept",
                                 "/v1/owners/auth/login",

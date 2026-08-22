@@ -8,6 +8,7 @@ import java.util.List;
 
 public record RoleWriteRequest(
         @NotBlank String name,
-        @NotEmpty List<ModuleGrant> grants
+        @NotEmpty List<ModuleGrant> grants,
+        boolean mfaRequired
 ) {
 }

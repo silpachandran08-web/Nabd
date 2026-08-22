@@ -16,7 +16,7 @@ final class AuthModels {
                  boolean mfaEnabled, byte[] mfaSecretEnc) {
     }
 
-    record Role(UUID id, UUID tenantId, String name, String grantsJson) {
+    record Role(UUID id, UUID tenantId, String name, String grantsJson, boolean mfaRequired) {
     }
 
     record SessionRow(UUID id, UUID tenantId, UUID staffId, UUID familyId, String tokenHash,
@@ -25,5 +25,9 @@ final class AuthModels {
         boolean active() {
             return revokedAt == null && expiresAt.isAfter(Instant.now());
         }
+    }
+
+    /** NB-048: an active break-glass grant, for the Owner-visible "who's elevated right now" panel. */
+    record BreakGlassRow(UUID id, UUID staffId, String staffName, String reason, Instant activatedAt, Instant expiresAt) {
     }
 }

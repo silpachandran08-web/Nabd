@@ -1,5 +1,6 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.WhatsAppOtpSender;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
@@ -291,7 +292,231 @@ class AuthApiTest extends ApiTestBase {
         assertThat(resp.getBody()).containsKey("stepUpToken");
     }
 
+    // ---- MFA enrollment + policy (NB-042) ----
+
+    @Test
+    void selfServiceEnrollConfirmIssuesRecoveryCodesAndEnablesMfa() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "enroll@a.com", "+919300000001", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> enrollResp = exchange("/v1/auth/mfa/enroll", HttpMethod.POST, authed(token), Map.class);
+        assertThat(enrollResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String secretBase32 = (String) enrollResp.getBody().get("secretBase32");
+        assertThat((String) enrollResp.getBody().get("otpauthUri")).startsWith("otpauth://totp/");
+
+        ResponseEntity<Map> confirmResp = exchange("/v1/auth/mfa/confirm", HttpMethod.POST,
+                authedJsonBody(token, Map.of("code", totpCodeFor(secretBase32))), Map.class);
+        assertThat(confirmResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<String> codes = (List<String>) confirmResp.getBody().get("recoveryCodes");
+        assertThat(codes).hasSize(8);
+        assertThat(new java.util.HashSet<>(codes)).hasSize(8); // all distinct
+
+        // MFA is now really enabled — the very next login gets a real challenge, not a bare token
+        ResponseEntity<Map> loginResp = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
+                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", STAFF_PIN)), Map.class);
+        assertThat(loginResp.getBody()).containsKey("challengeId");
+    }
+
+    @Test
+    void mfaConfirmWithWrongCodeFails() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "enroll2@a.com", "+919300000002", false);
+        String token = loginAndGetAccessToken(staff);
+
+        exchange("/v1/auth/mfa/enroll", HttpMethod.POST, authed(token), Map.class);
+        ResponseEntity<Map> resp = exchange("/v1/auth/mfa/confirm", HttpMethod.POST,
+                authedJsonBody(token, Map.of("code", "000000")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void roleWithMfaRequiredForcesSetupBeforeAnySession() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedRole(tenant.id(), "Owner Policy", true, fullGrant("staff"));
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE roles SET mfa_required = true WHERE id = ?", roleId));
+        SeededStaff staff = seedStaff(tenant, roleId, "policy@a.com", "+919300000003", false);
+
+        ResponseEntity<Map> loginResp = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
+                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", STAFF_PIN)), Map.class);
+        assertThat(loginResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(loginResp.getBody()).containsKey("setupToken");
+        assertThat(loginResp.getBody()).doesNotContainKeys("accessToken", "challengeId");
+        String setupToken = (String) loginResp.getBody().get("setupToken");
+
+        // the setup token authorizes enroll/confirm — nothing else
+        ResponseEntity<Map> enrollResp = exchange("/v1/auth/mfa/enroll", HttpMethod.POST, authed(setupToken), Map.class);
+        assertThat(enrollResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String secretBase32 = (String) enrollResp.getBody().get("secretBase32");
+        ResponseEntity<Map> confirmResp = exchange("/v1/auth/mfa/confirm", HttpMethod.POST,
+                authedJsonBody(setupToken, Map.of("code", totpCodeFor(secretBase32))), Map.class);
+        assertThat(confirmResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // logging in again now goes through the normal MFA challenge, same as any other enrolled staff
+        ResponseEntity<Map> secondLogin = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
+                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", STAFF_PIN)), Map.class);
+        assertThat(secondLogin.getBody()).containsKey("challengeId");
+        String challengeId = (String) secondLogin.getBody().get("challengeId");
+        ResponseEntity<Map> mfaResp = http.postForEntity(url("/v1/auth/mfa/verify"), jsonBody(Map.of(
+                "challengeId", challengeId, "code", totpCodeFor(secretBase32))), Map.class);
+        assertThat(mfaResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(mfaResp.getBody()).containsKey("accessToken");
+    }
+
+    // ---- session revocation enforced immediately, not at token expiry (NB-043) ----
+
+    @Test
+    void revokedSessionIsDeniedOnTheVeryNextRequest() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "revoke@a.com", "+919300000004", false);
+        String token = loginAndGetAccessToken(staff);
+
+        // the token is still cryptographically valid and far from its 15-minute expiry
+        ResponseEntity<List> before = exchange("/v1/auth/sessions", HttpMethod.GET, authed(token), List.class);
+        assertThat(before.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        UUID sessionId = currentSessionId(token);
+        exchange("/v1/auth/sessions/" + sessionId, HttpMethod.DELETE, authed(token), Void.class);
+
+        ResponseEntity<String> after = exchange("/v1/auth/sessions", HttpMethod.GET, authed(token), String.class);
+        assertThat(after.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    // ---- PIN reset (NB-046) ----
+
+    @Test
+    void pinResetRequestThenConfirmChangesThePin() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        String mobile = "+919300000005";
+        SeededStaff staff = seedStaff(tenant, roleId, "reset@a.com", mobile, false);
+
+        ResponseEntity<Void> reqResp = http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile)), Void.class);
+        assertThat(reqResp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        String token = otpSender.sentTo.get(mobile);
+        assertThat(token).isNotNull();
+
+        ResponseEntity<Void> confirmResp = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", token, "newPin", "9999")), Void.class);
+        assertThat(confirmResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        ResponseEntity<Map> oldPinLogin = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
+                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", STAFF_PIN)), Map.class);
+        assertThat(oldPinLogin.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        ResponseEntity<Map> newPinLogin = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
+                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", "9999")), Map.class);
+        assertThat(newPinLogin.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void pinResetRequestForUnknownMobileStillReturns202NoEnumeration() {
+        SeededTenant tenant = seedTenant();
+        ResponseEntity<Void> resp = http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+910000000099")), Void.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(otpSender.sentTo).doesNotContainKey("+910000000099");
+    }
+
+    @Test
+    void pinResetConfirmWithWrongTokenFails() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        String mobile = "+919300000006";
+        seedStaff(tenant, roleId, "reset2@a.com", mobile, false);
+
+        ResponseEntity<Void> resp = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", "not-a-real-token", "newPin", "9999")), Void.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    // ---- break-glass (NB-048) ----
+
+    @Test
+    void breakGlassGrantsOwnerPermissionsImmediatelyAndExpiryIsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID ownerRoleId = seedFullAccessRole(tenant.id()); // built_in Owner — break-glass elevates to this
+        UUID limitedRoleId = seedRole(tenant.id(), "Receptionist", false,
+                new ModuleGrant("queue", true, false, false, false, false, false, false));
+        SeededStaff staff = seedStaff(tenant, limitedRoleId, "bg@a.com", "+919300000007", false);
+        String token = loginAndGetAccessToken(staff);
+        assertThat(permissionsOf(token)).doesNotContain("staff:delete");
+
+        ResponseEntity<Map> activateResp = exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "Patient emergency, need chart access now")), Map.class);
+        assertThat(activateResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String elevatedToken = (String) activateResp.getBody().get("accessToken");
+        assertThat(permissionsOf(elevatedToken)).contains("staff:delete"); // full Owner grant, immediately
+
+        // find the grant id via the owner-visible panel, then force it into the past
+        String ownerToken = loginAndGetAccessToken(seedStaff(tenant, ownerRoleId, "owner8@a.com", "+919300000008", false));
+        ResponseEntity<List> activeResp = exchange("/v1/auth/break-glass/active", HttpMethod.GET, authed(ownerToken), List.class);
+        assertThat(activeResp.getBody()).hasSize(1);
+        String grantId = (String) ((Map<?, ?>) activeResp.getBody().get(0)).get("id");
+
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE break_glass_grants SET expires_at = now() - interval '1 minute' WHERE id = ?",
+                UUID.fromString(grantId)));
+        String tokenAfterExpiry = loginAndGetAccessToken(staff);
+        assertThat(permissionsOf(tokenAfterExpiry)).doesNotContain("staff:delete");
+
+        Integer auditRows = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'break_glass_grant' AND entity_id = ? AND action IN ('auth.break_glass_activated','auth.break_glass_expired')",
+                Integer.class, UUID.fromString(grantId)));
+        assertThat(auditRows).isEqualTo(2);
+    }
+
+    @Test
+    void breakGlassCanBeDeactivatedManually() {
+        SeededTenant tenant = seedTenant();
+        UUID limitedRoleId = seedRole(tenant.id(), "Receptionist 2", false,
+                new ModuleGrant("queue", true, false, false, false, false, false, false));
+        seedFullAccessRole(tenant.id()); // ensures a built-in Owner role exists to elevate to
+        SeededStaff staff = seedStaff(tenant, limitedRoleId, "bg2@a.com", "+919300000009", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> activateResp = exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "testing")), Map.class);
+        String elevatedToken = (String) activateResp.getBody().get("accessToken");
+
+        Map<?, ?> claims = decodeClaims(elevatedToken);
+        // grantId isn't in the token; look it up the same way the owner panel would
+        ResponseEntity<List> activeResp = exchange("/v1/auth/break-glass/active", HttpMethod.GET, authed(elevatedToken), List.class);
+        String grantId = (String) ((Map<?, ?>) activeResp.getBody().get(0)).get("id");
+
+        ResponseEntity<Void> deactivateResp = exchange("/v1/auth/break-glass/" + grantId + "/deactivate", HttpMethod.POST,
+                authed(elevatedToken), Void.class);
+        assertThat(deactivateResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        String tokenAfter = loginAndGetAccessToken(staff);
+        assertThat(permissionsOf(tokenAfter)).doesNotContain("staff:delete");
+    }
+
     // ---- helpers ----
+
+    @SuppressWarnings("unchecked")
+    private List<String> permissionsOf(String accessToken) {
+        return (List<String>) decodeClaims(accessToken).get("permissions");
+    }
+
+    private Map<String, Object> decodeClaims(String accessToken) {
+        String[] parts = accessToken.split("\\.");
+        byte[] payload = java.util.Base64.getUrlDecoder().decode(parts[1]);
+        try {
+            return objectMapper.readValue(payload, Map.class);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private String totpCodeFor(String secretBase32) {
+        byte[] secret = org.bouncycastle.util.encoders.Base32.decode(secretBase32);
+        long counter = java.time.Instant.now().getEpochSecond() / 30;
+        return new TotpService().generate(secret, counter);
+    }
 
     private Map<?, ?> login(SeededTenant tenant, SeededStaff staff) {
         ResponseEntity<Map> resp = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
