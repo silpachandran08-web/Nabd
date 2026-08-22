@@ -6,6 +6,7 @@ import com.nabd.hms.billing.dto.ChargeResponse;
 import com.nabd.hms.billing.dto.InvoiceResponse;
 import com.nabd.hms.billing.dto.LineItemRequest;
 import com.nabd.hms.billing.dto.LineItemResponse;
+import com.nabd.hms.billing.dto.OtcChargesResponse;
 import com.nabd.hms.billing.dto.PaymentRequest;
 import com.nabd.hms.billing.dto.PaymentResponse;
 import com.nabd.hms.common.ApiException;
@@ -86,9 +87,51 @@ public class CheckoutService {
                     "This visit has already been checked out.");
         }
 
+        Totals t = computeTotals(req);
+        List<LineItemInput> items = req.lineItems().stream().map(this::toLineItemInput).toList();
+
+        UUID invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
+                t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId);
+        repo.insertLineItems(tenantId, invoiceId, items);
+
+        // Closes the loop NB-102 left open: a doctor's "Complete consultation" moves a visit to
+        // checkout_pending; billing finishing checkout is what finally moves it to completed.
+        queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest("completed"));
+        log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
+                invoiceId, queueEntryId, staffId, tenantId, t.total());
+
+        return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
+    }
+
+    /** NB-186: a counter sale — no queue entry, no patient, no doctor. Same charge list, same
+     * dispense-and-decrement-stock path (CheckoutRepository.insertLineItems), just no queue to close. */
+    @Transactional
+    public OtcChargesResponse getOtcCharges(UUID tenantId) {
+        tenantContext.set(tenantId);
+        List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
+        return new OtcChargesResponse(currencyFor(tenantId), charges);
+    }
+
+    @Transactional
+    public InvoiceResponse otcCheckout(UUID tenantId, UUID staffId, CheckoutRequest req) {
+        tenantContext.set(tenantId);
+        Totals t = computeTotals(req);
+        List<LineItemInput> items = req.lineItems().stream().map(this::toLineItemInput).toList();
+
+        UUID invoiceId = repo.insertInvoice(tenantId, null, null, null, t.subtotal(), t.discount(), t.tax(),
+                t.roundOff(), t.total(), staffId);
+        repo.insertLineItems(tenantId, invoiceId, items);
+        log.info("OTC invoice {} created by {} (tenant {}, total {})", invoiceId, staffId, tenantId, t.total());
+
+        return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
+    }
+
+    private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total) {
+    }
+
+    private Totals computeTotals(CheckoutRequest req) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal tax = BigDecimal.ZERO;
-        List<LineItemInput> items = req.lineItems().stream().map(this::toLineItemInput).toList();
         for (LineItemRequest li : req.lineItems()) {
             BigDecimal lineAmount = li.unitPrice().multiply(BigDecimal.valueOf(li.quantity()));
             subtotal = subtotal.add(lineAmount);
@@ -104,18 +147,7 @@ public class CheckoutService {
         BigDecimal rawTotal = subtotal.subtract(discount).add(tax);
         BigDecimal total = rawTotal.setScale(0, RoundingMode.HALF_UP);
         BigDecimal roundOff = total.subtract(rawTotal);
-
-        UUID invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
-                subtotal, discount, tax, roundOff, total, staffId);
-        repo.insertLineItems(tenantId, invoiceId, items);
-
-        // Closes the loop NB-102 left open: a doctor's "Complete consultation" moves a visit to
-        // checkout_pending; billing finishing checkout is what finally moves it to completed.
-        queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest("completed"));
-        log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
-                invoiceId, queueEntryId, staffId, tenantId, total);
-
-        return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
+        return new Totals(subtotal, discount, tax, roundOff, total);
     }
 
     @Transactional
@@ -148,8 +180,10 @@ public class CheckoutService {
         List<PaymentResponse> payments = repo.findPayments(tenantId, row.id()).stream()
                 .map(p -> new PaymentResponse(p.id(), p.method(), p.amount(), p.recordedAt()))
                 .toList();
-        String patientName = repo.findPatientName(tenantId, row.patientId()).orElse("Unknown patient");
-        String doctorName = repo.findStaffName(tenantId, row.doctorId()).orElse("Unknown doctor");
+        String patientName = row.patientId() == null ? "Walk-in customer"
+                : repo.findPatientName(tenantId, row.patientId()).orElse("Unknown patient");
+        String doctorName = row.doctorId() == null ? "—"
+                : repo.findStaffName(tenantId, row.doctorId()).orElse("Unknown doctor");
         return new InvoiceResponse(row.id(), row.invoiceNumber(), row.queueEntryId(), row.patientId(), patientName,
                 row.doctorId(), doctorName, currencyFor(tenantId), row.subtotal(), row.discount(), row.tax(),
                 row.roundOff(), row.total(), row.paid(), row.total().subtract(row.paid()), row.status(),

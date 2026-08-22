@@ -188,6 +188,56 @@ class CheckoutApiTest extends ApiTestBase {
     }
 
     @Test
+    void otcCheckoutCreatesInvoiceWithNoPatientOrQueueEntry() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "recep9@a.com", "+919700000009", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> charges = exchange("/v1/billing/otc-charges", HttpMethod.GET, authed(token), Map.class);
+        assertThat(charges.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(charges.getBody().get("currency")).isEqualTo("INR");
+
+        // NB-186: a counter sale — no patient record, no queue token, just an invoice.
+        ResponseEntity<Map> resp = exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100.00, "taxRatePercent", 0)),
+                "discount", 0)), Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("queueEntryId")).isNull();
+        assertThat(resp.getBody().get("patientId")).isNull();
+        assertThat(resp.getBody().get("doctorId")).isNull();
+        assertThat(resp.getBody().get("patientName")).isEqualTo("Walk-in customer");
+        assertThat(((Number) resp.getBody().get("total")).doubleValue()).isEqualTo(100.00);
+        assertThat(resp.getBody().get("invoiceNumber")).asString().startsWith("INV-");
+
+        String invoiceId = (String) resp.getBody().get("id");
+        ResponseEntity<Map> fetched = exchange("/v1/billing/invoices/" + invoiceId, HttpMethod.GET, authed(token), Map.class);
+        assertThat(fetched.getBody().get("patientId")).isNull();
+    }
+
+    @Test
+    void otcCheckoutOfAPharmacyItemDecrementsStock() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "recep10@a.com", "+919700000010", false);
+        String token = loginAndGetAccessToken(staff);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        ResponseEntity<Map> item = exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Paracetamol 500mg", "isRx", false, "hsnCode", "3004", "price", 20.00,
+                "taxRatePercent", 12.00, "stockQty", 10)), Map.class);
+        String code = (String) item.getBody().get("code");
+
+        exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", code, "chargeName", "Paracetamol 500mg", "category", "Pharmacy",
+                        "quantity", 3, "unitPrice", 20.00, "taxRatePercent", 12.00)))), Map.class);
+
+        ResponseEntity<List> afterSale = exchange("/v1/pharmacy/items", HttpMethod.GET, authed(token), List.class);
+        assertThat(((Map<?, ?>) afterSale.getBody().get(0)).get("stockQty")).isEqualTo(7);
+    }
+
+    @Test
     void roleWithoutBillingGrantIsForbidden() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedRole(tenant.id(), "QueueOnly", false, fullGrant("queue"), fullGrant("patients"));

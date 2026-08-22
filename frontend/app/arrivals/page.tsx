@@ -325,7 +325,15 @@ export default function ArrivalsPage() {
           <h1 className={styles.title}>Today · Arrivals</h1>
           <p className={styles.subtitle}>{dateLabel} · {rows.length} on the board</p>
         </div>
-        {!forbidden && <button className={styles.registerBtn} onClick={openModal}>Register walk-in</button>}
+        {!forbidden && (
+          <div style={{ display: "flex", gap: "var(--nb-space-8)" }}>
+            <button className={styles.registerBtn} style={{ background: "transparent", color: "var(--nb-text-primary)", border: "1px solid var(--nb-border-default)" }}
+              onClick={() => router.push("/checkout/otc")}>
+              Counter sale
+            </button>
+            <button className={styles.registerBtn} onClick={openModal}>Register walk-in</button>
+          </div>
+        )}
       </div>
 
       {!forbidden && (

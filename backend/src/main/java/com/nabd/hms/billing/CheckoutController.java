@@ -3,6 +3,7 @@ package com.nabd.hms.billing;
 import com.nabd.hms.billing.dto.CheckoutContextResponse;
 import com.nabd.hms.billing.dto.CheckoutRequest;
 import com.nabd.hms.billing.dto.InvoiceResponse;
+import com.nabd.hms.billing.dto.OtcChargesResponse;
 import com.nabd.hms.billing.dto.PaymentRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,6 +45,18 @@ public class CheckoutController {
     public InvoiceResponse checkout(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                      @Valid @RequestBody CheckoutRequest req) {
         return service.checkout(tenantId(jwt), queueEntryId, staffId(jwt), req);
+    }
+
+    @GetMapping("/otc-charges")
+    @PreAuthorize("hasAuthority('billing:view')")
+    public OtcChargesResponse otcCharges(@AuthenticationPrincipal Jwt jwt) {
+        return service.getOtcCharges(tenantId(jwt));
+    }
+
+    @PostMapping("/otc-checkout")
+    @PreAuthorize("hasAuthority('billing:create')")
+    public InvoiceResponse otcCheckout(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req) {
+        return service.otcCheckout(tenantId(jwt), staffId(jwt), req);
     }
 
     @GetMapping("/invoices/{id}")

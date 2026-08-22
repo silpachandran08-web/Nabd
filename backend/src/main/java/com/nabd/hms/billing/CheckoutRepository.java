@@ -162,9 +162,15 @@ class CheckoutRepository {
     private RowMapper<InvoiceRow> invoiceMapper() {
         return (rs, i) -> new InvoiceRow(
                 UUID.fromString(rs.getString("id")), rs.getString("invoice_number"),
-                UUID.fromString(rs.getString("queue_entry_id")), UUID.fromString(rs.getString("patient_id")),
-                UUID.fromString(rs.getString("doctor_id")), rs.getBigDecimal("subtotal"), rs.getBigDecimal("discount"),
+                uuidOrNull(rs, "queue_entry_id"), uuidOrNull(rs, "patient_id"),
+                uuidOrNull(rs, "doctor_id"), rs.getBigDecimal("subtotal"), rs.getBigDecimal("discount"),
                 rs.getBigDecimal("tax"), rs.getBigDecimal("round_off"), rs.getBigDecimal("total"), rs.getBigDecimal("paid"),
                 rs.getString("status"), rs.getTimestamp("created_at").toInstant());
+    }
+
+    /** NB-186: OTC sale invoices leave queue_entry_id/patient_id/doctor_id null. */
+    private static UUID uuidOrNull(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
+        String s = rs.getString(column);
+        return s == null ? null : UUID.fromString(s);
     }
 }
