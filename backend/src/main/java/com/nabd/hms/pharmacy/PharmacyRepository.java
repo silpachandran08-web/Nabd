@@ -1,0 +1,77 @@
+package com.nabd.hms.pharmacy;
+
+import com.nabd.hms.pharmacy.dto.PharmacyItemWriteRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
+
+/** Pharmacy items are charge_catalogue rows tagged with a non-null stock_qty — no parallel item
+ * table, so a dispensed item is automatically a billable Fast Checkout charge (see
+ * CheckoutRepository.listActiveCharges/decrementPharmacyStockIfApplicable for the other side). */
+@Repository
+class PharmacyRepository {
+
+    private static final String CATEGORY = "Pharmacy";
+
+    private final JdbcTemplate jdbc;
+
+    PharmacyRepository(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    Optional<String> findMode(UUID tenantId) {
+        return jdbc.query("SELECT mode FROM pharmacy_settings WHERE tenant_id = ?",
+                (rs, i) -> rs.getString("mode"), tenantId).stream().findFirst();
+    }
+
+    void upsertMode(UUID tenantId, String mode) {
+        jdbc.update("INSERT INTO pharmacy_settings (tenant_id, mode) VALUES (?, ?) " +
+                        "ON CONFLICT (tenant_id) DO UPDATE SET mode = EXCLUDED.mode, updated_at = now()",
+                tenantId, mode);
+    }
+
+    List<PharmacyItemRow> listItems(UUID tenantId) {
+        return jdbc.query(
+                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active " +
+                        "FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL ORDER BY name",
+                itemMapper(), tenantId);
+    }
+
+    Optional<PharmacyItemRow> findItem(UUID tenantId, UUID id) {
+        return jdbc.query(
+                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active " +
+                        "FROM charge_catalogue WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
+                itemMapper(), tenantId, id).stream().findFirst();
+    }
+
+    UUID insertItem(UUID tenantId, String code, PharmacyItemWriteRequest req) {
+        UUID id = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, tax_rate_percent, " +
+                        "is_rx, hsn_code, stock_qty, active, effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,CURRENT_DATE)",
+                id, tenantId, code, req.name(), CATEGORY, req.price(), req.taxRatePercentOrZero(),
+                req.isRx(), req.hsnCode(), req.stockQtyOrZero(), true);
+        return id;
+    }
+
+    int updateItem(UUID tenantId, UUID id, PharmacyItemWriteRequest req) {
+        return jdbc.update(
+                "UPDATE charge_catalogue SET name = ?, base_amount = ?, tax_rate_percent = ?, is_rx = ?, " +
+                        "hsn_code = ?, stock_qty = ?, updated_at = now() " +
+                        "WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
+                req.name(), req.price(), req.taxRatePercentOrZero(), req.isRx(), req.hsnCode(), req.stockQtyOrZero(),
+                tenantId, id);
+    }
+
+    private RowMapper<PharmacyItemRow> itemMapper() {
+        return (rs, i) -> new PharmacyItemRow(UUID.fromString(rs.getString("id")), rs.getString("code"),
+                rs.getString("name"), rs.getBoolean("is_rx"), rs.getString("hsn_code"), rs.getBigDecimal("base_amount"),
+                rs.getBigDecimal("tax_rate_percent"), rs.getInt("stock_qty"), rs.getBoolean("active"));
+    }
+}

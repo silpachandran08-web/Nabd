@@ -1,5 +1,7 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.common.ApiException;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -32,10 +34,15 @@ class CheckoutRepository {
                 .stream().findFirst();
     }
 
+    // Pharmacy items (E16, Hybrid mode) are charge_catalogue rows with a non-null stock_qty — hidden
+    // from Fast Checkout entirely unless the tenant's pharmacy mode is 'hybrid', matching the
+    // wireframe's "in External mode every inventory and dispensing screen is genuinely absent" rule.
     List<ChargeRow> listActiveCharges(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, code, name, category, base_amount, follow_up_amount, tax_rate_percent " +
-                        "FROM charge_catalogue WHERE tenant_id = ? AND active = true ORDER BY display_order, name",
+                "SELECT c.id, c.code, c.name, c.category, c.base_amount, c.follow_up_amount, c.tax_rate_percent " +
+                        "FROM charge_catalogue c LEFT JOIN pharmacy_settings ps ON ps.tenant_id = c.tenant_id " +
+                        "WHERE c.tenant_id = ? AND c.active = true AND (c.stock_qty IS NULL OR ps.mode = 'hybrid') " +
+                        "ORDER BY c.display_order, c.name",
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("code"), rs.getString("name"),
                         rs.getString("category"), rs.getBigDecimal("base_amount"), rs.getBigDecimal("follow_up_amount"),
                         rs.getBigDecimal("tax_rate_percent")),
@@ -82,12 +89,31 @@ class CheckoutRepository {
     void insertLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items) {
         int order = 0;
         for (LineItemInput item : items) {
+            decrementPharmacyStockIfApplicable(tenantId, item.chargeCode(), item.quantity());
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
                             "quantity, unit_price, tax_rate_percent, line_total, display_order) VALUES (?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++);
+        }
+    }
+
+    /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same
+     * transaction — "one invoice, one-tap stock deduction", the wireframe's own words. Non-pharmacy
+     * charges (stock_qty IS NULL) are untouched. */
+    private void decrementPharmacyStockIfApplicable(UUID tenantId, String chargeCode, int quantity) {
+        List<Integer> stock = jdbc.query("SELECT stock_qty FROM charge_catalogue WHERE tenant_id = ? AND code = ?",
+                (rs, i) -> (Integer) rs.getObject("stock_qty"), tenantId, chargeCode);
+        if (stock.isEmpty() || stock.get(0) == null) {
+            return;
+        }
+        int updated = jdbc.update(
+                "UPDATE charge_catalogue SET stock_qty = stock_qty - ? WHERE tenant_id = ? AND code = ? AND stock_qty >= ?",
+                quantity, tenantId, chargeCode, quantity);
+        if (updated == 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Insufficient stock",
+                    "Not enough stock for " + chargeCode + " to dispense " + quantity + " unit(s).");
         }
     }
 
