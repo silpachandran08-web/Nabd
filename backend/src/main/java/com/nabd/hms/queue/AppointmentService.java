@@ -37,13 +37,15 @@ public class AppointmentService {
     private final AppointmentRepository repo;
     private final ScheduleRepository scheduleRepo;
     private final QueueRepository queueRepo;
+    private final WaitlistService waitlistService;
     private final TenantContext tenantContext;
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
-                        TenantContext tenantContext) {
+                        WaitlistService waitlistService, TenantContext tenantContext) {
         this.repo = repo;
         this.scheduleRepo = scheduleRepo;
         this.queueRepo = queueRepo;
+        this.waitlistService = waitlistService;
         this.tenantContext = tenantContext;
     }
 
@@ -91,9 +93,10 @@ public class AppointmentService {
     @Transactional
     public AppointmentResponse cancel(UUID tenantId, UUID callerStaffId, UUID id, CancelRequest req) {
         tenantContext.set(tenantId);
-        requireScheduled(tenantId, id);
+        AppointmentRow current = requireScheduled(tenantId, id);
         repo.cancel(tenantId, id, req.reason());
         log.info("appointment {} cancelled by {}: {}", id, callerStaffId, req.reason());
+        waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
@@ -110,6 +113,7 @@ public class AppointmentService {
         try {
             UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd);
             log.info("appointment {} rescheduled to {} (new id {}) by {}", id, req.newStartTime(), newId, callerStaffId);
+            waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
             return toResponse(repo.findById(tenantId, newId).orElseThrow());
         } catch (DataIntegrityViolationException e) {
             // rolls back the cancel too — no reason to leave the old slot released if the new one failed

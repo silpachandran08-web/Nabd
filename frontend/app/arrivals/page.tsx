@@ -94,6 +94,13 @@ export default function ArrivalsPage() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [waitEstimates, setWaitEstimates] = useState<Record<string, number>>({});
+  const [delays, setDelays] = useState<Record<string, { delayMinutes: number; reason: string | null } | null>>({});
+  const [delayFormFor, setDelayFormFor] = useState<string | null>(null);
+  const [delayMinutesInput, setDelayMinutesInput] = useState("15");
+  const [delayReasonInput, setDelayReasonInput] = useState("");
+  const [delayBusy, setDelayBusy] = useState(false);
+
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
@@ -130,10 +137,12 @@ export default function ArrivalsPage() {
       }
       const entries: QueueEntry[] = await queueRes.json();
       const staffMap = new Map<string, string>();
+      let doctorIds: string[] = [];
       if (staffRes?.ok) {
         const staffBody = await staffRes.json();
         setStaff(staffBody.data.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })));
         staffBody.data.forEach((s: { id: string; name: string }) => staffMap.set(s.id, s.name));
+        doctorIds = staffBody.data.map((s: { id: string }) => s.id);
       }
       const withNames = await Promise.all(entries.map(async (e) => {
         const pRes = await authedFetch(`/patients/${e.patientId}`);
@@ -141,6 +150,22 @@ export default function ArrivalsPage() {
         return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "" };
       }));
       setRows(withNames);
+
+      // NB-101/NB-100: per-doctor wait estimate and any active delay, for the sidebar.
+      const estimateEntries = await Promise.all(doctorIds.map(async (id: string) => {
+        const res = await authedFetch(`/queue/wait-estimate?doctorId=${id}`);
+        return [id, res?.ok ? (await res.json()).estimatedMinutes : null] as const;
+      }));
+      setWaitEstimates(Object.fromEntries(estimateEntries.filter(([, v]) => v !== null)));
+
+      const delayEntries = await Promise.all(doctorIds.map(async (id: string) => {
+        const res = await authedFetch(`/doctors/${id}/delay`);
+        if (!res?.ok) return [id, null] as const;
+        const history: { active: boolean; delayMinutes: number; reason: string | null }[] = await res.json();
+        const active = history.find((h) => h.active);
+        return [id, active ? { delayMinutes: active.delayMinutes, reason: active.reason } : null] as const;
+      }));
+      setDelays(Object.fromEntries(delayEntries));
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -307,6 +332,30 @@ export default function ArrivalsPage() {
     }
   }
 
+  async function submitDelay(e: React.FormEvent) {
+    e.preventDefault();
+    if (!delayFormFor) return;
+    setDelayBusy(true);
+    try {
+      const res = await authedFetch(`/doctors/${delayFormFor}/delay`, {
+        method: "POST",
+        body: JSON.stringify({ delayMinutes: Number(delayMinutesInput), reason: delayReasonInput || null }),
+      });
+      if (res?.ok) {
+        setDelayFormFor(null);
+        setDelayReasonInput("");
+        load();
+      }
+    } finally {
+      setDelayBusy(false);
+    }
+  }
+
+  async function clearDelay(doctorId: string) {
+    const res = await authedFetch(`/doctors/${doctorId}/delay/clear`, { method: "POST" });
+    if (res?.ok) load();
+  }
+
   const filtered = tab === "all" ? rows : rows.filter((r) => bucketOf(r.status) === tab);
   const counts: Record<string, number> = { all: rows.length };
   (["waiting", "in_consult", "checkout_pending", "completed"] as Bucket[]).forEach((b) => {
@@ -314,8 +363,13 @@ export default function ArrivalsPage() {
   });
 
   const doctorQueues = staff
-    .map((s) => ({ ...s, waiting: rows.filter((r) => r.doctorId === s.id && bucketOf(r.status) === "waiting").length }))
-    .filter((s) => s.waiting > 0)
+    .map((s) => ({
+      ...s,
+      waiting: rows.filter((r) => r.doctorId === s.id && bucketOf(r.status) === "waiting").length,
+      estimatedMinutes: waitEstimates[s.id],
+      delay: delays[s.id] ?? null,
+    }))
+    .filter((s) => s.waiting > 0 || s.delay)
     .sort((a, b) => b.waiting - a.waiting);
 
   return (
@@ -399,9 +453,24 @@ export default function ArrivalsPage() {
               <div className={styles.state}>No one waiting.</div>
             ) : (
               doctorQueues.map((d) => (
-                <div key={d.id} className={styles.doctorRow}>
-                  <span className={styles.doctorName}>{d.name}</span>
-                  <span className={styles.doctorCount}>{d.waiting} waiting</span>
+                <div key={d.id} className={styles.doctorRow} style={{ flexDirection: "column", alignItems: "stretch", gap: "4px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                    <span className={styles.doctorName}>{d.name}</span>
+                    <span className={styles.doctorCount}>
+                      {d.waiting} waiting{d.estimatedMinutes !== undefined ? ` · ~${d.estimatedMinutes}m wait` : ""}
+                    </span>
+                  </div>
+                  {d.delay ? (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--nb-danger-500)" }}>
+                      <span>Running {d.delay.delayMinutes}m late{d.delay.reason ? ` — ${d.delay.reason}` : ""}</span>
+                      <button className={styles.actionBtn} onClick={() => clearDelay(d.id)}>Clear delay</button>
+                    </div>
+                  ) : (
+                    <button className={styles.actionBtn} style={{ alignSelf: "flex-start" }}
+                      onClick={() => { setDelayFormFor(d.id); setDelayMinutesInput("15"); setDelayReasonInput(""); }}>
+                      Announce delay
+                    </button>
+                  )}
                 </div>
               ))
             )}
@@ -542,6 +611,30 @@ export default function ArrivalsPage() {
               <button type="submit" className={styles.submitBtn}
                 disabled={prioritySubmitting || (priorityReasonCode === "Other" && !priorityOtherReason.trim())}>
                 {prioritySubmitting ? "Saving…" : "Mark priority"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {delayFormFor && (
+        <div className={styles.overlay} onClick={() => setDelayFormFor(null)}>
+          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitDelay}>
+            <h2 className={styles.modalTitle}>Announce delay</h2>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="delayMinutes">Running late by (minutes)</label>
+              <input id="delayMinutes" type="number" min="1" className={styles.input}
+                value={delayMinutesInput} onChange={(e) => setDelayMinutesInput(e.target.value)} required />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="delayReason">Reason (optional)</label>
+              <input id="delayReason" className={styles.input} value={delayReasonInput}
+                onChange={(e) => setDelayReasonInput(e.target.value)} placeholder="Emergency case running long" />
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setDelayFormFor(null)}>Cancel</button>
+              <button type="submit" className={styles.submitBtn} disabled={delayBusy || !delayMinutesInput}>
+                {delayBusy ? "Announcing…" : "Announce delay"}
               </button>
             </div>
           </form>

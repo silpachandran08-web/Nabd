@@ -34,6 +34,17 @@ class QueueApiTest extends ApiTestBase {
         return (String) resp.getBody().get("id");
     }
 
+    /** Distinct dob per call — several same-named/similarly-named patients in one tenant with the
+     * same dob trip NB-060's fuzzy-duplicate detection and return a DuplicateCandidatesResponse
+     * (no "id" field) instead of registering. */
+    private static int dobYearCounter = 1970;
+
+    private String registerPatientWithDob(String token, String name, String phone) {
+        ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", name, "phone", phone, "dob", (dobYearCounter++) + "-01-01", "gender", "male")), Map.class);
+        return (String) resp.getBody().get("id");
+    }
+
     @Test
     void walkInCheckInAssignsToken() {
         SeededTenant tenant = seedTenant();
@@ -168,5 +179,67 @@ class QueueApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("priority")).isEqualTo(true);
         assertThat(resp.getBody().get("priorityReason")).isEqualTo("elderly patient");
+    }
+
+    // NB-101: estimate must land within +/-25% of the true historical average x patients ahead.
+    @Test
+    void waitEstimateIsWithin25PercentOfHistoricalAverage() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "owner7@a.com", "+919600000007", false);
+        String token = loginAndGetAccessToken(doctor);
+
+        // ten past visits alternating 10 and 20 minutes check-in-to-invoice -> true average 15 min
+        for (int i = 0; i < 10; i++) {
+            int minutes = (i % 2 == 0) ? 10 : 20;
+            String patientId = registerPatientWithDob(token, "Hist" + i, "+91960000" + (1100 + i));
+            seedCompletedVisit(tenant.id(), doctor.id(), patientId, minutes);
+        }
+
+        // two patients currently ahead in today's queue
+        String p1 = registerPatientWithDob(token, "Ahead1", "+919600001200");
+        String p2 = registerPatientWithDob(token, "Ahead2", "+919600001201");
+        exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", p1, "doctorId", doctor.id().toString())), Map.class);
+        exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", p2, "doctorId", doctor.id().toString())), Map.class);
+
+        ResponseEntity<Map> resp = exchange("/v1/queue/wait-estimate?doctorId=" + doctor.id(), HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("patientsAhead")).isEqualTo(2);
+        assertThat(resp.getBody().get("basedOnHistory")).isEqualTo(true);
+        int estimated = ((Number) resp.getBody().get("estimatedMinutes")).intValue();
+        int trueExpected = 30; // 15 min average x 2 patients ahead
+        assertThat(estimated).isBetween((int) (trueExpected * 0.75), (int) (trueExpected * 1.25));
+    }
+
+    @Test
+    void waitEstimateFallsBackToADefaultWithNoHistory() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "owner8@a.com", "+919600000008", false);
+        String token = loginAndGetAccessToken(doctor);
+
+        ResponseEntity<Map> resp = exchange("/v1/queue/wait-estimate?doctorId=" + doctor.id(), HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("patientsAhead")).isEqualTo(0);
+        assertThat(resp.getBody().get("basedOnHistory")).isEqualTo(false);
+        assertThat(resp.getBody().get("estimatedMinutes")).isEqualTo(0);
+    }
+
+    /** Directly seeds a completed, billed visit whose invoice landed exactly `minutesLater` after check-in. */
+    private void seedCompletedVisit(UUID tenantId, UUID doctorId, String patientId, int minutesLater) {
+        UUID queueEntryId = UUID.randomUUID();
+        UUID invoiceId = UUID.randomUUID();
+        inTenantTx(tenantId, () -> {
+            jdbc.update("INSERT INTO queue_entries (id, tenant_id, patient_id, doctor_id, queue_date, token_number, status, created_at) " +
+                            "VALUES (?,?,?,?,CURRENT_DATE - INTERVAL '1 day', " +
+                            "(SELECT COALESCE(MAX(token_number),0)+1 FROM queue_entries WHERE doctor_id = ?), 'completed', now() - INTERVAL '1 day')",
+                    queueEntryId, tenantId, UUID.fromString(patientId), doctorId, doctorId);
+            jdbc.update("INSERT INTO invoices (id, tenant_id, queue_entry_id, patient_id, doctor_id, subtotal, tax, total, created_by, created_at) " +
+                            "VALUES (?,?,?,?,?,100,0,100,?, (SELECT created_at FROM queue_entries WHERE id = ?) + (? || ' minutes')::interval)",
+                    invoiceId, tenantId, queueEntryId, UUID.fromString(patientId), doctorId, doctorId, queueEntryId, minutesLater);
+            return null;
+        });
     }
 }

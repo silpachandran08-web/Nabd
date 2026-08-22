@@ -25,4 +25,17 @@ final class QueueModels {
                           UUID priorityFlaggedBy, Instant priorityFlaggedAt, UUID priorityAcknowledgedBy,
                           Instant priorityAcknowledgedAt, String source, Instant createdAt) {
     }
+
+    /** NB-099: a waitlist membership; offeredSlotStart/offerExpiresAt are set only while status='offered'. */
+    record WaitlistEntryRow(UUID id, UUID doctorId, UUID patientId, String patientName, Instant joinedAt, String status,
+                             Instant offeredSlotStart, Instant offerExpiresAt, UUID bookedAppointmentId) {
+    }
+
+    /** NB-100: one entry in a doctor's delay history — active while clearedAt is null. */
+    record DoctorDelayRow(UUID id, UUID doctorId, int delayMinutes, String reason, UUID announcedBy, Instant announcedAt,
+                           UUID clearedBy, Instant clearedAt) {
+        boolean active() {
+            return clearedAt == null;
+        }
+    }
 }

@@ -94,6 +94,38 @@ class QueueRepository {
                 "WHERE tenant_id = ? AND id = ?", acknowledgedBy, tenantId, id);
     }
 
+    /**
+     * NB-101: mean minutes from check-in to invoice (a real, already-recorded end-to-end visit
+     * duration) over this doctor's most recent completed visits — a narrow direct query into
+     * billing's invoices table rather than injecting CheckoutRepository, same convention as
+     * CheckoutRepository's own reads into pharmacy/procedure_orders. OTC sales (no queue_entry_id)
+     * are naturally excluded by the join. Empty when this doctor has no billed visits yet.
+     */
+    Optional<Double> averageRecentVisitMinutes(UUID tenantId, UUID doctorId, int sampleSize) {
+        return jdbc.query(
+                "SELECT AVG(minutes) AS avg_minutes FROM (" +
+                        "  SELECT EXTRACT(EPOCH FROM (i.created_at - q.created_at)) / 60.0 AS minutes " +
+                        "  FROM invoices i JOIN queue_entries q ON q.id = i.queue_entry_id " +
+                        "  WHERE i.tenant_id = ? AND i.doctor_id = ? " +
+                        "  ORDER BY i.created_at DESC LIMIT ?" +
+                        ") recent",
+                (rs, i) -> {
+                    double v = rs.getDouble("avg_minutes");
+                    return rs.wasNull() ? null : v;
+                },
+                tenantId, doctorId, sampleSize
+        ).stream().filter(java.util.Objects::nonNull).findFirst();
+    }
+
+    /** Still-in-the-pipeline entries for a doctor today — what a newly-arriving patient is actually behind. */
+    int countActiveAhead(UUID tenantId, UUID doctorId, LocalDate date) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? " +
+                        "AND status NOT IN ('completed', 'no_show')",
+                Integer.class, tenantId, doctorId, Date.valueOf(date));
+        return count == null ? 0 : count;
+    }
+
     private RowMapper<QueueEntryRow> mapper() {
         return (rs, i) -> {
             String appointmentId = rs.getString("appointment_id");

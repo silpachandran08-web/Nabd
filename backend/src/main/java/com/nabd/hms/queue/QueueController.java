@@ -4,6 +4,7 @@ import com.nabd.hms.queue.dto.CheckInRequest;
 import com.nabd.hms.queue.dto.QueueEntryResponse;
 import com.nabd.hms.queue.dto.QueueReorderRequest;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
+import com.nabd.hms.queue.dto.WaitEstimateResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -66,6 +67,12 @@ public class QueueController {
     @PreAuthorize("hasAuthority('queue:edit')")
     public QueueEntryResponse acknowledgePriority(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.acknowledgePriority(tenantId(jwt), staffId(jwt), id);
+    }
+
+    @GetMapping("/wait-estimate")
+    @PreAuthorize("hasAuthority('queue:view')")
+    public WaitEstimateResponse waitEstimate(@AuthenticationPrincipal Jwt jwt, @RequestParam UUID doctorId) {
+        return service.waitEstimate(tenantId(jwt), doctorId);
     }
 
     private UUID tenantId(Jwt jwt) {

@@ -6,6 +6,7 @@ import com.nabd.hms.queue.dto.CheckInRequest;
 import com.nabd.hms.queue.dto.QueueEntryResponse;
 import com.nabd.hms.queue.dto.QueueReorderRequest;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
+import com.nabd.hms.queue.dto.WaitEstimateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -139,6 +140,23 @@ public class QueueService {
         repo.acknowledgePriority(tenantId, id, callerStaffId);
         log.info("queue entry {} priority acknowledged by {}", id, callerStaffId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    // ponytail: 30-visit sample, most-recent-first — enough to smooth out one unusually long/short
+    // visit without dragging in a doctor's schedule from months ago. Revisit if a doctor's typical
+    // visit length genuinely drifts week to week and this window turns out too short to track it.
+    private static final int WAIT_ESTIMATE_SAMPLE_SIZE = 30;
+    private static final double DEFAULT_VISIT_MINUTES = 15.0; // no billed history yet — same default as slot length
+
+    /** NB-101: estimated minutes until a patient checking in right now sees this doctor. */
+    @Transactional
+    public WaitEstimateResponse waitEstimate(UUID tenantId, UUID doctorId) {
+        tenantContext.set(tenantId);
+        Optional<Double> avg = repo.averageRecentVisitMinutes(tenantId, doctorId, WAIT_ESTIMATE_SAMPLE_SIZE);
+        double avgVisitMinutes = avg.orElse(DEFAULT_VISIT_MINUTES);
+        int patientsAhead = repo.countActiveAhead(tenantId, doctorId, LocalDate.now(ZoneOffset.UTC));
+        int estimatedMinutes = (int) Math.round(avgVisitMinutes * patientsAhead);
+        return new WaitEstimateResponse(estimatedMinutes, patientsAhead, avgVisitMinutes, avg.isPresent());
     }
 
     /** NB-098 — same session cap AppointmentService.book() enforces, applied to the walk-in path. */

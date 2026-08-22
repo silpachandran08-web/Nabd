@@ -1,10 +1,14 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.queue.dto.DelayAnnounceRequest;
+import com.nabd.hms.queue.dto.DoctorDelayResponse;
 import com.nabd.hms.queue.dto.DoctorLeaveResponse;
 import com.nabd.hms.queue.dto.DoctorLeaveWriteRequest;
 import com.nabd.hms.queue.dto.WorkingHoursResponse;
 import com.nabd.hms.queue.dto.WorkingHoursWriteRequest;
+import org.springframework.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.nabd.hms.queue.QueueModels.DoctorDelayRow;
 import static com.nabd.hms.queue.QueueModels.WorkingHoursRow;
 
 @Service
@@ -61,7 +66,7 @@ public class ScheduleService {
     public List<DoctorLeaveResponse> listLeave(UUID tenantId, UUID doctorId) {
         tenantContext.set(tenantId);
         return repo.listLeave(doctorId).stream()
-                .map(l -> new DoctorLeaveResponse(l.id(), l.dateFrom(), l.dateTo(), l.reason()))
+                .map(l -> new DoctorLeaveResponse(l.id(), l.dateFrom(), l.dateTo(), l.reason(), List.of()))
                 .toList();
     }
 
@@ -69,8 +74,10 @@ public class ScheduleService {
     public DoctorLeaveResponse addLeave(UUID tenantId, UUID callerStaffId, UUID doctorId, DoctorLeaveWriteRequest req) {
         tenantContext.set(tenantId);
         UUID id = repo.insertLeave(tenantId, doctorId, req.dateFrom(), req.dateTo(), req.reason());
-        log.info("leave {} added for doctor {} by {} ({} to {})", id, doctorId, callerStaffId, req.dateFrom(), req.dateTo());
-        return new DoctorLeaveResponse(id, req.dateFrom(), req.dateTo(), req.reason());
+        List<String> affected = repo.findAffectedPackagePatientNames(tenantId, doctorId);
+        log.info("leave {} added for doctor {} by {} ({} to {}); {} package patient(s) potentially affected",
+                id, doctorId, callerStaffId, req.dateFrom(), req.dateTo(), affected.size());
+        return new DoctorLeaveResponse(id, req.dateFrom(), req.dateTo(), req.reason(), affected);
     }
 
     @Transactional
@@ -108,5 +115,41 @@ public class ScheduleService {
     private WorkingHoursResponse toResponse(WorkingHoursRow row) {
         return new WorkingHoursResponse(row.id(), row.dayOfWeek(), row.startTime(), row.endTime(),
                 row.slotMinutes(), row.maxPatients());
+    }
+
+    // ── delay ladder (NB-100) ────────────────────────────────────────────
+    // The patient-facing broadcast (and its "bypasses the prayer-window hold" AC) needs E17's
+    // messaging infrastructure — not built yet, deferred like every other WhatsApp-dependent
+    // ticket this session. This is the in-app half: announce/clear plus history, "operationally
+    // urgent" here meaning it takes effect immediately, with nothing to hold it in the first place.
+
+    @Transactional
+    public DoctorDelayResponse announceDelay(UUID tenantId, UUID callerStaffId, UUID doctorId, DelayAnnounceRequest req) {
+        tenantContext.set(tenantId);
+        UUID id = repo.announceDelay(tenantId, doctorId, req.delayMinutes(), req.reason(), callerStaffId);
+        log.info("doctor {} delay announced by {}: {} min ({})", doctorId, callerStaffId, req.delayMinutes(), req.reason());
+        return toDelayResponse(repo.findActiveDelay(doctorId).orElseThrow());
+    }
+
+    @Transactional
+    public void clearDelay(UUID tenantId, UUID callerStaffId, UUID doctorId) {
+        tenantContext.set(tenantId);
+        if (repo.findActiveDelay(doctorId).isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "no-active-delay", "No active delay",
+                    "This doctor doesn't have an active delay to clear.");
+        }
+        repo.clearActiveDelay(tenantId, doctorId, callerStaffId);
+        log.info("doctor {} delay cleared by {}", doctorId, callerStaffId);
+    }
+
+    @Transactional
+    public List<DoctorDelayResponse> delayHistory(UUID tenantId, UUID doctorId) {
+        tenantContext.set(tenantId);
+        return repo.delayHistory(doctorId, 20).stream().map(this::toDelayResponse).toList();
+    }
+
+    private DoctorDelayResponse toDelayResponse(DoctorDelayRow row) {
+        return new DoctorDelayResponse(row.id(), row.doctorId(), row.delayMinutes(), row.reason(), row.announcedBy(),
+                row.announcedAt(), row.clearedBy(), row.clearedAt(), row.active());
     }
 }

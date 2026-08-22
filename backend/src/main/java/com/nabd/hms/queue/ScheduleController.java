@@ -1,5 +1,7 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.queue.dto.DelayAnnounceRequest;
+import com.nabd.hms.queue.dto.DoctorDelayResponse;
 import com.nabd.hms.queue.dto.DoctorLeaveResponse;
 import com.nabd.hms.queue.dto.DoctorLeaveWriteRequest;
 import com.nabd.hms.queue.dto.WorkingHoursResponse;
@@ -64,6 +66,26 @@ public class ScheduleController {
     public List<Instant> availability(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                        @RequestParam LocalDate date) {
         return service.availability(tenantId(jwt), id, date);
+    }
+
+    @PostMapping("/delay")
+    @PreAuthorize("hasAuthority('queue:edit')")
+    public ResponseEntity<DoctorDelayResponse> announceDelay(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                              @Valid @RequestBody DelayAnnounceRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.announceDelay(tenantId(jwt), staffId(jwt), id, req));
+    }
+
+    @PostMapping("/delay/clear")
+    @PreAuthorize("hasAuthority('queue:edit')")
+    public ResponseEntity<Void> clearDelay(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        service.clearDelay(tenantId(jwt), staffId(jwt), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/delay")
+    @PreAuthorize("hasAuthority('queue:view')")
+    public List<DoctorDelayResponse> delayHistory(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.delayHistory(tenantId(jwt), id);
     }
 
     private UUID tenantId(Jwt jwt) {

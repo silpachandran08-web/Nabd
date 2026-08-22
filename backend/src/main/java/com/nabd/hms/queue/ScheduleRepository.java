@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.queue.QueueModels.DoctorDelayRow;
 import static com.nabd.hms.queue.QueueModels.DoctorLeaveRow;
 import static com.nabd.hms.queue.QueueModels.WorkingHoursRow;
 
@@ -91,6 +92,25 @@ class ScheduleRepository {
         return id;
     }
 
+    /**
+     * NB-091: "blocking a doctor warns about affected package sessions restricted to that doctor" —
+     * a narrow direct query into the packages module's tables (same convention as CheckoutRepository
+     * reading pharmacy/procedure_orders directly) rather than injecting PackageRepository. Active
+     * instances only, and only packages actually restricted to a doctor via package_eligible_doctors
+     * (an unrestricted package is never "affected" by one doctor's leave), with at least one
+     * item still unconsumed.
+     */
+    List<String> findAffectedPackagePatientNames(UUID tenantId, UUID doctorId) {
+        return jdbc.query(
+                "SELECT DISTINCT p.name || ' (' || pi.package_name || ')' AS label " +
+                        "FROM package_instances pi " +
+                        "JOIN patients p ON p.id = pi.patient_id " +
+                        "JOIN package_eligible_doctors ed ON ed.package_id = pi.package_id AND ed.doctor_id = ? " +
+                        "WHERE pi.tenant_id = ? AND pi.status = 'active' " +
+                        "AND EXISTS (SELECT 1 FROM package_instance_items i WHERE i.instance_id = pi.id AND i.quantity_consumed < i.quantity_total)",
+                (rs, i) -> rs.getString("label"), doctorId, tenantId);
+    }
+
     /** Start times already booked (status='scheduled') for a doctor on a given date — used to exclude taken slots. */
     List<Instant> bookedStartTimes(UUID doctorId, Instant dayStart, Instant dayEnd) {
         return jdbc.query(
@@ -122,6 +142,51 @@ class ScheduleRepository {
                 doctorId, Timestamp.from(rangeStart), Timestamp.from(rangeEnd),
                 doctorId, Date.valueOf(date), Time.valueOf(blockStart), Time.valueOf(blockEnd));
         return count == null ? 0 : count;
+    }
+
+    // ── delay ladder (NB-100) ────────────────────────────────────────────
+
+    private static final String DELAY_SELECT =
+            "SELECT id, doctor_id, delay_minutes, reason, announced_by, announced_at, cleared_by, cleared_at " +
+                    "FROM doctor_delays WHERE doctor_id = ? ";
+
+    Optional<DoctorDelayRow> findActiveDelay(UUID doctorId) {
+        return jdbc.query(DELAY_SELECT + "AND cleared_at IS NULL", delayMapper(), doctorId).stream().findFirst();
+    }
+
+    List<DoctorDelayRow> delayHistory(UUID doctorId, int limit) {
+        return jdbc.query(DELAY_SELECT + "ORDER BY announced_at DESC LIMIT ?", delayMapper(), doctorId, limit);
+    }
+
+    /** "Writing the delay then closing and appending to history" — a fresh announcement always
+     * closes out any still-active one first, so the unique active-per-doctor index never fires. */
+    UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, UUID announcedBy) {
+        clearActiveDelay(tenantId, doctorId, announcedBy);
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by) VALUES (?,?,?,?,?,?)",
+                id, tenantId, doctorId, delayMinutes, reason, announcedBy);
+        return id;
+    }
+
+    void clearActiveDelay(UUID tenantId, UUID doctorId, UUID clearedBy) {
+        jdbc.update("UPDATE doctor_delays SET cleared_at = now(), cleared_by = ? " +
+                "WHERE tenant_id = ? AND doctor_id = ? AND cleared_at IS NULL", clearedBy, tenantId, doctorId);
+    }
+
+    private RowMapper<DoctorDelayRow> delayMapper() {
+        return (rs, i) -> {
+            Timestamp clearedAt = rs.getTimestamp("cleared_at");
+            String clearedBy = rs.getString("cleared_by");
+            return new DoctorDelayRow(
+                    UUID.fromString(rs.getString("id")),
+                    UUID.fromString(rs.getString("doctor_id")),
+                    rs.getInt("delay_minutes"),
+                    rs.getString("reason"),
+                    UUID.fromString(rs.getString("announced_by")),
+                    rs.getTimestamp("announced_at").toInstant(),
+                    clearedBy == null ? null : UUID.fromString(clearedBy),
+                    clearedAt == null ? null : clearedAt.toInstant());
+        };
     }
 
     private RowMapper<WorkingHoursRow> workingHoursMapper() {
