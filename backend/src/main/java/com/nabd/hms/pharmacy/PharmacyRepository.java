@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.pharmacy.PharmacyModels.DispensingItemRow;
+import static com.nabd.hms.pharmacy.PharmacyModels.DispensingQueueRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
 
 /** Pharmacy items are charge_catalogue rows tagged with a non-null stock_qty — no parallel item
@@ -67,6 +69,33 @@ class PharmacyRepository {
                         "WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
                 req.name(), req.price(), req.taxRatePercentOrZero(), req.isRx(), req.hsnCode(), req.stockQtyOrZero(),
                 tenantId, id);
+    }
+
+    /** NB-179: signed prescriptions still ahead of checkout, cross-patient — narrow direct query
+     * into the clinical schema, same precedent as CheckoutRepository reading procedure_orders. */
+    List<DispensingQueueRow> listDispensingQueue(UUID tenantId) {
+        return jdbc.query(
+                "SELECT pr.id AS prescription_id, pr.queue_entry_id, pr.patient_id, p.name AS patient_name, " +
+                        "s.name AS doctor_name, pr.signed_at " +
+                        "FROM prescriptions pr " +
+                        "JOIN patients p ON p.id = pr.patient_id " +
+                        "JOIN staff s ON s.id = pr.doctor_id " +
+                        "JOIN queue_entries q ON q.id = pr.queue_entry_id " +
+                        "WHERE pr.tenant_id = ? AND pr.status = 'signed' AND q.status != 'completed' " +
+                        "ORDER BY pr.signed_at",
+                (rs, i) -> new DispensingQueueRow(UUID.fromString(rs.getString("prescription_id")),
+                        UUID.fromString(rs.getString("queue_entry_id")), UUID.fromString(rs.getString("patient_id")),
+                        rs.getString("patient_name"), rs.getString("doctor_name"), rs.getTimestamp("signed_at").toInstant()),
+                tenantId);
+    }
+
+    List<DispensingItemRow> listDispensingItems(UUID tenantId, UUID prescriptionId) {
+        return jdbc.query(
+                "SELECT drug_name, dosage, frequency, duration, instructions FROM prescription_items " +
+                        "WHERE tenant_id = ? AND prescription_id = ? ORDER BY display_order",
+                (rs, i) -> new DispensingItemRow(rs.getString("drug_name"), rs.getString("dosage"),
+                        rs.getString("frequency"), rs.getString("duration"), rs.getString("instructions")),
+                tenantId, prescriptionId);
     }
 
     private RowMapper<PharmacyItemRow> itemMapper() {

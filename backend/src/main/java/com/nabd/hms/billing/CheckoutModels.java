@@ -31,4 +31,8 @@ final class CheckoutModels {
     record LineItemInput(String chargeCode, String chargeName, String category, int quantity,
                           BigDecimal unitPrice, BigDecimal taxRatePercent) {
     }
+
+    /** NB-179: what a signed-but-not-yet-billed prescription still needs dispensed. */
+    record PrescribedItemRow(String drugName, String dosage, String frequency, String duration, String instructions) {
+    }
 }

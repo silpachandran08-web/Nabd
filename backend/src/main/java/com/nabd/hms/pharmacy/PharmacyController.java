@@ -1,5 +1,6 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemWriteRequest;
 import com.nabd.hms.pharmacy.dto.PharmacySettingsResponse;
@@ -62,6 +63,12 @@ public class PharmacyController {
     public PharmacyItemResponse updateItem(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                             @Valid @RequestBody PharmacyItemWriteRequest req) {
         return service.updateItem(tenantId(jwt), id, req);
+    }
+
+    @GetMapping("/dispensing-queue")
+    @PreAuthorize("hasAuthority('pharmacy:view')")
+    public List<DispensingQueueEntryResponse> dispensingQueue(@AuthenticationPrincipal Jwt jwt) {
+        return service.dispensingQueue(tenantId(jwt));
     }
 
     private UUID tenantId(Jwt jwt) {

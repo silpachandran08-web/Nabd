@@ -18,6 +18,7 @@ import static com.nabd.hms.billing.CheckoutModels.InvoiceRow;
 import static com.nabd.hms.billing.CheckoutModels.LineItemInput;
 import static com.nabd.hms.billing.CheckoutModels.LineItemRow;
 import static com.nabd.hms.billing.CheckoutModels.PaymentRow;
+import static com.nabd.hms.billing.CheckoutModels.PrescribedItemRow;
 import static com.nabd.hms.billing.CheckoutModels.QueueEntryContext;
 
 @Repository
@@ -58,6 +59,18 @@ class CheckoutRepository {
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("charge_code"),
                         rs.getString("charge_name"), "Procedure", rs.getBigDecimal("base_amount"), null,
                         rs.getBigDecimal("tax_rate_percent")),
+                tenantId, queueEntryId);
+    }
+
+    /** NB-179: the signed Rx for this visit, so whoever's billing can see what to dispense —
+     * no separate dispense screen, same "visible from billing" precedent as pharmacy stock (V25). */
+    List<PrescribedItemRow> findSignedPrescriptionItems(UUID tenantId, UUID queueEntryId) {
+        return jdbc.query(
+                "SELECT pi.drug_name, pi.dosage, pi.frequency, pi.duration, pi.instructions " +
+                        "FROM prescription_items pi JOIN prescriptions pr ON pr.id = pi.prescription_id " +
+                        "WHERE pr.tenant_id = ? AND pr.queue_entry_id = ? AND pr.status = 'signed' ORDER BY pi.display_order",
+                (rs, i) -> new PrescribedItemRow(rs.getString("drug_name"), rs.getString("dosage"),
+                        rs.getString("frequency"), rs.getString("duration"), rs.getString("instructions")),
                 tenantId, queueEntryId);
     }
 

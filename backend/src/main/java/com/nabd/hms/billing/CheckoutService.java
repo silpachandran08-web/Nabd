@@ -9,6 +9,7 @@ import com.nabd.hms.billing.dto.LineItemResponse;
 import com.nabd.hms.billing.dto.OtcChargesResponse;
 import com.nabd.hms.billing.dto.PaymentRequest;
 import com.nabd.hms.billing.dto.PaymentResponse;
+import com.nabd.hms.billing.dto.PrescribedItemResponse;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.QueueService;
@@ -65,9 +66,12 @@ public class CheckoutService {
         List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
         List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
                 .map(this::toChargeResponse).toList();
+        List<PrescribedItemResponse> prescribedItems = repo.findSignedPrescriptionItems(tenantId, queueEntryId).stream()
+                .map(p -> new PrescribedItemResponse(p.drugName(), p.dosage(), p.frequency(), p.duration(), p.instructions()))
+                .toList();
         return new CheckoutContextResponse(queueEntryId, patientName, doctorName,
                 ctx.hasAppointment() ? "Appointment" : "Walk-in", followUpEligible, currencyFor(tenantId), charges,
-                pendingProcedures);
+                pendingProcedures, prescribedItems);
     }
 
     @Transactional

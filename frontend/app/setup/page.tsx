@@ -23,6 +23,10 @@ type Licence = { id: string; licenceType: string; holderId: string | null; holde
 type StaffSummary = { id: string; name: string; roleName: string };
 type PharmacySettings = { mode: "external" | "hybrid" | "in_house" };
 type PharmacyItem = { id: string; code: string; name: string; isRx: boolean; hsnCode: string | null; price: number; taxRatePercent: number; stockQty: number; active: boolean };
+type DispensingQueueEntry = {
+  prescriptionId: string; queueEntryId: string; patientName: string; doctorName: string; signedAt: string;
+  items: { drugName: string; dosage: string | null; frequency: string | null }[];
+};
 
 const TABS = [
   { key: "checklist", label: "Checklist" },
@@ -60,6 +64,7 @@ export default function SetupPage() {
   const [staff, setStaff] = useState<StaffSummary[]>([]);
   const [pharmacySettings, setPharmacySettings] = useState<PharmacySettings | null>(null);
   const [pharmacyItems, setPharmacyItems] = useState<PharmacyItem[]>([]);
+  const [dispensingQueue, setDispensingQueue] = useState<DispensingQueueEntry[]>([]);
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("nabd_access_token");
@@ -93,7 +98,7 @@ export default function SetupPage() {
         }
         return res.json();
       };
-      const [cl, pr, ch, po, co, ho, sh, su, ij, ej, li, st, ps, pi] = await Promise.all([
+      const [cl, pr, ch, po, co, ho, sh, su, ij, ej, li, st, ps, pi, dq] = await Promise.all([
         fetchJson<ChecklistItem[]>("/setup/checklist"),
         fetchJson<Profile>("/setup/profile"),
         fetchJson<Charge[]>("/setup/charges"),
@@ -108,6 +113,7 @@ export default function SetupPage() {
         fetchJson<StaffSummary[]>("/setup/staff"),
         fetchJson<PharmacySettings>("/pharmacy/settings"),
         fetchJson<PharmacyItem[]>("/pharmacy/items"),
+        fetchJson<DispensingQueueEntry[]>("/pharmacy/dispensing-queue"),
       ]);
       if (cl) setChecklist(cl);
       if (pr) setProfile(pr);
@@ -123,6 +129,7 @@ export default function SetupPage() {
       if (st) setStaff(st);
       if (ps) setPharmacySettings(ps);
       if (pi) setPharmacyItems(pi);
+      if (dq) setDispensingQueue(dq);
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -743,6 +750,28 @@ export default function SetupPage() {
                 </tbody>
               </table>
             </div>
+
+            <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
+            <p className={styles.subtitle}>Signed prescriptions still ahead of checkout — pick up here or on that patient&apos;s billing screen.</p>
+            {dispensingQueue.length === 0 ? (
+              <div className={styles.empty}>Nothing waiting to be dispensed.</div>
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Patient</th><th>Doctor</th><th>Drugs</th><th>Signed at</th></tr></thead>
+                  <tbody>
+                    {dispensingQueue.map((q) => (
+                      <tr key={q.prescriptionId}>
+                        <td>{q.patientName}</td>
+                        <td>{q.doctorName}</td>
+                        <td>{q.items.map((i) => i.drugName).join(", ")}</td>
+                        <td>{new Date(q.signedAt).toLocaleTimeString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         );
       default:

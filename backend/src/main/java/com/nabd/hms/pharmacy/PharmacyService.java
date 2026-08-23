@@ -2,6 +2,7 @@ package com.nabd.hms.pharmacy;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemWriteRequest;
 import com.nabd.hms.pharmacy.dto.PharmacySettingsResponse;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+import static com.nabd.hms.pharmacy.PharmacyModels.DispensingQueueRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
 
 /**
@@ -68,6 +70,22 @@ public class PharmacyService {
             throw notFound();
         }
         return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+    }
+
+    /** NB-179: live query, not a job — "within five seconds of consultation close" is trivially true
+     * for a read that runs the instant the queue page loads. */
+    @Transactional
+    public List<DispensingQueueEntryResponse> dispensingQueue(UUID tenantId) {
+        tenantContext.set(tenantId);
+        return repo.listDispensingQueue(tenantId).stream().map(r -> toDispensingResponse(tenantId, r)).toList();
+    }
+
+    private DispensingQueueEntryResponse toDispensingResponse(UUID tenantId, DispensingQueueRow r) {
+        List<DispensingQueueEntryResponse.Item> items = repo.listDispensingItems(tenantId, r.prescriptionId()).stream()
+                .map(i -> new DispensingQueueEntryResponse.Item(i.drugName(), i.dosage(), i.frequency(), i.duration(), i.instructions()))
+                .toList();
+        return new DispensingQueueEntryResponse(r.prescriptionId(), r.queueEntryId(), r.patientId(), r.patientName(),
+                r.doctorName(), r.signedAt(), items);
     }
 
     private void requireHybridMode(UUID tenantId) {

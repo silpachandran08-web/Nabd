@@ -6,9 +6,11 @@ import styles from "../checkout.module.css";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number };
+type PrescribedItem = { drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null };
 type CheckoutContext = {
   queueEntryId: string; patientName: string; doctorName: string; visitType: string;
   followUpEligible: boolean; currency: string; charges: Charge[]; pendingProcedures: Charge[];
+  prescribedItems: PrescribedItem[];
 };
 type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
 type Payment = { id: string; method: string; amount: number; recordedAt: string };
@@ -211,6 +213,13 @@ export default function CheckoutPage() {
         <div className={styles.banner}>
           Follow-up pricing available
           <span className={styles.bannerSub}>Same doctor, a completed visit within the last 14 days.</span>
+        </div>
+      )}
+
+      {context.prescribedItems.length > 0 && (
+        <div className={styles.banner}>
+          Prescribed: {context.prescribedItems.map((i) => i.drugName).join(", ")}
+          <span className={styles.bannerSub}>No separate dispense screen — add matching Pharmacy charges below if in stock.</span>
         </div>
       )}
 

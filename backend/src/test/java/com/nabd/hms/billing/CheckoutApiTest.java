@@ -238,6 +238,26 @@ class CheckoutApiTest extends ApiTestBase {
     }
 
     @Test
+    void checkoutContextSurfacesTheSignedPrescriptionSoBillingCanSeeWhatToDispense() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "recep11@a.com", "+919700000011", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "PRx", "+919999941011");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Amoxicillin", "dosage", "500mg", "frequency", "TDS")))), Map.class);
+        exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        moveTo(token, queueEntryId, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+
+        ResponseEntity<Map> ctx = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.GET, authed(token), Map.class);
+
+        List<Map> prescribed = (List<Map>) ctx.getBody().get("prescribedItems");
+        assertThat(prescribed).hasSize(1);
+        assertThat(prescribed.get(0).get("drugName")).isEqualTo("Amoxicillin");
+    }
+
+    @Test
     void roleWithoutBillingGrantIsForbidden() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedRole(tenant.id(), "QueueOnly", false, fullGrant("queue"), fullGrant("patients"));

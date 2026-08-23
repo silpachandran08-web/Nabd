@@ -147,6 +147,42 @@ class PharmacyApiTest extends ApiTestBase {
     }
 
     @Test
+    void signedPrescriptionAppearsInTheDispensingQueueUntilCheckoutCompletes() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "pharm8@a.com", "+919600000008", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "PharmQueue", "+919999940008");
+        ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", staff.id().toString())), Map.class);
+        String queueEntryId = (String) checkIn.getBody().get("id");
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Cetirizine", "dosage", "10mg", "frequency", "OD")))), Map.class);
+
+        ResponseEntity<List> beforeSign = exchange("/v1/pharmacy/dispensing-queue", HttpMethod.GET, authed(token), List.class);
+        assertThat(beforeSign.getBody()).isEmpty();
+
+        exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+
+        ResponseEntity<List> afterSign = exchange("/v1/pharmacy/dispensing-queue", HttpMethod.GET, authed(token), List.class);
+        assertThat(afterSign.getBody()).hasSize(1);
+        Map<?, ?> entry = (Map<?, ?>) afterSign.getBody().get(0);
+        assertThat(entry.get("patientName")).isEqualTo("PharmQueue");
+        List<?> items = (List<?>) entry.get("items");
+        assertThat(((Map<?, ?>) items.get(0)).get("drugName")).isEqualTo("Cetirizine");
+
+        for (String s : new String[]{"waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending"}) {
+            exchange("/v1/queue/" + queueEntryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", s)), Map.class);
+        }
+        exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
+
+        ResponseEntity<List> afterCheckout = exchange("/v1/pharmacy/dispensing-queue", HttpMethod.GET, authed(token), List.class);
+        assertThat(afterCheckout.getBody()).isEmpty();
+    }
+
+    @Test
     void roleWithoutPharmacyGrantIsForbidden() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedRole(tenant.id(), "QueueOnly", false, fullGrant("queue"), fullGrant("patients"));
