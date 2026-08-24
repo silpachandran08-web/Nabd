@@ -1,0 +1,58 @@
+/* Nabd design tokens — from startfromremaining-wireframe/project/DESIGN.md.
+   Dark-first is canonical (Sawariee reference); no light theme was approved yet (§1.7). */
+:root {
+  --nb-bg-root: #06090c;
+  --nb-bg-canvas: #0a0e12;
+  --nb-surface-1: #11161b;
+  --nb-surface-2: #171d23;
+  --nb-surface-3: #1e262d;
+
+  --nb-border-subtle: rgba(255, 255, 255, 0.07);
+  --nb-border-default: rgba(255, 255, 255, 0.11);
+  --nb-border-strong: rgba(255, 255, 255, 0.18);
+
+  --nb-accent-500: #2ed3e0;
+  --nb-accent-gradient: linear-gradient(90deg, #3ee0c4 0%, #35c9e8 100%);
+  --nb-accent-tint: rgba(46, 211, 224, 0.12);
+  --nb-accent-glow: 0 8px 24px rgba(46, 211, 224, 0.26);
+  --nb-on-accent: #04231f;
+
+  --nb-danger-500: #f0455c;
+  --nb-danger-tint: rgba(240, 69, 92, 0.13);
+
+  --nb-text-primary: #ffffff;
+  --nb-text-secondary: #a6b0b8;
+  --nb-text-tertiary: #78848c;
+  --nb-text-disabled: #4e585f;
+
+  --nb-radius-md: 12px;
+  --nb-radius-lg: 16px;
+
+  --nb-space-2: 2px;
+  --nb-space-4: 4px;
+  --nb-space-8: 8px;
+  --nb-space-12: 12px;
+  --nb-space-16: 16px;
+  --nb-space-24: 24px;
+  --nb-space-32: 32px;
+
+  --nb-dur-base: 180ms;
+  --nb-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--nb-bg-root);
+  color: var(--nb-text-primary);
+  font-family: var(--font-poppins), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}

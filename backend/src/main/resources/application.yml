@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: hms-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/nabd}
+    username: ${DB_USER:nabd_app}
+    password: ${DB_PASSWORD:nabd_app}
+  flyway:
+    # migrations live at repo root (db/migrations), shared with any future
+    # non-Java tooling — not duplicated into src/main/resources
+    locations: filesystem:../db/migrations
+
+server:
+  port: 8080
+
+logging:
+  pattern:
+    # [reqId=...] ties every line for one request together and matches the traceId returned in
+    # RFC 7807 error bodies (RequestCorrelationFilter + GlobalExceptionHandler share the value)
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [reqId=%X{requestId:-none}] %logger{35} - %msg%n"
+  level:
+    root: INFO
+    # ponytail: no PHI-redaction scanner on top of this yet (NB-158) — logging code is
+    # hand-disciplined to pass IDs, not patient name/phone/DOB/national-ID: read PatientService
+    # before adding a new log line there.
+    com.nabd.hms: INFO
+
+app:
+  auth:
+    access-token-ttl-minutes: 15
+    refresh-token-ttl-days: 30
+    mfa-challenge-ttl-minutes: 5
+    lockout-threshold: 5          # failed attempts before backoff kicks in
+    rate-limit-per-ip-per-minute: 20
+  crypto:
+    # base64, 32 bytes (AES-256), Vault/KMS-backed (NB-009) — no default;
+    # boot fails fast if unset rather than encrypting MFA secrets with a
+    # throwaway key.
+    key: ${APP_CRYPTO_KEY}
