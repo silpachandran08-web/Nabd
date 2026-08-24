@@ -106,6 +106,7 @@ export default function ProvisioningPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const [jobActionError, setJobActionError] = useState<Record<string, string>>({});
   const [lifecycleSel, setLifecycleSel] = useState(LIFECYCLE_STATES[1].key);
 
   const authedFetch = useCallback(
@@ -175,11 +176,29 @@ export default function ProvisioningPage() {
     }
   }
 
+  // authedFetch returns null when the session's expired (it redirects to /platform/login itself);
+  // any other failure gets a Problem body we can show — either way, this used to fail *silently*,
+  // leaving the button just reset with nothing to explain it. That silence was the actual bug.
+  async function describeFailure(res: Response | null, fallback: string): Promise<string | null> {
+    if (!res) return null; // already redirecting to login, nothing to show
+    if (res.ok) return null;
+    const p: Problem = await res.json().catch(() => ({ title: "Error", detail: fallback }));
+    return p.detail || fallback;
+  }
+
   async function approve(jobId: string) {
     setBusyJobId(jobId);
+    setJobActionError((prev) => ({ ...prev, [jobId]: "" }));
     try {
       const res = await authedFetch(`/platform/provisioning-jobs/${jobId}/approve`, { method: "POST" });
-      if (res?.ok) await load();
+      const err = await describeFailure(res, "Couldn't approve the job. Try again.");
+      if (err) {
+        setJobActionError((prev) => ({ ...prev, [jobId]: err }));
+        return;
+      }
+      await load();
+    } catch {
+      setJobActionError((prev) => ({ ...prev, [jobId]: "Couldn't reach the server. Check your connection and try again." }));
     } finally {
       setBusyJobId(null);
     }
@@ -189,15 +208,23 @@ export default function ProvisioningPage() {
   // looping here just saves an operator from clicking six times for the ordinary happy path.
   async function runToCompletion(jobId: string) {
     setBusyJobId(jobId);
+    setJobActionError((prev) => ({ ...prev, [jobId]: "" }));
     try {
       const stepCount = Object.keys(STEP_LABELS).length;
       for (let i = 0; i < stepCount; i++) {
         const res = await authedFetch(`/platform/provisioning-jobs/${jobId}/advance`, { method: "POST" });
-        if (!res?.ok) break;
+        const err = await describeFailure(res, "Couldn't advance the job. Try again.");
+        if (err) {
+          setJobActionError((prev) => ({ ...prev, [jobId]: err }));
+          break;
+        }
+        if (!res) break; // redirecting to login
         const updated: Job = await res.json();
         setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
         if (!["queued", "running"].includes(updated.status)) break;
       }
+    } catch {
+      setJobActionError((prev) => ({ ...prev, [jobId]: "Couldn't reach the server. Check your connection and try again." }));
     } finally {
       setBusyJobId(null);
     }
@@ -326,6 +353,7 @@ export default function ProvisioningPage() {
                             )}
                           </div>
                         </div>
+                        {jobActionError[job.id] && <div className={styles.formError} role="alert">{jobActionError[job.id]}</div>}
                         <div className={styles.steps}>
                           {job.steps.map((s) => (
                             <div key={s.stepName} className={styles.step}>
