@@ -35,6 +35,179 @@
   color: var(--nb-text-tertiary);
 }
 
+.tabStrip {
+  display: flex;
+  gap: var(--nb-space-8);
+  flex-wrap: wrap;
+  margin-bottom: var(--nb-space-16);
+}
+
+.tab {
+  height: 34px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: transparent;
+  color: var(--nb-text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tabActive {
+  composes: tab;
+  background: var(--nb-accent-tint);
+  border-color: var(--nb-accent-500);
+  color: var(--nb-accent-500);
+}
+
+.segmented {
+  display: flex;
+  gap: var(--nb-space-8);
+}
+
+.seg {
+  height: 40px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-3);
+  color: var(--nb-text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.segActive {
+  composes: seg;
+  background: var(--nb-accent-tint);
+  border-color: var(--nb-accent-500);
+  color: var(--nb-accent-500);
+}
+
+.formNote {
+  width: 100%;
+  font-size: 11.5px;
+  color: var(--nb-text-tertiary);
+}
+
+.refCard {
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-lg);
+  padding: var(--nb-space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-12);
+}
+
+.refText {
+  font-size: 12.5px;
+  color: var(--nb-text-secondary);
+  text-wrap: pretty;
+}
+
+.refList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-md);
+  overflow: hidden;
+}
+
+.refRowStatic {
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-top: 1px solid var(--nb-border-subtle);
+}
+
+.refRowStatic:first-child {
+  border-top: none;
+}
+
+.refRow {
+  composes: refRowStatic;
+  width: 100%;
+  text-align: start;
+  background: transparent;
+  border-inline-start: 2px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.refRowActive {
+  composes: refRow;
+  background: var(--nb-accent-tint);
+  border-inline-start-color: var(--nb-accent-500);
+}
+
+.refRowLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nb-text-primary);
+}
+
+.refRowSub {
+  font-size: 11.5px;
+  color: var(--nb-text-tertiary);
+  margin-top: 2px;
+  text-wrap: pretty;
+}
+
+.cNoteInfo {
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  font-size: 12.5px;
+  text-wrap: pretty;
+}
+
+.cNoteWarn {
+  background: rgba(240, 175, 69, 0.14);
+  color: #e0a63a;
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  font-size: 12.5px;
+  text-wrap: pretty;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nb-text-tertiary);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-bottom: 1px solid var(--nb-border-subtle);
+}
+
+.table td {
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.muted {
+  color: var(--nb-text-tertiary);
+}
+
 .formCard {
   background: var(--nb-surface-1);
   border: 1px solid var(--nb-border-subtle);
