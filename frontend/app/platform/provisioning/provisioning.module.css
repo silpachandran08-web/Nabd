@@ -208,6 +208,62 @@
   color: var(--nb-text-tertiary);
 }
 
+.tabHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--nb-space-16);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  padding: var(--nb-space-16);
+}
+
+.modal {
+  width: 520px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-lg);
+  padding: var(--nb-space-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-12);
+}
+
+.modalTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nb-space-8);
+}
+
+.cancelBtn {
+  height: 40px;
+  padding: 0 var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: transparent;
+  color: var(--nb-text-secondary);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .formCard {
   background: var(--nb-surface-1);
   border: 1px solid var(--nb-border-subtle);
