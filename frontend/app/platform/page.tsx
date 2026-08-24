@@ -20,6 +20,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/
 // Only surfaces with a built page get a nav entry here — SSA-02's "no access,
 // no button" rule extends to "no page yet, no link yet" for the rest.
 const SURFACES: { permission: string; label: string; href: string }[] = [
+  { permission: "onboarding_provisioning:view", label: "Tenant Provisioning", href: "/platform/provisioning" },
   { permission: "clinics_fleet:view", label: "Clinic fleet", href: "/platform/fleet" },
   { permission: "billing_revenue:view", label: "Billing & Revenue", href: "/platform/billing" },
   { permission: "pricing_packaging:view", label: "Pricing & Packaging", href: "/platform/plans" },
