@@ -101,6 +101,7 @@ export default function ProvisioningPage() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
 
+  const [showNewTenant, setShowNewTenant] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -167,6 +168,7 @@ export default function ProvisioningPage() {
         return;
       }
       setForm(emptyForm);
+      setShowNewTenant(false);
       load();
     } finally {
       setSaving(false);
@@ -231,54 +233,67 @@ export default function ProvisioningPage() {
         <>
           {tab === 0 && (
             <>
-              <form className={styles.formCard} onSubmit={submit}>
-                <div className={styles.field}>
-                  <label className={styles.label} htmlFor="path">Path</label>
-                  <div className={styles.segmented}>
-                    <button type="button" className={form.path === "self_serve" ? styles.segActive : styles.seg}
-                      onClick={() => setForm({ ...form, path: "self_serve" })}>Self-serve</button>
-                    <button type="button" className={form.path === "enterprise" ? styles.segActive : styles.seg}
-                      onClick={() => setForm({ ...form, path: "enterprise" })}>Enterprise (assisted)</button>
-                  </div>
+              <div className={styles.tabHeadRow}>
+                <span className={styles.jobMeta}>{jobs.length} provisioning job{jobs.length === 1 ? "" : "s"}</span>
+                <button type="button" className={styles.submit} onClick={() => setShowNewTenant(true)}>+ New tenant</button>
+              </div>
+
+              {showNewTenant && (
+                <div className={styles.overlay} onClick={() => setShowNewTenant(false)}>
+                  <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+                    <h2 className={styles.modalTitle}>Provision a new tenant</h2>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="path">Path</label>
+                      <div className={styles.segmented}>
+                        <button type="button" className={form.path === "self_serve" ? styles.segActive : styles.seg}
+                          onClick={() => setForm({ ...form, path: "self_serve" })}>Self-serve</button>
+                        <button type="button" className={form.path === "enterprise" ? styles.segActive : styles.seg}
+                          onClick={() => setForm({ ...form, path: "enterprise" })}>Enterprise (assisted)</button>
+                      </div>
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="tenantSlug">URL identifier</label>
+                      <input id="tenantSlug" className={styles.input} placeholder="shifa-family-clinic" value={form.tenantSlug}
+                        onChange={(e) => setForm({ ...form, tenantSlug: e.target.value })} required />
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="tenantName">Tenant name</label>
+                      <input id="tenantName" className={styles.input} placeholder="Shifa Family Clinic" value={form.tenantName}
+                        onChange={(e) => setForm({ ...form, tenantName: e.target.value })} required />
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="brandName">Trade name (patient-facing)</label>
+                      <input id="brandName" className={styles.input} value={form.brandName}
+                        onChange={(e) => setForm({ ...form, brandName: e.target.value })} required />
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="region">Country &amp; data region</label>
+                      <select id="region" className={styles.select} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
+                        <option value="IN">India</option>
+                        <option value="KSA">Saudi Arabia</option>
+                      </select>
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="ownerName">Owner name</label>
+                      <input id="ownerName" className={styles.input} value={form.ownerName}
+                        onChange={(e) => setForm({ ...form, ownerName: e.target.value })} required />
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="ownerEmail">Owner email</label>
+                      <input id="ownerEmail" type="email" className={styles.input} value={form.ownerEmail}
+                        onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} required />
+                    </div>
+                    {formError && <div className={styles.formError} role="alert">{formError}</div>}
+                    <div className={styles.formNote}>
+                      Tax ID, doctor count, specialties and plan selection aren&apos;t part of the provisioning job yet — they&apos;re set afterwards in Clinic Setup.
+                    </div>
+                    <div className={styles.modalActions}>
+                      <button type="button" className={styles.cancelBtn} onClick={() => setShowNewTenant(false)}>Cancel</button>
+                      <button type="submit" className={styles.submit} disabled={saving}>{saving ? "Provisioning…" : "Provision tenant"}</button>
+                    </div>
+                  </form>
                 </div>
-                <div className={styles.field}>
-                  <label className={styles.label} htmlFor="tenantSlug">URL identifier</label>
-                  <input id="tenantSlug" className={styles.input} placeholder="shifa-family-clinic" value={form.tenantSlug}
-                    onChange={(e) => setForm({ ...form, tenantSlug: e.target.value })} required />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label} htmlFor="tenantName">Tenant name</label>
-                  <input id="tenantName" className={styles.input} placeholder="Shifa Family Clinic" value={form.tenantName}
-                    onChange={(e) => setForm({ ...form, tenantName: e.target.value })} required />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label} htmlFor="brandName">Trade name (patient-facing)</label>
-                  <input id="brandName" className={styles.input} value={form.brandName}
-                    onChange={(e) => setForm({ ...form, brandName: e.target.value })} required />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label} htmlFor="region">Country &amp; data region</label>
-                  <select id="region" className={styles.select} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
-                    <option value="IN">India</option>
-                    <option value="KSA">Saudi Arabia</option>
-                  </select>
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label} htmlFor="ownerName">Owner name</label>
-                  <input id="ownerName" className={styles.input} value={form.ownerName}
-                    onChange={(e) => setForm({ ...form, ownerName: e.target.value })} required />
-                </div>
-                <div className={styles.field}>
-                  <label className={styles.label} htmlFor="ownerEmail">Owner email</label>
-                  <input id="ownerEmail" type="email" className={styles.input} value={form.ownerEmail}
-                    onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} required />
-                </div>
-                <button className={styles.submit} type="submit" disabled={saving}>{saving ? "Provisioning…" : "Provision tenant"}</button>
-                {formError && <div className={styles.formError} role="alert">{formError}</div>}
-                <div className={styles.formNote}>
-                  Tax ID, doctor count, specialties and plan selection aren&apos;t part of the provisioning job yet — they&apos;re set afterwards in Clinic Setup.
-                </div>
-              </form>
+              )}
 
               <div className={styles.jobList}>
                 {jobs.length === 0 ? (
