@@ -4,3 +4,4 @@ target/
 .claude/
 *.log
 .env.dev
+.vercel

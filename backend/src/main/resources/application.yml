@@ -26,6 +26,11 @@ logging:
     com.nabd.hms: INFO
 
 app:
+  cors:
+    # Comma-separated; overridable via APP_CORS_ALLOWED_ORIGINS without a redeploy. The deployed
+    # web app's origin is a public value (not a secret), so it's safe to default it here rather
+    # than requiring every environment to set it by hand.
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,https://nabd-nu.vercel.app}
   auth:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 30

@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# .env.production holds only the public API base URL, never a secret — tracked so a fresh
+# checkout deploys pointed at the right backend without a manual Vercel dashboard step.
+!.env.production
+!.env.local.example
 
 # vercel
 .vercel
