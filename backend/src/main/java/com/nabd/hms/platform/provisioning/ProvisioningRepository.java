@@ -23,16 +23,16 @@ class ProvisioningRepository {
     }
 
     private static final String JOB_COLUMNS =
-            "id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, brand_name, " +
+            "id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, owner_mobile, brand_name, " +
                     "status, path, created_tenant_id, created_owner_id, created_brand_id, " +
                     "owner_newly_created, brand_newly_created, approved_at, approved_by ";
 
     void insertJob(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
-                   String ownerEmail, String ownerName, String brandName, String path) {
+                   String ownerEmail, String ownerName, String ownerMobile, String brandName, String path) {
         jdbc.update("INSERT INTO master.provisioning_jobs " +
-                        "(id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, brand_name, path) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?)",
-                id, requestedBy, tenantSlug, tenantName, region, ownerEmail, ownerName, brandName, path);
+                        "(id, requested_by, tenant_slug, tenant_name, region, owner_email, owner_name, owner_mobile, brand_name, path) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                id, requestedBy, tenantSlug, tenantName, region, ownerEmail, ownerName, ownerMobile, brandName, path);
     }
 
     /** Only meaningful for an enterprise-path job — self-serve jobs have nothing to gate. */
@@ -166,10 +166,30 @@ class ProvisioningRepository {
         return count != null && count > 0;
     }
 
+    /** The Owner role seed_masters just created — verify_invite_owner needs its id to invite the owner as staff. */
+    Optional<UUID> findBuiltInRoleId(UUID tenantId) {
+        return jdbc.query("SELECT id FROM roles WHERE tenant_id = ? AND built_in = true LIMIT 1",
+                (rs, i) -> UUID.fromString(rs.getString("id")), tenantId
+        ).stream().findFirst();
+    }
+
+    /** NB-353: a brand-new tenant has no staff yet, so "any row at all" means the owner was already
+     * invited — same retry-after-a-later-step-failed idempotency shape as hasBuiltInRole. */
+    boolean hasOwnerStaff(UUID tenantId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM staff WHERE tenant_id = ?", Integer.class, tenantId);
+        return count != null && count > 0;
+    }
+
     // ---- rollback (NB-259) — reverse of the creates above, same FK-ordering constraints ----
 
     void deleteBuiltInRole(UUID tenantId) {
         jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND built_in = true", tenantId);
+    }
+
+    /** NB-353's undo of verify_invite_owner — a fatal later-step failure must leave no login behind either. */
+    void deleteStaffByTenant(UUID tenantId) {
+        jdbc.update("DELETE FROM staff WHERE tenant_id = ?", tenantId);
     }
 
     void deleteTenant(UUID tenantId) {
@@ -195,6 +215,7 @@ class ProvisioningRepository {
                     rs.getString("region"),
                     rs.getString("owner_email"),
                     rs.getString("owner_name"),
+                    rs.getString("owner_mobile"),
                     rs.getString("brand_name"),
                     rs.getString("status"),
                     rs.getString("path"),

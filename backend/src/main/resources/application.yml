@@ -9,6 +9,20 @@ spring:
     # migrations live at repo root (db/migrations), shared with any future
     # non-Java tooling — not duplicated into src/main/resources
     locations: filesystem:../db/migrations
+  mail:
+    # No default host: EmailSender's @Bean factory (MailConfig) picks LoggingEmailSender over
+    # SmtpEmailSender whenever this is blank, which is exactly every local/test run today —
+    # nothing here ever needs mocking out for tests, same as WhatsAppOtpSender/WabaProvisioningGateway.
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_APP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8080
@@ -31,6 +45,10 @@ app:
     # web app's origin is a public value (not a secret), so it's safe to default it here rather
     # than requiring every environment to set it by hand.
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,https://nabd-nu.vercel.app}
+  # Public value, same reasoning as allowed-origins above — used to build the owner-invite link
+  # inside the email body server-side (the frontend builds the same link client-side from
+  # window.location.origin for the manual-relay banner; this is that same value for SmtpEmailSender).
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
   auth:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 30

@@ -9,7 +9,7 @@ final class ProvisioningModels {
     }
 
     record Job(UUID id, UUID requestedBy, String tenantSlug, String tenantName, String region,
-               String ownerEmail, String ownerName, String brandName, String status, String path,
+               String ownerEmail, String ownerName, String ownerMobile, String brandName, String status, String path,
                UUID createdTenantId, UUID createdOwnerId, UUID createdBrandId,
                boolean ownerNewlyCreated, boolean brandNewlyCreated,
                Instant approvedAt, UUID approvedBy) {

@@ -10,6 +10,7 @@ public record CreateProvisioningJobRequest(
         @NotBlank @Pattern(regexp = "^(IN|KSA)$") String region,
         @NotBlank @Email String ownerEmail,
         @NotBlank String ownerName,
+        @NotBlank String ownerMobile,
         @NotBlank String brandName,
         @NotBlank @Pattern(regexp = "^(self_serve|enterprise)$") String path
 ) {
