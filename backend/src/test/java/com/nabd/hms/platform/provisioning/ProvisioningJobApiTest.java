@@ -73,6 +73,54 @@ class ProvisioningJobApiTest extends ApiTestBase {
         assertThat(roleCount).isEqualTo(1);
     }
 
+    // ---- NB-353: verify_invite_owner creates a real, login-capable staff row for the owner ----
+
+    @Test
+    void verifyInviteOwnerStepCreatesAStaffRowAndReturnsAOneTimeInviteToken() {
+        String token = superAdminToken();
+        UUID jobId = createJob(token, "clinic-owner-login");
+
+        Map<String, Object> body = null;
+        for (int i = 0; i < 6; i++) {
+            ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance",
+                    HttpMethod.POST, authed(token), Map.class);
+            body = resp.getBody();
+            if (i == 4) { // 0-indexed: the 5th advance() call runs verify_invite_owner
+                assertThat(body.get("ownerInviteToken")).isNotNull();
+            } else {
+                assertThat(body.get("ownerInviteToken")).isNull();
+            }
+        }
+        assertThat(body.get("status")).isEqualTo("done");
+
+        Job job = provisioningRepo.findJob(jobId).orElseThrow();
+        UUID tenantId = job.createdTenantId();
+        Map<String, Object> staffRow = inTenantTx(tenantId, () ->
+                jdbc.queryForMap("SELECT email::text, status FROM staff WHERE tenant_id = ?", tenantId));
+        assertThat(staffRow.get("email")).isEqualTo("owner-clinic-owner-login@nabd.health");
+        assertThat(staffRow.get("status")).isEqualTo("invited");
+    }
+
+    @Test
+    void undoingVerifyInviteOwnerRemovesTheStaffRowItCreated() {
+        String token = superAdminToken();
+        UUID jobId = createJob(token, "clinic-undo-invite");
+        for (int i = 0; i < 5; i++) { // through verify_invite_owner
+            exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance", HttpMethod.POST, authed(token), Map.class);
+        }
+        Job job = provisioningRepo.findJob(jobId).orElseThrow();
+        UUID tenantId = job.createdTenantId();
+        Integer before = inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM staff WHERE tenant_id = ?", Integer.class, tenantId));
+        assertThat(before).isEqualTo(1);
+
+        stepRunner.undo(job, "verify_invite_owner");
+
+        Integer after = inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM staff WHERE tenant_id = ?", Integer.class, tenantId));
+        assertThat(after).isEqualTo(0);
+    }
+
     @Test
     void advancingAFinishedJobIsIdempotent() {
         String token = superAdminToken();
@@ -334,6 +382,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
                 "region", region,
                 "ownerEmail", ownerEmail,
                 "ownerName", "Test Owner",
+                "ownerMobile", "+9198765" + Math.abs(slug.hashCode() % 100000),
                 "brandName", brandName,
                 "path", path
         );

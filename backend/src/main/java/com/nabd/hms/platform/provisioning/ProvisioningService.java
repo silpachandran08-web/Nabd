@@ -45,7 +45,7 @@ public class ProvisioningService {
     public ProvisioningJobResponse createJob(CreateProvisioningJobRequest req, UUID requestedBy) {
         UUID jobId = UUID.randomUUID();
         repo.insertJob(jobId, requestedBy, req.tenantSlug().toLowerCase(), req.tenantName(), req.region(),
-                req.ownerEmail().toLowerCase(), req.ownerName(), req.brandName(), req.path());
+                req.ownerEmail().toLowerCase(), req.ownerName(), req.ownerMobile(), req.brandName(), req.path());
         for (int i = 0; i < STEP_ORDER.size(); i++) {
             repo.insertStep(UUID.randomUUID(), jobId, STEP_ORDER.get(i), i + 1);
         }
@@ -94,8 +94,9 @@ public class ProvisioningService {
 
         repo.markStepRunning(next.id());
         repo.updateJobStatus(jobId, "running");
+        String ownerInviteToken = null;
         try {
-            stepRunner.run(job, next.stepName());
+            ownerInviteToken = stepRunner.run(job, next.stepName());
             repo.markStepDone(next.id());
             boolean allDone = !repo.hasIncompleteSteps(jobId);
             repo.updateJobStatus(jobId, allDone ? "done" : "running");
@@ -111,7 +112,7 @@ public class ProvisioningService {
                 repo.updateJobStatus(jobId, "failed"); // ordinary/transient failure — stays retryable via advance()
             }
         }
-        return toResponse(jobId);
+        return toResponse(jobId, ownerInviteToken);
     }
 
     /**
@@ -141,13 +142,18 @@ public class ProvisioningService {
     }
 
     private ProvisioningJobResponse toResponse(UUID jobId) {
+        return toResponse(jobId, null);
+    }
+
+    /** ownerInviteToken is reveal-once — only advance() ever has one to pass, right after verify_invite_owner runs. */
+    private ProvisioningJobResponse toResponse(UUID jobId, String ownerInviteToken) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
         List<ProvisioningStepResponse> steps = repo.findSteps(jobId).stream()
                 .map(s -> new ProvisioningStepResponse(s.stepName(), s.stepOrder(), s.status(),
                         s.startedAt(), s.completedAt(), s.errorDetail()))
                 .toList();
         return new ProvisioningJobResponse(job.id(), job.tenantSlug(), job.tenantName(), job.region(),
-                job.status(), job.path(), job.approvedAt(), job.createdTenantId(), steps);
+                job.status(), job.path(), job.approvedAt(), job.createdTenantId(), steps, ownerInviteToken);
     }
 
     private ApiException notFound() {

@@ -13,6 +13,8 @@ public record ProvisioningJobResponse(
         String path,
         Instant approvedAt,
         UUID createdTenantId,
-        List<ProvisioningStepResponse> steps
+        List<ProvisioningStepResponse> steps,
+        /** Reveal-once: only non-null on the advance() response right after verify_invite_owner runs. */
+        String ownerInviteToken
 ) {
 }

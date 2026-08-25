@@ -19,6 +19,8 @@ type Step = {
 type Job = {
   id: string; tenantSlug: string; tenantName: string; region: string; status: string; path: string;
   approvedAt: string | null; createdTenantId: string | null; steps: Step[];
+  // Reveal-once (NB-353): only non-null on the single advance() response right after verify_invite_owner runs.
+  ownerInviteToken: string | null;
 };
 type Problem = { title: string; detail: string };
 
@@ -43,7 +45,7 @@ const STEP_STATUS_CLASS: Record<string, string> = {
 };
 
 const emptyForm = {
-  tenantSlug: "", tenantName: "", region: "IN", ownerEmail: "", ownerName: "", brandName: "", path: "self_serve",
+  tenantSlug: "", tenantName: "", region: "IN", ownerEmail: "", ownerName: "", ownerMobile: "", brandName: "", path: "self_serve",
 };
 
 const TABS = [
@@ -107,6 +109,7 @@ export default function ProvisioningPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
   const [jobActionError, setJobActionError] = useState<Record<string, string>>({});
+  const [ownerInviteTokens, setOwnerInviteTokens] = useState<Record<string, string>>({});
   const [lifecycleSel, setLifecycleSel] = useState(LIFECYCLE_STATES[1].key);
 
   const authedFetch = useCallback(
@@ -221,6 +224,11 @@ export default function ProvisioningPage() {
         if (!res) break; // redirecting to login
         const updated: Job = await res.json();
         setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
+        if (updated.ownerInviteToken) {
+          // captured separately: the very next advance() call in this loop overwrites the job's
+          // own ownerInviteToken field with null, so this is the only chance to keep it around.
+          setOwnerInviteTokens((prev) => ({ ...prev, [jobId]: updated.ownerInviteToken! }));
+        }
         if (!["queued", "running"].includes(updated.status)) break;
       }
     } catch {
@@ -310,9 +318,14 @@ export default function ProvisioningPage() {
                       <input id="ownerEmail" type="email" className={styles.input} value={form.ownerEmail}
                         onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} required />
                     </div>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="ownerMobile">Owner mobile</label>
+                      <input id="ownerMobile" type="tel" className={styles.input} placeholder="+91 98765 43210" value={form.ownerMobile}
+                        onChange={(e) => setForm({ ...form, ownerMobile: e.target.value })} required />
+                    </div>
                     {formError && <div className={styles.formError} role="alert">{formError}</div>}
                     <div className={styles.formNote}>
-                      Tax ID, doctor count, specialties and plan selection aren&apos;t part of the provisioning job yet — they&apos;re set afterwards in Clinic Setup.
+                      Once provisioning reaches &quot;Verify &amp; invite owner&quot;, this creates the owner&apos;s login and shows a one-time invite link here to relay by hand — Tax ID, doctor count, specialties and plan selection still aren&apos;t part of the provisioning job; they&apos;re set afterwards in Clinic Setup.
                     </div>
                     <div className={styles.modalActions}>
                       <button type="button" className={styles.cancelBtn} onClick={() => setShowNewTenant(false)}>Cancel</button>
@@ -354,6 +367,12 @@ export default function ProvisioningPage() {
                           </div>
                         </div>
                         {jobActionError[job.id] && <div className={styles.formError} role="alert">{jobActionError[job.id]}</div>}
+                        {ownerInviteTokens[job.id] && (
+                          <div className={styles.cNoteWarn}>
+                            Owner invite link (shown once — relay by hand, no email service yet):{" "}
+                            <code>{`${typeof window !== "undefined" ? window.location.origin : ""}/accept-invite/${ownerInviteTokens[job.id]}`}</code>
+                          </div>
+                        )}
                         <div className={styles.steps}>
                           {job.steps.map((s) => (
                             <div key={s.stepName} className={styles.step}>

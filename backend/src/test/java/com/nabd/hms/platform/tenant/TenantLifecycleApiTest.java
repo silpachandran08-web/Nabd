@@ -92,6 +92,7 @@ class TenantLifecycleApiTest extends ApiTestBase {
                         "region", "IN",
                         "ownerEmail", "owner-lifecycle@nabd.health",
                         "ownerName", "Test Owner",
+                        "ownerMobile", "+919876543210",
                         "brandName", "Test Brand Lifecycle",
                         "path", "self_serve"
                 )), Map.class);
