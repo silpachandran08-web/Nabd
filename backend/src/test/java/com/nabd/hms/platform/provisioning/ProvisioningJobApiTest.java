@@ -49,6 +49,15 @@ class ProvisioningJobApiTest extends ApiTestBase {
     }
 
     @Test
+    void aMixedCaseTenantSlugIsAcceptedAndStoredLowercase() {
+        String token = superAdminToken();
+        ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs", HttpMethod.POST,
+                authedJsonBody(token, jobRequest("Clinic-MixedCase")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(resp.getBody().get("tenantSlug")).isEqualTo("clinic-mixedcase");
+    }
+
+    @Test
     void advancingSixTimesRunsTheJobToCompletionAndCreatesTheTenant() {
         String token = superAdminToken();
         UUID jobId = createJob(token, "clinic-c");
