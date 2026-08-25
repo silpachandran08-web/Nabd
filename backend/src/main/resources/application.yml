@@ -23,6 +23,12 @@ spring:
           auth: true
           starttls:
             enable: true
+          # Render blocks outbound SMTP on its network — without these, a blocked connection hangs
+          # on the OS's own TCP timeout (60s+) instead of failing fast. ProvisioningStepRunner
+          # already treats a send failure as best-effort, but the request shouldn't hang either way.
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 server:
   port: 8080
