@@ -205,11 +205,20 @@ class ProvisioningStepRunner {
         StaffInviteResponse invite = staffService.invite(tenantId, null,
                 new StaffInviteRequest(job.ownerEmail(), job.ownerName(), job.ownerMobile(), roleId, "all_clinic_patients"));
         String link = frontendBaseUrl + "/accept-invite/" + invite.inviteToken();
-        emailSender.send(job.ownerEmail(), "You're invited to " + job.tenantName() + " on Nabd",
-                "Hi " + job.ownerName() + ",\n\n" +
-                        "Your clinic \"" + job.tenantName() + "\" is ready on Nabd.\n\n" +
-                        "Set your PIN and sign in here (link expires in 72 hours):\n" + link + "\n\n" +
-                        "If you weren't expecting this, you can ignore this email.");
+        try {
+            emailSender.send(job.ownerEmail(), "You're invited to " + job.tenantName() + " on Nabd",
+                    "Hi " + job.ownerName() + ",\n\n" +
+                            "Your clinic \"" + job.tenantName() + "\" is ready on Nabd.\n\n" +
+                            "Set your PIN and sign in here (link expires in 72 hours):\n" + link + "\n\n" +
+                            "If you weren't expecting this, you can ignore this email.");
+        } catch (Exception e) {
+            // Best-effort: email is a convenience on top of the reveal-once token below, never a
+            // requirement for it. Render blocks outbound SMTP on its network (confirmed by a live
+            // timeout), so this catch is load-bearing today, not defensive-for-its-own-sake — without
+            // it, a send failure would roll back the staff row this same @Transactional step just created.
+            log.warn("owner invite email failed to send to {} for tenant {} — falling back to manual relay",
+                    job.ownerEmail(), job.tenantSlug(), e);
+        }
         // Still returned even though the email above may already have delivered it — same
         // reveal-once value shown as a manual-relay fallback if the email never arrives (unconfigured
         // SMTP, spam filter, wrong address typed at provisioning time).
