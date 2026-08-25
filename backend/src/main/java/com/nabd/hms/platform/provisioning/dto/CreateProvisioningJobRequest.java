@@ -5,7 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record CreateProvisioningJobRequest(
-        @NotBlank @Pattern(regexp = "^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$") String tenantSlug,
+        // Accepts either case: ProvisioningService.createJob() lowercases before persisting, so
+        // validation must match what a caller can actually type, not the normalized stored form.
+        @NotBlank @Pattern(regexp = "^[A-Za-z0-9](?:[A-Za-z0-9-]{1,61}[A-Za-z0-9])?$") String tenantSlug,
         @NotBlank String tenantName,
         @NotBlank @Pattern(regexp = "^(IN|KSA)$") String region,
         @NotBlank @Email String ownerEmail,
