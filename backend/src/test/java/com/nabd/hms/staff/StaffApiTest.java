@@ -30,19 +30,25 @@ class StaffApiTest extends ApiTestBase {
     /**
      * The bug this catches: arrivals/nursing doctor pickers used to call GET /v1/staff (gated on
      * staff:view, an HR-data permission), so a Reception/Nursing role that only holds queue:view
-     * got a 403 and an empty dropdown. /roster is the narrow id+name fix for exactly that role.
+     * got a 403 and an empty dropdown. /roster is the narrow id+name fix for exactly that role —
+     * and it's filtered to staff whose role is named "Doctor" (the only signal this schema has;
+     * roles are free-text tenant-defined objects, not a fixed type), so the receptionist calling
+     * it never sees themselves or any other non-doctor staff in the result.
      */
     @Test
-    void rosterIsUsableByAQueueViewOnlyRoleAndOnlyExposesIdAndName() {
+    void rosterIsUsableByAQueueViewOnlyRoleAndOnlyReturnsDoctorsWithIdAndName() {
         SeededTenant tenant = seedTenant();
         UUID receptionRole = seedRole(tenant.id(), "Receptionist", false, fullGrant("queue"));
+        UUID doctorRole = seedRole(tenant.id(), "Doctor", false, fullGrant("queue"), fullGrant("patients"));
         SeededStaff reception = seedStaff(tenant, receptionRole, "reception@a.com", "+919100000020", false);
+        SeededStaff doctor = seedStaff(tenant, doctorRole, "doctor@a.com", "+919100000030", false);
         String token = loginAndGetAccessToken(reception);
 
         ResponseEntity<List> resp = exchange("/v1/staff/roster", HttpMethod.GET, authed(token), List.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).hasSize(1); // reception themselves must not appear
         Map<String, Object> entry = (Map<String, Object>) resp.getBody().get(0);
-        assertThat(entry.get("id")).isEqualTo(reception.id().toString());
+        assertThat(entry.get("id")).isEqualTo(doctor.id().toString());
         assertThat(entry.get("name")).isEqualTo("Test Staff");
         assertThat(entry.keySet()).containsExactlyInAnyOrder("id", "name"); // no email/mobile/status leaking through
     }
@@ -50,16 +56,18 @@ class StaffApiTest extends ApiTestBase {
     @Test
     void rosterExcludesStaffThatHaveNotAcceptedTheirInviteYet() {
         SeededTenant tenant = seedTenant();
-        UUID roleId = seedFullAccessRole(tenant.id());
-        SeededStaff owner = seedStaff(tenant, roleId, "owner-roster@a.com", "+919100000021", false);
+        UUID ownerRole = seedFullAccessRole(tenant.id());
+        SeededStaff owner = seedStaff(tenant, ownerRole, "owner-roster@a.com", "+919100000021", false);
         String token = loginAndGetAccessToken(owner);
+        UUID doctorRole = seedRole(tenant.id(), "Doctor", false, fullGrant("queue"), fullGrant("patients"));
+        seedStaff(tenant, doctorRole, "doctor-active@a.com", "+919100000024", false);
         exchange("/v1/staff", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "email", "not-active-yet@a.com", "name", "Not Active Yet", "mobilePhone", "+919100000022",
-                "roleId", roleId.toString())), Map.class);
+                "roleId", doctorRole.toString())), Map.class);
 
         ResponseEntity<List> resp = exchange("/v1/staff/roster", HttpMethod.GET, authed(token), List.class);
         List<String> names = resp.getBody().stream().map(e -> (String) ((Map<String, Object>) e).get("name")).toList();
-        assertThat(names).doesNotContain("Not Active Yet");
+        assertThat(names).contains("Test Staff").doesNotContain("Not Active Yet");
     }
 
     @Test
