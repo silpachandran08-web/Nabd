@@ -1,5 +1,6 @@
 package com.nabd.hms.platform.provisioning;
 
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,7 +10,9 @@ import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -128,6 +131,34 @@ class ProvisioningJobApiTest extends ApiTestBase {
         Integer after = inTenantTx(tenantId, () -> jdbc.queryForObject(
                 "SELECT count(*) FROM staff WHERE tenant_id = ?", Integer.class, tenantId));
         assertThat(after).isEqualTo(0);
+    }
+
+    /**
+     * A real gap this caught: seed_masters used to grant the Owner role only staff/patients/queue,
+     * so an owner logging in couldn't create a Doctor role with Clinical Records access — the app's
+     * own privilege-escalation check blocks granting a permission the grantor doesn't hold. The
+     * Owner role must cover every module a real clinic needs to self-serve staff onboarding.
+     */
+    @Test
+    void theSeededOwnerRoleCoversEveryClinicModuleNotJustStaffPatientsAndQueue() throws Exception {
+        String token = superAdminToken();
+        UUID jobId = createJob(token, "clinic-owner-grants");
+        for (int i = 0; i < 6; i++) {
+            exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance", HttpMethod.POST, authed(token), Map.class);
+        }
+        Job job = provisioningRepo.findJob(jobId).orElseThrow();
+        UUID tenantId = job.createdTenantId();
+
+        String grantsJson = inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT grants::text FROM roles WHERE tenant_id = ? AND built_in = true", String.class, tenantId));
+        List<ModuleGrant> grants = objectMapper.readValue(grantsJson, objectMapper.getTypeFactory()
+                .constructCollectionType(List.class, ModuleGrant.class));
+        Set<String> modules = grants.stream().map(ModuleGrant::module).collect(Collectors.toSet());
+
+        assertThat(modules).containsExactlyInAnyOrder("staff", "patients", "queue", "setup", "clinical",
+                "billing", "specialty_dental", "reports", "pharmacy", "packages", "nursing");
+        assertThat(grants).allMatch(g -> g.view() && g.create() && g.edit() && g.delete()
+                && g.approve() && g.refundDiscount() && g.export());
     }
 
     @Test

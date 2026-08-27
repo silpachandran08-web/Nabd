@@ -184,7 +184,9 @@ class ProvisioningStepRunner {
             return; // retry after a later step failed — already seeded, nothing to redo
         }
         String grantsJson = writeGrantsJson(List.of(
-                fullGrant("staff"), fullGrant("patients"), fullGrant("queue")));
+                fullGrant("staff"), fullGrant("patients"), fullGrant("queue"), fullGrant("setup"),
+                fullGrant("clinical"), fullGrant("billing"), fullGrant("specialty_dental"),
+                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing")));
         repo.insertBuiltInOwnerRole(tenantId, grantsJson);
     }
 
