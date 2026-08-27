@@ -10,6 +10,7 @@ import com.nabd.hms.staff.dto.StaffInviteResponse;
 import com.nabd.hms.staff.dto.StaffPage;
 import com.nabd.hms.staff.dto.StaffPatchRequest;
 import com.nabd.hms.staff.dto.StaffResponse;
+import com.nabd.hms.staff.dto.StaffRosterEntry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -47,6 +49,14 @@ public class StaffController {
                            @RequestParam(defaultValue = "20") int limit,
                            @RequestParam(required = false) String cursor) {
         return staffService.list(tenantId(jwt), limit, cursor);
+    }
+
+    /** Queue/consult doctor pickers need id+name only — gated on queue:view (not staff:view) so
+     * Reception/Nursing roles can populate them without the full HR-data staff directory. */
+    @GetMapping("/roster")
+    @PreAuthorize("hasAuthority('queue:view')")
+    public List<StaffRosterEntry> roster(@AuthenticationPrincipal Jwt jwt) {
+        return staffService.roster(tenantId(jwt));
     }
 
     @PostMapping

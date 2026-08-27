@@ -90,7 +90,7 @@ export default function NursingPage() {
     setError(null);
     try {
       const [queueRes, priorityRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
-        authedFetch("/queue"), authedFetch("/queue?priority=true"), authedFetch("/staff?limit=100"),
+        authedFetch("/queue"), authedFetch("/queue?priority=true"), authedFetch("/staff/roster"),
         authedFetch("/nursing/administration-orders/today"), authedFetch("/nursing/procedure-orders/today"),
         authedFetch("/nursing/activity/today"),
       ]);
@@ -106,8 +106,7 @@ export default function NursingPage() {
       const entries: QueueEntry[] = await queueRes.json();
       const staffMap = new Map<string, string>();
       if (staffRes?.ok) {
-        const staffBody = await staffRes.json();
-        const options: StaffOption[] = staffBody.data.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name }));
+        const options: StaffOption[] = await staffRes.json();
         setStaff(options);
         options.forEach((s) => staffMap.set(s.id, s.name));
       }

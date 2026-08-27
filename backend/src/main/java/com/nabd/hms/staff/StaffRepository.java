@@ -1,5 +1,6 @@
 package com.nabd.hms.staff;
 
+import com.nabd.hms.staff.dto.StaffRosterEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -55,6 +56,13 @@ class StaffRepository {
         return jdbc.query(baseSelect() +
                         "WHERE s.tenant_id = ? AND (s.created_at, s.id) > (?, ?) ORDER BY s.created_at, s.id LIMIT ?",
                 staffMapper(), tenantId, Timestamp.from(afterCreatedAt), afterId, limit);
+    }
+
+    /** Deliberately id+name only, not baseSelect()'s full staff row — see StaffRosterEntry's doc comment. */
+    List<StaffRosterEntry> listRoster(UUID tenantId) {
+        return jdbc.query("SELECT id, name FROM staff WHERE tenant_id = ? AND status = 'active' ORDER BY name",
+                (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name")),
+                tenantId);
     }
 
     void insertInvite(UUID id, UUID tenantId, UUID roleId, String email, String name, String mobilePhone,
