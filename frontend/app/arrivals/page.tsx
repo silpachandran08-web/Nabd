@@ -367,6 +367,19 @@ export default function ArrivalsPage() {
     if (res?.ok) load();
   }
 
+  // QueueService's state machine only allows one hop at a time (checked_in -> waiting ->
+  // vitals_pending), and front desk has no reason to care about that middle "waiting" state —
+  // it's rendered with the same pill and grouped into the same tab as checked_in. This one button
+  // walks both hops (or just the second, if already "waiting") so vitals becomes reachable at all.
+  async function sendForVitals(row: Row) {
+    if (row.status === "checked_in") {
+      const toWaiting = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "waiting" }) });
+      if (!toWaiting?.ok) return;
+    }
+    const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "vitals_pending" }) });
+    if (res?.ok) load();
+  }
+
   const filtered = tab === "all" ? rows : rows.filter((r) => bucketOf(r.status) === tab);
   const counts: Record<string, number> = { all: rows.length };
   (["waiting", "in_consult", "checkout_pending", "completed"] as Bucket[]).forEach((b) => {
@@ -441,6 +454,9 @@ export default function ArrivalsPage() {
                           <td>
                             {!r.priority && b === "waiting" && (
                               <button className={styles.actionBtn} onClick={() => openPriorityModal(r.id)}>Mark priority</button>
+                            )}
+                            {(r.status === "checked_in" || r.status === "waiting") && (
+                              <button className={styles.actionBtn} onClick={() => sendForVitals(r)}>Send for vitals</button>
                             )}
                             {r.status === "vitals_pending" && (
                               <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Record vitals</button>

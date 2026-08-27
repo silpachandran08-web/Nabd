@@ -16,7 +16,8 @@ type Problem = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
-type View = "login" | "mfaVerify" | "mfaSetup" | "mfaSetupDone" | "forgotRequest" | "forgotConfirm" | "forgotDone";
+type View = "login" | "mfaVerify" | "mfaSetup" | "mfaSetupDone" | "forgotRequest" | "forgotConfirm" | "forgotDone"
+  | "otpRequest" | "otpVerify";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -70,6 +71,60 @@ export default function LoginPage() {
         return;
       }
       applyProblem(res.status, body as Problem);
+    } catch {
+      setFormError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // NB-041: PIN login alone never verifies phone possession, so a staff member who only ever
+  // accepted their email invite can be permanently locked out of every patient-data endpoint
+  // (both email AND mobile verification are required there). This is the one flow that sets
+  // mobile_verified — same triple-union response as PIN login, so it lands in the same branches.
+  async function submitOtpRequest(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    setLoading(true);
+    try {
+      await fetch(`${API_BASE}/auth/otp/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantSlug, mobilePhone }),
+      });
+      setView("otpVerify");
+    } catch {
+      setFormError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitOtpVerify(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/otp/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantSlug, mobilePhone, code }),
+      });
+      const body = await res.json();
+      if (res.ok) {
+        if ("setupToken" in body) {
+          setSetupRequired(body as MfaSetupRequired);
+          setView("mfaSetup");
+          await startEnrollment((body as MfaSetupRequired).setupToken);
+        } else if ("challengeId" in body) {
+          setChallenge(body as MfaChallenge);
+          setView("mfaVerify");
+        } else {
+          handleTokens(body as TokenPair);
+        }
+        return;
+      }
+      setFormError((body as Problem).detail || "That code is incorrect or has expired.");
     } catch {
       setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -338,6 +393,42 @@ export default function LoginPage() {
     );
   }
 
+  if (view === "otpRequest" || view === "otpVerify") {
+    return (
+      <main className={styles.page}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>Sign in with WhatsApp OTP</h1>
+          {formError && <div className={styles.formError} role="alert">{formError}</div>}
+          {view === "otpRequest" && (
+            <form onSubmit={submitOtpRequest} noValidate>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="oTenant">Clinic code</label>
+                <input id="oTenant" className={styles.input} value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} required />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="oMobile">Mobile number</label>
+                <input id="oMobile" className={styles.input} value={mobilePhone} onChange={(e) => setMobilePhone(e.target.value)} required />
+              </div>
+              <button className={styles.submit} type="submit" disabled={loading}>{loading ? "Sending…" : "Send code"}</button>
+            </form>
+          )}
+          {view === "otpVerify" && (
+            <form onSubmit={submitOtpVerify} noValidate>
+              <p className={styles.subtitle}>If that number is registered, a code was sent to it.</p>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="oCode">Code</label>
+                <input id="oCode" className={styles.input} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoFocus
+                  value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} required />
+              </div>
+              <button className={styles.submit} type="submit" disabled={loading || code.length !== 6}>{loading ? "Verifying…" : "Verify"}</button>
+            </form>
+          )}
+          <button className={styles.linkBtn} type="button" onClick={backToLogin}>Back to sign in</button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className={styles.page}>
       <div className={styles.card}>
@@ -397,7 +488,9 @@ export default function LoginPage() {
         <button className={styles.linkBtn} type="button" onClick={() => { setFormError(null); setView("forgotRequest"); }}>
           Forgot PIN?
         </button>
-        <p className={styles.hint}>WhatsApp OTP sign-in isn&apos;t built yet.</p>
+        <button className={styles.linkBtn} type="button" onClick={() => { setFormError(null); setView("otpRequest"); }}>
+          Sign in with WhatsApp OTP instead
+        </button>
       </div>
     </main>
   );
