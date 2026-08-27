@@ -58,9 +58,14 @@ class StaffRepository {
                 staffMapper(), tenantId, Timestamp.from(afterCreatedAt), afterId, limit);
     }
 
-    /** Deliberately id+name only, not baseSelect()'s full staff row — see StaffRosterEntry's doc comment. */
+    /** Deliberately id+name only, not baseSelect()'s full staff row — see StaffRosterEntry's doc
+     * comment. Roles are free-text tenant-defined objects (no fixed "is this a doctor" column
+     * anywhere), so a role literally named "Doctor" is the only signal this schema has — every
+     * caller (Arrivals' check-in picker, Packages' "Allowed doctors") wants a doctor list, never
+     * the whole staff directory. */
     List<StaffRosterEntry> listRoster(UUID tenantId) {
-        return jdbc.query("SELECT id, name FROM staff WHERE tenant_id = ? AND status = 'active' ORDER BY name",
+        return jdbc.query("SELECT s.id, s.name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.status = 'active' AND r.name ILIKE 'doctor' ORDER BY s.name",
                 (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name")),
                 tenantId);
     }
