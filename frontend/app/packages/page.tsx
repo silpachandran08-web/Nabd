@@ -112,7 +112,7 @@ export default function PackagesPage() {
       const [pkgRes, instRes, refundRes, expRes, liabRes, settingsRes, staffRes] = await Promise.all([
         authedFetch("/packages"), authedFetch("/packages/instances"), authedFetch("/packages/refunds"),
         authedFetch("/packages/expiring-soon"), authedFetch("/packages/liability"), authedFetch("/packages/settings"),
-        authedFetch("/staff?limit=100"),
+        authedFetch("/staff/roster"),
       ]);
       if (!pkgRes) return;
       if (pkgRes.status === 403) {
@@ -132,7 +132,7 @@ export default function PackagesPage() {
         const s: SettingsT = await settingsRes.json();
         setFloorInput(String(s.priceFloorPercent));
       }
-      if (staffRes?.ok) setStaff((await staffRes.json()).data.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })));
+      if (staffRes?.ok) setStaff(await staffRes.json());
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
