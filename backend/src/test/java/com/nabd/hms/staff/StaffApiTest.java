@@ -27,6 +27,52 @@ class StaffApiTest extends ApiTestBase {
         assertThat(data).isNotEmpty();
     }
 
+    /**
+     * The bug this catches: arrivals/nursing doctor pickers used to call GET /v1/staff (gated on
+     * staff:view, an HR-data permission), so a Reception/Nursing role that only holds queue:view
+     * got a 403 and an empty dropdown. /roster is the narrow id+name fix for exactly that role.
+     */
+    @Test
+    void rosterIsUsableByAQueueViewOnlyRoleAndOnlyExposesIdAndName() {
+        SeededTenant tenant = seedTenant();
+        UUID receptionRole = seedRole(tenant.id(), "Receptionist", false, fullGrant("queue"));
+        SeededStaff reception = seedStaff(tenant, receptionRole, "reception@a.com", "+919100000020", false);
+        String token = loginAndGetAccessToken(reception);
+
+        ResponseEntity<List> resp = exchange("/v1/staff/roster", HttpMethod.GET, authed(token), List.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> entry = (Map<String, Object>) resp.getBody().get(0);
+        assertThat(entry.get("id")).isEqualTo(reception.id().toString());
+        assertThat(entry.get("name")).isEqualTo("Test Staff");
+        assertThat(entry.keySet()).containsExactlyInAnyOrder("id", "name"); // no email/mobile/status leaking through
+    }
+
+    @Test
+    void rosterExcludesStaffThatHaveNotAcceptedTheirInviteYet() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff owner = seedStaff(tenant, roleId, "owner-roster@a.com", "+919100000021", false);
+        String token = loginAndGetAccessToken(owner);
+        exchange("/v1/staff", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "email", "not-active-yet@a.com", "name", "Not Active Yet", "mobilePhone", "+919100000022",
+                "roleId", roleId.toString())), Map.class);
+
+        ResponseEntity<List> resp = exchange("/v1/staff/roster", HttpMethod.GET, authed(token), List.class);
+        List<String> names = resp.getBody().stream().map(e -> (String) ((Map<String, Object>) e).get("name")).toList();
+        assertThat(names).doesNotContain("Not Active Yet");
+    }
+
+    @Test
+    void listStillRequiresStaffViewNotJustQueueView() {
+        SeededTenant tenant = seedTenant();
+        UUID receptionRole = seedRole(tenant.id(), "Receptionist", false, fullGrant("queue"));
+        SeededStaff reception = seedStaff(tenant, receptionRole, "reception2@a.com", "+919100000023", false);
+        String token = loginAndGetAccessToken(reception);
+
+        ResponseEntity<Map> resp = exchange("/v1/staff", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     @Test
     void inviteCreatesInvitedStaffWithToken() {
         SeededTenant tenant = seedTenant();

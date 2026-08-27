@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import styles from "./arrivals.module.css";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
-// GET /v1/staff (StaffController), POST /v1/queue/check-in, POST /v1/queue/{id}/reorder.
+// GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
+// can populate the doctor picker), POST /v1/queue/check-in, POST /v1/queue/{id}/reorder.
 type QueueEntry = {
   id: string; appointmentId: string | null; patientId: string; doctorId: string;
   queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
@@ -128,7 +129,7 @@ export default function ArrivalsPage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [queueRes, staffRes] = await Promise.all([authedFetch("/queue"), authedFetch("/staff?limit=100")]);
+      const [queueRes, staffRes] = await Promise.all([authedFetch("/queue"), authedFetch("/staff/roster")]);
       if (!queueRes) return;
       if (queueRes.status === 403) {
         setForbidden(true);
@@ -142,10 +143,10 @@ export default function ArrivalsPage() {
       const staffMap = new Map<string, string>();
       let doctorIds: string[] = [];
       if (staffRes?.ok) {
-        const staffBody = await staffRes.json();
-        setStaff(staffBody.data.map((s: { id: string; name: string }) => ({ id: s.id, name: s.name })));
-        staffBody.data.forEach((s: { id: string; name: string }) => staffMap.set(s.id, s.name));
-        doctorIds = staffBody.data.map((s: { id: string }) => s.id);
+        const roster: { id: string; name: string }[] = await staffRes.json();
+        setStaff(roster.map((s) => ({ id: s.id, name: s.name })));
+        roster.forEach((s) => staffMap.set(s.id, s.name));
+        doctorIds = roster.map((s) => s.id);
       }
       const withNames = await Promise.all(entries.map(async (e) => {
         const pRes = await authedFetch(`/patients/${e.patientId}`);

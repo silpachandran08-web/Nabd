@@ -14,6 +14,7 @@ import com.nabd.hms.staff.dto.StaffInviteResponse;
 import com.nabd.hms.staff.dto.StaffPage;
 import com.nabd.hms.staff.dto.StaffPatchRequest;
 import com.nabd.hms.staff.dto.StaffResponse;
+import com.nabd.hms.staff.dto.StaffRosterEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -63,6 +64,14 @@ public class StaffService {
                 : null;
 
         return new StaffPage(page.stream().map(this::toResponse).toList(), new PageMeta(nextCursor, limit));
+    }
+
+    /** Powers doctor pickers in queue/consult screens — see StaffRosterEntry's doc comment for why
+     * this isn't just a filtered call to list() above. */
+    @Transactional
+    public List<StaffRosterEntry> roster(UUID tenantId) {
+        tenantContext.set(tenantId);
+        return staffRepo.listRoster(tenantId);
     }
 
     @Transactional
