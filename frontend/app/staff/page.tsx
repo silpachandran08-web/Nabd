@@ -223,6 +223,23 @@ export default function StaffAccessPage() {
     setBuilder({ ...builder, grid: { ...builder.grid, [moduleKey]: { ...builder.grid[moduleKey], [actionKey]: !builder.grid[moduleKey][actionKey] } } });
   }
 
+  // "All" is derived from the same 7 booleans every other cell already uses, not a stored 8th
+  // grant field — the backend's escalation check (RoleService.requireNoPrivilegeEscalation) still
+  // runs on the real per-action grants either way, so ticking this can only ever request what the
+  // individual checkboxes could already request one at a time.
+  function allChecked(moduleKey: string): boolean {
+    return ACTIONS.every((a) => builder!.grid[moduleKey][a.key]);
+  }
+
+  function toggleAllForModule(moduleKey: string) {
+    if (!builder || builder.mode === "view") return;
+    const next = !allChecked(moduleKey);
+    setBuilder({
+      ...builder,
+      grid: { ...builder.grid, [moduleKey]: Object.fromEntries(ACTIONS.map((a) => [a.key, next])) as Record<ActionKey, boolean> },
+    });
+  }
+
   async function submitRole(e: React.FormEvent) {
     e.preventDefault();
     if (!builder || builder.mode === "view") return;
@@ -545,6 +562,7 @@ export default function StaffAccessPage() {
                 <thead>
                   <tr>
                     <th>Module</th>
+                    <th>All</th>
                     {ACTIONS.map((a) => <th key={a.key}>{a.label}</th>)}
                   </tr>
                 </thead>
@@ -552,6 +570,14 @@ export default function StaffAccessPage() {
                   {MODULES.map((m) => (
                     <tr key={m.key}>
                       <td>{m.label}</td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={allChecked(m.key)}
+                          disabled={builder.mode === "view"}
+                          onChange={() => toggleAllForModule(m.key)}
+                        />
+                      </td>
                       {ACTIONS.map((a) => (
                         <td key={a.key}>
                           <input

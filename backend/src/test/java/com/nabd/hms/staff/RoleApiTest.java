@@ -44,6 +44,30 @@ class RoleApiTest extends ApiTestBase {
         assertThat(resp.getBody().get("name")).isEqualTo("Receptionist");
     }
 
+    /** Backs the "All" checkbox added to the role builder's permission grid — a per-module shortcut
+     * for ticking every action at once. The grid itself only ever produces the same seven booleans
+     * every other checkbox already could; this proves the full-true shape round-trips correctly. */
+    @Test
+    void creatingARoleWithEveryActionGrantedForAModuleSucceeds() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner-allgrant@a.com", "+919200000099", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> resp = exchange("/v1/roles", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Full Clinical Access",
+                "grants", List.of(Map.of("module", "clinical", "view", true, "create", true, "edit", true,
+                        "delete", true, "approve", true, "refundDiscount", true, "export", true)))),
+                Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        List<Map<String, Object>> grants = (List<Map<String, Object>>) resp.getBody().get("grants");
+        Map<String, Object> clinicalGrant = grants.stream().filter(g -> "clinical".equals(g.get("module"))).findFirst().orElseThrow();
+        assertThat(clinicalGrant).containsEntry("view", true).containsEntry("create", true).containsEntry("edit", true)
+                .containsEntry("delete", true).containsEntry("approve", true).containsEntry("refundDiscount", true)
+                .containsEntry("export", true);
+    }
+
     @Test
     void createRoleExceedingCallerPermissionsIsBlocked() {
         SeededTenant tenant = seedTenant();
