@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.fleet;
 
 import com.nabd.hms.platform.fleet.dto.FleetPage;
+import com.nabd.hms.platform.fleet.dto.FleetSummaryResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,5 +24,10 @@ public class FleetController {
     public FleetPage list(@RequestParam(defaultValue = "50") int limit,
                            @RequestParam(required = false) String cursor) {
         return service.list(limit, cursor);
+    }
+
+    @GetMapping("/summary")
+    public FleetSummaryResponse summary() {
+        return service.summary();
     }
 }

@@ -33,6 +33,55 @@
   white-space: nowrap;
 }
 
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--nb-space-16);
+  margin-bottom: var(--nb-space-24);
+}
+
+@media (max-width: 720px) {
+  .kpiGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.kpiTile {
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-lg);
+  padding: var(--nb-space-16);
+}
+
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--nb-text-tertiary);
+  margin-bottom: var(--nb-space-8);
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--nb-text-primary);
+}
+
+.kpiUnavailable .kpiValue {
+  color: var(--nb-text-tertiary);
+}
+
+.kpiSub {
+  font-size: 12px;
+  color: var(--nb-text-secondary);
+  margin-top: var(--nb-space-4);
+  min-height: 15px;
+}
+
+.kpiUnavailable .kpiSub {
+  color: var(--nb-text-tertiary);
+}
+
 .card {
   background: var(--nb-surface-1);
   border: 1px solid var(--nb-border-subtle);
@@ -111,6 +160,20 @@
 .pillOffboarding { background: rgba(240, 175, 69, 0.14); color: #e0a63a; }
 .pillSuspended,
 .pillOffboarded { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
+
+.actionBtn {
+  height: 28px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
 
 .state {
   padding: var(--nb-space-32);
