@@ -93,6 +93,18 @@ export default function SupportAccessPage() {
     void Promise.resolve().then(load);
   }, [load]);
 
+  // Fleet's per-row "Support access" button hands off the tenant this way rather than a query
+  // param — this page's own <select> just needs tenantId to eventually match one of its options,
+  // so the fetch above populating `tenants` doesn't need to be sequenced with this at all.
+  useEffect(() => {
+    const prefill = sessionStorage.getItem("nabd_fleet_support_access_tenant_id");
+    if (prefill) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTenantId(prefill);
+      sessionStorage.removeItem("nabd_fleet_support_access_tenant_id");
+    }
+  }, []);
+
   async function requestGrant(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);

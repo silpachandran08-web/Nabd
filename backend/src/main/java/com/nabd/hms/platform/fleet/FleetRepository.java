@@ -34,6 +34,11 @@ class FleetRepository {
                 mapper(), Timestamp.from(afterCreatedAt), afterId, limit);
     }
 
+    /** Status+region only — the Fleet KPI grid's counts, cheaper than paging through every column. */
+    List<String[]> listStatusesAndRegions() {
+        return jdbc.query("SELECT status, region FROM tenants", (rs, i) -> new String[]{rs.getString("status"), rs.getString("region")});
+    }
+
     private RowMapper<TenantSummary> mapper() {
         return (rs, i) -> new TenantSummary(
                 UUID.fromString(rs.getString("id")),

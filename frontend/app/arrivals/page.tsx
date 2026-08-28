@@ -16,6 +16,8 @@ type Row = QueueEntry & { patientName: string; patientMrn: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
 type StaffOption = { id: string; name: string };
 type Problem = { title: string; detail: string };
+// Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
+type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
 // NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
 type CallbackEntry = { appointmentId: string; patientId: string; patientName: string; doctorId: string; startTime: string; status: string };
 
@@ -89,6 +91,7 @@ export default function ArrivalsPage() {
   const [searchResults, setSearchResults] = useState<PatientOption[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<PatientOption | null>(null);
   const [newPatientMode, setNewPatientMode] = useState(false);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[]>([]);
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newDob, setNewDob] = useState("");
@@ -212,6 +215,7 @@ export default function ArrivalsPage() {
     setPatientQuery(value);
     setSelectedPatient(null);
     setNewPatientMode(false);
+    setDuplicateCandidates([]);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (value.trim().length < 2) {
       setSearchResults([]);
@@ -235,6 +239,7 @@ export default function ArrivalsPage() {
     setNewGender("male");
     setDoctorId("");
     setModalError(null);
+    setDuplicateCandidates([]);
   }
 
   async function submitCheckIn(e: React.FormEvent) {
@@ -258,7 +263,11 @@ export default function ArrivalsPage() {
         });
         if (!res) return;
         if (res.status === 409) {
-          setModalError("A similar patient already exists — search for them above instead of registering again.");
+          const body: { candidates: DuplicateCandidate[] } = await res.json().catch(() => ({ candidates: [] }));
+          setDuplicateCandidates(body.candidates);
+          setModalError(body.candidates.length > 0
+            ? "A similar patient already exists — select them below, or search above instead of registering again."
+            : "A similar patient already exists — search for them above instead of registering again.");
           return;
         }
         if (!res.ok) {
@@ -593,6 +602,20 @@ export default function ArrivalsPage() {
             </div>
 
             {modalError && <div className={styles.formError} role="alert">{modalError}</div>}
+
+            {duplicateCandidates.length > 0 && (
+              <div className={styles.searchResults}>
+                {duplicateCandidates.map((c) => (
+                  <div key={c.patientId} className={styles.searchResultRow} onClick={() => {
+                    setSelectedPatient({ id: c.patientId, name: c.name, phone: c.phone, mrn: "" });
+                    setDuplicateCandidates([]);
+                    setModalError(null);
+                  }}>
+                    {c.name} · {c.phone}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>Cancel</button>

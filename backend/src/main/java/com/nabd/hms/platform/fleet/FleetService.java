@@ -2,11 +2,15 @@ package com.nabd.hms.platform.fleet;
 
 import com.nabd.hms.common.Cursor;
 import com.nabd.hms.platform.fleet.dto.FleetPage;
+import com.nabd.hms.platform.fleet.dto.FleetSummaryResponse;
 import com.nabd.hms.platform.fleet.dto.PageMeta;
 import com.nabd.hms.platform.fleet.dto.TenantSummaryResponse;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 
 import static com.nabd.hms.platform.fleet.FleetModels.TenantSummary;
 
@@ -31,6 +35,17 @@ public class FleetService {
                 : null;
 
         return new FleetPage(page.stream().map(this::toResponse).toList(), new PageMeta(nextCursor, limit));
+    }
+
+    public FleetSummaryResponse summary() {
+        List<String[]> rows = repo.listStatusesAndRegions();
+        Map<String, Integer> byStatus = new LinkedHashMap<>();
+        TreeSet<String> regions = new TreeSet<>();
+        for (String[] row : rows) {
+            byStatus.merge(row[0], 1, Integer::sum);
+            regions.add(row[1]);
+        }
+        return new FleetSummaryResponse(rows.size(), byStatus, List.copyOf(regions));
     }
 
     private TenantSummaryResponse toResponse(TenantSummary t) {

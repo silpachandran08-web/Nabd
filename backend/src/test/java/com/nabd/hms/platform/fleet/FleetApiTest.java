@@ -84,6 +84,33 @@ class FleetApiTest extends ApiTestBase {
         assertThat(ids).contains(t1.id().toString(), t2.id().toString(), t3.id().toString());
     }
 
+    /** Backs the Fleet page's KPI tiles — same clinics_fleet:view gate as the list itself. */
+    @Test
+    void summaryCountsStatusesAndListsDistinctRegions() {
+        SeededTenant a = seedTenant();
+        SeededTenant b = seedTenant();
+        jdbc.update("UPDATE tenants SET status = 'suspended' WHERE id = ?", a.id());
+        jdbc.update("UPDATE tenants SET status = 'suspended' WHERE id = ?", b.id());
+        String token = superAdminToken();
+
+        ResponseEntity<Map> resp = exchange("/v1/platform/tenants/summary", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> body = resp.getBody();
+        assertThat((Integer) body.get("total")).isGreaterThanOrEqualTo(2); // other tests in this class share the table
+        Map<String, Object> byStatus = (Map<String, Object>) body.get("byStatus");
+        assertThat((Integer) byStatus.get("suspended")).isGreaterThanOrEqualTo(2);
+        List<String> regions = (List<String>) body.get("regions");
+        assertThat(regions).contains("IN"); // seedTenant() defaults to IN
+    }
+
+    @Test
+    void sreCannotSeeTheFleetSummaryEither() {
+        SeededOperator sre = seedOperator("sre-fleet-summary@nabd.health", "sre", false);
+        String sreToken = platformLoginAndGetAccessToken(sre);
+        ResponseEntity<Map> resp = exchange("/v1/platform/tenants/summary", HttpMethod.GET, authed(sreToken), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     @Test
     void sreCannotSeeTheFleetButEveryOtherRoleCan() {
         seedTenant();
