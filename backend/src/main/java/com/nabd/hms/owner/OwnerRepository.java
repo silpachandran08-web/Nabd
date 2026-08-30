@@ -55,6 +55,25 @@ class OwnerRepository {
                 ownerId, email, ip, succeeded);
     }
 
+    /** Mirrors staff.invite_token_hash exactly — see V36's migration comment. */
+    void setInviteToken(UUID ownerId, String tokenHash, Instant expiresAt) {
+        jdbc.update("UPDATE owners SET invite_token_hash = ?, invite_expires_at = ? WHERE id = ?",
+                tokenHash, Timestamp.from(expiresAt), ownerId);
+    }
+
+    Optional<Owner> findByInviteTokenHash(String tokenHash) {
+        return jdbc.query("SELECT id, name, email, pin_hash, status FROM owners " +
+                        "WHERE invite_token_hash = ? AND invite_expires_at > now()",
+                ownerMapper(), tokenHash
+        ).stream().findFirst();
+    }
+
+    /** Setting the PIN is itself the activation step — same "accepting the link proves it" shape as staff. */
+    void acceptInvite(UUID ownerId, String pinHash) {
+        jdbc.update("UPDATE owners SET pin_hash = ?, invite_token_hash = NULL, invite_expires_at = NULL WHERE id = ?",
+                pinHash, ownerId);
+    }
+
     /** Same "failures since last success" window as AuthRepository's staff equivalent. */
     int countFailedAttemptsSinceLastSuccess(UUID ownerId) {
         Integer count = jdbc.queryForObject(

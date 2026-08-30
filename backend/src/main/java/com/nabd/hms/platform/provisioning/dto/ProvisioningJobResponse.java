@@ -14,7 +14,12 @@ public record ProvisioningJobResponse(
         Instant approvedAt,
         UUID createdTenantId,
         List<ProvisioningStepResponse> steps,
-        /** Reveal-once: only non-null on the advance() response right after verify_invite_owner runs. */
-        String ownerInviteToken
+        /** Reveal-once, per-tenant staff invite: only non-null on the advance() response right after
+         * verify_invite_owner runs. Accept at /accept-invite/{token}. */
+        String ownerInviteToken,
+        /** Reveal-once, top-level Owner account invite (NB-354/NB-350) — lets the same owner log into
+         * every clinic they own from one place. Null if this owner already activated their account
+         * (e.g. this is their second clinic). Accept at /owner/accept-invite/{token}. */
+        String ownerAccountInviteToken
 ) {
 }
