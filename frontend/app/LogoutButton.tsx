@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 // every screen — this app has no shared shell/header wrapping every clinic page yet, so rather than
 // hand-adding a button to each page's own bespoke header (and risk missing one), this mounts once
 // globally in layout.tsx, same pattern as IdleLockGuard, and floats itself into a fixed corner.
-const SKIP_PREFIXES = ["/login", "/platform", "/accept-invite"];
+const SKIP_PREFIXES = ["/login", "/platform", "/accept-invite", "/owner"];
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function LogoutButton() {
