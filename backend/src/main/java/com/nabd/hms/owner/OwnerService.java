@@ -3,6 +3,7 @@ package com.nabd.hms.owner;
 import com.nabd.hms.auth.AuthService;
 import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.config.AuthProperties;
 import com.nabd.hms.owner.dto.BrandWorkspaceResponse;
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.owner.OwnerModels.BrandWorkspace;
@@ -85,6 +87,35 @@ public class OwnerService {
         repo.recordLoginAttempt(owner.id(), email, ip, true);
         log.info("owner {} authenticated via PIN", owner.id());
 
+        return new PendingWorkspaceTokenResponse(issuePendingWorkspaceToken(owner), 300);
+    }
+
+    /** Called from provisioning (verify_invite_owner) on every job for this owner, not just their
+     * first — empty once they've activated, so a second/third clinic for the same owner correctly
+     * skips re-inviting. Same "raw token relayed to the caller, only its hash persisted" shape as
+     * StaffService.invite(), 72h expiry to match. Re-invitable: an owner who never accepted their
+     * first invite (e.g. their second clinic gets provisioned before they used it) just overwrites
+     * the stale token with a fresh one, rather than being stuck with an expired link forever. */
+    @Transactional
+    public Optional<String> invite(UUID ownerId) {
+        Owner owner = repo.findById(ownerId).orElseThrow(this::notFound);
+        if (owner.pinHash() != null) {
+            return Optional.empty();
+        }
+        String rawToken = OpaqueTokens.generate();
+        repo.setInviteToken(ownerId, OpaqueTokens.sha256Hex(rawToken), Instant.now().plus(72, ChronoUnit.HOURS));
+        log.info("owner {} invited to set their account PIN", ownerId);
+        return Optional.of(rawToken);
+    }
+
+    /** Mirrors StaffService.acceptInvite()'s "setting the PIN activates the account, and logs you
+     * straight in" convenience — translated to the owner's two-step login: hands back a pending
+     * workspace token instead of real tokens, since which clinic to enter still isn't chosen yet. */
+    @Transactional
+    public PendingWorkspaceTokenResponse acceptInvite(String rawToken, String pin) {
+        Owner owner = repo.findByInviteTokenHash(OpaqueTokens.sha256Hex(rawToken)).orElseThrow(this::inviteInvalid);
+        repo.acceptInvite(owner.id(), pinEncoder.encode(pin));
+        log.info("owner {} accepted invite and activated", owner.id());
         return new PendingWorkspaceTokenResponse(issuePendingWorkspaceToken(owner), 300);
     }
 
@@ -184,5 +215,10 @@ public class OwnerService {
     private ApiException notFound() {
         return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
                 "The requested resource was not found.");
+    }
+
+    private ApiException inviteInvalid() {
+        return new ApiException(HttpStatus.BAD_REQUEST, "invite-invalid", "Invite invalid",
+                "This invite link is invalid or has expired.");
     }
 }

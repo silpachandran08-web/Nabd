@@ -2,12 +2,14 @@ package com.nabd.hms.owner;
 
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -15,6 +17,16 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OwnerApiTest extends ApiTestBase {
+
+    @Autowired
+    private OwnerService ownerService;
+
+    /** A brand-new owner (as provisioning creates them): no PIN yet, needs to accept an invite. seedOwner() always sets one, so this clears it back off. */
+    private SeededOwner seedUnactivatedOwner(String email) {
+        SeededOwner owner = seedOwner(email);
+        jdbc.update("UPDATE owners SET pin_hash = NULL WHERE id = ?", owner.id());
+        return owner;
+    }
 
     // ---- login ----
 
@@ -205,5 +217,72 @@ class OwnerApiTest extends ApiTestBase {
                 "SELECT COUNT(*) FROM staff WHERE tenant_id = ? AND owner_id = ?", Integer.class,
                 clinic.id(), owner.id()));
         assertThat(shadowStaffCount).isEqualTo(1);
+    }
+
+    // ---- account invite (NB-354) ----
+
+    @Test
+    void invitingAnOwnerWithNoPinYetReturnsATokenButInvitingAnAlreadyActivatedOneDoesNot() {
+        SeededOwner fresh = seedUnactivatedOwner("fresh-invite@a.com");
+        assertThat(ownerService.invite(fresh.id())).isPresent();
+
+        SeededOwner activated = seedOwner("already-activated@a.com"); // seedOwner() sets a pin_hash
+        assertThat(ownerService.invite(activated.id())).isEmpty();
+    }
+
+    @Test
+    void acceptingAnAccountInviteActivatesThePinAndReturnsAWorkingPendingToken() {
+        SeededOwner owner = seedUnactivatedOwner("accept-invite@a.com");
+        SeededTenant clinic = seedClinicInBrand(seedBrand(owner, "Brand"));
+        String rawToken = ownerService.invite(owner.id()).orElseThrow();
+
+        ResponseEntity<Map> resp = http.postForEntity(url("/v1/owners/invitations/" + rawToken + "/accept"),
+                jsonBody(Map.of("pin", STAFF_PIN)), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String pendingToken = (String) resp.getBody().get("pendingToken");
+        assertThat(pendingToken).isNotBlank();
+
+        // must be a REAL, usable pending token — not just any string — proven by actually listing workspaces with it
+        ResponseEntity<Map> workspaces = exchange("/v1/owners/me/workspaces", HttpMethod.GET, authed(pendingToken), Map.class);
+        assertThat(workspaces.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> brands = (List<Map<String, Object>>) workspaces.getBody().get("brands");
+        assertThat(brands).hasSize(1);
+
+        // and the owner can now log in normally too, via their own PIN, same as any activated owner
+        String freshLogin = ownerLoginPendingToken(owner);
+        assertThat(freshLogin).isNotBlank();
+    }
+
+    @Test
+    void acceptingWithAnInvalidTokenIsRejected() {
+        ResponseEntity<Map> resp = http.postForEntity(url("/v1/owners/invitations/not-a-real-token/accept"),
+                jsonBody(Map.of("pin", STAFF_PIN)), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void acceptingTheSameInviteTwiceFailsTheSecondTime() {
+        SeededOwner owner = seedUnactivatedOwner("double-accept@a.com");
+        String rawToken = ownerService.invite(owner.id()).orElseThrow();
+
+        ResponseEntity<Map> first = http.postForEntity(url("/v1/owners/invitations/" + rawToken + "/accept"),
+                jsonBody(Map.of("pin", STAFF_PIN)), Map.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> second = http.postForEntity(url("/v1/owners/invitations/" + rawToken + "/accept"),
+                jsonBody(Map.of("pin", "5555")), Map.class);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void acceptingAnExpiredInviteIsRejected() {
+        SeededOwner owner = seedUnactivatedOwner("expired-invite@a.com");
+        String rawToken = ownerService.invite(owner.id()).orElseThrow();
+        jdbc.update("UPDATE owners SET invite_expires_at = ? WHERE id = ?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(60)), owner.id());
+
+        ResponseEntity<Map> resp = http.postForEntity(url("/v1/owners/invitations/" + rawToken + "/accept"),
+                jsonBody(Map.of("pin", STAFF_PIN)), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 }

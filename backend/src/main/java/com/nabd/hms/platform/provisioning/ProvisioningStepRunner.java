@@ -5,6 +5,7 @@ import com.nabd.hms.common.EmailSender;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WabaProvisioningGateway;
+import com.nabd.hms.owner.OwnerService;
 import com.nabd.hms.platform.tenant.TenantLifecycleService;
 import com.nabd.hms.staff.StaffService;
 import com.nabd.hms.staff.dto.StaffInviteRequest;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
+import static com.nabd.hms.platform.provisioning.ProvisioningModels.StepResult;
 
 /**
  * Executes exactly one provisioning step, in its own transaction, called through the Spring proxy
@@ -42,11 +44,13 @@ class ProvisioningStepRunner {
     private final StaffService staffService;
     private final EmailSender emailSender;
     private final String frontendBaseUrl;
+    private final OwnerService ownerService;
 
     ProvisioningStepRunner(ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
-                            EmailSender emailSender, @Value("${app.frontend-base-url}") String frontendBaseUrl) {
+                            EmailSender emailSender, @Value("${app.frontend-base-url}") String frontendBaseUrl,
+                            OwnerService ownerService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.wabaGateway = wabaGateway;
@@ -55,34 +59,35 @@ class ProvisioningStepRunner {
         this.staffService = staffService;
         this.emailSender = emailSender;
         this.frontendBaseUrl = frontendBaseUrl;
+        this.ownerService = ownerService;
     }
 
-    /** Returns the raw owner invite token when this step is verify_invite_owner (reveal-once, never persisted), null otherwise. */
+    /** Returns both reveal-once invite tokens when this step is verify_invite_owner (StepResult.NONE otherwise, never persisted). */
     @Transactional
-    String run(Job job, String stepName) {
+    StepResult run(Job job, String stepName) {
         return switch (stepName) {
             case "create_tenant" -> {
                 createTenant(job);
-                yield null;
+                yield StepResult.NONE;
             }
             case "migrate_schema" -> {
                 // No-op by design: tenancy here is shared-schema + RLS (app.tenant_id), not
                 // schema-per-tenant, so there is no per-tenant schema to migrate — the global
                 // Flyway migration already applied at boot covers every tenant, this one included.
-                yield null;
+                yield StepResult.NONE;
             }
             case "seed_masters" -> {
                 seedMasters(job);
-                yield null;
+                yield StepResult.NONE;
             }
             case "provision_whatsapp" -> {
                 wabaGateway.provisionNumber(job.tenantSlug());
-                yield null;
+                yield StepResult.NONE;
             }
             case "verify_invite_owner" -> inviteOwner(job);
             case "go_live" -> {
                 goLive(job);
-                yield null;
+                yield StepResult.NONE;
             }
             default -> throw new IllegalStateException("unknown provisioning step " + stepName);
         };
@@ -192,15 +197,38 @@ class ProvisioningStepRunner {
 
     /** NB-353: reuses StaffService's existing invite/accept machinery instead of inventing a second
      * temp-PIN mechanism — same "raw token relayed to the caller, only its hash persisted" shape
-     * regular staff invites already use (see StaffInviteResponse's doc comment). */
-    private String inviteOwner(Job job) {
+     * regular staff invites already use (see StaffInviteResponse's doc comment). NB-354 additionally
+     * invites the owner's top-level account (separate from this per-tenant staff row) whenever they
+     * don't have a PIN yet — OwnerService.invite() itself skips this for an owner who's already
+     * activated (e.g. provisioning a second clinic for the same person). */
+    private StepResult inviteOwner(Job job) {
         UUID tenantId = job.createdTenantId();
         if (tenantId == null) {
             throw new IllegalStateException("verify_invite_owner ran before create_tenant recorded a tenant id");
         }
         tenantContext.set(tenantId);
+        String ownerAccountInviteToken = ownerService.invite(job.createdOwnerId()).orElse(null);
+        if (ownerAccountInviteToken != null) {
+            String accountLink = frontendBaseUrl + "/owner/accept-invite/" + ownerAccountInviteToken;
+            try {
+                emailSender.send(job.ownerEmail(), "Set up your Nabd owner account",
+                        "Hi " + job.ownerName() + ",\n\n" +
+                                "Set a PIN for your Nabd owner account — this is separate from any one clinic's " +
+                                "login and lets you switch between every clinic you own from one place, as you " +
+                                "add more.\n\n" +
+                                "Set your PIN here (link expires in 72 hours):\n" + accountLink + "\n\n" +
+                                "If you weren't expecting this, you can ignore this email.");
+            } catch (Exception e) {
+                log.warn("owner account invite email failed to send to {} — falling back to manual relay",
+                        job.ownerEmail(), e);
+            }
+        }
+
         if (repo.hasOwnerStaff(tenantId)) {
-            return null; // retry after a later step failed — owner already invited, token already revealed once
+            // retry after a later step failed — this clinic's own staff invite already went out and
+            // was already revealed once, but the owner-account invite above still needed evaluating
+            // (a second clinic for an already-activated owner correctly sends nothing at all).
+            return new StepResult(null, ownerAccountInviteToken);
         }
         UUID roleId = repo.findBuiltInRoleId(tenantId)
                 .orElseThrow(() -> new IllegalStateException("verify_invite_owner ran before seed_masters created the Owner role"));
@@ -224,7 +252,7 @@ class ProvisioningStepRunner {
         // Still returned even though the email above may already have delivered it — same
         // reveal-once value shown as a manual-relay fallback if the email never arrives (unconfigured
         // SMTP, spam filter, wrong address typed at provisioning time).
-        return invite.inviteToken();
+        return new StepResult(invite.inviteToken(), ownerAccountInviteToken);
     }
 
     private void goLive(Job job) {

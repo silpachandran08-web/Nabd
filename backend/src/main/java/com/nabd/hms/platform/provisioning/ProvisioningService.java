@@ -15,6 +15,7 @@ import java.util.UUID;
 
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.JobStep;
+import static com.nabd.hms.platform.provisioning.ProvisioningModels.StepResult;
 
 /**
  * Orchestrates the six-step provisioning job (NB-258) — deliberately NOT @Transactional at this
@@ -94,9 +95,9 @@ public class ProvisioningService {
 
         repo.markStepRunning(next.id());
         repo.updateJobStatus(jobId, "running");
-        String ownerInviteToken = null;
+        StepResult result = StepResult.NONE;
         try {
-            ownerInviteToken = stepRunner.run(job, next.stepName());
+            result = stepRunner.run(job, next.stepName());
             repo.markStepDone(next.id());
             boolean allDone = !repo.hasIncompleteSteps(jobId);
             repo.updateJobStatus(jobId, allDone ? "done" : "running");
@@ -112,7 +113,7 @@ public class ProvisioningService {
                 repo.updateJobStatus(jobId, "failed"); // ordinary/transient failure — stays retryable via advance()
             }
         }
-        return toResponse(jobId, ownerInviteToken);
+        return toResponse(jobId, result.staffInviteToken(), result.ownerAccountInviteToken());
     }
 
     /**
@@ -142,18 +143,19 @@ public class ProvisioningService {
     }
 
     private ProvisioningJobResponse toResponse(UUID jobId) {
-        return toResponse(jobId, null);
+        return toResponse(jobId, null, null);
     }
 
-    /** ownerInviteToken is reveal-once — only advance() ever has one to pass, right after verify_invite_owner runs. */
-    private ProvisioningJobResponse toResponse(UUID jobId, String ownerInviteToken) {
+    /** Both tokens are reveal-once — only advance() ever has either to pass, right after verify_invite_owner runs. */
+    private ProvisioningJobResponse toResponse(UUID jobId, String ownerInviteToken, String ownerAccountInviteToken) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
         List<ProvisioningStepResponse> steps = repo.findSteps(jobId).stream()
                 .map(s -> new ProvisioningStepResponse(s.stepName(), s.stepOrder(), s.status(),
                         s.startedAt(), s.completedAt(), s.errorDetail()))
                 .toList();
         return new ProvisioningJobResponse(job.id(), job.tenantSlug(), job.tenantName(), job.region(),
-                job.status(), job.path(), job.approvedAt(), job.createdTenantId(), steps, ownerInviteToken);
+                job.status(), job.path(), job.approvedAt(), job.createdTenantId(), steps,
+                ownerInviteToken, ownerAccountInviteToken);
     }
 
     private ApiException notFound() {

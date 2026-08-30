@@ -133,6 +133,54 @@ class ProvisioningJobApiTest extends ApiTestBase {
         assertThat(after).isEqualTo(0);
     }
 
+    // ---- NB-354: verify_invite_owner also invites the owner's top-level account (NB-350) ----
+
+    @Test
+    void verifyInviteOwnerAlsoIssuesAnOwnerAccountInviteForANewOwner() {
+        String token = superAdminToken();
+        UUID jobId = createJob(token, "clinic-owner-account");
+
+        Map<String, Object> body = null;
+        for (int i = 0; i < 6; i++) {
+            ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs/" + jobId + "/advance",
+                    HttpMethod.POST, authed(token), Map.class);
+            body = resp.getBody();
+            if (i == 4) { // the same advance() call that reveals ownerInviteToken also reveals this one
+                assertThat(body.get("ownerAccountInviteToken")).isNotNull();
+            } else {
+                assertThat(body.get("ownerAccountInviteToken")).isNull();
+            }
+        }
+        assertThat(body.get("status")).isEqualTo("done");
+    }
+
+    @Test
+    void aSecondClinicForAnAlreadyActivatedOwnerDoesNotReissueTheAccountInvite() {
+        String token = superAdminToken();
+        String ownerEmail = "repeat-owner@nabd.health";
+
+        UUID firstJob = createJob(token, "clinic-repeat-1", ownerEmail, "IN");
+        String accountToken = null;
+        for (int i = 0; i < 6; i++) {
+            Map<String, Object> body = exchange("/v1/platform/provisioning-jobs/" + firstJob + "/advance", HttpMethod.POST, authed(token), Map.class).getBody();
+            if (i == 4) {
+                accountToken = (String) body.get("ownerAccountInviteToken"); // reveal-once — only this exact response has it
+            }
+        }
+        assertThat(accountToken).isNotNull();
+        ResponseEntity<Map> accept = http.postForEntity(url("/v1/owners/invitations/" + accountToken + "/accept"),
+                jsonBody(Map.of("pin", "1234")), Map.class);
+        assertThat(accept.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        UUID secondJob = createJob(token, "clinic-repeat-2", ownerEmail, "IN"); // same owner, same region (NB-002)
+        Map<String, Object> secondBody = null;
+        for (int i = 0; i < 6; i++) {
+            secondBody = exchange("/v1/platform/provisioning-jobs/" + secondJob + "/advance", HttpMethod.POST, authed(token), Map.class).getBody();
+            assertThat(secondBody.get("ownerAccountInviteToken")).isNull(); // never re-issued, at any step
+        }
+        assertThat(secondBody.get("status")).isEqualTo("done");
+    }
+
     /**
      * A real gap this caught: seed_masters used to grant the Owner role only staff/patients/queue,
      * so an owner logging in couldn't create a Doctor role with Clinical Records access — the app's
