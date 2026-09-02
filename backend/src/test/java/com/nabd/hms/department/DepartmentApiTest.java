@@ -82,13 +82,13 @@ class DepartmentApiTest extends ApiTestBase {
         String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
 
-        ResponseEntity<List> firstPut = exchange("/v1/departments/transfers", HttpMethod.PUT, authedJsonBody(token, Map.of(
+        ResponseEntity<List> firstPut = exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
         assertThat(firstPut.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(firstPut.getBody()).hasSize(1);
 
         // Replacing with an empty graph clears the previous edge entirely — whole-graph replace, not a merge.
-        ResponseEntity<List> secondPut = exchange("/v1/departments/transfers", HttpMethod.PUT, authedJsonBody(token, Map.of(
+        ResponseEntity<List> secondPut = exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "edges", List.of())), List.class);
         assertThat(secondPut.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(secondPut.getBody()).isEmpty();
@@ -104,7 +104,7 @@ class DepartmentApiTest extends ApiTestBase {
         String generalId = (String) defaultDepartment(ownerToken).get("id");
         String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
                 "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
-        exchange("/v1/departments/transfers", HttpMethod.PUT, authedJsonBody(ownerToken, Map.of(
+        exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
                 "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
 
         UUID doctorRoleId = seedRole(tenant.id(), "Doctor", false, fullGrant("clinical"), fullGrant("queue"));

@@ -238,7 +238,7 @@ class QueueApiTest extends ApiTestBase {
                 "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
         UUID dentalUuid = UUID.fromString(dentalId);
         inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ? WHERE id = ?", dentalUuid, dentist.id()));
-        exchange("/v1/departments/transfers", HttpMethod.PUT, authedJsonBody(token, Map.of(
+        exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
 
         String patientId = registerPatient(token, "Q9", "+919999910009");
@@ -301,7 +301,7 @@ class QueueApiTest extends ApiTestBase {
         String generalId = (String) defaultDepartment(token).get("id");
         String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
-        exchange("/v1/departments/transfers", HttpMethod.PUT, authedJsonBody(token, Map.of(
+        exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
 
         String patientId = registerPatient(token, "Q11", "+919999910015");

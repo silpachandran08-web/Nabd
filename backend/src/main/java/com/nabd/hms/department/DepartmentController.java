@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,7 +57,7 @@ public class DepartmentController {
         return service.listTransfers(tenantId(jwt));
     }
 
-    @PutMapping("/transfers")
+    @PostMapping("/transfers")
     @PreAuthorize("hasAuthority('departments:edit')")
     public List<TransferEdge> replaceTransfers(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TransferGraphRequest req) {
         return service.replaceTransfers(tenantId(jwt), staffId(jwt), req);
