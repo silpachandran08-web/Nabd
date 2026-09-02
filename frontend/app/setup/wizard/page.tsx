@@ -15,6 +15,7 @@ const STEPS = [
   { key: "profile", title: "Clinic profile" },
   { key: "tax", title: "Tax & IDs" },
   { key: "doctors", title: "Doctors" },
+  { key: "departments", title: "Departments" },
   { key: "schedule", title: "Schedule" },
   { key: "charges", title: "Price master" },
   { key: "pharmacy", title: "Pharmacy" },
@@ -169,6 +170,14 @@ export default function SetupWizardPage() {
             <h2 className={styles.cardTitle}>Doctors</h2>
             <p className={styles.text}>Invite doctors from Staff & Access. Once added, their licence numbers can be recorded in the Licences tab.</p>
             <button className={styles.btn} onClick={() => router.push("/staff")}>Open Staff & Access</button>
+          </div>
+        );
+      case "departments":
+        return (
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>Departments</h2>
+            <p className={styles.text}>Set up Dental, Dermatology, or any other departments this clinic runs, whether each one needs the vitals step, and which departments can transfer a patient to which.</p>
+            <button className={styles.btn} onClick={() => router.push("/setup/departments")}>Open Departments</button>
           </div>
         );
       case "schedule":

@@ -187,6 +187,12 @@ public abstract class ApiTestBase {
         String slug = "t" + id.toString().replace("-", "").substring(0, 12);
         jdbc.update("INSERT INTO tenants (id, slug, name, region, status) VALUES (?,?,?,?,?)",
                 id, slug, "Test Clinic " + slug, "IN", "active");
+        // Every tenant gets a default department the moment it exists — same backfill guarantee
+        // V37's migration gives every already-provisioned tenant, and ProvisioningStepRunner gives
+        // every newly-provisioned one. queue_entries.department_id is NOT NULL and check-in falls
+        // back to this row for any doctor with no department assigned yet.
+        inTenantTx(id, () -> jdbc.update(
+                "INSERT INTO departments (tenant_id, name, requires_vitals, is_default) VALUES (?,'General',true,true)", id));
         return new SeededTenant(id, slug);
     }
 
@@ -260,7 +266,8 @@ public abstract class ApiTestBase {
     protected UUID seedFullAccessRole(UUID tenantId) {
         return seedRole(tenantId, "Owner", true, fullGrant("staff"), fullGrant("patients"), fullGrant("queue"),
                 fullGrant("setup"), fullGrant("clinical"), fullGrant("billing"), fullGrant("specialty_dental"),
-                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing"));
+                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing"),
+                fullGrant("departments"));
     }
 
     protected UUID seedRole(UUID tenantId, String name, boolean builtIn, ModuleGrant... grants) {

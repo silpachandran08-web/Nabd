@@ -16,8 +16,9 @@ import static com.nabd.hms.queue.QueueModels.QueueEntryRow;
 class QueueRepository {
 
     private static final String COLUMNS =
-            "id, appointment_id, patient_id, doctor_id, queue_date, token_number, status, priority, priority_reason, " +
-                    "priority_flagged_by, priority_flagged_at, priority_acknowledged_by, priority_acknowledged_at, source, created_at ";
+            "id, appointment_id, patient_id, doctor_id, department_id, parent_queue_entry_id, queue_date, token_number, " +
+                    "status, priority, priority_reason, priority_flagged_by, priority_flagged_at, priority_acknowledged_by, " +
+                    "priority_acknowledged_at, source, created_at ";
 
     private final JdbcTemplate jdbc;
 
@@ -42,12 +43,42 @@ class QueueRepository {
         return (max == null ? 0 : max) + 1;
     }
 
-    UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, LocalDate queueDate, int tokenNumber, String source) {
+    UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
+                UUID parentQueueEntryId, LocalDate queueDate, int tokenNumber, String source, String status) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, queue_date, token_number, source) " +
-                        "VALUES (?,?,?,?,?,?,?,?)",
-                id, tenantId, appointmentId, patientId, doctorId, Date.valueOf(queueDate), tokenNumber, source);
+        jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
+                        "parent_queue_entry_id, queue_date, token_number, source, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId,
+                Date.valueOf(queueDate), tokenNumber, source, status);
         return id;
+    }
+
+    /** Server-derived, never client-supplied — a doctor's own assigned department, falling back to
+     * the tenant's single default department if nobody has assigned one yet (so check-in never
+     * breaks for a doctor no one has gotten around to configuring). */
+    UUID findCheckInDepartment(UUID tenantId, UUID doctorId) {
+        return jdbc.queryForObject(
+                "SELECT COALESCE(s.department_id, (SELECT id FROM departments WHERE tenant_id = ? AND is_default)) " +
+                        "FROM staff s WHERE s.tenant_id = ? AND s.id = ?",
+                UUID.class, tenantId, tenantId, doctorId);
+    }
+
+    /** Whether the department this entry belongs to requires the vitals step — a narrow direct
+     * read into departments, same "don't inject the other module's repository for one column"
+     * precedent as CheckoutRepository reaching into pharmacy_settings/charge_catalogue. */
+    boolean requiresVitals(UUID tenantId, UUID departmentId) {
+        Boolean requiresVitals = jdbc.queryForObject(
+                "SELECT requires_vitals FROM departments WHERE tenant_id = ? AND id = ?",
+                Boolean.class, tenantId, departmentId);
+        return Boolean.TRUE.equals(requiresVitals);
+    }
+
+    /** The owner-designed transfer graph, read narrowly here rather than injecting DepartmentRepository. */
+    boolean transferAllowed(UUID tenantId, UUID fromDepartmentId, UUID toDepartmentId) {
+        Boolean exists = jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM department_transfers WHERE tenant_id = ? AND from_department_id = ? AND to_department_id = ?)",
+                Boolean.class, tenantId, fromDepartmentId, toDepartmentId);
+        return Boolean.TRUE.equals(exists);
     }
 
     Optional<QueueEntryRow> findById(UUID tenantId, UUID id) {
@@ -55,13 +86,19 @@ class QueueRepository {
                 mapper(), tenantId, id).stream().findFirst();
     }
 
-    List<QueueEntryRow> listForDay(UUID tenantId, UUID doctorId, LocalDate date, boolean priorityOnly) {
+    List<QueueEntryRow> listForDay(UUID tenantId, UUID doctorId, UUID departmentId, LocalDate date, boolean priorityOnly) {
         String priorityGate = priorityOnly ? "AND priority = true " : "";
         if (doctorId != null) {
             return jdbc.query("SELECT " + COLUMNS + "FROM queue_entries " +
                             "WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? " + priorityGate +
                             "ORDER BY priority DESC, token_number",
                     mapper(), tenantId, doctorId, Date.valueOf(date));
+        }
+        if (departmentId != null) {
+            return jdbc.query("SELECT " + COLUMNS + "FROM queue_entries " +
+                            "WHERE tenant_id = ? AND department_id = ? AND queue_date = ? " + priorityGate +
+                            "ORDER BY doctor_id, priority DESC, token_number",
+                    mapper(), tenantId, departmentId, Date.valueOf(date));
         }
         return jdbc.query("SELECT " + COLUMNS + "FROM queue_entries " +
                         "WHERE tenant_id = ? AND queue_date = ? " + priorityGate +
@@ -121,7 +158,7 @@ class QueueRepository {
     int countActiveAhead(UUID tenantId, UUID doctorId, LocalDate date) {
         Integer count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? " +
-                        "AND status NOT IN ('completed', 'no_show')",
+                        "AND status NOT IN ('completed', 'no_show', 'transferred_out')",
                 Integer.class, tenantId, doctorId, Date.valueOf(date));
         return count == null ? 0 : count;
     }
@@ -129,6 +166,7 @@ class QueueRepository {
     private RowMapper<QueueEntryRow> mapper() {
         return (rs, i) -> {
             String appointmentId = rs.getString("appointment_id");
+            String parentQueueEntryId = rs.getString("parent_queue_entry_id");
             String flaggedBy = rs.getString("priority_flagged_by");
             String acknowledgedBy = rs.getString("priority_acknowledged_by");
             java.sql.Timestamp flaggedAt = rs.getTimestamp("priority_flagged_at");
@@ -138,6 +176,8 @@ class QueueRepository {
                     appointmentId == null ? null : UUID.fromString(appointmentId),
                     UUID.fromString(rs.getString("patient_id")),
                     UUID.fromString(rs.getString("doctor_id")),
+                    UUID.fromString(rs.getString("department_id")),
+                    parentQueueEntryId == null ? null : UUID.fromString(parentQueueEntryId),
                     rs.getDate("queue_date").toLocalDate(),
                     rs.getInt("token_number"),
                     rs.getString("status"),

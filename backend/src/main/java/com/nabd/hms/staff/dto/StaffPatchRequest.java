@@ -9,6 +9,7 @@ import java.util.UUID;
 public record StaffPatchRequest(
         UUID roleId,
         @Pattern(regexp = "own_patients_only|all_clinic_patients") String scope,
-        List<String> fieldGrants
+        List<String> fieldGrants,
+        UUID departmentId
 ) {
 }

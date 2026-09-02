@@ -6,6 +6,8 @@ import com.nabd.hms.queue.dto.CheckInRequest;
 import com.nabd.hms.queue.dto.QueueEntryResponse;
 import com.nabd.hms.queue.dto.QueueReorderRequest;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
+import com.nabd.hms.queue.dto.TransferRequest;
+import com.nabd.hms.queue.dto.TransferResponse;
 import com.nabd.hms.queue.dto.WaitEstimateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +20,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -34,18 +35,23 @@ public class QueueService {
     /**
      * Strict linear order (NB-094); no_show is reachable from anywhere before checkout. v2's
      * wireframe lists "vitals pending/done" as two distinct states, not the single "vitals" step
-     * v1 had — split here to match.
+     * v1 had — split here to match. Whether vitals_pending is even reachable now depends on the
+     * entry's department (NB-3xx departments) — a department with requiresVitals=false skips
+     * straight from waiting to in_consult. transferred_out is a second terminal alongside
+     * checkout_pending, reachable only from in_consult — a doctor's end-of-consult choice between
+     * billing this leg or moving the patient into another department's queue.
      */
-    private static final Map<String, Set<String>> TRANSITIONS = Map.of(
-            "checked_in", Set.of("waiting", "no_show"),
-            "waiting", Set.of("vitals_pending", "no_show"),
-            "vitals_pending", Set.of("vitals_done", "no_show"),
-            "vitals_done", Set.of("in_consult", "no_show"),
-            "in_consult", Set.of("checkout_pending", "no_show"),
-            "checkout_pending", Set.of("completed"),
-            "completed", Set.of(),
-            "no_show", Set.of()
-    );
+    private static Set<String> allowedNextStatuses(String current, boolean requiresVitals) {
+        return switch (current) {
+            case "checked_in" -> Set.of("waiting", "no_show");
+            case "waiting" -> requiresVitals ? Set.of("vitals_pending", "no_show") : Set.of("in_consult", "no_show");
+            case "vitals_pending" -> Set.of("vitals_done", "no_show");
+            case "vitals_done" -> Set.of("in_consult", "no_show");
+            case "in_consult" -> Set.of("checkout_pending", "transferred_out", "no_show");
+            case "checkout_pending" -> Set.of("completed");
+            default -> Set.of(); // completed, no_show, transferred_out are terminal
+        };
+    }
 
     private final QueueRepository repo;
     private final AppointmentRepository appointmentRepo;
@@ -83,32 +89,28 @@ public class QueueService {
             enforceSessionCapacity(req.doctorId(), today); // scheduled check-ins were already capacity-checked at booking
         }
 
+        UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
         int token = repo.nextTokenNumber(req.doctorId(), today);
         String source = req.source() == null ? "walk_in" : req.source();
-        UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), today, token, source);
+        UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
+                null, today, token, source, "checked_in");
         log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",
                 callerStaffId, token, req.doctorId(), req.appointmentId() == null ? "walk-in" : "scheduled", id);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
     @Transactional
-    public List<QueueEntryResponse> list(UUID tenantId, UUID doctorId, LocalDate date, boolean priorityOnly) {
+    public List<QueueEntryResponse> list(UUID tenantId, UUID doctorId, UUID departmentId, LocalDate date, boolean priorityOnly) {
         tenantContext.set(tenantId);
         LocalDate day = date == null ? LocalDate.now(ZoneOffset.UTC) : date;
-        return repo.listForDay(tenantId, doctorId, day, priorityOnly).stream().map(this::toResponse).toList();
+        return repo.listForDay(tenantId, doctorId, departmentId, day, priorityOnly).stream().map(this::toResponse).toList();
     }
 
     @Transactional
     public QueueEntryResponse updateStatus(UUID tenantId, UUID callerStaffId, UUID id, QueueStatusUpdateRequest req) {
         tenantContext.set(tenantId);
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
-
-        Set<String> allowed = TRANSITIONS.getOrDefault(current.status(), Set.of());
-        if (!allowed.contains(req.status())) {
-            log.warn("illegal queue transition blocked by {}: entry {} {} -> {}", callerStaffId, id, current.status(), req.status());
-            throw new ApiException(HttpStatus.BAD_REQUEST, "illegal-transition", "Illegal queue transition",
-                    "Cannot move from " + current.status() + " to " + req.status() + ".");
-        }
+        requireLegalTransition(tenantId, current, req.status(), callerStaffId, id);
 
         repo.updateStatus(tenantId, id, req.status());
         log.info("queue entry {} moved {} -> {} by {}", id, current.status(), req.status(), callerStaffId);
@@ -116,6 +118,50 @@ public class QueueService {
             appointmentService.markTerminal(tenantId, current.appointmentId(), req.status());
         }
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    private void requireLegalTransition(UUID tenantId, QueueEntryRow current, String nextStatus, UUID callerStaffId, UUID id) {
+        boolean requiresVitals = repo.requiresVitals(tenantId, current.departmentId());
+        Set<String> allowed = allowedNextStatuses(current.status(), requiresVitals);
+        if (!allowed.contains(nextStatus)) {
+            log.warn("illegal queue transition blocked by {}: entry {} {} -> {}", callerStaffId, id, current.status(), nextStatus);
+            throw new ApiException(HttpStatus.BAD_REQUEST, "illegal-transition", "Illegal queue transition",
+                    "Cannot move from " + current.status() + " to " + nextStatus + ".");
+        }
+    }
+
+    /** NB-3xx: a doctor's end-of-consult decision to move the patient into another department's
+     * queue instead of (or, via a later visit, in addition to) billing this leg. Closes the current
+     * leg (transferred_out, subject to the same legality check as any other transition) and opens a
+     * fresh one in the target department, starting at "waiting" rather than "checked_in" — the
+     * patient is already on-site, so the arrival-acknowledgment step is redundant for a same-visit
+     * transfer. Reuses the entire existing pipeline for the new leg; it just enters partway through. */
+    @Transactional
+    public TransferResponse transfer(UUID tenantId, UUID callerStaffId, UUID id, TransferRequest req) {
+        tenantContext.set(tenantId);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        requireLegalTransition(tenantId, current, "transferred_out", callerStaffId, id);
+
+        if (!repo.transferAllowed(tenantId, current.departmentId(), req.toDepartmentId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "transfer-not-allowed", "Transfer not allowed",
+                    "This department isn't configured to transfer patients to the requested department.");
+        }
+
+        repo.updateStatus(tenantId, id, "transferred_out");
+        log.info("queue entry {} transferred_out by {} (patient {} -> department {})",
+                id, callerStaffId, current.patientId(), req.toDepartmentId());
+
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        repo.lockDoctorDay(req.doctorId(), today);
+        int token = repo.nextTokenNumber(req.doctorId(), today);
+        UUID newId = repo.insert(tenantId, null, current.patientId(), req.doctorId(), req.toDepartmentId(),
+                current.id(), today, token, "internal_transfer", "waiting");
+        log.info("queue entry {} opened by transfer from {} (doctor {}, department {})",
+                newId, id, req.doctorId(), req.toDepartmentId());
+
+        return new TransferResponse(
+                toResponse(repo.findById(tenantId, id).orElseThrow()),
+                toResponse(repo.findById(tenantId, newId).orElseThrow()));
     }
 
     @Transactional
@@ -179,9 +225,9 @@ public class QueueService {
 
     private QueueEntryResponse toResponse(QueueEntryRow row) {
         return new QueueEntryResponse(row.id(), row.appointmentId(), row.patientId(), row.doctorId(),
-                row.queueDate(), row.tokenNumber(), row.status(), row.priority(), row.priorityReason(),
-                row.priorityFlaggedBy(), row.priorityFlaggedAt(), row.priorityAcknowledgedBy(),
-                row.priorityAcknowledgedAt(), row.source(), row.createdAt());
+                row.departmentId(), row.parentQueueEntryId(), row.queueDate(), row.tokenNumber(), row.status(),
+                row.priority(), row.priorityReason(), row.priorityFlaggedBy(), row.priorityFlaggedAt(),
+                row.priorityAcknowledgedBy(), row.priorityAcknowledgedAt(), row.source(), row.createdAt());
     }
 
     private ApiException notFound() {

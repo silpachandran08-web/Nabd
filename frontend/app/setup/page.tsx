@@ -31,6 +31,7 @@ type DispensingQueueEntry = {
 const TABS = [
   { key: "checklist", label: "Checklist" },
   { key: "profile", label: "Profile" },
+  { key: "departments", label: "Departments" },
   { key: "charges", label: "Charges" },
   { key: "policies", label: "Policies" },
   { key: "consent", label: "Consent" },
@@ -296,6 +297,13 @@ export default function SetupPage() {
                 </div>
               ))}
             </div>
+          </div>
+        );
+      case "departments":
+        return (
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>Departments</h2>
+            <button className={styles.btn} onClick={() => router.push("/setup/departments")}>Open Departments</button>
           </div>
         );
       case "profile":

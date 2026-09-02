@@ -21,6 +21,7 @@ type ModuleGrant = {
   approve: boolean; refundDiscount: boolean; export: boolean;
 };
 type Role = { id: string; name: string; builtIn: boolean; grants: ModuleGrant[] };
+type Department = { id: string; name: string; requiresVitals: boolean; isDefault: boolean; active: boolean };
 // GlobalExceptionHandler serializes RFC 7807 ProblemDetail — the machine-readable
 // error code lives in `type` (a "…/errors/<slug>" URI), not `title` (human text).
 type Problem = { type?: string; title: string; detail: string };
@@ -42,6 +43,7 @@ const MODULES: { key: string; label: string }[] = [
   { key: "setup", label: "Clinic Setup" },
   { key: "specialty_dental", label: "Specialty (Dental)" },
   { key: "nursing", label: "Nursing" },
+  { key: "departments", label: "Departments" },
 ];
 const ACTIONS: { key: ActionKey; label: string }[] = [
   { key: "view", label: "View" },
@@ -96,6 +98,7 @@ export default function StaffAccessPage() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [breakGlass, setBreakGlass] = useState<{ id: string; staffId: string; staffName: string; reason: string; activatedAt: string; expiresAt: string }[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,6 +111,7 @@ export default function StaffAccessPage() {
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteRoleId, setInviteRoleId] = useState("");
   const [inviteScope, setInviteScope] = useState("all_clinic_patients");
+  const [inviteDepartmentId, setInviteDepartmentId] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteFormError, setInviteFormError] = useState<string | null>(null);
   const [lastInvite, setLastInvite] = useState<{ name: string; link: string } | null>(null);
@@ -171,6 +175,9 @@ export default function StaffAccessPage() {
 
       const rolesRes = await authedFetch("/roles");
       if (rolesRes?.ok) setRoles(await rolesRes.json());
+
+      const departmentsRes = await authedFetch("/departments");
+      if (departmentsRes?.ok) setDepartments(await departmentsRes.json());
 
       const bgRes = await authedFetch("/auth/break-glass/active");
       if (bgRes?.ok) setBreakGlass(await bgRes.json());
@@ -286,7 +293,10 @@ export default function StaffAccessPage() {
     try {
       const res = await authedFetch("/staff", {
         method: "POST",
-        body: JSON.stringify({ email: inviteEmail, name: inviteName, mobilePhone: invitePhone, roleId: inviteRoleId, scope: inviteScope }),
+        body: JSON.stringify({
+          email: inviteEmail, name: inviteName, mobilePhone: invitePhone, roleId: inviteRoleId, scope: inviteScope,
+          departmentId: inviteDepartmentId || null,
+        }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -302,6 +312,7 @@ export default function StaffAccessPage() {
       setInvitePhone("");
       setInviteRoleId("");
       setInviteScope("all_clinic_patients");
+      setInviteDepartmentId("");
     } finally {
       setInviting(false);
     }
@@ -418,6 +429,17 @@ export default function StaffAccessPage() {
               <option value="own_patients_only">Own patients only</option>
             </select>
           </div>
+          {departments.length > 0 && (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="inviteDepartment">Department</label>
+              <select id="inviteDepartment" className={styles.select} value={inviteDepartmentId} onChange={(e) => setInviteDepartmentId(e.target.value)}>
+                <option value="">Clinic default</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button className={styles.submit} type="submit" disabled={inviting}>
             {inviting ? "Inviting…" : "Invite staff"}
           </button>

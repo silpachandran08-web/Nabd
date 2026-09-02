@@ -120,6 +120,7 @@ class ProvisioningStepRunner {
         }
         tenantContext.set(tenantId);
         repo.deleteBuiltInRole(tenantId);
+        repo.deleteDepartments(tenantId);
     }
 
     private void undoInviteOwner(Job job) {
@@ -191,8 +192,10 @@ class ProvisioningStepRunner {
         String grantsJson = writeGrantsJson(List.of(
                 fullGrant("staff"), fullGrant("patients"), fullGrant("queue"), fullGrant("setup"),
                 fullGrant("clinical"), fullGrant("billing"), fullGrant("specialty_dental"),
-                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing")));
+                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing"),
+                fullGrant("departments")));
         repo.insertBuiltInOwnerRole(tenantId, grantsJson);
+        repo.seedDefaultDepartment(tenantId);
     }
 
     /** NB-353: reuses StaffService's existing invite/accept machinery instead of inventing a second
@@ -233,7 +236,7 @@ class ProvisioningStepRunner {
         UUID roleId = repo.findBuiltInRoleId(tenantId)
                 .orElseThrow(() -> new IllegalStateException("verify_invite_owner ran before seed_masters created the Owner role"));
         StaffInviteResponse invite = staffService.invite(tenantId, null,
-                new StaffInviteRequest(job.ownerEmail(), job.ownerName(), job.ownerMobile(), roleId, "all_clinic_patients"));
+                new StaffInviteRequest(job.ownerEmail(), job.ownerName(), job.ownerMobile(), roleId, "all_clinic_patients", null));
         String link = frontendBaseUrl + "/accept-invite/" + invite.inviteToken();
         try {
             emailSender.send(job.ownerEmail(), "You're invited to " + job.tenantName() + " on Nabd",

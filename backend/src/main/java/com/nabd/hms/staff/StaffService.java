@@ -86,7 +86,7 @@ public class StaffService {
         Instant expiresAt = Instant.now().plus(72, ChronoUnit.HOURS);
         try {
             staffRepo.insertInvite(id, tenantId, req.roleId(), req.email().toLowerCase(), req.name(),
-                    req.mobilePhone(), req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy);
+                    req.mobilePhone(), req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy, req.departmentId());
         } catch (DataIntegrityViolationException e) {
             throw staffConflict(e);
         }
@@ -114,8 +114,9 @@ public class StaffService {
         UUID roleId = req.roleId() != null ? req.roleId() : current.roleId();
         String scope = req.scope() != null ? req.scope() : current.scope();
         List<String> fieldGrants = req.fieldGrants() != null ? req.fieldGrants() : current.fieldGrants();
+        UUID departmentId = req.departmentId() != null ? req.departmentId() : current.departmentId();
 
-        staffRepo.update(tenantId, id, roleId, scope, fieldGrants);
+        staffRepo.update(tenantId, id, roleId, scope, fieldGrants, departmentId);
         log.info("staff {} updated by {} (role {}, scope {})", id, callerStaffId, roleId, scope);
         return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
     }
@@ -150,7 +151,7 @@ public class StaffService {
 
     private StaffResponse toResponse(StaffRow row) {
         return new StaffResponse(row.id(), row.email(), row.name(), row.mobilePhone(), row.roleId(), row.status(),
-                row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants(), row.lastSeenAt());
+                row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants(), row.departmentId(), row.lastSeenAt());
     }
 
     private ApiException staffConflict(DataIntegrityViolationException e) {

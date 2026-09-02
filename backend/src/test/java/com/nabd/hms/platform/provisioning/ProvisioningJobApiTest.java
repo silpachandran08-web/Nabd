@@ -204,7 +204,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
         Set<String> modules = grants.stream().map(ModuleGrant::module).collect(Collectors.toSet());
 
         assertThat(modules).containsExactlyInAnyOrder("staff", "patients", "queue", "setup", "clinical",
-                "billing", "specialty_dental", "reports", "pharmacy", "packages", "nursing");
+                "billing", "specialty_dental", "reports", "pharmacy", "packages", "nursing", "departments");
         assertThat(grants).allMatch(g -> g.view() && g.create() && g.edit() && g.delete()
                 && g.approve() && g.refundDiscount() && g.export());
     }

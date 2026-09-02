@@ -48,7 +48,7 @@ class SetupRepository {
         ensureProgressSeeded(tenantId);
         return jdbc.query(
                 "SELECT id, step, status, skipped_at, done_at FROM clinic_setup_progress " +
-                        "WHERE tenant_id = ? ORDER BY array_position(ARRAY['welcome','profile','tax','doctors','schedule','charges','pharmacy','whatsapp','go_live'], step)",
+                        "WHERE tenant_id = ? ORDER BY array_position(ARRAY['welcome','profile','tax','doctors','departments','schedule','charges','pharmacy','whatsapp','go_live'], step)",
                 progressMapper(), tenantId);
     }
 
@@ -65,15 +65,14 @@ class SetupRepository {
                 status, status, status, tenantId, step);
     }
 
+    /** Per-step upsert (not a single "seed if empty" guard) so a step added after a tenant already
+     * had its checklist seeded — e.g. "departments" — still appears for it, without a one-off
+     * migration-time backfill. UNIQUE(tenant_id, step) makes this a no-op for steps already there. */
     private void ensureProgressSeeded(UUID tenantId) {
-        Long count = jdbc.queryForObject("SELECT count(*) FROM clinic_setup_progress WHERE tenant_id = ?", Long.class, tenantId);
-        if (count != null && count > 0) {
-            return;
-        }
-        String[] steps = {"welcome", "profile", "tax", "doctors", "schedule", "charges", "pharmacy", "whatsapp", "go_live"};
+        String[] steps = {"welcome", "profile", "tax", "doctors", "departments", "schedule", "charges", "pharmacy", "whatsapp", "go_live"};
         for (String step : steps) {
-            jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, ?, 'pending')",
-                    tenantId, step);
+            jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, ?, 'pending') " +
+                    "ON CONFLICT (tenant_id, step) DO NOTHING", tenantId, step);
         }
     }
 

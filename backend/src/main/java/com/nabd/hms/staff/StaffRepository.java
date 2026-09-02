@@ -40,7 +40,7 @@ class StaffRepository {
     Optional<StaffRow> findByInviteTokenHash(String tokenHash) {
         return jdbc.query(
                 "SELECT s.id, s.tenant_id, s.role_id, s.email, s.name, s.mobile_phone, s.status, s.scope, " +
-                        "s.email_verified, s.mobile_verified, s.mfa_enabled, " +
+                        "s.email_verified, s.mobile_verified, s.mfa_enabled, s.department_id, " +
                         "s.field_grants, null::timestamptz AS last_seen_at, s.created_at " +
                         "FROM find_staff_by_invite_token_hash(?) s " +
                         "WHERE s.invite_expires_at > now()",
@@ -71,17 +71,17 @@ class StaffRepository {
     }
 
     void insertInvite(UUID id, UUID tenantId, UUID roleId, String email, String name, String mobilePhone,
-                       String scope, String inviteTokenHash, Instant inviteExpiresAt, UUID invitedBy) {
+                       String scope, String inviteTokenHash, Instant inviteExpiresAt, UUID invitedBy, UUID departmentId) {
         jdbc.update(
-                "INSERT INTO staff (id, tenant_id, role_id, email, name, mobile_phone, status, scope, invite_token_hash, invite_expires_at, invited_by) " +
-                        "VALUES (?,?,?,?,?,?,'invited',?,?,?,?)",
-                id, tenantId, roleId, email, name, mobilePhone, scope, inviteTokenHash, Timestamp.from(inviteExpiresAt), invitedBy
+                "INSERT INTO staff (id, tenant_id, role_id, email, name, mobile_phone, status, scope, invite_token_hash, invite_expires_at, invited_by, department_id) " +
+                        "VALUES (?,?,?,?,?,?,'invited',?,?,?,?,?)",
+                id, tenantId, roleId, email, name, mobilePhone, scope, inviteTokenHash, Timestamp.from(inviteExpiresAt), invitedBy, departmentId
         );
     }
 
-    void update(UUID tenantId, UUID id, UUID roleId, String scope, List<String> fieldGrants) {
-        jdbc.update("UPDATE staff SET role_id = ?, scope = ?, field_grants = ? WHERE tenant_id = ? AND id = ?",
-                roleId, scope, fieldGrants.toArray(new String[0]), tenantId, id);
+    void update(UUID tenantId, UUID id, UUID roleId, String scope, List<String> fieldGrants, UUID departmentId) {
+        jdbc.update("UPDATE staff SET role_id = ?, scope = ?, field_grants = ?, department_id = ? WHERE tenant_id = ? AND id = ?",
+                roleId, scope, fieldGrants.toArray(new String[0]), departmentId, tenantId, id);
     }
 
     void suspend(UUID tenantId, UUID id) {
@@ -103,7 +103,7 @@ class StaffRepository {
 
     private String baseSelect() {
         return "SELECT s.id, s.tenant_id, s.role_id, s.email, s.name, s.mobile_phone, s.status, s.scope, " +
-                "s.email_verified, s.mobile_verified, s.mfa_enabled, " +
+                "s.email_verified, s.mobile_verified, s.mfa_enabled, s.department_id, " +
                 "s.field_grants, (SELECT max(last_seen_at) FROM sessions x WHERE x.staff_id = s.id) AS last_seen_at, " +
                 "s.created_at FROM staff s ";
     }
@@ -115,6 +115,7 @@ class StaffRepository {
             List<String> fieldGrants = fieldGrantsArray == null
                     ? List.of()
                     : Arrays.asList((String[]) fieldGrantsArray.getArray());
+            String departmentId = rs.getString("department_id");
             return new StaffRow(
                     UUID.fromString(rs.getString("id")),
                     UUID.fromString(rs.getString("tenant_id")),
@@ -128,6 +129,7 @@ class StaffRepository {
                     rs.getBoolean("mobile_verified"),
                     rs.getBoolean("mfa_enabled"),
                     fieldGrants,
+                    departmentId == null ? null : UUID.fromString(departmentId),
                     lastSeen == null ? null : lastSeen.toInstant(),
                     rs.getTimestamp("created_at").toInstant());
         };

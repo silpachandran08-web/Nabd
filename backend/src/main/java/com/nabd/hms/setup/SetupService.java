@@ -283,7 +283,7 @@ public class SetupService {
     }
 
     private void validateStep(String step) {
-        List<String> valid = List.of("welcome", "profile", "tax", "doctors", "schedule", "charges", "pharmacy", "whatsapp", "go_live");
+        List<String> valid = List.of("welcome", "profile", "tax", "doctors", "departments", "schedule", "charges", "pharmacy", "whatsapp", "go_live");
         if (!valid.contains(step)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-step", "Invalid wizard step", "Invalid wizard step: " + step);
         }
