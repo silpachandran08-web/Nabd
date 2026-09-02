@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
 // untouched, so there's no new login and nothing else to restore.
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-const SKIP_PREFIXES = ["/login", "/platform"];
+const SKIP_PREFIXES = ["/login", "/platform", "/owner"];
 
 export default function IdleLockGuard() {
   const pathname = usePathname();

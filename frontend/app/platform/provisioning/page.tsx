@@ -21,6 +21,9 @@ type Job = {
   approvedAt: string | null; createdTenantId: string | null; steps: Step[];
   // Reveal-once (NB-353): only non-null on the single advance() response right after verify_invite_owner runs.
   ownerInviteToken: string | null;
+  // Reveal-once (NB-354): the owner's top-level account invite — null if they already activated
+  // it on an earlier clinic (see OwnerService.invite()'s own-pin check).
+  ownerAccountInviteToken: string | null;
 };
 type Problem = { title: string; detail: string };
 
@@ -110,6 +113,7 @@ export default function ProvisioningPage() {
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
   const [jobActionError, setJobActionError] = useState<Record<string, string>>({});
   const [ownerInviteTokens, setOwnerInviteTokens] = useState<Record<string, string>>({});
+  const [ownerAccountInviteTokens, setOwnerAccountInviteTokens] = useState<Record<string, string>>({});
   const [lifecycleSel, setLifecycleSel] = useState(LIFECYCLE_STATES[1].key);
 
   const authedFetch = useCallback(
@@ -228,6 +232,11 @@ export default function ProvisioningPage() {
           // captured separately: the very next advance() call in this loop overwrites the job's
           // own ownerInviteToken field with null, so this is the only chance to keep it around.
           setOwnerInviteTokens((prev) => ({ ...prev, [jobId]: updated.ownerInviteToken! }));
+        }
+        if (updated.ownerAccountInviteToken) {
+          // Same reveal-once capture, for the separate top-level owner-account invite (NB-354) —
+          // null here whenever this owner already activated their account on an earlier clinic.
+          setOwnerAccountInviteTokens((prev) => ({ ...prev, [jobId]: updated.ownerAccountInviteToken! }));
         }
         if (!["queued", "running"].includes(updated.status)) break;
       }
@@ -369,8 +378,15 @@ export default function ProvisioningPage() {
                         {jobActionError[job.id] && <div className={styles.formError} role="alert">{jobActionError[job.id]}</div>}
                         {ownerInviteTokens[job.id] && (
                           <div className={styles.cNoteWarn}>
-                            Owner invite link (shown once — relay by hand, no email service yet):{" "}
+                            Clinic staff invite link (shown once — also emailed, relay by hand if it doesn&apos;t arrive):{" "}
                             <code>{`${typeof window !== "undefined" ? window.location.origin : ""}/accept-invite/${ownerInviteTokens[job.id]}`}</code>
+                          </div>
+                        )}
+                        {ownerAccountInviteTokens[job.id] && (
+                          <div className={styles.cNoteWarn}>
+                            Owner account invite link (shown once — lets this owner log into every clinic they
+                            own from one place; also emailed):{" "}
+                            <code>{`${typeof window !== "undefined" ? window.location.origin : ""}/owner/accept-invite/${ownerAccountInviteTokens[job.id]}`}</code>
                           </div>
                         )}
                         <div className={styles.steps}>

@@ -110,9 +110,13 @@ export default function CheckoutPage() {
     void Promise.resolve().then(load);
   }, [load]);
 
-  function addCharge(charge: Charge) {
+  function effectivePrice(charge: Charge): number {
     const useFollowUp = context?.followUpEligible && charge.category === "Consultation" && charge.followUpAmount != null;
-    const unitPrice = useFollowUp ? charge.followUpAmount! : charge.baseAmount;
+    return useFollowUp ? charge.followUpAmount! : charge.baseAmount;
+  }
+
+  function addCharge(charge: Charge) {
+    const unitPrice = effectivePrice(charge);
     setItems((prev) => {
       const existing = prev.find((i) => i.chargeCode === charge.code);
       if (existing) {
@@ -290,12 +294,19 @@ export default function CheckoutPage() {
                 <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c}</button>
               ))}
             </div>
-            {visibleCharges.map((c) => (
-              <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
-                <span className={styles.chargeName}>{c.name}</span>
-                <span className={styles.chargePrice}>{context.currency} {c.baseAmount.toFixed(2)}</span>
-              </button>
-            ))}
+            {visibleCharges.map((c) => {
+              const price = effectivePrice(c);
+              const isFollowUp = price !== c.baseAmount;
+              return (
+                <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
+                  <span className={styles.chargeName}>{c.name}</span>
+                  <span className={styles.chargePrice}>
+                    {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{c.baseAmount.toFixed(2)}</span>}
+                    {context.currency} {price.toFixed(2)}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <div className={styles.card}>
