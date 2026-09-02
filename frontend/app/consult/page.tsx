@@ -7,10 +7,11 @@ import styles from "./consult.module.css";
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
 type QueueEntry = {
-  id: string; appointmentId: string | null; patientId: string; doctorId: string;
+  id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
   queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
 };
 type Row = QueueEntry & { patientName: string };
+type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
 type PatientDetail = {
   id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string;
   allergies: string[]; chronicConditions: string[]; activePackages: number; outstandingBalance?: number; lastVisitAt: string | null;
@@ -94,6 +95,12 @@ export default function ConsultPage() {
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [completing, setCompleting] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferTargets, setTransferTargets] = useState<TransferTarget[] | null>(null);
+  const [transferDepartmentId, setTransferDepartmentId] = useState("");
+  const [transferDoctorId, setTransferDoctorId] = useState("");
+  const [transferring, setTransferring] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
   const [rxItems, setRxItems] = useState<PrescriptionItem[]>([]);
   const [rxStatus, setRxStatus] = useState<"draft" | "signed">("draft");
   const [rxSaving, setRxSaving] = useState(false);
@@ -425,6 +432,43 @@ export default function ConsultPage() {
     }
   }
 
+  async function openTransfer() {
+    if (!activeEntry) return;
+    setTransferError(null);
+    setTransferDepartmentId("");
+    setTransferDoctorId("");
+    setShowTransfer(true);
+    const res = await authedFetch(`/departments/${activeEntry.departmentId}/transfer-targets`);
+    if (!res?.ok) {
+      setTransferError("Couldn't load transfer options.");
+      setTransferTargets([]);
+      return;
+    }
+    setTransferTargets(await res.json());
+  }
+
+  async function submitTransfer() {
+    if (!activeEntry || !transferDepartmentId || !transferDoctorId) return;
+    setTransferring(true);
+    setTransferError(null);
+    try {
+      const res = await authedFetch(`/queue/${activeEntry.id}/transfer`, {
+        method: "POST",
+        body: JSON.stringify({ toDepartmentId: transferDepartmentId, doctorId: transferDoctorId }),
+      });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't transfer the patient." }));
+        setTransferError(p.detail || "Couldn't transfer the patient.");
+        return;
+      }
+      setShowTransfer(false);
+      closeShell();
+    } finally {
+      setTransferring(false);
+    }
+  }
+
   if (activeEntry) {
     return (
       <main className={styles.page}>
@@ -443,6 +487,11 @@ export default function ConsultPage() {
             <span className={styles.saveStatus}>
               {saving ? "Saving…" : dirty ? "Unsaved changes" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString()}` : ""}
             </span>
+            {activeEntry.status === "in_consult" && (
+              <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>
+                Transfer to another department
+              </button>
+            )}
             <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || noteStatus === "signed"}>
               {completing ? "Completing…" : "Complete consultation"}
             </button>
@@ -450,6 +499,57 @@ export default function ConsultPage() {
         </div>
 
         {shellError && <div className={styles.errorState} role="alert">{shellError}</div>}
+
+        {showTransfer && (
+          <div onClick={() => setShowTransfer(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: 380, background: "var(--nb-surface-1)", border: "1px solid var(--nb-border-default)", borderRadius: "var(--nb-radius-lg)", padding: 24 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 16px", color: "var(--nb-text-primary)" }}>Transfer to another department</h2>
+              {transferTargets === null ? (
+                <p style={{ color: "var(--nb-text-secondary)", fontSize: 13 }}>Loading…</p>
+              ) : transferTargets.length === 0 ? (
+                <p style={{ color: "var(--nb-text-secondary)", fontSize: 13 }}>This department isn&apos;t configured to transfer patients anywhere.</p>
+              ) : (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: "block", fontSize: 12, color: "var(--nb-text-secondary)", marginBottom: 4 }}>Department</label>
+                    <select
+                      value={transferDepartmentId}
+                      onChange={(e) => { setTransferDepartmentId(e.target.value); setTransferDoctorId(""); }}
+                      style={{ width: "100%", height: 36, background: "var(--nb-surface-3)", border: "1px solid var(--nb-border-default)", borderRadius: 8, padding: "0 12px", color: "var(--nb-text-primary)", fontSize: 13, boxSizing: "border-box" }}
+                    >
+                      <option value="">Select a department…</option>
+                      {transferTargets.map((t) => (
+                        <option key={t.departmentId} value={t.departmentId}>{t.departmentName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {transferDepartmentId && (
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ display: "block", fontSize: 12, color: "var(--nb-text-secondary)", marginBottom: 4 }}>Doctor</label>
+                      <select
+                        value={transferDoctorId}
+                        onChange={(e) => setTransferDoctorId(e.target.value)}
+                        style={{ width: "100%", height: 36, background: "var(--nb-surface-3)", border: "1px solid var(--nb-border-default)", borderRadius: 8, padding: "0 12px", color: "var(--nb-text-primary)", fontSize: 13, boxSizing: "border-box" }}
+                      >
+                        <option value="">Select a doctor…</option>
+                        {transferTargets.find((t) => t.departmentId === transferDepartmentId)?.doctors.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+              {transferError && <div className={styles.errorState}>{transferError}</div>}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+                <button className={styles.backBtn} onClick={() => setShowTransfer(false)}>Cancel</button>
+                <button className={styles.completeBtn} onClick={submitTransfer} disabled={transferring || !transferDepartmentId || !transferDoctorId}>
+                  {transferring ? "Transferring…" : "Transfer"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {activePatient && (
           <div className={activePatient.allergies.length === 0 ? styles.allergyBannerNone : styles.allergyBannerSome}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 // NB-044: shared clinic workstations auto-lock after inactivity. This is an overlay on top of
 // whatever page is mounted, not a navigation — nothing in the page underneath unmounts, so a
@@ -14,10 +14,12 @@ const SKIP_PREFIXES = ["/login", "/platform", "/owner"];
 
 export default function IdleLockGuard() {
   const pathname = usePathname();
+  const router = useRouter();
   const [locked, setLocked] = useState(false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const skip = SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
@@ -65,6 +67,24 @@ export default function IdleLockGuard() {
     }
   }
 
+  // The lock overlay covers the whole viewport (z-index 9999) above LogoutButton (z-index 100),
+  // so without this, a locked session with a forgotten PIN has no way out at all.
+  async function signOut() {
+    setSigningOut(true);
+    const token = localStorage.getItem("nabd_access_token");
+    if (token) {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
+    localStorage.removeItem("nabd_access_token");
+    localStorage.removeItem("nabd_refresh_token");
+    setLocked(false);
+    setPin("");
+    router.replace("/login");
+  }
+
   if (skip || !locked) return null;
 
   return (
@@ -92,6 +112,12 @@ export default function IdleLockGuard() {
           color: "var(--nb-on-accent)", fontWeight: 600, fontSize: 13, cursor: "pointer",
         }}>
           {checking ? "Checking…" : "Unlock"}
+        </button>
+        <button type="button" onClick={signOut} disabled={signingOut} style={{
+          width: "100%", height: 36, marginTop: 8, border: "none", background: "transparent",
+          color: "var(--nb-text-secondary)", fontSize: 13, cursor: "pointer", textDecoration: "underline",
+        }}>
+          {signingOut ? "Signing out…" : "Not you? Sign out"}
         </button>
       </form>
     </div>

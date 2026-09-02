@@ -10,7 +10,8 @@ public record StaffInviteRequest(
         @NotBlank String name,
         @NotBlank String mobilePhone,
         @NotNull java.util.UUID roleId,
-        @Pattern(regexp = "own_patients_only|all_clinic_patients") String scope
+        @Pattern(regexp = "own_patients_only|all_clinic_patients") String scope,
+        java.util.UUID departmentId
 ) {
     public String scopeOrDefault() {
         return scope == null ? "all_clinic_patients" : scope;

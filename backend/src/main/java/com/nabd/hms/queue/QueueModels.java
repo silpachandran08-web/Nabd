@@ -24,10 +24,10 @@ final class QueueModels {
     record CallbackEntryRow(UUID id, UUID patientId, String patientName, UUID doctorId, Instant startTime, String status) {
     }
 
-    record QueueEntryRow(UUID id, UUID appointmentId, UUID patientId, UUID doctorId, LocalDate queueDate,
-                          int tokenNumber, String status, boolean priority, String priorityReason,
-                          UUID priorityFlaggedBy, Instant priorityFlaggedAt, UUID priorityAcknowledgedBy,
-                          Instant priorityAcknowledgedAt, String source, Instant createdAt) {
+    record QueueEntryRow(UUID id, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
+                          UUID parentQueueEntryId, LocalDate queueDate, int tokenNumber, String status,
+                          boolean priority, String priorityReason, UUID priorityFlaggedBy, Instant priorityFlaggedAt,
+                          UUID priorityAcknowledgedBy, Instant priorityAcknowledgedAt, String source, Instant createdAt) {
     }
 
     /** NB-099: a waitlist membership; offeredSlotStart/offerExpiresAt are set only while status='offered'. */

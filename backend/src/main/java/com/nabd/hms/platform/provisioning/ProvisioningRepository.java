@@ -166,6 +166,13 @@ class ProvisioningRepository {
         return count != null && count > 0;
     }
 
+    /** Same backfill V37's migration gave every already-provisioned tenant — a brand-new tenant
+     * needs this too, so check-in never breaks for a doctor nobody has assigned a department to yet. */
+    void seedDefaultDepartment(UUID tenantId) {
+        jdbc.update("INSERT INTO departments (tenant_id, name, requires_vitals, is_default) VALUES (?,'General',true,true)",
+                tenantId);
+    }
+
     /** The Owner role seed_masters just created — verify_invite_owner needs its id to invite the owner as staff. */
     Optional<UUID> findBuiltInRoleId(UUID tenantId) {
         return jdbc.query("SELECT id FROM roles WHERE tenant_id = ? AND built_in = true LIMIT 1",
@@ -185,6 +192,12 @@ class ProvisioningRepository {
 
     void deleteBuiltInRole(UUID tenantId) {
         jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND built_in = true", tenantId);
+    }
+
+    /** Reverses seedDefaultDepartment — departments.tenant_id references tenants(id), so this must
+     * run before undoCreateTenant's deleteTenant or that DELETE hits a FK violation. */
+    void deleteDepartments(UUID tenantId) {
+        jdbc.update("DELETE FROM departments WHERE tenant_id = ?", tenantId);
     }
 
     /** NB-353's undo of verify_invite_owner — a fatal later-step failure must leave no login behind either. */

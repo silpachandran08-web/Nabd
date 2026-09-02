@@ -26,7 +26,7 @@ class SetupApiTest extends ApiTestBase {
 
         ResponseEntity<List> getResp = exchange("/v1/setup/checklist", HttpMethod.GET, authed(token), List.class);
         assertThat(getResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(getResp.getBody()).hasSize(9);
+        assertThat(getResp.getBody()).hasSize(10); // welcome..go_live, including "departments"
 
         ResponseEntity<Void> postResp = exchange("/v1/setup/checklist/profile/complete", HttpMethod.POST,
                 authedJsonBody(token, Map.of("status", "done")), Void.class);

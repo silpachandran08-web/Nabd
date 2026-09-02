@@ -6,5 +6,5 @@ import java.util.UUID;
 
 public record StaffResponse(UUID id, String email, String name, String mobilePhone, UUID roleId, String status,
                              String scope, boolean emailVerified, boolean mobileVerified,
-                             List<String> fieldGrants, Instant lastSeenAt) {
+                             List<String> fieldGrants, UUID departmentId, Instant lastSeenAt) {
 }

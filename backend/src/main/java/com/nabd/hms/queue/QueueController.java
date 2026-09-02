@@ -4,6 +4,8 @@ import com.nabd.hms.queue.dto.CheckInRequest;
 import com.nabd.hms.queue.dto.QueueEntryResponse;
 import com.nabd.hms.queue.dto.QueueReorderRequest;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
+import com.nabd.hms.queue.dto.TransferRequest;
+import com.nabd.hms.queue.dto.TransferResponse;
 import com.nabd.hms.queue.dto.WaitEstimateResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -44,9 +46,10 @@ public class QueueController {
     @PreAuthorize("hasAuthority('queue:view')")
     public List<QueueEntryResponse> list(@AuthenticationPrincipal Jwt jwt,
                                           @RequestParam(required = false) UUID doctorId,
+                                          @RequestParam(required = false) UUID departmentId,
                                           @RequestParam(required = false) LocalDate date,
                                           @RequestParam(defaultValue = "false") boolean priority) {
-        return service.list(tenantId(jwt), doctorId, date, priority);
+        return service.list(tenantId(jwt), doctorId, departmentId, date, priority);
     }
 
     @PatchMapping("/{id}/status")
@@ -54,6 +57,13 @@ public class QueueController {
     public QueueEntryResponse updateStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                             @Valid @RequestBody QueueStatusUpdateRequest req) {
         return service.updateStatus(tenantId(jwt), staffId(jwt), id, req);
+    }
+
+    @PostMapping("/{id}/transfer")
+    @PreAuthorize("hasAuthority('queue:edit')")
+    public TransferResponse transfer(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                      @Valid @RequestBody TransferRequest req) {
+        return service.transfer(tenantId(jwt), staffId(jwt), id, req);
     }
 
     @PostMapping("/{id}/reorder")
