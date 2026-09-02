@@ -130,7 +130,7 @@ export default function DepartmentsPage() {
     setMatrixError(null);
     setSavingMatrix(true);
     try {
-      const res = await authedFetch("/departments/transfers", { method: "PUT", body: JSON.stringify({ edges }) });
+      const res = await authedFetch("/departments/transfers", { method: "POST", body: JSON.stringify({ edges }) });
       if (!res) return;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save the transfer graph." }));
