@@ -63,16 +63,6 @@ class QueueRepository {
                 UUID.class, tenantId, tenantId, doctorId);
     }
 
-    /** Whether the department this entry belongs to requires the vitals step — a narrow direct
-     * read into departments, same "don't inject the other module's repository for one column"
-     * precedent as CheckoutRepository reaching into pharmacy_settings/charge_catalogue. */
-    boolean requiresVitals(UUID tenantId, UUID departmentId) {
-        Boolean requiresVitals = jdbc.queryForObject(
-                "SELECT requires_vitals FROM departments WHERE tenant_id = ? AND id = ?",
-                Boolean.class, tenantId, departmentId);
-        return Boolean.TRUE.equals(requiresVitals);
-    }
-
     /** The owner-designed transfer graph, read narrowly here rather than injecting DepartmentRepository. */
     boolean transferAllowed(UUID tenantId, UUID fromDepartmentId, UUID toDepartmentId) {
         Boolean exists = jdbc.queryForObject(

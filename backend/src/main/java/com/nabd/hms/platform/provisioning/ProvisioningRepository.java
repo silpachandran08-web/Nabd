@@ -167,9 +167,11 @@ class ProvisioningRepository {
     }
 
     /** Same backfill V37's migration gave every already-provisioned tenant — a brand-new tenant
-     * needs this too, so check-in never breaks for a doctor nobody has assigned a department to yet. */
+     * needs this too, so check-in never breaks for a doctor nobody has assigned a department to yet.
+     * No visit_flow_steps rows are seeded here — DepartmentService.resolveStatusSequence() already
+     * falls back to vitals+consultation (today's exact former default) when a department has none. */
     void seedDefaultDepartment(UUID tenantId) {
-        jdbc.update("INSERT INTO departments (tenant_id, name, requires_vitals, is_default) VALUES (?,'General',true,true)",
+        jdbc.update("INSERT INTO departments (tenant_id, name, is_default) VALUES (?,'General',true)",
                 tenantId);
     }
 

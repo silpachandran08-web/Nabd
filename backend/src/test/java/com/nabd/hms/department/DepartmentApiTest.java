@@ -22,9 +22,9 @@ class DepartmentApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
 
         ResponseEntity<Map> createResp = exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Dental", "requiresVitals", false, "active", true)), Map.class);
+                "name", "Dental", "active", true)), Map.class);
         assertThat(createResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(createResp.getBody()).containsEntry("name", "Dental").containsEntry("requiresVitals", false);
+        assertThat(createResp.getBody()).containsEntry("name", "Dental");
 
         ResponseEntity<List> listResp = exchange("/v1/departments", HttpMethod.GET, authed(token), List.class);
         assertThat(listResp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -43,13 +43,13 @@ class DepartmentApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
 
         ResponseEntity<Map> createResp = exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Dermatology", "requiresVitals", true, "active", true)), Map.class);
+                "name", "Dermatology", "active", true)), Map.class);
         String id = (String) createResp.getBody().get("id");
 
         ResponseEntity<Map> updateResp = exchange("/v1/departments/" + id, HttpMethod.PATCH, authedJsonBody(token, Map.of(
-                "name", "Dermatology & Cosmetology", "requiresVitals", false, "active", true)), Map.class);
+                "name", "Dermatology & Cosmetology", "active", true)), Map.class);
         assertThat(updateResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(updateResp.getBody()).containsEntry("name", "Dermatology & Cosmetology").containsEntry("requiresVitals", false);
+        assertThat(updateResp.getBody()).containsEntry("name", "Dermatology & Cosmetology");
     }
 
     /** The default department is the check-in fallback for any doctor nobody's assigned a
@@ -66,7 +66,7 @@ class DepartmentApiTest extends ApiTestBase {
         String id = (String) defaultDept.get("id");
 
         ResponseEntity<Map> resp = exchange("/v1/departments/" + id, HttpMethod.PATCH, authedJsonBody(token, Map.of(
-                "name", "General", "requiresVitals", true, "active", false)), Map.class);
+                "name", "General", "active", false)), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(resp.getBody().get("type")).asString().contains("default-department-immutable");
     }
@@ -79,19 +79,18 @@ class DepartmentApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
 
         String generalId = (String) defaultDepartment(token).get("id");
-        String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
+        String dentalId = createDepartment(token, "Dental");
 
-        ResponseEntity<List> firstPut = exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
+        ResponseEntity<List> firstPost = exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
-        assertThat(firstPut.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(firstPut.getBody()).hasSize(1);
+        assertThat(firstPost.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(firstPost.getBody()).hasSize(1);
 
         // Replacing with an empty graph clears the previous edge entirely — whole-graph replace, not a merge.
-        ResponseEntity<List> secondPut = exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
+        ResponseEntity<List> secondPost = exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "edges", List.of())), List.class);
-        assertThat(secondPut.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(secondPut.getBody()).isEmpty();
+        assertThat(secondPost.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(secondPost.getBody()).isEmpty();
     }
 
     @Test
@@ -102,8 +101,7 @@ class DepartmentApiTest extends ApiTestBase {
         String ownerToken = loginAndGetAccessToken(owner);
 
         String generalId = (String) defaultDepartment(ownerToken).get("id");
-        String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
-                "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
+        String dentalId = createDepartment(ownerToken, "Dental");
         exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
                 "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
 
@@ -120,6 +118,78 @@ class DepartmentApiTest extends ApiTestBase {
         assertThat(dentalTarget).containsEntry("departmentName", "Dental");
         List<Map<String, Object>> doctors = (List<Map<String, Object>>) dentalTarget.get("doctors");
         assertThat(doctors).extracting(d -> d.get("name")).contains("Test Staff");
+    }
+
+    // ── visit flow (NB-355) ──
+
+    @Test
+    void unconfiguredDepartmentFallsBackToVitalsThenConsultation() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner6@a.com", "+919200001007", false);
+        String token = loginAndGetAccessToken(staff);
+
+        String id = createDepartment(token, "Fresh");
+        ResponseEntity<List> resp = exchange("/v1/departments/" + id + "/flow", HttpMethod.GET, authed(token), List.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody()).isEmpty(); // nothing configured yet — the default only applies inside resolveStatusSequence()
+    }
+
+    @Test
+    void replacingTheFlowReordersAndPersistsSteps() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner7@a.com", "+919200001008", false);
+        String token = loginAndGetAccessToken(staff);
+        String id = createDepartment(token, "Dental");
+
+        // Dental example from the ticket: consultation, then procedures, then billing.
+        ResponseEntity<List> resp = exchange("/v1/departments/" + id + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "steps", List.of(
+                        Map.of("stepType", "consultation"),
+                        Map.of("stepType", "procedures"),
+                        Map.of("stepType", "billing")))), List.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> steps = resp.getBody();
+        assertThat(steps).extracting(s -> s.get("stepType")).containsExactly("consultation", "procedures", "billing");
+
+        ResponseEntity<List> getResp = exchange("/v1/departments/" + id + "/flow", HttpMethod.GET, authed(token), List.class);
+        assertThat(((List<Map<String, Object>>) getResp.getBody())).extracting(s -> s.get("stepType"))
+                .containsExactly("consultation", "procedures", "billing");
+    }
+
+    @Test
+    void flowMustIncludeExactlyOneConsultationStep() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner8@a.com", "+919200001009", false);
+        String token = loginAndGetAccessToken(staff);
+        String id = createDepartment(token, "Dental");
+
+        ResponseEntity<Map> missing = exchange("/v1/departments/" + id + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "steps", List.of(Map.of("stepType", "billing")))), Map.class);
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(missing.getBody().get("type")).asString().contains("flow-invalid");
+    }
+
+    @Test
+    void flowRejectsADuplicateStepType() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner9@a.com", "+919200001010", false);
+        String token = loginAndGetAccessToken(staff);
+        String id = createDepartment(token, "Dental");
+
+        ResponseEntity<Map> resp = exchange("/v1/departments/" + id + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "steps", List.of(Map.of("stepType", "consultation"), Map.of("stepType", "vitals"), Map.of("stepType", "vitals")))), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().get("type")).asString().contains("flow-invalid");
+    }
+
+    private String createDepartment(String token, String name) {
+        ResponseEntity<Map> resp = exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", name, "active", true)), Map.class);
+        return (String) resp.getBody().get("id");
     }
 
     private Map<String, Object> defaultDepartment(String token) {

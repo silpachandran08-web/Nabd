@@ -2,6 +2,7 @@ package com.nabd.hms.queue;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.department.DepartmentService;
 import com.nabd.hms.queue.dto.CheckInRequest;
 import com.nabd.hms.queue.dto.QueueEntryResponse;
 import com.nabd.hms.queue.dto.QueueReorderRequest;
@@ -33,38 +34,49 @@ public class QueueService {
     private static final Logger log = LoggerFactory.getLogger(QueueService.class);
 
     /**
-     * Strict linear order (NB-094); no_show is reachable from anywhere before checkout. v2's
-     * wireframe lists "vitals pending/done" as two distinct states, not the single "vitals" step
-     * v1 had — split here to match. Whether vitals_pending is even reachable now depends on the
-     * entry's department (NB-3xx departments) — a department with requiresVitals=false skips
-     * straight from waiting to in_consult. transferred_out is a second terminal alongside
-     * checkout_pending, reachable only from in_consult — a doctor's end-of-consult choice between
-     * billing this leg or moving the patient into another department's queue.
+     * NB-355: the linear order is no longer fixed in code — DepartmentService.resolveStatusSequence()
+     * is the single source of truth for a department's configured (or default) pipeline shape;
+     * this is a pure lookup over whatever sequence it returns. no_show is reachable from anywhere
+     * before the terminal checkout_pending step, matching the original NB-094 rule. transferred_out
+     * is a second terminal alongside checkout_pending, reachable only from in_consult — a doctor's
+     * end-of-consult choice between billing this leg or moving the patient into another
+     * department's queue.
      */
-    private static Set<String> allowedNextStatuses(String current, boolean requiresVitals) {
-        return switch (current) {
-            case "checked_in" -> Set.of("waiting", "no_show");
-            case "waiting" -> requiresVitals ? Set.of("vitals_pending", "no_show") : Set.of("in_consult", "no_show");
-            case "vitals_pending" -> Set.of("vitals_done", "no_show");
-            case "vitals_done" -> Set.of("in_consult", "no_show");
-            case "in_consult" -> Set.of("checkout_pending", "transferred_out", "no_show");
-            case "checkout_pending" -> Set.of("completed");
-            default -> Set.of(); // completed, no_show, transferred_out are terminal
-        };
+    private static Set<String> allowedNextStatuses(String current, List<String> sequence) {
+        if (Set.of("completed", "no_show", "transferred_out").contains(current)) {
+            return Set.of();
+        }
+        int i = sequence.indexOf(current);
+        Set<String> next = i >= 0 && i + 1 < sequence.size() ? Set.of(sequence.get(i + 1)) : Set.of();
+        if ("in_consult".equals(current)) {
+            next = union(next, "transferred_out");
+        }
+        if (!"checkout_pending".equals(current)) {
+            next = union(next, "no_show");
+        }
+        return next;
+    }
+
+    private static Set<String> union(Set<String> set, String extra) {
+        Set<String> combined = new java.util.HashSet<>(set);
+        combined.add(extra);
+        return combined;
     }
 
     private final QueueRepository repo;
     private final AppointmentRepository appointmentRepo;
     private final AppointmentService appointmentService;
     private final ScheduleRepository scheduleRepo;
+    private final DepartmentService departmentService;
     private final TenantContext tenantContext;
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
-                 ScheduleRepository scheduleRepo, TenantContext tenantContext) {
+                 ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext) {
         this.repo = repo;
         this.appointmentRepo = appointmentRepo;
         this.appointmentService = appointmentService;
         this.scheduleRepo = scheduleRepo;
+        this.departmentService = departmentService;
         this.tenantContext = tenantContext;
     }
 
@@ -121,8 +133,8 @@ public class QueueService {
     }
 
     private void requireLegalTransition(UUID tenantId, QueueEntryRow current, String nextStatus, UUID callerStaffId, UUID id) {
-        boolean requiresVitals = repo.requiresVitals(tenantId, current.departmentId());
-        Set<String> allowed = allowedNextStatuses(current.status(), requiresVitals);
+        List<String> sequence = departmentService.resolveStatusSequence(tenantId, current.departmentId());
+        Set<String> allowed = allowedNextStatuses(current.status(), sequence);
         if (!allowed.contains(nextStatus)) {
             log.warn("illegal queue transition blocked by {}: entry {} {} -> {}", callerStaffId, id, current.status(), nextStatus);
             throw new ApiException(HttpStatus.BAD_REQUEST, "illegal-transition", "Illegal queue transition",

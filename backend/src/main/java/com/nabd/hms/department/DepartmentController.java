@@ -2,6 +2,8 @@ package com.nabd.hms.department;
 
 import com.nabd.hms.department.dto.DepartmentResponse;
 import com.nabd.hms.department.dto.DepartmentWriteRequest;
+import com.nabd.hms.department.dto.FlowStepResponse;
+import com.nabd.hms.department.dto.FlowWriteRequest;
 import com.nabd.hms.department.dto.TransferEdge;
 import com.nabd.hms.department.dto.TransferGraphRequest;
 import com.nabd.hms.department.dto.TransferTargetResponse;
@@ -70,6 +72,22 @@ public class DepartmentController {
     @PreAuthorize("hasAuthority('queue:view')")
     public List<TransferTargetResponse> transferTargets(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.transferTargets(tenantId(jwt), id);
+    }
+
+    /** queue:view, not departments:view — front-desk/nursing/billing staff on the checkout and
+     * nursing pages need to read a department's flow to know what "next" means at their current
+     * stop, same broader-access precedent as transfer-targets above. */
+    @GetMapping("/{id}/flow")
+    @PreAuthorize("hasAuthority('queue:view')")
+    public List<FlowStepResponse> listFlow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.listFlow(tenantId(jwt), id);
+    }
+
+    @PostMapping("/{id}/flow")
+    @PreAuthorize("hasAuthority('departments:edit')")
+    public List<FlowStepResponse> replaceFlow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                               @Valid @RequestBody FlowWriteRequest req) {
+        return service.replaceFlow(tenantId(jwt), staffId(jwt), id, req);
     }
 
     private UUID tenantId(Jwt jwt) {

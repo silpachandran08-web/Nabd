@@ -6,10 +6,17 @@ import styles from "./departments.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
-type Department = { id: string; name: string; requiresVitals: boolean; isDefault: boolean; active: boolean };
+type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 type TransferEdge = { fromDepartmentId: string; toDepartmentId: string };
 type Problem = { title: string; detail: string };
-type Builder = { mode: "create" | "edit"; sourceId?: string; name: string; requiresVitals: boolean; active: boolean };
+type FlowStep = { stepType: string; staffingDepartmentId: string | null };
+type Builder = { mode: "create" | "edit"; sourceId?: string; name: string; active: boolean; flowSteps: FlowStep[]; flowLoading: boolean };
+
+const STEP_TYPES = ["billing", "vitals", "consultation", "procedures"] as const;
+const STEP_LABELS: Record<string, string> = { billing: "Billing", vitals: "Vitals", consultation: "Consultation", procedures: "Procedures" };
+// Matches DepartmentService's own fallback when nothing's configured yet — the flow editor shows
+// this instead of an empty list so it always reflects what's actually happening.
+const DEFAULT_FLOW: FlowStep[] = [{ stepType: "vitals", staffingDepartmentId: null }, { stepType: "consultation", staffingDepartmentId: null }];
 
 export default function DepartmentsPage() {
   const router = useRouter();
@@ -79,12 +86,46 @@ export default function DepartmentsPage() {
 
   function openCreate() {
     setBuilderError(null);
-    setBuilder({ mode: "create", name: "", requiresVitals: true, active: true });
+    setBuilder({ mode: "create", name: "", active: true, flowSteps: [], flowLoading: false });
   }
 
-  function openEdit(d: Department) {
+  async function openEdit(d: Department) {
     setBuilderError(null);
-    setBuilder({ mode: "edit", sourceId: d.id, name: d.name, requiresVitals: d.requiresVitals, active: d.active });
+    setBuilder({ mode: "edit", sourceId: d.id, name: d.name, active: d.active, flowSteps: [], flowLoading: true });
+    const res = await authedFetch(`/departments/${d.id}/flow`);
+    if (!res?.ok) {
+      setBuilder((prev) => (prev ? { ...prev, flowSteps: DEFAULT_FLOW, flowLoading: false } : prev));
+      return;
+    }
+    const steps: FlowStep[] = await res.json();
+    setBuilder((prev) => (prev ? { ...prev, flowSteps: steps.length > 0 ? steps : DEFAULT_FLOW, flowLoading: false } : prev));
+  }
+
+  function addFlowStep(stepType: string) {
+    setBuilder((prev) => (prev ? { ...prev, flowSteps: [...prev.flowSteps, { stepType, staffingDepartmentId: null }] } : prev));
+  }
+
+  function removeFlowStep(stepType: string) {
+    setBuilder((prev) => (prev ? { ...prev, flowSteps: prev.flowSteps.filter((s) => s.stepType !== stepType) } : prev));
+  }
+
+  function moveFlowStep(index: number, direction: -1 | 1) {
+    setBuilder((prev) => {
+      if (!prev) return prev;
+      const steps = [...prev.flowSteps];
+      const target = index + direction;
+      if (target < 0 || target >= steps.length) return prev;
+      [steps[index], steps[target]] = [steps[target], steps[index]];
+      return { ...prev, flowSteps: steps };
+    });
+  }
+
+  function setFlowStepStaffing(stepType: string, staffingDepartmentId: string) {
+    setBuilder((prev) =>
+      prev
+        ? { ...prev, flowSteps: prev.flowSteps.map((s) => (s.stepType === stepType ? { ...s, staffingDepartmentId: staffingDepartmentId || null } : s)) }
+        : prev
+    );
   }
 
   async function submitBuilder(e: React.FormEvent) {
@@ -96,12 +137,16 @@ export default function DepartmentsPage() {
       setBuilderError("Name the department.");
       return;
     }
+    if (builder.mode === "edit" && !builder.flowSteps.some((s) => s.stepType === "consultation")) {
+      setBuilderError("The flow must include a consultation step.");
+      return;
+    }
     setBuilderSubmitting(true);
     try {
       const isEdit = builder.mode === "edit";
       const res = await authedFetch(isEdit ? `/departments/${builder.sourceId}` : "/departments", {
         method: isEdit ? "PATCH" : "POST",
-        body: JSON.stringify({ name, requiresVitals: builder.requiresVitals, active: builder.active }),
+        body: JSON.stringify({ name, active: builder.active }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -110,6 +155,19 @@ export default function DepartmentsPage() {
         return;
       }
       const saved: Department = await res.json();
+
+      if (isEdit) {
+        const flowRes = await authedFetch(`/departments/${saved.id}/flow`, {
+          method: "POST",
+          body: JSON.stringify({ steps: builder.flowSteps.map((s) => ({ stepType: s.stepType, staffingDepartmentId: s.staffingDepartmentId })) }),
+        });
+        if (!flowRes?.ok) {
+          const p: Problem = await flowRes?.json().catch(() => ({ title: "Error", detail: "Couldn't save the visit flow." }));
+          setBuilderError(p?.detail || "Couldn't save the visit flow.");
+          return;
+        }
+      }
+
       setDepartments((prev) => (isEdit ? prev.map((d) => (d.id === saved.id ? saved : d)) : [...prev, saved]));
       setBuilder(null);
     } finally {
@@ -148,6 +206,8 @@ export default function DepartmentsPage() {
   if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to departments.</div></main>;
   if (error) return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
 
+  const availableStepTypes = builder ? STEP_TYPES.filter((t) => !builder.flowSteps.some((s) => s.stepType === t)) : [];
+
   return (
     <main className={styles.page}>
       <div className={styles.strip}>
@@ -162,13 +222,12 @@ export default function DepartmentsPage() {
         </div>
         <table className={styles.table}>
           <thead>
-            <tr><th>Name</th><th>Requires vitals</th><th>Status</th><th></th></tr>
+            <tr><th>Name</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {departments.map((d) => (
               <tr key={d.id}>
                 <td>{d.name}{d.isDefault && <span className={styles.defaultTag}>Default</span>}</td>
-                <td>{d.requiresVitals ? "Yes" : "No"}</td>
                 <td>{d.active ? "Active" : "Inactive"}</td>
                 <td><button className={styles.smallBtn} onClick={() => openEdit(d)}>Edit</button></td>
               </tr>
@@ -230,14 +289,6 @@ export default function DepartmentsPage() {
               <label className={styles.label}>Name</label>
               <input className={styles.input} value={builder.name} onChange={(e) => setBuilder({ ...builder, name: e.target.value })} />
             </div>
-            <label className={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                checked={builder.requiresVitals}
-                onChange={(e) => setBuilder({ ...builder, requiresVitals: e.target.checked })}
-              />
-              Requires vitals before consultation
-            </label>
             {builder.mode === "edit" && (
               <label className={styles.checkboxRow}>
                 <input
@@ -249,6 +300,51 @@ export default function DepartmentsPage() {
                 Active{departments.find((d) => d.id === builder.sourceId)?.isDefault ? " (default department, always active)" : ""}
               </label>
             )}
+
+            {builder.mode === "edit" && (
+              <div className={styles.field}>
+                <label className={styles.label}>Visit flow</label>
+                <p className={styles.hint}>The order a patient moves through this department&apos;s stages. Consultation is always included.</p>
+                {builder.flowLoading ? (
+                  <div className={styles.hint}>Loading…</div>
+                ) : (
+                  <>
+                    <div className={styles.flowList}>
+                      {builder.flowSteps.map((step, i) => (
+                        <div key={step.stepType} className={styles.flowRow}>
+                          <span className={styles.flowStepName}>{STEP_LABELS[step.stepType]}</span>
+                          <select
+                            className={styles.flowStaffingSelect}
+                            value={step.staffingDepartmentId ?? ""}
+                            onChange={(e) => setFlowStepStaffing(step.stepType, e.target.value)}
+                          >
+                            <option value="">Staffed by…</option>
+                            {departments.map((d) => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                          </select>
+                          <div className={styles.flowRowActions}>
+                            <button type="button" className={styles.smallBtn} onClick={() => moveFlowStep(i, -1)} disabled={i === 0}>▲</button>
+                            <button type="button" className={styles.smallBtn} onClick={() => moveFlowStep(i, 1)} disabled={i === builder.flowSteps.length - 1}>▼</button>
+                            {step.stepType !== "consultation" && (
+                              <button type="button" className={styles.smallBtn} onClick={() => removeFlowStep(step.stepType)}>Remove</button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {availableStepTypes.length > 0 && (
+                      <div className={styles.flowAddRow}>
+                        {availableStepTypes.map((t) => (
+                          <button type="button" key={t} className={styles.smallBtn} onClick={() => addFlowStep(t)}>+ {STEP_LABELS[t]}</button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             {builderError && <div className={styles.errorState}>{builderError}</div>}
             <div className={styles.modalActions}>
               <button type="button" className={styles.btn} onClick={() => setBuilder(null)}>Cancel</button>

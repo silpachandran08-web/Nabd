@@ -54,6 +54,28 @@ class QueueApiTest extends ApiTestBase {
         return departments.stream().filter(d -> Boolean.TRUE.equals(d.get("isDefault"))).findFirst().orElseThrow();
     }
 
+    private String createDepartment(String token, String name) {
+        ResponseEntity<Map> resp = exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", name, "active", true)), Map.class);
+        return (String) resp.getBody().get("id");
+    }
+
+    /** A department with no flow configured at all defaults to vitals+consultation (see
+     * DepartmentService.resolveStatusSequence's fallback) — explicitly configuring consultation-only
+     * is what "requiresVitals=false" used to mean before NB-355 generalized the single boolean. */
+    private void configureFlowWithoutVitals(String token, String departmentId) {
+        exchange("/v1/departments/" + departmentId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "steps", List.of(Map.of("stepType", "consultation")))), List.class);
+    }
+
+    /** checkout() auto-advances the queue on success — this reads the actual persisted status
+     * directly rather than inferring it from a subsequent PATCH's legality (a redundant PATCH to
+     * the status checkout() already moved the entry to would itself be an illegal self-transition). */
+    private String queueStatus(UUID tenantId, String queueEntryId) {
+        return inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT status FROM queue_entries WHERE id = ?", String.class, UUID.fromString(queueEntryId)));
+    }
+
     @Test
     void walkInCheckInAssignsToken() {
         SeededTenant tenant = seedTenant();
@@ -178,7 +200,8 @@ class QueueApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         addWorkingHours(token, staff.id(), null);
         String patientId = registerPatient(token, "Q7", "+919999910007");
-        // staff has no department_id assigned -> falls back to the tenant's seeded default (requiresVitals=true)
+        // staff has no department_id assigned -> falls back to the tenant's seeded default, which
+        // has no flow configured -> resolveStatusSequence()'s vitals+consultation fallback applies
         ResponseEntity<Map> checkin = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "patientId", patientId, "doctorId", staff.id().toString())), Map.class);
         String entryId = (String) checkin.getBody().get("id");
@@ -201,8 +224,8 @@ class QueueApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         addWorkingHours(token, staff.id(), null);
 
-        String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
+        String dentalId = createDepartment(token, "Dental");
+        configureFlowWithoutVitals(token, dentalId);
         UUID dentalUuid = UUID.fromString(dentalId);
         inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ? WHERE id = ?", dentalUuid, staff.id()));
 
@@ -223,6 +246,117 @@ class QueueApiTest extends ApiTestBase {
         assertThat(straightToConsult.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    /** NB-355: the exact general-clinic example from the ticket — Reception -> Billing (consultation
+     * fee) -> Vitals -> Consultation -> Checkout. Proves the interim billing_pending stop charges
+     * the consultation fee up front WITHOUT ending the visit, and the terminal checkout_pending
+     * stop closes it out on the SAME invoice with zero further payment due. */
+    @Test
+    void generalClinicFlowChargesTheConsultationFeeUpfrontThenClosesWithNoFurtherPaymentDue() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "gdoc@a.com", "+919600000020", false);
+        String token = loginAndGetAccessToken(doctor);
+        addWorkingHours(token, doctor.id(), null);
+
+        String generalId = (String) defaultDepartment(token).get("id");
+        exchange("/v1/departments/" + generalId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "steps", List.of(Map.of("stepType", "billing"), Map.of("stepType", "vitals"), Map.of("stepType", "consultation")))),
+                List.class);
+
+        String patientId = registerPatient(token, "Q12", "+919999910020");
+        ResponseEntity<Map> checkin = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", doctor.id().toString())), Map.class);
+        String entryId = (String) checkin.getBody().get("id");
+
+        exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", "waiting")), Map.class);
+        ResponseEntity<Map> toBilling = exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "billing_pending")), Map.class);
+        assertThat(toBilling.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> interim = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation fee",
+                        "category", "Consultation", "quantity", 1, "unitPrice", 500.00, "taxRatePercent", 0.00)),
+                "discount", 0)), Map.class);
+        assertThat(interim.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Number) interim.getBody().get("total")).doubleValue()).isEqualTo(500.00);
+        String invoiceId = (String) interim.getBody().get("id");
+
+        // checkout() auto-advances the queue on success -- the visit continues (vitals is next in
+        // this department's configured flow), the interim billing stop does NOT end it.
+        assertThat(queueStatus(tenant.id(), entryId)).isEqualTo("vitals_pending");
+
+        exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", "vitals_done")), Map.class);
+        exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", "in_consult")), Map.class);
+        exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", "checkout_pending")), Map.class);
+
+        // Nothing else was charged during the visit -- the terminal checkout closes with zero new
+        // line items, on the SAME invoice, for the same total ("checkout with 0 payment").
+        ResponseEntity<Map> finalCheckout = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(), "discount", 0)), Map.class);
+        assertThat(finalCheckout.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(finalCheckout.getBody().get("id")).isEqualTo(invoiceId);
+        assertThat(((Number) finalCheckout.getBody().get("total")).doubleValue()).isEqualTo(500.00);
+        assertThat(queueStatus(tenant.id(), entryId)).isEqualTo("completed");
+    }
+
+    /** NB-355: the exact dental-clinic example from the ticket — Reception -> Consultation ->
+     * Procedures -> Billing -> Checkout. Proves consultation is reachable directly with no vitals
+     * step, procedures_pending needs no special backend action to advance past, and two billing
+     * checkpoints (the interim one after procedures, the terminal one) accumulate onto ONE invoice. */
+    @Test
+    void dentalClinicFlowAccumulatesChargesAcrossTwoBillingCheckpointsOnOneInvoice() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff dentist = seedStaff(tenant, roleId, "ddoc@a.com", "+919600000021", false);
+        String token = loginAndGetAccessToken(dentist);
+        addWorkingHours(token, dentist.id(), null);
+
+        String dentalId = createDepartment(token, "Dental Clinic Flow");
+        exchange("/v1/departments/" + dentalId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "steps", List.of(Map.of("stepType", "consultation"), Map.of("stepType", "procedures"), Map.of("stepType", "billing")))),
+                List.class);
+        UUID dentalUuid = UUID.fromString(dentalId);
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ? WHERE id = ?", dentalUuid, dentist.id()));
+
+        String patientId = registerPatient(token, "Q13", "+919999910021");
+        ResponseEntity<Map> checkin = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", dentist.id().toString())), Map.class);
+        String entryId = (String) checkin.getBody().get("id");
+        assertThat(checkin.getBody().get("departmentId")).isEqualTo(dentalId);
+
+        exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", "waiting")), Map.class);
+        ResponseEntity<Map> toConsult = exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "in_consult")), Map.class);
+        assertThat(toConsult.getStatusCode()).isEqualTo(HttpStatus.OK); // no vitals step configured -- straight from waiting
+        exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", "procedures_pending")), Map.class);
+        ResponseEntity<Map> toBilling = exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "billing_pending")), Map.class);
+        assertThat(toBilling.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> firstBill = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "FILLING", "chargeName", "Tooth filling",
+                        "category", "Procedure", "quantity", 1, "unitPrice", 2000.00, "taxRatePercent", 0.00)),
+                "discount", 0)), Map.class);
+        assertThat(firstBill.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String invoiceId = (String) firstBill.getBody().get("id");
+        assertThat(((Number) firstBill.getBody().get("total")).doubleValue()).isEqualTo(2000.00);
+
+        // billing was the last configured step -- checkout() auto-advanced to the fixed terminal
+        // checkout_pending on its own; nothing else needs to PATCH it there.
+        assertThat(queueStatus(tenant.id(), entryId)).isEqualTo("checkout_pending");
+
+        ResponseEntity<Map> secondBill = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "XRAY", "chargeName", "Dental X-ray",
+                        "category", "Procedure", "quantity", 1, "unitPrice", 300.00, "taxRatePercent", 0.00)),
+                "discount", 0)), Map.class);
+        assertThat(secondBill.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(secondBill.getBody().get("id")).isEqualTo(invoiceId); // same invoice, accumulated
+        assertThat(((Number) secondBill.getBody().get("total")).doubleValue()).isEqualTo(2300.00);
+        List<Map<String, Object>> lineItems = (List<Map<String, Object>>) secondBill.getBody().get("lineItems");
+        assertThat(lineItems).hasSize(2);
+        assertThat(queueStatus(tenant.id(), entryId)).isEqualTo("completed");
+    }
+
     @Test
     void transferOpensANewLegInTheTargetDepartmentAndClosesTheCurrentOne() {
         SeededTenant tenant = seedTenant();
@@ -234,8 +368,8 @@ class QueueApiTest extends ApiTestBase {
         addWorkingHours(token, dentist.id(), null);
 
         String generalId = (String) defaultDepartment(token).get("id");
-        String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
+        String dentalId = createDepartment(token, "Dental");
+        configureFlowWithoutVitals(token, dentalId);
         UUID dentalUuid = UUID.fromString(dentalId);
         inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ? WHERE id = ?", dentalUuid, dentist.id()));
         exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
@@ -271,8 +405,8 @@ class QueueApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         addWorkingHours(token, staff.id(), null);
 
-        String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
+        String dentalId = createDepartment(token, "Dental");
+        configureFlowWithoutVitals(token, dentalId);
         // deliberately no transfer edge created between the caller's department and Dental
 
         String patientId = registerPatient(token, "Q10", "+919999910013");
@@ -299,8 +433,8 @@ class QueueApiTest extends ApiTestBase {
         addWorkingHours(token, staff.id(), null);
 
         String generalId = (String) defaultDepartment(token).get("id");
-        String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Dental", "requiresVitals", false, "active", true)), Map.class).getBody().get("id");
+        String dentalId = createDepartment(token, "Dental");
+        configureFlowWithoutVitals(token, dentalId);
         exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
 

@@ -34,9 +34,11 @@ const PRIORITY_REASON_CODES = [
 const STATUS_CLASS: Record<string, string> = {
   checked_in: styles.pillWaiting,
   waiting: styles.pillWaiting,
+  billing_pending: styles.pillVitals,
   vitals_pending: styles.pillVitals,
   vitals_done: styles.pillReady,
   in_consult: styles.pillConsult,
+  procedures_pending: styles.pillConsult,
   checkout_pending: styles.pillDone,
   completed: styles.pillDone,
   no_show: styles.pillNoShow,
@@ -44,8 +46,12 @@ const STATUS_CLASS: Record<string, string> = {
 
 type Bucket = "waiting" | "in_consult" | "checkout_pending" | "completed" | "other";
 function bucketOf(status: string): Bucket {
-  if (["checked_in", "waiting", "vitals_pending", "vitals_done"].includes(status)) return "waiting";
-  if (status === "in_consult") return "in_consult";
+  // NB-355: a tenant's configured visit flow can add billing_pending (pre-consultation limbo,
+  // same rationale as checked_in/vitals_pending) and procedures_pending (post-consultation,
+  // still with clinical/nursing staff, same rationale as in_consult) — folded into the existing
+  // buckets rather than growing the tab list, front desk doesn't need a finer-grained view here.
+  if (["checked_in", "waiting", "billing_pending", "vitals_pending", "vitals_done"].includes(status)) return "waiting";
+  if (["in_consult", "procedures_pending"].includes(status)) return "in_consult";
   if (status === "checkout_pending") return "checkout_pending";
   if (status === "completed") return "completed";
   return "other";

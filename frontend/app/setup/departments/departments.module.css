@@ -241,3 +241,51 @@
   margin-bottom: var(--nb-space-12);
   cursor: pointer;
 }
+
+.flowList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--nb-space-8);
+}
+
+.flowRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--nb-surface-2);
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: var(--nb-radius-md);
+  padding: 6px 8px;
+}
+
+.flowStepName {
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 90px;
+}
+
+.flowStaffingSelect {
+  flex: 1;
+  min-width: 120px;
+  height: 28px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-sm, 4px);
+  padding: 0 6px;
+  color: var(--nb-text-primary);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.flowRowActions {
+  display: flex;
+  gap: 4px;
+}
+
+.flowAddRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
