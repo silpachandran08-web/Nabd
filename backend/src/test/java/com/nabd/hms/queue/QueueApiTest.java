@@ -60,12 +60,13 @@ class QueueApiTest extends ApiTestBase {
         return (String) resp.getBody().get("id");
     }
 
-    /** A department with no flow configured at all defaults to vitals+consultation (see
-     * DepartmentService.resolveStatusSequence's fallback) — explicitly configuring consultation-only
-     * is what "requiresVitals=false" used to mean before NB-355 generalized the single boolean. */
+    /** A department with no workflow picked at all defaults to vitals+consultation (see
+     * DepartmentService.resolveStatusSequence's fallback) — explicitly picking the platform's
+     * clinic_walkin template with vitals switched off is what "requiresVitals=false" used to mean
+     * before NB-355/NB-357 generalized it into a configurable, then platform-authored, flow. */
     private void configureFlowWithoutVitals(String token, String departmentId) {
-        exchange("/v1/departments/" + departmentId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(Map.of("stepType", "consultation")))), List.class);
+        exchange("/v1/departments/" + departmentId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin", "toggles", Map.of("vitals_enabled", false))), Map.class);
     }
 
     /** checkout() auto-advances the queue on success — this reads the actual persisted status
@@ -259,9 +260,8 @@ class QueueApiTest extends ApiTestBase {
         addWorkingHours(token, doctor.id(), null);
 
         String generalId = (String) defaultDepartment(token).get("id");
-        exchange("/v1/departments/" + generalId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(Map.of("stepType", "billing"), Map.of("stepType", "vitals"), Map.of("stepType", "consultation")))),
-                List.class);
+        exchange("/v1/departments/" + generalId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin_with_billing", "toggles", Map.of("vitals_enabled", true))), Map.class);
 
         String patientId = registerPatient(token, "Q12", "+919999910020");
         ResponseEntity<Map> checkin = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
@@ -312,9 +312,8 @@ class QueueApiTest extends ApiTestBase {
         addWorkingHours(token, dentist.id(), null);
 
         String dentalId = createDepartment(token, "Dental Clinic Flow");
-        exchange("/v1/departments/" + dentalId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(Map.of("stepType", "consultation"), Map.of("stepType", "procedures"), Map.of("stepType", "billing")))),
-                List.class);
+        exchange("/v1/departments/" + dentalId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "dental_procedure", "toggles", Map.of())), Map.class);
         UUID dentalUuid = UUID.fromString(dentalId);
         inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ? WHERE id = ?", dentalUuid, dentist.id()));
 

@@ -10,8 +10,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.department.DepartmentModels.DepartmentRow;
-import static com.nabd.hms.department.DepartmentModels.FlowStepRow;
 import static com.nabd.hms.department.DepartmentModels.TransferEdgeRow;
+import static com.nabd.hms.department.DepartmentModels.WorkflowSelectionRow;
+import static com.nabd.hms.department.DepartmentModels.WorkflowTemplateRow;
 
 @Repository
 class DepartmentRepository {
@@ -45,32 +46,48 @@ class DepartmentRepository {
                 name, active, tenantId, id);
     }
 
-    // ── visit flow (owner-designed: the ordered sequence of stages a visit at this department moves through) ──
+    // ── workflow (platform-authored templates; a department picks one plus a few toggles) ──
 
-    List<FlowStepRow> findFlowSteps(UUID tenantId, UUID departmentId) {
+    List<WorkflowTemplateRow> listPlatformTemplates() {
         return jdbc.query(
-                "SELECT f.step_type, f.staffing_department_id, d.name AS staffing_department_name " +
-                        "FROM visit_flow_steps f LEFT JOIN departments d ON d.id = f.staffing_department_id " +
-                        "WHERE f.tenant_id = ? AND f.department_id = ? ORDER BY f.step_order",
-                (rs, i) -> {
-                    String staffingId = rs.getString("staffing_department_id");
-                    return new FlowStepRow(rs.getString("step_type"),
-                            staffingId == null ? null : UUID.fromString(staffingId),
-                            rs.getString("staffing_department_name"));
-                },
-                tenantId, departmentId);
+                "SELECT id, code, name, steps::text AS steps_json, toggle_keys::text AS toggle_keys_json " +
+                        "FROM workflow_definitions WHERE tenant_id IS NULL ORDER BY name",
+                templateMapper());
     }
 
-    /** Small list (a handful of steps) — delete-then-insert-all in the caller's transaction, same
-     * pattern as replaceTransfers. */
-    void replaceFlowSteps(UUID tenantId, UUID departmentId, List<FlowStepRow> steps) {
-        jdbc.update("DELETE FROM visit_flow_steps WHERE tenant_id = ? AND department_id = ?", tenantId, departmentId);
-        int order = 1;
-        for (FlowStepRow step : steps) {
-            jdbc.update("INSERT INTO visit_flow_steps (tenant_id, department_id, step_order, step_type, staffing_department_id) " +
-                            "VALUES (?,?,?,?,?)",
-                    tenantId, departmentId, order++, step.stepType(), step.staffingDepartmentId());
-        }
+    Optional<WorkflowTemplateRow> findPlatformTemplate(String code) {
+        return jdbc.query(
+                "SELECT id, code, name, steps::text AS steps_json, toggle_keys::text AS toggle_keys_json " +
+                        "FROM workflow_definitions WHERE tenant_id IS NULL AND code = ?",
+                templateMapper(), code).stream().findFirst();
+    }
+
+    Optional<WorkflowSelectionRow> findSelection(UUID tenantId, UUID departmentId) {
+        return jdbc.query(
+                "SELECT w.code, w.steps::text AS steps_json, w.toggle_keys::text AS toggle_keys_json, " +
+                        "s.workflow_definition_id, s.toggles::text AS toggles_json " +
+                        "FROM department_workflow_selection s JOIN workflow_definitions w ON w.id = s.workflow_definition_id " +
+                        "WHERE s.tenant_id = ? AND s.department_id = ?",
+                (rs, i) -> new WorkflowSelectionRow(
+                        UUID.fromString(rs.getString("workflow_definition_id")),
+                        rs.getString("code"), rs.getString("steps_json"), rs.getString("toggle_keys_json"),
+                        rs.getString("toggles_json")),
+                tenantId, departmentId).stream().findFirst();
+    }
+
+    void upsertSelection(UUID tenantId, UUID departmentId, UUID workflowDefinitionId, String togglesJson) {
+        jdbc.update(
+                "INSERT INTO department_workflow_selection (tenant_id, department_id, workflow_definition_id, toggles) " +
+                        "VALUES (?,?,?,?::jsonb) " +
+                        "ON CONFLICT (tenant_id, department_id) DO UPDATE SET " +
+                        "workflow_definition_id = EXCLUDED.workflow_definition_id, toggles = EXCLUDED.toggles",
+                tenantId, departmentId, workflowDefinitionId, togglesJson);
+    }
+
+    private RowMapper<WorkflowTemplateRow> templateMapper() {
+        return (rs, i) -> new WorkflowTemplateRow(
+                UUID.fromString(rs.getString("id")), rs.getString("code"), rs.getString("name"),
+                rs.getString("steps_json"), rs.getString("toggle_keys_json"));
     }
 
     // ── transfer graph (owner-designed: which department can transfer to which) ──

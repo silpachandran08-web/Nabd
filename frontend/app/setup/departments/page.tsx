@@ -9,14 +9,23 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/
 type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 type TransferEdge = { fromDepartmentId: string; toDepartmentId: string };
 type Problem = { title: string; detail: string };
-type FlowStep = { stepType: string; staffingDepartmentId: string | null };
-type Builder = { mode: "create" | "edit"; sourceId?: string; name: string; active: boolean; flowSteps: FlowStep[]; flowLoading: boolean };
+// Matches GET/POST /v1/departments/{id}/workflow (DepartmentController) — platform-authored
+// templates (NB-357) replaced the free-reorder flow editor (NB-355).
+type WorkflowTemplate = { code: string; name: string; steps: string[]; toggleKeys: string[] };
+type DepartmentWorkflow = { templateCode: string | null; toggles: Record<string, boolean>; resolvedSteps: string[]; availableTemplates: WorkflowTemplate[] };
+type Builder = {
+  mode: "create" | "edit"; sourceId?: string; name: string; active: boolean;
+  availableTemplates: WorkflowTemplate[]; workflowLoading: boolean;
+  selectedTemplateCode: string; toggles: Record<string, boolean>;
+};
 
-const STEP_TYPES = ["billing", "vitals", "consultation", "procedures"] as const;
 const STEP_LABELS: Record<string, string> = { billing: "Billing", vitals: "Vitals", consultation: "Consultation", procedures: "Procedures" };
-// Matches DepartmentService's own fallback when nothing's configured yet — the flow editor shows
-// this instead of an empty list so it always reflects what's actually happening.
-const DEFAULT_FLOW: FlowStep[] = [{ stepType: "vitals", staffingDepartmentId: null }, { stepType: "consultation", staffingDepartmentId: null }];
+const TOGGLE_LABELS: Record<string, string> = { vitals_enabled: "Include a vitals stage" };
+
+function resolvedPreview(template: WorkflowTemplate | undefined, toggles: Record<string, boolean>): string[] {
+  if (!template) return [];
+  return template.steps.filter((s) => !(s === "vitals" && toggles.vitals_enabled === false));
+}
 
 export default function DepartmentsPage() {
   const router = useRouter();
@@ -86,46 +95,39 @@ export default function DepartmentsPage() {
 
   function openCreate() {
     setBuilderError(null);
-    setBuilder({ mode: "create", name: "", active: true, flowSteps: [], flowLoading: false });
+    setBuilder({ mode: "create", name: "", active: true, availableTemplates: [], workflowLoading: false, selectedTemplateCode: "", toggles: {} });
   }
 
   async function openEdit(d: Department) {
     setBuilderError(null);
-    setBuilder({ mode: "edit", sourceId: d.id, name: d.name, active: d.active, flowSteps: [], flowLoading: true });
-    const res = await authedFetch(`/departments/${d.id}/flow`);
+    setBuilder({ mode: "edit", sourceId: d.id, name: d.name, active: d.active, availableTemplates: [], workflowLoading: true, selectedTemplateCode: "", toggles: {} });
+    const res = await authedFetch(`/departments/${d.id}/workflow`);
     if (!res?.ok) {
-      setBuilder((prev) => (prev ? { ...prev, flowSteps: DEFAULT_FLOW, flowLoading: false } : prev));
+      setBuilder((prev) => (prev ? { ...prev, workflowLoading: false } : prev));
       return;
     }
-    const steps: FlowStep[] = await res.json();
-    setBuilder((prev) => (prev ? { ...prev, flowSteps: steps.length > 0 ? steps : DEFAULT_FLOW, flowLoading: false } : prev));
-  }
-
-  function addFlowStep(stepType: string) {
-    setBuilder((prev) => (prev ? { ...prev, flowSteps: [...prev.flowSteps, { stepType, staffingDepartmentId: null }] } : prev));
-  }
-
-  function removeFlowStep(stepType: string) {
-    setBuilder((prev) => (prev ? { ...prev, flowSteps: prev.flowSteps.filter((s) => s.stepType !== stepType) } : prev));
-  }
-
-  function moveFlowStep(index: number, direction: -1 | 1) {
-    setBuilder((prev) => {
-      if (!prev) return prev;
-      const steps = [...prev.flowSteps];
-      const target = index + direction;
-      if (target < 0 || target >= steps.length) return prev;
-      [steps[index], steps[target]] = [steps[target], steps[index]];
-      return { ...prev, flowSteps: steps };
-    });
-  }
-
-  function setFlowStepStaffing(stepType: string, staffingDepartmentId: string) {
+    const workflow: DepartmentWorkflow = await res.json();
     setBuilder((prev) =>
       prev
-        ? { ...prev, flowSteps: prev.flowSteps.map((s) => (s.stepType === stepType ? { ...s, staffingDepartmentId: staffingDepartmentId || null } : s)) }
+        ? {
+            ...prev,
+            availableTemplates: workflow.availableTemplates,
+            // Nothing picked yet -> the platform default is already running (clinic_walkin, vitals
+            // on) — show that as the starting selection rather than an empty picker.
+            selectedTemplateCode: workflow.templateCode ?? "clinic_walkin",
+            toggles: workflow.toggles ?? {},
+            workflowLoading: false,
+          }
         : prev
     );
+  }
+
+  function selectTemplate(code: string) {
+    setBuilder((prev) => (prev ? { ...prev, selectedTemplateCode: code, toggles: {} } : prev));
+  }
+
+  function setToggle(key: string, value: boolean) {
+    setBuilder((prev) => (prev ? { ...prev, toggles: { ...prev.toggles, [key]: value } } : prev));
   }
 
   async function submitBuilder(e: React.FormEvent) {
@@ -137,8 +139,8 @@ export default function DepartmentsPage() {
       setBuilderError("Name the department.");
       return;
     }
-    if (builder.mode === "edit" && !builder.flowSteps.some((s) => s.stepType === "consultation")) {
-      setBuilderError("The flow must include a consultation step.");
+    if (builder.mode === "edit" && !builder.selectedTemplateCode) {
+      setBuilderError("Pick a workflow template.");
       return;
     }
     setBuilderSubmitting(true);
@@ -157,13 +159,13 @@ export default function DepartmentsPage() {
       const saved: Department = await res.json();
 
       if (isEdit) {
-        const flowRes = await authedFetch(`/departments/${saved.id}/flow`, {
+        const workflowRes = await authedFetch(`/departments/${saved.id}/workflow`, {
           method: "POST",
-          body: JSON.stringify({ steps: builder.flowSteps.map((s) => ({ stepType: s.stepType, staffingDepartmentId: s.staffingDepartmentId })) }),
+          body: JSON.stringify({ templateCode: builder.selectedTemplateCode, toggles: builder.toggles }),
         });
-        if (!flowRes?.ok) {
-          const p: Problem = await flowRes?.json().catch(() => ({ title: "Error", detail: "Couldn't save the visit flow." }));
-          setBuilderError(p?.detail || "Couldn't save the visit flow.");
+        if (!workflowRes?.ok) {
+          const p: Problem = await workflowRes?.json().catch(() => ({ title: "Error", detail: "Couldn't save the workflow." }));
+          setBuilderError(p?.detail || "Couldn't save the workflow.");
           return;
         }
       }
@@ -206,7 +208,7 @@ export default function DepartmentsPage() {
   if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to departments.</div></main>;
   if (error) return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
 
-  const availableStepTypes = builder ? STEP_TYPES.filter((t) => !builder.flowSteps.some((s) => s.stepType === t)) : [];
+  const selectedTemplate = builder ? builder.availableTemplates.find((t) => t.code === builder.selectedTemplateCode) : undefined;
 
   return (
     <main className={styles.page}>
@@ -303,43 +305,42 @@ export default function DepartmentsPage() {
 
             {builder.mode === "edit" && (
               <div className={styles.field}>
-                <label className={styles.label}>Visit flow</label>
-                <p className={styles.hint}>The order a patient moves through this department&apos;s stages. Consultation is always included.</p>
-                {builder.flowLoading ? (
+                <label className={styles.label}>Workflow template</label>
+                <p className={styles.hint}>
+                  Pick the stage sequence a visit follows here. Templates are published by the Nabd team — you choose one and flip the toggles it offers.
+                </p>
+                {builder.workflowLoading ? (
                   <div className={styles.hint}>Loading…</div>
                 ) : (
                   <>
-                    <div className={styles.flowList}>
-                      {builder.flowSteps.map((step, i) => (
-                        <div key={step.stepType} className={styles.flowRow}>
-                          <span className={styles.flowStepName}>{STEP_LABELS[step.stepType]}</span>
-                          <select
-                            className={styles.flowStaffingSelect}
-                            value={step.staffingDepartmentId ?? ""}
-                            onChange={(e) => setFlowStepStaffing(step.stepType, e.target.value)}
-                          >
-                            <option value="">Staffed by…</option>
-                            {departments.map((d) => (
-                              <option key={d.id} value={d.id}>{d.name}</option>
-                            ))}
-                          </select>
-                          <div className={styles.flowRowActions}>
-                            <button type="button" className={styles.smallBtn} onClick={() => moveFlowStep(i, -1)} disabled={i === 0}>▲</button>
-                            <button type="button" className={styles.smallBtn} onClick={() => moveFlowStep(i, 1)} disabled={i === builder.flowSteps.length - 1}>▼</button>
-                            {step.stepType !== "consultation" && (
-                              <button type="button" className={styles.smallBtn} onClick={() => removeFlowStep(step.stepType)}>Remove</button>
-                            )}
-                          </div>
-                        </div>
+                    <select className={styles.flowStaffingSelect} value={builder.selectedTemplateCode} onChange={(e) => selectTemplate(e.target.value)}>
+                      {builder.availableTemplates.map((t) => (
+                        <option key={t.code} value={t.code}>{t.name}</option>
                       ))}
-                    </div>
-                    {availableStepTypes.length > 0 && (
-                      <div className={styles.flowAddRow}>
-                        {availableStepTypes.map((t) => (
-                          <button type="button" key={t} className={styles.smallBtn} onClick={() => addFlowStep(t)}>+ {STEP_LABELS[t]}</button>
+                    </select>
+
+                    {selectedTemplate && selectedTemplate.toggleKeys.length > 0 && (
+                      <div className={styles.flowList}>
+                        {selectedTemplate.toggleKeys.map((key) => (
+                          <label key={key} className={styles.checkboxRow}>
+                            <input
+                              type="checkbox"
+                              checked={builder.toggles[key] !== false}
+                              onChange={(e) => setToggle(key, e.target.checked)}
+                            />
+                            {TOGGLE_LABELS[key] ?? key}
+                          </label>
                         ))}
                       </div>
                     )}
+
+                    <div className={styles.flowList}>
+                      {resolvedPreview(selectedTemplate, builder.toggles).map((stepType, i) => (
+                        <div key={stepType} className={styles.flowRow}>
+                          <span className={styles.flowStepName}>{i + 1}. {STEP_LABELS[stepType] ?? stepType}</span>
+                        </div>
+                      ))}
+                    </div>
                   </>
                 )}
               </div>

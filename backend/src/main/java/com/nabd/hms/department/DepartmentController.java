@@ -1,9 +1,10 @@
 package com.nabd.hms.department;
 
 import com.nabd.hms.department.dto.DepartmentResponse;
+import com.nabd.hms.department.dto.DepartmentWorkflowRequest;
+import com.nabd.hms.department.dto.DepartmentWorkflowResponse;
 import com.nabd.hms.department.dto.DepartmentWriteRequest;
 import com.nabd.hms.department.dto.FlowStepResponse;
-import com.nabd.hms.department.dto.FlowWriteRequest;
 import com.nabd.hms.department.dto.TransferEdge;
 import com.nabd.hms.department.dto.TransferGraphRequest;
 import com.nabd.hms.department.dto.TransferTargetResponse;
@@ -83,11 +84,19 @@ public class DepartmentController {
         return service.listFlow(tenantId(jwt), id);
     }
 
-    @PostMapping("/{id}/flow")
+    /** The platform-authored template a department is running on, plus the toggle values it set
+     * and the full template library — what the owner's editor renders its picker from. */
+    @GetMapping("/{id}/workflow")
+    @PreAuthorize("hasAuthority('departments:view')")
+    public DepartmentWorkflowResponse getWorkflow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.getWorkflow(tenantId(jwt), id);
+    }
+
+    @PostMapping("/{id}/workflow")
     @PreAuthorize("hasAuthority('departments:edit')")
-    public List<FlowStepResponse> replaceFlow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                               @Valid @RequestBody FlowWriteRequest req) {
-        return service.replaceFlow(tenantId(jwt), staffId(jwt), id, req);
+    public DepartmentWorkflowResponse replaceWorkflow(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                        @Valid @RequestBody DepartmentWorkflowRequest req) {
+        return service.replaceWorkflow(tenantId(jwt), staffId(jwt), id, req);
     }
 
     private UUID tenantId(Jwt jwt) {

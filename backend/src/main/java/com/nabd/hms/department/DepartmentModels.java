@@ -12,8 +12,14 @@ final class DepartmentModels {
     record TransferEdgeRow(UUID fromDepartmentId, UUID toDepartmentId) {
     }
 
-    /** One row of a department's configured visit flow, in step_order. staffingDepartmentId/Name
-     * are informational only — see V39's migration comment. */
-    record FlowStepRow(String stepType, UUID staffingDepartmentId, String staffingDepartmentName) {
+    /** A platform-authored workflow template. stepsJson/toggleKeysJson are raw jsonb text —
+     * DepartmentService parses them, same split as RoleRepository/RoleService for `grants`. */
+    record WorkflowTemplateRow(UUID id, String code, String name, String stepsJson, String toggleKeysJson) {
+    }
+
+    /** A department's current template pick plus the toggles it set, joined with the template it
+     * points to. Absent entirely when the department hasn't picked a template yet. */
+    record WorkflowSelectionRow(UUID workflowDefinitionId, String templateCode, String stepsJson,
+                                 String toggleKeysJson, String togglesJson) {
     }
 }

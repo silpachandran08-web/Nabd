@@ -149,8 +149,8 @@ class CheckoutApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
 
         String departmentId = (String) defaultDepartment(token).get("id");
-        exchange("/v1/departments/" + departmentId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(Map.of("stepType", "billing"), Map.of("stepType", "consultation")))), List.class);
+        exchange("/v1/departments/" + departmentId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin_with_billing", "toggles", Map.of("vitals_enabled", false))), Map.class);
 
         String patientId = registerPatient(token, "C6", "+919999930006");
         String queueEntryId = checkIn(token, patientId, staff.id());
@@ -188,8 +188,8 @@ class CheckoutApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
 
         String departmentId = (String) defaultDepartment(token).get("id");
-        exchange("/v1/departments/" + departmentId + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(Map.of("stepType", "billing"), Map.of("stepType", "consultation")))), List.class);
+        exchange("/v1/departments/" + departmentId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin_with_billing", "toggles", Map.of("vitals_enabled", false))), Map.class);
 
         String patientId = registerPatient(token, "C7", "+919999930007");
         String queueEntryId = checkIn(token, patientId, staff.id());

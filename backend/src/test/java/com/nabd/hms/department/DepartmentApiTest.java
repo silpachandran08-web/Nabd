@@ -120,7 +120,7 @@ class DepartmentApiTest extends ApiTestBase {
         assertThat(doctors).extracting(d -> d.get("name")).contains("Test Staff");
     }
 
-    // ── visit flow (NB-355) ──
+    // ── workflow (NB-357: platform-authored templates replace NB-355's free reorder) ──
 
     @Test
     void unconfiguredDepartmentFallsBackToVitalsThenConsultation() {
@@ -132,26 +132,31 @@ class DepartmentApiTest extends ApiTestBase {
         String id = createDepartment(token, "Fresh");
         ResponseEntity<List> resp = exchange("/v1/departments/" + id + "/flow", HttpMethod.GET, authed(token), List.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).isEmpty(); // nothing configured yet — the default only applies inside resolveStatusSequence()
+        assertThat(resp.getBody()).isEmpty(); // nothing picked yet — the default only applies inside resolveStatusSequence()
+
+        ResponseEntity<Map> workflowResp = exchange("/v1/departments/" + id + "/workflow", HttpMethod.GET, authed(token), Map.class);
+        assertThat(workflowResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(workflowResp.getBody().get("templateCode")).isNull();
+        assertThat((List<String>) workflowResp.getBody().get("resolvedSteps")).containsExactly("vitals", "consultation");
+        assertThat((List<Map<String, Object>>) workflowResp.getBody().get("availableTemplates"))
+                .extracting(t -> t.get("code")).containsExactlyInAnyOrder("clinic_walkin", "clinic_walkin_with_billing", "dental_procedure");
     }
 
     @Test
-    void replacingTheFlowReordersAndPersistsSteps() {
+    void pickingATemplatePersistsItAndResolvesTheFlowFromIt() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "owner7@a.com", "+919200001008", false);
         String token = loginAndGetAccessToken(staff);
         String id = createDepartment(token, "Dental");
 
-        // Dental example from the ticket: consultation, then procedures, then billing.
-        ResponseEntity<List> resp = exchange("/v1/departments/" + id + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(
-                        Map.of("stepType", "consultation"),
-                        Map.of("stepType", "procedures"),
-                        Map.of("stepType", "billing")))), List.class);
+        // Dental example from the ticket: consultation, then procedures, then billing — the platform's
+        // "dental_procedure" template shape, with no toggles.
+        ResponseEntity<Map> resp = exchange("/v1/departments/" + id + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "dental_procedure", "toggles", Map.of())), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        List<Map<String, Object>> steps = resp.getBody();
-        assertThat(steps).extracting(s -> s.get("stepType")).containsExactly("consultation", "procedures", "billing");
+        assertThat(resp.getBody().get("templateCode")).isEqualTo("dental_procedure");
+        assertThat((List<String>) resp.getBody().get("resolvedSteps")).containsExactly("consultation", "procedures", "billing");
 
         ResponseEntity<List> getResp = exchange("/v1/departments/" + id + "/flow", HttpMethod.GET, authed(token), List.class);
         assertThat(((List<Map<String, Object>>) getResp.getBody())).extracting(s -> s.get("stepType"))
@@ -159,31 +164,46 @@ class DepartmentApiTest extends ApiTestBase {
     }
 
     @Test
-    void flowMustIncludeExactlyOneConsultationStep() {
+    void vitalsEnabledToggleTurnsTheVitalsStepOffOnTheClinicWalkinTemplate() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "owner8@a.com", "+919200001009", false);
         String token = loginAndGetAccessToken(staff);
-        String id = createDepartment(token, "Dental");
+        String id = createDepartment(token, "General 2");
 
-        ResponseEntity<Map> missing = exchange("/v1/departments/" + id + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(Map.of("stepType", "billing")))), Map.class);
-        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(missing.getBody().get("type")).asString().contains("flow-invalid");
+        ResponseEntity<Map> resp = exchange("/v1/departments/" + id + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin_with_billing", "toggles", Map.of("vitals_enabled", false))), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat((List<String>) resp.getBody().get("resolvedSteps")).containsExactly("billing", "consultation");
     }
 
     @Test
-    void flowRejectsADuplicateStepType() {
+    void pickingAnUnknownTemplateCodeIsRejected() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "owner9@a.com", "+919200001010", false);
         String token = loginAndGetAccessToken(staff);
         String id = createDepartment(token, "Dental");
 
-        ResponseEntity<Map> resp = exchange("/v1/departments/" + id + "/flow", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "steps", List.of(Map.of("stepType", "consultation"), Map.of("stepType", "vitals"), Map.of("stepType", "vitals")))), Map.class);
+        ResponseEntity<Map> resp = exchange("/v1/departments/" + id + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "made_up_template", "toggles", Map.of())), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().get("type")).asString().contains("flow-invalid");
+        assertThat(resp.getBody().get("type")).asString().contains("unknown-workflow-template");
+    }
+
+    @Test
+    void aToggleNotDefinedOnTheChosenTemplateIsRejected() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner10@a.com", "+919200001011", false);
+        String token = loginAndGetAccessToken(staff);
+        String id = createDepartment(token, "Dental 2");
+
+        // dental_procedure has no toggles at all.
+        ResponseEntity<Map> resp = exchange("/v1/departments/" + id + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "dental_procedure", "toggles", Map.of("vitals_enabled", false))), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().get("type")).asString().contains("workflow-invalid");
     }
 
     private String createDepartment(String token, String name) {
