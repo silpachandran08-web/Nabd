@@ -82,9 +82,9 @@ class CheckoutRepository {
     // Not reaching into QueueRepository/PatientService (different packages) for these — same
     // narrow-direct-query precedent as CheckoutRepository.planExists() in the platform module.
     Optional<QueueEntryContext> findQueueEntryContext(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT patient_id, doctor_id, status, appointment_id FROM queue_entries WHERE tenant_id = ? AND id = ?",
+        return jdbc.query("SELECT patient_id, doctor_id, department_id, status, appointment_id FROM queue_entries WHERE tenant_id = ? AND id = ?",
                 (rs, i) -> new QueueEntryContext(UUID.fromString(rs.getString("patient_id")), UUID.fromString(rs.getString("doctor_id")),
-                        rs.getString("status"), rs.getString("appointment_id") != null),
+                        UUID.fromString(rs.getString("department_id")), rs.getString("status"), rs.getString("appointment_id") != null),
                 tenantId, queueEntryId).stream().findFirst();
     }
 
@@ -117,7 +117,14 @@ class CheckoutRepository {
     }
 
     void insertLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items) {
-        int order = 0;
+        appendLineItems(tenantId, invoiceId, items, 0);
+    }
+
+    /** NB-355: a department whose flow bills mid-visit (e.g. a consultation fee at an interim
+     * billing_pending stop) keeps adding to the SAME invoice at each later billing checkpoint
+     * rather than creating a new one — display_order continues from whatever's already there. */
+    void appendLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, int startOrder) {
+        int order = startOrder;
         for (LineItemInput item : items) {
             decrementPharmacyStockIfApplicable(tenantId, item.chargeCode(), item.quantity());
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
@@ -127,6 +134,23 @@ class CheckoutRepository {
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++);
         }
+    }
+
+    int nextLineItemOrder(UUID tenantId, UUID invoiceId) {
+        Integer max = jdbc.queryForObject(
+                "SELECT COALESCE(MAX(display_order), -1) FROM invoice_line_items WHERE tenant_id = ? AND invoice_id = ?",
+                Integer.class, tenantId, invoiceId);
+        return (max == null ? -1 : max) + 1;
+    }
+
+    /** Recomputes and overwrites an existing invoice's totals — used when a billing checkpoint
+     * appends more line items to an invoice created at an earlier one; the latest discount
+     * replaces (not adds to) whatever discount was applied before. */
+    void updateInvoiceTotals(UUID tenantId, UUID invoiceId, BigDecimal subtotal, BigDecimal discount,
+                              BigDecimal tax, BigDecimal roundOff, BigDecimal total) {
+        jdbc.update("UPDATE invoices SET subtotal = ?, discount = ?, tax = ?, round_off = ?, total = ? " +
+                        "WHERE tenant_id = ? AND id = ?",
+                subtotal, discount, tax, roundOff, total, tenantId, invoiceId);
     }
 
     /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same

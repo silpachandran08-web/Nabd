@@ -6,10 +6,26 @@ import styles from "./departments.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
-type Department = { id: string; name: string; requiresVitals: boolean; isDefault: boolean; active: boolean };
+type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 type TransferEdge = { fromDepartmentId: string; toDepartmentId: string };
 type Problem = { title: string; detail: string };
-type Builder = { mode: "create" | "edit"; sourceId?: string; name: string; requiresVitals: boolean; active: boolean };
+// Matches GET/POST /v1/departments/{id}/workflow (DepartmentController) — platform-authored
+// templates (NB-357) replaced the free-reorder flow editor (NB-355).
+type WorkflowTemplate = { code: string; name: string; steps: string[]; toggleKeys: string[] };
+type DepartmentWorkflow = { templateCode: string | null; toggles: Record<string, boolean>; resolvedSteps: string[]; availableTemplates: WorkflowTemplate[] };
+type Builder = {
+  mode: "create" | "edit"; sourceId?: string; name: string; active: boolean;
+  availableTemplates: WorkflowTemplate[]; workflowLoading: boolean;
+  selectedTemplateCode: string; toggles: Record<string, boolean>;
+};
+
+const STEP_LABELS: Record<string, string> = { billing: "Billing", vitals: "Vitals", consultation: "Consultation", procedures: "Procedures" };
+const TOGGLE_LABELS: Record<string, string> = { vitals_enabled: "Include a vitals stage" };
+
+function resolvedPreview(template: WorkflowTemplate | undefined, toggles: Record<string, boolean>): string[] {
+  if (!template) return [];
+  return template.steps.filter((s) => !(s === "vitals" && toggles.vitals_enabled === false));
+}
 
 export default function DepartmentsPage() {
   const router = useRouter();
@@ -79,12 +95,39 @@ export default function DepartmentsPage() {
 
   function openCreate() {
     setBuilderError(null);
-    setBuilder({ mode: "create", name: "", requiresVitals: true, active: true });
+    setBuilder({ mode: "create", name: "", active: true, availableTemplates: [], workflowLoading: false, selectedTemplateCode: "", toggles: {} });
   }
 
-  function openEdit(d: Department) {
+  async function openEdit(d: Department) {
     setBuilderError(null);
-    setBuilder({ mode: "edit", sourceId: d.id, name: d.name, requiresVitals: d.requiresVitals, active: d.active });
+    setBuilder({ mode: "edit", sourceId: d.id, name: d.name, active: d.active, availableTemplates: [], workflowLoading: true, selectedTemplateCode: "", toggles: {} });
+    const res = await authedFetch(`/departments/${d.id}/workflow`);
+    if (!res?.ok) {
+      setBuilder((prev) => (prev ? { ...prev, workflowLoading: false } : prev));
+      return;
+    }
+    const workflow: DepartmentWorkflow = await res.json();
+    setBuilder((prev) =>
+      prev
+        ? {
+            ...prev,
+            availableTemplates: workflow.availableTemplates,
+            // Nothing picked yet -> the platform default is already running (clinic_walkin, vitals
+            // on) — show that as the starting selection rather than an empty picker.
+            selectedTemplateCode: workflow.templateCode ?? "clinic_walkin",
+            toggles: workflow.toggles ?? {},
+            workflowLoading: false,
+          }
+        : prev
+    );
+  }
+
+  function selectTemplate(code: string) {
+    setBuilder((prev) => (prev ? { ...prev, selectedTemplateCode: code, toggles: {} } : prev));
+  }
+
+  function setToggle(key: string, value: boolean) {
+    setBuilder((prev) => (prev ? { ...prev, toggles: { ...prev.toggles, [key]: value } } : prev));
   }
 
   async function submitBuilder(e: React.FormEvent) {
@@ -96,12 +139,16 @@ export default function DepartmentsPage() {
       setBuilderError("Name the department.");
       return;
     }
+    if (builder.mode === "edit" && !builder.selectedTemplateCode) {
+      setBuilderError("Pick a workflow template.");
+      return;
+    }
     setBuilderSubmitting(true);
     try {
       const isEdit = builder.mode === "edit";
       const res = await authedFetch(isEdit ? `/departments/${builder.sourceId}` : "/departments", {
         method: isEdit ? "PATCH" : "POST",
-        body: JSON.stringify({ name, requiresVitals: builder.requiresVitals, active: builder.active }),
+        body: JSON.stringify({ name, active: builder.active }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -110,6 +157,19 @@ export default function DepartmentsPage() {
         return;
       }
       const saved: Department = await res.json();
+
+      if (isEdit) {
+        const workflowRes = await authedFetch(`/departments/${saved.id}/workflow`, {
+          method: "POST",
+          body: JSON.stringify({ templateCode: builder.selectedTemplateCode, toggles: builder.toggles }),
+        });
+        if (!workflowRes?.ok) {
+          const p: Problem = await workflowRes?.json().catch(() => ({ title: "Error", detail: "Couldn't save the workflow." }));
+          setBuilderError(p?.detail || "Couldn't save the workflow.");
+          return;
+        }
+      }
+
       setDepartments((prev) => (isEdit ? prev.map((d) => (d.id === saved.id ? saved : d)) : [...prev, saved]));
       setBuilder(null);
     } finally {
@@ -148,6 +208,8 @@ export default function DepartmentsPage() {
   if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to departments.</div></main>;
   if (error) return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
 
+  const selectedTemplate = builder ? builder.availableTemplates.find((t) => t.code === builder.selectedTemplateCode) : undefined;
+
   return (
     <main className={styles.page}>
       <div className={styles.strip}>
@@ -162,13 +224,12 @@ export default function DepartmentsPage() {
         </div>
         <table className={styles.table}>
           <thead>
-            <tr><th>Name</th><th>Requires vitals</th><th>Status</th><th></th></tr>
+            <tr><th>Name</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {departments.map((d) => (
               <tr key={d.id}>
                 <td>{d.name}{d.isDefault && <span className={styles.defaultTag}>Default</span>}</td>
-                <td>{d.requiresVitals ? "Yes" : "No"}</td>
                 <td>{d.active ? "Active" : "Inactive"}</td>
                 <td><button className={styles.smallBtn} onClick={() => openEdit(d)}>Edit</button></td>
               </tr>
@@ -230,14 +291,6 @@ export default function DepartmentsPage() {
               <label className={styles.label}>Name</label>
               <input className={styles.input} value={builder.name} onChange={(e) => setBuilder({ ...builder, name: e.target.value })} />
             </div>
-            <label className={styles.checkboxRow}>
-              <input
-                type="checkbox"
-                checked={builder.requiresVitals}
-                onChange={(e) => setBuilder({ ...builder, requiresVitals: e.target.checked })}
-              />
-              Requires vitals before consultation
-            </label>
             {builder.mode === "edit" && (
               <label className={styles.checkboxRow}>
                 <input
@@ -249,6 +302,50 @@ export default function DepartmentsPage() {
                 Active{departments.find((d) => d.id === builder.sourceId)?.isDefault ? " (default department, always active)" : ""}
               </label>
             )}
+
+            {builder.mode === "edit" && (
+              <div className={styles.field}>
+                <label className={styles.label}>Workflow template</label>
+                <p className={styles.hint}>
+                  Pick the stage sequence a visit follows here. Templates are published by the Nabd team — you choose one and flip the toggles it offers.
+                </p>
+                {builder.workflowLoading ? (
+                  <div className={styles.hint}>Loading…</div>
+                ) : (
+                  <>
+                    <select className={styles.flowStaffingSelect} value={builder.selectedTemplateCode} onChange={(e) => selectTemplate(e.target.value)}>
+                      {builder.availableTemplates.map((t) => (
+                        <option key={t.code} value={t.code}>{t.name}</option>
+                      ))}
+                    </select>
+
+                    {selectedTemplate && selectedTemplate.toggleKeys.length > 0 && (
+                      <div className={styles.flowList}>
+                        {selectedTemplate.toggleKeys.map((key) => (
+                          <label key={key} className={styles.checkboxRow}>
+                            <input
+                              type="checkbox"
+                              checked={builder.toggles[key] !== false}
+                              onChange={(e) => setToggle(key, e.target.checked)}
+                            />
+                            {TOGGLE_LABELS[key] ?? key}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className={styles.flowList}>
+                      {resolvedPreview(selectedTemplate, builder.toggles).map((stepType, i) => (
+                        <div key={stepType} className={styles.flowRow}>
+                          <span className={styles.flowStepName}>{i + 1}. {STEP_LABELS[stepType] ?? stepType}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {builderError && <div className={styles.errorState}>{builderError}</div>}
             <div className={styles.modalActions}>
               <button type="button" className={styles.btn} onClick={() => setBuilder(null)}>Cancel</button>

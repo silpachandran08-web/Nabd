@@ -13,7 +13,7 @@ final class CheckoutModels {
                       BigDecimal followUpAmount, BigDecimal taxRatePercent) {
     }
 
-    record QueueEntryContext(UUID patientId, UUID doctorId, String queueStatus, boolean hasAppointment) {
+    record QueueEntryContext(UUID patientId, UUID doctorId, UUID departmentId, String queueStatus, boolean hasAppointment) {
     }
 
     record InvoiceRow(UUID id, String invoiceNumber, UUID queueEntryId, UUID patientId, UUID doctorId,

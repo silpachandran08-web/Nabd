@@ -9,7 +9,7 @@ import styles from "./nursing.module.css";
 // WhatsApp inbox, which doesn't exist. NB-147 (package sessions) is a link to /packages, which
 // already has the redeem action — no new UI needed for it.
 type QueueEntry = {
-  id: string; patientId: string; doctorId: string; tokenNumber: number; status: string; createdAt: string;
+  id: string; patientId: string; doctorId: string; departmentId: string; tokenNumber: number; status: string; createdAt: string;
   priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
   priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
 };
@@ -44,10 +44,29 @@ function waitMinutes(createdAt: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000));
 }
 
+// Mirrors DepartmentService.resolveStatusSequence on the backend — see checkout/[queueEntryId]/page.tsx
+// for the same helper, duplicated locally rather than shared since it's a handful of lines.
+const STATUSES_FOR_STEP_TYPE: Record<string, string[]> = {
+  billing: ["billing_pending"],
+  vitals: ["vitals_pending", "vitals_done"],
+  consultation: ["in_consult"],
+  procedures: ["procedures_pending"],
+};
+const DEFAULT_STEP_TYPES = ["vitals", "consultation"];
+
+function resolveSequence(steps: { stepType: string }[]): string[] {
+  const stepTypes = steps.length > 0 ? steps.map((s) => s.stepType) : DEFAULT_STEP_TYPES;
+  const sequence = ["checked_in", "waiting"];
+  for (const t of stepTypes) sequence.push(...(STATUSES_FOR_STEP_TYPE[t] ?? []));
+  sequence.push("checkout_pending", "completed");
+  return sequence;
+}
+
 export default function NursingPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("vitals");
   const [rows, setRows] = useState<Row[]>([]);
+  const [proceduresPendingRows, setProceduresPendingRows] = useState<Row[]>([]);
   const [priorityRows, setPriorityRows] = useState<Row[]>([]);
   const [administrationOrders, setAdministrationOrders] = useState<AdministrationOrder[]>([]);
   const [procedureOrders, setProcedureOrders] = useState<ProcedureOrder[]>([]);
@@ -116,6 +135,7 @@ export default function NursingPage() {
         return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—" };
       }));
       setRows(await withNames(entries.filter((e) => e.status === "vitals_pending")));
+      setProceduresPendingRows(await withNames(entries.filter((e) => e.status === "procedures_pending")));
       if (priorityRes?.ok) setPriorityRows(await withNames(await priorityRes.json()));
       if (adminRes?.ok) setAdministrationOrders(await adminRes.json());
       if (procRes?.ok) setProcedureOrders(await procRes.json());
@@ -246,6 +266,27 @@ export default function NursingPage() {
       setActionError(p.detail || "Couldn't record refusal.");
     }
     setRefuseModal(null);
+    load();
+  }
+
+  // ── NB-355: the procedures_pending queue checkpoint — a coordination stop, not itself a
+  // procedure_orders row; advancing it needs no special backend action beyond the generic
+  // status PATCH, same as vitals_done -> in_consult on the consult page. ────────────────────
+  async function continueAfterProcedures(entry: Row) {
+    setActionError(null);
+    const flowRes = await authedFetch(`/departments/${entry.departmentId}/flow`);
+    const steps: { stepType: string }[] = flowRes?.ok ? await flowRes.json() : [];
+    const sequence = resolveSequence(steps);
+    const next = sequence[sequence.indexOf(entry.status) + 1];
+    if (!next) {
+      setActionError("Couldn't determine the next stage.");
+      return;
+    }
+    const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: next }) });
+    if (res && !res.ok) {
+      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't continue the visit." }));
+      setActionError(p.detail || "Couldn't continue the visit.");
+    }
     load();
   }
 
@@ -427,6 +468,27 @@ export default function NursingPage() {
 
       {tab === "procedures" && (
         <>
+          {proceduresPendingRows.length > 0 && (
+            <div className={styles.card} style={{ marginBottom: "12px" }}>
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Wait</th><th>Status</th><th></th></tr></thead>
+                  <tbody>
+                    {proceduresPendingRows.map((r) => (
+                      <tr key={r.id} className={r.priority ? styles.rowFlagged : undefined}>
+                        <td>#{r.tokenNumber}</td>
+                        <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
+                        <td>{r.doctorName}</td>
+                        <td className={styles.muted}>{waitMinutes(r.createdAt)}m</td>
+                        <td><span className={styles.pillVitals}>procedures pending</span></td>
+                        <td><button className={styles.actionBtn} onClick={() => continueAfterProcedures(r)}>Procedures done, continue</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
           <div className={styles.headerActions} style={{ marginBottom: "12px" }}>
             <button className={styles.actionBtn} onClick={() => setShowProcForm(true)}>+ New procedure</button>
           </div>

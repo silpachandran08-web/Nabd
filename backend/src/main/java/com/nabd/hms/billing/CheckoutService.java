@@ -12,6 +12,7 @@ import com.nabd.hms.billing.dto.PaymentResponse;
 import com.nabd.hms.billing.dto.PrescribedItemResponse;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.department.DepartmentService;
 import com.nabd.hms.queue.QueueService;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
 import org.slf4j.Logger;
@@ -24,11 +25,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.nabd.hms.billing.CheckoutModels.ChargeRow;
 import static com.nabd.hms.billing.CheckoutModels.InvoiceRow;
 import static com.nabd.hms.billing.CheckoutModels.LineItemInput;
+import static com.nabd.hms.billing.CheckoutModels.LineItemRow;
 import static com.nabd.hms.billing.CheckoutModels.QueueEntryContext;
 
 /**
@@ -45,14 +49,19 @@ public class CheckoutService {
     // clinic policy (alongside cancellation_window_hours etc.) if clinics ever need to vary it.
     private static final int FOLLOW_UP_WINDOW_DAYS = 14;
 
+    private static final Set<String> BILLING_CHECKPOINT_STATUSES = Set.of("billing_pending", "checkout_pending");
+
     private final CheckoutRepository repo;
     private final TenantContext tenantContext;
     private final QueueService queueService;
+    private final DepartmentService departmentService;
 
-    CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService) {
+    CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
+                     DepartmentService departmentService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.queueService = queueService;
+        this.departmentService = departmentService;
     }
 
     @Transactional
@@ -71,7 +80,7 @@ public class CheckoutService {
                 .toList();
         return new CheckoutContextResponse(queueEntryId, patientName, doctorName,
                 ctx.hasAppointment() ? "Appointment" : "Walk-in", followUpEligible, currencyFor(tenantId), charges,
-                pendingProcedures, prescribedItems);
+                pendingProcedures, prescribedItems, ctx.departmentId(), ctx.queueStatus());
     }
 
     @Transactional
@@ -81,32 +90,60 @@ public class CheckoutService {
         return toInvoiceResponse(tenantId, row);
     }
 
+    /**
+     * NB-355: a department's flow can bill at more than one point — an interim consultation-fee
+     * stop (billing_pending) as well as the terminal one (checkout_pending). The first billing
+     * checkpoint for a visit creates the invoice; every later one (interim or terminal) appends to
+     * the SAME invoice and recomputes its totals rather than rejecting with "invoice exists" — one
+     * evolving invoice per visit, not one per checkpoint. lineItems may be empty at a later
+     * checkpoint (e.g. the terminal checkout when nothing new was charged since the last stop —
+     * "checkout with 0 payment"); it must be non-empty the first time a visit is billed.
+     */
     @Transactional
     public InvoiceResponse checkout(UUID tenantId, UUID queueEntryId, UUID staffId, CheckoutRequest req) {
         tenantContext.set(tenantId);
         QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(this::notFound);
-        if (!"checkout_pending".equals(ctx.queueStatus())) {
+
+        List<String> sequence = departmentService.resolveStatusSequence(tenantId, ctx.departmentId());
+        int currentIndex = sequence.indexOf(ctx.queueStatus());
+        if (!BILLING_CHECKPOINT_STATUSES.contains(ctx.queueStatus()) || currentIndex < 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "not-checkout-pending", "Not ready for checkout",
-                    "This visit isn't at checkout yet — its status is " + ctx.queueStatus() + ".");
-        }
-        if (repo.findInvoiceByQueueEntry(tenantId, queueEntryId).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "invoice-exists", "Invoice already exists",
-                    "This visit has already been checked out.");
+                    "This visit isn't at a billing stop yet — its status is " + ctx.queueStatus() + ".");
         }
 
-        Totals t = computeTotals(req);
-        List<LineItemInput> items = req.lineItems().stream().map(this::toLineItemInput).toList();
-
-        UUID invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
-                t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId);
-        repo.insertLineItems(tenantId, invoiceId, items);
+        Optional<InvoiceRow> existing = repo.findInvoiceByQueueEntry(tenantId, queueEntryId);
+        UUID invoiceId;
+        if (existing.isEmpty()) {
+            if (req.lineItems().isEmpty()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
+                        "Add at least one charge before checking out.");
+            }
+            Totals t = computeTotals(req.lineItems(), List.of(), req.discountOrZero());
+            invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
+                    t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId);
+            repo.insertLineItems(tenantId, invoiceId, req.lineItems().stream().map(this::toLineItemInput).toList());
+            log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
+                    invoiceId, queueEntryId, staffId, tenantId, t.total());
+        } else {
+            invoiceId = existing.get().id();
+            List<LineItemRow> existingItems = repo.findLineItems(tenantId, invoiceId);
+            Totals t = computeTotals(req.lineItems(), existingItems, req.discountOrZero());
+            if (!req.lineItems().isEmpty()) {
+                repo.appendLineItems(tenantId, invoiceId, req.lineItems().stream().map(this::toLineItemInput).toList(),
+                        repo.nextLineItemOrder(tenantId, invoiceId));
+            }
+            repo.updateInvoiceTotals(tenantId, invoiceId, t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total());
+            log.info("invoice {} extended at queue entry {} by {} (tenant {}, new total {})",
+                    invoiceId, queueEntryId, staffId, tenantId, t.total());
+        }
         repo.markProceduresBilled(tenantId, queueEntryId); // NB-146: whatever wasn't already billed at this visit never will be pending again
 
         // Closes the loop NB-102 left open: a doctor's "Complete consultation" moves a visit to
-        // checkout_pending; billing finishing checkout is what finally moves it to completed.
-        queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest("completed"));
-        log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
-                invoiceId, queueEntryId, staffId, tenantId, t.total());
+        // checkout_pending; billing finishing at the TERMINAL checkpoint is what finally moves it
+        // to completed. An interim (billing_pending) checkpoint advances to whatever this
+        // department's configured flow puts next — the visit continues, it doesn't end here.
+        String nextStatus = sequence.get(currentIndex + 1);
+        queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest(nextStatus));
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }
@@ -134,6 +171,10 @@ public class CheckoutService {
 
     private InvoiceResponse standaloneInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req, String kind) {
         tenantContext.set(tenantId);
+        if (req.lineItems().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
+                    "Add at least one charge before checking out.");
+        }
         Totals t = computeTotals(req);
         List<LineItemInput> items = req.lineItems().stream().map(this::toLineItemInput).toList();
 
@@ -149,15 +190,26 @@ public class CheckoutService {
     }
 
     private Totals computeTotals(CheckoutRequest req) {
+        return computeTotals(req.lineItems(), List.of(), req.discountOrZero());
+    }
+
+    /** NB-355: totals over new (not-yet-persisted) line items plus, when extending an
+     * already-created invoice, whatever's already on it — one combined subtotal/tax/total either
+     * way, so a visit billed across more than one checkpoint still has exactly one number that
+     * "can never be typed over" per the class doc, just recomputed as more gets added. */
+    private Totals computeTotals(List<LineItemRequest> newItems, List<LineItemRow> existingItems, BigDecimal discount) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal tax = BigDecimal.ZERO;
-        for (LineItemRequest li : req.lineItems()) {
+        for (LineItemRequest li : newItems) {
             BigDecimal lineAmount = li.unitPrice().multiply(BigDecimal.valueOf(li.quantity()));
             subtotal = subtotal.add(lineAmount);
             tax = tax.add(lineAmount.multiply(li.taxRatePercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
         }
+        for (LineItemRow li : existingItems) {
+            subtotal = subtotal.add(li.lineTotal());
+            tax = tax.add(li.lineTotal().multiply(li.taxRatePercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
+        }
 
-        BigDecimal discount = req.discountOrZero();
         if (discount.compareTo(subtotal) > 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "discount-exceeds-subtotal", "Discount too large",
                     "The discount can't be more than the subtotal.");

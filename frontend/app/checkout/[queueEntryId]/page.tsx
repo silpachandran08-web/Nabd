@@ -10,8 +10,9 @@ type PrescribedItem = { drugName: string; dosage: string | null; frequency: stri
 type CheckoutContext = {
   queueEntryId: string; patientName: string; doctorName: string; visitType: string;
   followUpEligible: boolean; currency: string; charges: Charge[]; pendingProcedures: Charge[];
-  prescribedItems: PrescribedItem[];
+  prescribedItems: PrescribedItem[]; departmentId: string; queueStatus: string;
 };
+type FlowStep = { stepType: string };
 type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
 type Payment = { id: string; method: string; amount: number; recordedAt: string };
 type Invoice = {
@@ -24,6 +25,25 @@ type Problem = { title: string; detail: string };
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 const STATUS_PILL: Record<string, string> = { paid: styles.pillPaid, partial: styles.pillPartial, unpaid: styles.pillUnpaid };
+
+// Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
+// first, checkout_pending/completed always last, with this department's configured (or, if
+// unconfigured, the default vitals+consultation) steps expanded in between.
+const STATUSES_FOR_STEP_TYPE: Record<string, string[]> = {
+  billing: ["billing_pending"],
+  vitals: ["vitals_pending", "vitals_done"],
+  consultation: ["in_consult"],
+  procedures: ["procedures_pending"],
+};
+const DEFAULT_STEP_TYPES = ["vitals", "consultation"];
+
+function resolveSequence(steps: FlowStep[]): string[] {
+  const stepTypes = steps.length > 0 ? steps.map((s) => s.stepType) : DEFAULT_STEP_TYPES;
+  const sequence = ["checked_in", "waiting"];
+  for (const t of stepTypes) sequence.push(...(STATUSES_FOR_STEP_TYPE[t] ?? []));
+  sequence.push("checkout_pending", "completed");
+  return sequence;
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -50,6 +70,11 @@ export default function CheckoutPage() {
   const [amount, setAmount] = useState("");
   const [recording, setRecording] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const [flowSteps, setFlowSteps] = useState<FlowStep[]>([]);
+  const [continuing, setContinuing] = useState(false);
+  const [continueError, setContinueError] = useState<string | null>(null);
+  const [showAddMore, setShowAddMore] = useState(false);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -94,6 +119,9 @@ export default function CheckoutPage() {
           unitPrice: c.baseAmount, taxRatePercent: c.taxRatePercent,
         })));
       }
+
+      const flowRes = await authedFetch(`/departments/${ctx.departmentId}/flow`);
+      if (flowRes?.ok) setFlowSteps(await flowRes.json());
 
       const invRes = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`);
       if (invRes?.status === 200) {
@@ -143,7 +171,10 @@ export default function CheckoutPage() {
 
   async function submitCheckout() {
     setCreateError(null);
-    if (items.length === 0) {
+    // An invoice already existing means this is a later billing checkpoint appending to it (or
+    // closing out with nothing further to charge) — only the very first billing checkpoint for a
+    // visit requires at least one item.
+    if (!invoice && items.length === 0) {
       setCreateError("Add at least one charge.");
       return;
     }
@@ -163,8 +194,34 @@ export default function CheckoutPage() {
         return;
       }
       setInvoice(await res.json());
+      setItems([]); // picker resets — a later billing checkpoint starts its "add more" list fresh
+      setDiscount("0");
+      setShowAddMore(false);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function continueVisit() {
+    if (!context) return;
+    setContinueError(null);
+    setContinuing(true);
+    try {
+      const sequence = resolveSequence(flowSteps);
+      const next = sequence[sequence.indexOf(context.queueStatus) + 1];
+      const res = await authedFetch(`/queue/${queueEntryId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't continue the visit." }));
+        setContinueError(p.detail || "Couldn't continue the visit.");
+        return;
+      }
+      router.push("/arrivals");
+    } finally {
+      setContinuing(false);
     }
   }
 
@@ -202,6 +259,79 @@ export default function CheckoutPage() {
   const categories = ["All", ...Array.from(new Set(context.charges.map((c) => c.category)))];
   const visibleCharges = category === "All" ? context.charges : context.charges.filter((c) => c.category === category);
 
+  const picker = (
+    <div className={styles.layout}>
+      <div className={styles.card}>
+        <h2 className={styles.cardTitle}>Charges</h2>
+        <div className={styles.categoryTabs}>
+          {categories.map((c) => (
+            <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c}</button>
+          ))}
+        </div>
+        {visibleCharges.map((c) => {
+          const price = effectivePrice(c);
+          const isFollowUp = price !== c.baseAmount;
+          return (
+            <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
+              <span className={styles.chargeName}>{c.name}</span>
+              <span className={styles.chargePrice}>
+                {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{c.baseAmount.toFixed(2)}</span>}
+                {context.currency} {price.toFixed(2)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={styles.card}>
+        <h2 className={styles.cardTitle}>{invoice ? "New charges to add" : "Selected line items"}</h2>
+        {items.length === 0 ? (
+          <div className={styles.muted}>Pick a charge from the left.</div>
+        ) : (
+          <table className={styles.table}>
+            <thead><tr><th>Charge</th><th>Qty</th><th>Unit price</th><th>Tax</th><th>Line total</th><th></th></tr></thead>
+            <tbody>
+              {items.map((i) => (
+                <tr key={i.chargeCode}>
+                  <td>{i.chargeName}<div className={styles.muted}>{i.category}</div></td>
+                  <td>
+                    <span className={styles.qtyStepper}>
+                      <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity - 1)}>−</button>
+                      {i.quantity}
+                      <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity + 1)}>+</button>
+                    </span>
+                  </td>
+                  <td>{i.unitPrice.toFixed(2)}</td>
+                  <td>{i.taxRatePercent}%</td>
+                  <td>{(i.unitPrice * i.quantity).toFixed(2)}</td>
+                  <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <div className={styles.card}>
+        <div className={styles.totals}>
+          <div className={styles.totalsRow}><span>Subtotal</span><span>{subtotal.toFixed(2)}</span></div>
+          <div className={styles.totalsRow}>
+            <span>Discount</span>
+            <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+          </div>
+          <div className={styles.totalsRow}><span>Tax</span><span>{tax.toFixed(2)}</span></div>
+          <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : ""}{roundOff.toFixed(2)}</span></div>
+          <div className={styles.totalsRowMain}><span>Total</span><span>{context.currency} {previewTotal.toFixed(2)}</span></div>
+        </div>
+        <p className={styles.muted}>The total is computed from line items and can never be typed over.</p>
+        {createError && <div className={styles.errorState}>{createError}</div>}
+        <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || (!invoice && items.length === 0)}>
+          {creating ? (invoice ? "Adding…" : "Generating…") : invoice ? "Add to invoice" : "Checkout"}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <main className={styles.page}>
       <div className={styles.strip}>
@@ -227,7 +357,7 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {invoice ? (
+      {invoice && (
         <div className={styles.layout} style={{ gridTemplateColumns: "1fr 300px" }}>
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>{invoice.invoiceNumber}</h2>
@@ -256,6 +386,11 @@ export default function CheckoutPage() {
                 ))}
               </>
             )}
+            {!showAddMore && (
+              <button type="button" className={styles.backBtn} style={{ marginTop: "16px" }} onClick={() => setShowAddMore(true)}>
+                + Add more charges
+              </button>
+            )}
           </div>
 
           <div className={styles.card}>
@@ -268,6 +403,30 @@ export default function CheckoutPage() {
               <div className={styles.totalsRow}><span>Paid</span><span>{invoice.paid.toFixed(2)}</span></div>
               <div className={styles.totalsRow}><span>Balance due</span><span>{invoice.balanceDue.toFixed(2)}</span></div>
             </div>
+
+            {context.queueStatus === "billing_pending" && (
+              <>
+                <p className={styles.muted} style={{ marginTop: "12px" }}>
+                  This is an interim billing stop — the visit continues after this.
+                </p>
+                {continueError && <div className={styles.errorState}>{continueError}</div>}
+                <button className={styles.checkoutBtn} onClick={continueVisit} disabled={continuing}>
+                  {continuing ? "Continuing…" : "Continue visit →"}
+                </button>
+              </>
+            )}
+
+            {context.queueStatus === "checkout_pending" && (
+              <>
+                <p className={styles.muted} style={{ marginTop: "12px" }}>
+                  {invoice.balanceDue > 0 ? "Record the remaining payment, then complete checkout." : "Nothing further to charge for this visit."}
+                </p>
+                {createError && <div className={styles.errorState}>{createError}</div>}
+                <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating}>
+                  {creating ? "Completing…" : "Complete checkout"}
+                </button>
+              </>
+            )}
 
             {invoice.status !== "paid" && (
               <form onSubmit={submitPayment}>
@@ -285,78 +444,9 @@ export default function CheckoutPage() {
             )}
           </div>
         </div>
-      ) : (
-        <div className={styles.layout}>
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Charges</h2>
-            <div className={styles.categoryTabs}>
-              {categories.map((c) => (
-                <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c}</button>
-              ))}
-            </div>
-            {visibleCharges.map((c) => {
-              const price = effectivePrice(c);
-              const isFollowUp = price !== c.baseAmount;
-              return (
-                <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
-                  <span className={styles.chargeName}>{c.name}</span>
-                  <span className={styles.chargePrice}>
-                    {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{c.baseAmount.toFixed(2)}</span>}
-                    {context.currency} {price.toFixed(2)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Selected line items</h2>
-            {items.length === 0 ? (
-              <div className={styles.muted}>Pick a charge from the left.</div>
-            ) : (
-              <table className={styles.table}>
-                <thead><tr><th>Charge</th><th>Qty</th><th>Unit price</th><th>Tax</th><th>Line total</th><th></th></tr></thead>
-                <tbody>
-                  {items.map((i) => (
-                    <tr key={i.chargeCode}>
-                      <td>{i.chargeName}<div className={styles.muted}>{i.category}</div></td>
-                      <td>
-                        <span className={styles.qtyStepper}>
-                          <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity - 1)}>−</button>
-                          {i.quantity}
-                          <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity + 1)}>+</button>
-                        </span>
-                      </td>
-                      <td>{i.unitPrice.toFixed(2)}</td>
-                      <td>{i.taxRatePercent}%</td>
-                      <td>{(i.unitPrice * i.quantity).toFixed(2)}</td>
-                      <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <div className={styles.card}>
-            <div className={styles.totals}>
-              <div className={styles.totalsRow}><span>Subtotal</span><span>{subtotal.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}>
-                <span>Discount</span>
-                <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-              </div>
-              <div className={styles.totalsRow}><span>Tax</span><span>{tax.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : ""}{roundOff.toFixed(2)}</span></div>
-              <div className={styles.totalsRowMain}><span>Total</span><span>{context.currency} {previewTotal.toFixed(2)}</span></div>
-            </div>
-            <p className={styles.muted}>The total is computed from line items and can never be typed over.</p>
-            {createError && <div className={styles.errorState}>{createError}</div>}
-            <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0}>
-              {creating ? "Generating…" : "Checkout"}
-            </button>
-          </div>
-        </div>
       )}
+
+      {(!invoice || showAddMore) && picker}
     </main>
   );
 }

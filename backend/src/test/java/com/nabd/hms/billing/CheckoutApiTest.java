@@ -115,13 +115,121 @@ class CheckoutApiTest extends ApiTestBase {
                 "category", "Service", "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)));
 
         exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, body), Map.class);
-        // checkout already moved the queue entry to 'completed', so a second attempt is rejected by
-        // the status guard before it can ever reach the invoice-exists guard — that one only matters
-        // for two concurrent submits racing while the entry is still checkout_pending.
+        // checkout already moved the queue entry to 'completed' — a status this department's flow
+        // has no billing checkpoint after, so a second attempt is rejected outright. (NB-355: an
+        // existing invoice no longer 409s on its own — a department with more than one billing
+        // checkpoint is expected to bill the SAME invoice again at a later one — but 'completed'
+        // itself is never a valid checkpoint to bill from.)
         ResponseEntity<Map> second = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, body), Map.class);
 
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(second.getBody().get("type")).asString().contains("not-checkout-pending");
+    }
+
+    private Map<String, Object> defaultDepartment(String token) {
+        ResponseEntity<List> listResp = exchange("/v1/departments", HttpMethod.GET, authed(token), List.class);
+        List<Map<String, Object>> departments = listResp.getBody();
+        return departments.stream().filter(d -> Boolean.TRUE.equals(d.get("isDefault"))).findFirst().orElseThrow();
+    }
+
+    /** checkout() auto-advances the queue on success — this reads the actual persisted status
+     * directly rather than inferring it from a subsequent PATCH's legality. */
+    private String queueStatus(UUID tenantId, String queueEntryId) {
+        return inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT status FROM queue_entries WHERE id = ?", String.class, UUID.fromString(queueEntryId)));
+    }
+
+    /** NB-355: a department whose flow bills at more than one checkpoint keeps extending the SAME
+     * invoice rather than 409ing — the mechanism an interim consultation-fee stop relies on. */
+    @Test
+    void aSecondBillingCheckpointAppendsToTheExistingInvoiceAndRecomputesTotals() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "recep6@a.com", "+919700000006", false);
+        String token = loginAndGetAccessToken(staff);
+
+        String departmentId = (String) defaultDepartment(token).get("id");
+        exchange("/v1/departments/" + departmentId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin_with_billing", "toggles", Map.of("vitals_enabled", false))), Map.class);
+
+        String patientId = registerPatient(token, "C6", "+919999930006");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "billing_pending");
+
+        ResponseEntity<Map> first = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation",
+                        "category", "Consultation", "quantity", 1, "unitPrice", 200.00, "taxRatePercent", 0.00)),
+                "discount", 0)), Map.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String invoiceId = (String) first.getBody().get("id");
+        assertThat(((Number) first.getBody().get("total")).doubleValue()).isEqualTo(200.00);
+        assertThat(queueStatus(tenant.id(), queueEntryId)).isEqualTo("in_consult"); // auto-advanced, billing was not the last step
+
+        moveTo(token, queueEntryId, "checkout_pending");
+
+        ResponseEntity<Map> second = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "MED", "chargeName", "Medicine",
+                        "category", "Pharmacy", "quantity", 1, "unitPrice", 50.00, "taxRatePercent", 0.00)),
+                "discount", 0)), Map.class);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(second.getBody().get("id")).isEqualTo(invoiceId);
+        assertThat(((Number) second.getBody().get("total")).doubleValue()).isEqualTo(250.00);
+        List<Map<String, Object>> lineItems = (List<Map<String, Object>>) second.getBody().get("lineItems");
+        assertThat(lineItems).hasSize(2);
+    }
+
+    /** NB-355: "checkout with 0 payment" — the terminal checkpoint can close a visit with nothing
+     * further to bill, as long as an invoice already exists from an earlier checkpoint. */
+    @Test
+    void terminalCheckoutWithNoNewLineItemsClosesTheVisitWithoutChangingTheTotal() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "recep7@a.com", "+919700000007", false);
+        String token = loginAndGetAccessToken(staff);
+
+        String departmentId = (String) defaultDepartment(token).get("id");
+        exchange("/v1/departments/" + departmentId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin_with_billing", "toggles", Map.of("vitals_enabled", false))), Map.class);
+
+        String patientId = registerPatient(token, "C7", "+919999930007");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "billing_pending");
+
+        exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation",
+                        "category", "Consultation", "quantity", 1, "unitPrice", 200.00, "taxRatePercent", 0.00)),
+                "discount", 0)), Map.class);
+        moveTo(token, queueEntryId, "checkout_pending");
+
+        ResponseEntity<Map> finalCheckout = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(), "discount", 0)), Map.class);
+        assertThat(finalCheckout.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Number) finalCheckout.getBody().get("total")).doubleValue()).isEqualTo(200.00);
+        assertThat(queueStatus(tenant.id(), queueEntryId)).isEqualTo("completed");
+    }
+
+    /** NB-355: the billing_pending precondition genuinely reflects THIS department's configured
+     * sequence, not just "one of two hardcoded strings" — a queue entry that somehow ended up at
+     * billing_pending without that department having a billing step configured is rejected. */
+    @Test
+    void checkoutAtBillingPendingIsRejectedWhenTheDepartmentHasNoBillingStepConfigured() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "recep8@a.com", "+919700000008", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "C8", "+919999930008");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        // The default department has no billing step configured — the normal PATCH path would
+        // never legally reach billing_pending here, so force it directly to exercise the guard.
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE queue_entries SET status = 'billing_pending' WHERE id = ?",
+                UUID.fromString(queueEntryId)));
+
+        ResponseEntity<Map> resp = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().get("type")).asString().contains("not-checkout-pending");
     }
 
     @Test

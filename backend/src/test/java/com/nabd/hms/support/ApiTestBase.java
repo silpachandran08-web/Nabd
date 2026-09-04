@@ -192,7 +192,7 @@ public abstract class ApiTestBase {
         // every newly-provisioned one. queue_entries.department_id is NOT NULL and check-in falls
         // back to this row for any doctor with no department assigned yet.
         inTenantTx(id, () -> jdbc.update(
-                "INSERT INTO departments (tenant_id, name, requires_vitals, is_default) VALUES (?,'General',true,true)", id));
+                "INSERT INTO departments (tenant_id, name, is_default) VALUES (?,'General',true)", id));
         return new SeededTenant(id, slug);
     }
 
