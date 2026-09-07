@@ -16,7 +16,8 @@ import static com.nabd.hms.queue.QueueModels.QueueEntryRow;
 class QueueRepository {
 
     private static final String COLUMNS =
-            "id, appointment_id, patient_id, doctor_id, department_id, parent_queue_entry_id, queue_date, token_number, " +
+            "id, appointment_id, patient_id, doctor_id, department_id, parent_queue_entry_id, encounter_id, class, " +
+                    "current_stage, workflow_definition_id, queue_date, token_number, " +
                     "status, priority, priority_reason, priority_flagged_by, priority_flagged_at, priority_acknowledged_by, " +
                     "priority_acknowledged_at, source, created_at ";
 
@@ -43,12 +44,15 @@ class QueueRepository {
         return (max == null ? 0 : max) + 1;
     }
 
+    /** encounterId is null for a fresh check-in (the row's own id becomes its encounter_id via
+     * queue_entries_default_encounter, see V43) and the parent leg's encounterId when opened by
+     * transfer() — propagating one visit's identity across however many department legs it takes. */
     UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
-                UUID parentQueueEntryId, LocalDate queueDate, int tokenNumber, String source, String status) {
+                UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
-                        "parent_queue_entry_id, queue_date, token_number, source, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId,
+                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId, encounterId,
                 Date.valueOf(queueDate), tokenNumber, source, status);
         return id;
     }
@@ -157,6 +161,7 @@ class QueueRepository {
         return (rs, i) -> {
             String appointmentId = rs.getString("appointment_id");
             String parentQueueEntryId = rs.getString("parent_queue_entry_id");
+            String workflowDefinitionId = rs.getString("workflow_definition_id");
             String flaggedBy = rs.getString("priority_flagged_by");
             String acknowledgedBy = rs.getString("priority_acknowledged_by");
             java.sql.Timestamp flaggedAt = rs.getTimestamp("priority_flagged_at");
@@ -168,6 +173,10 @@ class QueueRepository {
                     UUID.fromString(rs.getString("doctor_id")),
                     UUID.fromString(rs.getString("department_id")),
                     parentQueueEntryId == null ? null : UUID.fromString(parentQueueEntryId),
+                    UUID.fromString(rs.getString("encounter_id")),
+                    rs.getString("class"),
+                    rs.getString("current_stage"),
+                    workflowDefinitionId == null ? null : UUID.fromString(workflowDefinitionId),
                     rs.getDate("queue_date").toLocalDate(),
                     rs.getInt("token_number"),
                     rs.getString("status"),
