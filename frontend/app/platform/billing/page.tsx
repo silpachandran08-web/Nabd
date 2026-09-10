@@ -128,7 +128,14 @@ export default function BillingPage() {
       if (tenantsRes?.ok) setTenants((await tenantsRes.json()).data);
 
       const plansRes = await authedFetch("/platform/plans");
-      if (plansRes?.ok) setPlans((await plansRes.json()).filter((p: PlanOption) => p.active));
+      if (plansRes?.ok) {
+        setPlans((await plansRes.json()).filter((p: PlanOption) => p.active));
+      } else if (plansRes && plansRes.status !== 401) {
+        // Pricing & Packaging access is a separate authority (pricing_packaging:view) from billing —
+        // a role with billing access but not that one would otherwise see a silently empty Plan
+        // dropdown with no clue why, same confusion an empty-but-successful load already causes.
+        setError("Couldn't load plans — check you have Pricing & Packaging access.");
+      }
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -275,6 +282,14 @@ export default function BillingPage() {
                 <option value="">Select a plan…</option>
                 {plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({(p.monthlyPriceCents / 100).toFixed(2)} {p.currency})</option>)}
               </select>
+              {plans.length === 0 && (
+                <p className={styles.muted}>
+                  No plans exist yet.{" "}
+                  <button type="button" className={styles.actionBtn} onClick={() => router.push("/platform/plans")}>
+                    Create one in Pricing &amp; Packaging
+                  </button>
+                </p>
+              )}
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="subMrr">MRR</label>

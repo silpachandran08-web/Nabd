@@ -393,6 +393,51 @@ class QueueApiTest extends ApiTestBase {
         assertThat(newLeg.get("departmentId")).isEqualTo(dentalId);
         assertThat(newLeg.get("parentQueueEntryId")).isEqualTo(entryId);
         assertThat(newLeg.get("doctorId")).isEqualTo(dentist.id().toString());
+
+        // NB-360: one visit, two department legs, one encounter — the transfer propagates the
+        // original leg's encounter_id onto the new leg rather than each leg minting its own.
+        assertThat(newLeg.get("encounterId")).isEqualTo(closedLeg.get("encounterId"));
+        assertThat(closedLeg.get("encounterId")).isEqualTo(entryId); // the first leg is its own encounter
+        assertThat(closedLeg.get("currentStage")).isEqualTo("COMPLETED"); // transferred_out's stage
+        assertThat(newLeg.get("currentStage")).isEqualTo("WAITING");
+        assertThat(newLeg.get("encounterClass")).isEqualTo("ambulatory");
+    }
+
+    /** NB-360: encounter_id/class/current_stage/workflow_definition_id are DB-trigger-managed (V43)
+     * — this exercises them purely through the API to prove the Java layer surfaces what the
+     * triggers actually computed, not a hand-maintained Java copy of the same logic. */
+    @Test
+    void checkInStampsEncounterAndStageColumnsAndStatusUpdatesKeepCurrentStageInSync() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "nb360doc@a.com", "+919600000030", false);
+        String token = loginAndGetAccessToken(doctor);
+        addWorkingHours(token, doctor.id(), null);
+
+        // Unconfigured department -> workflowDefinitionId stays null, matching DepartmentService's
+        // own resolveStatusSequence fallback everywhere else.
+        String patientId = registerPatient(token, "Q30", "+919999910030");
+        ResponseEntity<Map> checkin = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", doctor.id().toString())), Map.class);
+        assertThat(checkin.getBody().get("currentStage")).isEqualTo("CHECKED_IN");
+        assertThat(checkin.getBody().get("encounterClass")).isEqualTo("ambulatory");
+        assertThat(checkin.getBody().get("encounterId")).isEqualTo(checkin.getBody().get("id"));
+        assertThat(checkin.getBody().get("workflowDefinitionId")).isNull();
+
+        String entryId = (String) checkin.getBody().get("id");
+        ResponseEntity<Map> waiting = exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("status", "waiting")), Map.class);
+        assertThat(waiting.getBody().get("currentStage")).isEqualTo("WAITING");
+
+        // Selecting a platform workflow template makes workflowDefinitionId non-null on the next check-in.
+        String generalId = (String) defaultDepartment(token).get("id");
+        exchange("/v1/departments/" + generalId + "/workflow", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "templateCode", "clinic_walkin_with_billing", "toggles", Map.of("vitals_enabled", true))), Map.class);
+
+        String patient2Id = registerPatientWithDob(token, "Q31", "+919999910031");
+        ResponseEntity<Map> checkin2 = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patient2Id, "doctorId", doctor.id().toString())), Map.class);
+        assertThat(checkin2.getBody().get("workflowDefinitionId")).isNotNull();
     }
 
     @Test

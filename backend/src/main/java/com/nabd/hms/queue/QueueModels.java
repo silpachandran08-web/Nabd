@@ -25,7 +25,8 @@ final class QueueModels {
     }
 
     record QueueEntryRow(UUID id, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
-                          UUID parentQueueEntryId, LocalDate queueDate, int tokenNumber, String status,
+                          UUID parentQueueEntryId, UUID encounterId, String encounterClass, String currentStage,
+                          UUID workflowDefinitionId, LocalDate queueDate, int tokenNumber, String status,
                           boolean priority, String priorityReason, UUID priorityFlaggedBy, Instant priorityFlaggedAt,
                           UUID priorityAcknowledgedBy, Instant priorityAcknowledgedAt, String source, Instant createdAt) {
     }
