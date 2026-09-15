@@ -88,3 +88,69 @@
   composes: state;
   color: var(--nb-danger-500);
 }
+
+.navBar {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-24);
+  padding: 0 var(--nb-space-32);
+  height: 56px;
+  border-bottom: 1px solid var(--nb-border-subtle);
+  background: var(--nb-surface-1);
+}
+
+.navBarBrand {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nb-text-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navBarLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-4);
+  overflow-x: auto;
+  flex: 1;
+}
+
+.navBarLink {
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-radius: var(--nb-radius-md);
+  color: var(--nb-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--nb-dur-base) var(--nb-ease-standard), color var(--nb-dur-base) var(--nb-ease-standard);
+}
+
+.navBarLink:hover {
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+}
+
+.navBarLinkActive {
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
+}
+
+.navBarLogout {
+  height: 32px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--nb-dur-base) var(--nb-ease-standard);
+}
+
+.navBarLogout:hover {
+  border-color: var(--nb-border-strong);
+}
