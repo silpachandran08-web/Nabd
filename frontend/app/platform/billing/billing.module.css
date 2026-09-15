@@ -119,6 +119,13 @@
   font-size: 13px;
 }
 
+.planHint {
+  composes: muted;
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+}
+
 .card {
   background: var(--nb-surface-1);
   border: 1px solid var(--nb-border-subtle);

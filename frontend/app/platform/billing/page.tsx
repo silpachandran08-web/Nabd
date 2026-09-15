@@ -282,14 +282,6 @@ export default function BillingPage() {
                 <option value="">Select a plan…</option>
                 {plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({(p.monthlyPriceCents / 100).toFixed(2)} {p.currency})</option>)}
               </select>
-              {plans.length === 0 && (
-                <p className={styles.muted}>
-                  No plans exist yet.{" "}
-                  <button type="button" className={styles.actionBtn} onClick={() => router.push("/platform/plans")}>
-                    Create one in Pricing &amp; Packaging
-                  </button>
-                </p>
-              )}
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="subMrr">MRR</label>
@@ -300,6 +292,18 @@ export default function BillingPage() {
               <input id="subRenewal" type="date" className={styles.input} value={subRenewal} onChange={(e) => setSubRenewal(e.target.value)} />
             </div>
             <button className={styles.submit} type="submit" disabled={subSaving}>{subSaving ? "Saving…" : "Set plan"}</button>
+            {plans.length === 0 && (
+              // Full-width so it wraps onto its own line below the field row instead of
+              // stretching the Plan field taller than its siblings — .formCard bottom-aligns
+              // every field (align-items: flex-end), so a taller Plan field used to knock
+              // Clinic/MRR/Renewal date and Set plan out of alignment with it.
+              <p className={styles.planHint}>
+                No plans exist yet.{" "}
+                <button type="button" className={styles.actionBtn} onClick={() => router.push("/platform/plans")}>
+                  Create one in Pricing &amp; Packaging
+                </button>
+              </p>
+            )}
             {subError && <div className={styles.formError} role="alert">{subError}</div>}
           </form>
 
