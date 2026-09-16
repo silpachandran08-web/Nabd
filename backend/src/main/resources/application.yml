@@ -61,6 +61,10 @@ app:
     mfa-challenge-ttl-minutes: 5
     lockout-threshold: 5          # failed attempts before backoff kicks in
     rate-limit-per-ip-per-minute: 20
+  outbox:
+    poll-interval-ms: 2000
+    batch-size: 20
+    lease-seconds: 60
   crypto:
     # base64, 32 bytes (AES-256), Vault/KMS-backed (NB-009) — no default;
     # boot fails fast if unset rather than encrypting MFA secrets with a
