@@ -48,6 +48,14 @@ function normalizeRxItem(i: PrescriptionItem): PrescriptionItem {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const AUTOSAVE_MS = 10_000;
 const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
+// NB-116: matches CheckoutService.FOLLOW_UP_WINDOW_DAYS — pre-fills the date picker instead of
+// leaving it blank; the doctor can still override it.
+const FOLLOW_UP_WINDOW_DAYS = 14;
+function defaultFollowUpDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + FOLLOW_UP_WINDOW_DAYS);
+  return d.toISOString().slice(0, 10);
+}
 
 const STATUS_CLASS: Record<string, string> = {
   checked_in: styles.pillWaiting,
@@ -227,7 +235,7 @@ export default function ConsultPage() {
     setRxItems([]);
     setRxStatus("draft");
     setRxError(null);
-    setFollowUpDate("");
+    setFollowUpDate(defaultFollowUpDate());
     setFollowUpMessage(null);
     setPreviousMeds([]);
     setFavouriteSets([]);
