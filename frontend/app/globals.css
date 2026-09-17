@@ -73,3 +73,32 @@ body {
   flex: 1;
   min-width: 0;
 }
+
+/* DESIGN.md §9's interaction contract (hover/pressed feedback), applied once for every button
+   instead of per page. Most page CSS modules (setup, nursing, reports, checkout, ...) define
+   their own .actionBtn/.submitBtn/.tab/etc. with no hover or pressed state at all — this fills
+   that in globally. filter:brightness works uniformly regardless of a button's own background
+   (solid, gradient, transparent), same technique the wireframe itself used on every button via
+   style-hover="filter:brightness(...)". Lower specificity than any single-class rule (e.g.
+   arrivals' .actionBtn:hover, which sets background/border-color instead), so a page's own more
+   specific treatment for a given property always wins — this only covers what nothing else sets.
+   Browsers don't match :hover/:active on a disabled button, so it's excluded for free. */
+button {
+  transition: filter var(--nb-dur-base) var(--nb-ease-standard),
+    transform var(--nb-dur-base) var(--nb-ease-standard);
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+button:active {
+  filter: brightness(0.94);
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}
