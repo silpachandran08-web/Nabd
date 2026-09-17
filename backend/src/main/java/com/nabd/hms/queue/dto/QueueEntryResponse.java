@@ -8,5 +8,6 @@ public record QueueEntryResponse(UUID id, UUID appointmentId, UUID patientId, UU
                                   UUID parentQueueEntryId, UUID encounterId, String encounterClass, String currentStage,
                                   UUID workflowDefinitionId, LocalDate queueDate, int tokenNumber, String status,
                                   boolean priority, String priorityReason, UUID priorityFlaggedBy, Instant priorityFlaggedAt,
-                                  UUID priorityAcknowledgedBy, Instant priorityAcknowledgedAt, String source, Instant createdAt) {
+                                  UUID priorityAcknowledgedBy, Instant priorityAcknowledgedAt, String source,
+                                  String presentingComplaint, String paymentMode, Instant createdAt) {
 }

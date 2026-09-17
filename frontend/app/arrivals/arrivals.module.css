@@ -47,6 +47,16 @@
   flex-wrap: wrap;
 }
 
+/* Quick-actions toolbar (DESIGN.md's reception "qa" bar): one-tap access to the six actions that
+   would otherwise need a specific row already in the right state, or aren't reachable from the
+   table at all (Move queue, Notify delay for a doctor with nobody waiting yet). */
+.quickActions {
+  display: flex;
+  gap: var(--nb-space-8);
+  margin-bottom: var(--nb-space-16);
+  flex-wrap: wrap;
+}
+
 .tab {
   height: 34px;
   padding: 0 var(--nb-space-12);
@@ -301,6 +311,14 @@
   font-family: inherit;
   outline: none;
   width: 100%;
+}
+
+.textarea {
+  composes: input;
+  height: auto;
+  min-height: 64px;
+  padding: var(--nb-space-8) var(--nb-space-12);
+  resize: vertical;
 }
 
 .searchResults {

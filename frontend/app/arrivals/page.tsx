@@ -8,9 +8,9 @@ import styles from "./arrivals.module.css";
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
 // can populate the doctor picker), POST /v1/queue/check-in, POST /v1/queue/{id}/reorder.
 type QueueEntry = {
-  id: string; appointmentId: string | null; patientId: string; doctorId: string;
+  id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
   queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
-  createdAt: string;
+  createdAt: string; source: string;
 };
 type Row = QueueEntry & { patientName: string; patientMrn: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
@@ -20,6 +20,16 @@ type Problem = { title: string; detail: string };
 type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
 // NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
 type CallbackEntry = { appointmentId: string; patientId: string; patientName: string; doctorId: string; startTime: string; status: string };
+// A today's-schedule appointment not yet checked in — the "Check in" quick action's picker.
+type AppointmentOption = { id: string; patientId: string; patientName: string; doctorId: string; doctorName: string; startTime: string };
+// Matches GET /departments/{id}/transfer-targets (DepartmentController) — same shape consult's
+// own transfer picker already uses.
+type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
+
+const VISIT_LABEL: Record<string, string> = {
+  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
+  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
+};
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const POLL_MS = 15_000;
@@ -103,6 +113,8 @@ export default function ArrivalsPage() {
   const [newDob, setNewDob] = useState("");
   const [newGender, setNewGender] = useState("male");
   const [doctorId, setDoctorId] = useState("");
+  const [presentingComplaint, setPresentingComplaint] = useState("");
+  const [paymentMode, setPaymentMode] = useState("cash");
   const [modalError, setModalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -113,6 +125,26 @@ export default function ArrivalsPage() {
   const [delayReasonInput, setDelayReasonInput] = useState("");
   const [delayBusy, setDelayBusy] = useState(false);
   const [callbackList, setCallbackList] = useState<CallbackEntry[]>([]);
+  const [showDelayPicker, setShowDelayPicker] = useState(false);
+
+  // "Check in" quick action: a today's-appointment picker, distinct from Register walk-in.
+  const [showCheckin, setShowCheckin] = useState(false);
+  const [checkinAppointments, setCheckinAppointments] = useState<AppointmentOption[] | null>(null);
+  const [checkinError, setCheckinError] = useState<string | null>(null);
+  const [checkinSubmittingId, setCheckinSubmittingId] = useState<string | null>(null);
+
+  // "Move queue" quick action: pick a queue entry, then the same department/doctor transfer
+  // picker consult's page already uses against POST /queue/{id}/transfer.
+  const [showMove, setShowMove] = useState(false);
+  const [moveEntryId, setMoveEntryId] = useState("");
+  const [moveTargets, setMoveTargets] = useState<TransferTarget[] | null>(null);
+  const [moveDepartmentId, setMoveDepartmentId] = useState("");
+  const [moveDoctorId, setMoveDoctorId] = useState("");
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [moveSubmitting, setMoveSubmitting] = useState(false);
+
+  // "Checkout" quick action: pick which checkout-pending patient, then reuse the existing route.
+  const [showCheckoutPicker, setShowCheckoutPicker] = useState(false);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -244,6 +276,8 @@ export default function ArrivalsPage() {
     setNewDob("");
     setNewGender("male");
     setDoctorId("");
+    setPresentingComplaint("");
+    setPaymentMode("cash");
     setModalError(null);
     setDuplicateCandidates([]);
   }
@@ -286,7 +320,11 @@ export default function ArrivalsPage() {
 
       const ciRes = await authedFetch("/queue/check-in", {
         method: "POST",
-        body: JSON.stringify({ patientId, doctorId }),
+        body: JSON.stringify({
+          patientId, doctorId,
+          presentingComplaint: presentingComplaint.trim() || null,
+          paymentMode,
+        }),
       });
       if (!ciRes) return;
       if (!ciRes.ok) {
@@ -382,6 +420,113 @@ export default function ArrivalsPage() {
     if (res?.ok) load();
   }
 
+  function pickDelayDoctor(doctorId: string) {
+    setShowDelayPicker(false);
+    setDelayFormFor(doctorId);
+    setDelayMinutesInput("15");
+    setDelayReasonInput("");
+  }
+
+  // Today's scheduled appointments not yet checked in — distinct from Register walk-in, which
+  // is always a fresh/unscheduled arrival.
+  async function openCheckin() {
+    setShowCheckin(true);
+    setCheckinError(null);
+    setCheckinAppointments(null);
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await authedFetch(`/appointments?date=${today}`);
+    if (!res?.ok) {
+      setCheckinError("Couldn't load today's appointments.");
+      setCheckinAppointments([]);
+      return;
+    }
+    const body = await res.json();
+    const list: { id: string; patientId: string; doctorId: string; startTime: string; status: string }[] = body.data ?? body;
+    const alreadyArrived = new Set(rows.map((r) => r.appointmentId).filter(Boolean));
+    const pending = list.filter((a) => a.status === "scheduled" && !alreadyArrived.has(a.id));
+    const withNames = await Promise.all(pending.map(async (a) => {
+      const pRes = await authedFetch(`/patients/${a.patientId}`);
+      const p = pRes?.ok ? await pRes.json() : null;
+      return {
+        id: a.id, patientId: a.patientId, doctorId: a.doctorId,
+        doctorName: staff.find((s) => s.id === a.doctorId)?.name ?? "—",
+        patientName: p?.name ?? "Unknown patient", startTime: a.startTime,
+      };
+    }));
+    setCheckinAppointments(withNames);
+  }
+
+  async function submitScheduledCheckin(a: AppointmentOption) {
+    setCheckinSubmittingId(a.id);
+    setCheckinError(null);
+    try {
+      const res = await authedFetch("/queue/check-in", {
+        method: "POST",
+        body: JSON.stringify({ appointmentId: a.id, patientId: a.patientId, doctorId: a.doctorId }),
+      });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't check in." }));
+        setCheckinError(p.detail || "Couldn't check in.");
+        return;
+      }
+      setShowCheckin(false);
+      load();
+    } finally {
+      setCheckinSubmittingId(null);
+    }
+  }
+
+  // "Move queue": pick which active patient, then the same transfer-target picker consult's
+  // page already drives against the same POST /queue/{id}/transfer.
+  function openMove() {
+    setShowMove(true);
+    setMoveEntryId("");
+    setMoveTargets(null);
+    setMoveDepartmentId("");
+    setMoveDoctorId("");
+    setMoveError(null);
+  }
+
+  async function selectMoveEntry(entryId: string) {
+    setMoveEntryId(entryId);
+    setMoveDepartmentId("");
+    setMoveDoctorId("");
+    setMoveTargets(null);
+    setMoveError(null);
+    const entry = rows.find((r) => r.id === entryId);
+    if (!entry) return;
+    const res = await authedFetch(`/departments/${entry.departmentId}/transfer-targets`);
+    if (!res?.ok) {
+      setMoveError("Couldn't load transfer options.");
+      setMoveTargets([]);
+      return;
+    }
+    setMoveTargets(await res.json());
+  }
+
+  async function submitMove() {
+    if (!moveEntryId || !moveDepartmentId || !moveDoctorId) return;
+    setMoveSubmitting(true);
+    setMoveError(null);
+    try {
+      const res = await authedFetch(`/queue/${moveEntryId}/transfer`, {
+        method: "POST",
+        body: JSON.stringify({ toDepartmentId: moveDepartmentId, doctorId: moveDoctorId }),
+      });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't move the patient." }));
+        setMoveError(p.detail || "Couldn't move the patient.");
+        return;
+      }
+      setShowMove(false);
+      load();
+    } finally {
+      setMoveSubmitting(false);
+    }
+  }
+
   // QueueService's state machine only allows one hop at a time (checked_in -> waiting ->
   // vitals_pending), and front desk has no reason to care about that middle "waiting" state —
   // it's rendered with the same pill and grouped into the same tab as checked_in. This one button
@@ -439,6 +584,19 @@ export default function ArrivalsPage() {
         </div>
       )}
 
+      {!forbidden && (
+        <div className={styles.quickActions}>
+          <button className={styles.actionBtn} onClick={openModal}>Register walk-in</button>
+          <button className={styles.actionBtn} onClick={openCheckin}>Check in</button>
+          {/* Issue token isn't a separate backend action — a token is only ever created as part
+              of check-in, so this opens the same walk-in flow. */}
+          <button className={styles.actionBtn} onClick={openModal}>Issue token</button>
+          <button className={styles.actionBtn} onClick={openMove}>Move queue</button>
+          <button className={styles.actionBtn} onClick={() => setShowDelayPicker(true)}>Notify delay</button>
+          <button className={styles.actionBtn} onClick={() => setShowCheckoutPicker(true)}>Checkout</button>
+        </div>
+      )}
+
       {loading ? (
         <div className={styles.card}><div className={styles.state}>Loading…</div></div>
       ) : forbidden ? (
@@ -454,7 +612,7 @@ export default function ArrivalsPage() {
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
-                    <tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Wait</th><th>Status</th><th></th></tr>
+                    <tr><th>Token</th><th>Patient</th><th>Visit</th><th>Doctor</th><th>Wait</th><th>Status</th><th></th></tr>
                   </thead>
                   <tbody>
                     {filtered.map((r) => {
@@ -463,6 +621,7 @@ export default function ArrivalsPage() {
                         <tr key={r.id}>
                           <td className={styles.token}>{r.priority && <span className={styles.priorityDot} />}#{r.tokenNumber}</td>
                           <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
+                          <td className={styles.muted}>{VISIT_LABEL[r.source] ?? r.source}</td>
                           <td>{staff.find((s) => s.id === r.doctorId)?.name ?? "—"}</td>
                           <td className={styles.muted}>{b === "waiting" || b === "in_consult" ? `${waitMinutes(r.createdAt)}m` : "—"}</td>
                           <td><span className={`${styles.pill} ${STATUS_CLASS[r.status] ?? ""}`}>{r.status.replace("_", " ")}</span></td>
@@ -607,6 +766,22 @@ export default function ArrivalsPage() {
               </select>
             </div>
 
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="paymentMode">Payment mode</label>
+              <select id="paymentMode" className={styles.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="upi">UPI</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="presentingComplaint">Presenting complaint</label>
+              <textarea id="presentingComplaint" className={styles.textarea} value={presentingComplaint}
+                onChange={(e) => setPresentingComplaint(e.target.value)} placeholder="Fever, 3 days" />
+            </div>
+
             {modalError && <div className={styles.formError} role="alert">{modalError}</div>}
 
             {duplicateCandidates.length > 0 && (
@@ -693,7 +868,7 @@ export default function ArrivalsPage() {
       {delayFormFor && (
         <div className={styles.overlay} onClick={() => setDelayFormFor(null)}>
           <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitDelay}>
-            <h2 className={styles.modalTitle}>Announce delay</h2>
+            <h2 className={styles.modalTitle}>Announce delay — {staff.find((s) => s.id === delayFormFor)?.name ?? ""}</h2>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="delayMinutes">Running late by (minutes)</label>
               <input id="delayMinutes" type="number" min="1" className={styles.input}
@@ -711,6 +886,132 @@ export default function ArrivalsPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {showDelayPicker && (
+        <div className={styles.overlay} onClick={() => setShowDelayPicker(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Notify delay — pick a doctor</h2>
+            {staff.length === 0 ? (
+              <div className={styles.state}>No doctors on the roster.</div>
+            ) : (
+              <div className={styles.searchResults}>
+                {staff.map((s) => (
+                  <div key={s.id} className={styles.searchResultRow} onClick={() => pickDelayDoctor(s.id)}>{s.name}</div>
+                ))}
+              </div>
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setShowDelayPicker(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCheckoutPicker && (
+        <div className={styles.overlay} onClick={() => setShowCheckoutPicker(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Checkout — pick a patient</h2>
+            {rows.filter((r) => bucketOf(r.status) === "checkout_pending").length === 0 ? (
+              <div className={styles.state}>No one is ready for checkout.</div>
+            ) : (
+              <div className={styles.searchResults}>
+                {rows.filter((r) => bucketOf(r.status) === "checkout_pending").map((r) => (
+                  <div key={r.id} className={styles.searchResultRow}
+                    onClick={() => { setShowCheckoutPicker(false); router.push(`/checkout/${r.id}`); }}>
+                    #{r.tokenNumber} · {r.patientName}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setShowCheckoutPicker(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCheckin && (
+        <div className={styles.overlay} onClick={() => setShowCheckin(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Check in — today&apos;s appointments</h2>
+            {checkinError && <div className={styles.formError} role="alert">{checkinError}</div>}
+            {checkinAppointments === null ? (
+              <div className={styles.state}>Loading…</div>
+            ) : checkinAppointments.length === 0 ? (
+              <div className={styles.state}>No scheduled appointments are waiting to arrive.</div>
+            ) : (
+              <div className={styles.searchResults}>
+                {checkinAppointments.map((a) => (
+                  <div key={a.id} className={styles.searchResultRow} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span>{a.patientName} · {a.doctorName} · {new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                    <button type="button" className={styles.actionBtn} disabled={checkinSubmittingId === a.id}
+                      onClick={() => submitScheduledCheckin(a)}>
+                      {checkinSubmittingId === a.id ? "Checking in…" : "Check in"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setShowCheckin(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMove && (
+        <div className={styles.overlay} onClick={() => setShowMove(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Move queue</h2>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="moveEntry">Patient</label>
+              <select id="moveEntry" className={styles.select} value={moveEntryId} onChange={(e) => selectMoveEntry(e.target.value)}>
+                <option value="">Select a patient…</option>
+                {rows.filter((r) => bucketOf(r.status) === "waiting").map((r) => (
+                  <option key={r.id} value={r.id}>#{r.tokenNumber} · {r.patientName}</option>
+                ))}
+              </select>
+            </div>
+            {moveEntryId && (
+              moveTargets === null ? (
+                <div className={styles.state}>Loading…</div>
+              ) : moveTargets.length === 0 ? (
+                <div className={styles.state}>This department isn&apos;t configured to transfer patients anywhere.</div>
+              ) : (
+                <>
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="moveDepartment">Department</label>
+                    <select id="moveDepartment" className={styles.select} value={moveDepartmentId}
+                      onChange={(e) => { setMoveDepartmentId(e.target.value); setMoveDoctorId(""); }}>
+                      <option value="">Select a department…</option>
+                      {moveTargets.map((t) => <option key={t.departmentId} value={t.departmentId}>{t.departmentName}</option>)}
+                    </select>
+                  </div>
+                  {moveDepartmentId && (
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="moveDoctor">Doctor</label>
+                      <select id="moveDoctor" className={styles.select} value={moveDoctorId} onChange={(e) => setMoveDoctorId(e.target.value)}>
+                        <option value="">Select a doctor…</option>
+                        {moveTargets.find((t) => t.departmentId === moveDepartmentId)?.doctors.map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )
+            )}
+            {moveError && <div className={styles.formError} role="alert">{moveError}</div>}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setShowMove(false)}>Cancel</button>
+              <button type="button" className={styles.submitBtn} disabled={moveSubmitting || !moveDepartmentId || !moveDoctorId}
+                onClick={submitMove}>
+                {moveSubmitting ? "Moving…" : "Move"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </main>

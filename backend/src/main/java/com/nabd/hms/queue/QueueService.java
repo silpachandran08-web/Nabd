@@ -106,7 +106,7 @@ public class QueueService {
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
         UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
-                null, null, today, token, source, "checked_in");
+                null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode());
         log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",
                 callerStaffId, token, req.doctorId(), req.appointmentId() == null ? "walk-in" : "scheduled", id);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
@@ -170,7 +170,7 @@ public class QueueService {
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
         // though this is a brand-new queue_entries row with its own status/practitioner/department.
         UUID newId = repo.insert(tenantId, null, current.patientId(), req.doctorId(), req.toDepartmentId(),
-                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting");
+                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null);
         log.info("queue entry {} opened by transfer from {} (doctor {}, department {})",
                 newId, id, req.doctorId(), req.toDepartmentId());
 
@@ -243,7 +243,8 @@ public class QueueService {
                 row.departmentId(), row.parentQueueEntryId(), row.encounterId(), row.encounterClass(), row.currentStage(),
                 row.workflowDefinitionId(), row.queueDate(), row.tokenNumber(), row.status(),
                 row.priority(), row.priorityReason(), row.priorityFlaggedBy(), row.priorityFlaggedAt(),
-                row.priorityAcknowledgedBy(), row.priorityAcknowledgedAt(), row.source(), row.createdAt());
+                row.priorityAcknowledgedBy(), row.priorityAcknowledgedAt(), row.source(),
+                row.presentingComplaint(), row.paymentMode(), row.createdAt());
     }
 
     private ApiException notFound() {

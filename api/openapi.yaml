@@ -1388,6 +1388,9 @@ components:
         appointmentId: { type: [string, "null"], format: uuid, description: "Omit for a walk-in" }
         patientId: { type: string, format: uuid }
         doctorId: { type: string, format: uuid }
+        source: { type: [string, "null"], enum: [walk_in, referral, online, social_media, returning, other], description: "Defaults to walk_in" }
+        presentingComplaint: { type: [string, "null"] }
+        paymentMode: { type: [string, "null"], enum: [cash, card, upi, other] }
 
     QueueEntry:
       type: object
@@ -1396,9 +1399,13 @@ components:
         appointmentId: { type: [string, "null"], format: uuid }
         patientId: { type: string, format: uuid }
         doctorId: { type: string, format: uuid }
+        departmentId: { type: string, format: uuid }
         queueDate: { type: string, format: date }
         tokenNumber: { type: integer }
         status: { type: string, enum: [checked_in, waiting, vitals_pending, vitals_done, in_consult, checkout_pending, completed, no_show] }
+        source: { type: string, enum: [walk_in, referral, online, social_media, returning, other, internal_transfer] }
+        presentingComplaint: { type: [string, "null"] }
+        paymentMode: { type: [string, "null"], enum: [cash, card, upi, other] }
         priority: { type: boolean }
         priorityReason: { type: [string, "null"] }
 
