@@ -3,9 +3,12 @@
 :root {
   --nb-bg-root: #06090c;
   --nb-bg-canvas: #0a0e12;
+  --nb-bg-nav: #080b0e;
   --nb-surface-1: #11161b;
   --nb-surface-2: #171d23;
   --nb-surface-3: #1e262d;
+  --nb-surface-overlay: #12181e;
+  --nb-scrim: rgba(3, 6, 9, 0.72);
 
   --nb-border-subtle: rgba(255, 255, 255, 0.07);
   --nb-border-default: rgba(255, 255, 255, 0.11);
@@ -55,4 +58,18 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* App shell: ClinicNav (rendered in layout.tsx) beside the routed page content. ClinicNav
+   renders null on pre-auth/other-identity routes (login, platform, owner, accept-invite), so
+   appShellContent still gets the full width there. */
+.appShell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.appShellContent {
+  flex: 1;
+  min-width: 0;
 }

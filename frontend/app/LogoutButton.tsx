@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { SHELL_SKIP_PREFIXES } from "./lib/session";
 
 // Wireframe (Nabd Shell) puts "Sign out" as the last item in the header's user popover, present on
-// every screen — this app has no shared shell/header wrapping every clinic page yet, so rather than
-// hand-adding a button to each page's own bespoke header (and risk missing one), this mounts once
-// globally in layout.tsx, same pattern as IdleLockGuard, and floats itself into a fixed corner.
-const SKIP_PREFIXES = ["/login", "/platform", "/accept-invite", "/owner"];
+// every screen — this mounts once globally in layout.tsx, same pattern as IdleLockGuard and
+// ClinicNav, and floats itself into a fixed corner rather than being hand-added to each page's
+// own bespoke header.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function LogoutButton() {
@@ -15,7 +15,7 @@ export default function LogoutButton() {
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
   const [hasSession, setHasSession] = useState(false);
-  const skip = SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
+  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
 
   // Re-read on every navigation, not just mount — login/logout/idle-lock elsewhere in the app
   // always pair a token change with a route change (never a same-page silent clear), so this

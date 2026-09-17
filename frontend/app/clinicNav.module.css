@@ -1,0 +1,58 @@
+/* Mirrors platform/platform.module.css's .shell/.navBar pattern — same shape, this surface's
+   own background token (--nb-bg-nav, DESIGN.md's "Left navigation, navigation rail") and width
+   (DESIGN.md §4: 248px desktop sidebar) instead of the platform console's own choices. */
+.nav {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 248px;
+  padding: var(--nb-space-16) var(--nb-space-8);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-inline-end: 1px solid var(--nb-border-subtle);
+  background: var(--nb-bg-nav);
+}
+
+.brand {
+  padding: var(--nb-space-8) var(--nb-space-12);
+  margin-bottom: var(--nb-space-16);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--nb-text-primary);
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-4);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.link {
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-radius: var(--nb-radius-md);
+  color: var(--nb-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--nb-dur-base) var(--nb-ease-standard), color var(--nb-dur-base) var(--nb-ease-standard);
+}
+
+.link:hover {
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+}
+
+.linkActive {
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
+  box-shadow: inset 2px 0 0 var(--nb-accent-500);
+}

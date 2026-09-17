@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./login.module.css";
+import { decodeAccessToken, landingPathFor } from "../lib/session";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
@@ -42,7 +43,7 @@ export default function LoginPage() {
   function handleTokens(pair: TokenPair) {
     localStorage.setItem("nabd_access_token", pair.accessToken);
     localStorage.setItem("nabd_refresh_token", pair.refreshToken);
-    router.replace("/setup");
+    router.replace(landingPathFor(decodeAccessToken(pair.accessToken)?.permissions ?? []));
   }
 
   async function submitLogin(e: FormEvent) {
