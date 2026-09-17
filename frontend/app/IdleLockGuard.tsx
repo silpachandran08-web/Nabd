@@ -67,8 +67,8 @@ export default function IdleLockGuard() {
     }
   }
 
-  // The lock overlay covers the whole viewport (z-index 9999) above LogoutButton (z-index 100),
-  // so without this, a locked session with a forgotten PIN has no way out at all.
+  // The lock overlay covers the whole viewport (z-index 9999), above every page's own modals and
+  // LogoutButton alike, so without this, a locked session with a forgotten PIN has no way out at all.
   async function signOut() {
     setSigningOut(true);
     const token = localStorage.getItem("nabd_access_token");
