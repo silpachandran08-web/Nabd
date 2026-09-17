@@ -51,9 +51,11 @@ export default function LogoutButton() {
       style={{
         // Bottom-right, not top-right: several pages (Arrivals, Staff & Access, ...) already put
         // their own action buttons in the top-right of their in-flow header, and a fixed element
-        // there would sit visually on top of them. Nothing in this app currently docks anything
-        // in the bottom-right corner.
-        position: "fixed", bottom: 16, right: 16, zIndex: 100,
+        // there would sit visually on top of them. zIndex is deliberately low (below every page's
+        // own modal/overlay — 10 in most, tied at 100 with a couple but those lose ties since this
+        // renders after {children} in layout.tsx) so this floating button can never sit on top of
+        // and block a dialog's own action buttons when they land in this same corner.
+        position: "fixed", bottom: 16, right: 16, zIndex: 1,
         height: 36, padding: "0 16px", border: "1px solid var(--nb-border-default)",
         borderRadius: "var(--nb-radius-md)", background: "var(--nb-surface-2)", color: "var(--nb-text-primary)",
         boxShadow: "0 2px 8px rgba(0,0,0,0.24)",
