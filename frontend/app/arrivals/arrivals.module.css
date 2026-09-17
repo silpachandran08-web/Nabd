@@ -225,7 +225,8 @@
   font-size: 12px;
 }
 
-/* Register walk-in modal */
+/* Record vitals / Mark priority / Announce delay — quick confirmations, centered per DESIGN.md
+   §8.11 (modal reserved for that; drawer is for anything more like a form/navigation). */
 .overlay {
   position: fixed;
   inset: 0;
@@ -245,6 +246,28 @@
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-lg);
   padding: var(--nb-space-24);
+}
+
+/* Register walk-in — DESIGN.md §8.10: "the default container for register-walk-in", docked to
+   the inline-end edge (right in LTR), not a centered modal covering the page. */
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: var(--nb-scrim);
+  z-index: 10;
+}
+
+.drawer {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 480px;
+  max-width: 92vw;
+  overflow-y: auto;
+  background: var(--nb-surface-overlay);
+  border-inline-start: 1px solid var(--nb-border-default);
+  padding: var(--nb-space-24);
+  z-index: 11;
 }
 
 .modalTitle {

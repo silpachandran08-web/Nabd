@@ -81,7 +81,10 @@ export default function OwnerWorkspacesPage() {
       const pair: TokenPair = await res.json();
       localStorage.setItem("nabd_access_token", pair.accessToken);
       localStorage.setItem("nabd_refresh_token", pair.refreshToken);
-      router.replace("/setup");
+      // Unlike staff PIN login (lib/session's landingPathFor, which guesses a home page from
+      // permissions), this caller already knows the identity entering the clinic — the tenant
+      // owner — so it goes straight to Owner Insights instead of matching queue:view first.
+      router.replace("/reports");
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {

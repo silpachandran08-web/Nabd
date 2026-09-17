@@ -538,8 +538,8 @@ export default function ArrivalsPage() {
       )}
 
       {showModal && (
-        <div className={styles.overlay} onClick={() => setShowModal(false)}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitCheckIn}>
+        <div className={styles.drawerOverlay} onClick={() => setShowModal(false)}>
+          <form className={styles.drawer} onClick={(e) => e.stopPropagation()} onSubmit={submitCheckIn}>
             <h2 className={styles.modalTitle}>Register walk-in</h2>
 
             <div className={styles.field}>

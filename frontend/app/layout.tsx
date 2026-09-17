@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import ClinicNav from "./ClinicNav";
 import IdleLockGuard from "./IdleLockGuard";
 import LogoutButton from "./LogoutButton";
 
@@ -20,7 +21,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={poppins.variable}>
       <body>
-        {children}
+        <div className="appShell">
+          <ClinicNav />
+          <div className="appShellContent">{children}</div>
+        </div>
         <LogoutButton />
         <IdleLockGuard />
       </body>
