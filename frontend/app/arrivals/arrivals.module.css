@@ -188,6 +188,21 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
+  transition: background var(--nb-dur-base) var(--nb-ease-standard),
+    border-color var(--nb-dur-base) var(--nb-ease-standard);
+}
+
+/* DESIGN.md §9 interaction contract: hover = surface +1 step, border subtle → default;
+   pressed = brightness .96 + translateY(1px). Every other button class in this file already
+   needed this too, but the toolbar is the one actually reported missing it. */
+.actionBtn:hover {
+  background: var(--nb-surface-3);
+  border-color: var(--nb-border-strong);
+}
+
+.actionBtn:active {
+  filter: brightness(0.96);
+  transform: translateY(1px);
 }
 
 .state {
