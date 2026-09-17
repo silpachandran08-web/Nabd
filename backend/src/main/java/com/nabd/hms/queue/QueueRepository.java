@@ -19,7 +19,7 @@ class QueueRepository {
             "id, appointment_id, patient_id, doctor_id, department_id, parent_queue_entry_id, encounter_id, class, " +
                     "current_stage, workflow_definition_id, queue_date, token_number, " +
                     "status, priority, priority_reason, priority_flagged_by, priority_flagged_at, priority_acknowledged_by, " +
-                    "priority_acknowledged_at, source, created_at ";
+                    "priority_acknowledged_at, source, presenting_complaint, payment_mode, created_at ";
 
     private final JdbcTemplate jdbc;
 
@@ -48,12 +48,14 @@ class QueueRepository {
      * queue_entries_default_encounter, see V43) and the parent leg's encounterId when opened by
      * transfer() — propagating one visit's identity across however many department legs it takes. */
     UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
-                UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status) {
+                UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status,
+                String presentingComplaint, String paymentMode) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
-                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId, encounterId,
-                Date.valueOf(queueDate), tokenNumber, source, status);
+                Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode);
         return id;
     }
 
@@ -187,6 +189,8 @@ class QueueRepository {
                     acknowledgedBy == null ? null : UUID.fromString(acknowledgedBy),
                     acknowledgedAt == null ? null : acknowledgedAt.toInstant(),
                     rs.getString("source"),
+                    rs.getString("presenting_complaint"),
+                    rs.getString("payment_mode"),
                     rs.getTimestamp("created_at").toInstant());
         };
     }
