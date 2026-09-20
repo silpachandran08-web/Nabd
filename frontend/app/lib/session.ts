@@ -23,10 +23,17 @@ export function getPermissions(): string[] {
 // First matching permission wins — each role's actual home worklist (DESIGN.md's per-role
 // "Today" screen), so login lands staff where their role works instead of everyone hitting
 // the owner-facing Setup screen (NB-060-070's bug: handleTokens always did router.replace("/setup")).
+//
+// Ordered most-exclusive-permission-first, not by role "importance": queue:view is the one
+// nearly every clinic-facing role needs just to see the day's arrivals (reception, nurses,
+// often doctors too), so it has to be checked last among these or it silently wins over a much
+// more specific signal — a Nurse role with both queue:view and nursing:view was landing on
+// /arrivals instead of /nursing for exactly this reason. nursing:view/clinical:view are narrow
+// enough that only the role they actually name would plausibly have them.
 const LANDING_RULES: [permission: string, path: string][] = [
-  ["queue:view", "/arrivals"],
   ["nursing:view", "/nursing"],
   ["clinical:view", "/consult"],
+  ["queue:view", "/arrivals"],
   ["reports:view", "/reports"],
   ["setup:view", "/setup"],
 ];
