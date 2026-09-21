@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
 import { getPermissions, SHELL_SKIP_PREFIXES } from "./lib/session";
@@ -12,7 +12,6 @@ import { getPermissions, SHELL_SKIP_PREFIXES } from "./lib/session";
 // off the JWT's own "permissions" claim so each role only sees what it can open.
 const NAV_ITEMS: { href: string; label: string; permission: string | null }[] = [
   { href: "/arrivals", label: "Today · Arrivals", permission: "queue:view" },
-  { href: "/nursing", label: "Nursing Worklist", permission: "nursing:view" },
   { href: "/patients", label: "Patients", permission: "patients:view" },
   { href: "/consult", label: "Consultation Workspace", permission: "clinical:view" },
   { href: "/packages", label: "Treatment Packages", permission: "packages:view" },
@@ -22,8 +21,42 @@ const NAV_ITEMS: { href: string; label: string; permission: string | null }[] = 
   { href: "/account", label: "My account", permission: null },
 ];
 
+// DESIGN.md's Nurse sidebar is its own flat list (Today, Waiting Patients, Vitals, Vaccines &
+// Injections, Administration History, More) rather than one "Nursing Worklist" entry point —
+// the real nursing page is a single route with tabs/filters, so each of these deep-links into
+// it via query params instead of being a separate page. Vaccines & Injections is omitted: no
+// backend exists for it (filed separately), and a link to nothing isn't a real nav item.
+// Procedures/Priority/Activity aren't in the wireframe's mock (that screen predates them) but
+// are real, already-built tabs — exposed directly rather than hidden behind an unbuilt "More".
+const NURSING_ITEMS: { label: string; tab?: string; filter?: string }[] = [
+  { label: "Today", filter: "due" },
+  { label: "Waiting Patients", filter: "all" },
+  { label: "Vitals", filter: "recorded" },
+  { label: "Priority Patients", tab: "priority" },
+  { label: "Administration History", tab: "administration" },
+  { label: "Procedures", tab: "procedures" },
+  { label: "Completed Activity", tab: "activity" },
+];
+
+function nursingHref(item: { tab?: string; filter?: string }): string {
+  const params = new URLSearchParams();
+  if (item.tab) params.set("tab", item.tab);
+  if (item.filter) params.set("filter", item.filter);
+  const qs = params.toString();
+  return qs ? `/nursing?${qs}` : "/nursing";
+}
+
+function isNursingItemActive(item: { tab?: string; filter?: string }, pathname: string | null, searchParams: URLSearchParams): boolean {
+  if (pathname !== "/nursing") return false;
+  const currentTab = searchParams.get("tab") ?? "vitals";
+  if ((item.tab ?? "vitals") !== currentTab) return false;
+  if (currentTab === "vitals" && (item.filter ?? "due") !== (searchParams.get("filter") ?? "due")) return false;
+  return true;
+}
+
 export default function ClinicNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const [permissions, setPermissions] = useState<string[] | null>(null);
 
@@ -37,12 +70,22 @@ export default function ClinicNav() {
   if (skip || !permissions || permissions.length === 0) return null;
 
   const items = NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
-  if (items.length === 0) return null;
+  const showNursing = permissions.includes("nursing:view");
+  if (items.length === 0 && !showNursing) return null;
 
   return (
     <nav className={styles.nav}>
       <div className={styles.brand}>nabd</div>
       <div className={styles.links}>
+        {showNursing && NURSING_ITEMS.map((item) => (
+          <Link
+            key={item.label}
+            href={nursingHref(item)}
+            className={`${styles.link} ${isNursingItemActive(item, pathname, searchParams) ? styles.linkActive : ""}`}
+          >
+            {item.label}
+          </Link>
+        ))}
         {items.map((item) => (
           <Link
             key={item.href}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./nursing.module.css";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
@@ -67,6 +67,14 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "activity", label: "Completed Activity" },
 ];
 
+function validTab(t: string | null): Tab {
+  return TABS.some((x) => x.key === t) ? (t as Tab) : "vitals";
+}
+
+function validFilter(f: string | null): VitalsFilter {
+  return f === "recorded" || f === "all" ? f : "due";
+}
+
 function waitMinutes(createdAt: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000));
 }
@@ -90,11 +98,41 @@ function resolveSequence(steps: { stepType: string }[]): string[] {
 }
 
 export default function NursingPage() {
+  return (
+    <Suspense fallback={null}>
+      <NursingWorklist />
+    </Suspense>
+  );
+}
+
+// useSearchParams (ClinicNav's Today/Waiting Patients/... deep links) needs a Suspense
+// boundary above it — the outer component here is that boundary.
+function NursingWorklist() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("vitals");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => validTab(searchParams.get("tab")));
   const [rows, setRows] = useState<Row[]>([]);
   const [recordedRows, setRecordedRows] = useState<Row[]>([]);
-  const [vitalsFilter, setVitalsFilter] = useState<VitalsFilter>("due");
+  const [vitalsFilter, setVitalsFilter] = useState<VitalsFilter>(() => validFilter(searchParams.get("filter")));
+
+  // ClinicNav's nurse sub-items (Today, Waiting Patients, Vitals, ...) are all deep links into
+  // this one page via ?tab=/?filter= — a click while already here changes the URL but doesn't
+  // remount the page, so this re-syncs local state whenever the query string changes.
+  useEffect(() => {
+    // Deferred to a microtask so the effect body itself never calls setState synchronously.
+    void Promise.resolve().then(() => {
+      setTab(validTab(searchParams.get("tab")));
+      setVitalsFilter(validFilter(searchParams.get("filter")));
+    });
+  }, [searchParams]);
+
+  function changeTab(key: Tab) {
+    router.replace(key === "vitals" ? "/nursing" : `/nursing?tab=${key}`);
+  }
+
+  function changeFilter(f: VitalsFilter) {
+    router.replace(f === "due" ? "/nursing" : `/nursing?filter=${f}`);
+  }
   const [proceduresPendingRows, setProceduresPendingRows] = useState<Row[]>([]);
   const [priorityRows, setPriorityRows] = useState<Row[]>([]);
   const [administrationOrders, setAdministrationOrders] = useState<AdministrationOrder[]>([]);
@@ -456,7 +494,7 @@ export default function NursingPage() {
 
       <div className={styles.tabs}>
         {TABS.map((t) => (
-          <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => setTab(t.key)}>{t.label}</button>
+          <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => changeTab(t.key)}>{t.label}</button>
         ))}
       </div>
 
@@ -465,13 +503,13 @@ export default function NursingPage() {
       {tab === "vitals" && (
         <>
           <div className={styles.filterPills}>
-            <button className={vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} onClick={() => setVitalsFilter("due")}>
+            <button className={vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("due")}>
               Vitals due <span className={styles.pillCount}>{rows.length}</span>
             </button>
-            <button className={vitalsFilter === "recorded" ? styles.pillFilterActive : styles.pillFilter} onClick={() => setVitalsFilter("recorded")}>
+            <button className={vitalsFilter === "recorded" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("recorded")}>
               Recorded <span className={styles.pillCount}>{recordedRows.length}</span>
             </button>
-            <button className={vitalsFilter === "all" ? styles.pillFilterActive : styles.pillFilter} onClick={() => setVitalsFilter("all")}>
+            <button className={vitalsFilter === "all" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("all")}>
               All <span className={styles.pillCount}>{rows.length + recordedRows.length}</span>
             </button>
           </div>
