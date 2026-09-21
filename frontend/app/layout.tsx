@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import ClinicNav from "./ClinicNav";
 import IdleLockGuard from "./IdleLockGuard";
@@ -22,7 +23,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={poppins.variable}>
       <body>
         <div className="appShell">
-          <ClinicNav />
+          {/* ClinicNav reads useSearchParams (nursing's deep-linked sidebar items), which
+              requires a Suspense boundary or every other page's static prerender breaks. */}
+          <Suspense fallback={null}>
+            <ClinicNav />
+          </Suspense>
           <div className="appShellContent">{children}</div>
         </div>
         <LogoutButton />

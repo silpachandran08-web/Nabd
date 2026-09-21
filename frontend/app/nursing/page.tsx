@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./nursing.module.css";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
@@ -12,8 +12,35 @@ type QueueEntry = {
   id: string; patientId: string; doctorId: string; departmentId: string; tokenNumber: number; status: string; createdAt: string;
   priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
   priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
+  source: string; presentingComplaint: string | null;
 };
-type Row = QueueEntry & { patientName: string; patientMrn: string; doctorName: string };
+type Row = QueueEntry & {
+  patientName: string; patientMrn: string; doctorName: string;
+  allergies: string[]; chronicConditions: string[];
+  lastVitalsAt: string | null; vitalsOutOfRange: boolean;
+};
+// A patient's clinical-flags chips: allergy (danger), chronic condition (warn), presenting
+// complaint (urgent) — same three-tier severity the wireframe's Vitals Worklist uses.
+type Flag = { kind: "danger" | "warn" | "urgent"; text: string };
+function flagsFor(r: { allergies: string[]; chronicConditions: string[]; presentingComplaint: string | null }): Flag[] {
+  return [
+    ...r.allergies.map((a): Flag => ({ kind: "danger", text: `Allergy: ${a}` })),
+    ...r.chronicConditions.map((c): Flag => ({ kind: "warn", text: c })),
+    ...(r.presentingComplaint ? [{ kind: "urgent", text: r.presentingComplaint } as Flag] : []),
+  ];
+}
+const VISIT_LABEL: Record<string, string> = {
+  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
+  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
+};
+// Same catalogue as arrivals' Mark priority — nursing can only acknowledge an existing flag
+// today, never raise one; this is the missing "Mark urgent" quick action from DESIGN.md's
+// Vitals Worklist toolbar, using the same POST /queue/{id}/reorder reception already drives.
+const URGENT_REASON_CODES = [
+  "Chest pain / cardiac symptoms", "Breathing difficulty", "Severe bleeding",
+  "High fever in infant", "Post-operative complication", "Severe pain", "Other",
+] as const;
+type VitalsFilter = "due" | "recorded" | "all";
 type StaffOption = { id: string; name: string };
 type AdministrationOrder = {
   id: string; queueEntryId: string; patientId: string; patientName: string; orderedByName: string; drugName: string;
@@ -40,6 +67,14 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "activity", label: "Completed Activity" },
 ];
 
+function validTab(t: string | null): Tab {
+  return TABS.some((x) => x.key === t) ? (t as Tab) : "vitals";
+}
+
+function validFilter(f: string | null): VitalsFilter {
+  return f === "recorded" || f === "all" ? f : "due";
+}
+
 function waitMinutes(createdAt: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000));
 }
@@ -63,9 +98,41 @@ function resolveSequence(steps: { stepType: string }[]): string[] {
 }
 
 export default function NursingPage() {
+  return (
+    <Suspense fallback={null}>
+      <NursingWorklist />
+    </Suspense>
+  );
+}
+
+// useSearchParams (ClinicNav's Today/Waiting Patients/... deep links) needs a Suspense
+// boundary above it — the outer component here is that boundary.
+function NursingWorklist() {
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("vitals");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => validTab(searchParams.get("tab")));
   const [rows, setRows] = useState<Row[]>([]);
+  const [recordedRows, setRecordedRows] = useState<Row[]>([]);
+  const [vitalsFilter, setVitalsFilter] = useState<VitalsFilter>(() => validFilter(searchParams.get("filter")));
+
+  // ClinicNav's nurse sub-items (Today, Waiting Patients, Vitals, ...) are all deep links into
+  // this one page via ?tab=/?filter= — a click while already here changes the URL but doesn't
+  // remount the page, so this re-syncs local state whenever the query string changes.
+  useEffect(() => {
+    // Deferred to a microtask so the effect body itself never calls setState synchronously.
+    void Promise.resolve().then(() => {
+      setTab(validTab(searchParams.get("tab")));
+      setVitalsFilter(validFilter(searchParams.get("filter")));
+    });
+  }, [searchParams]);
+
+  function changeTab(key: Tab) {
+    router.replace(key === "vitals" ? "/nursing" : `/nursing?tab=${key}`);
+  }
+
+  function changeFilter(f: VitalsFilter) {
+    router.replace(f === "due" ? "/nursing" : `/nursing?filter=${f}`);
+  }
   const [proceduresPendingRows, setProceduresPendingRows] = useState<Row[]>([]);
   const [priorityRows, setPriorityRows] = useState<Row[]>([]);
   const [administrationOrders, setAdministrationOrders] = useState<AdministrationOrder[]>([]);
@@ -83,6 +150,17 @@ export default function NursingPage() {
   const [vitalsError, setVitalsError] = useState<string | null>(null);
   const [vitalsFlags, setVitalsFlags] = useState<string[] | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
+
+  // Quick actions (DESIGN.md's Vitals Worklist toolbar): "Capture vitals" is a picker over
+  // dueRows reusing the existing per-row modal; "Mark urgent" is the missing create-a-flag
+  // action (nursing could previously only acknowledge one someone else raised).
+  const [showCapturePicker, setShowCapturePicker] = useState(false);
+  const [showUrgentPicker, setShowUrgentPicker] = useState(false);
+  const [urgentEntryId, setUrgentEntryId] = useState("");
+  const [urgentReasonCode, setUrgentReasonCode] = useState<string>(URGENT_REASON_CODES[0]);
+  const [urgentOtherReason, setUrgentOtherReason] = useState("");
+  const [urgentSubmitting, setUrgentSubmitting] = useState(false);
+  const [urgentError, setUrgentError] = useState<string | null>(null);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -131,10 +209,26 @@ export default function NursingPage() {
       }
       const withNames = async (list: QueueEntry[]) => Promise.all(list.map(async (e) => {
         const pRes = await authedFetch(`/patients/${e.patientId}`);
-        const p = pRes?.ok ? await pRes.json() : null;
-        return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—" };
+        const p: { name?: string; mrn?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
+        return {
+          ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—",
+          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
+          lastVitalsAt: null, vitalsOutOfRange: false,
+        };
       }));
+      // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today —
+      // fetched vitals confirm it actually happened (a tenant's flow can skip the vitals step type
+      // entirely) rather than assuming from status alone.
+      const RECORDED_STATUSES = ["vitals_done", "in_consult", "procedures_pending", "checkout_pending", "completed"];
+      const withVitals = async (list: Row[]) => (await Promise.all(list.map(async (r): Promise<Row | null> => {
+        const vRes = await authedFetch(`/clinical/vitals/${r.id}`);
+        if (!vRes?.ok) return null;
+        const v: { recordedAt: string; abnormalFlags: string[] } = await vRes.json();
+        return { ...r, lastVitalsAt: v.recordedAt, vitalsOutOfRange: v.abnormalFlags.length > 0 };
+      }))).filter((r): r is Row => r !== null);
+
       setRows(await withNames(entries.filter((e) => e.status === "vitals_pending")));
+      setRecordedRows(await withVitals(await withNames(entries.filter((e) => RECORDED_STATUSES.includes(e.status)))));
       setProceduresPendingRows(await withNames(entries.filter((e) => e.status === "procedures_pending")));
       if (priorityRes?.ok) setPriorityRows(await withNames(await priorityRes.json()));
       if (adminRes?.ok) setAdministrationOrders(await adminRes.json());
@@ -217,6 +311,36 @@ export default function NursingPage() {
       setActionError(p.detail || "Couldn't acknowledge.");
     }
     load();
+  }
+
+  function openUrgentPicker() {
+    setShowUrgentPicker(true);
+    setUrgentEntryId("");
+    setUrgentReasonCode(URGENT_REASON_CODES[0]);
+    setUrgentOtherReason("");
+    setUrgentError(null);
+  }
+
+  async function submitMarkUrgent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!urgentEntryId) return;
+    const reason = urgentReasonCode === "Other" ? urgentOtherReason.trim() : urgentReasonCode;
+    if (!reason) return;
+    setUrgentSubmitting(true);
+    setUrgentError(null);
+    try {
+      const res = await authedFetch(`/queue/${urgentEntryId}/reorder`, { method: "POST", body: JSON.stringify({ priority: true, reason }) });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't flag this patient." }));
+        setUrgentError(p.detail || "Couldn't flag this patient.");
+        return;
+      }
+      setShowUrgentPicker(false);
+      load();
+    } finally {
+      setUrgentSubmitting(false);
+    }
   }
 
   // ── NB-145: administration orders ────────────────────────────────────────
@@ -354,6 +478,10 @@ export default function NursingPage() {
   if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to the nursing worklist.</div></main>;
   if (error) return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
 
+  const visibleVitalsRows = vitalsFilter === "due" ? rows : vitalsFilter === "recorded" ? recordedRows : [...rows, ...recordedRows];
+  const urgentCandidates = [...rows, ...recordedRows].filter((r) => !r.priority);
+  const outOfRangeCount = recordedRows.filter((r) => r.vitalsOutOfRange).length;
+
   return (
     <main className={styles.page}>
       <div className={styles.headerRow}>
@@ -366,36 +494,85 @@ export default function NursingPage() {
 
       <div className={styles.tabs}>
         {TABS.map((t) => (
-          <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => setTab(t.key)}>{t.label}</button>
+          <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => changeTab(t.key)}>{t.label}</button>
         ))}
       </div>
 
       {actionError && <div className={styles.errorState} style={{ padding: "8px 0" }}>{actionError}</div>}
 
       {tab === "vitals" && (
-        <div className={styles.card}>
-          {rows.length === 0 ? (
-            <div className={styles.state}>Nobody is waiting on vitals right now.</div>
-          ) : (
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Wait</th><th>Status</th><th></th></tr></thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id} className={r.priority ? styles.rowFlagged : undefined}>
-                      <td>#{r.tokenNumber}</td>
-                      <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                      <td>{r.doctorName}</td>
-                      <td className={styles.muted}>{waitMinutes(r.createdAt)}m</td>
-                      <td><span className={styles.pillVitals}>vitals pending</span></td>
-                      <td><button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Record vitals</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <>
+          <div className={styles.filterPills}>
+            <button className={vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("due")}>
+              Vitals due <span className={styles.pillCount}>{rows.length}</span>
+            </button>
+            <button className={vitalsFilter === "recorded" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("recorded")}>
+              Recorded <span className={styles.pillCount}>{recordedRows.length}</span>
+            </button>
+            <button className={vitalsFilter === "all" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("all")}>
+              All <span className={styles.pillCount}>{rows.length + recordedRows.length}</span>
+            </button>
+          </div>
+
+          <div className={styles.headerActions} style={{ marginBottom: "12px" }}>
+            <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}>Capture vitals</button>
+            <button className={styles.smallBtn} onClick={openUrgentPicker}>Mark urgent</button>
+          </div>
+
+          <div className={styles.layout}>
+            <div className={styles.card}>
+              {visibleVitalsRows.length === 0 ? (
+                <div className={styles.state}>Nobody is waiting on vitals right now.</div>
+              ) : (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead><tr><th>Patient</th><th>Visit</th><th>Clinical flags</th><th>Last vitals</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                      {visibleVitalsRows.map((r) => {
+                        const flags = flagsFor(r);
+                        const hasDanger = r.priority || flags.some((f) => f.kind === "danger");
+                        const hasUrgent = flags.some((f) => f.kind === "urgent");
+                        const rowClass = hasDanger ? styles.rowFlagged : hasUrgent ? styles.rowUrgent : undefined;
+                        return (
+                          <tr key={r.id} className={rowClass}>
+                            <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
+                            <td className={styles.muted}>{VISIT_LABEL[r.source] ?? r.source}</td>
+                            <td>
+                              {flags.length === 0 ? <span className={styles.muted}>—</span> : (
+                                <div className={styles.flagList}>
+                                  {flags.map((f, i) => (
+                                    <span key={i} className={`${styles.flagChip} ${f.kind === "danger" ? styles.flagDanger : f.kind === "warn" ? styles.flagWarn : styles.flagUrgent}`}>
+                                      {f.text}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className={styles.muted}>
+                              {r.lastVitalsAt ? new Date(r.lastVitalsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
+                            </td>
+                            <td>
+                              {r.status === "vitals_pending"
+                                ? <span className={styles.pillVitals}>waiting</span>
+                                : <span className={r.vitalsOutOfRange ? styles.pillDanger : styles.pillDone}>{r.status.replace("_", " ")}</span>}
+                            </td>
+                            <td>{r.status === "vitals_pending" && <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Capture vitals</button>}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+
+            <div className={styles.card}>
+              <div className={styles.sideTitle}>Vitals summary</div>
+              <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedRows.length}</span></div>
+              <div className={styles.summaryRow}><span>Out of range</span><span className={styles.summaryValue} style={outOfRangeCount > 0 ? { color: "var(--nb-danger-500)" } : undefined}>{outOfRangeCount}</span></div>
+            </div>
+          </div>
+        </>
       )}
 
       {tab === "priority" && (
@@ -593,6 +770,62 @@ export default function NursingPage() {
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={closeVitalsModal}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save vitals"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {showCapturePicker && (
+        <div className={styles.overlay} onClick={() => setShowCapturePicker(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>Capture vitals — pick a patient</h2>
+            {rows.length === 0 ? (
+              <div className={styles.state}>Nobody is waiting on vitals right now.</div>
+            ) : (
+              rows.map((r) => (
+                <div key={r.id} className={styles.pickerRow} onClick={() => { setShowCapturePicker(false); openVitalsModal(r.id); }}>
+                  <span className={styles.patientName}>{r.patientName}</span>
+                  <span className={styles.muted}>{waitMinutes(r.createdAt)}m waiting</span>
+                </div>
+              ))
+            )}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setShowCapturePicker(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showUrgentPicker && (
+        <div className={styles.overlay} onClick={() => setShowUrgentPicker(false)}>
+          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitMarkUrgent}>
+            <h2 className={styles.modalTitle}>Mark urgent</h2>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="urgentPatient">Patient</label>
+              <select id="urgentPatient" className={styles.select} value={urgentEntryId} onChange={(e) => setUrgentEntryId(e.target.value)}>
+                <option value="">Select a patient…</option>
+                {urgentCandidates.map((r) => <option key={r.id} value={r.id}>{r.patientName}</option>)}
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="urgentReason">Reason</label>
+              <select id="urgentReason" className={styles.select} value={urgentReasonCode} onChange={(e) => setUrgentReasonCode(e.target.value)}>
+                {URGENT_REASON_CODES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            {urgentReasonCode === "Other" && (
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="urgentOther">Specify</label>
+                <input id="urgentOther" className={styles.input} value={urgentOtherReason} onChange={(e) => setUrgentOtherReason(e.target.value)} />
+              </div>
+            )}
+            {urgentError && <div className={styles.formError} role="alert">{urgentError}</div>}
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setShowUrgentPicker(false)}>Cancel</button>
+              <button type="submit" className={styles.submitBtn}
+                disabled={urgentSubmitting || !urgentEntryId || (urgentReasonCode === "Other" && !urgentOtherReason.trim())}>
+                {urgentSubmitting ? "Flagging…" : "Mark urgent"}
+              </button>
             </div>
           </form>
         </div>
