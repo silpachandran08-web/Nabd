@@ -60,9 +60,10 @@ body {
   box-sizing: border-box;
 }
 
-/* App shell: ClinicNav (rendered in layout.tsx) beside the routed page content. ClinicNav
-   renders null on pre-auth/other-identity routes (login, platform, owner, accept-invite), so
-   appShellContent still gets the full width there. */
+/* App shell (AppShell.tsx): ClinicNav beside TopBar + the routed page content, TopBar stacked
+   above that content. Both ClinicNav and TopBar render null on pre-auth/other-identity routes
+   (login, platform, owner, accept-invite), so appShellContent still gets the full width/height
+   there with no empty top-bar gap. */
 .appShell {
   display: flex;
   align-items: stretch;
@@ -70,6 +71,13 @@ body {
 }
 
 .appShellContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.appShellBody {
   flex: 1;
   min-width: 0;
 }

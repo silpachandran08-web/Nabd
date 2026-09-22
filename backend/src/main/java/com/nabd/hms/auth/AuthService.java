@@ -532,6 +532,8 @@ public class AuthService {
     private TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent) {
         Role role = repo.findRole(staff.roleId())
                 .orElseThrow(() -> new IllegalStateException("role missing for staff " + staff.id()));
+        Tenant tenant = repo.findTenantById(staff.tenantId())
+                .orElseThrow(() -> new IllegalStateException("tenant missing for staff " + staff.id()));
         List<String> permissions = new java.util.ArrayList<>(flattenGrants(role.grantsJson()));
 
         // NB-057: fold in any role currently on loan (e.g. covering a doctor's leave). Auditing
@@ -577,6 +579,12 @@ public class AuthService {
                 .claim("roleId", staff.roleId().toString())
                 .claim("sid", sessionId.toString())
                 .claim("permissions", permissions)
+                // Display-only (ClinicNav's clinic-info card and signed-in-as footer) — never
+                // used for authorization, so a stale name until next login is harmless.
+                .claim("tenantName", tenant.name())
+                .claim("tenantRegion", tenant.region())
+                .claim("staffName", staff.name())
+                .claim("roleName", role.name())
                 .build();
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
 

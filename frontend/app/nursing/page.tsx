@@ -489,7 +489,22 @@ function NursingWorklist() {
           <h1 className={styles.title}>Nursing Worklist</h1>
           <p className={styles.subtitle}>Vitals, priority triage, administration, procedures and today&apos;s activity.</p>
         </div>
-        <button className={styles.smallBtn} onClick={() => router.push("/packages")}>Package Sessions →</button>
+        <div className={styles.headerRight}>
+          {tab === "vitals" && (
+            <div className={styles.filterPills}>
+              <button className={vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("due")}>
+                Vitals due <span className={styles.pillCount}>{rows.length}</span>
+              </button>
+              <button className={vitalsFilter === "recorded" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("recorded")}>
+                Recorded <span className={styles.pillCount}>{recordedRows.length}</span>
+              </button>
+              <button className={vitalsFilter === "all" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("all")}>
+                All <span className={styles.pillCount}>{rows.length + recordedRows.length}</span>
+              </button>
+            </div>
+          )}
+          <button className={styles.smallBtn} onClick={() => router.push("/packages")}>Package Sessions →</button>
+        </div>
       </div>
 
       <div className={styles.tabs}>
@@ -502,18 +517,6 @@ function NursingWorklist() {
 
       {tab === "vitals" && (
         <>
-          <div className={styles.filterPills}>
-            <button className={vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("due")}>
-              Vitals due <span className={styles.pillCount}>{rows.length}</span>
-            </button>
-            <button className={vitalsFilter === "recorded" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("recorded")}>
-              Recorded <span className={styles.pillCount}>{recordedRows.length}</span>
-            </button>
-            <button className={vitalsFilter === "all" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("all")}>
-              All <span className={styles.pillCount}>{rows.length + recordedRows.length}</span>
-            </button>
-          </div>
-
           <div className={styles.headerActions} style={{ marginBottom: "12px" }}>
             <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}>Capture vitals</button>
             <button className={styles.smallBtn} onClick={openUrgentPicker}>Mark urgent</button>
@@ -566,10 +569,19 @@ function NursingWorklist() {
               )}
             </div>
 
-            <div className={styles.card}>
-              <div className={styles.sideTitle}>Vitals summary</div>
-              <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedRows.length}</span></div>
-              <div className={styles.summaryRow}><span>Out of range</span><span className={styles.summaryValue} style={outOfRangeCount > 0 ? { color: "var(--nb-danger-500)" } : undefined}>{outOfRangeCount}</span></div>
+            <div className={styles.sidebarStack}>
+              <div className={styles.card}>
+                <div className={styles.sideTitle}>Vitals summary</div>
+                <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedRows.length}</span></div>
+                <div className={styles.summaryRow}><span>Out of range</span><span className={styles.summaryValue} style={outOfRangeCount > 0 ? { color: "var(--nb-danger-500)" } : undefined}>{outOfRangeCount}</span></div>
+              </div>
+
+              {/* No backend exists for vaccines/injections yet (filed separately) — shown as an
+                  honest "not available" card rather than fabricated due-dates. */}
+              <div className={styles.card}>
+                <div className={styles.sideTitle}>Vaccines &amp; injections due</div>
+                <div className={styles.state} style={{ padding: "var(--nb-space-16)" }}>Not available yet.</div>
+              </div>
             </div>
           </div>
         </>

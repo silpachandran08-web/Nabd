@@ -17,11 +17,102 @@
 
 .brand {
   padding: var(--nb-space-8) var(--nb-space-12);
-  margin-bottom: var(--nb-space-16);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--nb-text-primary);
+}
+
+/* Collapsed state: a real, if simpler, alternative to the wireframe's icon-only rail — this
+   codebase has no icon set for nav items yet, so hiding the sidebar outright (rather than
+   shrinking to icons that don't exist) is the honest version of "more room for content." */
+.navCollapsed {
+  flex: none;
+  width: 0;
+  overflow: hidden;
+}
+
+.clinicInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  margin-bottom: var(--nb-space-16);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+}
+
+.clinicIcon {
+  font-size: 16px;
+  flex: none;
+}
+
+.clinicText {
+  min-width: 0;
+}
+
+.clinicName {
+  color: var(--nb-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clinicRegion {
+  color: var(--nb-text-tertiary);
+  font-size: 11px;
+}
+
+.identityFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  margin-top: var(--nb-space-8);
+  border-radius: var(--nb-radius-md);
+  text-decoration: none;
+  flex: none;
+}
+
+.identityFooter:hover {
+  background: var(--nb-surface-2);
+}
+
+.identityAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex: none;
+}
+
+.identityText {
+  min-width: 0;
+}
+
+.identityName {
+  color: var(--nb-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.identityRole {
+  color: var(--nb-text-tertiary);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .links {

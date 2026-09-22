@@ -8,7 +8,7 @@ final class AuthModels {
     private AuthModels() {
     }
 
-    record Tenant(UUID id, String slug, String status) {
+    record Tenant(UUID id, String slug, String status, String name, String region) {
     }
 
     record Staff(UUID id, UUID tenantId, UUID roleId, String email, String name, String mobilePhone,

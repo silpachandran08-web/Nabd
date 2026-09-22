@@ -14,10 +14,15 @@
   align-items: start;
 }
 
+.sidebarStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-16);
+}
+
 .filterPills {
   display: flex;
   gap: var(--nb-space-8);
-  margin-bottom: var(--nb-space-12);
   flex-wrap: wrap;
 }
 
@@ -114,9 +119,21 @@
 
 .headerRow {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: var(--nb-space-16);
+  flex-wrap: wrap;
   margin-bottom: var(--nb-space-16);
+}
+
+/* DESIGN.md's Vitals Worklist: the filter pills sit in the header row, right-aligned, above
+   the tab strip — not their own left-aligned row underneath it. */
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-12);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .tabs {
