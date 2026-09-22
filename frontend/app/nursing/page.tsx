@@ -115,17 +115,6 @@ function NursingWorklist() {
   const [recordedRows, setRecordedRows] = useState<Row[]>([]);
   const [vitalsFilter, setVitalsFilter] = useState<VitalsFilter>(() => validFilter(searchParams.get("filter")));
 
-  // ClinicNav's nurse sub-items (Today, Waiting Patients, Vitals, ...) are all deep links into
-  // this one page via ?tab=/?filter= — a click while already here changes the URL but doesn't
-  // remount the page, so this re-syncs local state whenever the query string changes.
-  useEffect(() => {
-    // Deferred to a microtask so the effect body itself never calls setState synchronously.
-    void Promise.resolve().then(() => {
-      setTab(validTab(searchParams.get("tab")));
-      setVitalsFilter(validFilter(searchParams.get("filter")));
-    });
-  }, [searchParams]);
-
   function changeTab(key: Tab) {
     router.replace(key === "vitals" ? "/nursing" : `/nursing?tab=${key}`);
   }
@@ -161,6 +150,24 @@ function NursingWorklist() {
   const [urgentOtherReason, setUrgentOtherReason] = useState("");
   const [urgentSubmitting, setUrgentSubmitting] = useState(false);
   const [urgentError, setUrgentError] = useState<string | null>(null);
+
+  // ClinicNav's nurse sub-items (Today, Waiting Patients, Vitals, ...) are all deep links into
+  // this one page via ?tab=/?filter= — a click while already here changes the URL but doesn't
+  // remount the page, so this re-syncs local state whenever the query string changes.
+  useEffect(() => {
+    // Deferred to a microtask so the effect body itself never calls setState synchronously.
+    void Promise.resolve().then(() => {
+      setTab(validTab(searchParams.get("tab")));
+      setVitalsFilter(validFilter(searchParams.get("filter")));
+      // TopBar's "Capture vitals" button (DESIGN.md's top-bar primary action) signals through
+      // ?action=capture rather than a cross-component callback, since TopBar is mounted above
+      // and outside this page. Strip it once consumed so back/refresh doesn't reopen the picker.
+      if (searchParams.get("action") === "capture") {
+        setShowCapturePicker(true);
+        router.replace("/nursing");
+      }
+    });
+  }, [searchParams, router]);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -481,6 +488,10 @@ function NursingWorklist() {
   const visibleVitalsRows = vitalsFilter === "due" ? rows : vitalsFilter === "recorded" ? recordedRows : [...rows, ...recordedRows];
   const urgentCandidates = [...rows, ...recordedRows].filter((r) => !r.priority);
   const outOfRangeCount = recordedRows.filter((r) => r.vitalsOutOfRange).length;
+  // ClinicNav's "Vaccines & Injections" sidebar item deep-links here (?tab=vaccines) even though
+  // no backend exists for it — not one of the 5 real tabs, so it's checked from the raw query
+  // param (validTab() would just fall it back to "vitals") and shown as its own honest section.
+  const isVaccinesView = searchParams.get("tab") === "vaccines";
 
   return (
     <main className={styles.page}>
@@ -507,6 +518,12 @@ function NursingWorklist() {
         </div>
       </div>
 
+      {isVaccinesView ? (
+        <div className={styles.card}>
+          <div className={styles.state}>Vaccines &amp; injections isn&apos;t available yet.</div>
+        </div>
+      ) : (
+        <>
       <div className={styles.tabs}>
         {TABS.map((t) => (
           <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => changeTab(t.key)}>{t.label}</button>
@@ -746,6 +763,8 @@ function NursingWorklist() {
               </div>
             )}
           </div>
+        </>
+      )}
         </>
       )}
 

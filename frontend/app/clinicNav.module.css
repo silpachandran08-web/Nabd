@@ -65,19 +65,107 @@
   font-size: 11px;
 }
 
+.identityWrap {
+  position: relative;
+  flex: none;
+  margin-top: var(--nb-space-8);
+}
+
 .identityFooter {
   display: flex;
   align-items: center;
   gap: var(--nb-space-8);
+  width: 100%;
   padding: var(--nb-space-8) var(--nb-space-12);
-  margin-top: var(--nb-space-8);
+  border: none;
   border-radius: var(--nb-radius-md);
+  background: transparent;
   text-decoration: none;
-  flex: none;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
 }
 
 .identityFooter:hover {
   background: var(--nb-surface-2);
+}
+
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+}
+
+/* Sits just above the identity footer it's triggered from, matching DESIGN.md's signed-in
+   popover — same surface-overlay + e3-shadow treatment as any other dropdown/menu. */
+.identityMenu {
+  position: absolute;
+  bottom: calc(100% + var(--nb-space-8));
+  left: 0;
+  width: 260px;
+  z-index: 50;
+  padding: var(--nb-space-12);
+  border-radius: var(--nb-radius-lg);
+  background: var(--nb-surface-overlay);
+  border: 1px solid var(--nb-border-default);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+}
+
+.menuHeader {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--nb-text-tertiary);
+  padding: 0 var(--nb-space-4) var(--nb-space-8);
+}
+
+.menuIdentityRow {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding: var(--nb-space-4);
+  margin-bottom: var(--nb-space-8);
+}
+
+.menuRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--nb-space-8) var(--nb-space-4);
+  font-size: 12px;
+  color: var(--nb-text-secondary);
+  border-top: 1px solid var(--nb-border-subtle);
+}
+
+.menuRowValue {
+  color: var(--nb-text-primary);
+  font-weight: 500;
+}
+
+.menuSignOut {
+  width: 100%;
+  margin-top: var(--nb-space-8);
+  padding: var(--nb-space-8) var(--nb-space-4);
+  border: none;
+  border-top: 1px solid var(--nb-border-subtle);
+  background: transparent;
+  color: var(--nb-danger-500);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.menuSignOut:hover {
+  background: var(--nb-danger-tint);
+  border-radius: var(--nb-radius-md);
+}
+
+.menuSignOut:disabled {
+  color: var(--nb-text-disabled);
+  cursor: not-allowed;
 }
 
 .identityAvatar {
