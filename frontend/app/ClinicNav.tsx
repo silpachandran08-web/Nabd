@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
-import { getPermissions, SHELL_SKIP_PREFIXES } from "./lib/session";
+import { getIdentity, getPermissions, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 // DESIGN.md §4/§8: 248px left sidebar, one item per accessible module. Every clinic page
 // (arrivals, patients, ...) was built standalone with no shared shell — this is that missing
@@ -54,17 +54,24 @@ function isNursingItemActive(item: { tab?: string; filter?: string }, pathname: 
   return true;
 }
 
-export default function ClinicNav() {
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [identity, setIdentity] = useState<Identity | null>(null);
 
   // Hydration-safe, same reasoning as LogoutButton: render nothing until this mounts and can
   // read localStorage, then reflect it — never read it directly during render.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPermissions(skip ? [] : getPermissions());
+    setIdentity(skip ? null : getIdentity());
   }, [pathname, skip]);
 
   if (skip || !permissions || permissions.length === 0) return null;
@@ -73,9 +80,22 @@ export default function ClinicNav() {
   const showNursing = permissions.includes("nursing:view");
   if (items.length === 0 && !showNursing) return null;
 
+  if (collapsed) return <nav className={styles.navCollapsed} aria-hidden="true" />;
+
   return (
     <nav className={styles.nav}>
       <div className={styles.brand}>nabd</div>
+
+      {identity && (
+        <div className={styles.clinicInfo}>
+          <div className={styles.clinicIcon}>🏥</div>
+          <div className={styles.clinicText}>
+            <div className={styles.clinicName}>{identity.tenantName}</div>
+            {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
+          </div>
+        </div>
+      )}
+
       <div className={styles.links}>
         {showNursing && NURSING_ITEMS.map((item) => (
           <Link
@@ -96,6 +116,16 @@ export default function ClinicNav() {
           </Link>
         ))}
       </div>
+
+      {identity && (
+        <Link href="/account" className={styles.identityFooter}>
+          <div className={styles.identityAvatar}>{initials(identity.staffName)}</div>
+          <div className={styles.identityText}>
+            <div className={styles.identityName}>{identity.staffName}</div>
+            <div className={styles.identityRole}>{identity.roleName}</div>
+          </div>
+        </Link>
+      )}
     </nav>
   );
 }

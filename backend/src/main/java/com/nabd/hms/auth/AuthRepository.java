@@ -40,8 +40,18 @@ class AuthRepository {
 
     Optional<Tenant> findTenantBySlug(String slug) {
         return jdbc.query(
-                "SELECT id, slug, status FROM tenants WHERE slug = ?::citext",
+                "SELECT id, slug, status, name, region FROM tenants WHERE slug = ?::citext",
                 tenantMapper(), slug
+        ).stream().findFirst();
+    }
+
+    /** For the access token's tenantName claim (ClinicNav's clinic-info card) — looked up by id
+     * since minting happens well past the slug-based login step (MFA verify, OTP verify, refresh
+     * all mint a fresh token from just a staff/session row, no slug in hand). */
+    Optional<Tenant> findTenantById(UUID id) {
+        return jdbc.query(
+                "SELECT id, slug, status, name, region FROM tenants WHERE id = ?",
+                tenantMapper(), id
         ).stream().findFirst();
     }
 
@@ -310,7 +320,8 @@ class AuthRepository {
 
     private RowMapper<Tenant> tenantMapper() {
         return (rs, i) -> new Tenant(
-                UUID.fromString(rs.getString("id")), rs.getString("slug"), rs.getString("status"));
+                UUID.fromString(rs.getString("id")), rs.getString("slug"), rs.getString("status"),
+                rs.getString("name"), rs.getString("region"));
     }
 
     private RowMapper<Staff> staffMapper() {

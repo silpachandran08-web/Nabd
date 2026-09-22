@@ -1,7 +1,15 @@
 // The access token's "permissions" claim (SecurityConfig.java: authoritiesClaimName) already
 // carries everything the client needs for nav/redirect — decoding it here avoids a round trip
 // to a /me endpoint that doesn't exist for clinic staff (only /platform/auth/me does).
-type AccessTokenClaims = { permissions?: string[] };
+// tenantName/tenantRegion/staffName/roleName are display-only (AuthService.mintTokenPair) — for
+// ClinicNav's clinic-info card and signed-in-as footer, never for authorization.
+type AccessTokenClaims = {
+  permissions?: string[];
+  tenantName?: string;
+  tenantRegion?: string;
+  staffName?: string;
+  roleName?: string;
+};
 
 export function decodeAccessToken(token: string): AccessTokenClaims | null {
   try {
@@ -18,6 +26,22 @@ export function getPermissions(): string[] {
   const token = localStorage.getItem("nabd_access_token");
   if (!token) return [];
   return decodeAccessToken(token)?.permissions ?? [];
+}
+
+export type Identity = { tenantName: string; tenantRegion: string; staffName: string; roleName: string };
+
+export function getIdentity(): Identity | null {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("nabd_access_token");
+  if (!token) return null;
+  const claims = decodeAccessToken(token);
+  if (!claims?.tenantName || !claims.staffName || !claims.roleName) return null;
+  return {
+    tenantName: claims.tenantName,
+    tenantRegion: claims.tenantRegion ?? "",
+    staffName: claims.staffName,
+    roleName: claims.roleName,
+  };
 }
 
 // First matching permission wins — each role's actual home worklist (DESIGN.md's per-role

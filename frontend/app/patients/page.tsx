@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./patients.module.css";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
@@ -63,9 +63,20 @@ function age(dob: string): number {
 }
 
 export default function PatientsPage() {
+  return (
+    <Suspense fallback={null}>
+      <PatientsList />
+    </Suspense>
+  );
+}
+
+// useSearchParams (the global TopBar's search deep-links here as ?q=) needs a Suspense boundary
+// above it — the outer component here is that boundary.
+function PatientsList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -158,7 +169,8 @@ export default function PatientsPage() {
   );
 
   useEffect(() => {
-    void Promise.resolve().then(() => load(""));
+    void Promise.resolve().then(() => load(searchParams.get("q") ?? ""));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
 
   useEffect(() => {
