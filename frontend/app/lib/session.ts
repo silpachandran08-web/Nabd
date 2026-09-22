@@ -9,6 +9,7 @@ type AccessTokenClaims = {
   tenantRegion?: string;
   staffName?: string;
   roleName?: string;
+  exp?: number;
 };
 
 export function decodeAccessToken(token: string): AccessTokenClaims | null {
@@ -72,3 +73,26 @@ export function landingPathFor(permissions: string[]): string {
 // Routes with their own identity/nav (platform console, owner's cross-clinic login) or no
 // session yet (login, invite acceptance) — the shared clinic shell never renders here.
 export const SHELL_SKIP_PREFIXES = ["/login", "/platform", "/accept-invite", "/owner"];
+
+// "exp" is the JWT standard claim (Unix seconds) — for the signed-in popover's "Session expires
+// in Xh Ym", not used for any auth decision (the server enforces expiry independently).
+export function getSessionExpiresAt(): Date | null {
+  if (typeof window === "undefined") return null;
+  const token = localStorage.getItem("nabd_access_token");
+  if (!token) return null;
+  const exp = decodeAccessToken(token)?.exp;
+  return exp ? new Date(exp * 1000) : null;
+}
+
+export async function signOut(): Promise<void> {
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+  const token = localStorage.getItem("nabd_access_token");
+  if (token) {
+    await fetch(`${API_BASE}/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {});
+  }
+  localStorage.removeItem("nabd_access_token");
+  localStorage.removeItem("nabd_refresh_token");
+}

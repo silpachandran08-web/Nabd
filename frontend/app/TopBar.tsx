@@ -7,14 +7,21 @@ import { SHELL_SKIP_PREFIXES } from "./lib/session";
 
 const SEARCH_INPUT_ID = "nb-global-search";
 
+// Pathname -> the top bar's primary action button, DESIGN.md's Vitals Worklist ("Capture
+// vitals" next to Synced). Navigation-based (a query param the target page reacts to) rather
+// than a cross-component callback registry — the only consumer so far is nursing's own capture-
+// vitals picker, and a URL round trip is simpler and less error-prone than wiring a context
+// just for this one case. Add more pathnames here if other pages want the same treatment.
+const PRIMARY_ACTIONS: Record<string, { label: string; href: string }> = {
+  "/nursing": { label: "Capture vitals", href: "/nursing?action=capture" },
+};
+
 // DESIGN.md's top bar, present on every clinic page: sidebar collapse toggle, global patient
-// search, and a sync/connectivity indicator. Left out: the wireframe's language switcher and
-// notification bell (no i18n or notifications system exists anywhere in this app — a toggle or
-// bell that does nothing isn't a real feature) and its per-page primary action button (Register
-// walk-in / Capture vitals / ...) — each page already has its own, in its own header; putting it
-// in both places would just be a second, redundant button. "Synced"/"Offline" uses the browser's
-// real online/offline events — the app doesn't have — or need — any actual sync queue, so this
-// is a connectivity indicator, not a claim about queued writes.
+// search, the current page's primary action, and a sync/connectivity indicator. Left out: the
+// wireframe's language switcher and notification bell — no i18n or notifications system exists
+// anywhere in this app, and a control that does nothing isn't a real feature. "Synced"/"Offline"
+// uses the browser's real online/offline events — the app doesn't have, or need, any actual sync
+// queue, so this is a connectivity indicator, not a claim about queued writes.
 export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -64,6 +71,8 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     if (trimmed) router.push(`/patients?q=${encodeURIComponent(trimmed)}`);
   }
 
+  const primaryAction = pathname ? PRIMARY_ACTIONS[pathname] : undefined;
+
   return (
     <div className={styles.bar}>
       <button type="button" className={styles.iconBtn} onClick={onToggleCollapse}
@@ -83,6 +92,11 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
       </form>
       <span className={styles.kbd}>⌘K</span>
       <div className={styles.spacer} />
+      {primaryAction && (
+        <button type="button" className={styles.primaryAction} onClick={() => router.push(primaryAction.href)}>
+          {primaryAction.label}
+        </button>
+      )}
       <div className={`${styles.syncPill} ${online ? styles.syncOnline : styles.syncOffline}`}>
         <span className={styles.syncDot} />
         {online ? "Synced" : "Offline"}

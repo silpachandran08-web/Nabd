@@ -74,6 +74,20 @@
   flex: 1;
 }
 
+.primaryAction {
+  height: 36px;
+  padding: 0 var(--nb-space-16);
+  border: none;
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  flex: none;
+}
+
 .syncPill {
   display: inline-flex;
   align-items: center;

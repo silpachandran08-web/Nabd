@@ -3,7 +3,6 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import AppShell from "./AppShell";
 import IdleLockGuard from "./IdleLockGuard";
-import LogoutButton from "./LogoutButton";
 
 // DESIGN.md §2.1 — weights 400/500/600/700 only, Poppins is the only Latin family.
 const poppins = Poppins({
@@ -22,7 +21,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={poppins.variable}>
       <body>
         <AppShell>{children}</AppShell>
-        <LogoutButton />
         <IdleLockGuard />
       </body>
     </html>
