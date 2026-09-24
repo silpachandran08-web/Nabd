@@ -13,7 +13,9 @@ import { getIdentity, getPermissions, getSessionExpiresAt, signOut, SHELL_SKIP_P
 const NAV_ITEMS: { href: string; label: string; permission: string | null }[] = [
   { href: "/arrivals", label: "Today · Arrivals", permission: "queue:view" },
   { href: "/patients", label: "Patients", permission: "patients:view" },
-  { href: "/consult", label: "Consultation Workspace", permission: "clinical:view" },
+  // clinical:edit, not clinical:view — reception can be granted clinical:view (e.g. for billing
+  // lookups) without being a clinician; see lib/session.ts's LANDING_RULES for the full reasoning.
+  { href: "/consult", label: "Consultation Workspace", permission: "clinical:edit" },
   { href: "/packages", label: "Treatment Packages", permission: "packages:view" },
   { href: "/staff", label: "Staff & Access", permission: "staff:view" },
   { href: "/reports", label: "Owner Insights", permission: "reports:view" },
