@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./setup.module.css";
 import WhatsAppTemplates from "./WhatsAppTemplates";
 import TimezoneSelect from "./TimezoneSelect";
@@ -47,9 +47,28 @@ const TABS = [
   { key: "pharmacy", label: "Pharmacy" },
 ];
 
+const isSetupTab = (t: string | null): t is string => TABS.some((x) => x.key === t);
+
+// ?tab= deep links (the owner sidebar's Compliance & Audit and Plan & Modules open the Licences and
+// Subscription tabs) read useSearchParams, which needs a Suspense boundary for static prerender.
 export default function SetupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SetupPageInner />
+    </Suspense>
+  );
+}
+
+function SetupPageInner() {
   const router = useRouter();
-  const [tab, setTab] = useState("checklist");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  // The URL is the tab's only state: sidebar links and tab clicks both just change ?tab=, so the
+  // sidebar's active item always matches what's on screen.
+  const tab = isSetupTab(tabParam) ? tabParam : "checklist";
+  function selectTab(key: string) {
+    router.replace(key === "checklist" ? "/setup" : `/setup?tab=${key}`, { scroll: false });
+  }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -813,7 +832,7 @@ export default function SetupPage() {
 
       <div className={styles.tabs}>
         {TABS.map((t) => (
-          <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => setTab(t.key)}>
+          <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => selectTab(t.key)}>
             {t.label}
           </button>
         ))}
