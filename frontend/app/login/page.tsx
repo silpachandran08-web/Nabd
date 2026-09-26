@@ -43,7 +43,8 @@ export default function LoginPage() {
   function handleTokens(pair: TokenPair) {
     localStorage.setItem("nabd_access_token", pair.accessToken);
     localStorage.setItem("nabd_refresh_token", pair.refreshToken);
-    router.replace(landingPathFor(decodeAccessToken(pair.accessToken)?.permissions ?? []));
+    const claims = decodeAccessToken(pair.accessToken);
+    router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
   }
 
   async function submitLogin(e: FormEvent) {

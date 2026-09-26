@@ -16,7 +16,8 @@ final class AuthModels {
                  boolean mfaEnabled, byte[] mfaSecretEnc) {
     }
 
-    record Role(UUID id, UUID tenantId, String name, String grantsJson, boolean mfaRequired) {
+    /** builtIn = the clinic's one built-in role, the Owner (custom roles are never built-in, see RoleRepository). */
+    record Role(UUID id, UUID tenantId, String name, String grantsJson, boolean mfaRequired, boolean builtIn) {
     }
 
     record SessionRow(UUID id, UUID tenantId, UUID staffId, UUID familyId, String tokenHash,
