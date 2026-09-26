@@ -32,6 +32,15 @@ export function getPermissions(): string[] {
 
 export type Identity = { tenantName: string; tenantRegion: string; staffName: string; roleName: string };
 
+/** The clinic owner (built-in role — AuthService's "owner" claim). Drives landing and the owner
+ * sidebar only; every permission check stays on the server. */
+export function isOwner(): boolean {
+  if (typeof window === "undefined") return false;
+  const token = localStorage.getItem("nabd_access_token");
+  if (!token) return false;
+  return decodeAccessToken(token)?.owner === true;
+}
+
 export function getIdentity(): Identity | null {
   if (typeof window === "undefined") return null;
   const token = localStorage.getItem("nabd_access_token");
@@ -70,11 +79,11 @@ const LANDING_RULES: [permission: string, path: string][] = [
 ];
 
 // The clinic owner holds every grant, so the rules below would land them on /nursing. Their home
-// is Owner Insights — the same page the owner portal (owner/workspaces) opens after picking a
-// clinic. "owner" comes from the staff member's own built-in role (AuthService.mintTokenPair);
+// is the Overview ("Today at a glance", DESIGN.md's owner home) — the same page the owner portal
+// (owner/workspaces) opens after picking a clinic. "owner" comes from the staff member's own built-in role (AuthService.mintTokenPair);
 // tokens minted before that claim existed simply fall through to the rules.
 export function landingPathFor(permissions: string[], owner = false): string {
-  if (owner && permissions.includes("reports:view")) return "/reports";
+  if (owner && permissions.includes("reports:view")) return "/overview";
   for (const [permission, path] of LANDING_RULES) {
     if (permissions.includes(permission)) return path;
   }

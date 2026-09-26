@@ -52,6 +52,60 @@ class ReportsApiTest extends ApiTestBase {
     }
 
     @Test
+    void overviewSummarisesTheClinicsDay() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "ov1@a.com", "+919800069001", false);
+        String token = loginAndGetAccessToken(owner); // a live session opened today
+
+        // A: checked out, 200 of 500 paid by UPI (partial invoice)
+        String a = checkIn(token, registerPatient(token, "Ov A", "+919999969001"), owner.id(), null);
+        moveTo(token, a, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        ResponseEntity<Map> inv = exchange("/v1/billing/checkout/" + a, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 500, "taxRatePercent", 0)))), Map.class);
+        exchange("/v1/billing/invoices/" + inv.getBody().get("id") + "/payments", HttpMethod.POST,
+                authedJsonBody(token, Map.of("method", "upi", "amount", 200)), Map.class);
+        // B: waiting at checkout
+        String b = checkIn(token, registerPatient(token, "Ov B", "+919999969002"), owner.id(), null);
+        moveTo(token, b, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        // C: with the doctor right now
+        String c = checkIn(token, registerPatient(token, "Ov C", "+919999969003"), owner.id(), null);
+        moveTo(token, c, "waiting", "vitals_pending", "vitals_done", "in_consult");
+
+        ResponseEntity<Map> resp = exchange("/v1/reports/overview", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> body = resp.getBody();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> visits = (Map<String, Object>) body.get("visits");
+        assertThat(visits).containsEntry("total", 3).containsEntry("completed", 1).containsEntry("inFlow", 2); // A done; B, C in flow
+        assertThat(((Map<?, ?>) body.get("checkout")).get("pending")).isEqualTo(1);
+        Map<?, ?> collections = (Map<?, ?>) body.get("collections");
+        assertThat(((Number) collections.get("collected")).doubleValue()).isEqualTo(200.0);
+        assertThat(collections.get("invoices")).isEqualTo(1);
+        assertThat(collections.get("pendingInvoices")).isEqualTo(1);
+        assertThat(((Number) ((Map<?, ?>) body.get("checkout")).get("outstanding")).doubleValue()).isEqualTo(300.0);
+        assertThat((List<?>) body.get("paymentSplit")).singleElement().satisfies(p -> {
+            assertThat(((Map<?, ?>) p).get("method")).isEqualTo("upi");
+            assertThat(((Number) ((Map<?, ?>) p).get("amount")).doubleValue()).isEqualTo(200.0);
+        });
+        assertThat(((Map<?, ?>) body.get("dayClose")).get("unpaidInvoices")).isEqualTo(1);
+        assertThat((List<?>) body.get("activeStaff")).singleElement().satisfies(s -> {
+            assertThat(((Map<?, ?>) s).get("name")).isEqualTo("Test Staff");
+            assertThat(((Map<?, ?>) s).get("inConsult")).isEqualTo(true);
+        });
+        assertThat(((Map<?, ?>) body.get("staff")).get("active")).isEqualTo(1);
+    }
+
+    @Test
+    void overviewNeedsReportsView() {
+        SeededTenant tenant = seedTenant();
+        UUID nurseRole = seedRole(tenant.id(), "Nurse", false, fullGrant("nursing"));
+        String token = loginAndGetAccessToken(seedStaff(tenant, nurseRole, "ovn@a.com", "+919800069009", false));
+        assertThat(exchange("/v1/reports/overview", HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void dailyMoneyReflectsTodaysInvoicingAndCollection() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());

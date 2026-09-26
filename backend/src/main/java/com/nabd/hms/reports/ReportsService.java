@@ -1,5 +1,6 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.reports.dto.OverviewResponse;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -63,6 +64,28 @@ public class ReportsService {
         this.staffService = staffService;
         this.auditService = auditService;
         this.tenantContext = tenantContext;
+    }
+
+    /** Owner home — one call for the whole "Today at a glance" page, all on the clinic's own day. */
+    @Transactional
+    public OverviewResponse overview(UUID tenantId) {
+        tenantContext.set(tenantId);
+        ZoneId zone = clock.zone(tenantId);
+        LocalDate today = LocalDate.now(zone);
+        Instant dayStart = today.atStartOfDay(zone).toInstant();
+        Instant dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant();
+        int checkoutPending = repo.checkoutPendingOn(tenantId, today);
+        return new OverviewResponse(
+                today,
+                repo.visitsOn(tenantId, today),
+                new OverviewResponse.Collections(repo.collectedOn(tenantId, dayStart, dayEnd), repo.invoiceCountOn(tenantId, dayStart, dayEnd),
+                        repo.unpaidInvoiceCountOn(tenantId, dayStart, dayEnd)),
+                new OverviewResponse.Checkout(checkoutPending, repo.outstandingTotal(tenantId)),
+                new OverviewResponse.Packages(repo.packagesSoldOn(tenantId, dayStart, dayEnd), repo.sessionsOwed(tenantId)),
+                repo.paymentSplitOn(tenantId, dayStart, dayEnd),
+                new OverviewResponse.DayClose(repo.unpaidInvoiceCount(tenantId), checkoutPending),
+                repo.activeStaffSince(tenantId, dayStart, today),
+                repo.staffSummary(tenantId));
     }
 
     @Transactional

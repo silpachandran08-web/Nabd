@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./arrivals.module.css";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
@@ -79,14 +79,28 @@ function waitMinutes(createdAt: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000));
 }
 
+type ArrivalsTab = "all" | Bucket;
+const isArrivalsTab = (t: string | null): t is ArrivalsTab => TABS.some((x) => x.key === t);
+
+// ?tab= deep links (the owner sidebar's Billing & Day Close opens ?tab=checkout_pending) read
+// useSearchParams, which needs a Suspense boundary or the page's static prerender breaks.
 export default function ArrivalsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ArrivalsPageInner />
+    </Suspense>
+  );
+}
+
+function ArrivalsPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
   const [rows, setRows] = useState<Row[]>([]);
   const [staff, setStaff] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
-  const [tab, setTab] = useState<"all" | Bucket>("all");
   const [, setNow] = useState(() => Date.now());
   // Computed client-side only — server and browser locale defaults for toLocaleDateString can
   // differ, and doing this during the initial render causes a hydration mismatch.
@@ -541,6 +555,11 @@ export default function ArrivalsPage() {
     if (res?.ok) load();
   }
 
+  // The URL is the tab's only state: sidebar links and tab clicks both just change ?tab=, so the
+  // sidebar's active item always matches what's on screen.
+  const tab: ArrivalsTab = isArrivalsTab(tabParam) ? tabParam : "all";
+  const selectTab = (key: ArrivalsTab) =>
+    router.replace(key === "all" ? "/arrivals" : `/arrivals?tab=${key}`, { scroll: false });
   const filtered = tab === "all" ? rows : rows.filter((r) => bucketOf(r.status) === tab);
   const counts: Record<string, number> = { all: rows.length };
   (["waiting", "in_consult", "checkout_pending", "completed"] as Bucket[]).forEach((b) => {
@@ -578,7 +597,7 @@ export default function ArrivalsPage() {
       {!forbidden && (
         <div className={styles.tabs}>
           {TABS.map((t) => (
-            <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => setTab(t.key)}>
+            <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => selectTab(t.key)}>
               {t.label} {counts[t.key] !== undefined ? `(${counts[t.key]})` : ""}
             </button>
           ))}

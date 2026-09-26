@@ -1,5 +1,6 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.reports.dto.OverviewResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -41,6 +42,87 @@ class ReportsRepository {
         return nz(jdbc.queryForObject("SELECT COALESCE(SUM(amount), 0) FROM invoice_payments " +
                         "WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ?",
                 BigDecimal.class, tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd)));
+    }
+
+    // ── owner Overview (all day bounds are the clinic's day, computed by the caller) ──
+
+    OverviewResponse.Visits visitsOn(UUID tenantId, LocalDate day) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS total,
+                       count(*) FILTER (WHERE status = 'completed') AS completed,
+                       count(*) FILTER (WHERE status NOT IN ('completed', 'no_show')) AS in_flow
+                FROM queue_entries WHERE tenant_id = ? AND queue_date = ?
+                """, (rs, i) -> new OverviewResponse.Visits(rs.getInt("total"), rs.getInt("completed"), rs.getInt("in_flow")),
+                tenantId, java.sql.Date.valueOf(day));
+    }
+
+    int checkoutPendingOn(UUID tenantId, LocalDate day) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ? AND status = 'checkout_pending'",
+                Integer.class, tenantId, java.sql.Date.valueOf(day));
+        return n == null ? 0 : n;
+    }
+
+    int unpaidInvoiceCountOn(UUID tenantId, Instant dayStart, Instant dayEnd) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM invoices WHERE tenant_id = ? AND status IN ('unpaid', 'partial') " +
+                "AND created_at >= ? AND created_at < ?", Integer.class, tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd));
+        return n == null ? 0 : n;
+    }
+
+    int unpaidInvoiceCount(UUID tenantId) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM invoices WHERE tenant_id = ? AND status IN ('unpaid', 'partial')",
+                Integer.class, tenantId);
+        return n == null ? 0 : n;
+    }
+
+    List<OverviewResponse.PaymentSplit> paymentSplitOn(UUID tenantId, Instant dayStart, Instant dayEnd) {
+        return jdbc.query("SELECT method, SUM(amount) AS amount FROM invoice_payments WHERE tenant_id = ? " +
+                        "AND recorded_at >= ? AND recorded_at < ? GROUP BY method ORDER BY SUM(amount) DESC",
+                (rs, i) -> new OverviewResponse.PaymentSplit(rs.getString("method"), rs.getBigDecimal("amount")),
+                tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd));
+    }
+
+    int packagesSoldOn(UUID tenantId, Instant dayStart, Instant dayEnd) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM package_instances WHERE tenant_id = ? AND created_at >= ? AND created_at < ?",
+                Integer.class, tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd));
+        return n == null ? 0 : n;
+    }
+
+    /** Same "sessions owed" figure as the package liability report (PackageRepository.computeLiability). */
+    long sessionsOwed(UUID tenantId) {
+        Long n = jdbc.queryForObject("SELECT COALESCE(SUM(ii.quantity_total - ii.quantity_consumed), 0) FROM package_instances i " +
+                "JOIN package_instance_items ii ON ii.instance_id = i.id WHERE i.tenant_id = ? AND i.status = 'active'", Long.class, tenantId);
+        return n == null ? 0 : n;
+    }
+
+    /** A live (unrevoked, unexpired) session opened since dayStart — i.e. signed in today and not signed out.
+     * Token refresh opens a new session row, so the newest one is the latest sign-in or refresh. */
+    List<OverviewResponse.ActiveStaff> activeStaffSince(UUID tenantId, Instant dayStart, LocalDate day) {
+        return jdbc.query("""
+                SELECT s.id, s.name, r.name AS role_name, d.name AS department_name, max(se.created_at) AS signed_in_at,
+                       EXISTS (SELECT 1 FROM queue_entries q WHERE q.tenant_id = s.tenant_id AND q.doctor_id = s.id
+                               AND q.queue_date = ? AND q.status = 'in_consult') AS in_consult
+                FROM staff s
+                JOIN roles r ON r.id = s.role_id
+                LEFT JOIN departments d ON d.id = s.department_id
+                JOIN sessions se ON se.staff_id = s.id AND se.revoked_at IS NULL AND se.expires_at > now() AND se.created_at >= ?
+                WHERE s.tenant_id = ? AND s.status = 'active'
+                GROUP BY s.id, s.name, r.name, d.name
+                ORDER BY max(se.created_at) DESC
+                """, (rs, i) -> new OverviewResponse.ActiveStaff(rs.getObject("id", UUID.class), rs.getString("name"),
+                        rs.getString("role_name"), rs.getString("department_name"), rs.getTimestamp("signed_in_at").toInstant(),
+                        rs.getBoolean("in_consult")),
+                java.sql.Date.valueOf(day), Timestamp.from(dayStart), tenantId);
+    }
+
+    OverviewResponse.StaffSummary staffSummary(UUID tenantId) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FILTER (WHERE status = 'active') AS active,
+                       count(*) FILTER (WHERE status = 'suspended') AS suspended,
+                       count(*) FILTER (WHERE status = 'invited') AS invited,
+                       (SELECT count(*) FROM roles WHERE tenant_id = ?) AS roles
+                FROM staff WHERE tenant_id = ?
+                """, (rs, i) -> new OverviewResponse.StaffSummary(rs.getInt("active"), rs.getInt("suspended"),
+                        rs.getInt("invited"), rs.getInt("roles")), tenantId, tenantId);
     }
 
     BigDecimal outstandingTotal(UUID tenantId) {

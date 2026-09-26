@@ -1,5 +1,6 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.reports.dto.OverviewResponse;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.reports.dto.BillingLeakageResponse;
 import com.nabd.hms.reports.dto.DailyMoneyResponse;
@@ -32,6 +33,12 @@ public class ReportsController {
 
     ReportsController(ReportsService service) {
         this.service = service;
+    }
+
+    @GetMapping("/overview")
+    @PreAuthorize("hasAuthority('reports:view')")
+    public OverviewResponse overview(@AuthenticationPrincipal Jwt jwt) {
+        return service.overview(tenantId(jwt));
     }
 
     @GetMapping("/daily-money")

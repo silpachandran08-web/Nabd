@@ -83,8 +83,8 @@ export default function OwnerWorkspacesPage() {
       localStorage.setItem("nabd_refresh_token", pair.refreshToken);
       // Unlike staff PIN login (lib/session's landingPathFor, which guesses a home page from
       // permissions), this caller already knows the identity entering the clinic — the tenant
-      // owner — so it goes straight to Owner Insights instead of matching queue:view first.
-      router.replace("/reports");
+      // owner — so it goes straight to the owner's Overview instead of matching queue:view first.
+      router.replace("/overview");
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {

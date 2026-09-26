@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
-import { getIdentity, getPermissions, getSessionExpiresAt, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
+import { getIdentity, getPermissions, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 // DESIGN.md §4/§8: 248px left sidebar, one item per accessible module. Every clinic page
 // (arrivals, patients, ...) was built standalone with no shared shell — this is that missing
@@ -35,6 +35,29 @@ const NURSING_ITEMS: { label: string; tab?: string; filter?: string }[] = [
   { label: "Vitals", filter: "recorded" },
   { label: "Vaccines & Injections", tab: "vaccines" },
   { label: "Administration History", tab: "administration" },
+];
+
+// DESIGN.md's Owner / Clinic Manager sidebar, in its order. The owner holds every grant (so the
+// nursing check below would otherwise win); each item still needs its permission, so a trimmed
+// Owner role never shows a link it can't open. Destinations that have no page of their own yet
+// reuse the closest existing one: Billing & Day Close is the checkout worklist on Arrivals,
+// Compliance & Audit and Plan & Modules are Setup's Licences and Subscription tabs.
+type OwnerItem = { label: string; href: string; permission: string; active: (path: string, tab: string | null) => boolean };
+const OWNER_ITEMS: OwnerItem[] = [
+  { label: "Overview", href: "/overview", permission: "reports:view", active: (p) => p === "/overview" },
+  { label: "Clinic Operations", href: "/arrivals", permission: "queue:view",
+    active: (p, tab) => p === "/arrivals" && tab !== "checkout_pending" },
+  { label: "Billing & Day Close", href: "/arrivals?tab=checkout_pending", permission: "billing:view",
+    active: (p, tab) => (p === "/arrivals" && tab === "checkout_pending") || p.startsWith("/checkout") },
+  { label: "Treatment Packages", href: "/packages", permission: "packages:view", active: (p) => p.startsWith("/packages") },
+  { label: "Reports", href: "/reports", permission: "reports:view", active: (p) => p.startsWith("/reports") },
+  { label: "Staff & Access", href: "/staff", permission: "staff:view", active: (p) => p.startsWith("/staff") },
+  { label: "Clinic Setup", href: "/setup", permission: "setup:view",
+    active: (p, tab) => p.startsWith("/setup") && tab !== "licences" && tab !== "subscription" },
+  { label: "Compliance & Audit", href: "/setup?tab=licences", permission: "setup:view",
+    active: (p, tab) => p === "/setup" && tab === "licences" },
+  { label: "Plan & Modules", href: "/setup?tab=subscription", permission: "setup:view",
+    active: (p, tab) => p === "/setup" && tab === "subscription" },
 ];
 
 function nursingHref(item: { tab?: string; filter?: string }): string {
@@ -74,6 +97,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const searchParams = useSearchParams();
   const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [owner, setOwner] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [sessionLabel, setSessionLabel] = useState("—");
@@ -85,6 +109,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPermissions(skip ? [] : getPermissions());
     setIdentity(skip ? null : getIdentity());
+    setOwner(skip ? false : isOwner());
   }, [pathname, skip]);
 
   if (skip || !permissions || permissions.length === 0) return null;
@@ -92,9 +117,12 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // A Nurse's sidebar is DESIGN.md's own dedicated worklist nav, never the generic module list —
   // a staff record that also carries queue:view/patients:view (this local test account does) must
   // not leak those in here, or the sidebar mixes two different roles' navigation into one.
-  const showNursing = permissions.includes("nursing:view");
-  const items = showNursing ? [] : NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
-  if (items.length === 0 && !showNursing) return null;
+  const ownerItems = owner ? OWNER_ITEMS.filter((item) => permissions.includes(item.permission)) : [];
+  const showOwner = ownerItems.length > 0;
+  const showNursing = !showOwner && permissions.includes("nursing:view");
+  const items = showOwner || showNursing ? [] : NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
+  if (items.length === 0 && !showNursing && !showOwner) return null;
+  const currentTab = searchParams.get("tab");
 
   if (collapsed) return <nav className={styles.navCollapsed} aria-hidden="true" />;
 
@@ -124,6 +152,15 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       )}
 
       <div className={styles.links}>
+        {ownerItems.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className={`${styles.link} ${pathname && item.active(pathname, currentTab) ? styles.linkActive : ""}`}
+          >
+            {item.label}
+          </Link>
+        ))}
         {showNursing && NURSING_ITEMS.map((item) => (
           <Link
             key={item.label}
