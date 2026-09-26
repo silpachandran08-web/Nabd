@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./setup.module.css";
 import WhatsAppTemplates from "./WhatsAppTemplates";
+import TimezoneSelect from "./TimezoneSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -191,7 +192,7 @@ export default function SetupPage() {
 
   // effectiveFrom has no visible input below — defaulted to today (matching the column's own
   // CURRENT_DATE default) since addCharge()'s own guard requires it truthy to submit at all.
-  const [newCharge, setNewCharge] = useState<Partial<Charge>>({ active: true, displayOrder: 0, effectiveFrom: new Date().toISOString().slice(0, 10) });
+  const [newCharge, setNewCharge] = useState<Partial<Charge>>({ active: true, displayOrder: 0, effectiveFrom: new Date().toLocaleDateString("en-CA") });
   const addCharge = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCharge.code || !newCharge.name || !newCharge.category || newCharge.baseAmount == null || !newCharge.effectiveFrom) return;
@@ -320,8 +321,8 @@ export default function SetupPage() {
                 </div>
                 <div className={styles.row}>
                   <div className={styles.field}>
-                    <label className={styles.label}>Timezone</label>
-                    <input className={styles.input} value={profile.timezone} onChange={(e) => setProfile({ ...profile, timezone: e.target.value })} />
+                    <label className={styles.label} htmlFor="clinic-timezone">Timezone</label>
+                    <TimezoneSelect id="clinic-timezone" className={styles.select} value={profile.timezone} onChange={(timezone) => setProfile({ ...profile, timezone })} />
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label}>WhatsApp number</label>

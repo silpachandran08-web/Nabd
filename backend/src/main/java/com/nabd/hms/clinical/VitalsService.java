@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.VitalsResponse;
 import com.nabd.hms.clinical.dto.VitalsWriteRequest;
 import com.nabd.hms.common.ApiException;
@@ -32,7 +33,10 @@ public class VitalsService {
     private final QueueService queueService;
     private final TenantContext tenantContext;
 
-    VitalsService(VitalsRepository repo, QueueService queueService, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    VitalsService(VitalsRepository repo, QueueService queueService, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.queueService = queueService;
         this.tenantContext = tenantContext;
@@ -62,15 +66,15 @@ public class VitalsService {
     }
 
     private VitalsResponse toResponse(UUID tenantId, VitalsRow v) {
-        int ageYears = repo.findPatientDob(tenantId, v.patientId()).map(this::ageInYears).orElse(30);
+        int ageYears = repo.findPatientDob(tenantId, v.patientId()).map(dob -> ageInYears(dob, clock.today(tenantId))).orElse(30);
         List<String> flags = VitalsRanges.flags(v, ageYears);
         return new VitalsResponse(v.id(), v.queueEntryId(), v.patientId(), v.heightCm(), v.weightKg(),
                 v.bpSystolic(), v.bpDiastolic(), v.pulseBpm(), v.tempCelsius(), v.spo2Percent(),
                 v.recordedBy(), v.recordedAt(), flags);
     }
 
-    private int ageInYears(LocalDate dob) {
-        return Period.between(dob, LocalDate.now(ZoneOffset.UTC)).getYears();
+    private static int ageInYears(LocalDate dob, LocalDate today) {
+        return Period.between(dob, today).getYears();
     }
 
     private ApiException notFound() {

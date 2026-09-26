@@ -1,5 +1,6 @@
 package com.nabd.hms.setup;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.setup.dto.ChargeHeadResponse;
@@ -87,6 +88,11 @@ public class SetupService {
     @Transactional
     public ClinicProfileResponse updateProfile(UUID tenantId, UUID callerStaffId, ClinicProfileWriteRequest req) {
         tenantContext.set(tenantId);
+        // Every schedule, queue day and report reads this (ClinicClock) — only real IANA zones get in.
+        if (!ClinicClock.isValidZone(req.timezone())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-timezone", "Invalid timezone",
+                    "Use a timezone like Asia/Kolkata, Asia/Riyadh or UTC.");
+        }
         repo.updateProfile(tenantId, req);
         log.info("clinic profile updated for tenant {} by {}", tenantId, callerStaffId);
         return getProfile(tenantId);

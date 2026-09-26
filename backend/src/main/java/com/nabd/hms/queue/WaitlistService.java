@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.dto.WaitlistEntryResponse;
@@ -13,7 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -41,8 +41,11 @@ public class WaitlistService {
     private final ScheduleRepository scheduleRepo;
     private final TenantContext tenantContext;
 
+    private final ClinicClock clock;
+
     WaitlistService(WaitlistRepository repo, AppointmentRepository appointmentRepo, ScheduleRepository scheduleRepo,
-                     TenantContext tenantContext) {
+                     TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.appointmentRepo = appointmentRepo;
         this.scheduleRepo = scheduleRepo;
@@ -107,7 +110,7 @@ public class WaitlistService {
                     "This waitlist offer has expired or was already used.");
         }
 
-        int slotMinutes = resolveSlotMinutes(entry.doctorId(), entry.offeredSlotStart());
+        int slotMinutes = resolveSlotMinutes(tenantId, entry.doctorId(), entry.offeredSlotStart());
         Instant end = entry.offeredSlotStart().plus(slotMinutes, ChronoUnit.MINUTES);
         UUID appointmentId;
         try {
@@ -135,10 +138,10 @@ public class WaitlistService {
         repo.cancelMembership(tenantId, id);
     }
 
-    private int resolveSlotMinutes(UUID doctorId, Instant start) {
-        LocalDate date = start.atZone(ZoneOffset.UTC).toLocalDate();
-        int dayOfWeek = date.getDayOfWeek().getValue() % 7;
-        LocalTime time = start.atZone(ZoneOffset.UTC).toLocalTime();
+    private int resolveSlotMinutes(UUID tenantId, UUID doctorId, Instant start) {
+        java.time.ZonedDateTime local = start.atZone(clock.zone(tenantId));
+        int dayOfWeek = local.getDayOfWeek().getValue() % 7;
+        LocalTime time = local.toLocalTime();
         return scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time)
                 .map(WorkingHoursRow::slotMinutes)
                 .orElse(DEFAULT_SLOT_MINUTES);

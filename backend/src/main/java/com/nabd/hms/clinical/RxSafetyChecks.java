@@ -27,11 +27,11 @@ final class RxSafetyChecks {
             "tramadol", "alprazolam", "diazepam", "codeine", "morphine", "fentanyl");
 
     /** NB-113: fires for any patient of childbearing potential — female, roughly 12-55 — regardless of specialty. */
-    static String pregnancyWarning(String drugName, String gender, LocalDate dob) {
+    static String pregnancyWarning(String drugName, String gender, LocalDate dob, LocalDate today) {
         if (!"female".equals(gender)) {
             return null;
         }
-        int age = Period.between(dob, LocalDate.now(ZoneOffset.UTC)).getYears();
+        int age = Period.between(dob, today).getYears();
         if (age < 12 || age > 55) {
             return null;
         }

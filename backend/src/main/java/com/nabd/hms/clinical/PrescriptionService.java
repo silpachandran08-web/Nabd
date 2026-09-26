@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetItemResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
@@ -50,8 +51,11 @@ public class PrescriptionService {
     private final AuditService auditService;
     private final TenantContext tenantContext;
 
+    private final ClinicClock clock;
+
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
-                         AuditService auditService, TenantContext tenantContext) {
+                         AuditService auditService, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.allergyRepo = allergyRepo;
         this.vitalsRepo = vitalsRepo;
@@ -172,7 +176,7 @@ public class PrescriptionService {
                     Optional<AllergyRow> match = findMatch(allergies, i.drugName());
                     String allergyWarning = match.map(a -> a.substance() + " (" + a.severity() + ")").orElse(null);
                     String pregnancyWarning = profile == null ? null
-                            : RxSafetyChecks.pregnancyWarning(i.drugName(), profile.gender(), profile.dob());
+                            : RxSafetyChecks.pregnancyWarning(i.drugName(), profile.gender(), profile.dob(), clock.today(tenantId));
                     String controlledWarning = RxSafetyChecks.controlledSubstanceWarning(i.drugName(), region);
                     return new PrescriptionItemResponse(i.id(), i.drugName(), i.dosage(), i.frequency(), i.duration(),
                             i.instructions(), i.allergyOverrideReason(), i.displayOrder(), allergyWarning,

@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.EncounterPage;
 import com.nabd.hms.clinical.dto.EncounterResponse;
 import com.nabd.hms.clinical.dto.PageMeta;
@@ -22,7 +23,10 @@ public class TimelineService {
     private final TimelineRepository repo;
     private final TenantContext tenantContext;
 
-    TimelineService(TimelineRepository repo, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    TimelineService(TimelineRepository repo, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -31,7 +35,8 @@ public class TimelineService {
     @Transactional
     public EncounterPage get(UUID tenantId, UUID patientId, int limit, String cursor) {
         tenantContext.set(tenantId);
-        Instant since = LocalDate.now(ZoneOffset.UTC).minusYears(5).atStartOfDay(ZoneOffset.UTC).toInstant();
+        java.time.ZoneId zone = clock.zone(tenantId);
+        Instant since = java.time.LocalDate.now(zone).minusYears(5).atStartOfDay(zone).toInstant();
         Cursor after = cursor == null ? null : Cursor.decode(cursor);
         List<EncounterRow> rows = repo.findForPatient(tenantId, patientId, since, limit + 1,
                 after == null ? null : after.createdAt(), after == null ? null : after.id());

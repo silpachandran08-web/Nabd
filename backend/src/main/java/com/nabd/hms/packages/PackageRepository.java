@@ -1,5 +1,6 @@
 package com.nabd.hms.packages;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.packages.dto.PackageItemInput;
 import org.springframework.http.HttpStatus;
@@ -27,7 +28,10 @@ class PackageRepository {
 
     private final JdbcTemplate jdbc;
 
-    PackageRepository(JdbcTemplate jdbc) {
+    private final ClinicClock clock;
+
+    PackageRepository(JdbcTemplate jdbc, ClinicClock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
     }
 
@@ -114,8 +118,8 @@ class PackageRepository {
                         "JOIN staff s ON s.id = ed.doctor_id " +
                         "JOIN doctor_leave dl ON dl.doctor_id = ed.doctor_id " +
                         "WHERE p.tenant_id = ? AND ed.package_id = ? AND dl.tenant_id = ? " +
-                        "AND CURRENT_DATE BETWEEN dl.date_from AND dl.date_to LIMIT 1",
-                (rs, i) -> rs.getString("name"), tenantId, packageId, tenantId).stream().findFirst();
+                        "AND ?::date BETWEEN dl.date_from AND dl.date_to LIMIT 1",
+                (rs, i) -> rs.getString("name"), tenantId, packageId, tenantId, java.sql.Date.valueOf(clock.today(tenantId))).stream().findFirst();
     }
 
     // ── settings ──────────────────────────────────────────────────────────
@@ -303,10 +307,10 @@ class PackageRepository {
     List<InstanceRow> listActiveInstancesExpiringWithinGrace(UUID tenantId) {
         return jdbc.query(INSTANCE_SELECT +
                         "WHERE i.tenant_id = ? AND i.status = 'active' " +
-                        "AND CURRENT_DATE <= i.validity_end + (i.grace_days || ' days')::interval " +
-                        "AND CURRENT_DATE >= i.validity_end - interval '30 days' " +
+                        "AND ?::date <= i.validity_end + (i.grace_days || ' days')::interval " +
+                        "AND ?::date >= i.validity_end - interval '30 days' " +
                         "ORDER BY i.validity_end",
-                this::mapInstance, tenantId);
+                this::mapInstance, tenantId, java.sql.Date.valueOf(clock.today(tenantId)), java.sql.Date.valueOf(clock.today(tenantId)));
     }
 
     LiabilityRow computeLiability(UUID tenantId) {
@@ -325,16 +329,16 @@ class PackageRepository {
     long countInGracePeriod(UUID tenantId) {
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM package_instances WHERE tenant_id = ? AND status = 'active' " +
-                        "AND CURRENT_DATE > validity_end AND CURRENT_DATE <= validity_end + (grace_days || ' days')::interval",
-                Long.class, tenantId);
+                        "AND ?::date > validity_end AND ?::date <= validity_end + (grace_days || ' days')::interval",
+                Long.class, tenantId, java.sql.Date.valueOf(clock.today(tenantId)), java.sql.Date.valueOf(clock.today(tenantId)));
         return count == null ? 0 : count;
     }
 
     long countExpiringIn30Days(UUID tenantId) {
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM package_instances WHERE tenant_id = ? AND status = 'active' " +
-                        "AND validity_end BETWEEN CURRENT_DATE AND CURRENT_DATE + interval '30 days'",
-                Long.class, tenantId);
+                        "AND validity_end BETWEEN ?::date AND ?::date + interval '30 days'",
+                Long.class, tenantId, java.sql.Date.valueOf(clock.today(tenantId)), java.sql.Date.valueOf(clock.today(tenantId)));
         return count == null ? 0 : count;
     }
 
@@ -343,9 +347,9 @@ class PackageRepository {
                 "SELECT COALESCE(SUM((ii.quantity_total - ii.quantity_consumed) * ii.allocated_price / ii.quantity_total), 0) " +
                         "FROM package_instances i JOIN package_instance_items ii ON ii.instance_id = i.id " +
                         "WHERE i.tenant_id = ? AND i.status = 'active' " +
-                        "AND CURRENT_DATE <= i.validity_end + (i.grace_days || ' days')::interval " +
-                        "AND CURRENT_DATE >= i.validity_end - interval '30 days'",
-                BigDecimal.class, tenantId);
+                        "AND ?::date <= i.validity_end + (i.grace_days || ' days')::interval " +
+                        "AND ?::date >= i.validity_end - interval '30 days'",
+                BigDecimal.class, tenantId, java.sql.Date.valueOf(clock.today(tenantId)), java.sql.Date.valueOf(clock.today(tenantId)));
         return loss == null ? BigDecimal.ZERO : loss;
     }
 

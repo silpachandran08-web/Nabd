@@ -1,5 +1,6 @@
 package com.nabd.hms.packages;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.billing.CheckoutService;
 import com.nabd.hms.billing.dto.CheckoutRequest;
 import com.nabd.hms.billing.dto.InvoiceResponse;
@@ -61,8 +62,11 @@ public class PackageInstanceService {
     private final CheckoutService checkoutService;
     private final AuditService auditService;
 
+    private final ClinicClock clock;
+
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
-                            AuditService auditService) {
+                            AuditService auditService, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.checkoutService = checkoutService;
@@ -114,7 +118,7 @@ public class PackageInstanceService {
                 new CheckoutRequest(lineItems, BigDecimal.ZERO));
         checkoutService.recordPayment(tenantId, invoice.id(), staffId, new PaymentRequest(req.paymentMethod(), invoice.total()));
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today(tenantId);
         boolean startsNow = "purchase_date".equals(pkg.validityStarts());
         LocalDate validityStart = startsNow ? today : null;
         LocalDate validityEnd = startsNow ? today.plusDays(pkg.validityDays()) : null;
@@ -153,7 +157,7 @@ public class PackageInstanceService {
         InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(this::notFound);
         UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(this::notFound);
         InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(this::notFound);
-        requireActionable(instance, item);
+        requireActionable(instance, item, clock.today(tenantId));
 
         repo.insertRedemption(tenantId, instanceItemId, staffId);
         repo.insertEvent(tenantId, instanceId, "session_booked", item.name() + " · no entitlement consumed on booking", 0, staffId);
@@ -166,10 +170,10 @@ public class PackageInstanceService {
         InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(this::notFound);
         UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(this::notFound);
         InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(this::notFound);
-        requireActionable(instance, item);
+        requireActionable(instance, item, clock.today(tenantId));
 
         if ("first_session".equals(instance.validityStarts()) && instance.validityStart() == null) {
-            LocalDate start = LocalDate.now();
+            LocalDate start = clock.today(tenantId);
             repo.startValidityClock(tenantId, instanceId, start, start.plusDays(instance.validityDays()));
         }
 
@@ -193,8 +197,8 @@ public class PackageInstanceService {
 
     /** The wireframe's own rule: no booking or redeeming on an expired, fully consumed, refunded or
      * cancelled package. Grace period still permits both — only past grace is a hard stop. */
-    private void requireActionable(InstanceRow instance, InstanceItemRow item) {
-        String status = effectiveStatus(instance);
+    private void requireActionable(InstanceRow instance, InstanceItemRow item, LocalDate today) {
+        String status = effectiveStatus(instance, today);
         if (!"active".equals(status) && !"grace".equals(status)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "package-not-actionable", "Package not available",
                     "This package is " + status + " and can no longer be booked or redeemed.");
@@ -219,6 +223,7 @@ public class PackageInstanceService {
     @Transactional
     public List<ExpiringSoonResponse> expiringSoon(UUID tenantId) {
         tenantContext.set(tenantId);
+        LocalDate today = clock.today(tenantId);
         List<ExpiringSoonResponse> out = new ArrayList<>();
         for (InstanceRow row : repo.listActiveInstancesExpiringWithinGrace(tenantId)) {
             List<InstanceItemRow> items = repo.listInstanceItems(tenantId, row.id());
@@ -228,7 +233,7 @@ public class PackageInstanceService {
                     .map(i -> i.allocatedPrice().multiply(BigDecimal.valueOf(i.quantityTotal() - i.quantityConsumed()))
                             .divide(BigDecimal.valueOf(i.quantityTotal()), 2, RoundingMode.HALF_UP))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            int tier = currentAlertTier(row);
+            int tier = currentAlertTier(row, today);
             boolean alreadySent = row.lastAlertTier() != null && row.lastAlertTier() <= tier;
             out.add(new ExpiringSoonResponse(row.id().toString(), row.patientName(), row.packageName(), consumed,
                     total, row.validityEnd(), valueLeft, tier, alreadySent));
@@ -243,7 +248,7 @@ public class PackageInstanceService {
     public InstanceResponse sendReminder(UUID tenantId, UUID staffId, UUID id) {
         tenantContext.set(tenantId);
         InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
-        int tier = currentAlertTier(instance);
+        int tier = currentAlertTier(instance, clock.today(tenantId));
         if (tier == 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "not-expiring-soon", "Not due for a reminder",
                     "This package isn't within 30 days of expiry.");
@@ -253,11 +258,11 @@ public class PackageInstanceService {
         return detail(tenantId, id);
     }
 
-    private int currentAlertTier(InstanceRow row) {
+    private int currentAlertTier(InstanceRow row, LocalDate today) {
         if (row.validityEnd() == null) {
             return 0;
         }
-        int daysLeft = (int) LocalDate.now().until(row.validityEnd()).getDays();
+        int daysLeft = (int) today.until(row.validityEnd()).getDays();
         return ALERT_TIERS.stream().filter(t -> daysLeft <= t).findFirst().orElse(0);
     }
 
@@ -338,14 +343,13 @@ public class PackageInstanceService {
                 repo.potentialExpiryLoss(tenantId), repo.countPendingRefunds(tenantId));
     }
 
-    private String effectiveStatus(InstanceRow row) {
+    private String effectiveStatus(InstanceRow row, LocalDate today) {
         if (!"active".equals(row.status())) {
             return row.status();
         }
         if (row.validityEnd() == null) {
             return "active"; // validity_starts = first_session, not yet redeemed once
         }
-        LocalDate today = LocalDate.now();
         if (!today.isAfter(row.validityEnd())) {
             return "active";
         }
@@ -368,7 +372,7 @@ public class PackageInstanceService {
         return new InstanceResponse(row.id().toString(), row.packageId().toString(), row.packageName(),
                 row.patientId().toString(), row.patientName(), row.invoiceId().toString(), row.invoiceNumber(),
                 row.soldPrice(), row.soldTax(), row.validityStart(), row.validityEnd(), row.graceDays(),
-                effectiveStatus(row), items, events);
+                effectiveStatus(row, clock.today(tenantId)), items, events);
     }
 
     private RefundResponse toRefundResponse(RefundRow r) {

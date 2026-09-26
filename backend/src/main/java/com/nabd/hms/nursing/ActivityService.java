@@ -1,5 +1,6 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.nursing.dto.ActivityEntryResponse;
 import org.springframework.stereotype.Service;
@@ -18,7 +19,10 @@ public class ActivityService {
     private final NursingRepository repo;
     private final TenantContext tenantContext;
 
-    ActivityService(NursingRepository repo, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    ActivityService(NursingRepository repo, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -26,7 +30,7 @@ public class ActivityService {
     @Transactional
     public List<ActivityEntryResponse> today(UUID tenantId, UUID staffId) {
         tenantContext.set(tenantId);
-        return repo.listActivityForStaffToday(tenantId, staffId, LocalDate.now()).stream()
+        return repo.listActivityForStaffToday(tenantId, staffId, clock.today(tenantId), clock.zone(tenantId)).stream()
                 .map(r -> new ActivityEntryResponse(r.kind(), r.activity(),
                         repo.findPatientName(tenantId, r.patientId()).orElse("Unknown patient"), r.occurredAt()))
                 .toList();

@@ -433,7 +433,8 @@ export default function ArrivalsPage() {
     setShowCheckin(true);
     setCheckinError(null);
     setCheckinAppointments(null);
-    const today = new Date().toISOString().slice(0, 10);
+    // Local date, not toISOString() (UTC) — before 05:30 in India that would ask for yesterday.
+    const today = new Date().toLocaleDateString("en-CA");
     const res = await authedFetch(`/appointments?date=${today}`);
     if (!res?.ok) {
       setCheckinError("Couldn't load today's appointments.");

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./wizard.module.css";
+import TimezoneSelect from "../TimezoneSelect";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -137,8 +138,8 @@ export default function SetupWizardPage() {
               <input className={styles.input} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
             </div>
             <div className={styles.field}>
-              <label className={styles.label}>Timezone</label>
-              <input className={styles.input} value={profile.timezone} onChange={(e) => setProfile({ ...profile, timezone: e.target.value })} />
+              <label className={styles.label} htmlFor="clinic-timezone">Timezone</label>
+              <TimezoneSelect id="clinic-timezone" className={styles.select} value={profile.timezone} onChange={(timezone) => setProfile({ ...profile, timezone })} />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Specialties (comma separated)</label>

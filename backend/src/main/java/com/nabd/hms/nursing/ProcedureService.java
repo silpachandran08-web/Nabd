@@ -1,5 +1,6 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.nursing.dto.ProcedureConsentRequest;
@@ -30,7 +31,10 @@ public class ProcedureService {
     private final NursingRepository repo;
     private final TenantContext tenantContext;
 
-    ProcedureService(NursingRepository repo, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    ProcedureService(NursingRepository repo, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -49,7 +53,7 @@ public class ProcedureService {
     @Transactional
     public List<ProcedureOrderResponse> listToday(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listProcedureOrders(tenantId, LocalDate.now()).stream().map(p -> toResponse(tenantId, p)).toList();
+        return repo.listProcedureOrders(tenantId, clock.today(tenantId)).stream().map(p -> toResponse(tenantId, p)).toList();
     }
 
     @Transactional

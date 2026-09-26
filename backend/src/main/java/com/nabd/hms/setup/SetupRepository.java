@@ -1,5 +1,6 @@
 package com.nabd.hms.setup;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.setup.dto.ChargeHeadWriteRequest;
 import com.nabd.hms.setup.dto.ClinicHolidayWriteRequest;
 import com.nabd.hms.setup.dto.ClinicProfileWriteRequest;
@@ -38,7 +39,10 @@ class SetupRepository {
 
     private final JdbcTemplate jdbc;
 
-    SetupRepository(JdbcTemplate jdbc) {
+    private final ClinicClock clock;
+
+    SetupRepository(JdbcTemplate jdbc, ClinicClock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
     }
 
@@ -309,7 +313,7 @@ class SetupRepository {
 
     UUID insertLicence(UUID tenantId, LicenceWriteRequest req) {
         UUID id = UUID.randomUUID();
-        String status = computeLicenceStatus(req.expiryDate());
+        String status = computeLicenceStatus(req.expiryDate(), clock.today(tenantId));
         jdbc.update("INSERT INTO licence_registry (id, tenant_id, licence_type, holder_id, holder_name, number, issuing_body, expiry_date, region, status) " +
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id, tenantId, req.licenceType(), req.holderId(), req.holderName(), req.number(),
@@ -318,15 +322,14 @@ class SetupRepository {
     }
 
     void updateLicence(UUID tenantId, UUID id, LicenceWriteRequest req) {
-        String status = computeLicenceStatus(req.expiryDate());
+        String status = computeLicenceStatus(req.expiryDate(), clock.today(tenantId));
         jdbc.update("UPDATE licence_registry SET licence_type = ?, holder_id = ?, holder_name = ?, number = ?, " +
                         "issuing_body = ?, expiry_date = ?, region = ?, status = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
                 req.licenceType(), req.holderId(), req.holderName(), req.number(), req.issuingBody(),
                 Date.valueOf(req.expiryDate()), req.region(), status, tenantId, id);
     }
 
-    private String computeLicenceStatus(LocalDate expiry) {
-        LocalDate now = LocalDate.now();
+    private String computeLicenceStatus(LocalDate expiry, LocalDate now) {
         if (expiry.isBefore(now)) {
             return "expired";
         }

@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -213,7 +214,7 @@ class PackageApiTest extends ApiTestBase {
         String facialItemId = items.stream().filter(i -> "Facial".equals(i.get("name"))).findFirst().orElseThrow().get("id").toString();
         ResponseEntity<Map> afterRedeem = exchange("/v1/packages/instances/items/" + facialItemId + "/redeem", HttpMethod.POST, authed(token), Map.class);
 
-        assertThat(afterRedeem.getBody().get("validityEnd")).isEqualTo(LocalDate.now().plusDays(30).toString());
+        assertThat(afterRedeem.getBody().get("validityEnd")).isEqualTo(LocalDate.now(ZoneOffset.UTC).plusDays(30).toString());
     }
 
     @Test
@@ -227,7 +228,7 @@ class PackageApiTest extends ApiTestBase {
         activate(token, packageId);
         Map instance = sell(token, patientId, packageId);
         String instanceId = (String) instance.get("id");
-        LocalDate newEnd = LocalDate.now().plusDays(60);
+        LocalDate newEnd = LocalDate.now(ZoneOffset.UTC).plusDays(60);
 
         ResponseEntity<Map> resp = exchange("/v1/packages/instances/" + instanceId + "/extend", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "newValidityEnd", newEnd.toString(), "reason", "Patient hospitalised")), Map.class);
@@ -348,7 +349,7 @@ class PackageApiTest extends ApiTestBase {
 
         inTenantTx(tenant.id(), () -> jdbc.update(
                 "INSERT INTO doctor_leave (tenant_id, doctor_id, date_from, date_to, reason) VALUES (?,?,?,?,?)",
-                tenant.id(), staff.id(), java.sql.Date.valueOf(LocalDate.now()), java.sql.Date.valueOf(LocalDate.now()), "leave"));
+                tenant.id(), staff.id(), java.sql.Date.valueOf(LocalDate.now(ZoneOffset.UTC)), java.sql.Date.valueOf(LocalDate.now(ZoneOffset.UTC)), "leave"));
 
         ResponseEntity<Map> afterLeave = exchange("/v1/packages/" + packageId, HttpMethod.GET, authed(token), Map.class);
         assertThat(afterLeave.getBody().get("doctorLeaveWarning")).asString().contains("on leave today");

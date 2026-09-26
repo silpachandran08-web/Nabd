@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.Cursor;
 import com.nabd.hms.common.TenantContext;
@@ -20,7 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -41,8 +43,11 @@ public class AppointmentService {
     private final WaitlistService waitlistService;
     private final TenantContext tenantContext;
 
+    private final ClinicClock clock;
+
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
-                        WaitlistService waitlistService, TenantContext tenantContext) {
+                        WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.scheduleRepo = scheduleRepo;
         this.queueRepo = queueRepo;
@@ -55,8 +60,8 @@ public class AppointmentService {
     public AppointmentResponse book(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req) {
         tenantContext.set(tenantId);
         requireNotHoliday(tenantId, req.startTime());
-        enforceSessionCapacity(req.doctorId(), req.startTime());
-        int slotMinutes = resolveSlotMinutes(req.doctorId(), req.startTime());
+        enforceSessionCapacity(tenantId, req.doctorId(), req.startTime());
+        int slotMinutes = resolveSlotMinutes(tenantId, req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
             UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end, req.isFollowUpOrDefault());
@@ -73,7 +78,7 @@ public class AppointmentService {
     public AppointmentPage list(UUID tenantId, UUID doctorId, UUID patientId, LocalDate date, int limit, String cursor) {
         tenantContext.set(tenantId);
         Cursor after = cursor == null ? null : Cursor.decode(cursor);
-        List<AppointmentRow> rows = repo.listPage(tenantId, doctorId, patientId, date, limit + 1,
+        List<AppointmentRow> rows = repo.listPage(tenantId, doctorId, patientId, date, clock.zone(tenantId), limit + 1,
                 after == null ? null : after.createdAt(), after == null ? null : after.id());
 
         boolean hasMore = rows.size() > limit;
@@ -108,8 +113,8 @@ public class AppointmentService {
         requireNotHoliday(tenantId, req.newStartTime());
 
         repo.cancel(tenantId, id, "rescheduled");
-        enforceSessionCapacity(current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot
-        int slotMinutes = resolveSlotMinutes(current.doctorId(), req.newStartTime());
+        enforceSessionCapacity(tenantId, current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot
+        int slotMinutes = resolveSlotMinutes(tenantId, current.doctorId(), req.newStartTime());
         Instant newEnd = req.newStartTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
             UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp());
@@ -142,10 +147,10 @@ public class AppointmentService {
                 .orElseThrow(this::notFound);
     }
 
-    private int resolveSlotMinutes(UUID doctorId, Instant start) {
-        LocalDate date = start.atZone(ZoneOffset.UTC).toLocalDate();
-        int dayOfWeek = date.getDayOfWeek().getValue() % 7;
-        LocalTime time = start.atZone(ZoneOffset.UTC).toLocalTime();
+    private int resolveSlotMinutes(UUID tenantId, UUID doctorId, Instant start) {
+        ZonedDateTime local = start.atZone(clock.zone(tenantId));
+        int dayOfWeek = local.getDayOfWeek().getValue() % 7;
+        LocalTime time = local.toLocalTime();
         return scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time)
                 .map(WorkingHoursRow::slotMinutes)
                 .orElse(DEFAULT_SLOT_MINUTES);
@@ -153,7 +158,7 @@ public class AppointmentService {
 
     /** NB-092: shared by book() and reschedule() — both routes to booking a slot go through here. */
     private void requireNotHoliday(UUID tenantId, Instant start) {
-        LocalDate date = start.atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate date = start.atZone(clock.zone(tenantId)).toLocalDate();
         if (scheduleRepo.isClinicHoliday(tenantId, date)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "clinic-holiday", "Clinic closed",
                     "The clinic is closed on " + date + ".");
@@ -166,10 +171,11 @@ public class AppointmentService {
      * assignment — booking and walk-in check-in draw from the same pool, so they need to be
      * serialized against each other, not just against themselves.
      */
-    private void enforceSessionCapacity(UUID doctorId, Instant start) {
-        LocalDate date = start.atZone(ZoneOffset.UTC).toLocalDate();
+    private void enforceSessionCapacity(UUID tenantId, UUID doctorId, Instant start) {
+        ZoneId zone = clock.zone(tenantId);
+        LocalDate date = start.atZone(zone).toLocalDate();
         int dayOfWeek = date.getDayOfWeek().getValue() % 7;
-        LocalTime time = start.atZone(ZoneOffset.UTC).toLocalTime();
+        LocalTime time = start.atZone(zone).toLocalTime();
 
         Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time);
         if (block.isEmpty() || block.get().maxPatients() == null) {
@@ -177,7 +183,7 @@ public class AppointmentService {
         }
 
         queueRepo.lockDoctorDay(doctorId, date);
-        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, date, block.get().startTime(), block.get().endTime());
+        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, date, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.get().maxPatients());
             throw sessionFull();

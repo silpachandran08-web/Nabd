@@ -1,5 +1,6 @@
 package com.nabd.hms.platform.provisioning;
 
+import com.nabd.hms.common.ClinicClock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -149,8 +150,9 @@ class ProvisioningRepository {
     /** Unique on slug — callers must translate the resulting DuplicateKeyException into a readable step failure. */
     UUID insertTenant(String slug, String name, String region, UUID brandId) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO tenants (id, slug, name, region, status, brand_id) VALUES (?,?,?,?,'provisioning',?)",
-                id, slug, name, region, brandId);
+        // New clinics get their region's zone; existing ones keep what they have (UTC by default).
+        jdbc.update("INSERT INTO tenants (id, slug, name, region, status, brand_id, timezone) VALUES (?,?,?,?,'provisioning',?,?)",
+                id, slug, name, region, brandId, ClinicClock.defaultZoneFor(region));
         return id;
     }
 

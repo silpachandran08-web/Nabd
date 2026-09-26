@@ -153,13 +153,13 @@ class ReportsRepository {
     }
 
     /** NB-236: sameDayRepeatDays counts distinct announcement-days with 2+ delays for that doctor. */
-    List<DoctorPunctualityRow> doctorPunctuality(UUID tenantId, Instant since) {
+    List<DoctorPunctualityRow> doctorPunctuality(UUID tenantId, Instant since, java.time.ZoneId zone) {
         return jdbc.query("""
                 SELECT doctor_id, s.name AS doctor_name, count(*) AS delay_count, avg(delay_minutes) AS avg_minutes,
                        count(DISTINCT day) FILTER (WHERE day_count > 1) AS same_day_repeat_days
                 FROM (
-                  SELECT dd.doctor_id, dd.delay_minutes, date_trunc('day', dd.announced_at) AS day,
-                         count(*) OVER (PARTITION BY dd.doctor_id, date_trunc('day', dd.announced_at)) AS day_count
+                  SELECT dd.doctor_id, dd.delay_minutes, date_trunc('day', dd.announced_at AT TIME ZONE ?) AS day,
+                         count(*) OVER (PARTITION BY dd.doctor_id, date_trunc('day', dd.announced_at AT TIME ZONE ?)) AS day_count
                   FROM doctor_delays dd WHERE dd.tenant_id = ? AND dd.announced_at >= ?
                 ) x
                 JOIN staff s ON s.id = x.doctor_id
@@ -168,7 +168,7 @@ class ReportsRepository {
                 """,
                 (rs, i) -> new DoctorPunctualityRow(UUID.fromString(rs.getString("doctor_id")), rs.getString("doctor_name"),
                         rs.getLong("delay_count"), rs.getDouble("avg_minutes"), rs.getLong("same_day_repeat_days")),
-                tenantId, Timestamp.from(since));
+                zone.getId(), zone.getId(), tenantId, Timestamp.from(since));
     }
 
     Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {

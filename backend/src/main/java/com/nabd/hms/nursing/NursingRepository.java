@@ -180,27 +180,30 @@ class NursingRepository {
 
     // ── NB-148: completed activity — a read across three existing write paths, no new table ──
 
-    List<ActivityRow> listActivityForStaffToday(UUID tenantId, UUID staffId, LocalDate day) {
-        java.sql.Date sqlDay = java.sql.Date.valueOf(day);
+    /** Instant range for the clinic's day, not "recorded_at::date = ?" — that cast uses the DB
+     * session's timezone (the JVM's, via PgJDBC), which is neither the clinic's nor UTC. */
+    List<ActivityRow> listActivityForStaffToday(UUID tenantId, UUID staffId, LocalDate day, java.time.ZoneId zone) {
+        java.sql.Timestamp from = java.sql.Timestamp.from(day.atStartOfDay(zone).toInstant());
+        java.sql.Timestamp to = java.sql.Timestamp.from(day.plusDays(1).atStartOfDay(zone).toInstant());
         return jdbc.query("""
                 SELECT 'vitals' AS kind, 'Vitals recorded' AS activity, patient_id, recorded_by AS staff_id, recorded_at AS occurred_at
-                FROM vitals WHERE tenant_id = ? AND recorded_by = ? AND recorded_at::date = ?
+                FROM vitals WHERE tenant_id = ? AND recorded_by = ? AND recorded_at >= ? AND recorded_at < ?
                 UNION ALL
                 SELECT 'administration', CASE WHEN r.action = 'administered' THEN o.drug_name || ' administered'
                                                ELSE o.drug_name || ' refused' END,
                        o.patient_id, r.recorded_by, r.recorded_at
                 FROM administration_records r JOIN administration_orders o ON o.id = r.order_id
-                WHERE r.tenant_id = ? AND (r.recorded_by = ? OR r.witnessed_by = ?) AND r.recorded_at::date = ?
+                WHERE r.tenant_id = ? AND (r.recorded_by = ? OR r.witnessed_by = ?) AND r.recorded_at >= ? AND r.recorded_at < ?
                 UNION ALL
                 SELECT 'priority', 'Urgent priority flagged', patient_id, priority_flagged_by, priority_flagged_at
-                FROM queue_entries WHERE tenant_id = ? AND priority_flagged_by = ? AND priority_flagged_at::date = ?
+                FROM queue_entries WHERE tenant_id = ? AND priority_flagged_by = ? AND priority_flagged_at >= ? AND priority_flagged_at < ?
                 ORDER BY occurred_at
                 """,
                 (rs, i) -> new ActivityRow(rs.getString("kind"), rs.getString("activity"),
                         UUID.fromString(rs.getString("patient_id")), UUID.fromString(rs.getString("staff_id")),
                         rs.getTimestamp("occurred_at").toInstant()),
-                tenantId, staffId, sqlDay,
-                tenantId, staffId, staffId, sqlDay,
-                tenantId, staffId, sqlDay);
+                tenantId, staffId, from, to,
+                tenantId, staffId, staffId, from, to,
+                tenantId, staffId, from, to);
     }
 }

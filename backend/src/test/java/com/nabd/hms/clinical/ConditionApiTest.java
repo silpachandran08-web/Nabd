@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -49,7 +50,7 @@ class ConditionApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         String patientId = registerPatient(token, "C2", "+919999990002");
         ResponseEntity<Map> add = exchange("/v1/clinical/patients/" + patientId + "/conditions", HttpMethod.POST,
-                authedJsonBody(token, Map.of("condition", "Hypertension", "reviewDueDate", LocalDate.now().toString())), Map.class);
+                authedJsonBody(token, Map.of("condition", "Hypertension", "reviewDueDate", LocalDate.now(ZoneOffset.UTC).toString())), Map.class);
         String conditionId = (String) add.getBody().get("id");
 
         ResponseEntity<Void> resolve = exchange("/v1/clinical/conditions/" + conditionId + "/resolve", HttpMethod.PATCH, authed(token), Void.class);
@@ -68,9 +69,9 @@ class ConditionApiTest extends ApiTestBase {
         String duePatientId = registerPatient(token, "C3", "+919999990003");
         String notDuePatientId = registerPatient(token, "C4", "+919999990004");
         exchange("/v1/clinical/patients/" + duePatientId + "/conditions", HttpMethod.POST,
-                authedJsonBody(token, Map.of("condition", "Asthma review", "reviewDueDate", LocalDate.now().minusDays(1).toString())), Map.class);
+                authedJsonBody(token, Map.of("condition", "Asthma review", "reviewDueDate", LocalDate.now(ZoneOffset.UTC).minusDays(1).toString())), Map.class);
         exchange("/v1/clinical/patients/" + notDuePatientId + "/conditions", HttpMethod.POST,
-                authedJsonBody(token, Map.of("condition", "Thyroid review", "reviewDueDate", LocalDate.now().plusMonths(6).toString())), Map.class);
+                authedJsonBody(token, Map.of("condition", "Thyroid review", "reviewDueDate", LocalDate.now(ZoneOffset.UTC).plusMonths(6).toString())), Map.class);
         exchange("/v1/clinical/patients/" + duePatientId + "/conditions", HttpMethod.POST,
                 authedJsonBody(token, Map.of("condition", "No review needed")), Map.class); // null reviewDueDate never appears
 
