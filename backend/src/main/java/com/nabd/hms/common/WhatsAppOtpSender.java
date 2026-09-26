@@ -1,9 +1,9 @@
 package com.nabd.hms.common;
 
 /**
- * WhatsApp Business API integration lives in the Messaging Platform epic (E17), not built yet.
- * This interface is the seam: swap {@link LoggingWhatsAppOtpSender} for a real implementation
- * once that epic lands, without touching AuthService.
+ * Staff login OTP delivery over WhatsApp (NB-040).
+ * Implemented by messaging.TemplateWhatsAppOtpSender (Meta Cloud API, or a logging fallback when
+ * app.whatsapp.access-token is blank).
  */
 public interface WhatsAppOtpSender {
     void send(String mobilePhone, String code);

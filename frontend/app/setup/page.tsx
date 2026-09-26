@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./setup.module.css";
+import WhatsAppTemplates from "./WhatsAppTemplates";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -35,6 +36,7 @@ const TABS = [
   { key: "charges", label: "Charges" },
   { key: "policies", label: "Policies" },
   { key: "consent", label: "Consent" },
+  { key: "whatsapp", label: "WhatsApp" },
   { key: "holidays", label: "Holidays" },
   { key: "shifts", label: "Shifts" },
   { key: "payroll", label: "Payroll" },
@@ -782,6 +784,8 @@ export default function SetupPage() {
             )}
           </div>
         );
+      case "whatsapp":
+        return <WhatsAppTemplates authedFetch={authedFetch} />;
       default:
         return null;
     }

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * poll() is called directly in tests (see OutboxDispatcherApiTest) rather than waiting on the
  * real timer, so delivery is deterministic to test. */
 @Component
-class OutboxDispatcher {
+public class OutboxDispatcher {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxDispatcher.class);
 
@@ -25,7 +25,7 @@ class OutboxDispatcher {
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-interval-ms:2000}")
-    void poll() {
+    public void poll() {
         for (OutboxEvent event : repo.claim(props.batchSize(), props.leaseSeconds())) {
             try {
                 processor.runHandler(event);
