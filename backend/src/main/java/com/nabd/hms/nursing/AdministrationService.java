@@ -1,5 +1,6 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.nursing.dto.AdministerRequest;
@@ -30,7 +31,10 @@ public class AdministrationService {
     private final NursingRepository repo;
     private final TenantContext tenantContext;
 
-    AdministrationService(NursingRepository repo, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    AdministrationService(NursingRepository repo, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -47,7 +51,7 @@ public class AdministrationService {
     @Transactional
     public List<AdministrationOrderResponse> listToday(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.listAdministrationOrders(tenantId, LocalDate.now()).stream().map(o -> toResponse(tenantId, o)).toList();
+        return repo.listAdministrationOrders(tenantId, clock.today(tenantId)).stream().map(o -> toResponse(tenantId, o)).toList();
     }
 
     @Transactional

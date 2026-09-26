@@ -10,7 +10,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -124,12 +124,12 @@ class ScheduleRepository {
      * NB-098: scheduled appointments and walk-ins share one cap per session. Walk-ins have no
      * explicit session reference, so they're bucketed by their check-in time-of-day (created_at)
      * falling inside the block — the same window a scheduled appointment's start_time is compared
-     * against. AT TIME ZONE 'UTC' forces the comparison into UTC regardless of the DB server's
-     * session timezone, matching the UTC assumption the whole slot generator already makes.
+     * against. Both sides are read in the clinic's zone (explicit AT TIME ZONE, never the DB session's
+     * zone) because blockStart/blockEnd are the clinic's wall-clock times.
      */
-    int countSessionOccupancy(UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd) {
-        Instant rangeStart = date.atTime(blockStart).atZone(ZoneOffset.UTC).toInstant();
-        Instant rangeEnd = date.atTime(blockEnd).atZone(ZoneOffset.UTC).toInstant();
+    int countSessionOccupancy(UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
+        Instant rangeStart = date.atTime(blockStart).atZone(zone).toInstant();
+        Instant rangeEnd = date.atTime(blockEnd).atZone(zone).toInstant();
         Integer count = jdbc.queryForObject(
                 "SELECT " +
                         "(SELECT count(*) FROM appointments a WHERE a.doctor_id = ? AND a.status = 'scheduled' " +
@@ -137,10 +137,10 @@ class ScheduleRepository {
                         "+ " +
                         "(SELECT count(*) FROM queue_entries q WHERE q.doctor_id = ? AND q.queue_date = ? " +
                         "  AND q.appointment_id IS NULL AND q.status != 'no_show' " +
-                        "  AND (q.created_at AT TIME ZONE 'UTC')::time >= ? AND (q.created_at AT TIME ZONE 'UTC')::time < ?)",
+                        "  AND (q.created_at AT TIME ZONE ?)::time >= ? AND (q.created_at AT TIME ZONE ?)::time < ?)",
                 Integer.class,
                 doctorId, Timestamp.from(rangeStart), Timestamp.from(rangeEnd),
-                doctorId, Date.valueOf(date), Time.valueOf(blockStart), Time.valueOf(blockEnd));
+                doctorId, Date.valueOf(date), zone.getId(), Time.valueOf(blockStart), zone.getId(), Time.valueOf(blockEnd));
         return count == null ? 0 : count;
     }
 

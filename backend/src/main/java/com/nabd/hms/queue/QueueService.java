@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.department.DepartmentService;
@@ -19,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -70,8 +71,11 @@ public class QueueService {
     private final DepartmentService departmentService;
     private final TenantContext tenantContext;
 
+    private final ClinicClock clock;
+
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
-                 ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext) {
+                 ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.appointmentRepo = appointmentRepo;
         this.appointmentService = appointmentService;
@@ -83,7 +87,7 @@ public class QueueService {
     @Transactional
     public QueueEntryResponse checkIn(UUID tenantId, UUID callerStaffId, CheckInRequest req) {
         tenantContext.set(tenantId);
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate today = clock.today(tenantId);
 
         if (req.appointmentId() != null) {
             appointmentRepo.findById(tenantId, req.appointmentId())
@@ -98,7 +102,7 @@ public class QueueService {
         repo.lockDoctorDay(req.doctorId(), today);
 
         if (req.appointmentId() == null) {
-            enforceSessionCapacity(req.doctorId(), today); // scheduled check-ins were already capacity-checked at booking
+            enforceSessionCapacity(tenantId, req.doctorId(), today); // scheduled check-ins were already capacity-checked at booking
         }
 
         UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
@@ -115,7 +119,7 @@ public class QueueService {
     @Transactional
     public List<QueueEntryResponse> list(UUID tenantId, UUID doctorId, UUID departmentId, LocalDate date, boolean priorityOnly) {
         tenantContext.set(tenantId);
-        LocalDate day = date == null ? LocalDate.now(ZoneOffset.UTC) : date;
+        LocalDate day = date == null ? clock.today(tenantId) : date;
         return repo.listForDay(tenantId, doctorId, departmentId, day, priorityOnly).stream().map(this::toResponse).toList();
     }
 
@@ -164,7 +168,7 @@ public class QueueService {
         log.info("queue entry {} transferred_out by {} (patient {} -> department {})",
                 id, callerStaffId, current.patientId(), req.toDepartmentId());
 
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        LocalDate today = clock.today(tenantId);
         repo.lockDoctorDay(req.doctorId(), today);
         int token = repo.nextTokenNumber(req.doctorId(), today);
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
@@ -215,14 +219,15 @@ public class QueueService {
         tenantContext.set(tenantId);
         Optional<Double> avg = repo.averageRecentVisitMinutes(tenantId, doctorId, WAIT_ESTIMATE_SAMPLE_SIZE);
         double avgVisitMinutes = avg.orElse(DEFAULT_VISIT_MINUTES);
-        int patientsAhead = repo.countActiveAhead(tenantId, doctorId, LocalDate.now(ZoneOffset.UTC));
+        int patientsAhead = repo.countActiveAhead(tenantId, doctorId, clock.today(tenantId));
         int estimatedMinutes = (int) Math.round(avgVisitMinutes * patientsAhead);
         return new WaitEstimateResponse(estimatedMinutes, patientsAhead, avgVisitMinutes, avg.isPresent());
     }
 
     /** NB-098 — same session cap AppointmentService.book() enforces, applied to the walk-in path. */
-    private void enforceSessionCapacity(UUID doctorId, LocalDate today) {
-        LocalTime now = Instant.now().atZone(ZoneOffset.UTC).toLocalTime();
+    private void enforceSessionCapacity(UUID tenantId, UUID doctorId, LocalDate today) {
+        ZoneId zone = clock.zone(tenantId);
+        LocalTime now = Instant.now().atZone(zone).toLocalTime(); // the clinic's clock, same as the block times
         int dayOfWeek = today.getDayOfWeek().getValue() % 7;
 
         Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, now);
@@ -230,7 +235,7 @@ public class QueueService {
             return;
         }
 
-        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, today, block.get().startTime(), block.get().endTime());
+        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, today, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached (walk-in check-in): doctor {} on {} ({}/{})",
                     doctorId, today, occupancy, block.get().maxPatients());

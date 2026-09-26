@@ -1,5 +1,6 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
@@ -20,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,7 +55,10 @@ public class ReportsService {
     private final AuditService auditService;
     private final TenantContext tenantContext;
 
-    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.staffService = staffService;
         this.auditService = auditService;
@@ -64,9 +68,10 @@ public class ReportsService {
     @Transactional
     public DailyMoneyResponse dailyMoney(UUID tenantId) {
         tenantContext.set(tenantId);
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        Instant dayStart = today.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant dayEnd = today.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
+        LocalDate today = LocalDate.now(zone);
+        Instant dayStart = today.atStartOfDay(zone).toInstant();
+        Instant dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant();
         return new DailyMoneyResponse(repo.billedOn(tenantId, dayStart, dayEnd), repo.collectedOn(tenantId, dayStart, dayEnd),
                 repo.outstandingTotal(tenantId), repo.invoiceCountOn(tenantId, dayStart, dayEnd), repo.paymentCountOn(tenantId, dayStart, dayEnd));
     }
@@ -74,7 +79,8 @@ public class ReportsService {
     @Transactional
     public List<SourceBreakdownResponse> sourceBreakdown(UUID tenantId, int days) {
         tenantContext.set(tenantId);
-        LocalDate since = LocalDate.now(ZoneOffset.UTC).minusDays(days);
+        ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
+        LocalDate since = LocalDate.now(zone).minusDays(days);
         return repo.sourceBreakdown(tenantId, since).stream()
                 .map(s -> new SourceBreakdownResponse(s.source(), s.visitCount())).toList();
     }
@@ -83,9 +89,10 @@ public class ReportsService {
     @Transactional
     public List<StaffPerformanceResponse> staffPerformance(UUID tenantId, UUID callerStaffId, int days) {
         tenantContext.set(tenantId);
+        ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
         CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
         UUID scopedToStaffId = "own_patients_only".equals(caller.scope()) ? callerStaffId : null;
-        Instant since = LocalDate.now(ZoneOffset.UTC).minusDays(days).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant since = LocalDate.now(zone).minusDays(days).atStartOfDay(zone).toInstant();
         return repo.staffCollection(tenantId, since, scopedToStaffId).stream()
                 .map(s -> new StaffPerformanceResponse(s.staffId(), s.staffName(), s.collected(), s.paymentCount())).toList();
     }
@@ -116,7 +123,8 @@ public class ReportsService {
     @Transactional
     public NoShowRiskResponse noShowRisk(UUID tenantId) {
         tenantContext.set(tenantId);
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
+        LocalDate today = LocalDate.now(zone);
         LocalDate since = today.minusDays(NO_SHOW_LOOKBACK_DAYS);
         List<NoShowRiskRow> rows = repo.noShowRiskToday(tenantId, today, since, NO_SHOW_RISK_THRESHOLD);
         return new NoShowRiskResponse(NO_SHOW_RULE, rows.stream()
@@ -128,8 +136,9 @@ public class ReportsService {
     @Transactional
     public BillingLeakageResponse billingLeakage(UUID tenantId, BigDecimal thresholdAmount) {
         tenantContext.set(tenantId);
+        ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
         BigDecimal threshold = thresholdAmount == null ? BigDecimal.ZERO : thresholdAmount;
-        Instant since = LocalDate.now(ZoneOffset.UTC).minusDays(LEAKAGE_LOOKBACK_DAYS).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant since = LocalDate.now(zone).minusDays(LEAKAGE_LOOKBACK_DAYS).atStartOfDay(zone).toInstant();
         String rule = "Checked-out procedures whose charge never appears on that visit's invoice, amount >= "
                 + threshold + " (last " + LEAKAGE_LOOKBACK_DAYS + " days)";
         List<LeakageRow> rows = repo.billingLeakage(tenantId, since, threshold);
@@ -144,8 +153,9 @@ public class ReportsService {
     @Transactional
     public DoctorPunctualityResponse doctorPunctuality(UUID tenantId) {
         tenantContext.set(tenantId);
-        Instant since = LocalDate.now(ZoneOffset.UTC).minusDays(PUNCTUALITY_LOOKBACK_DAYS).atStartOfDay(ZoneOffset.UTC).toInstant();
-        List<DoctorPunctualityRow> rows = repo.doctorPunctuality(tenantId, since);
+        ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
+        Instant since = LocalDate.now(zone).minusDays(PUNCTUALITY_LOOKBACK_DAYS).atStartOfDay(zone).toInstant();
+        List<DoctorPunctualityRow> rows = repo.doctorPunctuality(tenantId, since, zone);
         return new DoctorPunctualityResponse(PUNCTUALITY_ACCESS_NOTE, rows.stream()
                 .map(r -> new DoctorPunctualityResponse.Entry(r.doctorId(), r.doctorName(), r.delayCount(),
                         round1(r.avgDelayMinutes()), r.sameDayRepeatDays()))

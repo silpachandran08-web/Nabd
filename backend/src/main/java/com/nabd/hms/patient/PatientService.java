@@ -1,5 +1,6 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.AesGcmCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -48,8 +49,11 @@ public class PatientService {
     private final StaffService staffService;
     private final AuditService auditService;
 
+    private final ClinicClock clock;
+
     PatientService(PatientRepository repo, TenantContext tenantContext, AesGcmCipher cipher,
-                    StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService) {
+                    StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.cipher = cipher;
@@ -240,12 +244,12 @@ public class PatientService {
 
     /** NB-082/NB-089: the one age check every minor/guardian/marketing-block rule in this module
      * builds on. */
-    private boolean isMinor(LocalDate dob) {
-        return Period.between(dob, LocalDate.now()).getYears() < 18;
+    private static boolean isMinor(LocalDate dob, LocalDate today) {
+        return Period.between(dob, today).getYears() < 18;
     }
 
     private void validateGuardian(UUID tenantId, PatientWriteRequest req) {
-        if (isMinor(req.dob()) && req.guardianId() == null) {
+        if (isMinor(req.dob(), clock.today(tenantId)) && req.guardianId() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-required", "Guardian required",
                     "A minor cannot be registered without a guardian.");
         }
@@ -263,7 +267,7 @@ public class PatientService {
 
     private PatientResponse toResponse(PatientRow row) {
         return new PatientResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
-                row.status(), isMinor(row.dob()));
+                row.status(), isMinor(row.dob(), clock.today(row.tenantId())));
     }
 
     /** NB-052: outstandingBalance (the one financial field this response carries) is omitted from
@@ -279,7 +283,7 @@ public class PatientService {
         java.time.Instant guardianConsentGrantedAt = row.guardianId() == null ? null
                 : repo.findActiveConsentGrantedAt(tenantId, row.id(), GUARDIAN_ACCESS).orElse(null);
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
-                row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt, isMinor(row.dob()),
+                row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt, isMinor(row.dob(), clock.today(row.tenantId())),
                 row.guardianId(), guardianName, guardianConsentGrantedAt);
     }
 

@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.ConditionResponse;
 import com.nabd.hms.clinical.dto.ConditionWriteRequest;
 import com.nabd.hms.clinical.dto.DueConditionResponse;
@@ -24,7 +25,10 @@ public class ConditionService {
     private final ConditionRepository repo;
     private final TenantContext tenantContext;
 
-    ConditionService(ConditionRepository repo, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    ConditionService(ConditionRepository repo, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -54,7 +58,7 @@ public class ConditionService {
     @Transactional
     public List<DueConditionResponse> due(UUID tenantId) {
         tenantContext.set(tenantId);
-        return repo.findDue(tenantId, LocalDate.now(ZoneOffset.UTC)).stream()
+        return repo.findDue(tenantId, clock.today(tenantId)).stream()
                 .map(d -> new DueConditionResponse(d.id(), d.patientId(), d.patientName(), d.condition(), d.reviewDueDate()))
                 .toList();
     }

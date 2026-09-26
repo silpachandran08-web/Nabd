@@ -1,5 +1,6 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.pharmacy.dto.PharmacyItemWriteRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -23,7 +24,10 @@ class PharmacyRepository {
 
     private final JdbcTemplate jdbc;
 
-    PharmacyRepository(JdbcTemplate jdbc) {
+    private final ClinicClock clock;
+
+    PharmacyRepository(JdbcTemplate jdbc, ClinicClock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
     }
 
@@ -56,9 +60,9 @@ class PharmacyRepository {
         UUID id = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO charge_catalogue (id, tenant_id, code, name, category, base_amount, tax_rate_percent, " +
-                        "is_rx, hsn_code, stock_qty, active, effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,CURRENT_DATE)",
+                        "is_rx, hsn_code, stock_qty, active, effective_from) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 id, tenantId, code, req.name(), CATEGORY, req.price(), req.taxRatePercentOrZero(),
-                req.isRx(), req.hsnCode(), req.stockQtyOrZero(), true);
+                req.isRx(), req.hsnCode(), req.stockQtyOrZero(), true, java.sql.Date.valueOf(clock.today(tenantId)));
         return id;
     }
 

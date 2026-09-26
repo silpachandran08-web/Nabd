@@ -206,6 +206,64 @@ class DepartmentApiTest extends ApiTestBase {
         assertThat(resp.getBody().get("type")).asString().contains("workflow-invalid");
     }
 
+    @Test
+    void emptyDepartmentIsDeletedWithItsTransferRoutes() {
+        SeededTenant tenant = seedTenant();
+        String token = loginAndGetAccessToken(seedStaff(tenant, seedFullAccessRole(tenant.id()), "del1@a.com", "+919200009001", false));
+        String derm = createDepartment(token, "Dermatology");
+        String general = (String) defaultDepartment(token).get("id");
+        exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of("edges", List.of(
+                Map.of("fromDepartmentId", general, "toDepartmentId", derm)))), List.class);
+
+        assertThat(exchange("/v1/departments/" + derm, HttpMethod.DELETE, authed(token), Void.class).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        List<Map<String, Object>> left = exchange("/v1/departments", HttpMethod.GET, authed(token), List.class).getBody();
+        assertThat(left).extracting(d -> d.get("name")).containsExactly("General");
+        assertThat(exchange("/v1/departments/transfers", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+    }
+
+    @Test
+    void departmentWithStaffVisitsOrDefaultFlagIsNotDeleted() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "del2@a.com", "+919200009002", false);
+        String token = loginAndGetAccessToken(owner);
+
+        // staff linked -> 409 naming the fix
+        String derm = createDepartment(token, "Dermatology");
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ?::uuid WHERE id = ?", derm, owner.id()));
+        ResponseEntity<Map> withStaff = exchange("/v1/departments/" + derm, HttpMethod.DELETE, authed(token), Map.class);
+        assertThat(withStaff.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(withStaff.getBody().get("detail")).asString().contains("1 staff member is assigned");
+
+        // staff moved away but a past visit remains -> still 409, deactivate instead
+        inTenantTx(tenant.id(), () -> {
+            jdbc.update("UPDATE staff SET department_id = NULL WHERE id = ?", owner.id());
+            UUID patient = jdbc.queryForObject("INSERT INTO patients (tenant_id, name, phone, dob, gender) " +
+                    "VALUES (?, 'P', '+919000000001', '1990-01-01', 'other') RETURNING id", UUID.class, tenant.id());
+            jdbc.update("INSERT INTO queue_entries (tenant_id, patient_id, doctor_id, department_id, queue_date, token_number, status) " +
+                    "VALUES (?,?,?,?::uuid, DATE '2026-01-05', 1, 'completed')", tenant.id(), patient, owner.id(), derm);
+        });
+        ResponseEntity<Map> withVisits = exchange("/v1/departments/" + derm, HttpMethod.DELETE, authed(token), Map.class);
+        assertThat(withVisits.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(withVisits.getBody().get("detail")).asString().contains("Deactivate it instead");
+
+        String general = (String) defaultDepartment(token).get("id");
+        assertThat(exchange("/v1/departments/" + general, HttpMethod.DELETE, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void deletingNeedsTheDeleteGrant() {
+        SeededTenant tenant = seedTenant();
+        String ownerToken = loginAndGetAccessToken(seedStaff(tenant, seedFullAccessRole(tenant.id()), "del3@a.com", "+919200009003", false));
+        String derm = createDepartment(ownerToken, "Dermatology");
+        UUID editorRole = seedRole(tenant.id(), "Editor", false,
+                new com.nabd.hms.common.ModuleGrant("departments", true, true, true, false, false, false, false));
+        String editorToken = loginAndGetAccessToken(seedStaff(tenant, editorRole, "ed@a.com", "+919200009004", false));
+        assertThat(exchange("/v1/departments/" + derm, HttpMethod.DELETE, authed(editorToken), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
     private String createDepartment(String token, String name) {
         ResponseEntity<Map> resp = exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", name, "active", true)), Map.class);

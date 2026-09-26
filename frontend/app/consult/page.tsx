@@ -54,7 +54,7 @@ const FOLLOW_UP_WINDOW_DAYS = 14;
 function defaultFollowUpDate(): string {
   const d = new Date();
   d.setDate(d.getDate() + FOLLOW_UP_WINDOW_DAYS);
-  return d.toISOString().slice(0, 10);
+  return d.toLocaleDateString("en-CA"); // local YYYY-MM-DD; toISOString() would give the UTC date
 }
 
 const STATUS_CLASS: Record<string, string> = {

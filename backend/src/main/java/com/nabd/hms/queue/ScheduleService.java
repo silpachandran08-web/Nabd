@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.dto.DelayAnnounceRequest;
@@ -16,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -32,15 +33,15 @@ public class ScheduleService {
 
     private static final Logger log = LoggerFactory.getLogger(ScheduleService.class);
 
-    // ponytail: slot generation is UTC-based, no per-region timezone or prayer-time blocking yet
-    // (NB-074's regional prayer-time blocks). Add once a tenant carries a timezone/region setting
-    // the slot generator can read.
-    private static final ZoneOffset ZONE = ZoneOffset.UTC;
+    // ponytail: no prayer-time blocking yet (NB-074's regional prayer-time blocks).
 
     private final ScheduleRepository repo;
     private final TenantContext tenantContext;
 
-    ScheduleService(ScheduleRepository repo, TenantContext tenantContext) {
+    private final ClinicClock clock;
+
+    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -93,15 +94,16 @@ public class ScheduleService {
             return List.of();
         }
 
-        Instant dayStart = date.atStartOfDay(ZONE).toInstant();
-        Instant dayEnd = date.plusDays(1).atStartOfDay(ZONE).toInstant();
+        ZoneId zone = clock.zone(tenantId); // "09:00" in working hours is the clinic's wall clock
+        Instant dayStart = date.atStartOfDay(zone).toInstant();
+        Instant dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant();
         Set<Instant> booked = new HashSet<>(repo.bookedStartTimes(doctorId, dayStart, dayEnd));
 
         Instant now = Instant.now();
         List<Instant> slots = new ArrayList<>();
         for (WorkingHoursRow wh : hours) {
-            Instant slotStart = date.atTime(wh.startTime()).atZone(ZONE).toInstant();
-            Instant blockEnd = date.atTime(wh.endTime()).atZone(ZONE).toInstant();
+            Instant slotStart = date.atTime(wh.startTime()).atZone(zone).toInstant();
+            Instant blockEnd = date.atTime(wh.endTime()).atZone(zone).toInstant();
             while (!slotStart.plus(wh.slotMinutes(), ChronoUnit.MINUTES).isAfter(blockEnd)) {
                 if (slotStart.isAfter(now) && !booked.contains(slotStart)) {
                     slots.add(slotStart);

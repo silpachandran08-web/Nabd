@@ -1,5 +1,6 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.billing.dto.CheckoutContextResponse;
 import com.nabd.hms.billing.dto.CheckoutRequest;
 import com.nabd.hms.billing.dto.ChargeResponse;
@@ -56,8 +57,11 @@ public class CheckoutService {
     private final QueueService queueService;
     private final DepartmentService departmentService;
 
+    private final ClinicClock clock;
+
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
-                     DepartmentService departmentService) {
+                     DepartmentService departmentService, ClinicClock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.queueService = queueService;
@@ -71,7 +75,7 @@ public class CheckoutService {
         String patientName = repo.findPatientName(tenantId, ctx.patientId()).orElse("Unknown patient");
         String doctorName = repo.findStaffName(tenantId, ctx.doctorId()).orElse("Unknown doctor");
         boolean followUpEligible = repo.hasRecentCompletedVisit(tenantId, ctx.patientId(), ctx.doctorId(),
-                LocalDate.now().minusDays(FOLLOW_UP_WINDOW_DAYS));
+                clock.today(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
         List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
         List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
                 .map(this::toChargeResponse).toList();

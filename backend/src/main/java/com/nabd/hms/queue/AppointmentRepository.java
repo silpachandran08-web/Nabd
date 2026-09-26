@@ -55,7 +55,7 @@ class AppointmentRepository {
                 mapper(), tenantId, id).stream().findFirst();
     }
 
-    List<AppointmentRow> listPage(UUID tenantId, UUID doctorId, UUID patientId, LocalDate date,
+    List<AppointmentRow> listPage(UUID tenantId, UUID doctorId, UUID patientId, LocalDate date, java.time.ZoneId zone,
                                    int limit, Instant afterCreatedAt, UUID afterId) {
         StringBuilder sql = new StringBuilder("SELECT " + COLUMNS + "FROM appointments WHERE tenant_id = ? ");
         List<Object> params = new ArrayList<>();
@@ -71,8 +71,8 @@ class AppointmentRepository {
         }
         if (date != null) {
             sql.append("AND start_time >= ? AND start_time < ? ");
-            params.add(Timestamp.from(date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant()));
-            params.add(Timestamp.from(date.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant()));
+            params.add(Timestamp.from(date.atStartOfDay(zone).toInstant()));
+            params.add(Timestamp.from(date.plusDays(1).atStartOfDay(zone).toInstant()));
         }
         if (afterCreatedAt != null) {
             sql.append("AND (created_at, id) > (?, ?) ");

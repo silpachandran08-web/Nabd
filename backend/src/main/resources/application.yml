@@ -65,6 +65,17 @@ app:
     poll-interval-ms: 2000
     batch-size: 20
     lease-seconds: 60
+  whatsapp:
+    # Meta WhatsApp Cloud API. Blank access token = LoggingWhatsAppClient (logs, never sends) —
+    # every local/test run, same as spring.mail.host above.
+    api-base-url: ${WHATSAPP_API_BASE_URL:https://graph.facebook.com/v21.0}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    business-account-id: ${WHATSAPP_BUSINESS_ACCOUNT_ID:}
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+    app-secret: ${WHATSAPP_APP_SECRET:}       # blank = webhook rejects every POST
+    verify-token: ${WHATSAPP_VERIFY_TOKEN:}   # blank = webhook subscription handshake always fails
+    otp-template: ${WHATSAPP_OTP_TEMPLATE:nabd_login_otp}
+    otp-language: ${WHATSAPP_OTP_LANGUAGE:en}
   crypto:
     # base64, 32 bytes (AES-256), Vault/KMS-backed (NB-009) — no default;
     # boot fails fast if unset rather than encrypting MFA secrets with a

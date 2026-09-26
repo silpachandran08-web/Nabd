@@ -1,5 +1,6 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.common.ClinicClock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -44,7 +45,10 @@ class PatientRepository {
 
     private final JdbcTemplate jdbc;
 
-    PatientRepository(JdbcTemplate jdbc) {
+    private final ClinicClock clock;
+
+    PatientRepository(JdbcTemplate jdbc, ClinicClock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
     }
 
@@ -202,9 +206,9 @@ class PatientRepository {
      * review task is this computed worklist, not a background job (none exists yet, NB-308). */
     List<PatientRow> findGuardianReviewsDue(UUID tenantId) {
         return jdbc.query("SELECT " + COLUMNS + "FROM patients WHERE tenant_id = ? AND status = 'active' " +
-                        "AND guardian_id IS NOT NULL AND dob <= CURRENT_DATE - INTERVAL '18 years' " +
+                        "AND guardian_id IS NOT NULL AND dob <= ?::date - INTERVAL '18 years' " +
                         "ORDER BY dob",
-                patientMapper(), tenantId);
+                patientMapper(), tenantId, java.sql.Date.valueOf(clock.today(tenantId)));
     }
 
     /** NB-085: audit_log's actor_name/actor_role snapshot — same per-module pattern as Dental. */
