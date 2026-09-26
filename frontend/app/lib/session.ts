@@ -53,11 +53,16 @@ export function getIdentity(): Identity | null {
 // nearly every clinic-facing role needs just to see the day's arrivals (reception, nurses,
 // often doctors too), so it has to be checked last among these or it silently wins over a much
 // more specific signal — a Nurse role with both queue:view and nursing:view was landing on
-// /arrivals instead of /nursing for exactly this reason. nursing:view/clinical:view are narrow
-// enough that only the role they actually name would plausibly have them.
+// /arrivals instead of /nursing for exactly this reason.
+//
+// clinical:edit, not clinical:view: every real write in the consult workspace (notes,
+// prescriptions, allergies, vitals) is gated on clinical:edit on the backend — clinical:view is
+// just read access to clinical history, which reception can reasonably be granted too (e.g. for
+// billing lookups) without being a clinician. Landing a receptionist with that grant on /consult
+// instead of /arrivals was exactly this mistake.
 const LANDING_RULES: [permission: string, path: string][] = [
   ["nursing:view", "/nursing"],
-  ["clinical:view", "/consult"],
+  ["clinical:edit", "/consult"],
   ["queue:view", "/arrivals"],
   ["reports:view", "/reports"],
   ["setup:view", "/setup"],
