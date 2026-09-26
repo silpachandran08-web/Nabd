@@ -9,6 +9,7 @@ type AccessTokenClaims = {
   tenantRegion?: string;
   staffName?: string;
   roleName?: string;
+  owner?: boolean;
   exp?: number;
 };
 
@@ -68,7 +69,12 @@ const LANDING_RULES: [permission: string, path: string][] = [
   ["setup:view", "/setup"],
 ];
 
-export function landingPathFor(permissions: string[]): string {
+// The clinic owner holds every grant, so the rules below would land them on /nursing. Their home
+// is Owner Insights — the same page the owner portal (owner/workspaces) opens after picking a
+// clinic. "owner" comes from the staff member's own built-in role (AuthService.mintTokenPair);
+// tokens minted before that claim existed simply fall through to the rules.
+export function landingPathFor(permissions: string[], owner = false): string {
+  if (owner && permissions.includes("reports:view")) return "/reports";
   for (const [permission, path] of LANDING_RULES) {
     if (permissions.includes(permission)) return path;
   }

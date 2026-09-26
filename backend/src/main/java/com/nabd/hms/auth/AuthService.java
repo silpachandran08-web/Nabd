@@ -585,6 +585,10 @@ public class AuthService {
                 .claim("tenantRegion", tenant.region())
                 .claim("staffName", staff.name())
                 .claim("roleName", role.name())
+                // Landing only (lib/session landingPathFor): the owner's home is Owner Insights, but
+                // their full grants would otherwise match the nursing rule first. From the staff
+                // member's own role, never a delegated one.
+                .claim("owner", role.builtIn())
                 .build();
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
 

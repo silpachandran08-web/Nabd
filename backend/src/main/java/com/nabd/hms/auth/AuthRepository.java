@@ -183,7 +183,7 @@ class AuthRepository {
 
     Optional<Role> findRole(UUID roleId) {
         return jdbc.query(
-                "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required FROM roles WHERE id = ?",
+                "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required, built_in FROM roles WHERE id = ?",
                 roleMapper(), roleId
         ).stream().findFirst();
     }
@@ -191,7 +191,7 @@ class AuthRepository {
     /** NB-048: break-glass elevates to whatever the tenant's built-in Owner role currently grants. */
     Optional<Role> findBuiltInOwnerRole(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required FROM roles WHERE tenant_id = ? AND built_in = true",
+                "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required, built_in FROM roles WHERE tenant_id = ? AND built_in = true",
                 roleMapper(), tenantId
         ).stream().findFirst();
     }
@@ -203,7 +203,7 @@ class AuthRepository {
      */
     List<Role> findActiveDelegatedRoles(UUID staffId) {
         return jdbc.query(
-                "SELECT r.id, r.tenant_id, r.name, r.grants::text AS grants_json, r.mfa_required " +
+                "SELECT r.id, r.tenant_id, r.name, r.grants::text AS grants_json, r.mfa_required, r.built_in " +
                         "FROM role_delegations d JOIN roles r ON r.id = d.delegated_role_id " +
                         "WHERE d.staff_id = ? AND d.revoked_at IS NULL AND d.starts_at <= now() AND d.expires_at > now()",
                 roleMapper(), staffId);
@@ -347,7 +347,8 @@ class AuthRepository {
                 UUID.fromString(rs.getString("tenant_id")),
                 rs.getString("name"),
                 rs.getString("grants_json"),
-                rs.getBoolean("mfa_required"));
+                rs.getBoolean("mfa_required"),
+                rs.getBoolean("built_in"));
     }
 
     private RowMapper<SessionRow> sessionMapper() {

@@ -43,6 +43,19 @@ class AuthApiTest extends ApiTestBase {
     }
 
     @Test
+    void accessTokenMarksOnlyTheBuiltInOwnerRoleAsOwner() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "own@a.com", "+919000000071", false);
+        // same full grants, but a custom role — must not be treated as the owner
+        UUID manager = seedRole(tenant.id(), "Manager", false, fullGrant("nursing"), fullGrant("clinical"), fullGrant("queue"),
+                fullGrant("reports"), fullGrant("setup"));
+        SeededStaff notOwner = seedStaff(tenant, manager, "mgr@a.com", "+919000000072", false);
+
+        assertThat(decodeClaims(loginAndGetAccessToken(owner)).get("owner")).isEqualTo(true);
+        assertThat(decodeClaims(loginAndGetAccessToken(notOwner)).get("owner")).isEqualTo(false);
+    }
+
+    @Test
     void loginWithWrongPinFails() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
