@@ -101,6 +101,34 @@ public class DepartmentService {
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
+    /**
+     * Hard delete, only for a department nothing real depends on yet: not the default, no staff
+     * assigned, no patient visits. Anything with history is deactivated instead (update, active=false)
+     * — queue_entries must keep pointing at it. Config it owns (transfers, workflow, service points)
+     * goes with it.
+     */
+    @Transactional
+    public void delete(UUID tenantId, UUID callerStaffId, UUID id) {
+        tenantContext.set(tenantId);
+        DepartmentRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        if (current.isDefault()) {
+            throw new ApiException(HttpStatus.CONFLICT, "default-department-undeletable", "Can't delete the default department",
+                    "This is the clinic's fallback department for check-in, so it can't be deleted.");
+        }
+        int staff = repo.countStaff(tenantId, id);
+        if (staff > 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "department-has-staff", "Department has staff",
+                    staff + (staff == 1 ? " staff member is" : " staff members are")
+                            + " assigned to " + current.name() + ". Move them to another department first.");
+        }
+        if (repo.hasVisits(tenantId, id)) {
+            throw new ApiException(HttpStatus.CONFLICT, "department-has-visits", "Department has visit history",
+                    current.name() + " has patient visits on record, so it can't be deleted. Deactivate it instead.");
+        }
+        repo.delete(tenantId, id);
+        log.info("department {} ({}) deleted by {} (tenant {})", id, current.name(), callerStaffId, tenantId);
+    }
+
     @Transactional
     public List<TransferEdge> listTransfers(UUID tenantId) {
         tenantContext.set(tenantId);

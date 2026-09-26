@@ -41,6 +41,27 @@ class DepartmentRepository {
                 UUID.class, tenantId, name);
     }
 
+    int countStaff(UUID tenantId, UUID departmentId) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM staff WHERE tenant_id = ? AND department_id = ?",
+                Integer.class, tenantId, departmentId);
+        return n == null ? 0 : n;
+    }
+
+    boolean hasVisits(UUID tenantId, UUID departmentId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM queue_entries WHERE tenant_id = ? AND department_id = ?)",
+                Boolean.class, tenantId, departmentId));
+    }
+
+    /** Owned config first (transfer routes, workflow choice, service points), then the row. */
+    void delete(UUID tenantId, UUID id) {
+        jdbc.update("DELETE FROM department_transfers WHERE tenant_id = ? AND (from_department_id = ? OR to_department_id = ?)",
+                tenantId, id, id);
+        jdbc.update("DELETE FROM department_workflow_selection WHERE tenant_id = ? AND department_id = ?", tenantId, id);
+        jdbc.update("DELETE FROM service_points WHERE tenant_id = ? AND department_id = ?", tenantId, id);
+        jdbc.update("DELETE FROM departments WHERE tenant_id = ? AND id = ?", tenantId, id);
+    }
+
     void update(UUID tenantId, UUID id, String name, boolean active) {
         jdbc.update("UPDATE departments SET name = ?, active = ? WHERE tenant_id = ? AND id = ?",
                 name, active, tenantId, id);

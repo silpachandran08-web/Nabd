@@ -43,6 +43,9 @@ export default function DepartmentsPage() {
   const [matrixDirty, setMatrixDirty] = useState(false);
   const [matrixError, setMatrixError] = useState<string | null>(null);
   const [savingMatrix, setSavingMatrix] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -92,6 +95,43 @@ export default function DepartmentsPage() {
   useEffect(() => {
     void Promise.resolve().then(load);
   }, [load]);
+
+  // Deactivate keeps the department (and its visit history) and can be undone. Delete is for a
+  // department nothing uses yet — the server refuses it while staff are assigned or visits exist.
+  async function setActive(d: Department, active: boolean) {
+    setTogglingId(d.id);
+    setToggleError(null);
+    try {
+      const res = await authedFetch(`/departments/${d.id}`, { method: "PATCH", body: JSON.stringify({ name: d.name, active }) });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't update the department." }));
+        setToggleError(p.detail || "Couldn't update the department.");
+        return;
+      }
+      await load();
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
+  async function deleteDepartment(d: Department) {
+    setTogglingId(d.id);
+    setToggleError(null);
+    try {
+      const res = await authedFetch(`/departments/${d.id}`, { method: "DELETE" });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't delete the department." }));
+        setToggleError(p.detail || "Couldn't delete the department.");
+        return;
+      }
+      await load();
+    } finally {
+      setTogglingId(null);
+      setConfirmDeleteId(null);
+    }
+  }
 
   function openCreate() {
     setBuilderError(null);
@@ -222,6 +262,7 @@ export default function DepartmentsPage() {
           <h2 className={styles.cardTitle}>Departments</h2>
           <button className={styles.btn} onClick={openCreate}>+ Add department</button>
         </div>
+        {toggleError && <div className={styles.errorState} role="alert">{toggleError}</div>}
         <table className={styles.table}>
           <thead>
             <tr><th>Name</th><th>Status</th><th></th></tr>
@@ -231,7 +272,22 @@ export default function DepartmentsPage() {
               <tr key={d.id}>
                 <td>{d.name}{d.isDefault && <span className={styles.defaultTag}>Default</span>}</td>
                 <td>{d.active ? "Active" : "Inactive"}</td>
-                <td><button className={styles.smallBtn} onClick={() => openEdit(d)}>Edit</button></td>
+                <td className={styles.rowActions}>
+                  <button className={styles.smallBtn} onClick={() => openEdit(d)}>Edit</button>
+                  {!d.isDefault && (
+                    <button className={styles.smallBtn} disabled={togglingId === d.id} onClick={() => setActive(d, !d.active)}>
+                      {d.active ? "Deactivate" : "Reactivate"}
+                    </button>
+                  )}
+                  {!d.isDefault && (confirmDeleteId === d.id ? (
+                    <>
+                      <button className={styles.dangerBtn} disabled={togglingId === d.id} onClick={() => deleteDepartment(d)}>Confirm delete</button>
+                      <button className={styles.smallBtn} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                    </>
+                  ) : (
+                    <button className={styles.smallBtn} onClick={() => { setToggleError(null); setConfirmDeleteId(d.id); }}>Delete</button>
+                  ))}
+                </td>
               </tr>
             ))}
           </tbody>
