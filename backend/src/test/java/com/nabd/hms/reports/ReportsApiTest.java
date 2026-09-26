@@ -88,7 +88,8 @@ class ReportsApiTest extends ApiTestBase {
             assertThat(((Map<?, ?>) p).get("method")).isEqualTo("upi");
             assertThat(((Number) ((Map<?, ?>) p).get("amount")).doubleValue()).isEqualTo(200.0);
         });
-        assertThat(((Map<?, ?>) body.get("dayClose")).get("unpaidInvoices")).isEqualTo(1);
+        // B is at checkout with no bill (blocks the close); A's partial balance doesn't block it
+        assertThat(((Map<?, ?>) body.get("dayClose"))).isEqualTo(Map.of("unbilledConsultations", 1, "pendingCheckouts", 1, "closed", false));
         assertThat((List<?>) body.get("activeStaff")).singleElement().satisfies(s -> {
             assertThat(((Map<?, ?>) s).get("name")).isEqualTo("Test Staff");
             assertThat(((Map<?, ?>) s).get("inConsult")).isEqualTo(true);

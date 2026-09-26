@@ -39,17 +39,16 @@ const NURSING_ITEMS: { label: string; tab?: string; filter?: string }[] = [
 
 // DESIGN.md's Owner / Clinic Manager sidebar, in its order. The owner holds every grant (so the
 // nursing check below would otherwise win); each item still needs its permission, so a trimmed
-// Owner role never shows a link it can't open. Destinations that have no page of their own yet
-// reuse the closest existing one: Clinic Operations is Schedule + Live Queue (Arrivals), Billing &
-// Day Close is the checkout worklist on Arrivals,
-// Compliance & Audit and Plan & Modules are Setup's Licences and Subscription tabs.
+// Owner role never shows a link it can't open. Clinic Operations covers Schedule and its Live
+// Queue tab (Arrivals); Compliance & Audit and Plan & Modules have no page of their own yet, so
+// they open Setup's Licences and Subscription tabs.
 type OwnerItem = { label: string; href: string; permission: string; active: (path: string, tab: string | null) => boolean };
 const OWNER_ITEMS: OwnerItem[] = [
   { label: "Overview", href: "/overview", permission: "reports:view", active: (p) => p === "/overview" },
   { label: "Clinic Operations", href: "/schedule", permission: "queue:view",
-    active: (p, tab) => p === "/schedule" || (p === "/arrivals" && tab !== "checkout_pending") },
-  { label: "Billing & Day Close", href: "/arrivals?tab=checkout_pending", permission: "billing:view",
-    active: (p, tab) => (p === "/arrivals" && tab === "checkout_pending") || p.startsWith("/checkout") },
+    active: (p) => p === "/schedule" || p === "/arrivals" },
+  { label: "Billing & Day Close", href: "/billing", permission: "billing:view",
+    active: (p) => p === "/billing" || p.startsWith("/checkout") },
   { label: "Treatment Packages", href: "/packages", permission: "packages:view", active: (p) => p.startsWith("/packages") },
   { label: "Reports", href: "/reports", permission: "reports:view", active: (p) => p.startsWith("/reports") },
   { label: "Staff & Access", href: "/staff", permission: "staff:view", active: (p) => p.startsWith("/staff") },

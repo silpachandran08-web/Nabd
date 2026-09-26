@@ -59,8 +59,11 @@ public class CheckoutService {
 
     private final ClinicClock clock;
 
+    private final DayCloseService dayClose;
+
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
-                     DepartmentService departmentService, ClinicClock clock) {
+                     DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose) {
+        this.dayClose = dayClose;
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -106,6 +109,7 @@ public class CheckoutService {
     @Transactional
     public InvoiceResponse checkout(UUID tenantId, UUID queueEntryId, UUID staffId, CheckoutRequest req) {
         tenantContext.set(tenantId);
+        dayClose.requireTodayOpen(tenantId);
         QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(this::notFound);
 
         List<String> sequence = departmentService.resolveStatusSequence(tenantId, ctx.departmentId());
@@ -175,6 +179,7 @@ public class CheckoutService {
 
     private InvoiceResponse standaloneInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req, String kind) {
         tenantContext.set(tenantId);
+        dayClose.requireTodayOpen(tenantId);
         if (req.lineItems().isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
                     "Add at least one charge before checking out.");
@@ -228,6 +233,7 @@ public class CheckoutService {
     @Transactional
     public InvoiceResponse recordPayment(UUID tenantId, UUID invoiceId, UUID staffId, PaymentRequest req) {
         tenantContext.set(tenantId);
+        dayClose.requireTodayOpen(tenantId);
         InvoiceRow invoice = repo.findInvoice(tenantId, invoiceId).orElseThrow(this::notFound);
         if ("paid".equals(invoice.status())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invoice-already-paid", "Invoice already paid",
