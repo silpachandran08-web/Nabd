@@ -429,3 +429,28 @@
   font-size: 13px;
   margin-top: var(--nb-space-12);
 }
+
+/* Schedule | Live Queue switch — same look as schedule.module.css's */
+.segmented {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 12px;
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+}
+
+.segment {
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nb-text-secondary);
+  text-decoration: none;
+}
+
+.segmentActive {
+  composes: segment;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+}

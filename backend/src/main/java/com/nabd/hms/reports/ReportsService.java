@@ -83,7 +83,7 @@ public class ReportsService {
                 new OverviewResponse.Checkout(checkoutPending, repo.outstandingTotal(tenantId)),
                 new OverviewResponse.Packages(repo.packagesSoldOn(tenantId, dayStart, dayEnd), repo.sessionsOwed(tenantId)),
                 repo.paymentSplitOn(tenantId, dayStart, dayEnd),
-                new OverviewResponse.DayClose(repo.unpaidInvoiceCount(tenantId), checkoutPending),
+                new OverviewResponse.DayClose(repo.unbilledConsultationsOn(tenantId, today), checkoutPending, repo.dayClosed(tenantId, today)),
                 repo.activeStaffSince(tenantId, dayStart, today),
                 repo.staffSummary(tenantId));
     }

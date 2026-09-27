@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import styles from "./arrivals.module.css";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
@@ -584,7 +585,12 @@ function ArrivalsPageInner() {
           <p className={styles.subtitle}>{dateLabel} · {rows.length} on the board</p>
         </div>
         {!forbidden && (
-          <div style={{ display: "flex", gap: "var(--nb-space-8)" }}>
+          <div style={{ display: "flex", gap: "var(--nb-space-8)", alignItems: "center" }}>
+            {/* Clinic Operations' two views (DESIGN.md): this page is the Live Queue half. */}
+            <nav className={styles.segmented} aria-label="Clinic operations view">
+              <Link className={styles.segment} href="/schedule">Schedule</Link>
+              <span className={styles.segmentActive} aria-current="page">Live Queue</span>
+            </nav>
             <button className={styles.registerBtn} style={{ background: "transparent", color: "var(--nb-text-primary)", border: "1px solid var(--nb-border-default)" }}
               onClick={() => router.push("/checkout/otc")}>
               Counter sale

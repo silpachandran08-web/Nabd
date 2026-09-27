@@ -57,20 +57,29 @@ class ReportsRepository {
     }
 
     int checkoutPendingOn(UUID tenantId, LocalDate day) {
-        Integer n = jdbc.queryForObject("SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ? AND status = 'checkout_pending'",
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ? " +
+                        "AND status IN ('checkout_pending', 'billing_pending')", // same worklist as DayCloseRepository.pendingCheckouts
                 Integer.class, tenantId, java.sql.Date.valueOf(day));
         return n == null ? 0 : n;
+    }
+
+    /** Same rule as DayCloseRepository.unbilled: sent to checkout, no bill yet. */
+    int unbilledConsultationsOn(UUID tenantId, LocalDate day) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM queue_entries q WHERE q.tenant_id = ? AND q.queue_date = ? " +
+                "AND q.status = 'checkout_pending' AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.queue_entry_id = q.id)",
+                Integer.class, tenantId, java.sql.Date.valueOf(day));
+        return n == null ? 0 : n;
+    }
+
+    boolean dayClosed(UUID tenantId, LocalDate day) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM day_closes WHERE tenant_id = ? AND close_date = ? AND status = 'closed')",
+                Boolean.class, tenantId, java.sql.Date.valueOf(day)));
     }
 
     int unpaidInvoiceCountOn(UUID tenantId, Instant dayStart, Instant dayEnd) {
         Integer n = jdbc.queryForObject("SELECT count(*) FROM invoices WHERE tenant_id = ? AND status IN ('unpaid', 'partial') " +
                 "AND created_at >= ? AND created_at < ?", Integer.class, tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd));
-        return n == null ? 0 : n;
-    }
-
-    int unpaidInvoiceCount(UUID tenantId) {
-        Integer n = jdbc.queryForObject("SELECT count(*) FROM invoices WHERE tenant_id = ? AND status IN ('unpaid', 'partial')",
-                Integer.class, tenantId);
         return n == null ? 0 : n;
     }
 

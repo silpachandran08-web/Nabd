@@ -35,8 +35,8 @@ public record OverviewResponse(
     public record PaymentSplit(String method, BigDecimal amount) {
     }
 
-    /** What stands between the clinic and closing the day. There's no day-close workflow yet (E15). */
-    public record DayClose(int unpaidInvoices, int pendingCheckouts) {
+    /** Same rules as Billing & Day Close (DayCloseService): unbilled consultations block the close. */
+    public record DayClose(int unbilledConsultations, int pendingCheckouts, boolean closed) {
     }
 
     /** Staff with a live session opened today. inConsult: a doctor with a patient in consultation now. */

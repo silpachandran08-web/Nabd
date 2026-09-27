@@ -16,7 +16,7 @@ type Overview = {
   checkout: { pending: number; outstanding: number };
   packages: { soldToday: number; sessionsOwed: number };
   paymentSplit: { method: string; amount: number }[];
-  dayClose: { unpaidInvoices: number; pendingCheckouts: number };
+  dayClose: { unbilledConsultations: number; pendingCheckouts: number; closed: boolean };
   activeStaff: { staffId: string; name: string; roleName: string; departmentName: string | null; signedInAt: string; inConsult: boolean }[];
   staff: { active: number; suspended: number; invited: number; roles: number };
 };
@@ -132,7 +132,8 @@ export default function OverviewPage() {
     .map((l) => ({ ...l, daysLeft: daysBetween(today, localDate(l.expiryDate)) }))
     .filter((l) => l.daysLeft <= LICENCE_WARNING_DAYS)
     .sort((a, b) => a.daysLeft - b.daysLeft);
-  const blocked = data.dayClose.unpaidInvoices > 0 || data.dayClose.pendingCheckouts > 0;
+  // Same rule as Billing & Day Close: only consultations with no bill block the close.
+  const blocked = !data.dayClose.closed && data.dayClose.unbilledConsultations > 0;
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   return (
@@ -230,16 +231,16 @@ export default function OverviewPage() {
         <div className={styles.column}>
           <section className={blocked ? styles.dayClose : styles.dayCloseClear} aria-label="Day close">
             <div className={blocked ? styles.dayCloseLabel : styles.dayCloseLabelClear}>
-              Day close · {blocked ? "blocked" : "ready"}
+              Day close · {data.dayClose.closed ? "closed" : blocked ? "blocked" : "ready"}
             </div>
             <p className={styles.dayCloseText}>
-              {blocked
-                ? `${plural(data.dayClose.unpaidInvoices, "invoice", "invoices")} unpaid and ${plural(data.dayClose.pendingCheckouts, "checkout", "checkouts")} pending. Day close is blocked until every invoice is settled.`
-                : "Every invoice is settled and no checkouts are pending."}
+              {data.dayClose.closed
+                ? "Today is closed. Billing is locked until the day is unlocked."
+                : blocked
+                  ? `${plural(data.dayClose.unbilledConsultations, "completed consultation has", "completed consultations have")} no bill. Day close is blocked until each is billed.`
+                  : `Nothing blocks the close.${data.dayClose.pendingCheckouts > 0 ? ` ${plural(data.dayClose.pendingCheckouts, "checkout", "checkouts")} still pending.` : ""}`}
             </p>
-            {blocked && <Link className={styles.primaryLink} href="/arrivals?tab=checkout_pending">Review checkouts</Link>}
-            {/* No day-close workflow exists yet (E15) — say so rather than offer a button that does nothing. */}
-            <div className={styles.note}>Closing the day in Nabd isn&apos;t available yet.</div>
+            <Link className={styles.primaryLink} href="/billing">{data.dayClose.closed ? "View day close" : "Go to day close"}</Link>
           </section>
 
           <section className={styles.card} aria-label="Staff currently active">
