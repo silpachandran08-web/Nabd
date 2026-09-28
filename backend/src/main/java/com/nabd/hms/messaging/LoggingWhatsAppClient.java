@@ -19,7 +19,7 @@ class LoggingWhatsAppClient implements WhatsAppClient {
 
     @Override
     public String sendOtp(String toPhone, String templateName, String language, String code) {
-        log.info("[MOCK WhatsApp OTP] would send {} to {}", code, toPhone);
+        log.info("[MOCK WhatsApp OTP] would send an OTP to {} (the code itself is logged by TemplateWhatsAppOtpSender)", toPhone);
         return "mock." + UUID.randomUUID();
     }
 

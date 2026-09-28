@@ -212,12 +212,18 @@ class AuthApiTest extends ApiTestBase {
     // ---- WhatsApp OTP ----
 
     @Test
-    void otpRequestForUnknownMobileStillReturns202NoEnumeration() {
+    void otpRequestForUnknownMobileOrClinicSaysSo() {
         SeededTenant tenant = seedTenant();
-        ResponseEntity<Void> resp = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
-                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+910000000000")), Void.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        ResponseEntity<Map> resp = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+910000000000")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(resp.getBody().get("detail")).isEqualTo("No active staff member with that mobile number in this clinic.");
         assertThat(otpSender.sentTo).doesNotContainKey("+910000000000");
+
+        ResponseEntity<Map> noClinic = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", "no-such-clinic", "mobilePhone", "+910000000000")), Map.class);
+        assertThat(noClinic.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(noClinic.getBody().get("type")).asString().endsWith("clinic-not-found");
     }
 
     @Test
@@ -238,6 +244,32 @@ class AuthApiTest extends ApiTestBase {
                 "tenantSlug", tenant.slug(), "mobilePhone", mobile, "code", code)), Map.class);
         assertThat(verifyResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(verifyResp.getBody()).containsKey("accessToken");
+    }
+
+    @Test
+    void otpWorksWhateverFormatTheMobileIsTypedInAndGoesToTheNumberOnFile() {
+        SeededTenant tenant = seedTenant(); // region IN
+        UUID roleId = seedFullAccessRole(tenant.id());
+        seedStaff(tenant, roleId, "otpfmt@a.com", "+919812345671", false);
+
+        ResponseEntity<Void> req = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "98123 45671")), Void.class);
+        assertThat(req.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        String code = otpSender.sentTo.get("+919812345671"); // sent to the stored number, not the typed text
+        assertThat(code).isNotNull();
+        assertThat(otpSender.sentTo).doesNotContainKey("98123 45671");
+
+        ResponseEntity<Map> verify = http.postForEntity(url("/v1/auth/otp/verify"), jsonBody(Map.of(
+                "tenantSlug", tenant.slug(), "mobilePhone", "00919812345671", "code", code)), Map.class);
+        assertThat(verify.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(verify.getBody()).containsKey("accessToken");
+
+        // an unknown number is refused and nothing is sent
+        int before = otpSender.sentTo.size();
+        assertThat(http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "98000 00000")), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(otpSender.sentTo).hasSize(before);
     }
 
     @Test

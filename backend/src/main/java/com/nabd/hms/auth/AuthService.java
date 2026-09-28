@@ -164,21 +164,26 @@ public class AuthService {
         Tenant tenant = repo.findTenantBySlug(req.tenantSlug())
                 .filter(t -> !"offboarded".equals(t.status()) && !"suspended".equals(t.status()))
                 .orElse(null);
+        // ponytail: explicit "not found" errors were asked for so staff know why no OTP came. This
+        // lets anyone probe which clinic codes / mobiles exist (only the per-IP rate limit slows it);
+        // switch both back to a silent return + 202 to restore no-enumeration.
         if (tenant == null) {
-            log.debug("OTP requested for unknown/inactive tenant slug from {}", ip);
-            return;
+            log.info("OTP requested for unknown/inactive tenant slug from {}", ip);
+            throw new ApiException(HttpStatus.NOT_FOUND, "clinic-not-found", "Clinic not found",
+                    "No clinic with that clinic code. Check the code and try again.");
         }
         tenantContext.set(tenant.id());
 
-        Staff staff = repo.findStaffByMobile(tenant.id(), req.mobilePhone()).orElse(null);
+        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null || !"active".equals(staff.status())) {
-            log.debug("OTP requested for unresolved mobile in tenant {} from {}", tenant.id(), ip);
-            return;
+            log.info("OTP requested for a mobile with no active staff in tenant {} from {}", tenant.id(), ip);
+            throw new ApiException(HttpStatus.NOT_FOUND, "mobile-not-found", "Mobile number not found",
+                    "No active staff member with that mobile number in this clinic.");
         }
 
         String code = generateOtpCode();
         repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), Instant.now().plus(5, ChronoUnit.MINUTES));
-        otpSender.send(req.mobilePhone(), code);
+        otpSender.send(staff.mobilePhone(), code); // the number on file, not whatever format was typed
         log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
 
@@ -193,7 +198,7 @@ public class AuthService {
                 .orElseThrow(this::invalidCredentials);
         tenantContext.set(tenant.id());
 
-        Staff staff = repo.findStaffByMobile(tenant.id(), req.mobilePhone()).orElse(null);
+        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null || !"active".equals(staff.status())) {
             throw invalidCredentials();
         }
@@ -337,13 +342,13 @@ public class AuthService {
             return;
         }
         tenantContext.set(tenant.id());
-        Staff staff = repo.findStaffByMobile(tenant.id(), req.mobilePhone()).orElse(null);
+        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null || !"active".equals(staff.status())) {
             return;
         }
         String token = OpaqueTokens.generate();
         repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), Instant.now().plus(15, ChronoUnit.MINUTES));
-        otpSender.send(req.mobilePhone(), token);
+        otpSender.send(staff.mobilePhone(), token);
         log.info("PIN reset token issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
 
@@ -354,7 +359,7 @@ public class AuthService {
                 .filter(t -> !"offboarded".equals(t.status()) && !"suspended".equals(t.status()))
                 .orElseThrow(this::invalidCredentials);
         tenantContext.set(tenant.id());
-        Staff staff = repo.findStaffByMobile(tenant.id(), req.mobilePhone()).orElse(null);
+        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
         if (staff == null) {
             throw invalidCredentials();
         }

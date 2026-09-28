@@ -53,7 +53,7 @@ public class AuthController {
     @PostMapping("/otp/request")
     public ResponseEntity<Void> requestOtp(@Valid @RequestBody OtpRequestRequest req, HttpServletRequest http) {
         authService.requestOtp(req, RequestMeta.clientIp(http));
-        return ResponseEntity.accepted().build(); // always 202 — same tenant/mobile no-enumeration shape as password-reset
+        return ResponseEntity.accepted().build(); // 202 when sent; unknown clinic/mobile → 404 (AuthService.requestOtp)
     }
 
     @PostMapping("/otp/verify")
