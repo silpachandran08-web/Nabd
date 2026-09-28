@@ -76,6 +76,7 @@ app:
     verify-token: ${WHATSAPP_VERIFY_TOKEN:}   # blank = webhook subscription handshake always fails
     otp-template: ${WHATSAPP_OTP_TEMPLATE:nabd_login_otp}
     otp-language: ${WHATSAPP_OTP_LANGUAGE:en}
+    log-otp: ${WHATSAPP_LOG_OTP:true}          # also print every OTP to the log; set false once WhatsApp delivery works
   crypto:
     # base64, 32 bytes (AES-256), Vault/KMS-backed (NB-009) — no default;
     # boot fails fast if unset rather than encrypting MFA secrets with a

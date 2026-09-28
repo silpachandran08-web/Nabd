@@ -13,6 +13,7 @@ public record WhatsAppProperties(
         String appSecret,         // signs webhook payloads (X-Hub-Signature-256)
         String verifyToken,       // echoed back during Meta's webhook subscription handshake
         String otpTemplate,       // an approved AUTHENTICATION-category template with a copy-code button
-        String otpLanguage
+        String otpLanguage,
+        boolean logOtp            // also write every OTP to the log (WHATSAPP_LOG_OTP) — turn off once delivery is proven
 ) {
 }

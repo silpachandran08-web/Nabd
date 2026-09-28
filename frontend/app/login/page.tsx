@@ -89,11 +89,17 @@ export default function LoginPage() {
     setFormError(null);
     setLoading(true);
     try {
-      await fetch(`${API_BASE}/auth/otp/request`, {
+      const res = await fetch(`${API_BASE}/auth/otp/request`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenantSlug, mobilePhone }),
       });
+      if (!res.ok) {
+        // Unknown clinic code / mobile (404), rate limit (429), etc. — say why instead of moving on.
+        const p = await res.json().catch(() => null);
+        setFormError(p?.detail || "Couldn't send the code. Try again.");
+        return;
+      }
       setView("otpVerify");
     } catch {
       setFormError("Couldn't reach the server. Check your connection and try again.");
