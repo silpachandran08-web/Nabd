@@ -1,5 +1,6 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.reports.dto.MoneyResponse;
 import com.nabd.hms.reports.dto.OverviewResponse;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
@@ -99,36 +100,71 @@ public class ReportsService {
                 repo.outstandingTotal(tenantId), repo.invoiceCountOn(tenantId, dayStart, dayEnd), repo.paymentCountOn(tenantId, dayStart, dayEnd));
     }
 
+    /** A report period in clinic days: explicit from/to (inclusive), or the last `days` days up to today. */
+    public record Range(LocalDate from, LocalDate to) {
+    }
+
+    public Range range(UUID tenantId, Integer days, LocalDate from, LocalDate to) {
+        LocalDate today = clock.today(tenantId);
+        if (from == null && to == null) {
+            return new Range(today.minusDays(days == null ? 30 : days), today);
+        }
+        LocalDate f = from != null ? from : to;
+        LocalDate t = to != null ? to : from;
+        if (t.isBefore(f) || f.plusDays(366).isBefore(t)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-period", "Invalid period",
+                    "Pick a start date on or before the end date, at most a year apart.");
+        }
+        return new Range(f, t);
+    }
+
+    /** Reports → Today's money for a period of clinic days (inclusive). */
     @Transactional
-    public List<SourceBreakdownResponse> sourceBreakdown(UUID tenantId, int days) {
+    public MoneyResponse money(UUID tenantId, Range r) {
         tenantContext.set(tenantId);
-        ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
-        LocalDate since = LocalDate.now(zone).minusDays(days);
-        return repo.sourceBreakdown(tenantId, since).stream()
+        ZoneId zone = clock.zone(tenantId);
+        LocalDate today = LocalDate.now(zone);
+        Instant start = r.from().atStartOfDay(zone).toInstant();
+        Instant end = r.to().plusDays(1).atStartOfDay(zone).toInstant();
+        boolean includesToday = !today.isBefore(r.from()) && !today.isAfter(r.to());
+        boolean ksa = "KSA".equals(repo.region(tenantId).orElse("IN"));
+        int[] bookings = repo.bookingsAndNoShows(tenantId, start, end, Instant.now());
+        return new MoneyResponse(r.from(), r.to(), includesToday, ksa ? "SAR" : "INR", ksa ? "VAT" : "GST",
+                repo.collectedOn(tenantId, start, end), repo.invoiceCountOn(tenantId, start, end),
+                repo.taxBilledBetween(tenantId, start, end), bookings[1], bookings[0],
+                includesToday ? repo.waitingNow(tenantId, today) : null,
+                repo.tenderBetween(tenantId, start, end), repo.topServicesBetween(tenantId, start, end, 5));
+    }
+
+    @Transactional
+    public List<SourceBreakdownResponse> sourceBreakdown(UUID tenantId, Range r) {
+        tenantContext.set(tenantId);
+        return repo.sourceBreakdown(tenantId, r.from(), r.to()).stream()
                 .map(s -> new SourceBreakdownResponse(s.source(), s.visitCount())).toList();
     }
 
     /** NB-231: same row-scoping convention as NB-051 — "own_patients_only" staff see only their own row. */
     @Transactional
-    public List<StaffPerformanceResponse> staffPerformance(UUID tenantId, UUID callerStaffId, int days) {
+    public List<StaffPerformanceResponse> staffPerformance(UUID tenantId, UUID callerStaffId, Range r) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
         CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
         UUID scopedToStaffId = "own_patients_only".equals(caller.scope()) ? callerStaffId : null;
-        Instant since = LocalDate.now(zone).minusDays(days).atStartOfDay(zone).toInstant();
-        return repo.staffCollection(tenantId, since, scopedToStaffId).stream()
+        Instant since = r.from().atStartOfDay(zone).toInstant();
+        Instant until = r.to().plusDays(1).atStartOfDay(zone).toInstant();
+        return repo.staffCollection(tenantId, since, until, scopedToStaffId).stream()
                 .map(s -> new StaffPerformanceResponse(s.staffId(), s.staffName(), s.collected(), s.paymentCount())).toList();
     }
 
     /** NB-231: the access rule stated on the surface, same convention as NB-235's echoed rule text. */
     @Transactional
-    public StaffPerformanceReport staffPerformanceReport(UUID tenantId, UUID callerStaffId, int days) {
+    public StaffPerformanceReport staffPerformanceReport(UUID tenantId, UUID callerStaffId, Range r) {
         tenantContext.set(tenantId);
         CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
         String scopeNote = "own_patients_only".equals(caller.scope())
                 ? "You can see only your own row."
                 : "You can see every staff member's row (full access).";
-        return new StaffPerformanceReport(scopeNote, staffPerformance(tenantId, callerStaffId, days));
+        return new StaffPerformanceReport(scopeNote, staffPerformance(tenantId, callerStaffId, r));
     }
 
     @Transactional
@@ -188,20 +224,20 @@ public class ReportsService {
     /** NB-237, scoped: CSV export of the two genuinely tabular reports, audited with the row count
      * on every export. Scheduled/emailed delivery needs a job scheduler (NB-308) that doesn't exist. */
     @Transactional
-    public String exportCsv(UUID tenantId, UUID callerStaffId, String ipAddress, String reportType, int days) {
+    public String exportCsv(UUID tenantId, UUID callerStaffId, String ipAddress, String reportType, Range period) {
         tenantContext.set(tenantId);
         String csv;
         int rowCount;
         switch (reportType) {
             case "sources" -> {
-                List<SourceBreakdownResponse> rows = sourceBreakdown(tenantId, days);
+                List<SourceBreakdownResponse> rows = sourceBreakdown(tenantId, period);
                 rowCount = rows.size();
                 StringBuilder sb = new StringBuilder("source,visitCount\n");
                 rows.forEach(r -> sb.append(csvField(r.source())).append(',').append(r.visitCount()).append('\n'));
                 csv = sb.toString();
             }
             case "staff-performance" -> {
-                List<StaffPerformanceResponse> rows = staffPerformance(tenantId, callerStaffId, days);
+                List<StaffPerformanceResponse> rows = staffPerformance(tenantId, callerStaffId, period);
                 rowCount = rows.size();
                 StringBuilder sb = new StringBuilder("staffName,collected,paymentCount\n");
                 rows.forEach(r -> sb.append(csvField(r.staffName())).append(',').append(r.collected())

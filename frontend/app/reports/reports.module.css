@@ -138,3 +138,197 @@
   composes: state;
   color: var(--nb-danger-500);
 }
+
+/* ── Reports (DESIGN.md owner "Reports"): period switch, tabs, Today's money ── */
+.wide {
+  max-width: 1320px;
+}
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--nb-surface-1);
+  border: 1px solid var(--nb-border-subtle);
+  margin-bottom: var(--nb-space-12);
+}
+
+.seg {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 0;
+  background: transparent;
+  color: var(--nb-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segOn {
+  composes: seg;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+}
+
+.customRange {
+  display: flex;
+  gap: var(--nb-space-8);
+  align-items: center;
+  margin: 0 0 var(--nb-space-12);
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+}
+
+.dateInput {
+  height: 34px;
+  padding: 0 var(--nb-space-8);
+  border-radius: 9px;
+  border: 1px solid var(--nb-border-default);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  color-scheme: dark;
+}
+
+.infoNote {
+  border: 1px solid rgba(106, 168, 255, 0.45);
+  background: rgba(106, 168, 255, 0.1);
+  color: #8fbcff;
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  font-size: 15px;
+  margin-bottom: var(--nb-space-12);
+}
+
+.infoNoteSmall {
+  composes: infoNote;
+  font-size: 12px;
+  padding: var(--nb-space-8) var(--nb-space-12);
+}
+
+.hero {
+  composes: card;
+  margin-bottom: var(--nb-space-16);
+}
+
+.heroLabel {
+  font-size: 12px;
+  color: var(--nb-text-tertiary);
+}
+
+.heroValue {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+
+.stats4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--nb-space-12);
+  margin-bottom: var(--nb-space-16);
+}
+
+.statInfo { color: #6aa8ff; }
+.statWarn { color: #f5b544; }
+.statAcc { color: var(--nb-accent-500); }
+
+.tileWarn {
+  composes: card; /* card directly — a two-level composes chain lost the box */
+  border-color: rgba(245, 181, 68, 0.45);
+}
+
+.tileInfo {
+  composes: card; /* card directly — a two-level composes chain lost the box */
+  border-color: rgba(106, 168, 255, 0.35);
+}
+
+.cardLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nb-text-tertiary);
+  margin-bottom: var(--nb-space-12);
+}
+
+.columns {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: var(--nb-space-16);
+  height: 150px;
+  padding-top: var(--nb-space-12);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  height: 100%;
+  min-width: 60px;
+  font-size: 11px;
+}
+
+.columnValue {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.columnBar {
+  width: 28px;
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+}
+
+.columnLabel {
+  color: var(--nb-text-secondary);
+}
+
+.hbarRow {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: var(--nb-space-12);
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.hbarName {
+  color: var(--nb-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hbarTrack {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  min-width: 0;
+}
+
+.hbar {
+  height: 14px;
+  border-radius: 3px;
+  background: #c2378a;
+  min-width: 2px;
+}
+
+.hbarValue {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .stats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
