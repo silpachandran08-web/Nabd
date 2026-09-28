@@ -15,6 +15,9 @@ public record PatientWriteRequest(
         @NotBlank @Pattern(regexp = "male|female|other") String gender,
         UUID guardianId,
         String address,
-        String nationalId
+        String nationalId,
+        // Set after staff reviewed the duplicate candidates a first attempt returned and confirmed
+        // this is a different person (e.g. a child on a parent's number). Absent = old behaviour.
+        Boolean confirmedNotDuplicate
 ) {
 }

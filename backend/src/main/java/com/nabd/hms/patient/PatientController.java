@@ -1,5 +1,6 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.patient.dto.PatientRegistryResponse;
 import com.nabd.hms.patient.dto.DuplicateCandidatesResponse;
 import com.nabd.hms.patient.dto.GuardianReviewResponse;
 import com.nabd.hms.patient.dto.MergeRequest;
@@ -35,6 +36,15 @@ public class PatientController {
 
     PatientController(PatientService service) {
         this.service = service;
+    }
+
+    /** Patient Registry — filter: all (default), recent, followup, package, balance, duplicate, archived. */
+    @GetMapping("/registry")
+    @PreAuthorize("hasAuthority('patients:view')")
+    public PatientRegistryResponse registry(@AuthenticationPrincipal Jwt jwt,
+                                            @RequestParam(required = false) String q,
+                                            @RequestParam(required = false) String filter) {
+        return service.registry(tenantId(jwt), staffId(jwt), q, filter);
     }
 
     @GetMapping

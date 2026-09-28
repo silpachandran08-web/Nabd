@@ -3,10 +3,10 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./patients.module.css";
+import { CheckInDialog, RegisterDialog } from "./RegistryDialogs";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
-type PatientPage = { data: Patient[]; page: { nextCursor: string | null; limit: number } };
 type PatientDetail = Patient & {
   allergies: string[];
   chronicConditions: string[];
@@ -20,7 +20,46 @@ type PatientDetail = Patient & {
 };
 type Allergy = { id: string; substance: string; severity: string; reaction: string | null; active: boolean };
 type Condition = { id: string; condition: string; status: string; reviewDueDate: string | null };
-type DueCondition = { id: string; patientId: string; patientName: string; condition: string; reviewDueDate: string };
+// GET /v1/patients/registry (PatientController.registry → PatientRegistryResponse)
+type RegistryRow = {
+  id: string; mrn: string; name: string; phone: string; age: number; gender: string; minor: boolean;
+  lastVisit: string | null; nextAppointment: string | null; nextDoctorName: string | null; nextDoctorId: string | null;
+  nextAppointmentId: string | null; nextAppointmentToday: boolean;
+  packageSessionsUsed: number | null; packageSessionsTotal: number | null; condition: string | null; followUpDue: boolean;
+  allergy: string | null; balanceDue: boolean; duplicate: boolean; archived: boolean;
+  queueToken: number | null; queueStatus: string | null; tags: string[];
+};
+type Registry = { total: number; counts: Record<string, number>; rows: RegistryRow[] };
+const FILTERS: [string, string][] = [["all", "All"], ["recent", "Recently visited"], ["followup", "Follow-up due"],
+  ["package", "Active package"], ["balance", "Outstanding balance"], ["duplicate", "Duplicate review"], ["archived", "Archived"]];
+
+/** "+91 ••••• 4412" — the list shows only the last four digits; the full number is in the drawer. */
+function maskPhone(phone: string): string {
+  const p = phone.replace(/\s/g, "");
+  const digits = p.replace(/\D/g, "");
+  if (digits.length < 8) return phone;
+  const cc = p.startsWith("+966") ? "+966 " : p.startsWith("+91") ? "+91 " : "";
+  return `${cc}••••• ${digits.slice(-4)}`;
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+const fmtDate = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+};
+
+function nextLabel(r: RegistryRow): string {
+  if (!r.nextAppointment) return "—";
+  const at = new Date(r.nextAppointment);
+  const when = r.nextAppointmentToday
+    ? `Today ${at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+    : at.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return r.nextDoctorName ? `${when} · ${r.nextDoctorName}` : when;
+}
 type PrescriptionItem = { id: string; drugName: string; dosage: string | null; frequency: string | null; duration: string | null };
 type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
 type Encounter = { queueEntryId: string; occurredAt: string; diagnosis: string | null; assessment: string | null; medications: string | null };
@@ -75,7 +114,13 @@ export default function PatientsPage() {
 function PatientsList() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [registry, setRegistry] = useState<Registry | null>(null);
+  const [filter, setFilter] = useState("all");
+  const [checkInFor, setCheckInFor] = useState<RegistryRow | null>(null);
+  const [registering, setRegistering] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [canCheckIn, setCanCheckIn] = useState(false);
+  const [canRegister, setCanRegister] = useState(false);
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,8 +138,6 @@ function PatientsList() {
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [newCondition, setNewCondition] = useState({ condition: "", reviewDueDate: "" });
   const [conditionBusy, setConditionBusy] = useState(false);
-  const [dueConditions, setDueConditions] = useState<DueCondition[]>([]);
-  const [showDue, setShowDue] = useState(false);
 
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [timeline, setTimeline] = useState<Encounter[]>([]);
@@ -138,16 +181,22 @@ function PatientsList() {
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
     const permissions = decodeJwt(token).permissions;
-    void Promise.resolve().then(() => setCanDental(Array.isArray(permissions) && permissions.includes("specialty_dental:view")));
+    const has = (p: string) => Array.isArray(permissions) && permissions.includes(p);
+    void Promise.resolve().then(() => {
+      setCanDental(has("specialty_dental:view"));
+      // Actions a role can't take are absent, not disabled (RBAC matrix rule).
+      setCanCheckIn(has("queue:create"));
+      setCanRegister(has("patients:create"));
+    });
   }, []);
 
   const load = useCallback(
-    async (query: string) => {
-      setLoading(true);
-      setError(null);
+    async (query: string, which: string) => {
+      setError(null); // `loading` is only the first load — searching/filtering keeps the table on screen
       try {
-        const qs = query ? `?q=${encodeURIComponent(query)}` : "?limit=50";
-        const res = await authedFetch(`/patients${qs}`);
+        const params = new URLSearchParams({ filter: which });
+        if (query.trim()) params.set("q", query.trim());
+        const res = await authedFetch(`/patients/registry?${params}`);
         if (!res) return;
         if (res.status === 403) {
           setForbidden(true);
@@ -157,8 +206,7 @@ function PatientsList() {
           setError("Couldn't load patients. Try again.");
           return;
         }
-        const body: PatientPage = await res.json();
-        setPatients(body.data);
+        setRegistry(await res.json());
       } catch {
         setError("Couldn't reach the server. Check your connection and try again.");
       } finally {
@@ -169,16 +217,9 @@ function PatientsList() {
   );
 
   useEffect(() => {
-    void Promise.resolve().then(() => load(searchParams.get("q") ?? ""));
+    void Promise.resolve().then(() => load(searchParams.get("q") ?? "", "all"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load]);
-
-  useEffect(() => {
-    void Promise.resolve().then(async () => {
-      const res = await authedFetch("/clinical/conditions/due");
-      if (res?.ok) setDueConditions(await res.json());
-    });
-  }, [authedFetch]);
 
   async function openDrawer(id: string) {
     setDrawerError(null);
@@ -288,8 +329,7 @@ function PatientsList() {
         refreshConditions(drawerPatient.id);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
-        const dueRes = await authedFetch("/clinical/conditions/due");
-        if (dueRes?.ok) setDueConditions(await dueRes.json());
+        void load(q, filter); // Follow-up due flag/count may have changed
       }
     } finally {
       setConditionBusy(false);
@@ -319,8 +359,7 @@ function PatientsList() {
       refreshConditions(drawerPatient.id);
       const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
       if (pRes?.ok) setDrawerPatient(await pRes.json());
-      const dueRes = await authedFetch("/clinical/conditions/due");
-      if (dueRes?.ok) setDueConditions(await dueRes.json());
+      void load(q, filter); // Follow-up due flag/count may have changed
     }
   }
 
@@ -401,40 +440,38 @@ function PatientsList() {
     <main className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Patients</h1>
-          <p className={styles.subtitle}>Search the clinic&apos;s patient directory.</p>
-        </div>
-      </div>
-
-      {!forbidden && dueConditions.length > 0 && (
-        <div className={styles.dueBanner}>
-          <button className={styles.linkBtn} onClick={() => setShowDue((v) => !v)}>
-            {showDue ? "Hide" : "Show"} {dueConditions.length} chronic review{dueConditions.length === 1 ? "" : "s"} due
-          </button>
-          {showDue && (
-            <div className={styles.dueList}>
-              {dueConditions.map((d) => (
-                <div key={d.id} className={styles.dueRow} onClick={() => openDrawer(d.patientId)}>
-                  <span className={styles.patientName}>{d.patientName}</span>
-                  <span>{d.condition}</span>
-                  <span className={styles.muted}>due {new Date(d.reviewDueDate).toLocaleDateString()}</span>
-                </div>
-              ))}
-            </div>
+          <h1 className={styles.title}>Patient Registry</h1>
+          {registry && (
+            <p className={styles.subtitle}>
+              {registry.counts[filter] ?? 0} of {(registry.counts.all ?? 0) + (registry.counts.archived ?? 0)} patients
+            </p>
           )}
         </div>
-      )}
+        {canRegister && !forbidden && (
+          <button type="button" className={styles.primaryBtn} onClick={() => setRegistering(true)}>＋ Register patient</button>
+        )}
+      </div>
 
       {!forbidden && (
-        <form className={styles.searchBar} onSubmit={(e) => { e.preventDefault(); load(q); }}>
-          <input
-            className={styles.input}
-            placeholder="Search by name, phone or MRN…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </form>
+        <>
+          <form className={styles.searchBar} role="search" onSubmit={(e) => { e.preventDefault(); void load(q, filter); }}>
+            <input className={styles.searchInput} aria-label="Search patients" value={q}
+              placeholder="Search by name, mobile, patient ID or token number"
+              onChange={(e) => setQ(e.target.value)} onBlur={() => void load(q, filter)} />
+          </form>
+          <div className={styles.filterBar} role="tablist" aria-label="Filter patients">
+            {FILTERS.map(([key, label]) => (
+              <button key={key} type="button" role="tab" aria-selected={filter === key}
+                className={filter === key ? styles.filterOn : styles.filter}
+                onClick={() => { setFilter(key); void load(q, key); }}>
+                {label} <span className={styles.filterCount}>{registry?.counts[key] ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
+
+      {flash && <div className={styles.flash} role="status">{flash}</div>}
 
       <div className={styles.card}>
         {loading ? (
@@ -443,21 +480,47 @@ function PatientsList() {
           <div className={styles.state}>Your role doesn&apos;t have access to patient records.</div>
         ) : error ? (
           <div className={styles.errorState}>{error}</div>
-        ) : patients.length === 0 ? (
-          <div className={styles.state}>No patients found.</div>
+        ) : !registry || registry.rows.length === 0 ? (
+          <div className={styles.state}>{q.trim() ? "No patients match that search." : "No patients here."}</div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th>Patient</th><th>Phone</th><th>Age / Gender</th><th>Status</th></tr>
+                <tr><th>Patient</th><th>Mobile</th><th>Age</th><th>Last visit</th><th>Next appointment</th><th>Flags</th><th /></tr>
               </thead>
               <tbody>
-                {patients.map((p) => (
+                {registry.rows.map((p) => (
                   <tr key={p.id} className={styles.row} onClick={() => openDrawer(p.id)}>
-                    <td><span className={styles.patientName}>{p.name}</span><span className={styles.mrn}>{p.mrn}</span></td>
-                    <td>{p.phone}</td>
-                    <td>{age(p.dob)} · {p.gender}</td>
-                    <td><span className={`${styles.pill} ${p.status === "active" ? styles.pillActive : styles.pillMerged}`}>{p.status}</span></td>
+                    <td>
+                      <span className={styles.patientCell}>
+                        <span className={p.archived ? styles.avatarMuted : styles.avatar} aria-hidden="true">{initials(p.name)}</span>
+                        <span><span className={styles.patientName}>{p.name}</span><span className={styles.mrn}>{p.mrn}</span></span>
+                      </span>
+                    </td>
+                    <td className={styles.nowrap}>{maskPhone(p.phone)}</td>
+                    <td className={styles.nowrap}>{p.age} {p.gender === "female" ? "F" : p.gender === "male" ? "M" : "O"}</td>
+                    <td className={styles.nowrap}>{p.lastVisit ? fmtDate(p.lastVisit) : "—"}</td>
+                    <td>{nextLabel(p)}</td>
+                    <td>
+                      <span className={styles.flags}>
+                        {p.archived && <span className={styles.flagMuted}>Archived</span>}
+                        {p.packageSessionsTotal != null && <span className={styles.flagInfo}>Package {p.packageSessionsUsed}/{p.packageSessionsTotal}</span>}
+                        {p.condition && <span className={styles.flagWarn}>{p.condition}</span>}
+                        {p.followUpDue && <span className={styles.flagWarn}>Follow-up due</span>}
+                        {p.minor && <span className={styles.flagInfo}>Guardian consent</span>}
+                        {p.balanceDue && <span className={styles.flagOrange}>Balance due</span>}
+                        {p.allergy && <span className={styles.flagBad}>Allergy: {p.allergy}</span>}
+                        {p.duplicate && <span className={styles.flagDup}>Duplicate review</span>}
+                      </span>
+                    </td>
+                    <td className={styles.actionCell}>
+                      {p.queueToken != null ? (
+                        <span className={styles.inQueue}>In queue · T-{p.queueToken}</span>
+                      ) : canCheckIn && !p.archived && (
+                        <button type="button" className={styles.checkInBtn}
+                          onClick={(e) => { e.stopPropagation(); setFlash(null); setCheckInFor(p); }}>Check in</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -465,6 +528,16 @@ function PatientsList() {
           </div>
         )}
       </div>
+
+      {checkInFor && (
+        <CheckInDialog patient={checkInFor} authedFetch={authedFetch} onClose={() => setCheckInFor(null)}
+          onDone={(token) => { setFlash(`${checkInFor.name} checked in · T-${token}`); setCheckInFor(null); void load(q, filter); }} />
+      )}
+      {registering && (
+        <RegisterDialog authedFetch={authedFetch} onClose={() => setRegistering(false)}
+          onRegistered={(id) => { setRegistering(false); setFlash("Patient registered."); void load(q, filter); void openDrawer(id); }}
+          onOpenExisting={(id) => { setRegistering(false); void openDrawer(id); }} />
+      )}
 
       {(drawerPatient || drawerError) && (
         <div className={styles.overlay} onClick={() => { setDrawerPatient(null); setDrawerError(null); }}>
