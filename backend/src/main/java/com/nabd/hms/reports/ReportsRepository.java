@@ -1,5 +1,6 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.reports.dto.MoneyResponse;
 import com.nabd.hms.reports.dto.OverviewResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -152,24 +153,71 @@ class ReportsRepository {
     }
 
     // NB-230/NB-079: single-axis source, straight off queue_entries.source.
-    List<SourceCount> sourceBreakdown(UUID tenantId, LocalDate since) {
+    List<SourceCount> sourceBreakdown(UUID tenantId, LocalDate from, LocalDate to) {
         return jdbc.query("SELECT source, COUNT(*) AS visit_count FROM queue_entries " +
-                        "WHERE tenant_id = ? AND queue_date >= ? GROUP BY source ORDER BY visit_count DESC",
+                        "WHERE tenant_id = ? AND queue_date BETWEEN ? AND ? GROUP BY source ORDER BY visit_count DESC",
                 (rs, i) -> new SourceCount(rs.getString("source"), rs.getLong("visit_count")),
-                tenantId, Date.valueOf(since));
+                tenantId, Date.valueOf(from), Date.valueOf(to));
     }
 
     // NB-231: scopedToStaffId null = every staff member (Owner/manager view); non-null = that
     // staff member's own row only (NB-051's exact row-scoping convention, reused here).
-    List<StaffCollectionRow> staffCollection(UUID tenantId, Instant since, UUID scopedToStaffId) {
+    List<StaffCollectionRow> staffCollection(UUID tenantId, Instant since, Instant until, UUID scopedToStaffId) {
         return jdbc.query("SELECT ip.recorded_by, s.name, SUM(ip.amount) AS collected, COUNT(*) AS payment_count " +
                         "FROM invoice_payments ip JOIN staff s ON s.id = ip.recorded_by " +
-                        "WHERE ip.tenant_id = ? AND ip.recorded_at >= ? " +
+                        "WHERE ip.tenant_id = ? AND ip.recorded_at >= ? AND ip.recorded_at < ? " +
                         "AND (?::uuid IS NULL OR ip.recorded_by = ?::uuid) " +
                         "GROUP BY ip.recorded_by, s.name ORDER BY collected DESC",
                 (rs, i) -> new StaffCollectionRow(UUID.fromString(rs.getString("recorded_by")), rs.getString("name"),
                         rs.getBigDecimal("collected"), rs.getLong("payment_count")),
-                tenantId, Timestamp.from(since), scopedToStaffId, scopedToStaffId);
+                tenantId, Timestamp.from(since), Timestamp.from(until), scopedToStaffId, scopedToStaffId);
+    }
+
+    // ── Reports → Today's money, over [start, end) on the clinic's clock ──
+
+    BigDecimal taxBilledBetween(UUID tenantId, Instant start, Instant end) {
+        return nz(jdbc.queryForObject("SELECT COALESCE(SUM(tax), 0) FROM invoices WHERE tenant_id = ? AND created_at >= ? AND created_at < ?",
+                BigDecimal.class, tenantId, Timestamp.from(start), Timestamp.from(end)));
+    }
+
+    /** [bookings, no-shows]: non-cancelled appointments in range whose time has passed, and those never checked in. */
+    int[] bookingsAndNoShows(UUID tenantId, Instant start, Instant end, Instant now) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS bookings,
+                       count(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM queue_entries q WHERE q.appointment_id = a.id)) AS no_shows
+                FROM appointments a
+                WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ? AND a.start_time < ?
+                """, (rs, i) -> new int[]{rs.getInt("bookings"), rs.getInt("no_shows")},
+                tenantId, Timestamp.from(start), Timestamp.from(end), Timestamp.from(now));
+    }
+
+    /** Patients in today's queue who haven't reached the doctor yet. */
+    int waitingNow(UUID tenantId, LocalDate today) {
+        Integer n = jdbc.queryForObject("SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ? " +
+                "AND status IN ('checked_in', 'waiting', 'billing_pending', 'vitals_pending', 'vitals_done')",
+                Integer.class, tenantId, Date.valueOf(today));
+        return n == null ? 0 : n;
+    }
+
+    List<MoneyResponse.Tender> tenderBetween(UUID tenantId, Instant start, Instant end) {
+        return jdbc.query("SELECT method, SUM(amount) AS amount FROM invoice_payments WHERE tenant_id = ? " +
+                        "AND recorded_at >= ? AND recorded_at < ? GROUP BY method ORDER BY SUM(amount) DESC",
+                (rs, i) -> new MoneyResponse.Tender(rs.getString("method"), rs.getBigDecimal("amount")),
+                tenantId, Timestamp.from(start), Timestamp.from(end));
+    }
+
+    List<MoneyResponse.Service> topServicesBetween(UUID tenantId, Instant start, Instant end, int limit) {
+        return jdbc.query("""
+                SELECT li.charge_name, SUM(li.line_total) AS revenue
+                FROM invoice_line_items li JOIN invoices i ON i.id = li.invoice_id
+                WHERE i.tenant_id = ? AND i.created_at >= ? AND i.created_at < ?
+                GROUP BY li.charge_name ORDER BY SUM(li.line_total) DESC, li.charge_name LIMIT ?
+                """, (rs, i) -> new MoneyResponse.Service(rs.getString("charge_name"), rs.getBigDecimal("revenue")),
+                tenantId, Timestamp.from(start), Timestamp.from(end), limit);
+    }
+
+    Optional<String> region(UUID tenantId) {
+        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
     }
 
     // NB-234: aggregate-only retention numbers — no per-patient row is ever returned from here.

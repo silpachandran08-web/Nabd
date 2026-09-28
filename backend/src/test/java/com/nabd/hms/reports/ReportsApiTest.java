@@ -52,6 +52,42 @@ class ReportsApiTest extends ApiTestBase {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void moneyReportCoversThePeriodAndOtherTabsFollowIt() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "mo1@a.com", "+919800068001", false);
+        String token = loginAndGetAccessToken(owner);
+        String paid = checkIn(token, registerPatient(token, "Mo Paid", "+919999968001"), owner.id(), null);
+        moveTo(token, paid, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        checkoutAndPay(token, paid, 500);                                       // line "X", 0% tax, cash
+        checkIn(token, registerPatient(token, "Mo Waiting", "+919999968002"), owner.id(), null); // still waiting
+        String noShow = registerPatient(token, "Mo NoShow", "+919999968003");
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "INSERT INTO appointments (tenant_id, patient_id, doctor_id, start_time, end_time) VALUES (?,?::uuid,?, now() - interval '1 minute', now() + interval '14 minutes')",
+                tenant.id(), noShow, owner.id()));                              // booked, time passed, never checked in
+
+        Map<String, Object> m = exchange("/v1/reports/money", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(m).containsEntry("includesToday", true).containsEntry("currency", "INR").containsEntry("taxLabel", "GST")
+                .containsEntry("billsRaised", 1).containsEntry("bookings", 1).containsEntry("noShows", 1).containsEntry("waitingNow", 1);
+        assertThat(((Number) m.get("collected")).doubleValue()).isEqualTo(500.0);
+        assertThat((List<Map<String, Object>>) m.get("tender")).singleElement().satisfies(x -> assertThat(x).containsEntry("method", "cash"));
+        assertThat((List<Map<String, Object>>) m.get("topServices")).singleElement().satisfies(x -> {
+            assertThat(x).containsEntry("name", "X");
+            assertThat(((Number) x.get("revenue")).doubleValue()).isEqualTo(500.0);
+        });
+
+        String yesterday = java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1).toString(); // test tenants are UTC
+        Map<String, Object> y = exchange("/v1/reports/money?from=" + yesterday + "&to=" + yesterday, HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(y).containsEntry("includesToday", false).containsEntry("billsRaised", 0).containsEntry("waitingNow", null);
+        assertThat(exchange("/v1/reports/sources?from=" + yesterday + "&to=" + yesterday, HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        assertThat(exchange("/v1/reports/sources", HttpMethod.GET, authed(token), List.class).getBody()).isNotEmpty(); // default: last 30 days
+
+        String today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString();
+        assertThat(exchange("/v1/reports/money?from=" + today + "&to=" + yesterday, HttpMethod.GET, authed(token), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void overviewSummarisesTheClinicsDay() {
         SeededTenant tenant = seedTenant();
         SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "ov1@a.com", "+919800069001", false);

@@ -1,5 +1,8 @@
 package com.nabd.hms.reports;
 
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
+import com.nabd.hms.reports.dto.MoneyResponse;
 import com.nabd.hms.reports.dto.OverviewResponse;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.reports.dto.BillingLeakageResponse;
@@ -47,18 +50,29 @@ public class ReportsController {
         return service.dailyMoney(tenantId(jwt));
     }
 
+    /** Reports → Today's money. from/to are clinic days, inclusive; both default to today. */
+    @GetMapping("/money")
+    @PreAuthorize("hasAuthority('reports:view')")
+    public MoneyResponse money(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        UUID tenantId = tenantId(jwt);
+        return service.money(tenantId, service.range(tenantId, 0, from, to));
+    }
+
+    /** from/to (clinic days, inclusive) win over days; days alone keeps the old "last N days" window. */
     @GetMapping("/sources")
     @PreAuthorize("hasAuthority('reports:view')")
     public List<SourceBreakdownResponse> sources(@AuthenticationPrincipal Jwt jwt,
-                                                   @RequestParam(defaultValue = "30") int days) {
-        return service.sourceBreakdown(tenantId(jwt), days);
+                                                   @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        UUID tenantId = tenantId(jwt);
+        return service.sourceBreakdown(tenantId, service.range(tenantId, days, from, to));
     }
 
     @GetMapping("/staff-performance")
     @PreAuthorize("hasAuthority('reports:view')")
     public StaffPerformanceReport staffPerformance(@AuthenticationPrincipal Jwt jwt,
-                                                    @RequestParam(defaultValue = "30") int days) {
-        return service.staffPerformanceReport(tenantId(jwt), staffId(jwt), days);
+                                                    @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        UUID tenantId = tenantId(jwt);
+        return service.staffPerformanceReport(tenantId, staffId(jwt), service.range(tenantId, days, from, to));
     }
 
     @GetMapping("/billing-leakage")
@@ -89,8 +103,11 @@ public class ReportsController {
     @GetMapping("/export")
     @PreAuthorize("hasAuthority('reports:export')")
     public ResponseEntity<String> export(@AuthenticationPrincipal Jwt jwt, @RequestParam String reportType,
-                                          @RequestParam(defaultValue = "30") int days, HttpServletRequest http) {
-        String csv = service.exportCsv(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), reportType, days);
+                                          @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                          HttpServletRequest http) {
+        UUID tenantId = tenantId(jwt);
+        String csv = service.exportCsv(tenantId, staffId(jwt), RequestMeta.clientIp(http), reportType,
+                service.range(tenantId, days, from, to));
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf("text/csv"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + reportType + ".csv\"")

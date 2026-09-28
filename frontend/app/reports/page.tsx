@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./reports.module.css";
+import { getIdentity } from "../lib/session";
 
 // E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
-type DailyMoney = { billedToday: number; collectedToday: number; outstandingTotal: number; invoiceCountToday: number; paymentCountToday: number };
 type SourceRow = { source: string; visitCount: number };
 type StaffRow = { staffId: string; staffName: string; collected: number; paymentCount: number };
 type StaffPerformanceReport = { scopeNote: string; rows: StaffRow[] };
@@ -19,6 +19,12 @@ type BillingLeakage = {
   rule: string; thresholdAmount: number;
   entries: { procedureOrderId: string; patientName: string; chargeCode: string; chargeName: string; amount: number; completedAt: string }[];
 };
+// GET /v1/reports/money (ReportsController.money → MoneyResponse)
+type Money = {
+  from: string; to: string; includesToday: boolean; currency: string; taxLabel: string;
+  collected: number; billsRaised: number; taxCollected: number; noShows: number; bookings: number; waitingNow: number | null;
+  tender: { method: string; amount: number }[]; topServices: { name: string; revenue: number }[];
+};
 type DoctorPunctuality = {
   accessNote: string;
   entries: { doctorId: string; doctorName: string; delayCount: number; avgDelayMinutes: number; sameDayRepeatDays: number }[];
@@ -27,13 +33,41 @@ type DoctorPunctuality = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// DESIGN.md owner "Reports": period switch, then six tabs.
+type Period = "today" | "yesterday" | "week" | "month" | "custom";
+const PERIODS: [Period, string][] = [["today", "Today"], ["yesterday", "Yesterday"], ["week", "This week"], ["month", "This month"], ["custom", "Custom"]];
+type Tab = "money" | "sources" | "staff" | "packages" | "leakage" | "retention";
+const TABS: [Tab, string][] = [["money", "Today's money"], ["sources", "Sources"], ["staff", "Staff"], ["packages", "Packages"], ["leakage", "Leakage"], ["retention", "Retention"]];
+const TENDER_LABELS: Record<string, string> = { cash: "Cash", upi: "UPI", card: "Card", other: "Other" };
+const TENDER_COLORS: Record<string, string> = { cash: "#c2378a", upi: "#c8411b", card: "#2553d9", other: "#7a7f85" };
+
+/** The browser's local calendar date as YYYY-MM-DD (staff browsers run on the clinic's clock). */
+const localIso = (d: Date) => d.toLocaleDateString("en-CA");
+
+function periodRange(p: Period, custom: { from: string; to: string }): { from: string; to: string } {
+  const now = new Date();
+  const today = localIso(now);
+  if (p === "today") return { from: today, to: today };
+  if (p === "yesterday") {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    return { from: localIso(y), to: localIso(y) };
+  }
+  if (p === "week") {
+    const m = new Date(now);
+    m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); // back to Monday
+    return { from: localIso(m), to: today };
+  }
+  if (p === "month") return { from: localIso(new Date(now.getFullYear(), now.getMonth(), 1)), to: today };
+  return custom;
+}
+
 export default function ReportsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [dailyMoney, setDailyMoney] = useState<DailyMoney | null>(null);
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [staffPerf, setStaffPerf] = useState<StaffPerformanceReport | null>(null);
   const [retention, setRetention] = useState<Retention | null>(null);
@@ -42,6 +76,18 @@ export default function ReportsPage() {
   const [leakage, setLeakage] = useState<BillingLeakage | null>(null);
   const [leakageThreshold, setLeakageThreshold] = useState("0");
   const [punctuality, setPunctuality] = useState<DoctorPunctuality | null>(null);
+  const [period, setPeriod] = useState<Period>("today");
+  const [custom, setCustom] = useState(() => {
+    const d = new Date();
+    const to = localIso(d);
+    d.setDate(d.getDate() - 6);
+    return { from: localIso(d), to };
+  });
+  const [tab, setTab] = useState<Tab>("money");
+  const [moneyReport, setMoneyReport] = useState<Money | null>(null);
+  const [clinicName, setClinicName] = useState("");
+  const range = periodRange(period, custom);
+  const qs = `from=${range.from}&to=${range.to}`;
 
   const authedFetch = useCallback(
     async (path: string) => {
@@ -62,12 +108,11 @@ export default function ReportsPage() {
   );
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setError(null); // `loading` is only the first load — switching period keeps the page on screen
     try {
       const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes, liabilityRes, leakageRes, punctualityRes] = await Promise.all([
-        authedFetch("/reports/daily-money"), authedFetch("/reports/sources"),
-        authedFetch("/reports/staff-performance"), authedFetch("/reports/retention"),
+        authedFetch(`/reports/money?${qs}`), authedFetch(`/reports/sources?${qs}`),
+        authedFetch(`/reports/staff-performance?${qs}`), authedFetch("/reports/retention"),
         authedFetch("/reports/no-show-risk"), authedFetch("/packages/liability"),
         authedFetch("/reports/billing-leakage?thresholdAmount=0"), authedFetch("/reports/doctor-punctuality"),
       ]);
@@ -77,10 +122,12 @@ export default function ReportsPage() {
         return;
       }
       if (!moneyRes.ok) {
-        setError("Couldn't load reports. Try again.");
+        const p = await moneyRes.json().catch(() => null);
+        setError(p?.detail || "Couldn't load reports. Try again.");
         return;
       }
-      setDailyMoney(await moneyRes.json());
+      setMoneyReport(await moneyRes.json());
+      setClinicName(getIdentity()?.tenantName ?? "");
       if (sourcesRes?.ok) setSources(await sourcesRes.json());
       if (staffRes?.ok) setStaffPerf(await staffRes.json());
       if (retentionRes?.ok) setRetention(await retentionRes.json());
@@ -93,7 +140,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, [authedFetch, qs]);
 
   const reloadLeakage = useCallback(
     async (threshold: string) => {
@@ -110,7 +157,7 @@ export default function ReportsPage() {
   async function exportCsv(reportType: string) {
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
-    const res = await fetch(`${API_BASE}/reports/export?reportType=${reportType}`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(`${API_BASE}/reports/export?reportType=${reportType}&${qs}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return;
     const csv = await res.text();
     const blob = new Blob([csv], { type: "text/csv" });
@@ -132,54 +179,115 @@ export default function ReportsPage() {
     return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
   }
 
+  const m = moneyReport;
+  const cur = m ? new Intl.NumberFormat(m.currency === "SAR" ? "en-SA" : "en-IN", { style: "currency", currency: m.currency, minimumFractionDigits: 2 }) : null;
+  const tenderMax = m ? Math.max(0, ...m.tender.map((t) => Number(t.amount))) : 0;
+  const serviceMax = m ? Math.max(0, ...m.topServices.map((t) => Number(t.revenue))) : 0;
+
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${styles.wide}`}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Owner Insights</h1>
-        <p className={styles.subtitle}>Live view over today&apos;s clinic data.</p>
+        <h1 className={styles.title}>Reports</h1>
+        {clinicName && <p className={styles.subtitle}>{clinicName}</p>}
       </div>
 
-      {dailyMoney && (
-        <div className={styles.grid}>
-          <div className={styles.statTile}>
-            <div className={styles.statLabel}>Billed today</div>
-            <div className={styles.statValue}>{money(dailyMoney.billedToday)}</div>
-            <div className={styles.statSub}>{dailyMoney.invoiceCountToday} invoice{dailyMoney.invoiceCountToday === 1 ? "" : "s"}</div>
-          </div>
-          <div className={styles.statTile}>
-            <div className={styles.statLabel}>Collected today</div>
-            <div className={styles.statValue}>{money(dailyMoney.collectedToday)}</div>
-            <div className={styles.statSub}>{dailyMoney.paymentCountToday} payment{dailyMoney.paymentCountToday === 1 ? "" : "s"}</div>
-          </div>
-          <div className={styles.statTile}>
-            <div className={styles.statLabel}>Outstanding</div>
-            <div className={styles.statValue}>{money(dailyMoney.outstandingTotal)}</div>
-            <div className={styles.statSub}>unpaid + partial invoices</div>
-          </div>
+      <div className={styles.segmented} role="tablist" aria-label="Period">
+        {PERIODS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={period === key}
+            className={period === key ? styles.segOn : styles.seg} onClick={() => setPeriod(key)}>{label}</button>
+        ))}
+      </div>
+      {period === "custom" && (
+        <div className={styles.customRange}>
+          <label>From <input type="date" className={styles.dateInput} value={custom.from} max={custom.to}
+            onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })} /></label>
+          <label>to <input type="date" className={styles.dateInput} value={custom.to} min={custom.from}
+            onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} /></label>
         </div>
       )}
+      {m?.includesToday && <div className={styles.infoNote} role="note">ⓘ Today is still in progress — figures are provisional</div>}
 
-      {retention && (
-        <div className={styles.grid}>
-          <div className={styles.statTile}>
-            <div className={styles.statLabel}>Active patients</div>
-            <div className={styles.statValue}>{retention.totalPatients}</div>
+      <div className={styles.segmented} role="tablist" aria-label="Report">
+        {TABS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key}
+            className={tab === key ? styles.segOn : styles.seg} onClick={() => setTab(key)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === "money" && m && cur && (
+        <>
+          <div className={styles.hero}>
+            <div className={styles.heroLabel}>Collections — selected period</div>
+            <div className={styles.heroValue}>{cur.format(Number(m.collected))}</div>
           </div>
-          <div className={styles.statTile}>
-            <div className={styles.statLabel}>Repeat rate</div>
-            <div className={styles.statValue}>{retention.repeatRatePercent}%</div>
-            <div className={styles.statSub}>{retention.repeatPatients} repeat patients</div>
+          <div className={styles.stats4}>
+            <div className={styles.tileInfo}>
+              <div className={styles.statLabel}>Bills raised</div>
+              <div className={`${styles.statValue} ${styles.statInfo}`}>{m.billsRaised}</div>
+            </div>
+            <div className={styles.tileWarn}>
+              <div className={styles.statLabel}>No-shows</div>
+              <div className={`${styles.statValue} ${styles.statWarn}`}>
+                {m.noShows}{m.bookings > 0 ? ` · ${Math.round((m.noShows / m.bookings) * 100)}%` : ""}
+              </div>
+              <div className={styles.statSub}>from bookings vs check-ins</div>
+            </div>
+            <div className={styles.tileInfo}>
+              <div className={styles.statLabel}>Waiting now</div>
+              <div className={`${styles.statValue} ${styles.statAcc}`}>{m.waitingNow ?? "—"}</div>
+              {m.waitingNow === null && <div className={styles.statSub}>only while the period includes today</div>}
+            </div>
+            <div className={styles.tileInfo}>
+              <div className={styles.statLabel}>{m.taxLabel} collected</div>
+              <div className={`${styles.statValue} ${styles.statInfo}`}>{cur.format(Number(m.taxCollected))}</div>
+            </div>
           </div>
-          <div className={styles.statTile}>
-            <div className={styles.statLabel}>Avg visits / patient</div>
-            <div className={styles.statValue}>{retention.avgVisitsPerPatient}</div>
+
+          <div className={styles.card + " " + styles.section}>
+            <div className={styles.cardLabel}>Tender split</div>
+            <div className={styles.infoNoteSmall}>ⓘ Payments recorded in the period — the same figures Billing &amp; Day Close uses</div>
+            {m.tender.length === 0 ? (
+              <div className={styles.muted}>No payments in this period.</div>
+            ) : (
+              <div className={styles.columns}>
+                {m.tender.map((t) => (
+                  <div key={t.method} className={styles.column}>
+                    <span className={styles.columnValue}>{cur.format(Number(t.amount))}</span>
+                    <span className={styles.columnBar} style={{
+                      height: `${tenderMax > 0 ? Math.max(2, (Number(t.amount) / tenderMax) * 100) : 2}px`,
+                      background: TENDER_COLORS[t.method] ?? TENDER_COLORS.other,
+                    }} />
+                    <span className={styles.columnLabel}>{TENDER_LABELS[t.method] ?? t.method}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+
+          <div className={styles.card + " " + styles.section}>
+            <div className={styles.cardLabel}>Top 5 services by revenue</div>
+            {m.topServices.length === 0 ? (
+              <div className={styles.muted}>No bills in this period.</div>
+            ) : (
+              m.topServices.map((sv) => (
+                <div key={sv.name} className={styles.hbarRow}>
+                  <span className={styles.hbarName} title={sv.name}>{sv.name}</span>
+                  <span className={styles.hbarTrack}>
+                    <span className={styles.hbar} style={{ width: `${serviceMax > 0 ? (Number(sv.revenue) / serviceMax) * 60 : 0}%` }} />
+                    <span className={styles.hbarValue}>{cur.format(Number(sv.revenue))}</span>
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </>
       )}
 
+      {tab === "sources" && (
+        <>
       <div className={styles.card + " " + styles.section}>
         <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>Where patients come from (last 30 days)</h3>
+          <h3 className={styles.sectionTitle}>Where patients come from (selected period)</h3>
           <button className={styles.exportBtn} onClick={() => exportCsv("sources")}>Export CSV</button>
         </div>
         {sources.length === 0 ? (
@@ -196,10 +304,15 @@ export default function ReportsPage() {
         )}
       </div>
 
+        </>
+      )}
+
+      {tab === "staff" && (
+        <>
       {staffPerf && (
         <div className={styles.card + " " + styles.section}>
           <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Staff collection & performance (last 30 days)</h3>
+            <h3 className={styles.sectionTitle}>Staff collection & performance (selected period)</h3>
             <button className={styles.exportBtn} onClick={() => exportCsv("staff-performance")}>Export CSV</button>
           </div>
           <div className={styles.rule}>{staffPerf.scopeNote}</div>
@@ -218,6 +331,35 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {punctuality && (
+        <div className={styles.card + " " + styles.section}>
+          <div className={styles.sectionHeader}>
+            <h3 className={styles.sectionTitle}>Doctor punctuality (last 90 days)</h3>
+          </div>
+          <div className={styles.rule}>{punctuality.accessNote}</div>
+          {punctuality.entries.length === 0 ? (
+            <div className={styles.muted}>No delays announced.</div>
+          ) : (
+            <table className={styles.table}>
+              <thead><tr><th>Doctor</th><th>Delays</th><th>Avg minutes</th><th>Same-day repeats</th></tr></thead>
+              <tbody>
+                {punctuality.entries.map((e) => (
+                  <tr key={e.doctorId}>
+                    <td>{e.doctorName}</td><td>{e.delayCount}</td><td>{e.avgDelayMinutes}</td><td>{e.sameDayRepeatDays}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+        </>
+      )}
+
+      {tab === "packages" && (
+        <>
+          <div className={styles.rule}>Current position — not affected by the period.</div>
       {liability && (
         <div className={styles.card + " " + styles.section}>
           <div className={styles.sectionHeader}>
@@ -248,6 +390,11 @@ export default function ReportsPage() {
         </div>
       )}
 
+        </>
+      )}
+
+      {tab === "leakage" && (
+        <>
       {leakage && (
         <div className={styles.card + " " + styles.section}>
           <div className={styles.sectionHeader}>
@@ -283,26 +430,27 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {punctuality && (
-        <div className={styles.card + " " + styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Doctor punctuality (last 90 days)</h3>
+        </>
+      )}
+
+      {tab === "retention" && (
+        <>
+          <div className={styles.rule}>Across all patients — not affected by the period.</div>
+      {retention && (
+        <div className={styles.grid}>
+          <div className={styles.statTile}>
+            <div className={styles.statLabel}>Active patients</div>
+            <div className={styles.statValue}>{retention.totalPatients}</div>
           </div>
-          <div className={styles.rule}>{punctuality.accessNote}</div>
-          {punctuality.entries.length === 0 ? (
-            <div className={styles.muted}>No delays announced.</div>
-          ) : (
-            <table className={styles.table}>
-              <thead><tr><th>Doctor</th><th>Delays</th><th>Avg minutes</th><th>Same-day repeats</th></tr></thead>
-              <tbody>
-                {punctuality.entries.map((e) => (
-                  <tr key={e.doctorId}>
-                    <td>{e.doctorName}</td><td>{e.delayCount}</td><td>{e.avgDelayMinutes}</td><td>{e.sameDayRepeatDays}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <div className={styles.statTile}>
+            <div className={styles.statLabel}>Repeat rate</div>
+            <div className={styles.statValue}>{retention.repeatRatePercent}%</div>
+            <div className={styles.statSub}>{retention.repeatPatients} repeat patients</div>
+          </div>
+          <div className={styles.statTile}>
+            <div className={styles.statLabel}>Avg visits / patient</div>
+            <div className={styles.statValue}>{retention.avgVisitsPerPatient}</div>
+          </div>
         </div>
       )}
 
@@ -325,6 +473,8 @@ export default function ReportsPage() {
             </table>
           )}
         </div>
+      )}
+        </>
       )}
     </main>
   );
