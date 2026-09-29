@@ -256,6 +256,16 @@ function ArrivalsPageInner() {
     return () => clearInterval(id);
   }, []);
 
+  // TopBar's "Register walk-in" (on the schedule board) lands here with ?action=walkin; strip it
+  // once consumed so back/refresh doesn't reopen the dialog. Fresh mount, so fields are already blank.
+  useEffect(() => {
+    if (searchParams.get("action") !== "walkin") return;
+    void Promise.resolve().then(() => {
+      setShowModal(true);
+      router.replace("/arrivals");
+    });
+  }, [searchParams, router]);
+
   useEffect(() => {
     // Deferred to a microtask so the effect body itself never calls setState synchronously.
     void Promise.resolve().then(() => {

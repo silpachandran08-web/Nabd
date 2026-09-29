@@ -230,6 +230,19 @@
   color: var(--nb-text-primary);
 }
 
+.badge {
+  float: right;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
 .linkActive {
   background: var(--nb-accent-tint);
   color: var(--nb-accent-500);
