@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./topBar.module.css";
-import { SHELL_SKIP_PREFIXES } from "./lib/session";
+import { getPermissions, SHELL_SKIP_PREFIXES } from "./lib/session";
 
 const SEARCH_INPUT_ID = "nb-global-search";
 
@@ -12,8 +12,11 @@ const SEARCH_INPUT_ID = "nb-global-search";
 // than a cross-component callback registry — the only consumer so far is nursing's own capture-
 // vitals picker, and a URL round trip is simpler and less error-prone than wiring a context
 // just for this one case. Add more pathnames here if other pages want the same treatment.
-const PRIMARY_ACTIONS: Record<string, { label: string; href: string }> = {
+// The Receptionist's Queue & Appointments board carries "Register walk-in", which opens the
+// Arrivals page's own walk-in dialog (?action=walkin) — only for those who can check in.
+const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?: string }> = {
   "/nursing": { label: "Capture vitals", href: "/nursing?action=capture" },
+  "/schedule": { label: "Register walk-in", href: "/arrivals?action=walkin", permission: "queue:create" },
 };
 
 // DESIGN.md's top bar, present on every clinic page: sidebar collapse toggle, global patient
@@ -71,7 +74,8 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     if (trimmed) router.push(`/patients?q=${encodeURIComponent(trimmed)}`);
   }
 
-  const primaryAction = pathname ? PRIMARY_ACTIONS[pathname] : undefined;
+  const action = pathname ? PRIMARY_ACTIONS[pathname] : undefined;
+  const primaryAction = action && (!action.permission || getPermissions().includes(action.permission)) ? action : undefined;
 
   return (
     <div className={styles.bar}>

@@ -6,16 +6,25 @@ import Link from "next/link";
 import styles from "./clinicNav.module.css";
 import { getIdentity, getPermissions, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+// Same "waiting" bucket as the Arrivals page's own tab counts (arrivals/page.tsx bucketOf).
+const WAITING_STATUSES = ["checked_in", "waiting", "billing_pending", "vitals_pending", "vitals_done"];
+
 // DESIGN.md §4/§8: 248px left sidebar, one item per accessible module. Every clinic page
 // (arrivals, patients, ...) was built standalone with no shared shell — this is that missing
 // nav, mounted once in layout.tsx (same pattern as /platform/PlatformNav.tsx), permission-gated
 // off the JWT's own "permissions" claim so each role only sees what it can open.
+// Reception's items follow DESIGN.md's Receptionist sidebar (Today / Arrivals, Queue &
+// Appointments, Patients, Checkout & Billing, Treatment Packages); its Messages item is left out —
+// there's no inbox page to open yet.
 const NAV_ITEMS: { href: string; label: string; permission: string | null }[] = [
-  { href: "/arrivals", label: "Today · Arrivals", permission: "queue:view" },
+  { href: "/arrivals", label: "Today / Arrivals", permission: "queue:view" },
+  { href: "/schedule", label: "Queue & Appointments", permission: "queue:view" },
   { href: "/patients", label: "Patients", permission: "patients:view" },
   // clinical:edit, not clinical:view — reception can be granted clinical:view (e.g. for billing
   // lookups) without being a clinician; see lib/session.ts's LANDING_RULES for the full reasoning.
   { href: "/consult", label: "Consultation Workspace", permission: "clinical:edit" },
+  { href: "/billing", label: "Checkout & Billing", permission: "billing:view" },
   { href: "/packages", label: "Treatment Packages", permission: "packages:view" },
   { href: "/staff", label: "Staff & Access", permission: "staff:view" },
   { href: "/reports", label: "Owner Insights", permission: "reports:view" },
@@ -102,6 +111,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [showMenu, setShowMenu] = useState(false);
   const [sessionLabel, setSessionLabel] = useState("—");
   const [signingOut, setSigningOut] = useState(false);
+  const [badges, setBadges] = useState<Record<string, number>>({});
 
   // Hydration-safe: render nothing until this mounts and can read localStorage, then reflect
   // it — never read it directly during render.
@@ -110,6 +120,29 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     setPermissions(skip ? [] : getPermissions());
     setIdentity(skip ? null : getIdentity());
     setOwner(skip ? false : isOwner());
+  }, [pathname, skip]);
+
+  // The Receptionist sidebar's count badges: today's waiting arrivals and visits sent to checkout,
+  // both off today's queue (GET /queue). Refreshed on every navigation.
+  // ponytail: no polling — a count can lag until the next page change; poll if reception asks.
+  useEffect(() => {
+    const perms = getPermissions();
+    if (skip || isOwner() || perms.includes("nursing:view") || !perms.includes("queue:view")) return;
+    const token = localStorage.getItem("nabd_access_token");
+    if (!token) return;
+    let cancelled = false;
+    void fetch(`${API_BASE}/queue`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (cancelled || !res.ok) return;
+        const rows: { status: string }[] = await res.json();
+        if (cancelled) return;
+        setBadges({
+          "/arrivals": rows.filter((r) => WAITING_STATUSES.includes(r.status)).length,
+          "/billing": rows.filter((r) => r.status === "checkout_pending").length,
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [pathname, skip]);
 
   if (skip || !permissions || permissions.length === 0) return null;
@@ -174,9 +207,11 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           <Link
             key={item.href}
             href={item.href}
-            className={`${styles.link} ${pathname?.startsWith(item.href) ? styles.linkActive : ""}`}
+            className={`${styles.link} ${pathname?.startsWith(item.href)
+              || (item.href === "/billing" && pathname?.startsWith("/checkout")) ? styles.linkActive : ""}`}
           >
             {item.label}
+            {!!badges[item.href] && <span className={styles.badge}>{badges[item.href]}</span>}
           </Link>
         ))}
       </div>
