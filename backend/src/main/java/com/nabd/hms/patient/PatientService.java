@@ -1,5 +1,7 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.common.PhoneNumbers;
+import com.nabd.hms.patient.dto.PatientRegistryResponse;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.AesGcmCipher;
 import com.nabd.hms.common.ApiException;
@@ -62,6 +64,70 @@ public class PatientService {
         this.auditService = auditService;
     }
 
+    public static final List<String> REGISTRY_FILTERS = List.of("all", "recent", "followup", "package", "balance", "duplicate", "archived");
+    private static final int RECENT_VISIT_DAYS = 90;
+    // ponytail: flags are computed for up to REGISTRY_CAP patients per request, then filtered and
+    // searched in memory; move filtering into SQL with keyset paging once a clinic outgrows this.
+    private static final int REGISTRY_CAP = 3000;
+    private static final int REGISTRY_ROWS = 200;
+
+    /** Patient Registry: per-patient visit/appointment/package/balance/clinical flags, one count per filter. */
+    @Transactional(readOnly = true)
+    public PatientRegistryResponse registry(UUID tenantId, UUID callerStaffId, String q, String filter) {
+        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        tenantContext.set(tenantId);
+        String f = filter == null || filter.isBlank() ? "all" : filter;
+        if (!REGISTRY_FILTERS.contains(f)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-filter", "Invalid filter",
+                    "filter must be one of " + String.join(", ", REGISTRY_FILTERS) + ".");
+        }
+        java.time.ZoneId zone = clock.zone(tenantId);
+        LocalDate today = LocalDate.now(zone);
+        List<PatientRegistryResponse.Row> all = repo.registry(tenantId, scopedToDoctorId, today,
+                today.atStartOfDay(zone).toInstant(), REGISTRY_CAP).stream().map(r -> {
+            boolean archived = !"active".equals(r.status());
+            List<String> tags = new java.util.ArrayList<>();
+            if (archived) tags.add("archived");
+            if (!archived && r.lastVisit() != null && !r.lastVisit().isBefore(today.minusDays(RECENT_VISIT_DAYS))) tags.add("recent");
+            if (!archived && r.followUpDue()) tags.add("followup");
+            if (!archived && r.packageTotal() > 0) tags.add("package");
+            if (r.balanceDue()) tags.add("balance");
+            if (r.duplicate()) tags.add("duplicate");
+            boolean nextToday = r.nextStart() != null && r.nextStart().atZone(zone).toLocalDate().equals(today);
+            return new PatientRegistryResponse.Row(r.id(), r.mrn(), r.name(), r.phone(),
+                    java.time.Period.between(r.dob(), today).getYears(), r.gender(), isMinor(r.dob(), today),
+                    r.lastVisit(), r.nextStart(), r.nextDoctorName(), r.nextDoctorId(), r.nextAppointmentId(), nextToday,
+                    r.packageTotal() > 0 ? r.packageUsed() : null, r.packageTotal() > 0 ? r.packageTotal() : null,
+                    r.condition(), r.followUpDue(), r.allergy(), r.balanceDue(), r.duplicate(), archived,
+                    r.queueToken(), r.queueStatus(), List.copyOf(tags));
+        }).toList();
+
+        java.util.Map<String, Integer> counts = new java.util.LinkedHashMap<>();
+        for (String key : REGISTRY_FILTERS) {
+            counts.put(key, (int) all.stream().filter(r -> inFilter(r, key)).count());
+        }
+        String needle = q == null ? "" : q.strip().toLowerCase();
+        List<PatientRegistryResponse.Row> rows = all.stream()
+                .filter(r -> inFilter(r, f))
+                .filter(r -> needle.isEmpty() || matches(r, needle))
+                .limit(REGISTRY_ROWS).toList();
+        return new PatientRegistryResponse(counts.get("all"), counts, rows);
+    }
+
+    private static boolean inFilter(PatientRegistryResponse.Row r, String filter) {
+        return "all".equals(filter) ? !r.archived() : r.tags().contains(filter);
+    }
+
+    /** Name, MRN, mobile digits, or today's token ("T-12" / "12"). */
+    private static boolean matches(PatientRegistryResponse.Row r, String needle) {
+        String digits = needle.replaceAll("\\D", "");
+        String token = needle.startsWith("t-") ? needle.substring(2) : needle;
+        return r.name().toLowerCase().contains(needle)
+                || r.mrn().toLowerCase().contains(needle)
+                || (digits.length() >= 3 && r.phone().replaceAll("\\D", "").contains(digits))
+                || (r.queueToken() != null && token.equals(String.valueOf(r.queueToken())));
+    }
+
     @Transactional
     public PatientPage list(UUID tenantId, UUID callerStaffId, String q, int limit, String cursor) {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
@@ -94,7 +160,10 @@ public class PatientService {
         tenantContext.set(tenantId);
         validateGuardian(tenantId, req);
 
-        List<MatchCandidateRow> candidates = repo.findDuplicateCandidates(tenantId, req.phone(), req.name(), req.dob(), 5);
+        String phone = PhoneNumbers.e164(req.phone(), repo.region(tenantId)); // one stored format, whatever was typed
+        List<MatchCandidateRow> candidates = Boolean.TRUE.equals(req.confirmedNotDuplicate())
+                ? List.of() // reviewed and confirmed distinct; the registry's Duplicate review flag still surfaces it
+                : repo.findDuplicateCandidates(tenantId, phone, req.name(), req.dob(), 5);
         if (!candidates.isEmpty()) {
             // count only — candidate ids/names/phones are PHI, don't belong in an operational log
             log.info("patient registration blocked by {}: {} duplicate candidate(s) (tenant {})",
@@ -105,7 +174,7 @@ public class PatientService {
         }
 
         byte[] nationalIdEnc = encryptOrNull(req.nationalId());
-        UUID id = repo.insert(tenantId, req.name(), req.phone(), req.dob(), req.gender(),
+        UUID id = repo.insert(tenantId, req.name(), phone, req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
         if (req.guardianId() != null) {
             grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId());
@@ -134,7 +203,7 @@ public class PatientService {
         validateGuardian(tenantId, req);
 
         byte[] nationalIdEnc = encryptOrNull(req.nationalId());
-        repo.update(tenantId, id, req.name(), req.phone(), req.dob(), req.gender(),
+        repo.update(tenantId, id, req.name(), PhoneNumbers.e164(req.phone(), repo.region(tenantId)), req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
         // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
         // the one place that needs to keep guardian_access consent (and the audit trail) in step —

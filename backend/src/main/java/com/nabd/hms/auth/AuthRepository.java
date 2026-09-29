@@ -1,5 +1,6 @@
 package com.nabd.hms.auth;
 
+import com.nabd.hms.common.PhoneNumbers;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -74,29 +75,8 @@ class AuthRepository {
     Optional<Staff> findStaffByMobile(UUID tenantId, String region, String mobilePhone) {
         return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND mobile_phone IS NOT NULL " +
                         "AND regexp_replace(mobile_phone, '\\D', '', 'g') = ?",
-                staffMapper(), tenantId, phoneDigits(mobilePhone, region)
+                staffMapper(), tenantId, PhoneNumbers.digits(mobilePhone, region)
         ).stream().findFirst();
-    }
-
-    /** E.164 digits (no "+") for India (91) and Saudi Arabia (966); anything already carrying a
-     * country code is kept as is. Package-private for AuthPhoneNumbersTest. */
-    static String phoneDigits(String raw, String region) {
-        String trimmed = raw == null ? "" : raw.strip();
-        String d = trimmed.replaceAll("\\D", "");
-        if (trimmed.startsWith("+")) {
-            return d;
-        }
-        if (d.startsWith("00")) {
-            return d.substring(2);
-        }
-        if ("KSA".equals(region)) {
-            if (d.length() == 10 && d.startsWith("05")) return "966" + d.substring(1);
-            if (d.length() == 9 && d.startsWith("5")) return "966" + d;
-            return d;
-        }
-        if (d.length() == 11 && d.startsWith("0")) return "91" + d.substring(1);
-        if (d.length() == 10) return "91" + d;
-        return d;
     }
 
     Optional<Staff> findStaffById(UUID staffId) {

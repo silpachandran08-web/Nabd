@@ -93,11 +93,72 @@ class PatientRepository {
                 String.class, tenantId, patientId);
     }
 
+    String region(UUID tenantId) {
+        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst().orElse("IN");
+    }
+
     boolean existsActive(UUID tenantId, UUID id) {
         Boolean exists = jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ? AND status = 'active')",
                 Boolean.class, tenantId, id);
         return Boolean.TRUE.equals(exists);
+    }
+
+    record RegistryRow(UUID id, String mrn, String name, String phone, LocalDate dob, String gender, String status,
+                       LocalDate lastVisit, Instant nextStart, String nextDoctorName, UUID nextDoctorId, UUID nextAppointmentId,
+                       int packageUsed, int packageTotal, String condition, boolean followUpDue, String allergy,
+                       boolean balanceDue, boolean duplicate, Integer queueToken, String queueStatus) {
+    }
+
+    /**
+     * Everything the Patient Registry shows per patient, in one pass, through the same consent and
+     * doctor-scope gates as every other patient read. Duplicate review reuses registration's own
+     * rule (findDuplicateCandidates: same phone, or same DOB + similar name) but skips guardian /
+     * sibling links, since a family legitimately shares one number (NB-080).
+     */
+    List<RegistryRow> registry(UUID tenantId, UUID scopedToDoctorId, LocalDate today, Instant todayStart, int cap) {
+        return jdbc.query("""
+                SELECT patients.id, patients.mrn, patients.name, patients.phone, patients.dob, patients.gender, patients.status,
+                       (SELECT max(q.queue_date) FROM queue_entries q WHERE q.patient_id = patients.id AND q.status <> 'no_show') AS last_visit,
+                       na.start_time AS next_start, na.doctor_name AS next_doctor, na.doctor_id AS next_doctor_id, na.id AS next_appt_id,
+                       pk.used AS pkg_used, pk.total AS pkg_total,
+                       (SELECT c.condition FROM chronic_conditions c WHERE c.patient_id = patients.id AND c.status = 'active'
+                        ORDER BY c.recorded_at LIMIT 1) AS condition,
+                       EXISTS (SELECT 1 FROM chronic_conditions c WHERE c.patient_id = patients.id AND c.status = 'active'
+                               AND c.review_due_date <= ?) AS followup_due,
+                       (SELECT a.substance FROM patient_allergies a WHERE a.patient_id = patients.id AND a.active
+                        ORDER BY CASE a.severity WHEN 'severe' THEN 0 WHEN 'moderate' THEN 1 ELSE 2 END, a.recorded_at LIMIT 1) AS allergy,
+                       EXISTS (SELECT 1 FROM invoices i WHERE i.patient_id = patients.id AND i.status IN ('unpaid', 'partial')) AS balance_due,
+                       (patients.status = 'active' AND EXISTS (
+                          SELECT 1 FROM patients d WHERE d.tenant_id = patients.tenant_id AND d.id <> patients.id AND d.status = 'active'
+                            AND ((regexp_replace(d.phone, '\\D', '', 'g') = regexp_replace(patients.phone, '\\D', '', 'g')
+                                  AND NOT (d.guardian_id IS NOT DISTINCT FROM patients.id OR patients.guardian_id IS NOT DISTINCT FROM d.id
+                                           OR (d.guardian_id IS NOT NULL AND d.guardian_id = patients.guardian_id)))
+                                 OR (d.dob = patients.dob AND similarity(d.name, patients.name) > 0.3)))) AS duplicate,
+                       tq.token_number AS queue_token, tq.status AS queue_status
+                FROM patients
+                LEFT JOIN LATERAL (SELECT a.id, a.start_time, a.doctor_id, s.name AS doctor_name
+                                   FROM appointments a JOIN staff s ON s.id = a.doctor_id
+                                   WHERE a.patient_id = patients.id AND a.status = 'scheduled' AND a.start_time >= ?
+                                   ORDER BY a.start_time LIMIT 1) na ON true
+                LEFT JOIN LATERAL (SELECT COALESCE(SUM(ii.quantity_consumed), 0) AS used, COALESCE(SUM(ii.quantity_total), 0) AS total
+                                   FROM package_instances pi JOIN package_instance_items ii ON ii.instance_id = pi.id
+                                   WHERE pi.patient_id = patients.id AND pi.status = 'active') pk ON true
+                LEFT JOIN LATERAL (SELECT q.token_number, q.status FROM queue_entries q
+                                   WHERE q.patient_id = patients.id AND q.queue_date = ? AND q.status NOT IN ('completed', 'no_show')
+                                   ORDER BY q.created_at DESC LIMIT 1) tq ON true
+                WHERE patients.tenant_id = ?
+                """ + CONSENT_GATE + SCOPE_GATE + "ORDER BY patients.name LIMIT ?",
+                (rs, i) -> new RegistryRow(rs.getObject("id", UUID.class), rs.getString("mrn"), rs.getString("name"),
+                        rs.getString("phone"), rs.getDate("dob").toLocalDate(), rs.getString("gender"), rs.getString("status"),
+                        rs.getDate("last_visit") == null ? null : rs.getDate("last_visit").toLocalDate(),
+                        rs.getTimestamp("next_start") == null ? null : rs.getTimestamp("next_start").toInstant(),
+                        rs.getString("next_doctor"), rs.getObject("next_doctor_id", UUID.class), rs.getObject("next_appt_id", UUID.class),
+                        rs.getInt("pkg_used"), rs.getInt("pkg_total"), rs.getString("condition"), rs.getBoolean("followup_due"),
+                        rs.getString("allergy"), rs.getBoolean("balance_due"), rs.getBoolean("duplicate"),
+                        (Integer) rs.getObject("queue_token"), rs.getString("queue_status")),
+                java.sql.Date.valueOf(today), java.sql.Timestamp.from(todayStart), java.sql.Date.valueOf(today),
+                tenantId, scopedToDoctorId, scopedToDoctorId, cap);
     }
 
     /** Free-text search: phone/MRN prefix, name by substring OR trigram fuzzy match (typo-tolerant). */
@@ -126,17 +187,19 @@ class PatientRepository {
     }
 
     /** Phone-exact is the strong signal; DOB match + trigram name similarity is the fuzzy one (NB-060). */
+    // Phones compare as digits (PhoneNumbers), so records saved in any format before normalisation still match.
     List<MatchCandidateRow> findDuplicateCandidates(UUID tenantId, String phone, String name, LocalDate dob, int limit) {
+        String digits = phone.replaceAll("\\D", "");
         return jdbc.query(
                 "SELECT id, name, phone, GREATEST(" +
-                        "  CASE WHEN phone = ? THEN 1.0 ELSE 0.0 END," +
+                        "  CASE WHEN regexp_replace(phone, '\\D', '', 'g') = ? THEN 1.0 ELSE 0.0 END," +
                         "  CASE WHEN dob = ? THEN similarity(name, ?) ELSE 0.0 END" +
                         ") AS match_score " +
                         "FROM patients " +
                         "WHERE tenant_id = ? AND status = 'active' " +
-                        "AND (phone = ? OR (dob = ? AND similarity(name, ?) > 0.3)) " +
+                        "AND (regexp_replace(phone, '\\D', '', 'g') = ? OR (dob = ? AND similarity(name, ?) > 0.3)) " +
                         "ORDER BY match_score DESC LIMIT ?",
-                candidateMapper(), phone, dob, name, tenantId, phone, dob, name, limit);
+                candidateMapper(), digits, dob, name, tenantId, digits, dob, name, limit);
     }
 
     UUID insert(UUID tenantId, String name, String phone, LocalDate dob, String gender,
