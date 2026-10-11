@@ -3,6 +3,10 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import styles from "./ui.module.css";
 
+// Open dialogs, innermost last. Only the top one answers Escape and Tab, so a confirm opened from a
+// drawer closes alone instead of taking the drawer with it.
+const openStack: symbol[] = [];
+
 // Accessible modal: role=dialog, aria-modal, labelled by its title, focus moved in on open and
 // restored on close, Escape closes, Tab is trapped. `size="drawer"` renders the side-drawer
 // variant (DESIGN.md §8.10); narrow screens turn either into a bottom sheet via CSS.
@@ -30,8 +34,12 @@ export default function Dialog({
     const node = ref.current;
     const focusable = () =>
       Array.from(node?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])') ?? []);
-    (focusable()[0] ?? node)?.focus();
+    const me = Symbol("dialog");
+    openStack.push(me);
+    // A child that already took focus (autoFocus) keeps it; otherwise start at the first control.
+    if (!node?.contains(document.activeElement)) (focusable()[0] ?? node)?.focus();
     function onKey(e: KeyboardEvent) {
+      if (openStack[openStack.length - 1] !== me) return;
       if (e.key === "Escape") {
         e.stopPropagation();
         closeRef.current();
@@ -47,6 +55,7 @@ export default function Dialog({
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
+      openStack.splice(openStack.indexOf(me), 1);
       previous?.focus?.();
     };
   }, []);
