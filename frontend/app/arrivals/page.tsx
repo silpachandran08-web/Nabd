@@ -4,6 +4,12 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./arrivals.module.css";
+import Dialog from "../components/ui/Dialog";
+import StatusPill, { type PillTone } from "../components/ui/StatusPill";
+import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
+import type { IconName } from "../components/ui/Icon";
+import { can } from "../lib/permissions";
+import { CheckInDialog, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
@@ -15,8 +21,11 @@ type QueueEntry = {
 };
 type Row = QueueEntry & { patientName: string; patientMrn: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
+type GuardianOption = { id: string; name: string; phone: string };
+// GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
+type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
+type Grants = { queueCreate: boolean; queueEdit: boolean; billingCreate: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
 type StaffOption = { id: string; name: string };
-type Problem = { title: string; detail: string };
 // Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
 type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
 // NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
@@ -42,18 +51,25 @@ const PRIORITY_REASON_CODES = [
   "High fever in infant", "Post-operative complication", "Severe pain", "Other",
 ] as const;
 
-const STATUS_CLASS: Record<string, string> = {
-  checked_in: styles.pillWaiting,
-  waiting: styles.pillWaiting,
-  billing_pending: styles.pillVitals,
-  vitals_pending: styles.pillVitals,
-  vitals_done: styles.pillReady,
-  in_consult: styles.pillConsult,
-  procedures_pending: styles.pillConsult,
-  checkout_pending: styles.pillDone,
-  completed: styles.pillDone,
-  no_show: styles.pillNoShow,
+// Status is icon + text, never colour alone (DESIGN.md §8) — rendered through the shared StatusPill.
+const STATUS_PILL: Record<string, { label: string; tone: PillTone; icon: IconName }> = {
+  checked_in: { label: "Checked in", tone: "info", icon: "check" },
+  waiting: { label: "Waiting", tone: "warn", icon: "clock" },
+  billing_pending: { label: "Billing pending", tone: "warn", icon: "receipt" },
+  vitals_pending: { label: "Vitals pending", tone: "warn", icon: "pulse" },
+  vitals_done: { label: "Vitals done", tone: "ok", icon: "check" },
+  in_consult: { label: "In consultation", tone: "sync", icon: "stethoscope" },
+  procedures_pending: { label: "Procedures pending", tone: "sync", icon: "syringe" },
+  checkout_pending: { label: "Checkout pending", tone: "info", icon: "receipt" },
+  completed: { label: "Completed", tone: "ok", icon: "check" },
+  no_show: { label: "No show", tone: "danger", icon: "alert" },
 };
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_PILL[status];
+  const fallback = status.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  return <StatusPill tone={s?.tone ?? "neutral"} label={s?.label ?? fallback} icon={s?.icon} />;
+}
 
 type Bucket = "waiting" | "in_consult" | "checkout_pending" | "completed" | "other";
 function bucketOf(status: string): Bucket {
@@ -75,6 +91,12 @@ const TABS: { key: "all" | Bucket; label: string }[] = [
   { key: "checkout_pending", label: "Checkout pending" },
   { key: "completed", label: "Completed" },
 ];
+
+// PatientMatchCandidateResponse.matchScore is a 0-1 fraction (1.0 = exact phone match, otherwise
+// trigram name similarity); show it as a percentage.
+function matchPercent(score: number): number {
+  return Math.round(Math.min(1, Math.max(0, score)) * 100);
+}
 
 function waitMinutes(createdAt: string): number {
   return Math.max(0, Math.round((Date.now() - new Date(createdAt).getTime()) / 60000));
@@ -103,6 +125,19 @@ function ArrivalsPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [, setNow] = useState(() => Date.now());
+  // Per-action visibility (REC-014/052/062). Read after mount: the token lives in localStorage, so
+  // evaluating can() during SSR/first render would mismatch. Absent until known, never disabled.
+  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, billingCreate: false, billingView: false, clinicalEdit: false, patientsView: false });
+  // Patient name/MRN lookups are per-row GET /patients/{id}; cache them so the 15s poll only
+  // fetches patients it hasn't seen (the N+1 shrinks to the first load).
+  const patientCache = useRef(new Map<string, { name: string; mrn: string }>());
+  const [railId, setRailId] = useState<string | null>(null);
+  const [railPatient, setRailPatient] = useState<{ state: "loading" | "error" | "ready"; data: PatientDetail | null }>({ state: "loading", data: null });
+  const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null);
+  const [checkinTarget, setCheckinTarget] = useState<AppointmentOption | null>(null);
+  const [guardianQuery, setGuardianQuery] = useState("");
+  const [guardianResults, setGuardianResults] = useState<GuardianOption[]>([]);
+  const [guardian, setGuardian] = useState<GuardianOption | null>(null);
   // Computed client-side only — server and browser locale defaults for toLocaleDateString can
   // differ, and doing this during the initial render causes a hydration mismatch.
   const [dateLabel, setDateLabel] = useState("");
@@ -116,6 +151,7 @@ function ArrivalsPageInner() {
   const [priorityReasonCode, setPriorityReasonCode] = useState<string>(PRIORITY_REASON_CODES[0]);
   const [priorityOtherReason, setPriorityOtherReason] = useState("");
   const [prioritySubmitting, setPrioritySubmitting] = useState(false);
+  const [priorityError, setPriorityError] = useState<string | null>(null);
 
   const [showModal, setShowModal] = useState(false);
   const [patientQuery, setPatientQuery] = useState("");
@@ -139,6 +175,8 @@ function ArrivalsPageInner() {
   const [delayMinutesInput, setDelayMinutesInput] = useState("15");
   const [delayReasonInput, setDelayReasonInput] = useState("");
   const [delayBusy, setDelayBusy] = useState(false);
+  const [delayError, setDelayError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [callbackList, setCallbackList] = useState<CallbackEntry[]>([]);
   const [showDelayPicker, setShowDelayPicker] = useState(false);
 
@@ -146,7 +184,6 @@ function ArrivalsPageInner() {
   const [showCheckin, setShowCheckin] = useState(false);
   const [checkinAppointments, setCheckinAppointments] = useState<AppointmentOption[] | null>(null);
   const [checkinError, setCheckinError] = useState<string | null>(null);
-  const [checkinSubmittingId, setCheckinSubmittingId] = useState<string | null>(null);
 
   // "Move queue" quick action: pick a queue entry, then the same department/doctor transfer
   // picker consult's page already uses against POST /queue/{id}/transfer.
@@ -205,8 +242,11 @@ function ArrivalsPageInner() {
         doctorIds = roster.map((s) => s.id);
       }
       const withNames = await Promise.all(entries.map(async (e) => {
+        const cached = patientCache.current.get(e.patientId);
+        if (cached) return { ...e, patientName: cached.name, patientMrn: cached.mrn };
         const pRes = await authedFetch(`/patients/${e.patientId}`);
         const p = pRes?.ok ? await pRes.json() : null;
+        if (p?.name) patientCache.current.set(e.patientId, { name: p.name, mrn: p.mrn ?? "" });
         return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "" };
       }));
       setRows(withNames);
@@ -237,6 +277,42 @@ function ArrivalsPageInner() {
     void Promise.resolve().then(load);
   }, [load]);
 
+  useEffect(() => {
+    void Promise.resolve().then(() => setGrants({
+      queueCreate: can("queue:create"), queueEdit: can("queue:edit"),
+      billingCreate: can("billing:create"), billingView: can("billing:view"), clinicalEdit: can("clinical:edit"), patientsView: can("patients:view"),
+    }));
+  }, []);
+
+  // Guardian search for a minor's new record (same /patients?q= call the registry's dialog uses).
+  useEffect(() => {
+    const q = guardianQuery.trim();
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      if (q.length < 2) {
+        if (!cancelled) setGuardianResults([]);
+        return;
+      }
+      const res = await authedFetch(`/patients?q=${encodeURIComponent(q)}&limit=6`);
+      if (cancelled || !res?.ok) return;
+      const page: { data: GuardianOption[] } = await res.json();
+      if (!cancelled) setGuardianResults(page.data);
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [guardianQuery, authedFetch]);
+
+  // Detail rail: one GET /patients/{id} when a row is opened.
+  const loadRailPatient = useCallback(async (patientId: string) => {
+    setRailPatient({ state: "loading", data: null });
+    try {
+      const res = await authedFetch(`/patients/${patientId}`);
+      if (!res) return;
+      if (!res.ok) { setRailPatient({ state: "error", data: null }); return; }
+      setRailPatient({ state: "ready", data: await res.json() });
+    } catch {
+      setRailPatient({ state: "error", data: null });
+    }
+  }, [authedFetch]);
   useEffect(() => {
     void Promise.resolve().then(async () => {
       const res = await authedFetch("/appointments/callback-list");
@@ -305,10 +381,28 @@ function ArrivalsPageInner() {
     setPaymentMode("cash");
     setModalError(null);
     setDuplicateCandidates([]);
+    setGuardianQuery("");
+    setGuardianResults([]);
+    setGuardian(null);
   }
 
-  async function submitCheckIn(e: React.FormEvent) {
+  const minor = (() => {
+    if (!newDob) return false;
+    const [y, m, d] = newDob.split("-").map(Number);
+    const now = new Date();
+    let age = now.getFullYear() - y;
+    if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age--;
+    return age < 18;
+  })();
+
+  function submitCheckIn(e: React.FormEvent) {
     e.preventDefault();
+    return registerAndCheckIn(false);
+  }
+
+  // confirmedNotDuplicate=true is only sent after the receptionist reviewed the match list and
+  // chose "Different person" — the server then files the record under duplicate review.
+  async function registerAndCheckIn(confirmedNotDuplicate: boolean) {
     setModalError(null);
     if (!doctorId) {
       setModalError("Pick a doctor.");
@@ -317,30 +411,39 @@ function ArrivalsPageInner() {
     setSubmitting(true);
     try {
       let patientId = selectedPatient?.id ?? null;
+      let patientName = selectedPatient?.name ?? "";
       if (!patientId) {
         if (!newName || !newPhone || !newDob) {
           setModalError("Fill in the new patient's name, phone and date of birth.");
           return;
         }
+        if (minor && !guardian) {
+          setModalError("A guardian is required for patients under 18. Search for the guardian's record below.");
+          return;
+        }
         const res = await authedFetch("/patients", {
           method: "POST",
-          body: JSON.stringify({ name: newName, phone: newPhone, dob: newDob, gender: newGender }),
+          body: JSON.stringify({
+            name: newName, phone: newPhone, dob: newDob, gender: newGender,
+            guardianId: minor ? guardian?.id ?? null : null,
+            ...(confirmedNotDuplicate ? { confirmedNotDuplicate: true } : {}),
+          }),
         });
         if (!res) return;
         if (res.status === 409) {
           const body: { candidates: DuplicateCandidate[] } = await res.json().catch(() => ({ candidates: [] }));
-          setDuplicateCandidates(body.candidates);
+          setDuplicateCandidates([...body.candidates].sort((x, y) => y.matchScore - x.matchScore));
           setModalError(body.candidates.length > 0
-            ? "A similar patient already exists — select them below, or search above instead of registering again."
+            ? "Possible existing records found. Review the matches below — use an existing patient, or confirm this is a different person."
             : "A similar patient already exists — search for them above instead of registering again.");
           return;
         }
         if (!res.ok) {
-          const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't register patient." }));
-          setModalError(p.detail || "Couldn't register patient.");
+          setModalError(await problemMessage(res, "Couldn't register patient."));
           return;
         }
         patientId = (await res.json()).id;
+        patientName = newName;
       }
 
       const ciRes = await authedFetch("/queue/check-in", {
@@ -353,12 +456,18 @@ function ArrivalsPageInner() {
       });
       if (!ciRes) return;
       if (!ciRes.ok) {
-        const p: Problem = await ciRes.json().catch(() => ({ title: "Error", detail: "Couldn't check in." }));
-        setModalError(p.detail || "Couldn't check in.");
+        setModalError(await problemMessage(ciRes, "Couldn't check in."));
         return;
       }
+      const entry: { id?: string; tokenNumber: number } = await ciRes.json();
       setShowModal(false);
-      load();
+      setCheckInResult({
+        tokenNumber: entry.tokenNumber, patientName, doctorId,
+        doctorName: staff.find((s) => s.id === doctorId)?.name ?? "", entryId: entry.id,
+      });
+      void load();
+    } catch {
+      setModalError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -387,8 +496,7 @@ function ArrivalsPageInner() {
       });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save vitals." }));
-        setVitalsError(p.detail || "Couldn't save vitals.");
+        setVitalsError(await problemMessage(res, "Couldn't save vitals."));
         return;
       }
       setVitalsEntryId(null);
@@ -402,19 +510,22 @@ function ArrivalsPageInner() {
     setPriorityEntryId(id);
     setPriorityReasonCode(PRIORITY_REASON_CODES[0]);
     setPriorityOtherReason("");
+    setPriorityError(null);
   }
 
   async function submitPriority(e: React.FormEvent) {
     e.preventDefault();
     if (!priorityEntryId) return;
     const reason = priorityReasonCode === "Other" ? priorityOtherReason.trim() : priorityReasonCode;
-    if (!reason) return;
+    if (reason.length < 3) return; // QueueReorderRequest.reason: @Size(min = 3)
     setPrioritySubmitting(true);
     try {
       const res = await authedFetch(`/queue/${priorityEntryId}/reorder`, { method: "POST", body: JSON.stringify({ priority: true, reason }) });
       if (res?.ok) {
         setPriorityEntryId(null);
         load();
+      } else if (res) {
+        setPriorityError(await problemMessage(res, "Couldn't mark this patient as priority."));
       }
     } finally {
       setPrioritySubmitting(false);
@@ -434,6 +545,8 @@ function ArrivalsPageInner() {
         setDelayFormFor(null);
         setDelayReasonInput("");
         load();
+      } else if (res) {
+        setDelayError(await problemMessage(res, "Couldn't announce the delay."));
       }
     } finally {
       setDelayBusy(false);
@@ -443,6 +556,7 @@ function ArrivalsPageInner() {
   async function clearDelay(doctorId: string) {
     const res = await authedFetch(`/doctors/${doctorId}/delay/clear`, { method: "POST" });
     if (res?.ok) load();
+    else if (res) setActionError(await problemMessage(res, "Couldn't clear the delay."));
   }
 
   function pickDelayDoctor(doctorId: string) {
@@ -450,6 +564,7 @@ function ArrivalsPageInner() {
     setDelayFormFor(doctorId);
     setDelayMinutesInput("15");
     setDelayReasonInput("");
+    setDelayError(null);
   }
 
   // Today's scheduled appointments not yet checked in — distinct from Register walk-in, which
@@ -460,9 +575,9 @@ function ArrivalsPageInner() {
     setCheckinAppointments(null);
     // Local date, not toISOString() (UTC) — before 05:30 in India that would ask for yesterday.
     const today = new Date().toLocaleDateString("en-CA");
-    const res = await authedFetch(`/appointments?date=${today}`);
+    const res = await authedFetch(`/appointments?date=${today}&limit=100`);
     if (!res?.ok) {
-      setCheckinError("Couldn't load today's appointments.");
+      setCheckinError(res ? await problemMessage(res, "Couldn't load today's appointments.") : "Couldn't load today's appointments.");
       setCheckinAppointments([]);
       return;
     }
@@ -480,27 +595,6 @@ function ArrivalsPageInner() {
       };
     }));
     setCheckinAppointments(withNames);
-  }
-
-  async function submitScheduledCheckin(a: AppointmentOption) {
-    setCheckinSubmittingId(a.id);
-    setCheckinError(null);
-    try {
-      const res = await authedFetch("/queue/check-in", {
-        method: "POST",
-        body: JSON.stringify({ appointmentId: a.id, patientId: a.patientId, doctorId: a.doctorId }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't check in." }));
-        setCheckinError(p.detail || "Couldn't check in.");
-        return;
-      }
-      setShowCheckin(false);
-      load();
-    } finally {
-      setCheckinSubmittingId(null);
-    }
   }
 
   // "Move queue": pick which active patient, then the same transfer-target picker consult's
@@ -542,8 +636,7 @@ function ArrivalsPageInner() {
       });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't move the patient." }));
-        setMoveError(p.detail || "Couldn't move the patient.");
+        setMoveError(await problemMessage(res, "Couldn't move the patient."));
         return;
       }
       setShowMove(false);
@@ -560,10 +653,14 @@ function ArrivalsPageInner() {
   async function sendForVitals(row: Row) {
     if (row.status === "checked_in") {
       const toWaiting = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "waiting" }) });
-      if (!toWaiting?.ok) return;
+      if (!toWaiting?.ok) {
+        if (toWaiting) setActionError(await problemMessage(toWaiting, "Couldn't send the patient for vitals."));
+        return;
+      }
     }
     const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "vitals_pending" }) });
     if (res?.ok) load();
+    else if (res) setActionError(await problemMessage(res, "Couldn't send the patient for vitals."));
   }
 
   // The URL is the tab's only state: sidebar links and tab clicks both just change ?tab=, so the
@@ -587,6 +684,55 @@ function ArrivalsPageInner() {
     .filter((s) => s.waiting > 0 || s.delay)
     .sort((a, b) => b.waiting - a.waiting);
 
+  // Stable close handlers: Dialog re-focuses its first control whenever onClose changes identity.
+  const closeWalkin = useCallback(() => setShowModal(false), []);
+  const closeVitals = useCallback(() => setVitalsEntryId(null), []);
+  const closePriority = useCallback(() => setPriorityEntryId(null), []);
+  const closeDelayForm = useCallback(() => setDelayFormFor(null), []);
+  const closeDelayPicker = useCallback(() => setShowDelayPicker(false), []);
+  const closeCheckoutPicker = useCallback(() => setShowCheckoutPicker(false), []);
+  const closeCheckin = useCallback(() => setShowCheckin(false), []);
+  const closeMove = useCallback(() => setShowMove(false), []);
+  const closeRail = useCallback(() => setRailId(null), []);
+  const closeCheckinTarget = useCallback(() => setCheckinTarget(null), []);
+  const closeResult = useCallback(() => setCheckInResult(null), []);
+
+  function openRail(row: Row) {
+    setRailId(row.id);
+    void loadRailPatient(row.patientId);
+  }
+  // Rail actions close the rail first so only one dialog traps focus at a time.
+  function fromRail(fn: () => void) {
+    setRailId(null);
+    fn();
+  }
+
+  const railRow = railId ? rows.find((r) => r.id === railId) ?? null : null;
+  const checkoutRows = rows.filter((r) => bucketOf(r.status) === "checkout_pending");
+  const hasQuickActions = grants.queueCreate || grants.queueEdit || grants.billingView;
+
+  // One contextual set of row actions, shared by the table and the detail rail. Each is absent
+  // (not disabled) when the role lacks the permission the endpoint needs.
+  function rowActions(r: Row, afterClick: (fn: () => void) => void) {
+    const b = bucketOf(r.status);
+    return (
+      <>
+        {grants.queueEdit && !r.priority && b === "waiting" && (
+          <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openPriorityModal(r.id))}>Mark priority</button>
+        )}
+        {grants.clinicalEdit && (r.status === "checked_in" || r.status === "waiting") && (
+          <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => void sendForVitals(r))}>Send for vitals</button>
+        )}
+        {grants.clinicalEdit && r.status === "vitals_pending" && (
+          <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openVitalsModal(r.id))}>Record vitals</button>
+        )}
+        {grants.billingView && b === "checkout_pending" && (
+          <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => router.push(`/checkout/${r.id}`))}>Checkout</button>
+        )}
+      </>
+    );
+  }
+
   return (
     <main className={styles.page}>
       <div className={styles.header}>
@@ -595,85 +741,95 @@ function ArrivalsPageInner() {
           <p className={styles.subtitle}>{dateLabel} · {rows.length} on the board</p>
         </div>
         {!forbidden && (
-          <div style={{ display: "flex", gap: "var(--nb-space-8)", alignItems: "center" }}>
+          <div className={styles.headerActions}>
             {/* Clinic Operations' two views (DESIGN.md): this page is the Live Queue half. */}
             <nav className={styles.segmented} aria-label="Clinic operations view">
               <Link className={styles.segment} href="/schedule">Schedule</Link>
               <span className={styles.segmentActive} aria-current="page">Live Queue</span>
             </nav>
-            <button className={styles.registerBtn} style={{ background: "transparent", color: "var(--nb-text-primary)", border: "1px solid var(--nb-border-default)" }}
-              onClick={() => router.push("/checkout/otc")}>
-              Counter sale
-            </button>
-            <button className={styles.registerBtn} onClick={openModal}>Register walk-in</button>
+            {grants.billingCreate && (
+              <button type="button" className={styles.secondaryBtn} onClick={() => router.push("/checkout/otc")}>
+                Counter sale
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {!forbidden && (
-        <div className={styles.tabs}>
+        <div className={styles.tabs} role="group" aria-label="Filter arrivals by status">
           {TABS.map((t) => (
-            <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => selectTab(t.key)}>
-              {t.label} {counts[t.key] !== undefined ? `(${counts[t.key]})` : ""}
+            <button type="button" key={t.key} className={tab === t.key ? styles.tabActive : styles.tab}
+              aria-pressed={tab === t.key} onClick={() => selectTab(t.key)}>
+              {t.label}
+              {counts[t.key] !== undefined && <span className={styles.chip}>{counts[t.key]}</span>}
             </button>
           ))}
         </div>
       )}
 
-      {!forbidden && (
+      {!forbidden && hasQuickActions && (
         <div className={styles.quickActions}>
-          <button className={styles.actionBtn} onClick={openModal}>Register walk-in</button>
-          <button className={styles.actionBtn} onClick={openCheckin}>Check in</button>
-          {/* Issue token isn't a separate backend action — a token is only ever created as part
-              of check-in, so this opens the same walk-in flow. */}
-          <button className={styles.actionBtn} onClick={openModal}>Issue token</button>
-          <button className={styles.actionBtn} onClick={openMove}>Move queue</button>
-          <button className={styles.actionBtn} onClick={() => setShowDelayPicker(true)}>Notify delay</button>
-          <button className={styles.actionBtn} onClick={() => setShowCheckoutPicker(true)}>Checkout</button>
+          {/* A token is only ever created as part of check-in, so walk-in and "issue token" are one action. */}
+          {grants.queueCreate && <button type="button" className={styles.primaryAction} onClick={openModal}>Walk-in &amp; token</button>}
+          {grants.queueCreate && <button type="button" className={styles.actionBtn} onClick={openCheckin}>Check in</button>}
+          {grants.queueEdit && <button type="button" className={styles.actionBtn} onClick={openMove}>Move queue</button>}
+          {grants.queueEdit && <button type="button" className={styles.actionBtn} onClick={() => setShowDelayPicker(true)}>Notify delay</button>}
+          {grants.billingView && <button type="button" className={styles.actionBtn} onClick={() => setShowCheckoutPicker(true)}>Checkout</button>}
+        </div>
+      )}
+
+      {actionError && (
+        <div className={styles.formError} role="alert">
+          {actionError}{" "}
+          <button type="button" className={styles.linkBtn} onClick={() => setActionError(null)}>Dismiss</button>
         </div>
       )}
 
       {loading ? (
-        <div className={styles.card}><div className={styles.state}>Loading…</div></div>
+        <div className={styles.card}><Skeleton rows={6} label="Loading today's arrivals" /></div>
       ) : forbidden ? (
-        <div className={styles.card}><div className={styles.state}>Your role doesn&apos;t have access to the arrivals board.</div></div>
-      ) : error ? (
-        <div className={styles.card}><div className={styles.errorState}>{error}</div></div>
+        <div className={styles.card}><EmptyState icon="shield" title="No access to the arrivals board" hint="Your role doesn't include the live queue. Ask your clinic owner if you need it." /></div>
+      ) : error && rows.length === 0 ? (
+        <div className={styles.card}><ErrorState message={error} onRetry={() => { setLoading(true); void load(); }} /></div>
       ) : (
+        <>
+        {error && (
+          <div className={styles.formError} role="alert">
+            {error} Showing the last loaded list.{" "}
+            <button type="button" className={styles.linkBtn} onClick={() => void load()}>Retry</button>
+          </div>
+        )}
         <div className={styles.layout}>
           <div className={styles.card}>
             {filtered.length === 0 ? (
-              <div className={styles.state}>No patients here yet.</div>
+              <EmptyState icon="users" title="No patients here yet"
+                hint={tab === "all" ? "Walk-ins and checked-in appointments appear here as they arrive." : "Nobody is in this stage right now."}
+                action={tab !== "all" ? <button type="button" className={styles.linkBtn} onClick={() => selectTab("all")}>Show all arrivals</button> : undefined} />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
-                    <tr><th>Token</th><th>Patient</th><th>Visit</th><th>Doctor</th><th>Wait</th><th>Status</th><th></th></tr>
+                    <tr><th>Token</th><th>Patient</th><th className={styles.colVisit}>Visit</th><th className={styles.colDoctor}>Doctor</th><th>Wait</th><th>Status</th><th><span className={styles.srOnly}>Actions</span></th></tr>
                   </thead>
                   <tbody>
                     {filtered.map((r) => {
                       const b = bucketOf(r.status);
                       return (
-                        <tr key={r.id}>
-                          <td className={styles.token}>{r.priority && <span className={styles.priorityDot} />}#{r.tokenNumber}</td>
-                          <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                          <td className={styles.muted}>{VISIT_LABEL[r.source] ?? r.source}</td>
-                          <td>{staff.find((s) => s.id === r.doctorId)?.name ?? "—"}</td>
-                          <td className={styles.muted}>{b === "waiting" || b === "in_consult" ? `${waitMinutes(r.createdAt)}m` : "—"}</td>
-                          <td><span className={`${styles.pill} ${STATUS_CLASS[r.status] ?? ""}`}>{r.status.replace("_", " ")}</span></td>
-                          <td>
-                            {!r.priority && b === "waiting" && (
-                              <button className={styles.actionBtn} onClick={() => openPriorityModal(r.id)}>Mark priority</button>
-                            )}
-                            {(r.status === "checked_in" || r.status === "waiting") && (
-                              <button className={styles.actionBtn} onClick={() => sendForVitals(r)}>Send for vitals</button>
-                            )}
-                            {r.status === "vitals_pending" && (
-                              <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Record vitals</button>
-                            )}
-                            {b === "checkout_pending" && (
-                              <button className={styles.actionBtn} onClick={() => router.push(`/checkout/${r.id}`)}>Checkout</button>
-                            )}
+                        <tr key={r.id} className={styles.row} tabIndex={0} aria-label={`Open details for ${r.patientName}, token ${r.tokenNumber}`}
+                          onClick={() => openRail(r)}
+                          onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openRail(r); } }}>
+                          <td className={styles.token} data-label="Token">
+                            #{r.tokenNumber}
+                            {r.priority && <span className={styles.priorityTag}><StatusPill tone="urgent" label="Priority" /></span>}
+                          </td>
+                          <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
+                          <td className={`${styles.muted} ${styles.colVisit}`} data-label="Visit">{VISIT_LABEL[r.source] ?? r.source}</td>
+                          <td className={styles.colDoctor} data-label="Doctor">{staff.find((s) => s.id === r.doctorId)?.name ?? "—"}</td>
+                          <td className={styles.muted} data-label="Wait">{b === "waiting" || b === "in_consult" ? `${waitMinutes(r.createdAt)}m` : "—"}</td>
+                          <td data-label="Status"><StatusBadge status={r.status} /></td>
+                          <td className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
+                            {rowActions(r, (fn) => fn())}
                           </td>
                         </tr>
                       );
@@ -684,27 +840,28 @@ function ArrivalsPageInner() {
             )}
           </div>
 
+          <div className={styles.sideCol}>
           <div className={styles.card}>
             <div className={styles.sideTitle}>Doctor queues</div>
             {doctorQueues.length === 0 ? (
-              <div className={styles.state}>No one waiting.</div>
+              <EmptyState icon="stethoscope" title="No one waiting" />
             ) : (
               doctorQueues.map((d) => (
-                <div key={d.id} className={styles.doctorRow} style={{ flexDirection: "column", alignItems: "stretch", gap: "4px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <div key={d.id} className={`${styles.doctorRow} ${styles.doctorRowStack}`}>
+                  <div className={styles.doctorLine}>
                     <span className={styles.doctorName}>{d.name}</span>
                     <span className={styles.doctorCount}>
                       {d.waiting} waiting{d.estimatedMinutes !== undefined ? ` · ~${d.estimatedMinutes}m wait` : ""}
                     </span>
                   </div>
                   {d.delay ? (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "var(--nb-danger-500)" }}>
-                      <span>Running {d.delay.delayMinutes}m late{d.delay.reason ? ` — ${d.delay.reason}` : ""}</span>
-                      <button className={styles.actionBtn} onClick={() => clearDelay(d.id)}>Clear delay</button>
+                    <div className={styles.delayLine}>
+                      <span><StatusPill tone="danger" label="Delayed" icon="clock" /> Running {d.delay.delayMinutes}m late{d.delay.reason ? ` — ${d.delay.reason}` : ""}</span>
+                      {grants.queueEdit && <button type="button" className={styles.actionBtn} onClick={() => clearDelay(d.id)}>Clear delay</button>}
                     </div>
-                  ) : (
-                    <button className={styles.actionBtn} style={{ alignSelf: "flex-start" }}
-                      onClick={() => { setDelayFormFor(d.id); setDelayMinutesInput("15"); setDelayReasonInput(""); }}>
+                  ) : grants.queueEdit && (
+                    <button type="button" className={`${styles.actionBtn} ${styles.alignStart}`}
+                      onClick={() => { setDelayFormFor(d.id); setDelayMinutesInput("15"); setDelayReasonInput(""); setDelayError(null); }}>
                       Announce delay
                     </button>
                   )}
@@ -717,26 +874,59 @@ function ArrivalsPageInner() {
             <div className={styles.card}>
               <div className={styles.sideTitle}>Follow-up callback list</div>
               {callbackList.map((c) => (
-                <div key={c.appointmentId} className={styles.doctorRow} style={{ flexDirection: "column", alignItems: "stretch", gap: "2px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <div key={c.appointmentId} className={`${styles.doctorRow} ${styles.doctorRowStack}`}>
+                  <div className={styles.doctorLine}>
                     <span className={styles.doctorName}>{c.patientName}</span>
-                    <span className={styles.doctorCount}>{c.status === "no_show" ? "missed" : "overdue"}</span>
+                    {c.status === "no_show" ? <StatusPill tone="danger" label="Missed" /> : <StatusPill tone="warn" label="Overdue" />}
                   </div>
-                  <span style={{ fontSize: "12px", color: "var(--nb-text-secondary)" }}>
+                  <span className={styles.callbackNote}>
                     Follow-up was {new Date(c.startTime).toLocaleDateString()}
                   </span>
                 </div>
               ))}
             </div>
           )}
+          </div>
         </div>
+        </>
+      )}
+
+      {railId && railRow && (
+        <Dialog size="drawer" title={`#${railRow.tokenNumber} · ${railRow.patientName}`} onClose={closeRail}>
+          <div className={styles.railStatus}>
+            <StatusBadge status={railRow.status} />
+            {railRow.priority && <StatusPill tone="urgent" label="Priority" />}
+          </div>
+          {railRow.priority && railRow.priorityReason && <p className={styles.railNote}>Priority reason: {railRow.priorityReason}</p>}
+          <dl className={styles.railList}>
+            <div><dt>MRN</dt><dd>{railRow.patientMrn || "—"}</dd></div>
+            <div><dt>Visit</dt><dd>{VISIT_LABEL[railRow.source] ?? railRow.source}</dd></div>
+            <div><dt>Doctor</dt><dd>{staff.find((s) => s.id === railRow.doctorId)?.name ?? "—"}</dd></div>
+            <div><dt>Waiting</dt><dd>{bucketOf(railRow.status) === "waiting" || bucketOf(railRow.status) === "in_consult" ? `${waitMinutes(railRow.createdAt)} min` : "—"}</dd></div>
+            <div><dt>Arrived</dt><dd>{new Date(railRow.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</dd></div>
+          </dl>
+          <div className={styles.sideTitle} style={{ paddingInline: 0 }}>Patient</div>
+          {railPatient.state === "loading" ? (
+            <Skeleton rows={3} label="Loading patient" />
+          ) : railPatient.state === "error" ? (
+            <ErrorState message="Couldn't load the patient record." onRetry={() => void loadRailPatient(railRow.patientId)} />
+          ) : (
+            <dl className={styles.railList}>
+              <div><dt>Phone</dt><dd>{railPatient.data?.phone || "—"}</dd></div>
+              <div><dt>Date of birth</dt><dd>{railPatient.data?.dob || "—"}</dd></div>
+              <div><dt>Sex</dt><dd>{railPatient.data?.gender || "—"}</dd></div>
+            </dl>
+          )}
+          <div className={styles.railActions}>
+            {rowActions(railRow, fromRail)}
+            {grants.patientsView && railRow.patientMrn && <Link className={styles.linkBtn} href={`/patients?q=${encodeURIComponent(railRow.patientMrn)}`}>Find in patient registry</Link>}
+          </div>
+        </Dialog>
       )}
 
       {showModal && (
-        <div className={styles.drawerOverlay} onClick={() => setShowModal(false)}>
-          <form className={styles.drawer} onClick={(e) => e.stopPropagation()} onSubmit={submitCheckIn}>
-            <h2 className={styles.modalTitle}>Register walk-in</h2>
-
+        <Dialog size="drawer" title="Register walk-in" onClose={closeWalkin}>
+          <form onSubmit={submitCheckIn}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="patientSearch">Patient</label>
               <input
@@ -756,9 +946,9 @@ function ArrivalsPageInner() {
               {!selectedPatient && searchResults.length > 0 && (
                 <div className={styles.searchResults}>
                   {searchResults.map((p) => (
-                    <div key={p.id} className={styles.searchResultRow} onClick={() => { setSelectedPatient(p); setSearchResults([]); }}>
+                    <button type="button" key={p.id} className={styles.searchResultRow} onClick={() => { setSelectedPatient(p); setSearchResults([]); }}>
                       {p.name} · {p.phone} · {p.mrn}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -777,11 +967,11 @@ function ArrivalsPageInner() {
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newPhone">Phone</label>
-                  <input id="newPhone" className={styles.input} value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
+                  <input id="newPhone" className={styles.input} inputMode="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newDob">Date of birth</label>
-                  <input id="newDob" type="date" className={styles.input} value={newDob} onChange={(e) => setNewDob(e.target.value)} />
+                  <input id="newDob" type="date" className={styles.input} value={newDob} max={new Date().toLocaleDateString("en-CA")} onChange={(e) => setNewDob(e.target.value)} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newGender">Gender</label>
@@ -791,6 +981,33 @@ function ArrivalsPageInner() {
                     <option value="other">Other</option>
                   </select>
                 </div>
+                {minor && (
+                  <div className={styles.field}>
+                    <label className={styles.label} htmlFor="guardianSearch">Guardian (required for under-18s)</label>
+                    {guardian ? (
+                      <div className={styles.selectedPatient}>
+                        <span>{guardian.name} · {guardian.phone}</span>
+                        <button type="button" className={styles.linkBtn} onClick={() => { setGuardian(null); setGuardianQuery(""); }}>Change</button>
+                      </div>
+                    ) : (
+                      <>
+                        <input id="guardianSearch" className={styles.input} value={guardianQuery}
+                          placeholder="Search the guardian's record by name or phone"
+                          onChange={(e) => setGuardianQuery(e.target.value)} />
+                        {guardianResults.length > 0 && (
+                          <div className={styles.searchResults}>
+                            {guardianResults.map((g) => (
+                              <button type="button" key={g.id} className={styles.searchResultRow}
+                                onClick={() => { setGuardian(g); setGuardianResults([]); }}>
+                                {g.name} · {g.phone}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -821,31 +1038,54 @@ function ArrivalsPageInner() {
             {modalError && <div className={styles.formError} role="alert">{modalError}</div>}
 
             {duplicateCandidates.length > 0 && (
-              <div className={styles.searchResults}>
+              <div className={styles.matchList} role="group" aria-label="Possible existing patients">
                 {duplicateCandidates.map((c) => (
-                  <div key={c.patientId} className={styles.searchResultRow} onClick={() => {
-                    setSelectedPatient({ id: c.patientId, name: c.name, phone: c.phone, mrn: "" });
-                    setDuplicateCandidates([]);
-                    setModalError(null);
-                  }}>
-                    {c.name} · {c.phone}
+                  <div key={c.patientId} className={styles.matchRow}>
+                    <span>
+                      <span className={styles.patientName}>{c.name}</span>
+                      <span className={styles.mrn}>{c.phone}</span>
+                    </span>
+                    <StatusPill tone={matchPercent(c.matchScore) >= 85 ? "danger" : "warn"} icon="alert" label={`${matchPercent(c.matchScore)}% match`} />
+                    <button type="button" className={styles.actionBtn} onClick={() => {
+                      setSelectedPatient({ id: c.patientId, name: c.name, phone: c.phone, mrn: "" });
+                      setDuplicateCandidates([]);
+                      setModalError(null);
+                    }}>Use this patient</button>
                   </div>
                 ))}
+                <button type="button" className={styles.cancelBtn} disabled={submitting} onClick={() => void registerAndCheckIn(true)}>
+                  Different person — register anyway
+                </button>
               </div>
             )}
 
             <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="button" className={styles.cancelBtn} onClick={closeWalkin}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={submitting}>{submitting ? "Checking in…" : "Check in"}</button>
             </div>
           </form>
-        </div>
+        </Dialog>
+      )}
+
+      {checkInResult && <CheckInResultDialog result={checkInResult} authedFetch={authedFetch} onClose={closeResult} />}
+
+      {checkinTarget && (
+        <CheckInDialog
+          patient={{
+            id: checkinTarget.patientId, name: checkinTarget.patientName, nextAppointmentToday: true,
+            nextAppointmentId: checkinTarget.id, nextDoctorId: checkinTarget.doctorId,
+            nextDoctorName: checkinTarget.doctorName, nextAppointment: checkinTarget.startTime,
+          }}
+          authedFetch={authedFetch}
+          onClose={closeCheckinTarget}
+          onCheckedIn={() => void load()}
+          onDone={closeCheckinTarget}
+        />
       )}
 
       {vitalsEntryId && (
-        <div className={styles.overlay} onClick={() => setVitalsEntryId(null)}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitVitals}>
-            <h2 className={styles.modalTitle}>Record vitals</h2>
+        <Dialog title="Record vitals" onClose={closeVitals}>
+          <form onSubmit={submitVitals}>
             {([
               ["heightCm", "Height (cm)"], ["weightKg", "Weight (kg)"],
               ["bpSystolic", "BP systolic"], ["bpDiastolic", "BP diastolic"],
@@ -865,17 +1105,16 @@ function ArrivalsPageInner() {
             ))}
             {vitalsError && <div className={styles.formError} role="alert">{vitalsError}</div>}
             <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setVitalsEntryId(null)}>Cancel</button>
+              <button type="button" className={styles.cancelBtn} onClick={closeVitals}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save vitals"}</button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {priorityEntryId && (
-        <div className={styles.overlay} onClick={() => setPriorityEntryId(null)}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitPriority}>
-            <h2 className={styles.modalTitle}>Mark priority</h2>
+        <Dialog title="Mark priority" onClose={closePriority}>
+          <form onSubmit={submitPriority}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="priorityReason">Reason</label>
               <select id="priorityReason" className={styles.select} value={priorityReasonCode}
@@ -886,28 +1125,28 @@ function ArrivalsPageInner() {
             {priorityReasonCode === "Other" && (
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="priorityOther">Specify</label>
-                <input id="priorityOther" className={styles.input} value={priorityOtherReason}
+                <input id="priorityOther" className={styles.input} minLength={3} value={priorityOtherReason}
                   onChange={(e) => setPriorityOtherReason(e.target.value)} />
               </div>
             )}
+            {priorityError && <div className={styles.formError} role="alert">{priorityError}</div>}
             <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setPriorityEntryId(null)}>Cancel</button>
+              <button type="button" className={styles.cancelBtn} onClick={closePriority}>Cancel</button>
               <button type="submit" className={styles.submitBtn}
-                disabled={prioritySubmitting || (priorityReasonCode === "Other" && !priorityOtherReason.trim())}>
+                disabled={prioritySubmitting || (priorityReasonCode === "Other" && priorityOtherReason.trim().length < 3)}>
                 {prioritySubmitting ? "Saving…" : "Mark priority"}
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {delayFormFor && (
-        <div className={styles.overlay} onClick={() => setDelayFormFor(null)}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitDelay}>
-            <h2 className={styles.modalTitle}>Announce delay — {staff.find((s) => s.id === delayFormFor)?.name ?? ""}</h2>
+        <Dialog title={`Announce delay — ${staff.find((s) => s.id === delayFormFor)?.name ?? ""}`} onClose={closeDelayForm}>
+          <form onSubmit={submitDelay}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="delayMinutes">Running late by (minutes)</label>
-              <input id="delayMinutes" type="number" min="1" className={styles.input}
+              <input id="delayMinutes" type="number" min="1" step="1" className={styles.input}
                 value={delayMinutesInput} onChange={(e) => setDelayMinutesInput(e.target.value)} required />
             </div>
             <div className={styles.field}>
@@ -915,140 +1154,128 @@ function ArrivalsPageInner() {
               <input id="delayReason" className={styles.input} value={delayReasonInput}
                 onChange={(e) => setDelayReasonInput(e.target.value)} placeholder="Emergency case running long" />
             </div>
+            {delayError && <div className={styles.formError} role="alert">{delayError}</div>}
             <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setDelayFormFor(null)}>Cancel</button>
+              <button type="button" className={styles.cancelBtn} onClick={closeDelayForm}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={delayBusy || !delayMinutesInput}>
                 {delayBusy ? "Announcing…" : "Announce delay"}
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {showDelayPicker && (
-        <div className={styles.overlay} onClick={() => setShowDelayPicker(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Notify delay — pick a doctor</h2>
-            {staff.length === 0 ? (
-              <div className={styles.state}>No doctors on the roster.</div>
-            ) : (
-              <div className={styles.searchResults}>
-                {staff.map((s) => (
-                  <div key={s.id} className={styles.searchResultRow} onClick={() => pickDelayDoctor(s.id)}>{s.name}</div>
-                ))}
-              </div>
-            )}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setShowDelayPicker(false)}>Cancel</button>
+        <Dialog title="Notify delay — pick a doctor" onClose={closeDelayPicker}>
+          {staff.length === 0 ? (
+            <EmptyState icon="users" title="No doctors on the roster" />
+          ) : (
+            <div className={styles.searchResults}>
+              {staff.map((s) => (
+                <button type="button" key={s.id} className={styles.searchResultRow} onClick={() => pickDelayDoctor(s.id)}>{s.name}</button>
+              ))}
             </div>
+          )}
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.cancelBtn} onClick={closeDelayPicker}>Cancel</button>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {showCheckoutPicker && (
-        <div className={styles.overlay} onClick={() => setShowCheckoutPicker(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Checkout — pick a patient</h2>
-            {rows.filter((r) => bucketOf(r.status) === "checkout_pending").length === 0 ? (
-              <div className={styles.state}>No one is ready for checkout.</div>
-            ) : (
-              <div className={styles.searchResults}>
-                {rows.filter((r) => bucketOf(r.status) === "checkout_pending").map((r) => (
-                  <div key={r.id} className={styles.searchResultRow}
-                    onClick={() => { setShowCheckoutPicker(false); router.push(`/checkout/${r.id}`); }}>
-                    #{r.tokenNumber} · {r.patientName}
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setShowCheckoutPicker(false)}>Cancel</button>
+        <Dialog title="Checkout — pick a patient" onClose={closeCheckoutPicker}>
+          {checkoutRows.length === 0 ? (
+            <EmptyState icon="receipt" title="No one is ready for checkout" />
+          ) : (
+            <div className={styles.searchResults}>
+              {checkoutRows.map((r) => (
+                <button type="button" key={r.id} className={styles.searchResultRow}
+                  onClick={() => { setShowCheckoutPicker(false); router.push(`/checkout/${r.id}`); }}>
+                  #{r.tokenNumber} · {r.patientName}
+                </button>
+              ))}
             </div>
+          )}
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.cancelBtn} onClick={closeCheckoutPicker}>Cancel</button>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {showCheckin && (
-        <div className={styles.overlay} onClick={() => setShowCheckin(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Check in — today&apos;s appointments</h2>
-            {checkinError && <div className={styles.formError} role="alert">{checkinError}</div>}
-            {checkinAppointments === null ? (
-              <div className={styles.state}>Loading…</div>
-            ) : checkinAppointments.length === 0 ? (
-              <div className={styles.state}>No scheduled appointments are waiting to arrive.</div>
-            ) : (
-              <div className={styles.searchResults}>
-                {checkinAppointments.map((a) => (
-                  <div key={a.id} className={styles.searchResultRow} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>{a.patientName} · {a.doctorName} · {new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                    <button type="button" className={styles.actionBtn} disabled={checkinSubmittingId === a.id}
-                      onClick={() => submitScheduledCheckin(a)}>
-                      {checkinSubmittingId === a.id ? "Checking in…" : "Check in"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setShowCheckin(false)}>Cancel</button>
+        <Dialog title="Check in — today's appointments" onClose={closeCheckin}>
+          {checkinError && <div className={styles.formError} role="alert">{checkinError}</div>}
+          {checkinAppointments === null ? (
+            <Skeleton rows={3} label="Loading today's appointments" />
+          ) : checkinAppointments.length === 0 ? (
+            <EmptyState icon="calendar" title="No scheduled appointments are waiting to arrive" />
+          ) : (
+            <div className={styles.searchResults}>
+              {checkinAppointments.map((a) => (
+                <div key={a.id} className={styles.appointmentRow}>
+                  <span>{a.patientName} · {a.doctorName} · {new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <button type="button" className={styles.actionBtn} onClick={() => { setShowCheckin(false); setCheckinTarget(a); }}>
+                    Check in
+                  </button>
+                </div>
+              ))}
             </div>
+          )}
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.cancelBtn} onClick={closeCheckin}>Cancel</button>
           </div>
-        </div>
+        </Dialog>
       )}
 
       {showMove && (
-        <div className={styles.overlay} onClick={() => setShowMove(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Move queue</h2>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="moveEntry">Patient</label>
-              <select id="moveEntry" className={styles.select} value={moveEntryId} onChange={(e) => selectMoveEntry(e.target.value)}>
-                <option value="">Select a patient…</option>
-                {rows.filter((r) => bucketOf(r.status) === "waiting").map((r) => (
-                  <option key={r.id} value={r.id}>#{r.tokenNumber} · {r.patientName}</option>
-                ))}
-              </select>
-            </div>
-            {moveEntryId && (
-              moveTargets === null ? (
-                <div className={styles.state}>Loading…</div>
-              ) : moveTargets.length === 0 ? (
-                <div className={styles.state}>This department isn&apos;t configured to transfer patients anywhere.</div>
-              ) : (
-                <>
+        <Dialog title="Move queue" onClose={closeMove}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="moveEntry">Patient</label>
+            <select id="moveEntry" className={styles.select} value={moveEntryId} onChange={(e) => selectMoveEntry(e.target.value)}>
+              <option value="">Select a patient…</option>
+              {rows.filter((r) => bucketOf(r.status) === "waiting").map((r) => (
+                <option key={r.id} value={r.id}>#{r.tokenNumber} · {r.patientName}</option>
+              ))}
+            </select>
+          </div>
+          {moveEntryId && (
+            moveTargets === null ? (
+              <Skeleton rows={2} label="Loading transfer options" />
+            ) : moveTargets.length === 0 ? (
+              <EmptyState icon="info" title="This department isn't configured to transfer patients anywhere" />
+            ) : (
+              <>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor="moveDepartment">Department</label>
+                  <select id="moveDepartment" className={styles.select} value={moveDepartmentId}
+                    onChange={(e) => { setMoveDepartmentId(e.target.value); setMoveDoctorId(""); }}>
+                    <option value="">Select a department…</option>
+                    {moveTargets.map((t) => <option key={t.departmentId} value={t.departmentId}>{t.departmentName}</option>)}
+                  </select>
+                </div>
+                {moveDepartmentId && (
                   <div className={styles.field}>
-                    <label className={styles.label} htmlFor="moveDepartment">Department</label>
-                    <select id="moveDepartment" className={styles.select} value={moveDepartmentId}
-                      onChange={(e) => { setMoveDepartmentId(e.target.value); setMoveDoctorId(""); }}>
-                      <option value="">Select a department…</option>
-                      {moveTargets.map((t) => <option key={t.departmentId} value={t.departmentId}>{t.departmentName}</option>)}
+                    <label className={styles.label} htmlFor="moveDoctor">Doctor</label>
+                    <select id="moveDoctor" className={styles.select} value={moveDoctorId} onChange={(e) => setMoveDoctorId(e.target.value)}>
+                      <option value="">Select a doctor…</option>
+                      {moveTargets.find((t) => t.departmentId === moveDepartmentId)?.doctors.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
                     </select>
                   </div>
-                  {moveDepartmentId && (
-                    <div className={styles.field}>
-                      <label className={styles.label} htmlFor="moveDoctor">Doctor</label>
-                      <select id="moveDoctor" className={styles.select} value={moveDoctorId} onChange={(e) => setMoveDoctorId(e.target.value)}>
-                        <option value="">Select a doctor…</option>
-                        {moveTargets.find((t) => t.departmentId === moveDepartmentId)?.doctors.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </>
-              )
-            )}
-            {moveError && <div className={styles.formError} role="alert">{moveError}</div>}
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setShowMove(false)}>Cancel</button>
-              <button type="button" className={styles.submitBtn} disabled={moveSubmitting || !moveDepartmentId || !moveDoctorId}
-                onClick={submitMove}>
-                {moveSubmitting ? "Moving…" : "Move"}
-              </button>
-            </div>
+                )}
+              </>
+            )
+          )}
+          {moveError && <div className={styles.formError} role="alert">{moveError}</div>}
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.cancelBtn} onClick={closeMove}>Cancel</button>
+            <button type="button" className={styles.submitBtn} disabled={moveSubmitting || !moveDepartmentId || !moveDoctorId}
+              onClick={submitMove}>
+              {moveSubmitting ? "Moving…" : "Move"}
+            </button>
           </div>
-        </div>
+        </Dialog>
       )}
     </main>
   );

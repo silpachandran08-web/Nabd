@@ -1,9 +1,14 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./patients.module.css";
-import { CheckInDialog, RegisterDialog } from "./RegistryDialogs";
+import { RegisterDialog } from "./RegistryDialogs";
+import { CheckInDialog } from "../components/arrivals/CheckInDialog";
+import Dialog from "../components/ui/Dialog";
+import StatusPill from "../components/ui/StatusPill";
+import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
+import { can } from "../lib/permissions";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
@@ -32,8 +37,11 @@ type RegistryRow = {
 type Registry = { total: number; counts: Record<string, number>; rows: RegistryRow[] };
 const FILTERS: [string, string][] = [["all", "All"], ["recent", "Recently visited"], ["followup", "Follow-up due"],
   ["package", "Active package"], ["balance", "Outstanding balance"], ["duplicate", "Duplicate review"], ["archived", "Archived"]];
+// Financial and duplicate-review filters are absent (not disabled) for roles that don't hold the grant.
+type Perms = { clinicalView: boolean; clinicalEdit: boolean; dentalView: boolean; dentalEdit: boolean; billingView: boolean; checkIn: boolean; register: boolean; patientsEdit: boolean };
+const NO_PERMS: Perms = { clinicalView: false, clinicalEdit: false, dentalView: false, dentalEdit: false, billingView: false, checkIn: false, register: false, patientsEdit: false };
 
-/** "+91 ••••• 4412" — the list shows only the last four digits; the full number is in the drawer. */
+/** "+91 ••••• 4412" — only the last four digits; used in the list and, until revealed, in the drawer. */
 function maskPhone(phone: string): string {
   const p = phone.replace(/\s/g, "");
   const digits = p.replace(/\D/g, "");
@@ -82,17 +90,6 @@ const FDI_TO_UNIVERSAL: Record<number, number> = {
   41: 25, 42: 26, 43: 27, 44: 28, 45: 29, 46: 30, 47: 31, 48: 32,
 };
 
-function decodeJwt(token: string): Record<string, unknown> {
-  try {
-    const payload = token.split(".")[1];
-    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
-    return JSON.parse(atob(padded));
-  } catch {
-    return {};
-  }
-}
-
 function age(dob: string): number {
   const d = new Date(dob);
   const now = new Date();
@@ -119,8 +116,10 @@ function PatientsList() {
   const [checkInFor, setCheckInFor] = useState<RegistryRow | null>(null);
   const [registering, setRegistering] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
-  const [canCheckIn, setCanCheckIn] = useState(false);
-  const [canRegister, setCanRegister] = useState(false);
+  const [perms, setPerms] = useState<Perms>(NO_PERMS);
+  const { checkIn: canCheckIn, register: canRegister, clinicalView, clinicalEdit, dentalView: canDental, dentalEdit, billingView, patientsEdit } = perms;
+  const loadSeq = useRef(0);
+  const [phoneShown, setPhoneShown] = useState(false);
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,12 +127,15 @@ function PatientsList() {
 
   const [drawerPatient, setDrawerPatient] = useState<PatientDetail | null>(null);
   const [drawerError, setDrawerError] = useState<string | null>(null);
+  const [drawerId, setDrawerId] = useState<string | null>(null); // set while the drawer is open (or loading)
   const [drawerTab, setDrawerTab] = useState<"overview" | "dental">("overview");
-  const [canDental, setCanDental] = useState(false);
 
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   const [newAllergy, setNewAllergy] = useState({ substance: "", severity: "moderate", reaction: "" });
   const [allergyBusy, setAllergyBusy] = useState(false);
+  // Never claim "none recorded" for a register that failed to load.
+  const [allergyLoad, setAllergyLoad] = useState<"loading" | "ok" | "error">("loading");
+  const [conditionLoad, setConditionLoad] = useState<"loading" | "ok" | "error">("loading");
 
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [newCondition, setNewCondition] = useState({ condition: "", reviewDueDate: "" });
@@ -151,6 +153,8 @@ function PatientsList() {
   const [supernumeraryBusy, setSupernumeraryBusy] = useState<string | null>(null);
   const [historyToothId, setHistoryToothId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<ToothHistoryEntry[]>([]);
+
+  const queueRow = drawerPatient ? registry?.rows.find((r) => r.id === drawerPatient.id && r.queueToken != null) : undefined;
 
   function toothLabel(fdiNumber: number): string {
     return numbering === "universal" ? `#${FDI_TO_UNIVERSAL[fdiNumber]}` : String(fdiNumber);
@@ -178,26 +182,26 @@ function PatientsList() {
   );
 
   useEffect(() => {
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) return;
-    const permissions = decodeJwt(token).permissions;
-    const has = (p: string) => Array.isArray(permissions) && permissions.includes(p);
     void Promise.resolve().then(() => {
-      setCanDental(has("specialty_dental:view"));
-      // Actions a role can't take are absent, not disabled (RBAC matrix rule).
-      setCanCheckIn(has("queue:create"));
-      setCanRegister(has("patients:create"));
+      // Actions a role can't take are absent, not disabled (RBAC matrix rule). UI gating only —
+      // the server still enforces every grant.
+      setPerms({
+        clinicalView: can("clinical:view"), clinicalEdit: can("clinical:edit"),
+        dentalView: can("specialty_dental:view"), dentalEdit: can("specialty_dental:edit"),
+        billingView: can("billing:view"), checkIn: can("queue:create"), register: can("patients:create"), patientsEdit: can("patients:edit"),
+      });
     });
   }, []);
 
   const load = useCallback(
     async (query: string, which: string) => {
       setError(null); // `loading` is only the first load — searching/filtering keeps the table on screen
+      const seq = ++loadSeq.current;
       try {
         const params = new URLSearchParams({ filter: which });
         if (query.trim()) params.set("q", query.trim());
         const res = await authedFetch(`/patients/registry?${params}`);
-        if (!res) return;
+        if (!res || seq !== loadSeq.current) return; // a newer search is in flight
         if (res.status === 403) {
           setForbidden(true);
           return;
@@ -206,22 +210,30 @@ function PatientsList() {
           setError("Couldn't load patients. Try again.");
           return;
         }
-        setRegistry(await res.json());
+        const body: Registry = await res.json();
+        if (seq === loadSeq.current) setRegistry(body);
       } catch {
-        setError("Couldn't reach the server. Check your connection and try again.");
+        if (seq === loadSeq.current) setError("Couldn't reach the server. Check your connection and try again.");
       } finally {
-        setLoading(false);
+        if (seq === loadSeq.current) setLoading(false);
       }
     },
     [authedFetch]
   );
 
+  // Live search: first load is immediate, typing is debounced; filter changes reload straight away.
+  const firstLoad = useRef(true);
   useEffect(() => {
-    void Promise.resolve().then(() => load(searchParams.get("q") ?? "", "all"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load]);
+    const delay = firstLoad.current ? 0 : 300;
+    firstLoad.current = false;
+    const t = setTimeout(() => void load(q, filter), delay);
+    return () => clearTimeout(t);
+  }, [load, q, filter]);
+
+  const closeDrawer = useCallback(() => { setDrawerId(null); setDrawerPatient(null); setDrawerError(null); }, []);
 
   async function openDrawer(id: string) {
+    setDrawerId(id);
     setDrawerError(null);
     setDrawerPatient(null);
     setDrawerTab("overview");
@@ -236,24 +248,35 @@ function PatientsList() {
     setHistoryEntries([]);
     setNewSupernumerary({ nearToothNumber: 11, status: "healthy", note: "" });
     setNewAllergy({ substance: "", severity: "moderate", reaction: "" });
-    const res = await authedFetch(`/patients/${id}`);
+    setPhoneShown(false);
+    setAllergyLoad("loading");
+    setConditionLoad("loading");
+    let res: Response | null;
+    try {
+      res = await authedFetch(`/patients/${id}`);
+    } catch {
+      setDrawerError("Couldn't reach the server. Check your connection and try again.");
+      return;
+    }
     if (!res) return;
     if (!res.ok) {
       setDrawerError("Couldn't load this patient.");
       return;
     }
     setDrawerPatient(await res.json());
-    refreshAllergies(id);
-    refreshConditions(id);
+    if (clinicalView) {
+      refreshAllergies(id);
+      refreshConditions(id);
 
-    const rxRes = await authedFetch(`/clinical/patients/${id}/prescriptions`);
-    if (rxRes?.ok) setPrescriptions(await rxRes.json());
+      const rxRes = await authedFetch(`/clinical/patients/${id}/prescriptions`);
+      if (rxRes?.ok) setPrescriptions(await rxRes.json());
 
-    const tlRes = await authedFetch(`/clinical/patients/${id}/timeline?limit=10`);
-    if (tlRes?.ok) {
-      const page = await tlRes.json();
-      setTimeline(page.data);
-      setTimelineCursor(page.page.nextCursor);
+      const tlRes = await authedFetch(`/clinical/patients/${id}/timeline?limit=10`);
+      if (tlRes?.ok) {
+        const page = await tlRes.json();
+        setTimeline(page.data);
+        setTimelineCursor(page.page.nextCursor);
+      }
     }
 
     if (canDental) {
@@ -279,7 +302,7 @@ function PatientsList() {
 
   async function refreshAllergies(patientId: string) {
     const res = await authedFetch(`/clinical/patients/${patientId}/allergies`);
-    if (res?.ok) setAllergies(await res.json());
+    if (res?.ok) { setAllergies(await res.json()); setAllergyLoad("ok"); } else if (res) setAllergyLoad("error");
   }
 
   async function addAllergy() {
@@ -313,7 +336,7 @@ function PatientsList() {
 
   async function refreshConditions(patientId: string) {
     const res = await authedFetch(`/clinical/patients/${patientId}/conditions`);
-    if (res?.ok) setConditions(await res.json());
+    if (res?.ok) { setConditions(await res.json()); setConditionLoad("ok"); } else if (res) setConditionLoad("error");
   }
 
   async function addCondition() {
@@ -457,13 +480,13 @@ function PatientsList() {
           <form className={styles.searchBar} role="search" onSubmit={(e) => { e.preventDefault(); void load(q, filter); }}>
             <input className={styles.searchInput} aria-label="Search patients" value={q}
               placeholder="Search by name, mobile, patient ID or token number"
-              onChange={(e) => setQ(e.target.value)} onBlur={() => void load(q, filter)} />
+              onChange={(e) => setQ(e.target.value)} />
           </form>
           <div className={styles.filterBar} role="tablist" aria-label="Filter patients">
-            {FILTERS.map(([key, label]) => (
+            {FILTERS.filter(([key]) => (key !== "balance" || billingView) && (key !== "duplicate" || canRegister)).map(([key, label]) => (
               <button key={key} type="button" role="tab" aria-selected={filter === key}
                 className={filter === key ? styles.filterOn : styles.filter}
-                onClick={() => { setFilter(key); void load(q, key); }}>
+                onClick={() => setFilter(key)}>
                 {label} <span className={styles.filterCount}>{registry?.counts[key] ?? 0}</span>
               </button>
             ))}
@@ -475,13 +498,13 @@ function PatientsList() {
 
       <div className={styles.card}>
         {loading ? (
-          <div className={styles.state}>Loading…</div>
+          <Skeleton rows={6} label="Loading patients" />
         ) : forbidden ? (
-          <div className={styles.state}>Your role doesn&apos;t have access to patient records.</div>
+          <EmptyState icon="shield" title="Your role doesn't have access to patient records." />
         ) : error ? (
-          <div className={styles.errorState}>{error}</div>
+          <ErrorState message={error} onRetry={() => void load(q, filter)} />
         ) : !registry || registry.rows.length === 0 ? (
-          <div className={styles.state}>{q.trim() ? "No patients match that search." : "No patients here."}</div>
+          <EmptyState icon="users" title={q.trim() ? "No patients match that search." : "No patients here."} />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -503,14 +526,15 @@ function PatientsList() {
                     <td>{nextLabel(p)}</td>
                     <td>
                       <span className={styles.flags}>
-                        {p.archived && <span className={styles.flagMuted}>Archived</span>}
-                        {p.packageSessionsTotal != null && <span className={styles.flagInfo}>Package {p.packageSessionsUsed}/{p.packageSessionsTotal}</span>}
-                        {p.condition && <span className={styles.flagWarn}>{p.condition}</span>}
-                        {p.followUpDue && <span className={styles.flagWarn}>Follow-up due</span>}
-                        {p.minor && <span className={styles.flagInfo}>Guardian consent</span>}
-                        {p.balanceDue && <span className={styles.flagOrange}>Balance due</span>}
-                        {p.allergy && <span className={styles.flagBad}>Allergy: {p.allergy}</span>}
-                        {p.duplicate && <span className={styles.flagDup}>Duplicate review</span>}
+                        {p.archived && <StatusPill tone="neutral" label="Archived" icon="inbox" />}
+                        {p.packageSessionsTotal != null && <StatusPill tone="info" icon="package" label={`Package ${p.packageSessionsUsed}/${p.packageSessionsTotal}`} />}
+                        {clinicalView && p.condition && <StatusPill tone="warn" icon="pulse" label={p.condition} />}
+                        {p.followUpDue && <StatusPill tone="warn" label="Follow-up due" />}
+                        {/* The registry row carries no consent state, so it can't say consent exists. */}
+                        {p.minor && <StatusPill tone="info" icon="user" label="Minor" />}
+                        {billingView && p.balanceDue && <StatusPill tone="urgent" icon="receipt" label="Balance due" />}
+                        {p.allergy && <StatusPill tone="danger" label={`Allergy: ${p.allergy}`} />}
+                        {canRegister && p.duplicate && <StatusPill tone="sync" icon="users" label="Duplicate review" />}
                       </span>
                     </td>
                     <td className={styles.actionCell}>
@@ -539,242 +563,291 @@ function PatientsList() {
           onOpenExisting={(id) => { setRegistering(false); void openDrawer(id); }} />
       )}
 
-      {(drawerPatient || drawerError) && (
-        <div className={styles.overlay} onClick={() => { setDrawerPatient(null); setDrawerError(null); }}>
-          <div className={styles.drawer} onClick={(e) => e.stopPropagation()}>
-            {drawerError ? (
-              <div className={styles.errorState}>{drawerError}</div>
-            ) : drawerPatient && (
-              <>
-                <div className={styles.drawerHeader}>
-                  <div>
-                    <h2 className={styles.drawerName}>{drawerPatient.name}</h2>
-                    <span className={styles.drawerMeta}>{drawerPatient.mrn} · {age(drawerPatient.dob)} · {drawerPatient.gender}</span>
-                  </div>
-                  <button className={styles.closeBtn} onClick={() => setDrawerPatient(null)} aria-label="Close">×</button>
-                </div>
-
-                {canDental && (
-                  <div className={styles.drawerTabs}>
-                    <button className={drawerTab === "overview" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("overview")}>Overview</button>
-                    <button className={drawerTab === "dental" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("dental")}>Dental chart</button>
-                  </div>
+      {drawerId && (
+        <Dialog title={drawerPatient?.name ?? "Patient"} size="drawer" onClose={closeDrawer}>
+          {drawerError ? (
+            <ErrorState message={drawerError} onRetry={() => void openDrawer(drawerId)} />
+          ) : !drawerPatient ? (
+            <Skeleton rows={5} label="Loading patient" />
+          ) : (
+            <>
+              <div className={styles.drawerHeader}>
+                <span className={styles.drawerMeta}>{drawerPatient.mrn} · {age(drawerPatient.dob)} · {drawerPatient.gender}</span>
+                {queueRow && clinicalEdit && (
+                  <button type="button" className={styles.primaryBtn} onClick={() => router.push("/consult")}>
+                    Open consult queue · T-{queueRow.queueToken}
+                  </button>
                 )}
+              </div>
 
-                {drawerTab === "dental" && canDental ? (
-                  <>
-                    <div className={styles.numberingToggle}>
-                      <button className={numbering === "fdi" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("fdi")}>FDI</button>
-                      <button className={numbering === "universal" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("universal")}>Universal</button>
-                    </div>
+              {canDental && (
+                <div className={styles.drawerTabs}>
+                  <button className={drawerTab === "overview" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("overview")}>Overview</button>
+                  <button className={drawerTab === "dental" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("dental")}>Dental chart</button>
+                </div>
+              )}
 
-                    <div className={styles.toothGrid}>
-                      {FDI_TEETH.map((n) => {
-                        const tooth = chart.find((t) => t.toothNumber === n && !t.isSupernumerary);
-                        return (
-                          <div key={n} className={styles.toothCell}>
-                            <span className={styles.toothNumber}>{toothLabel(n)}</span>
+              {drawerTab === "dental" && canDental ? (
+                <>
+                  <div className={styles.numberingToggle}>
+                    <button className={numbering === "fdi" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("fdi")}>FDI</button>
+                    <button className={numbering === "universal" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("universal")}>Universal</button>
+                  </div>
+
+                  <div className={styles.toothGrid}>
+                    {FDI_TEETH.map((n) => {
+                      const tooth = chart.find((t) => t.toothNumber === n && !t.isSupernumerary);
+                      return (
+                        <div key={n} className={styles.toothCell}>
+                          <span className={styles.toothNumber}>{toothLabel(n)}</span>
+                          {dentalEdit ? (
                             <select
                               className={styles.toothSelect}
+                              aria-label={`Tooth ${toothLabel(n)} status`}
                               value={tooth?.status ?? "healthy"}
                               disabled={chartBusy === n}
                               onChange={(e) => setToothStatus(n, e.target.value)}
                             >
                               {TOOTH_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
                             </select>
-                            {tooth && (
-                              <button className={styles.linkBtn} style={{ fontSize: "10px" }} onClick={() => openHistory(tooth.id)}>History</button>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                          ) : (
+                            <span className={styles.toothStatus}>{(tooth?.status ?? "healthy").replace("_", " ")}</span>
+                          )}
+                          {tooth && (
+                            <button className={styles.linkBtn} style={{ fontSize: "10px" }} onClick={() => openHistory(tooth.id)}>History</button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                    <div className={styles.section}>
-                      <div className={styles.sectionLabel}>Supernumerary teeth</div>
-                      {chart.filter((t) => t.isSupernumerary).length === 0 ? (
-                        <div className={styles.muted}>None recorded</div>
-                      ) : (
-                        chart.filter((t) => t.isSupernumerary).map((t) => (
-                          <div key={t.id} className={styles.allergyRow}>
-                            <span>Near {toothLabel(t.toothNumber)}{t.note ? ` · ${t.note}` : ""}</span>
-                            <select className={styles.smallInput} value={t.status} disabled={supernumeraryBusy === t.id}
+                  <div className={styles.section}>
+                    <div className={styles.sectionLabel}>Supernumerary teeth</div>
+                    {chart.filter((t) => t.isSupernumerary).length === 0 ? (
+                      <div className={styles.muted}>None recorded</div>
+                    ) : (
+                      chart.filter((t) => t.isSupernumerary).map((t) => (
+                        <div key={t.id} className={styles.allergyRow}>
+                          <span>Near {toothLabel(t.toothNumber)}{t.note ? ` · ${t.note}` : ""}</span>
+                          {dentalEdit ? (
+                            <select className={styles.smallInput} aria-label="Supernumerary tooth status" value={t.status} disabled={supernumeraryBusy === t.id}
                               onChange={(e) => updateSupernumeraryStatus(t.id, e.target.value)}>
                               {TOOTH_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
                             </select>
-                            <button className={styles.linkBtn} onClick={() => openHistory(t.id)}>History</button>
+                          ) : (
+                            <span>{t.status.replace("_", " ")}</span>
+                          )}
+                          <button className={styles.linkBtn} onClick={() => openHistory(t.id)}>History</button>
+                          {dentalEdit && (
                             <button className={styles.linkBtn} disabled={supernumeraryBusy === t.id} onClick={() => removeSupernumerary(t.id)}>Remove</button>
-                          </div>
-                        ))
-                      )}
+                          )}
+                        </div>
+                      ))
+                    )}
+                    {dentalEdit && (
                       <div className={styles.allergyForm}>
-                        <select className={styles.smallInput} value={newSupernumerary.nearToothNumber}
+                        <select className={styles.smallInput} aria-label="Near tooth" value={newSupernumerary.nearToothNumber}
                           onChange={(e) => setNewSupernumerary((p) => ({ ...p, nearToothNumber: Number(e.target.value) }))}>
                           {FDI_TEETH.map((n) => <option key={n} value={n}>Near {toothLabel(n)}</option>)}
                         </select>
-                        <select className={styles.smallInput} value={newSupernumerary.status}
+                        <select className={styles.smallInput} aria-label="Status" value={newSupernumerary.status}
                           onChange={(e) => setNewSupernumerary((p) => ({ ...p, status: e.target.value }))}>
                           {TOOTH_STATUSES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
                         </select>
-                        <input className={styles.smallInput} placeholder="Note (optional)" value={newSupernumerary.note}
+                        <input className={styles.smallInput} aria-label="Note" placeholder="Note (optional)" value={newSupernumerary.note}
                           onChange={(e) => setNewSupernumerary((p) => ({ ...p, note: e.target.value }))} />
                         <button className={styles.linkBtn} disabled={supernumeraryBusy === "new"} onClick={addSupernumerary}>Add</button>
                       </div>
-                    </div>
+                    )}
+                  </div>
 
-                    {historyToothId && (
+                  {historyToothId && (
+                    <div className={styles.section}>
+                      <div className={styles.sectionLabel}>
+                        Tooth history <button className={styles.linkBtn} onClick={() => setHistoryToothId(null)}>Close</button>
+                      </div>
+                      {historyEntries.length === 0 ? (
+                        <div className={styles.muted}>No changes recorded yet</div>
+                      ) : (
+                        historyEntries.map((h, i) => (
+                          <div key={i} className={styles.timelineRow}>
+                            <span className={styles.muted}>{new Date(h.occurredAt).toLocaleString()} — {h.actorName} ({h.actorRole})</span>
+                            <span>{h.action}</span>
+                            {h.after && <span className={styles.muted}>{h.after}</span>}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Never assert "no known allergies" for a role that can't see the allergy data. */}
+                  {drawerPatient.allergies.length > 0 ? (
+                    <div className={styles.allergyBannerSome}>
+                      <StatusPill tone="danger" label="Allergies" /> {drawerPatient.allergies.join(", ")}
+                    </div>
+                  ) : clinicalView ? (
+                    <div className={styles.allergyBannerNone}>No known allergies</div>
+                  ) : (
+                    <div className={styles.allergyBannerNone}>Allergy information isn&apos;t available to your role.</div>
+                  )}
+
+                  <div className={styles.statGrid}>
+                    <div className={styles.section}>
+                      <div className={styles.sectionLabel}>Last visit</div>
+                      <div className={styles.sectionValue}>{drawerPatient.lastVisitAt ? new Date(drawerPatient.lastVisitAt).toLocaleDateString() : "No visits yet"}</div>
+                    </div>
+                    <div className={styles.section}>
+                      <div className={styles.sectionLabel}>Active packages</div>
+                      <div className={styles.sectionValue}>{drawerPatient.activePackages}</div>
+                    </div>
+                    {billingView && drawerPatient.outstandingBalance !== undefined && (
                       <div className={styles.section}>
-                        <div className={styles.sectionLabel}>
-                          Tooth history <button className={styles.linkBtn} onClick={() => setHistoryToothId(null)}>Close</button>
-                        </div>
-                        {historyEntries.length === 0 ? (
-                          <div className={styles.muted}>No changes recorded yet</div>
+                        <div className={styles.sectionLabel}>Outstanding balance</div>
+                        <div className={styles.sectionValue}>{drawerPatient.outstandingBalance.toFixed(2)}</div>
+                      </div>
+                    )}
+                    <div className={styles.section}>
+                      <div className={styles.sectionLabel}>Phone</div>
+                      <div className={styles.sectionValue}>
+                        {phoneShown && canRegister ? drawerPatient.phone : maskPhone(drawerPatient.phone)}
+                        {canRegister && (
+                          <button type="button" className={styles.linkBtn} style={{ marginInlineStart: "8px" }}
+                            aria-pressed={phoneShown} onClick={() => setPhoneShown((v) => !v)}>
+                            {phoneShown ? "Hide" : "Reveal"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {drawerPatient.guardianId && (
+                    <div className={styles.section}>
+                      <div className={styles.sectionLabel}>Guardian / proxy</div>
+                      <div className={styles.allergyRow}>
+                        <span className={styles.guardianCell}>
+                          {drawerPatient.guardianName ?? <span className={styles.muted}>Name not on file</span>}
+                          {drawerPatient.guardianConsentGrantedAt ? (
+                            <StatusPill tone="ok" label={`Consent captured ${new Date(drawerPatient.guardianConsentGrantedAt).toLocaleDateString()}`} />
+                          ) : (
+                            <StatusPill tone="danger" label="Consent missing" />
+                          )}
+                        </span>
+                        {!drawerPatient.isMinor && patientsEdit && (
+                          <button className={styles.linkBtn} onClick={revokeGuardian}>Revoke access</button>
+                        )}
+                      </div>
+                      {drawerPatient.isMinor && (
+                        <div className={styles.muted}>A minor&apos;s guardian can&apos;t be removed — reassign instead, or wait for the automatic age-18 review.</div>
+                      )}
+                    </div>
+                  )}
+
+                  {clinicalView ? (
+                    <>
+                      <div className={styles.section}>
+                        <div className={styles.sectionLabel}>Chronic conditions</div>
+                        {conditionLoad === "error" ? (
+                          <div className={styles.errorInline} role="alert">Couldn&apos;t load conditions.</div>
+                        ) : conditionLoad === "loading" ? (
+                          <Skeleton rows={1} label="Loading conditions" />
+                        ) : conditions.length === 0 ? (
+                          <div className={styles.muted}>None recorded</div>
                         ) : (
-                          historyEntries.map((h, i) => (
-                            <div key={i} className={styles.timelineRow}>
-                              <span className={styles.muted}>{new Date(h.occurredAt).toLocaleString()} — {h.actorName} ({h.actorRole})</span>
-                              <span>{h.action}</span>
-                              {h.after && <span className={styles.muted}>{h.after}</span>}
+                          conditions.map((c) => (
+                            <div key={c.id} className={styles.allergyRow}>
+                              <span>{c.condition}{c.reviewDueDate ? ` · review due ${new Date(c.reviewDueDate).toLocaleDateString()}` : ""}</span>
+                              {clinicalEdit && <button className={styles.linkBtn} onClick={() => resolveCondition(c.id)}>Resolve</button>}
+                            </div>
+                          ))
+                        )}
+                        {clinicalEdit && (
+                          <div className={styles.allergyForm}>
+                            <input className={styles.smallInput} aria-label="Condition" placeholder="Condition" value={newCondition.condition}
+                              onChange={(e) => setNewCondition((p) => ({ ...p, condition: e.target.value }))} />
+                            <input className={styles.smallInput} aria-label="Review due date" type="date" value={newCondition.reviewDueDate}
+                              onChange={(e) => setNewCondition((p) => ({ ...p, reviewDueDate: e.target.value }))} />
+                            <button className={styles.linkBtn} disabled={conditionBusy || !newCondition.condition.trim()} onClick={addCondition}>Add</button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={styles.section}>
+                        <div className={styles.sectionLabel}>Allergy register</div>
+                        {allergyLoad === "error" ? (
+                          <div className={styles.errorInline} role="alert">Couldn&apos;t load the allergy register. Don&apos;t assume there are none.</div>
+                        ) : allergyLoad === "loading" ? (
+                          <Skeleton rows={1} label="Loading allergies" />
+                        ) : allergies.length === 0 ? (
+                          <div className={styles.muted}>None recorded</div>
+                        ) : (
+                          allergies.map((a) => (
+                            <div key={a.id} className={styles.allergyRow}>
+                              <span>{a.substance} · {a.severity}{a.reaction ? ` · ${a.reaction}` : ""}</span>
+                              {clinicalEdit && <button className={styles.linkBtn} onClick={() => deactivateAllergy(a.id)}>Remove</button>}
+                            </div>
+                          ))
+                        )}
+                        {clinicalEdit && (
+                          <div className={styles.allergyForm}>
+                            <input className={styles.smallInput} aria-label="Substance" placeholder="Substance" value={newAllergy.substance}
+                              onChange={(e) => setNewAllergy((p) => ({ ...p, substance: e.target.value }))} />
+                            <select className={styles.smallInput} aria-label="Severity" value={newAllergy.severity}
+                              onChange={(e) => setNewAllergy((p) => ({ ...p, severity: e.target.value }))}>
+                              <option value="mild">mild</option>
+                              <option value="moderate">moderate</option>
+                              <option value="severe">severe</option>
+                            </select>
+                            <input className={styles.smallInput} aria-label="Reaction" placeholder="Reaction (optional)" value={newAllergy.reaction}
+                              onChange={(e) => setNewAllergy((p) => ({ ...p, reaction: e.target.value }))} />
+                            <button className={styles.linkBtn} disabled={allergyBusy || !newAllergy.substance.trim()} onClick={addAllergy}>Add</button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={styles.section}>
+                        <div className={styles.sectionLabel}>Previous medicines</div>
+                        {prescriptions.length === 0 ? (
+                          <div className={styles.muted}>None recorded</div>
+                        ) : (
+                          prescriptions.map((rx) => (
+                            <div key={rx.id} className={styles.sectionValue} style={{ marginBottom: "8px" }}>
+                              {rx.signedAt && <span className={styles.muted}>{new Date(rx.signedAt).toLocaleDateString()} — </span>}
+                              {rx.items.map((i) => i.drugName).join(", ")}
                             </div>
                           ))
                         )}
                       </div>
-                    )}
-                  </>
-                ) : (
-                <>
-                <div className={drawerPatient.allergies.length === 0 ? styles.allergyBannerNone : styles.allergyBannerSome}>
-                  {drawerPatient.allergies.length === 0 ? "No known allergies" : `⚠ Allergies: ${drawerPatient.allergies.join(", ")}`}
-                </div>
 
-                <div className={styles.statGrid}>
-                  <div className={styles.section}>
-                    <div className={styles.sectionLabel}>Last visit</div>
-                    <div className={styles.sectionValue}>{drawerPatient.lastVisitAt ? new Date(drawerPatient.lastVisitAt).toLocaleDateString() : "No visits yet"}</div>
-                  </div>
-                  <div className={styles.section}>
-                    <div className={styles.sectionLabel}>Active packages</div>
-                    <div className={styles.sectionValue}>{drawerPatient.activePackages}</div>
-                  </div>
-                  {drawerPatient.outstandingBalance !== undefined && (
-                    <div className={styles.section}>
-                      <div className={styles.sectionLabel}>Outstanding balance</div>
-                      <div className={styles.sectionValue}>{drawerPatient.outstandingBalance.toFixed(2)}</div>
-                    </div>
-                  )}
-                  <div className={styles.section}>
-                    <div className={styles.sectionLabel}>Phone</div>
-                    <div className={styles.sectionValue}>{drawerPatient.phone}</div>
-                  </div>
-                </div>
-
-                {drawerPatient.guardianId && (
-                  <div className={styles.section}>
-                    <div className={styles.sectionLabel}>Guardian / proxy</div>
-                    <div className={styles.allergyRow}>
-                      <span>
-                        {drawerPatient.guardianName ?? "Unknown"}
-                        {drawerPatient.guardianConsentGrantedAt
-                          ? ` · consent captured ${new Date(drawerPatient.guardianConsentGrantedAt).toLocaleDateString()}`
-                          : ""}
-                      </span>
-                      {!drawerPatient.isMinor && (
-                        <button className={styles.linkBtn} onClick={revokeGuardian}>Revoke access</button>
-                      )}
-                    </div>
-                    {drawerPatient.isMinor && (
-                      <div className={styles.muted}>A minor&apos;s guardian can&apos;t be removed — reassign instead, or wait for the automatic age-18 review.</div>
-                    )}
-                  </div>
-                )}
-
-                <div className={styles.section}>
-                  <div className={styles.sectionLabel}>Chronic conditions</div>
-                  {conditions.length === 0 ? (
-                    <div className={styles.muted}>None recorded</div>
-                  ) : (
-                    conditions.map((c) => (
-                      <div key={c.id} className={styles.allergyRow}>
-                        <span>{c.condition}{c.reviewDueDate ? ` · review due ${new Date(c.reviewDueDate).toLocaleDateString()}` : ""}</span>
-                        <button className={styles.linkBtn} onClick={() => resolveCondition(c.id)}>Resolve</button>
+                      <div className={styles.section}>
+                        <div className={styles.sectionLabel}>Encounter timeline</div>
+                        {timeline.length === 0 ? (
+                          <div className={styles.muted}>No completed visits yet</div>
+                        ) : (
+                          timeline.map((e) => (
+                            <div key={e.queueEntryId} className={styles.timelineRow}>
+                              <span className={styles.muted}>{new Date(e.occurredAt).toLocaleDateString()}</span>
+                              <span>{e.diagnosis || e.assessment || "—"}</span>
+                              {e.medications && <span className={styles.muted}>{e.medications}</span>}
+                            </div>
+                          ))
+                        )}
+                        {timelineCursor && (
+                          <button className={styles.linkBtn} onClick={() => loadMoreTimeline(drawerPatient.id)} disabled={timelineLoadingMore}>
+                            {timelineLoadingMore ? "Loading…" : "Load more"}
+                          </button>
+                        )}
                       </div>
-                    ))
-                  )}
-                  <div className={styles.allergyForm}>
-                    <input className={styles.smallInput} placeholder="Condition" value={newCondition.condition}
-                      onChange={(e) => setNewCondition((p) => ({ ...p, condition: e.target.value }))} />
-                    <input className={styles.smallInput} type="date" value={newCondition.reviewDueDate}
-                      onChange={(e) => setNewCondition((p) => ({ ...p, reviewDueDate: e.target.value }))} />
-                    <button className={styles.linkBtn} disabled={conditionBusy || !newCondition.condition.trim()} onClick={addCondition}>Add</button>
-                  </div>
-                </div>
-
-                <div className={styles.section}>
-                  <div className={styles.sectionLabel}>Allergy register</div>
-                  {allergies.length === 0 ? (
-                    <div className={styles.muted}>None recorded</div>
+                    </>
                   ) : (
-                    allergies.map((a) => (
-                      <div key={a.id} className={styles.allergyRow}>
-                        <span>{a.substance} · {a.severity}{a.reaction ? ` · ${a.reaction}` : ""}</span>
-                        <button className={styles.linkBtn} onClick={() => deactivateAllergy(a.id)}>Remove</button>
-                      </div>
-                    ))
+                    <div className={styles.muted}>Clinical records aren&apos;t available to your role.</div>
                   )}
-                  <div className={styles.allergyForm}>
-                    <input className={styles.smallInput} placeholder="Substance" value={newAllergy.substance}
-                      onChange={(e) => setNewAllergy((p) => ({ ...p, substance: e.target.value }))} />
-                    <select className={styles.smallInput} value={newAllergy.severity}
-                      onChange={(e) => setNewAllergy((p) => ({ ...p, severity: e.target.value }))}>
-                      <option value="mild">mild</option>
-                      <option value="moderate">moderate</option>
-                      <option value="severe">severe</option>
-                    </select>
-                    <input className={styles.smallInput} placeholder="Reaction (optional)" value={newAllergy.reaction}
-                      onChange={(e) => setNewAllergy((p) => ({ ...p, reaction: e.target.value }))} />
-                    <button className={styles.linkBtn} disabled={allergyBusy || !newAllergy.substance.trim()} onClick={addAllergy}>Add</button>
-                  </div>
-                </div>
-
-                <div className={styles.section}>
-                  <div className={styles.sectionLabel}>Previous medicines</div>
-                  {prescriptions.length === 0 ? (
-                    <div className={styles.muted}>None recorded</div>
-                  ) : (
-                    prescriptions.map((rx) => (
-                      <div key={rx.id} className={styles.sectionValue} style={{ marginBottom: "8px" }}>
-                        {rx.signedAt && <span className={styles.muted}>{new Date(rx.signedAt).toLocaleDateString()} — </span>}
-                        {rx.items.map((i) => i.drugName).join(", ")}
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className={styles.section}>
-                  <div className={styles.sectionLabel}>Encounter timeline</div>
-                  {timeline.length === 0 ? (
-                    <div className={styles.muted}>No completed visits yet</div>
-                  ) : (
-                    timeline.map((e) => (
-                      <div key={e.queueEntryId} className={styles.timelineRow}>
-                        <span className={styles.muted}>{new Date(e.occurredAt).toLocaleDateString()}</span>
-                        <span>{e.diagnosis || e.assessment || "—"}</span>
-                        {e.medications && <span className={styles.muted}>{e.medications}</span>}
-                      </div>
-                    ))
-                  )}
-                  {timelineCursor && drawerPatient && (
-                    <button className={styles.linkBtn} onClick={() => loadMoreTimeline(drawerPatient.id)} disabled={timelineLoadingMore}>
-                      {timelineLoadingMore ? "Loading…" : "Load more"}
-                    </button>
-                  )}
-                </div>
                 </>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+              )}
+            </>
+          )}
+        </Dialog>
       )}
     </main>
   );
