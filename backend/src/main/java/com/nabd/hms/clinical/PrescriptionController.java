@@ -44,13 +44,13 @@ public class PrescriptionController {
     @PreAuthorize("hasAuthority('clinical:edit')")
     public PrescriptionResponse upsert(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                         @Valid @RequestBody PrescriptionUpsertRequest req, HttpServletRequest http) {
-        return service.upsert(tenantId(jwt), queueEntryId, staffId(jwt), RequestMeta.clientIp(http), req.items());
+        return service.upsert(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req.items());
     }
 
     @PostMapping("/prescriptions/{queueEntryId}/sign")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
-        return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), RequestMeta.clientIp(http));
+        return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
     }
 
     @GetMapping("/patients/{patientId}/prescriptions")
@@ -82,11 +82,19 @@ public class PrescriptionController {
     @PreAuthorize("hasAuthority('clinical:edit')")
     public PrescriptionResponse applySet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                           @PathVariable UUID setId, HttpServletRequest http) {
-        return service.applySet(tenantId(jwt), queueEntryId, setId, staffId(jwt), RequestMeta.clientIp(http));
+        return service.applySet(tenantId(jwt), queueEntryId, setId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
     }
 
     private UUID tenantId(Jwt jwt) {
         return UUID.fromString(jwt.getClaimAsString("tenantId"));
+    }
+
+    /** V1-007: the explicit permission that lets someone other than the visit's doctor record a warning decision
+     * or sign (a covering doctor, a clinical lead). It is the existing `approve` action of the `clinical` module
+     * in the role matrix; nothing new to seed. */
+    private static boolean canApprove(Jwt jwt) {
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        return permissions != null && permissions.contains(PrescriptionService.PERMISSION_CLINICAL_APPROVE);
     }
 
     private UUID staffId(Jwt jwt) {

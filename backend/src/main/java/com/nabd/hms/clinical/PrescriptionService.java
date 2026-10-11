@@ -60,6 +60,10 @@ import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionRow;
 @Service
 public class PrescriptionService {
 
+    /** Role-matrix permission (module `clinical`, action `approve`) that lets someone other than the visit's doctor
+     * record a warning decision or sign a prescription. */
+    static final String PERMISSION_CLINICAL_APPROVE = "clinical:approve";
+
     private static final String DOSE_RULE_SOURCE = "Weight-based mg/kg calculation v1 (clinician-supplied rate; no coded per-drug formulary)";
 
     private final PrescriptionRepository repo;
@@ -107,13 +111,18 @@ public class PrescriptionService {
     }
 
     @Transactional
-    public PrescriptionResponse upsert(UUID tenantId, UUID queueEntryId, UUID callerStaffId, String ipAddress,
-                                        List<PrescriptionItemRequest> items) {
+    public PrescriptionResponse upsert(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
+                                        String ipAddress, List<PrescriptionItemRequest> items) {
         tenantContext.set(tenantId);
         QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        boolean mayDecide = mayDecide(owner, callerStaffId, callerCanApprove);
 
+        // V1-004: serialise against sign() and against allergy-register writes for this patient. Lock order is
+        // always register first, then the prescription row. Everything below runs inside the lock, so the
+        // "already signed" check and the allergy snapshot can no longer go stale before the items are replaced.
+        allergyRepo.lockRegister(tenantId, owner.patientId());
         UUID prescriptionId = repo.ensureDraft(tenantId, queueEntryId, owner.patientId(), owner.doctorId());
-        PrescriptionRow current = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        PrescriptionRow current = repo.lockByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
         if ("signed".equals(current.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "prescription-signed", "Prescription already signed",
                     "This prescription is signed and can no longer be edited.");
@@ -146,6 +155,9 @@ public class PrescriptionService {
                     if (prior != null && prior.reasonCode().equals(requested.reasonCode()) && Objects.equals(prior.note(), note)) {
                         decisions.add(prior);
                     } else {
+                        if (!mayDecide) {
+                            throw notPrescriber("record a warning decision on");
+                        }
                         StoredDecision fresh = new StoredDecision(d.kind(), requested.reasonCode(), note, d.matched(), d.severity(),
                                 callerStaffId.toString(), actor.name(), Instant.now().toString());
                         decisions.add(fresh);
@@ -190,14 +202,15 @@ public class PrescriptionService {
     }
 
     @Transactional
-    public PrescriptionResponse applySet(UUID tenantId, UUID queueEntryId, UUID setId, UUID callerStaffId, String ipAddress) {
+    public PrescriptionResponse applySet(UUID tenantId, UUID queueEntryId, UUID setId, UUID callerStaffId,
+                                          boolean callerCanApprove, String ipAddress) {
         tenantContext.set(tenantId);
         repo.findSet(tenantId, setId).orElseThrow(this::notFound);
         List<PrescriptionItemRequest> items = repo.findSetItems(tenantId, setId).stream()
                 .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
                         i.instructions(), null))
                 .toList();
-        return upsert(tenantId, queueEntryId, callerStaffId, ipAddress, items);
+        return upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
     }
 
     private FavouriteRxSetResponse toSetResponse(UUID tenantId, FavouriteSetRow s) {
@@ -211,9 +224,18 @@ public class PrescriptionService {
     /** Server-side gate: signing re-checks every line against the current allergy register and patient profile and
      * refuses while any warning still needs a decision, whatever the client showed. */
     @Transactional
-    public PrescriptionResponse sign(UUID tenantId, UUID queueEntryId, UUID callerStaffId, String ipAddress) {
+    public PrescriptionResponse sign(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
+                                      String ipAddress) {
         tenantContext.set(tenantId);
-        PrescriptionRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        // V1-007: only the visit's doctor, or a holder of the explicit clinical:approve grant, may sign.
+        if (!mayDecide(owner, callerStaffId, callerCanApprove)) {
+            throw notPrescriber("sign");
+        }
+        // V1-004: same lock order as upsert (register, then the prescription row). Warnings are evaluated and the
+        // status flipped while holding the row lock, so a concurrent save cannot slip an unresolved line in between.
+        allergyRepo.lockRegister(tenantId, owner.patientId());
+        PrescriptionRow row = repo.lockByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
         if ("signed".equals(row.status())) {
             return toResponse(tenantId, row); // idempotent: already signed, nothing more to record
         }
@@ -231,7 +253,10 @@ public class PrescriptionService {
             throw new ApiException(HttpStatus.CONFLICT, "warning-unresolved", "Resolve the warning first",
                     "These medicines carry a safety warning that needs a recorded decision before signing: " + lines + ".");
         }
-        repo.sign(tenantId, row.id());
+        if (repo.sign(tenantId, row.id()) == 0) {
+            // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
+            return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
+        }
         ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
         List<Map<String, Object>> finalItems = current.items().stream().map(i -> {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -244,8 +269,21 @@ public class PrescriptionService {
             return m;
         }).toList();
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
-                "prescription.signed", "prescription", row.id(), null, Map.of("queueEntryId", queueEntryId.toString(), "items", finalItems));
+                "prescription.signed", "prescription", row.id(), null, Map.of("queueEntryId", queueEntryId.toString(), "items", finalItems,
+                        "signedByVisitDoctor", owner.doctorId().equals(callerStaffId)));
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
+    }
+
+    /** V1-007: the visit's own doctor, or someone holding the explicit clinical:approve grant. Draft editing stays
+     * open to clinical:edit (a nurse may prepare a line); recording a warning decision and signing do not. */
+    private static boolean mayDecide(QueueEntryOwner owner, UUID callerStaffId, boolean callerCanApprove) {
+        return callerCanApprove || (owner.doctorId() != null && owner.doctorId().equals(callerStaffId));
+    }
+
+    private ApiException notPrescriber(String what) {
+        return new ApiException(HttpStatus.FORBIDDEN, "not-prescriber", "Prescriber only",
+                "Only the doctor on this visit, or a clinician with prescription approval rights, can " + what
+                        + " this prescription.");
     }
 
     private PrescriptionResponse toResponse(UUID tenantId, PrescriptionRow p) {
