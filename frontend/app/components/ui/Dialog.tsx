@@ -19,6 +19,11 @@ export default function Dialog({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Callers pass inline arrows, so onClose changes identity on every parent render. Read it through a
+  // ref so the effect below runs once per open: re-running it on each keystroke or autosave tick
+  // would restore focus to the opener and then yank it to the Close button mid-typing.
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; });
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -29,7 +34,7 @@ export default function Dialog({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        closeRef.current();
       } else if (e.key === "Tab") {
         const items = focusable();
         if (items.length === 0) return;
@@ -44,7 +49,7 @@ export default function Dialog({
       document.removeEventListener("keydown", onKey);
       previous?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className={styles.scrim} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
