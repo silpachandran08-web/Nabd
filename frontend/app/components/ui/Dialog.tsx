@@ -28,11 +28,18 @@ export default function Dialog({
   // would restore focus to the opener and then yank it to the Close button mid-typing.
   // The opener is read before the children mount: a child's autoFocus would otherwise be captured
   // here instead, and closing would drop focus to <body>.
+  // The enclosing dialog (e.g. the drawer a confirm was opened from) is the fallback target when the
+  // opener is gone by the time we close (a removed row's button).
   const [opener] = useState(() => (typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null)));
+  const [parentDialog] = useState(() => opener?.closest<HTMLElement>('[role="dialog"]') ?? null);
+  // Restore is deferred one tick and cancelled by a re-run of the effect, so React StrictMode's
+  // mount-cleanup-remount does not move focus out and back (which would override a child's autoFocus).
+  const restoreTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; });
 
   useEffect(() => {
+    clearTimeout(restoreTimer.current);
     const node = ref.current;
     const focusable = () =>
       Array.from(node?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])') ?? []);
@@ -58,9 +65,12 @@ export default function Dialog({
     return () => {
       document.removeEventListener("keydown", onKey);
       openStack.splice(openStack.indexOf(me), 1);
-      opener?.focus?.();
+      restoreTimer.current = setTimeout(() => {
+        const target = opener?.isConnected ? opener : parentDialog?.isConnected ? parentDialog : null;
+        target?.focus?.();
+      }, 0);
     };
-  }, [opener]);
+  }, [opener, parentDialog]);
 
   return (
     <div className={styles.scrim} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>

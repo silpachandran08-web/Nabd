@@ -13,6 +13,8 @@
 .safetyIcon { flex: none; margin-block-start: 2px; }
 .allergyList { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--nb-space-4) var(--nb-space-12); }
 .linkBtn { background: none; border: none; padding: 0; min-height: 24px; color: var(--nb-accent-500); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+/* 44px target on coarse pointers (V2-018); only the standalone links, not inline Retry/Dismiss. */
+@media (pointer: coarse) { .linkBtnTouch { min-height: 44px; min-inline-size: 44px; } }
 
 /* Vitals card (DOC-023) */
 .card { background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-lg); padding: var(--nb-space-16); }

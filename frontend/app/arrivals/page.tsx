@@ -10,6 +10,7 @@ import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
 import type { IconName } from "../components/ui/Icon";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
+import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { CheckInDialog, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 
@@ -145,7 +146,8 @@ function ArrivalsPageInner() {
   const [dateLabel, setDateLabel] = useState("");
 
   const [vitalsEntryId, setVitalsEntryId] = useState<string | null>(null);
-  const [vitalsForm, setVitalsForm] = useState({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
+  const [vitalsForm, setVitalsForm] = useState<VitalsForm>(EMPTY_VITALS);
+  const [vitalsAttempted, setVitalsAttempted] = useState(false);
   const [vitalsError, setVitalsError] = useState<string | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
 
@@ -281,6 +283,7 @@ function ArrivalsPageInner() {
 
   const [region, setRegion] = useState<string | undefined>(undefined);
   // A patient created by a check-in whose second call failed: a retry must reuse it, not re-register.
+  // shortcut: editing any new-patient field after "registered, check-in failed" re-registers on retry (like the name edit already did), so a corrected DOB is never dropped; the duplicate check then surfaces the earlier record. A PATCH of the changed fields would avoid the second record.
   const registeredRef = useRef<{ id: string; name: string } | null>(null);
   useEffect(() => {
     void Promise.resolve().then(() => setRegion(getIdentity()?.tenantRegion));
@@ -487,7 +490,8 @@ function ArrivalsPageInner() {
 
   function openVitalsModal(entryId: string) {
     setVitalsEntryId(entryId);
-    setVitalsForm({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
+    setVitalsForm(EMPTY_VITALS);
+    setVitalsAttempted(false);
     setVitalsError(null);
   }
 
@@ -495,16 +499,13 @@ function ArrivalsPageInner() {
     e.preventDefault();
     if (!vitalsEntryId) return;
     setVitalsError(null);
+    setVitalsAttempted(true);
+    if (Object.keys(vitalsErrors(vitalsForm)).length > 0) return;
     setVitalsSubmitting(true);
     try {
-      const num = (v: string) => (v.trim() === "" ? null : Number(v));
       const res = await authedFetch(`/clinical/vitals/${vitalsEntryId}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          heightCm: num(vitalsForm.heightCm), weightKg: num(vitalsForm.weightKg),
-          bpSystolic: num(vitalsForm.bpSystolic), bpDiastolic: num(vitalsForm.bpDiastolic),
-          pulseBpm: num(vitalsForm.pulseBpm), tempCelsius: num(vitalsForm.tempCelsius), spo2Percent: num(vitalsForm.spo2Percent),
-        }),
+        body: JSON.stringify(vitalsPayload(vitalsForm)),
       });
       if (!res) return;
       if (!res.ok) {
@@ -698,6 +699,7 @@ function ArrivalsPageInner() {
 
   // Stable close handlers: Dialog re-focuses its first control whenever onClose changes identity.
   const closeWalkin = useCallback(() => setShowModal(false), []);
+  const vErrors = vitalsErrors(vitalsForm);
   const closeVitals = useCallback(() => setVitalsEntryId(null), []);
   const closePriority = useCallback(() => setPriorityEntryId(null), []);
   const closeDelayForm = useCallback(() => setDelayFormFor(null), []);
@@ -979,15 +981,15 @@ function ArrivalsPageInner() {
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newPhone">Phone</label>
-                  <input id="newPhone" className={styles.input} inputMode="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} />
+                  <input id="newPhone" className={styles.input} inputMode="tel" value={newPhone} onChange={(e) => { registeredRef.current = null; setNewPhone(e.target.value); }} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newDob">Date of birth</label>
-                  <input id="newDob" type="date" className={styles.input} value={newDob} max={new Date().toLocaleDateString("en-CA")} onChange={(e) => setNewDob(e.target.value)} />
+                  <input id="newDob" type="date" className={styles.input} value={newDob} max={new Date().toLocaleDateString("en-CA")} onChange={(e) => { registeredRef.current = null; setNewDob(e.target.value); }} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newGender">Gender</label>
-                  <select id="newGender" className={styles.select} value={newGender} onChange={(e) => setNewGender(e.target.value)}>
+                  <select id="newGender" className={styles.select} value={newGender} onChange={(e) => { registeredRef.current = null; setNewGender(e.target.value); }}>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                     <option value="other">Other</option>
@@ -999,7 +1001,7 @@ function ArrivalsPageInner() {
                     {guardian ? (
                       <div className={styles.selectedPatient}>
                         <span>{guardian.name} · {guardian.phone}</span>
-                        <button type="button" className={styles.linkBtn} onClick={() => { setGuardian(null); setGuardianQuery(""); }}>Change</button>
+                        <button type="button" className={styles.linkBtn} onClick={() => { registeredRef.current = null; setGuardian(null); setGuardianQuery(""); }}>Change</button>
                       </div>
                     ) : (
                       <>
@@ -1010,7 +1012,7 @@ function ArrivalsPageInner() {
                           <div className={styles.searchResults}>
                             {guardianResults.map((g) => (
                               <button type="button" key={g.id} className={styles.searchResultRow}
-                                onClick={() => { setGuardian(g); setGuardianResults([]); }}>
+                                onClick={() => { registeredRef.current = null; setGuardian(g); setGuardianResults([]); }}>
                                 {g.name} · {g.phone}
                               </button>
                             ))}
@@ -1094,24 +1096,31 @@ function ArrivalsPageInner() {
 
       {vitalsEntryId && (
         <Dialog title="Record vitals" onClose={closeVitals}>
-          <form onSubmit={submitVitals}>
-            {([
-              ["heightCm", "Height (cm)"], ["weightKg", "Weight (kg)"],
-              ["bpSystolic", "BP systolic"], ["bpDiastolic", "BP diastolic"],
-              ["pulseBpm", "Pulse (bpm)"], ["tempCelsius", "Temp (°C)"], ["spo2Percent", "SpO2 (%)"],
-            ] as const).map(([key, label]) => (
-              <div className={styles.field} key={key}>
-                <label className={styles.label} htmlFor={key}>{label}</label>
-                <input
-                  id={key}
-                  type="number"
-                  step="any"
-                  className={styles.input}
-                  value={vitalsForm[key]}
-                  onChange={(e) => setVitalsForm((prev) => ({ ...prev, [key]: e.target.value }))}
-                />
-              </div>
-            ))}
+          <form onSubmit={submitVitals} noValidate>
+            <p className={styles.muted}>{VITALS_BLANK_HINT}</p>
+            {vitalsAttempted && vErrors.form && <div className={styles.formError} role="alert">{vErrors.form}</div>}
+            {VITAL_FIELDS.map((d) => {
+              const err = vitalsAttempted ? vErrors[d.key] : undefined;
+              return (
+                <div className={styles.field} key={d.key}>
+                  <label className={styles.label} htmlFor={d.key}>{d.label} ({d.unit})</label>
+                  <input
+                    id={d.key}
+                    type="number"
+                    inputMode="decimal"
+                    step={d.step}
+                    min={d.min}
+                    max={d.max}
+                    className={styles.input}
+                    value={vitalsForm[d.key]}
+                    aria-invalid={!!err}
+                    aria-describedby={err ? `${d.key}-err` : undefined}
+                    onChange={(e) => setVitalsForm((prev) => ({ ...prev, [d.key]: e.target.value }))}
+                  />
+                  {err && <div className={styles.formError} id={`${d.key}-err`} role="alert">{err}</div>}
+                </div>
+              );
+            })}
             {vitalsError && <div className={styles.formError} role="alert">{vitalsError}</div>}
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={closeVitals}>Cancel</button>

@@ -68,7 +68,7 @@ export default function SafetyStrip({ patient, ctx, onRetry, sticky = true, onMa
               Couldn&apos;t confirm allergies — ask the patient. <button type="button" className={s.linkBtn} onClick={onRetry}>Retry</button>
             </span>
           )}
-          {onManageAllergies && <button type="button" className={s.linkBtn} onClick={onManageAllergies}>Allergy register</button>}
+          {onManageAllergies && <button type="button" className={`${s.linkBtn} ${s.linkBtnTouch}`} onClick={onManageAllergies}>Allergy register</button>}
         </span>
       </div>
 
