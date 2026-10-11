@@ -6,6 +6,7 @@ import com.nabd.hms.patient.dto.GuardianReviewResponse;
 import com.nabd.hms.patient.dto.MergeRequest;
 import com.nabd.hms.patient.dto.PatientDetailResponse;
 import com.nabd.hms.patient.dto.PatientPage;
+import com.nabd.hms.patient.dto.PatientPatchRequest;
 import com.nabd.hms.patient.dto.PatientResponse;
 import com.nabd.hms.patient.dto.PatientWriteRequest;
 import com.nabd.hms.patient.dto.WithdrawConsentRequest;
@@ -79,7 +80,7 @@ public class PatientController {
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('patients:edit')")
     public PatientResponse patch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                  @Valid @RequestBody PatientWriteRequest req) {
+                                  @Valid @RequestBody PatientPatchRequest req) {
         return service.patch(tenantId(jwt), staffId(jwt), id, req);
     }
 

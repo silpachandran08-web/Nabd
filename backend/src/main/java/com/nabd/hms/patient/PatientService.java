@@ -16,6 +16,7 @@ import com.nabd.hms.patient.dto.PageMeta;
 import com.nabd.hms.patient.dto.PatientDetailResponse;
 import com.nabd.hms.patient.dto.PatientMatchCandidateResponse;
 import com.nabd.hms.patient.dto.PatientPage;
+import com.nabd.hms.patient.dto.PatientPatchRequest;
 import com.nabd.hms.patient.dto.PatientResponse;
 import com.nabd.hms.patient.dto.PatientWriteRequest;
 import com.nabd.hms.staff.StaffService;
@@ -193,26 +194,54 @@ public class PatientService {
                 repo.findActiveConditionNames(tenantId, id), fieldGrants);
     }
 
+    /**
+     * True partial update: only the properties present in the request are written (an absent
+     * address / nationalId / guardianId is left alone; an explicit JSON null clears it). Revoking a
+     * guardian is therefore just {"guardianId": null} and cannot touch the other columns.
+     */
     @Transactional
-    public PatientResponse patch(UUID tenantId, UUID callerStaffId, UUID id, PatientWriteRequest req) {
+    public PatientResponse patch(UUID tenantId, UUID callerStaffId, UUID id, PatientPatchRequest req) {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         // scoped out or genuinely absent look identical — both 404, never 403 (NB-051)
         PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
                 .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
-        validateGuardian(tenantId, req);
+        for (String required : List.of("name", "phone", "dob", "gender")) {
+            if (req.has(required) && valueOf(req, required) == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
+                        required + " cannot be cleared.");
+            }
+        }
+        LocalDate dob = req.has("dob") ? req.dob() : before.dob();
+        UUID guardianId = req.has("guardianId") ? req.guardianId() : before.guardianId();
+        validateGuardian(tenantId, dob, guardianId);
 
-        byte[] nationalIdEnc = encryptOrNull(req.nationalId());
-        repo.update(tenantId, id, req.name(), PhoneNumbers.e164(req.phone(), repo.region(tenantId)), req.dob(), req.gender(),
-                req.guardianId(), req.address(), nationalIdEnc);
+        java.util.Map<String, Object> changes = new java.util.LinkedHashMap<>();
+        if (req.has("name")) changes.put("name", req.name());
+        if (req.has("phone")) changes.put("phone", PhoneNumbers.e164(req.phone(), repo.region(tenantId)));
+        if (req.has("dob")) changes.put("dob", java.sql.Date.valueOf(req.dob()));
+        if (req.has("gender")) changes.put("gender", req.gender());
+        if (req.has("guardianId")) changes.put("guardian_id", req.guardianId());
+        if (req.has("address")) changes.put("address", req.address());
+        if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(req.nationalId()));
+        repo.update(tenantId, id, changes);
         // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
         // the one place that needs to keep guardian_access consent (and the audit trail) in step —
         // covers grant, revoke (new guardianId is null) and reassignment alike.
-        if (!Objects.equals(before.guardianId(), req.guardianId())) {
-            changeGuardian(tenantId, callerStaffId, id, before.guardianId(), req.guardianId());
+        if (!Objects.equals(before.guardianId(), guardianId)) {
+            changeGuardian(tenantId, callerStaffId, id, before.guardianId(), guardianId);
         }
         log.info("patient {} updated by {} (tenant {})", id, callerStaffId, tenantId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    private static Object valueOf(PatientPatchRequest req, String property) {
+        return switch (property) {
+            case "name" -> req.name();
+            case "phone" -> req.phone();
+            case "dob" -> req.dob();
+            default -> req.gender();
+        };
     }
 
     /** NB-082: patients who've turned 18 but still have a guardian on file — the "automatic" part
@@ -318,11 +347,15 @@ public class PatientService {
     }
 
     private void validateGuardian(UUID tenantId, PatientWriteRequest req) {
-        if (isMinor(req.dob(), clock.today(tenantId)) && req.guardianId() == null) {
+        validateGuardian(tenantId, req.dob(), req.guardianId());
+    }
+
+    private void validateGuardian(UUID tenantId, LocalDate dob, UUID guardianId) {
+        if (isMinor(dob, clock.today(tenantId)) && guardianId == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-required", "Guardian required",
                     "A minor cannot be registered without a guardian.");
         }
-        if (req.guardianId() != null && !repo.existsActive(tenantId, req.guardianId())) {
+        if (guardianId != null && !repo.existsActive(tenantId, guardianId)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-not-found", "Guardian not found",
                     "guardianId does not reference an existing patient in this tenant.");
         }
