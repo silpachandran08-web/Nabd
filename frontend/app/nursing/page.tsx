@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./nursing.module.css";
 import Icon from "../components/ui/Icon";
+import AccessGate from "../components/ui/AccessGate";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
@@ -168,9 +169,11 @@ function resolveSequence(steps: { stepType: string }[]): string[] {
 
 export default function NursingPage() {
   return (
-    <Suspense fallback={null}>
-      <NursingWorklist />
-    </Suspense>
+    <AccessGate permission="nursing:view" surface="Nursing">
+      <Suspense fallback={null}>
+        <NursingWorklist />
+      </Suspense>
+    </AccessGate>
   );
 }
 

@@ -7,6 +7,7 @@ import WhatsAppTemplates from "./WhatsAppTemplates";
 import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
 import Icon from "../components/ui/Icon";
+import AccessGate from "../components/ui/AccessGate";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
@@ -65,9 +66,11 @@ function csvCell(v: string | number): string {
 // Subscription tabs) read useSearchParams, which needs a Suspense boundary for static prerender.
 export default function SetupPage() {
   return (
-    <Suspense fallback={null}>
-      <SetupPageInner />
-    </Suspense>
+    <AccessGate permission="setup:view" surface="Clinic Setup">
+      <Suspense fallback={null}>
+        <SetupPageInner />
+      </Suspense>
+    </AccessGate>
   );
 }
 
