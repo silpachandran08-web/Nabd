@@ -232,11 +232,13 @@ export default function ProvisioningPage() {
         <span className={styles.frd}>SSA-01 · region locks irreversibly on commit</span>
       </div>
 
-      <div className={styles.tabStrip}>
-        {TABS.map((t, i) => (
-          <button key={t} type="button" className={i === tab ? styles.tabActive : styles.tab} onClick={() => setTab(i)}>{t}</button>
-        ))}
-      </div>
+      {!forbidden && (
+        <div className={styles.tabStrip}>
+          {TABS.map((t, i) => (
+            <button key={t} type="button" className={i === tab ? styles.tabActive : styles.tab} onClick={() => setTab(i)}>{t}</button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <Skeleton rows={5} label="Loading provisioning jobs" />
