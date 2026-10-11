@@ -1065,6 +1065,7 @@ export default function ConsultPage() {
                       </div>
                     )}
                   </div>
+                  {rxStatus !== "signed" && <p className={p.muted}>The allergy check matches drug names and common drug classes only. It is not a drug database, so confirm against the patient&apos;s record.</p>}
                   {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
                   {openWarnings > 0 && rxStatus !== "signed" && (
                     <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-12)" }}>
