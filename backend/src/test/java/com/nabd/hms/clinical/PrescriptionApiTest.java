@@ -51,7 +51,7 @@ class PrescriptionApiTest extends ApiTestBase {
     }
 
     @Test
-    void prescribingADrugMatchingARecordedAllergyIsBlockedWithoutAnOverrideReason() {
+    void aSevereAllergyMatchCannotBeSignedUntilADecisionWithANamedReasonIsRecorded() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff doc = seedStaff(tenant, roleId, "doc5@a.com", "+919800020002", false);
@@ -61,15 +61,56 @@ class PrescriptionApiTest extends ApiTestBase {
                 authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
         String queueEntryId = checkIn(token, patientId, doc.id());
 
-        ResponseEntity<Map> blocked = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+        // Saving the draft is allowed and returns the structured warning, unresolved.
+        ResponseEntity<Map> saved = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
                 "items", List.of(Map.of("drugName", "Amoxicillin-Penicillin combo", "dosage", "250mg")))), Map.class);
-        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(blocked.getBody().get("type")).asString().contains("allergy-conflict");
+        assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(saved.getBody().get("unresolvedWarnings")).isEqualTo(1);
 
-        ResponseEntity<Map> overridden = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+        // Signing is refused server-side while the warning is unresolved.
+        ResponseEntity<Map> refused = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(refused.getBody().get("type")).asString().contains("warning-unresolved");
+
+        // A free-text or unknown reason is not accepted: it must be one of the named reasons.
+        ResponseEntity<Map> badReason = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
                 "items", List.of(Map.of("drugName", "Amoxicillin-Penicillin combo", "dosage", "250mg",
-                        "allergyOverrideReason", "Prior tolerance confirmed by patient")))), Map.class);
-        assertThat(overridden.getStatusCode()).isEqualTo(HttpStatus.OK);
+                        "overrides", List.of(Map.of("kind", "allergy", "reasonCode", "because")))))), Map.class);
+        assertThat(badReason.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(badReason.getBody().get("type")).asString().contains("invalid-override-reason");
+
+        ResponseEntity<Map> decided = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Amoxicillin-Penicillin combo", "dosage", "250mg",
+                        "overrides", List.of(Map.of("kind", "allergy", "reasonCode", "direct_supervision")))))), Map.class);
+        assertThat(decided.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(decided.getBody().get("unresolvedWarnings")).isEqualTo(0);
+
+        // Re-saving the same line without resending the decision keeps it (never silently cleared).
+        ResponseEntity<Map> resaved = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Amoxicillin-Penicillin combo", "dosage", "500mg")))), Map.class);
+        assertThat(resaved.getBody().get("unresolvedWarnings")).isEqualTo(0);
+
+        ResponseEntity<Map> signed = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(signed.getBody().get("status")).isEqualTo("signed");
+    }
+
+    @Test
+    void anAllergyRecordedAfterTheDraftWasSavedStillBlocksSigning() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc5d@a.com", "+919800020014", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P2d", "+919999960014");
+        String queueEntryId = checkIn(token, patientId, doc.id());
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Ibuprofen", "dosage", "400mg")))), Map.class);
+
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "NSAID", "severity", "severe", "reaction", "angioedema")), Map.class);
+
+        ResponseEntity<Map> refused = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
@@ -104,14 +145,14 @@ class PrescriptionApiTest extends ApiTestBase {
 
         exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
                 "items", List.of(Map.of("drugName", "Penicillin-VK", "dosage", "500mg",
-                        "allergyOverrideReason", "Desensitisation protocol under supervision")))), Map.class);
+                        "overrides", List.of(Map.of("kind", "allergy", "reasonCode", "direct_supervision", "note", "Desensitisation protocol")))))), Map.class);
 
         Map<String, Object> audited = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
                 "SELECT action, actor_name, before, after FROM audit_log " +
                         "WHERE tenant_id = ? AND action = 'prescription.allergy_override' ORDER BY created_at DESC LIMIT 1",
                 tenant.id()));
         assertThat(audited.get("actor_name")).isEqualTo("Test Staff");
-        assertThat(audited.get("after").toString()).contains("Penicillin-VK").contains("Desensitisation protocol under supervision");
+        assertThat(audited.get("after").toString()).contains("Penicillin-VK").contains("direct_supervision").contains("Desensitisation protocol");
     }
 
     @Test
@@ -157,10 +198,36 @@ class PrescriptionApiTest extends ApiTestBase {
                 authedJsonBody(token, Map.of("substance", "Paracetamol", "severity", "severe", "reaction", "hives")), Map.class);
         String queueEntryId = checkIn(token, patientId, doc.id());
 
-        ResponseEntity<Map> blocked = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/apply-set/" + setId,
+        ResponseEntity<Map> applied = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/apply-set/" + setId,
                 HttpMethod.POST, authed(token), Map.class);
-        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(blocked.getBody().get("type")).asString().contains("allergy-conflict");
+        assertThat(applied.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(applied.getBody().get("unresolvedWarnings")).isEqualTo(1); // flagged, not silently accepted
+
+        ResponseEntity<Map> refused = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void aPregnancyCautionForAWomanOfChildbearingAgeNeedsANamedReasonBeforeSigning() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc5e@a.com", "+919800020015", false);
+        String token = loginAndGetAccessToken(doc);
+        ResponseEntity<Map> reg = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "P2e", "phone", "+919999960015", "dob", "1995-01-01", "gender", "female")), Map.class);
+        String queueEntryId = checkIn(token, (String) reg.getBody().get("id"), doc.id());
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Doxycycline", "dosage", "100mg")))), Map.class);
+
+        assertThat(exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Doxycycline", "dosage", "100mg",
+                        "overrides", List.of(Map.of("kind", "pregnancy", "reasonCode", "obstetric_consultation")))))), Map.class);
+
+        assertThat(exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
