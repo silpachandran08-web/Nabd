@@ -1199,7 +1199,7 @@ export default function ConsultPage() {
                 {!hasDrugs ? <StatusPill tone="neutral" icon="list" label="None" /> : rxStatus === "signed" ? <StatusPill tone="ok" label="Signed" /> : <StatusPill tone="warn" label="Draft" />}
               </h3>
               {hasDrugs ? <ul className={p.list}>{rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}</li>)}</ul> : <p className={p.muted}>No drugs added.</p>}
-              <button type="button" className={p.linkBtn} onClick={() => setStep("plan")}>Open prescription</button>
+              <button type="button" className={`${p.linkBtn} ${p.linkBtnTouch}`} onClick={() => setStep("plan")}>Open prescription</button>
             </section>
             <FollowUpPanel authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} />
             <section className={p.card} aria-label="Package">
