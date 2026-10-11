@@ -21,6 +21,12 @@ class AllergyDrugClassesTest {
             "Sulfamethoxazole, Sulfa",
             "Sulphamethoxazole, Sulfonamide",
             "Bactrim, Sulphonamides",
+            // V5-001: class names containing a longer compound word must still match
+            "Ciprofloxacin, Fluoroquinolone",
+            "Levofloxacin, Fluoroquinolones",
+            "Codeine, Dihydrocodeine",
+            "Ibuprofen, Dexibuprofen",
+            "Gentamicin, Dihydrostreptomycin",
             // penicillin class in both directions
             "Augmentin 625, Penicillin",
             "Co-amoxiclav, Amoxicillin",
