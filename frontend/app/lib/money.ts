@@ -4,7 +4,7 @@ export function formatMoney(amount: number | null | undefined, currency = "INR")
   if (amount === null || amount === undefined || Number.isNaN(amount)) return "—";
   try {
     if (currency === "SAR") return `${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)} ﷼`;
-    return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", { style: "currency", currency, maximumFractionDigits: currency === "INR" ? 0 : 2 }).format(amount);
+    return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", { style: "currency", currency, minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2 }).format(amount);
   } catch {
     return `${currency} ${amount}`;
   }

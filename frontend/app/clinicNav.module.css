@@ -307,3 +307,19 @@
   .navRail .link { flex-direction: column; width: 76px; height: auto; min-height: 52px; }
   .navRail .linkLabel { display: none; }
 }
+
+.clinicWrap { position: relative; margin-bottom: var(--nb-space-16); }
+.clinicWrap .clinicInfo { margin-bottom: 0; }
+.clinicButton { width: 100%; border: none; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.clinicChevron { margin-inline-start: auto; color: var(--nb-text-tertiary); display: inline-flex; }
+.clinicMenu { position: absolute; top: calc(100% + var(--nb-space-8)); inset-inline-start: 0; width: 240px; z-index: 50; padding: var(--nb-space-12); border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0,0,0,.55); }
+.clinicCurrent { display: flex; align-items: center; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-4); color: var(--nb-accent-500); font-size: 13px; font-weight: 600; }
+.clinicSwitch { display: block; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-secondary); font-size: 13px; text-decoration: none; }
+.clinicSwitch:hover { color: var(--nb-text-primary); }
+.planChip { display: flex; flex-direction: column; gap: 2px; margin-top: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px dashed var(--nb-sync-500); background: var(--nb-sync-tint); text-decoration: none; }
+.planName { color: var(--nb-sync-500); font-size: 12px; font-weight: 600; text-transform: capitalize; }
+.planSub { color: var(--nb-text-secondary); font-size: 11px; text-transform: capitalize; }
+.menuLink { display: block; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-primary); font-size: 13px; font-weight: 500; text-decoration: none; }
+.menuLink:hover { background: var(--nb-surface-2); border-radius: var(--nb-radius-md); }
+@media (max-width: 1024px) { .clinicChevron, .planChip, .clinicMenu { display: none; } }
+.navRail .clinicChevron, .navRail .planChip { display: none; }

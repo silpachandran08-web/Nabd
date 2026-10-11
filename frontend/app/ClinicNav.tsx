@@ -25,6 +25,7 @@ const NAV_ITEMS: { href: string; label: string; short: string; icon: IconName; p
   // clinical:edit, not clinical:view — reception can be granted clinical:view (e.g. for billing
   // lookups) without being a clinician; see lib/session.ts's LANDING_RULES for the full reasoning.
   { href: "/consult", label: "Consultation Workspace", short: "Consult", icon: "stethoscope", permission: "clinical:edit" },
+  { href: "/pharmacy", label: "Pharmacy", short: "Pharmacy", icon: "syringe", permission: "pharmacy:view" },
   { href: "/billing", label: "Checkout & Billing", short: "Billing", icon: "receipt", permission: "billing:view" },
   { href: "/packages", label: "Treatment Packages", short: "Packages", icon: "package", permission: "packages:view" },
   { href: "/staff", label: "Staff & Access", short: "Staff", icon: "shield", permission: "staff:view" },
@@ -113,6 +114,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [sessionLabel, setSessionLabel] = useState("—");
   const [signingOut, setSigningOut] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [showClinic, setShowClinic] = useState(false);
+  const [plan, setPlan] = useState<{ plan: string; status: string } | null>(null);
   const [badges, setBadges] = useState<Record<string, number>>({});
 
   // Hydration-safe: render nothing until this mounts and can read localStorage, then reflect
@@ -146,6 +149,22 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       .catch(() => {});
     return () => { cancelled = true; };
   }, [pathname, skip]);
+
+  // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
+  useEffect(() => {
+    if (skip || !isOwner() || !getPermissions().includes("setup:view")) return;
+    const token = localStorage.getItem("nabd_access_token");
+    if (!token) return;
+    let cancelled = false;
+    void fetch(`${API_BASE}/setup/subscription`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (cancelled || !res.ok) return;
+        const body: { plan: string; status: string } = await res.json();
+        if (!cancelled) setPlan({ plan: body.plan, status: body.status });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [skip]);
 
   if (skip || !permissions || permissions.length === 0) return null;
 
@@ -187,7 +206,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   async function handleSignOut() {
     setSigningOut(true);
     await signOut();
-    router.replace("/login");
+    router.replace(owner ? "/owner/login" : "/login");
   }
 
   return (
@@ -195,7 +214,33 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     <nav className={`${styles.nav} ${collapsed ? styles.navRail : ""}`} aria-label="Main">
       <div className={styles.brand}>nabd</div>
 
-      {identity && (
+      {identity && (owner ? (
+        <div className={styles.clinicWrap}>
+          <button type="button" className={`${styles.clinicInfo} ${styles.clinicButton}`} aria-haspopup="menu"
+            aria-expanded={showClinic} onClick={() => setShowClinic((v) => !v)}>
+            <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
+            <div className={styles.clinicText}>
+              <div className={styles.clinicName}>{identity.tenantName}</div>
+              {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
+            </div>
+            <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
+          </button>
+          {showClinic && (
+            <>
+              <div className={styles.menuBackdrop} onClick={() => setShowClinic(false)} />
+              <div className={styles.clinicMenu} role="menu">
+                <div className={styles.menuHeader}>Clinic</div>
+                <div className={styles.clinicCurrent} role="menuitem" aria-current="true">
+                  <Icon name="check" size={14} /> {identity.tenantName}
+                </div>
+                <Link href="/owner/workspaces" role="menuitem" className={styles.clinicSwitch} onClick={() => setShowClinic(false)}>
+                  Switch workspace
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
         <div className={styles.clinicInfo}>
           <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
           <div className={styles.clinicText}>
@@ -203,7 +248,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
           </div>
         </div>
-      )}
+      ))}
 
       <div className={styles.links}>
         {entries.map((e) => (
@@ -221,6 +266,13 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           </Link>
         ))}
       </div>
+
+      {owner && plan && (
+        <Link href="/setup?tab=subscription" className={styles.planChip}>
+          <span className={styles.planName}>Plan: {plan.plan}</span>
+          <span className={styles.planSub}>{plan.status.replace(/_/g, " ")} · view catalog</span>
+        </Link>
+      )}
 
       {identity && (
         <div className={styles.identityWrap}>
@@ -240,10 +292,21 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                   <span>Active role</span>
                   <span className={styles.menuRowValue}>{identity.roleName}</span>
                 </div>
+                {owner && identity.tenantRegion && (
+                  <div className={styles.menuRow}>
+                    <span>Region</span>
+                    <span className={styles.menuRowValue}>{identity.tenantRegion}</span>
+                  </div>
+                )}
                 <div className={styles.menuRow}>
                   <span>Session</span>
                   <span className={styles.menuRowValue}>{sessionLabel}</span>
                 </div>
+                {owner && (
+                  <Link href="/account" className={styles.menuLink} onClick={() => setShowMenu(false)}>
+                    Account &amp; Security
+                  </Link>
+                )}
                 <button type="button" className={styles.menuSignOut} onClick={handleSignOut} disabled={signingOut}>
                   {signingOut ? "Signing out…" : "Sign out"}
                 </button>
