@@ -9,6 +9,8 @@ import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
 import type { IconName } from "../components/ui/Icon";
 import { can } from "../lib/permissions";
+import { getIdentity } from "../lib/session";
+import { PAYMENT_METHODS, paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { CheckInDialog, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
@@ -277,6 +279,13 @@ function ArrivalsPageInner() {
     void Promise.resolve().then(load);
   }, [load]);
 
+  const [region, setRegion] = useState<string | undefined>(undefined);
+  // A patient created by a check-in whose second call failed: a retry must reuse it, not re-register.
+  const registeredRef = useRef<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    void Promise.resolve().then(() => setRegion(getIdentity()?.tenantRegion));
+  }, []);
+
   useEffect(() => {
     void Promise.resolve().then(() => setGrants({
       queueCreate: can("queue:create"), queueEdit: can("queue:edit"),
@@ -352,6 +361,7 @@ function ArrivalsPageInner() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function onPatientQueryChange(value: string) {
     setPatientQuery(value);
+    registeredRef.current = null;
     setSelectedPatient(null);
     setNewPatientMode(false);
     setDuplicateCandidates([]);
@@ -367,6 +377,7 @@ function ArrivalsPageInner() {
   }
 
   function openModal() {
+    registeredRef.current = null;
     setShowModal(true);
     setPatientQuery("");
     setSearchResults([]);
@@ -410,8 +421,8 @@ function ArrivalsPageInner() {
     }
     setSubmitting(true);
     try {
-      let patientId = selectedPatient?.id ?? null;
-      let patientName = selectedPatient?.name ?? "";
+      let patientId = selectedPatient?.id ?? registeredRef.current?.id ?? null;
+      let patientName = selectedPatient?.name ?? registeredRef.current?.name ?? "";
       if (!patientId) {
         if (!newName || !newPhone || !newDob) {
           setModalError("Fill in the new patient's name, phone and date of birth.");
@@ -444,6 +455,7 @@ function ArrivalsPageInner() {
         }
         patientId = (await res.json()).id;
         patientName = newName;
+        registeredRef.current = { id: patientId as string, name: newName };
       }
 
       const ciRes = await authedFetch("/queue/check-in", {
@@ -720,7 +732,7 @@ function ArrivalsPageInner() {
         {grants.queueEdit && !r.priority && b === "waiting" && (
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openPriorityModal(r.id))}>Mark priority</button>
         )}
-        {grants.clinicalEdit && (r.status === "checked_in" || r.status === "waiting") && (
+        {grants.queueEdit && (r.status === "checked_in" || r.status === "waiting") && (
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => void sendForVitals(r))}>Send for vitals</button>
         )}
         {grants.clinicalEdit && r.status === "vitals_pending" && (
@@ -747,7 +759,7 @@ function ArrivalsPageInner() {
               <Link className={styles.segment} href="/schedule">Schedule</Link>
               <span className={styles.segmentActive} aria-current="page">Live Queue</span>
             </nav>
-            {grants.billingCreate && (
+            {grants.billingCreate && grants.billingView && (
               <button type="button" className={styles.secondaryBtn} onClick={() => router.push("/checkout/otc")}>
                 Counter sale
               </button>
@@ -828,8 +840,8 @@ function ArrivalsPageInner() {
                           <td className={styles.colDoctor} data-label="Doctor">{staff.find((s) => s.id === r.doctorId)?.name ?? "—"}</td>
                           <td className={styles.muted} data-label="Wait">{b === "waiting" || b === "in_consult" ? `${waitMinutes(r.createdAt)}m` : "—"}</td>
                           <td data-label="Status"><StatusBadge status={r.status} /></td>
-                          <td className={styles.rowActions} onClick={(e) => e.stopPropagation()}>
-                            {rowActions(r, (fn) => fn())}
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <div className={styles.rowActions}>{rowActions(r, (fn) => fn())}</div>
                           </td>
                         </tr>
                       );
@@ -963,7 +975,7 @@ function ArrivalsPageInner() {
               <>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newName">Name</label>
-                  <input id="newName" className={styles.input} value={newName} onChange={(e) => setNewName(e.target.value)} />
+                  <input id="newName" className={styles.input} value={newName} onChange={(e) => { registeredRef.current = null; setNewName(e.target.value); }} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newPhone">Phone</label>
@@ -1022,10 +1034,7 @@ function ArrivalsPageInner() {
             <div className={styles.field}>
               <label className={styles.label} htmlFor="paymentMode">Payment mode</label>
               <select id="paymentMode" className={styles.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="upi">UPI</option>
-                <option value="other">Other</option>
+                {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{paymentMethodLabel(m, region)}</option>)}
               </select>
             </div>
 
