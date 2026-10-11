@@ -90,7 +90,9 @@ public class VitalsService {
     }
 
     /** A later save that changes an already-recorded value is a correction of a clinical measurement: the old and new
-     * values of the fields that changed go to the audit trail (nothing is overwritten without a trace). */
+     * values of the fields that changed go to the audit trail (nothing is overwritten without a trace). Measured values are
+     * kept here on purpose: vitals has no history table and the upsert overwrites the row, so audit_log is the only record
+     * of the old reading (see the PHI policy on AuditService). */
     private void auditCorrection(UUID tenantId, UUID staffId, UUID queueEntryId, VitalsRow before, VitalsRow after) {
         if (before == null) {
             return;
