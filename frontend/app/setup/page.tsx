@@ -99,7 +99,7 @@ function SetupPageInner() {
   const [staff, setStaff] = useState<StaffSummary[]>([]);
   const [canPharmacy, setCanPharmacy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [payrollMonth, setPayrollMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [payrollMonth, setPayrollMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }) // local month, not UTC;
   const [payrollError, setPayrollError] = useState<string | null>(null);
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [specialtyDraft, setSpecialtyDraft] = useState("");
