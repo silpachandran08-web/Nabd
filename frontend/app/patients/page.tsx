@@ -136,6 +136,11 @@ function PatientsList() {
   // Never claim "none recorded" for a register that failed to load.
   const [allergyLoad, setAllergyLoad] = useState<"loading" | "ok" | "error">("loading");
   const [conditionLoad, setConditionLoad] = useState<"loading" | "ok" | "error">("loading");
+  const [rxLoad, setRxLoad] = useState<"loading" | "ok" | "error">("loading");
+  const [timelineLoad, setTimelineLoad] = useState<"loading" | "ok" | "error">("loading");
+  // A write that failed must say so — never leave the clinician thinking an allergy/guardian change landed.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const openSeq = useRef(0); // guards against a slow earlier drawer load landing in a later patient's drawer
 
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [newCondition, setNewCondition] = useState({ condition: "", reviewDueDate: "" });
@@ -230,9 +235,13 @@ function PatientsList() {
     return () => clearTimeout(t);
   }, [load, q, filter]);
 
-  const closeDrawer = useCallback(() => { setDrawerId(null); setDrawerPatient(null); setDrawerError(null); }, []);
+  const closeDrawer = useCallback(() => { openSeq.current++; setDrawerId(null); setDrawerPatient(null); setDrawerError(null); }, []);
 
   async function openDrawer(id: string) {
+    const seq = ++openSeq.current;
+    setActionError(null);
+    setRxLoad("loading");
+    setTimelineLoad("loading");
     setDrawerId(id);
     setDrawerError(null);
     setDrawerPatient(null);
@@ -258,30 +267,41 @@ function PatientsList() {
       setDrawerError("Couldn't reach the server. Check your connection and try again.");
       return;
     }
-    if (!res) return;
+    if (!res || seq !== openSeq.current) return;
     if (!res.ok) {
       setDrawerError("Couldn't load this patient.");
       return;
     }
-    setDrawerPatient(await res.json());
+    const detail: PatientDetail = await res.json();
+    if (seq !== openSeq.current) return;
+    setDrawerPatient(detail);
     if (clinicalView) {
-      refreshAllergies(id);
-      refreshConditions(id);
+      void refreshAllergies(id, seq);
+      void refreshConditions(id, seq);
 
-      const rxRes = await authedFetch(`/clinical/patients/${id}/prescriptions`);
-      if (rxRes?.ok) setPrescriptions(await rxRes.json());
+      try {
+        const rxRes = await authedFetch(`/clinical/patients/${id}/prescriptions`);
+        if (seq !== openSeq.current) return;
+        if (rxRes?.ok) { setPrescriptions(await rxRes.json()); setRxLoad("ok"); } else if (rxRes) setRxLoad("error");
 
-      const tlRes = await authedFetch(`/clinical/patients/${id}/timeline?limit=10`);
-      if (tlRes?.ok) {
-        const page = await tlRes.json();
-        setTimeline(page.data);
-        setTimelineCursor(page.page.nextCursor);
+        const tlRes = await authedFetch(`/clinical/patients/${id}/timeline?limit=10`);
+        if (seq !== openSeq.current) return;
+        if (tlRes?.ok) {
+          const page = await tlRes.json();
+          setTimeline(page.data);
+          setTimelineCursor(page.page.nextCursor);
+          setTimelineLoad("ok");
+        } else if (tlRes) setTimelineLoad("error");
+      } catch {
+        if (seq === openSeq.current) { setRxLoad((v) => (v === "ok" ? v : "error")); setTimelineLoad("error"); }
       }
     }
 
     if (canDental) {
-      const chartRes = await authedFetch(`/specialty/dental/patients/${id}/chart`);
-      if (chartRes?.ok) setChart(await chartRes.json());
+      try {
+        const chartRes = await authedFetch(`/specialty/dental/patients/${id}/chart`);
+        if (seq === openSeq.current && chartRes?.ok) setChart(await chartRes.json());
+      } catch { /* chart stays empty; tooth edits re-fetch nothing */ }
     }
   }
 
@@ -300,14 +320,20 @@ function PatientsList() {
     }
   }
 
-  async function refreshAllergies(patientId: string) {
-    const res = await authedFetch(`/clinical/patients/${patientId}/allergies`);
-    if (res?.ok) { setAllergies(await res.json()); setAllergyLoad("ok"); } else if (res) setAllergyLoad("error");
+  async function refreshAllergies(patientId: string, seq = openSeq.current) {
+    try {
+      const res = await authedFetch(`/clinical/patients/${patientId}/allergies`);
+      if (seq !== openSeq.current) return;
+      if (res?.ok) { setAllergies(await res.json()); setAllergyLoad("ok"); } else if (res) setAllergyLoad("error");
+    } catch {
+      if (seq === openSeq.current) setAllergyLoad("error");
+    }
   }
 
   async function addAllergy() {
     if (!drawerPatient || !newAllergy.substance.trim()) return;
     setAllergyBusy(true);
+    setActionError(null);
     try {
       const res = await authedFetch(`/clinical/patients/${drawerPatient.id}/allergies`, {
         method: "POST",
@@ -318,7 +344,9 @@ function PatientsList() {
         refreshAllergies(drawerPatient.id);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
-      }
+      } else if (res) setActionError("Couldn't save the allergy. It has NOT been recorded.");
+    } catch {
+      setActionError("Couldn't reach the server. The allergy has NOT been recorded.");
     } finally {
       setAllergyBusy(false);
     }
@@ -326,22 +354,33 @@ function PatientsList() {
 
   async function deactivateAllergy(id: string) {
     if (!drawerPatient) return;
-    const res = await authedFetch(`/clinical/allergies/${id}/deactivate`, { method: "PATCH" });
-    if (res?.ok) {
-      refreshAllergies(drawerPatient.id);
-      const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-      if (pRes?.ok) setDrawerPatient(await pRes.json());
+    setActionError(null);
+    try {
+      const res = await authedFetch(`/clinical/allergies/${id}/deactivate`, { method: "PATCH" });
+      if (res?.ok) {
+        refreshAllergies(drawerPatient.id);
+        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
+        if (pRes?.ok) setDrawerPatient(await pRes.json());
+      } else if (res) setActionError("Couldn't remove the allergy. It is still on record.");
+    } catch {
+      setActionError("Couldn't reach the server. The allergy is still on record.");
     }
   }
 
-  async function refreshConditions(patientId: string) {
-    const res = await authedFetch(`/clinical/patients/${patientId}/conditions`);
-    if (res?.ok) { setConditions(await res.json()); setConditionLoad("ok"); } else if (res) setConditionLoad("error");
+  async function refreshConditions(patientId: string, seq = openSeq.current) {
+    try {
+      const res = await authedFetch(`/clinical/patients/${patientId}/conditions`);
+      if (seq !== openSeq.current) return;
+      if (res?.ok) { setConditions(await res.json()); setConditionLoad("ok"); } else if (res) setConditionLoad("error");
+    } catch {
+      if (seq === openSeq.current) setConditionLoad("error");
+    }
   }
 
   async function addCondition() {
     if (!drawerPatient || !newCondition.condition.trim()) return;
     setConditionBusy(true);
+    setActionError(null);
     try {
       const res = await authedFetch(`/clinical/patients/${drawerPatient.id}/conditions`, {
         method: "POST",
@@ -353,36 +392,49 @@ function PatientsList() {
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
         void load(q, filter); // Follow-up due flag/count may have changed
-      }
+      } else if (res) setActionError("Couldn't save the condition. It has NOT been recorded.");
+    } catch {
+      setActionError("Couldn't reach the server. The condition has NOT been recorded.");
     } finally {
       setConditionBusy(false);
     }
   }
 
-  /** NB-085: revocation is just a normal patch clearing guardianId — PatientService audits the
-   * change (and withdraws the guardian_access consent) as part of that same write. */
+  /** NB-085 / CGV-001: revocation is a partial PATCH carrying ONLY guardianId:null. PATCH leaves every
+   * property it doesn't mention untouched (address, national ID...), so nothing else may be echoed
+   * back — the detail response doesn't carry those fields anyway. PatientService audits the change
+   * and withdraws the guardian_access consent in the same write. */
   async function revokeGuardian() {
     if (!drawerPatient) return;
-    const res = await authedFetch(`/patients/${drawerPatient.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        name: drawerPatient.name, phone: drawerPatient.phone, dob: drawerPatient.dob, gender: drawerPatient.gender,
-      }),
-    });
-    if (res?.ok) {
-      const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-      if (pRes?.ok) setDrawerPatient(await pRes.json());
+    setActionError(null);
+    try {
+      const res = await authedFetch(`/patients/${drawerPatient.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ guardianId: null }),
+      });
+      if (res?.ok) {
+        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
+        if (pRes?.ok) setDrawerPatient(await pRes.json());
+        void load(q, filter);
+      } else if (res) setActionError("Couldn't revoke guardian access. It is still active.");
+    } catch {
+      setActionError("Couldn't reach the server. Guardian access is still active.");
     }
   }
 
   async function resolveCondition(id: string) {
     if (!drawerPatient) return;
-    const res = await authedFetch(`/clinical/conditions/${id}/resolve`, { method: "PATCH" });
-    if (res?.ok) {
-      refreshConditions(drawerPatient.id);
-      const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-      if (pRes?.ok) setDrawerPatient(await pRes.json());
-      void load(q, filter); // Follow-up due flag/count may have changed
+    setActionError(null);
+    try {
+      const res = await authedFetch(`/clinical/conditions/${id}/resolve`, { method: "PATCH" });
+      if (res?.ok) {
+        refreshConditions(drawerPatient.id);
+        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
+        if (pRes?.ok) setDrawerPatient(await pRes.json());
+        void load(q, filter); // Follow-up due flag/count may have changed
+      } else if (res) setActionError("Couldn't resolve the condition. It is still active.");
+    } catch {
+      setActionError("Couldn't reach the server. The condition is still active.");
     }
   }
 
@@ -682,11 +734,14 @@ function PatientsList() {
                 </>
               ) : (
                 <>
+                  {actionError && <div className={styles.errorInline} role="alert">{actionError}</div>}
                   {/* Never assert "no known allergies" for a role that can't see the allergy data. */}
                   {drawerPatient.allergies.length > 0 ? (
                     <div className={styles.allergyBannerSome}>
                       <StatusPill tone="danger" label="Allergies" /> {drawerPatient.allergies.join(", ")}
                     </div>
+                  ) : clinicalView && allergyLoad === "error" ? (
+                    <div className={styles.allergyBannerNone}>Allergy status couldn&apos;t be confirmed. Don&apos;t assume there are none.</div>
                   ) : clinicalView ? (
                     <div className={styles.allergyBannerNone}>No known allergies</div>
                   ) : (
@@ -808,7 +863,11 @@ function PatientsList() {
 
                       <div className={styles.section}>
                         <div className={styles.sectionLabel}>Previous medicines</div>
-                        {prescriptions.length === 0 ? (
+                        {rxLoad === "error" ? (
+                          <div className={styles.errorInline} role="alert">Couldn&apos;t load previous medicines.</div>
+                        ) : rxLoad === "loading" ? (
+                          <Skeleton rows={1} label="Loading medicines" />
+                        ) : prescriptions.length === 0 ? (
                           <div className={styles.muted}>None recorded</div>
                         ) : (
                           prescriptions.map((rx) => (
@@ -822,7 +881,11 @@ function PatientsList() {
 
                       <div className={styles.section}>
                         <div className={styles.sectionLabel}>Encounter timeline</div>
-                        {timeline.length === 0 ? (
+                        {timelineLoad === "error" ? (
+                          <div className={styles.errorInline} role="alert">Couldn&apos;t load the encounter timeline.</div>
+                        ) : timelineLoad === "loading" ? (
+                          <Skeleton rows={2} label="Loading timeline" />
+                        ) : timeline.length === 0 ? (
                           <div className={styles.muted}>No completed visits yet</div>
                         ) : (
                           timeline.map((e) => (
