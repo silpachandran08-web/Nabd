@@ -458,6 +458,23 @@ class PatientApiTest extends ApiTestBase {
         assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, blankId), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
+        // V3-010: same for a blank address, and clearing a national ID that is already empty is a no-op with no audit row.
+        java.util.Map<String, Object> blankAddress = new java.util.HashMap<>();
+        blankAddress.put("address", "  ");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, blankAddress), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        Integer auditsBefore = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'patient.updated' AND entity_id = ?",
+                Integer.class, tenant.id(), patientId));
+        java.util.Map<String, Object> clearAgain = new java.util.HashMap<>();
+        clearAgain.put("nationalId", null);
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, clearAgain), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        Integer auditsAfter = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'patient.updated' AND entity_id = ?",
+                Integer.class, tenant.id(), patientId));
+        assertThat(auditsAfter).isEqualTo(auditsBefore);
+
         java.util.Map<String, Object> nullName = new java.util.HashMap<>();
         nullName.put("name", null);
         assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, nullName), Map.class)

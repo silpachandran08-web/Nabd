@@ -314,4 +314,12 @@ class PatientRepository {
                 UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("phone"),
                 rs.getDouble("match_score"));
     }
+
+    /** V3-010: whether a national ID is on file (the encrypted value itself is never read back), so the audit row can
+     * say "cleared" only when something was actually cleared. */
+    boolean hasNationalId(UUID tenantId, UUID id) {
+        Boolean has = jdbc.queryForObject(
+                "SELECT national_id_enc IS NOT NULL FROM patients WHERE tenant_id = ? AND id = ?", Boolean.class, tenantId, id);
+        return Boolean.TRUE.equals(has);
+    }
 }

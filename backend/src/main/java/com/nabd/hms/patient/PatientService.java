@@ -212,11 +212,16 @@ public class PatientService {
                         required + " cannot be cleared.");
             }
         }
-        // V1-015: a blank-but-present national ID must not act as a silent clear; clearing is an explicit null.
+        // V1-015 / V3-010: a blank-but-present national ID or address must not act as a silent clear; clearing is an explicit null.
         if (req.has("nationalId") && req.nationalId() != null && req.nationalId().isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
                     "nationalId cannot be blank. Send null to clear it.");
         }
+        if (req.has("address") && req.address() != null && req.address().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
+                    "address cannot be blank. Send null to clear it.");
+        }
+        boolean hadNationalId = req.has("nationalId") && repo.hasNationalId(tenantId, id);
         LocalDate dob = req.has("dob") ? req.dob() : before.dob();
         UUID guardianId = req.has("guardianId") ? req.guardianId() : before.guardianId();
         validateGuardian(tenantId, dob, guardianId);
@@ -230,7 +235,7 @@ public class PatientService {
         if (req.has("address")) changes.put("address", req.address());
         if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(req.nationalId()));
         repo.update(tenantId, id, changes);
-        auditUpdate(tenantId, callerStaffId, id, before, req, changes.get("phone"));
+        auditUpdate(tenantId, callerStaffId, id, before, req, changes.get("phone"), hadNationalId);
         // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
         // the one place that needs to keep guardian_access consent (and the audit trail) in step —
         // covers grant, revoke (new guardianId is null) and reassignment alike.
@@ -245,7 +250,7 @@ public class PatientService {
      * phone, address or national-ID values (PHI) go into the payload. `cleared` names the fields that were emptied, so
      * a destructive clear of the national ID or address is visible. Guardian changes keep their own detailed events. */
     private void auditUpdate(UUID tenantId, UUID callerStaffId, UUID id, PatientRow before, PatientPatchRequest req,
-                             Object normalisedPhone) {
+                             Object normalisedPhone, boolean hadNationalId) {
         List<String> changed = new java.util.ArrayList<>();
         List<String> cleared = new java.util.ArrayList<>();
         if (req.has("name") && !Objects.equals(before.name(), req.name())) changed.add("name");
@@ -257,7 +262,8 @@ public class PatientService {
             changed.add("address");
             if (req.address() == null) cleared.add("address");
         }
-        if (req.has("nationalId")) {
+        // shortcut: a non-null nationalId is always listed as changed (the stored value is encrypted, so equality is not checked).
+        if (req.has("nationalId") && (req.nationalId() != null || hadNationalId)) {
             changed.add("nationalId");
             if (req.nationalId() == null) cleared.add("nationalId");
         }
