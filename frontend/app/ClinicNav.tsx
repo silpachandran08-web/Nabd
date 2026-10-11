@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
@@ -114,9 +114,20 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [sessionLabel, setSessionLabel] = useState("—");
   const [signingOut, setSigningOut] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
   const [showClinic, setShowClinic] = useState(false);
   const [plan, setPlan] = useState<{ plan: string; status: string } | null>(null);
   const [badges, setBadges] = useState<Record<string, number>>({});
+
+  // Escape closes the mobile More menu and hands focus back to its button.
+  useEffect(() => {
+    if (!showMore) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") { setShowMore(false); moreBtnRef.current?.focus(); }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showMore]);
 
   // Hydration-safe: render nothing until this mounts and can read localStorage, then reflect
   // it — never read it directly during render.
@@ -350,7 +361,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
               </div>
             </>
           )}
-          <button type="button" className={styles.bottomLink} aria-expanded={showMore} aria-haspopup="menu"
+          <button type="button" ref={moreBtnRef} className={styles.bottomLink} aria-expanded={showMore} aria-haspopup="menu"
             onClick={() => setShowMore((v) => !v)}>
             <span className={styles.bottomIcon}><Icon name="more" size={20} /></span>
             More
