@@ -777,6 +777,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PatientPatch" } } }
       responses:
         "200": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /patients/{id}/merge:
@@ -1164,7 +1165,88 @@ paths:
         "403": { description: "Forbidden. 403 not-prescriber: caller is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /clinical/vitals/{queueEntryId}:
+    get:
+      tags: [Clinical]
+      summary: Vitals recorded for a visit
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Vitals" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Clinical]
+      summary: >
+        Record or correct a visit's vitals. A field that is absent or null keeps the stored value; a measurement is
+        corrected by sending the new value and cannot be blanked. At least one measurement is required
+        (400 no-measurement); blood pressure is a pair (400 incomplete-blood-pressure) and systolic must exceed
+        diastolic (400 invalid-blood-pressure). Values outside the plausibility bounds below are 400 validation-failed
+        and are never altered. A change to an already-recorded value is audited as vitals.corrected with old and new values.
+      x-required-permission: clinical:edit
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/VitalsWrite" } } }
+      responses:
+        "200": { description: The vitals as stored, content: { application/json: { schema: { $ref: "#/components/schemas/Vitals" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ------------------------------------------------------------ Pharmacy (Hybrid mode)
+  /pharmacy/settings:
+    get:
+      tags: [Pharmacy]
+      summary: The tenant's pharmacy mode
+      x-required-permission: pharmacy:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
+    patch:
+      tags: [Pharmacy]
+      summary: Set the pharmacy mode (external, hybrid or in_house). Items and stock are only managed in hybrid mode.
+      x-required-permission: pharmacy:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } }
+      responses:
+        "200": { description: The settings, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /pharmacy/items:
+    get:
+      tags: [Pharmacy]
+      summary: Pharmacy (stocked) catalogue items, active and inactive
+      x-required-permission: pharmacy:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PharmacyItem" } } } } }
+    post:
+      tags: [Pharmacy]
+      summary: Add a stocked item. `stockQty` is the opening stock and is logged as the first stock movement. 400 pharmacy-mode-not-hybrid outside Hybrid mode.
+      x-required-permission: pharmacy:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItemWrite" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /pharmacy/items/{id}:
+    patch:
+      tags: [Pharmacy]
+      summary: Edit an item's name, price, tax, Rx flag and HSN. `stockQty` in the body is ignored; use POST /pharmacy/items/{id}/stock-adjustments to change stock.
+      x-required-permission: pharmacy:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItemWrite" } } }
+      responses:
+        "200": { description: The item, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /pharmacy/dispensing-queue:
+    get:
+      tags: [Pharmacy]
+      summary: Signed prescriptions waiting to be dispensed (live query)
+      x-required-permission: pharmacy:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DispensingQueueEntry" } } } } }
   /pharmacy/items/{id}/stock-adjustments:
     post:
       tags: [Pharmacy]
@@ -1174,7 +1256,7 @@ paths:
         stock-movement row plus an audit event (pharmacy.stock_adjusted) record who, when and why. This is the only way to change
         stock by hand: PATCH /pharmacy/items/{id} ignores `stockQty` (it edits name, price, tax, Rx flag and HSN only).
         400 insufficient-stock when the result would be below zero; 400 no-change when the count would not change;
-        400 pharmacy-mode-not-hybrid outside Hybrid mode.
+        400 pharmacy-mode-not-hybrid outside Hybrid mode. A missing or blank `reason` is 400 validation-failed (bean validation).
       x-required-permission: pharmacy:edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -1281,15 +1363,15 @@ components:
         id: { type: string, format: uuid }
         patientId: { type: string, format: uuid }
         substance: { type: string }
-        category: { type: string, enum: [drug, food, environmental, other], nullable: true }
+        category: { type: [string, "null"], enum: [drug, food, environmental, other, null] }
         severity: { type: string, enum: [mild, moderate, severe] }
-        reaction: { type: string, nullable: true }
-        source: { type: string, enum: [clinician, patient_reported, outside_record], nullable: true }
+        reaction: { type: [string, "null"] }
+        source: { type: [string, "null"], enum: [clinician, patient_reported, outside_record, null] }
         active: { type: boolean }
         recordedBy: { type: string, format: uuid }
-        recordedByName: { type: string, nullable: true }
+        recordedByName: { type: [string, "null"] }
         recordedAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedAt: { type: [string, "null"], format: date-time }
     AllergyWrite:
       type: object
       required: [substance, severity]
@@ -1313,23 +1395,23 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        allergyId: { type: string, format: uuid, nullable: true }
+        allergyId: { type: [string, "null"], format: uuid }
         event: { type: string }
-        substance: { type: string, nullable: true }
-        before: { type: object, additionalProperties: true, nullable: true }
-        after: { type: object, additionalProperties: true, nullable: true }
-        reason: { type: string, nullable: true }
+        substance: { type: [string, "null"] }
+        before: { type: [object, "null"], additionalProperties: true }
+        after: { type: [object, "null"], additionalProperties: true }
+        reason: { type: [string, "null"] }
         actorId: { type: string, format: uuid }
-        actorName: { type: string, nullable: true }
+        actorName: { type: [string, "null"] }
         occurredAt: { type: string, format: date-time }
     AllergyStatus:
       type: object
       properties:
         state: { type: string, enum: [recorded, none_documented, not_assessed] }
         activeCount: { type: integer }
-        documentedBy: { type: string, format: uuid, nullable: true }
-        documentedByName: { type: string, nullable: true }
-        documentedAt: { type: string, format: date-time, nullable: true }
+        documentedBy: { type: [string, "null"], format: uuid }
+        documentedByName: { type: [string, "null"] }
+        documentedAt: { type: [string, "null"], format: date-time }
     RxWarningDecision:
       type: object
       required: [kind, reasonCode]
@@ -1353,38 +1435,97 @@ components:
         kind: { type: string, enum: [allergy, pregnancy, controlled] }
         severity: { type: string, description: "mild|moderate|severe for allergies, caution otherwise" }
         message: { type: string }
-        matched: { type: string, nullable: true }
+        matched: { type: [string, "null"] }
         requiresDecision: { type: boolean }
         resolved: { type: boolean }
         reasonOptions:
           type: array
           items: { type: object, properties: { code: { type: string }, label: { type: string } } }
         decision:
-          nullable: true
-          type: object
+          type: [object, "null"]
           properties:
             kind: { type: string }
             reasonCode: { type: string }
             reasonLabel: { type: string }
-            note: { type: string, nullable: true }
+            note: { type: [string, "null"] }
             by: { type: string, format: uuid }
-            byName: { type: string, nullable: true }
+            byName: { type: [string, "null"] }
             at: { type: string, format: date-time }
     PrescriptionItem:
       type: object
       properties:
         id: { type: string, format: uuid }
         drugName: { type: string }
-        dosage: { type: string, nullable: true }
-        frequency: { type: string, nullable: true }
-        duration: { type: string, nullable: true }
-        instructions: { type: string, nullable: true }
-        allergyOverrideReason: { type: string, nullable: true }
+        dosage: { type: [string, "null"] }
+        frequency: { type: [string, "null"] }
+        duration: { type: [string, "null"] }
+        instructions: { type: [string, "null"] }
+        allergyOverrideReason: { type: [string, "null"] }
         displayOrder: { type: integer }
-        allergyWarning: { type: string, nullable: true }
-        pregnancyWarning: { type: string, nullable: true }
-        controlledSubstanceWarning: { type: string, nullable: true }
+        allergyWarning: { type: [string, "null"] }
+        pregnancyWarning: { type: [string, "null"] }
+        controlledSubstanceWarning: { type: [string, "null"] }
         warnings: { type: array, items: { $ref: "#/components/schemas/RxWarning" } }
+    PharmacySettings:
+      type: object
+      properties:
+        mode: { type: string, enum: [external, hybrid, in_house] }
+    PharmacyItemWrite:
+      type: object
+      required: [name, price]
+      properties:
+        name: { type: string, minLength: 1 }
+        isRx: { type: boolean }
+        hsnCode: { type: [string, "null"] }
+        price: { type: number, minimum: 0 }
+        taxRatePercent: { type: [number, "null"], minimum: 0, description: Defaults to 0 }
+        stockQty: { type: [integer, "null"], minimum: 0, description: Opening stock on POST; ignored on PATCH }
+    DispensingQueueEntry:
+      type: object
+      properties:
+        prescriptionId: { type: string, format: uuid }
+        queueEntryId: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        doctorName: { type: string }
+        signedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              drugName: { type: string }
+              dosage: { type: [string, "null"] }
+              frequency: { type: [string, "null"] }
+              duration: { type: [string, "null"] }
+              instructions: { type: [string, "null"] }
+    VitalsWrite:
+      type: object
+      description: Every field optional; null or absent keeps the stored value. Bounds are plausibility limits, not clinical normal ranges.
+      properties:
+        heightCm: { type: [number, "null"], minimum: 20, maximum: 250 }
+        weightKg: { type: [number, "null"], minimum: 0.2, maximum: 400 }
+        bpSystolic: { type: [integer, "null"], minimum: 20, maximum: 300 }
+        bpDiastolic: { type: [integer, "null"], minimum: 10, maximum: 200 }
+        pulseBpm: { type: [integer, "null"], minimum: 20, maximum: 300 }
+        tempCelsius: { type: [number, "null"], minimum: 20, maximum: 45 }
+        spo2Percent: { type: [integer, "null"], minimum: 1, maximum: 100 }
+    Vitals:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        queueEntryId: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        heightCm: { type: [number, "null"] }
+        weightKg: { type: [number, "null"] }
+        bpSystolic: { type: [integer, "null"] }
+        bpDiastolic: { type: [integer, "null"] }
+        pulseBpm: { type: [integer, "null"] }
+        tempCelsius: { type: [number, "null"] }
+        spo2Percent: { type: [integer, "null"] }
+        recordedBy: { type: string, format: uuid }
+        recordedAt: { type: string, format: date-time }
+        abnormalFlags: { type: array, items: { type: string } }
     PharmacyItem:
       type: object
       properties:
@@ -1426,7 +1567,7 @@ components:
         doctorId: { type: string, format: uuid }
         status: { type: string }
         createdAt: { type: string, format: date-time }
-        signedAt: { type: string, format: date-time, nullable: true }
+        signedAt: { type: [string, "null"], format: date-time }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
     Problem:
@@ -1620,6 +1761,7 @@ components:
         unchanged (so revoking a guardian is {"guardianId": null} and cannot touch address/nationalId).
         guardianId, address and nationalId accept an explicit null to clear. name/phone/dob/gender
         cannot be null. A minor (computed from the resulting dob) must keep a guardian.
+        A blank ("" or whitespace) address or nationalId is 400 validation-failed: clear with an explicit null, never with an empty string.
       properties:
         name: { type: string }
         phone: { type: string }
@@ -1744,8 +1886,8 @@ components:
         action: { type: string, example: "patient.merge" }
         resourceType: { type: string }
         resourceId: { type: string }
-        before: { type: object, additionalProperties: true, nullable: true }
-        after: { type: object, additionalProperties: true, nullable: true }
+        before: { type: [object, "null"], additionalProperties: true }
+        after: { type: [object, "null"], additionalProperties: true }
 
     SetupChecklistItem:
       type: object
