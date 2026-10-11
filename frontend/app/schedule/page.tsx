@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ErrorState, Skeleton } from "../components/ui/StateViews";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./schedule.module.css";
 import NewAppointmentDialog from "./NewAppointmentDialog";
 import { getPermissions } from "../lib/session";
+import { can } from "../lib/permissions";
+import { CancelAppointmentDialog, MoveAppointmentDialog } from "./AppointmentActions";
+import LiveQueueBoard from "./LiveQueueBoard";
+import WaitlistPanel from "./WaitlistPanel";
+import Icon from "../components/ui/Icon";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -23,15 +29,16 @@ type Day = {
 };
 type Week = { start: string; today: string; days: { date: string; holiday: string | null; sessions: { label: string; booked: number; free: number }[] }[] };
 
-const DOCTOR_COLORS = ["#2ED3E0", "#58B2F5", "#B48CF0", "#F5B544", "#4CCF8F", "#F07AA8"];
+const DOCTOR_COLORS = ["var(--nb-accent-500)", "var(--nb-info-500)", "var(--nb-sync-500)", "var(--nb-warn-500)", "var(--nb-ok-500)", "var(--nb-urgent-500)"];
 const VISIT_LABELS: Record<Booking["visitType"], string> = {
   appointment: "Appointment", follow_up: "Follow-up", walk_in: "Walk-in", transfer: "Transfer",
 };
 const STATUS_LABELS: Record<string, string> = {
   scheduled: "Not arrived", checked_in: "Checked in", waiting: "Waiting", billing_pending: "Billing pending",
   vitals_pending: "Vitals pending", vitals_done: "Vitals done", in_consult: "In consultation",
-  checkout_pending: "Checkout pending", completed: "Completed", no_show: "No-show",
+  procedures_pending: "Procedures pending", checkout_pending: "Checkout pending", completed: "Completed", no_show: "No-show",
 };
+const statusLabel = (status: string) => STATUS_LABELS[status] ?? status.replace(/_/g, " ");
 // Non-bookable cells: label shown in the grid, and what the slot-info dialog explains.
 const CELL_INFO: Record<string, { label: string; explain: (doctor: Doctor) => string }> = {
   break: { label: "Break", explain: (d) => `Outside ${d.name}'s working hours for this day.` },
@@ -69,12 +76,14 @@ function bookingClass(b: Booking): string {
 type Dialog =
   | { kind: "new"; doctorId: string; date: string; slot: string | null }
   | { kind: "booking"; booking: Booking; doctor: Doctor }
-  | { kind: "slot"; cell: Cell; doctor: Doctor; time: string };
+  | { kind: "slot"; cell: Cell; doctor: Doctor; time: string }
+  | { kind: "cancel"; booking: Booking; doctor: Doctor }
+  | { kind: "move"; booking: Booking; doctor: Doctor };
 
 export default function SchedulePage() {
   const router = useRouter();
   const [date, setDate] = useState<string | null>(null); // null = the clinic's today (server decides)
-  const [mode, setMode] = useState<"day" | "week">("day");
+  const [mode, setMode] = useState<"day" | "week" | "queue">("day");
   const [day, setDay] = useState<Day | null>(null);
   const [week, setWeek] = useState<Week | null>(null);
   const [doctorFilter, setDoctorFilter] = useState("all");
@@ -83,6 +92,11 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [canBook, setCanBook] = useState(false);
+  const [canEdit, setCanEdit] = useState(false); // queue:edit — cancel / move / waitlist
+  const [canQueue, setCanQueue] = useState(false); // queue:view — live queue board
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const closeDialog = useCallback(() => setDialog(null), []);
+  const closeWaitlist = useCallback(() => setWaitlistOpen(false), []);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -111,6 +125,8 @@ export default function SchedulePage() {
       const perms = getPermissions();
       // Booking needs queue:create (POST /appointments) and patient search needs patients:view.
       setCanBook(perms.includes("queue:create") && perms.includes("patients:view"));
+      setCanEdit(can("queue:edit"));
+      setCanQueue(can("queue:view"));
       const dayRes = await authedFetch(`/schedule/day${date ? `?date=${date}` : ""}`);
       if (!dayRes) return;
       if (dayRes.status === 403) {
@@ -151,6 +167,12 @@ export default function SchedulePage() {
   const sessionLabels = week ? [...new Set(week.days.flatMap((d) => d.sessions.map((s) => s.label)))]
     .sort((a, b) => ["Morning", "Afternoon", "Evening"].indexOf(a) - ["Morning", "Afternoon", "Evening"].indexOf(b)) : [];
 
+  // queueEntryId → patient name, so the live queue board can label entries it only knows by token.
+  const queueNames: Record<string, string> = {};
+  day?.sessions.forEach((s) => s.rows.forEach((r) => r.cells.forEach((c) => c.bookings.forEach((b) => {
+    if (b.queueEntryId) queueNames[b.queueEntryId] = b.patientName;
+  }))));
+
   function openCell(cell: Cell, doctor: Doctor, time: string) {
     if (cell.kind === "available" && cell.slotStart) {
       if (canBook && current) setDialog({ kind: "new", doctorId: doctor.id, date: current, slot: cell.slotStart });
@@ -175,12 +197,19 @@ export default function SchedulePage() {
           )}
         </div>
         <nav className={styles.segmented} aria-label="Clinic operations view">
-          <span className={styles.segmentActive} aria-current="page">Schedule</span>
-          <Link className={styles.segment} href="/arrivals">Live Queue</Link>
+          <button type="button" className={mode !== "queue" ? styles.segmentActive : styles.segment}
+            aria-current={mode !== "queue" ? "page" : undefined}
+            onClick={() => setMode((m) => (m === "queue" ? "day" : m))}>Schedule</button>
+          {canQueue && (
+            <button type="button" className={mode === "queue" ? styles.segmentActive : styles.segment}
+              aria-current={mode === "queue" ? "page" : undefined}
+              onClick={() => { setDate(null); setMode("queue"); }}>Live Queue</button>
+          )}
+          <Link className={styles.segment} href="/arrivals">Arrivals</Link>
         </nav>
       </div>
 
-      <div className={styles.toolbar}>
+      {mode !== "queue" && <div className={styles.toolbar}>
         <button type="button" className={styles.tbBtn} aria-label={mode === "day" ? "Previous day" : "Previous week"}
           onClick={() => shift(mode === "day" ? -1 : -7)} disabled={!current}>‹</button>
         <button type="button" className={day?.today ? styles.tbBtnOn : styles.tbBtn} onClick={() => setDate(null)}>Today</button>
@@ -200,16 +229,27 @@ export default function SchedulePage() {
         <button type="button" className={mode === "week" ? styles.tbBtnOn : styles.tbBtn} onClick={() => setMode(mode === "day" ? "week" : "day")}>
           {mode === "day" ? "Week overview" : "Day view"}
         </button>
+        {canEdit && (
+          <button type="button" className={styles.tbBtn} onClick={() => setWaitlistOpen(true)}>
+            <Icon name="list" size={14} /> Waitlist
+          </button>
+        )}
         {canBook && day && day.doctors.length > 0 && (
           <button type="button" className={styles.tbPrimary}
             onClick={() => setDialog({ kind: "new", doctorId: doctors[0]?.id ?? day.doctors[0].id, date: day.date, slot: null })}>
             + New appointment
           </button>
         )}
-      </div>
+      </div>}
 
-      {error && <div className={styles.error} role="alert">{error}</div>}
-      {!day && !error && <p className={styles.state}>Loading…</p>}
+      {error && (
+        <ErrorState message={error} onRetry={() => void load()} />
+      )}
+      {!day && !error && <Skeleton rows={6} label="Loading schedule" />}
+
+      {day && mode === "queue" && (
+        <LiveQueueBoard doctors={day.doctors} names={queueNames} authedFetch={authedFetch} />
+      )}
 
       {day && mode === "day" && (
         <>
@@ -278,20 +318,40 @@ export default function SchedulePage() {
       {dialog?.kind === "new" && day && (
         <NewAppointmentDialog doctors={day.doctors} timezone={day.timezone} initialDoctorId={dialog.doctorId}
           initialDate={dialog.date} initialSlot={dialog.slot} authedFetch={authedFetch}
-          onClose={() => setDialog(null)} onBooked={() => { setDialog(null); void load(); }} />
+          onClose={closeDialog} onBooked={() => { setDialog(null); void load(); }} />
       )}
       {dialog?.kind === "booking" && day && (
-        <InfoDialog title={dialog.booking.patientName} onClose={() => setDialog(null)}
+        <InfoDialog title={dialog.booking.patientName} onClose={closeDialog}
           sub={`${dialog.booking.time} · ${dialog.doctor.name} · ${formatDay(day.date, { day: "numeric", month: "short", year: "numeric" })}`}
           rows={[
             ["Visit type", VISIT_LABELS[dialog.booking.visitType]],
             ["Token", dialog.booking.token != null ? `T-${dialog.booking.token}` : "Not checked in yet"],
-            ["Status", STATUS_LABELS[dialog.booking.status] ?? dialog.booking.status],
+            ["Status", statusLabel(dialog.booking.status)],
           ]}
-          action={day.today ? { label: "Open live queue", href: "/arrivals" } : undefined} />
+          action={day.today ? { label: "Open live queue", href: "/arrivals" } : undefined}
+          extra={canEdit && dialog.booking.appointmentId && dialog.booking.status === "scheduled" ? (
+            <>
+              <button type="button" className={styles.btn} onClick={() => setDialog({ kind: "move", booking: dialog.booking, doctor: dialog.doctor })}>Move</button>
+              <button type="button" className={styles.btnDangerOutline} onClick={() => setDialog({ kind: "cancel", booking: dialog.booking, doctor: dialog.doctor })}>Cancel appointment</button>
+            </>
+          ) : undefined} />
+      )}
+      {(dialog?.kind === "cancel" || dialog?.kind === "move") && day && dialog.booking.appointmentId && (() => {
+        const target = {
+          appointmentId: dialog.booking.appointmentId, patientName: dialog.booking.patientName,
+          doctorId: dialog.doctor.id, doctorName: dialog.doctor.name, time: dialog.booking.time,
+          dateLabel: formatDay(day.date, { day: "numeric", month: "short", year: "numeric" }),
+        };
+        const done = () => { setDialog(null); void load(); };
+        return dialog.kind === "cancel"
+          ? <CancelAppointmentDialog target={target} authedFetch={authedFetch} onClose={closeDialog} onDone={done} />
+          : <MoveAppointmentDialog target={target} timezone={day.timezone} initialDate={day.date} authedFetch={authedFetch} onClose={closeDialog} onDone={done} />;
+      })()}
+      {waitlistOpen && day && (
+        <WaitlistPanel doctors={day.doctors} authedFetch={authedFetch} onClose={closeWaitlist} />
       )}
       {dialog?.kind === "slot" && day && (
-        <InfoDialog title={CELL_INFO[dialog.cell.kind].label} onClose={() => setDialog(null)}
+        <InfoDialog title={CELL_INFO[dialog.cell.kind].label} onClose={closeDialog}
           sub={`${dialog.time} · ${dialog.doctor.name} · ${formatDay(day.date, { day: "numeric", month: "short", year: "numeric" })}`}
           rows={[["Not bookable", CELL_INFO[dialog.cell.kind].explain(dialog.doctor)]]} />
       )}
@@ -365,8 +425,8 @@ function WeekRow({ label, week, onPick }: { label: string; week: Week; onPick: (
   );
 }
 
-function InfoDialog({ title, sub, rows, action, onClose }: {
-  title: string; sub: string; rows: [string, string][]; action?: { label: string; href: string }; onClose: () => void;
+function InfoDialog({ title, sub, rows, action, extra, onClose }: {
+  title: string; sub: string; rows: [string, string][]; action?: { label: string; href: string }; extra?: ReactNode; onClose: () => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -382,6 +442,7 @@ function InfoDialog({ title, sub, rows, action, onClose }: {
           <div key={k} className={styles.detailRow}><span className={styles.detailKey}>{k}</span><span>{v}</span></div>
         ))}
         <div className={styles.actions}>
+          {extra}
           {action && <Link className={styles.btn} href={action.href}>{action.label}</Link>}
           <button type="button" className={styles.btnPrimary} onClick={onClose} autoFocus>Got it</button>
         </div>
