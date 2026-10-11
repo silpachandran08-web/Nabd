@@ -72,14 +72,19 @@ class TenantLifecycleApiTest extends ApiTestBase {
     }
 
     @Test
-    void supportEngineerCanTransitionATenant() {
+    void viewOnlyOperatorsCannotTransitionATenantButCanReadIt() {
         SeededTenant tenant = seedTenant();
-        SeededOperator support = seedOperator("support-lifecycle@nabd.health", "support_engineer", false);
-        String token = platformLoginAndGetAccessToken(support);
+        for (String role : new String[]{"support_engineer", "compliance_dpo", "implementation"}) {
+            SeededOperator op = seedOperator(role + "-lifecycle-" + UUID.randomUUID() + "@nabd.health", role, false);
+            String token = platformLoginAndGetAccessToken(op);
 
-        ResponseEntity<Map> resp = exchange("/v1/platform/tenants/" + tenant.id() + "/lifecycle/transitions",
-                HttpMethod.POST, authedJsonBody(token, Map.of("toStatus", "suspended", "reason", "abuse")), Map.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+            ResponseEntity<Map> resp = exchange("/v1/platform/tenants/" + tenant.id() + "/lifecycle/transitions",
+                    HttpMethod.POST, authedJsonBody(token, Map.of("toStatus", "suspended", "reason", "abuse")), Map.class);
+            assertThat(resp.getStatusCode()).as(role).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(exchange("/v1/platform/tenants/" + tenant.id() + "/lifecycle", HttpMethod.GET, authed(token), Map.class)
+                    .getStatusCode()).as(role).isEqualTo(HttpStatus.OK);
+        }
+        assertThat(jdbc.queryForObject("SELECT status FROM tenants WHERE id = ?", String.class, tenant.id())).isEqualTo("active");
     }
 
     @Test

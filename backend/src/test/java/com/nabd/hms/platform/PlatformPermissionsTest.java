@@ -78,4 +78,13 @@ class PlatformPermissionsTest {
             assertThat(PlatformPermissions.forRole(role)).doesNotContain("billing_revenue:edit", "billing_revenue:approve");
         }
     }
+
+    // V3-001: lifecycle transitions are finer than tenant_detail:view; only super_admin holds tenant_detail:edit.
+    @Test
+    void tenantLifecycleWriteIsSuperAdminOnly() {
+        assertThat(PlatformPermissions.forRole("super_admin")).contains("tenant_detail:edit");
+        for (String role : new String[]{"implementation", "support_engineer", "compliance_dpo", "billing", "sre", "commercial"}) {
+            assertThat(PlatformPermissions.forRole(role)).doesNotContain("tenant_detail:edit");
+        }
+    }
 }

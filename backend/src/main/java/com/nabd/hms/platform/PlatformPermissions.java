@@ -17,6 +17,9 @@ import java.util.Set;
  * discount: super_admin + billing) and {@code billing_revenue:approve} (approve or reject an above-cap
  * discount: super_admin only, per the SSA-08 note "a super-admin approval request"). The JWT is issued
  * with these at login, so an operator signed in before this change re-authenticates to pick them up.
+ * The same applies to {@code tenant_detail:edit} (V3-001): tenant lifecycle transitions (suspend, offboard,
+ * reactivate) are super_admin only; the other tenant_detail roles keep read access. Operators signed in before
+ * this deploy must sign in again to get it.
  */
 final class PlatformPermissions {
 
@@ -43,7 +46,8 @@ final class PlatformPermissions {
     /** Finer-grained authorities beyond ":view"; each lists exactly the roles that hold it. */
     private static final Map<String, Set<String>> ACTION_ROLES = Map.of(
             "billing_revenue:edit", Set.of("super_admin", "billing"),
-            "billing_revenue:approve", Set.of("super_admin")
+            "billing_revenue:approve", Set.of("super_admin"),
+            "tenant_detail:edit", Set.of("super_admin") // V3-001: suspend / offboard / reactivate a clinic; shortcut: implementation excluded until the role spec says otherwise
     );
 
     static List<String> forRole(String role) {

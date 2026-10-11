@@ -15,7 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** Gated on tenant_detail:view — per NB-257's matrix, super_admin/implementation/support_engineer/compliance_dpo. */
+/** Reads need tenant_detail:view (NB-257's matrix: super_admin/implementation/support_engineer/compliance_dpo).
+ * Transitions (suspend, offboard, reactivate) need tenant_detail:edit, super_admin only (V3-001). */
 @RestController
 @RequestMapping("/v1/platform/tenants/{tenantId}/lifecycle")
 @PreAuthorize("hasAuthority('tenant_detail:view')")
@@ -33,6 +34,7 @@ public class TenantLifecycleController {
     }
 
     @PostMapping("/transitions")
+    @PreAuthorize("hasAuthority('tenant_detail:edit')")
     public TenantLifecycleResponse transition(@PathVariable UUID tenantId, @Valid @RequestBody TransitionRequest req,
                                                 @AuthenticationPrincipal Jwt jwt) {
         return service.transition(tenantId, req.toStatus(), UUID.fromString(jwt.getSubject()), req.reason());
