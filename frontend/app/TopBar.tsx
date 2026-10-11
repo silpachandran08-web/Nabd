@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./topBar.module.css";
-import { getPermissions, SHELL_SKIP_PREFIXES } from "./lib/session";
+import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./lib/session";
 
 const SEARCH_INPUT_ID = "nb-global-search";
 
@@ -74,7 +74,12 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     if (trimmed) router.push(`/patients?q=${encodeURIComponent(trimmed)}`);
   }
 
-  const action = pathname ? PRIMARY_ACTIONS[pathname] : undefined;
+  // The owner's primary action on every owner page is "Start day close" (wireframe PRIMARY.owner);
+  // /billing already carries its own button, and closing the day needs billing:approve.
+  const ownerAction: { label: string; href: string; permission?: string } | undefined = isOwner() && pathname !== "/billing" && getPermissions().includes("billing:approve")
+    ? { label: "Start day close", href: "/billing?action=close" }
+    : undefined;
+  const action = (pathname ? PRIMARY_ACTIONS[pathname] : undefined) ?? ownerAction;
   const primaryAction = action && (!action.permission || getPermissions().includes(action.permission)) ? action : undefined;
 
   return (

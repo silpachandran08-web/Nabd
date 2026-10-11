@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import styles from "./provisioning.module.css";
+import InviteLink from "./InviteLink";
+import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
+import RoleDenied from "../../components/platform/RoleDenied";
+import { JobStatusPill } from "../../components/platform/statusPills";
+import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
 
 // Matches POST/GET /v1/platform/provisioning-jobs, POST .../{id}/advance, POST .../{id}/approve
 // (ProvisioningController) — NB-258/259/260/261. Six fixed steps, run one at a time via advance().
@@ -25,9 +29,6 @@ type Job = {
   // it on an earlier clinic (see OwnerService.invite()'s own-pin check).
   ownerAccountInviteToken: string | null;
 };
-type Problem = { title: string; detail: string };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 const STEP_LABELS: Record<string, string> = {
   create_tenant: "Create tenant",
@@ -36,15 +37,6 @@ const STEP_LABELS: Record<string, string> = {
   provision_whatsapp: "Provision WhatsApp",
   verify_invite_owner: "Verify & invite owner",
   go_live: "Go live",
-};
-
-const STATUS_CLASS: Record<string, string> = {
-  queued: styles.statusQueued, running: styles.statusRunning, done: styles.statusDone,
-  failed: styles.statusFailed, rolled_back: styles.statusRolled_back,
-};
-const STEP_STATUS_CLASS: Record<string, string> = {
-  queued: styles.statusStepQueued, running: styles.statusStepRunning, done: styles.statusStepDone,
-  failed: styles.statusStepFailed, rolled_back: styles.statusStepRolled_back,
 };
 
 const emptyForm = {
@@ -99,7 +91,7 @@ const SECRETS = [
 ];
 
 export default function ProvisioningPage() {
-  const router = useRouter();
+  const access = useOperatorAccess();
   const [tab, setTab] = useState(0);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,28 +108,10 @@ export default function ProvisioningPage() {
   const [ownerAccountInviteTokens, setOwnerAccountInviteTokens] = useState<Record<string, string>>({});
   const [lifecycleSel, setLifecycleSel] = useState(LIFECYCLE_STATES[1].key);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_platform_access_token");
-      if (!token) {
-        router.replace("/platform/login");
-        return null;
-      }
-      const res = await fetch(`${API_BASE}${path}`, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_platform_access_token");
-        router.replace("/platform/login");
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  const authedFetch = usePlatformFetch();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showSkeleton = false) => {
+    if (showSkeleton) setLoading(true);
     setError(null);
     try {
       const res = await authedFetch("/platform/provisioning-jobs");
@@ -160,7 +134,7 @@ export default function ProvisioningPage() {
   }, [authedFetch]);
 
   useEffect(() => {
-    void Promise.resolve().then(load);
+    void Promise.resolve().then(() => load());
   }, [load]);
 
   async function submit(e: React.FormEvent) {
@@ -171,8 +145,7 @@ export default function ProvisioningPage() {
       const res = await authedFetch("/platform/provisioning-jobs", { method: "POST", body: JSON.stringify(form) });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't create the job." }));
-        setFormError(p.detail || "Couldn't create the job.");
+        setFormError(await problemDetail(res, "Couldn't create the job."));
         return;
       }
       setForm(emptyForm);
@@ -189,8 +162,7 @@ export default function ProvisioningPage() {
   async function describeFailure(res: Response | null, fallback: string): Promise<string | null> {
     if (!res) return null; // already redirecting to login, nothing to show
     if (res.ok) return null;
-    const p: Problem = await res.json().catch(() => ({ title: "Error", detail: fallback }));
-    return p.detail || fallback;
+    return problemDetail(res, fallback);
   }
 
   async function approve(jobId: string) {
@@ -247,10 +219,6 @@ export default function ProvisioningPage() {
     }
   }
 
-  if (loading) {
-    return <main className={styles.page}><div className={styles.state}>Loading…</div></main>;
-  }
-
   const lifecycleDetail = LIFECYCLE_STATES.find((s) => s.key === lifecycleSel) ?? LIFECYCLE_STATES[1];
 
   return (
@@ -269,20 +237,27 @@ export default function ProvisioningPage() {
         ))}
       </div>
 
-      {forbidden ? (
-        <div className={styles.state}>Your role doesn&apos;t have access to tenant provisioning.</div>
+      {loading ? (
+        <Skeleton rows={5} label="Loading provisioning jobs" />
+      ) : forbidden ? (
+        <RoleDenied
+          surface="Tenant provisioning"
+          body="SSA-02 · Only Super admin or Implementation can create a tenant. The element is absent, not disabled — no create button exists anywhere for this role."
+        />
       ) : error ? (
-        <div className={styles.errorState}>{error}</div>
+        <ErrorState message={error} onRetry={() => load(true)} />
       ) : (
         <>
           {tab === 0 && (
             <>
               <div className={styles.tabHeadRow}>
                 <span className={styles.jobMeta}>{jobs.length} provisioning job{jobs.length === 1 ? "" : "s"}</span>
-                <button type="button" className={styles.submit} onClick={() => setShowNewTenant(true)}>+ New tenant</button>
+                {access.canWrite && (
+                  <button type="button" className={styles.submit} onClick={() => setShowNewTenant(true)}>+ New tenant</button>
+                )}
               </div>
 
-              {showNewTenant && (
+              {access.canWrite && showNewTenant && (
                 <div className={styles.overlay} onClick={() => setShowNewTenant(false)}>
                   <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submit}>
                     <h2 className={styles.modalTitle}>Provision a new tenant</h2>
@@ -346,7 +321,11 @@ export default function ProvisioningPage() {
 
               <div className={styles.jobList}>
                 {jobs.length === 0 ? (
-                  <div className={styles.state}>No provisioning jobs yet.</div>
+                  <EmptyState
+                    icon="building"
+                    title="No provisioning jobs yet"
+                    hint={access.canWrite ? "Use “+ New tenant” to provision the first clinic." : undefined}
+                  />
                 ) : (
                   jobs.map((job) => {
                     const gated = job.path === "enterprise" && !job.approvedAt;
@@ -362,13 +341,13 @@ export default function ProvisioningPage() {
                             </div>
                           </div>
                           <div className={styles.jobActions}>
-                            <span className={`${styles.pill} ${STATUS_CLASS[job.status] ?? ""}`}>{job.status.replace("_", " ")}</span>
-                            {gated && (
+                            <JobStatusPill status={job.status} />
+                            {access.canWrite && gated && (
                               <button className={styles.actionBtn} disabled={busyJobId === job.id} onClick={() => approve(job.id)}>
                                 {busyJobId === job.id ? "Approving…" : "Approve"}
                               </button>
                             )}
-                            {!gated && !finished && (
+                            {access.canWrite && !gated && !finished && (
                               <button className={styles.actionBtn} disabled={busyJobId === job.id} onClick={() => runToCompletion(job.id)}>
                                 {busyJobId === job.id ? "Running…" : job.status === "failed" ? "Retry" : "Run provisioning"}
                               </button>
@@ -377,22 +356,20 @@ export default function ProvisioningPage() {
                         </div>
                         {jobActionError[job.id] && <div className={styles.formError} role="alert">{jobActionError[job.id]}</div>}
                         {ownerInviteTokens[job.id] && (
-                          <div className={styles.cNoteWarn}>
-                            Clinic staff invite link (shown once — also emailed, relay by hand if it doesn&apos;t arrive):{" "}
-                            <code>{`${typeof window !== "undefined" ? window.location.origin : ""}/accept-invite/${ownerInviteTokens[job.id]}`}</code>
-                          </div>
+                          <InviteLink label="Clinic staff invite link" path="/accept-invite/" token={ownerInviteTokens[job.id]} />
                         )}
                         {ownerAccountInviteTokens[job.id] && (
-                          <div className={styles.cNoteWarn}>
-                            Owner account invite link (shown once — lets this owner log into every clinic they
-                            own from one place; also emailed):{" "}
-                            <code>{`${typeof window !== "undefined" ? window.location.origin : ""}/owner/accept-invite/${ownerAccountInviteTokens[job.id]}`}</code>
-                          </div>
+                          <InviteLink
+                            label="Owner account invite link — lets this owner log into every clinic they own from one place"
+                            path="/owner/accept-invite/"
+                            emailed
+                            token={ownerAccountInviteTokens[job.id]}
+                          />
                         )}
                         <div className={styles.steps}>
                           {job.steps.map((s) => (
                             <div key={s.stepName} className={styles.step}>
-                              <span className={`${styles.stepDot} ${STEP_STATUS_CLASS[s.status] ?? ""}`}>{s.status.replace("_", " ")}</span>
+                              <JobStatusPill status={s.status} />
                               <span className={styles.stepLabel}>{STEP_LABELS[s.stepName] ?? s.stepName}</span>
                               {s.errorDetail && <span className={styles.stepError}>{s.errorDetail}</span>}
                             </div>

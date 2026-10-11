@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import styles from "./plans.module.css";
+import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
+import RoleDenied, { ReadOnlyNote } from "../../components/platform/RoleDenied";
+import { PlanStatusPill } from "../../components/platform/statusPills";
+import { formatMoney } from "../../lib/money";
+import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
 
 // Matches GET/POST/PATCH /v1/platform/plans (PlanController).
 type Plan = {
@@ -14,14 +18,11 @@ type Plan = {
   seatLimit: number;
   active: boolean;
 };
-type Problem = { title: string; detail: string };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 const emptyForm = { code: "", name: "", monthlyPrice: "", currency: "INR", seatLimit: "", active: true };
 
 export default function PlansPage() {
-  const router = useRouter();
+  const access = useOperatorAccess();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,26 +33,7 @@ export default function PlansPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_platform_access_token");
-      if (!token) {
-        router.replace("/platform/login");
-        return null;
-      }
-      const res = await fetch(`${API_BASE}${path}`, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_platform_access_token");
-        router.replace("/platform/login");
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  const authedFetch = usePlatformFetch();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,8 +97,7 @@ export default function PlansPage() {
         : await authedFetch("/platform/plans", { method: "POST", body: JSON.stringify(body) });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save plan." }));
-        setFormError(p.detail || "Couldn't save plan.");
+        setFormError(await problemDetail(res, "Couldn't save plan."));
         return;
       }
       cancelEdit();
@@ -135,7 +116,7 @@ export default function PlansPage() {
         </div>
       </div>
 
-      {!forbidden && (
+      {!forbidden && access.canBill && (
         <form className={styles.formCard} onSubmit={submit}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="code">Code</label>
@@ -173,15 +154,17 @@ export default function PlansPage() {
         </form>
       )}
 
+      {!forbidden && access.ready && access.readOnly && <ReadOnlyNote />}
+
       <div className={styles.card}>
         {loading ? (
-          <div className={styles.state}>Loading…</div>
+          <Skeleton rows={5} label="Loading plans" />
         ) : forbidden ? (
-          <div className={styles.state}>Your role doesn&apos;t have access to pricing & packaging.</div>
+          <RoleDenied surface="Pricing & packaging" />
         ) : error ? (
-          <div className={styles.errorState}>{error}</div>
+          <ErrorState message={error} onRetry={load} />
         ) : plans.length === 0 ? (
-          <div className={styles.state}>No plans yet.</div>
+          <EmptyState icon="package" title="No plans yet" hint={access.canBill ? "Add the first plan with the form above." : undefined} />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -192,7 +175,7 @@ export default function PlansPage() {
                   <th>Monthly price</th>
                   <th>Seat limit</th>
                   <th>Status</th>
-                  <th></th>
+                  {access.canBill && <th></th>}
                 </tr>
               </thead>
               <tbody>
@@ -200,10 +183,10 @@ export default function PlansPage() {
                   <tr key={p.id}>
                     <td>{p.code}</td>
                     <td>{p.name}</td>
-                    <td>{(p.monthlyPriceCents / 100).toFixed(2)} {p.currency}</td>
+                    <td>{formatMoney(p.monthlyPriceCents / 100, p.currency)}</td>
                     <td>{p.seatLimit}</td>
-                    <td><span className={`${styles.pill} ${p.active ? styles.pillActive : styles.pillInactive}`}>{p.active ? "active" : "inactive"}</span></td>
-                    <td><button className={styles.actionBtn} onClick={() => startEdit(p)}>Edit</button></td>
+                    <td><PlanStatusPill active={p.active} /></td>
+                    {access.canBill && <td><button className={styles.actionBtn} onClick={() => startEdit(p)}>Edit</button></td>}
                   </tr>
                 ))}
               </tbody>

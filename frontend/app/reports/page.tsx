@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./reports.module.css";
+import Link from "next/link";
 import { getIdentity } from "../lib/session";
+import { can } from "../lib/permissions";
+import StatusPill from "../components/ui/StatusPill";
+import { ErrorState, Skeleton } from "../components/ui/StateViews";
 
 // E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
 type SourceRow = { source: string; visitCount: number };
@@ -25,6 +29,11 @@ type Money = {
   collected: number; billsRaised: number; taxCollected: number; noShows: number; bookings: number; waitingNow: number | null;
   tender: { method: string; amount: number }[]; topServices: { name: string; revenue: number }[];
 };
+// GET /v1/billing/day-close — only the fields the Day close card reads.
+type DayClose = {
+  date: string; today: boolean; pendingCheckouts: number; unbilled: unknown[];
+  close: { status: "closed" | "reopened"; closedAt: string } | null;
+};
 type DoctorPunctuality = {
   accessNote: string;
   entries: { doctorId: string; doctorName: string; delayCount: number; avgDelayMinutes: number; sameDayRepeatDays: number }[];
@@ -33,13 +42,14 @@ type DoctorPunctuality = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// DESIGN.md owner "Reports": period switch, then six tabs.
+// DESIGN.md owner "Reports": period switch, then seven tabs.
 type Period = "today" | "yesterday" | "week" | "month" | "custom";
 const PERIODS: [Period, string][] = [["today", "Today"], ["yesterday", "Yesterday"], ["week", "This week"], ["month", "This month"], ["custom", "Custom"]];
-type Tab = "money" | "sources" | "staff" | "packages" | "leakage" | "retention";
-const TABS: [Tab, string][] = [["money", "Today's money"], ["sources", "Sources"], ["staff", "Staff"], ["packages", "Packages"], ["leakage", "Leakage"], ["retention", "Retention"]];
+type Tab = "money" | "sources" | "staff" | "packages" | "leakage" | "retention" | "punctuality";
+const TABS: [Tab, string][] = [["money", "Today's money"], ["sources", "Sources"], ["staff", "Staff"], ["packages", "Packages"], ["leakage", "Leakage"], ["retention", "Retention"], ["punctuality", "Punctuality"]];
 const TENDER_LABELS: Record<string, string> = { cash: "Cash", upi: "UPI", card: "Card", other: "Other" };
-const TENDER_COLORS: Record<string, string> = { cash: "#c2378a", upi: "#c8411b", card: "#2553d9", other: "#7a7f85" };
+// Chart series colours (DESIGN §8.22); each column also carries its text label.
+const TENDER_COLORS: Record<string, string> = { cash: "var(--rp-series-1)", upi: "var(--rp-series-2)", card: "var(--rp-series-3)", other: "var(--nb-text-tertiary)" };
 
 /** The browser's local calendar date as YYYY-MM-DD (staff browsers run on the clinic's clock). */
 const localIso = (d: Date) => d.toLocaleDateString("en-CA");
@@ -85,7 +95,9 @@ export default function ReportsPage() {
   });
   const [tab, setTab] = useState<Tab>("money");
   const [moneyReport, setMoneyReport] = useState<Money | null>(null);
+  const [dayClose, setDayClose] = useState<DayClose | null>(null);
   const [clinicName, setClinicName] = useState("");
+  const [exportError, setExportError] = useState<string | null>(null);
   const range = periodRange(period, custom);
   const qs = `from=${range.from}&to=${range.to}`;
 
@@ -110,11 +122,12 @@ export default function ReportsPage() {
   const load = useCallback(async () => {
     setError(null); // `loading` is only the first load — switching period keeps the page on screen
     try {
-      const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes, liabilityRes, leakageRes, punctualityRes] = await Promise.all([
+      const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes, liabilityRes, leakageRes, punctualityRes, dayCloseRes] = await Promise.all([
         authedFetch(`/reports/money?${qs}`), authedFetch(`/reports/sources?${qs}`),
         authedFetch(`/reports/staff-performance?${qs}`), authedFetch("/reports/retention"),
         authedFetch("/reports/no-show-risk"), authedFetch("/packages/liability"),
         authedFetch("/reports/billing-leakage?thresholdAmount=0"), authedFetch("/reports/doctor-punctuality"),
+        authedFetch("/billing/day-close"),
       ]);
       if (!moneyRes) return;
       if (moneyRes.status === 403) {
@@ -135,6 +148,8 @@ export default function ReportsPage() {
       if (liabilityRes?.ok) setLiability(await liabilityRes.json());
       if (leakageRes?.ok) setLeakage(await leakageRes.json());
       if (punctualityRes?.ok) setPunctuality(await punctualityRes.json());
+      // Roles without billing access simply don't get the Day close card.
+      setDayClose(dayCloseRes?.ok ? await dayCloseRes.json() : null);
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -155,10 +170,20 @@ export default function ReportsPage() {
   }, [load]);
 
   async function exportCsv(reportType: string) {
+    setExportError(null);
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
-    const res = await fetch(`${API_BASE}/reports/export?reportType=${reportType}&${qs}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return;
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/reports/export?reportType=${reportType}&${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+    } catch {
+      setExportError("Couldn't reach the server. The export wasn't downloaded.");
+      return;
+    }
+    if (!res.ok) {
+      setExportError(res.status === 403 ? "Your role isn't allowed to export reports." : "Couldn't export this report. Try again.");
+      return;
+    }
     const csv = await res.text();
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -170,14 +195,17 @@ export default function ReportsPage() {
   }
 
   if (loading) {
-    return <main className={styles.page}><div className={styles.state}>Loading…</div></main>;
+    return <main className={styles.page}><Skeleton rows={6} label="Loading reports" /></main>;
   }
   if (forbidden) {
     return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to reports.</div></main>;
   }
   if (error) {
-    return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
+    return <main className={styles.page}><ErrorState message={error} onRetry={() => void load()} /></main>;
   }
+
+  // Export is its own grant (RBAC: Reports > Export); absent, not disabled, without it.
+  const canExport = can("reports:export");
 
   const m = moneyReport;
   const cur = m ? new Intl.NumberFormat(m.currency === "SAR" ? "en-SA" : "en-IN", { style: "currency", currency: m.currency, minimumFractionDigits: 2 }) : null;
@@ -205,6 +233,7 @@ export default function ReportsPage() {
             onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} /></label>
         </div>
       )}
+      {exportError && <div className={styles.infoNote} role="alert">{exportError}</div>}
       {m?.includesToday && <div className={styles.infoNote} role="note">ⓘ Today is still in progress — figures are provisional</div>}
 
       <div className={styles.segmented} role="tablist" aria-label="Report">
@@ -242,6 +271,29 @@ export default function ReportsPage() {
               <div className={`${styles.statValue} ${styles.statInfo}`}>{cur.format(Number(m.taxCollected))}</div>
             </div>
           </div>
+
+          {dayClose && (() => {
+            const closed = dayClose.close?.status === "closed";
+            const blocked = !closed && dayClose.unbilled.length > 0;
+            return (
+              <div className={styles.card + " " + styles.section} role="group" aria-label="Day close">
+                <div className={styles.cardLabel}>Day close</div>
+                <div className={styles.dayCloseRow}>
+                  <div>
+                    {closed ? <StatusPill tone="ok" label="Closed" />
+                      : blocked ? <StatusPill tone="warn" label="Blocked" />
+                      : <StatusPill tone="info" label="Open" icon="clock" />}
+                    <div className={styles.statSub}>
+                      {closed ? "Today is closed. Billing is locked until the day is unlocked."
+                        : blocked ? `${dayClose.unbilled.length} completed ${dayClose.unbilled.length === 1 ? "consultation has" : "consultations have"} no bill.`
+                        : `Nothing blocks the close.${dayClose.pendingCheckouts > 0 ? ` ${dayClose.pendingCheckouts} checkout${dayClose.pendingCheckouts === 1 ? "" : "s"} still pending.` : ""}`}
+                    </div>
+                  </div>
+                  <Link className={styles.exportBtn} href="/billing">{closed ? "View day close" : "Open day close"}</Link>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className={styles.card + " " + styles.section}>
             <div className={styles.cardLabel}>Tender split</div>
@@ -288,7 +340,7 @@ export default function ReportsPage() {
       <div className={styles.card + " " + styles.section}>
         <div className={styles.sectionHeader}>
           <h3 className={styles.sectionTitle}>Where patients come from (selected period)</h3>
-          <button className={styles.exportBtn} onClick={() => exportCsv("sources")}>Export CSV</button>
+          {canExport && <button className={styles.exportBtn} onClick={() => exportCsv("sources")}>Export CSV</button>}
         </div>
         {sources.length === 0 ? (
           <div className={styles.muted}>No visits recorded yet.</div>
@@ -313,7 +365,7 @@ export default function ReportsPage() {
         <div className={styles.card + " " + styles.section}>
           <div className={styles.sectionHeader}>
             <h3 className={styles.sectionTitle}>Staff collection & performance (selected period)</h3>
-            <button className={styles.exportBtn} onClick={() => exportCsv("staff-performance")}>Export CSV</button>
+            {canExport && <button className={styles.exportBtn} onClick={() => exportCsv("staff-performance")}>Export CSV</button>}
           </div>
           <div className={styles.rule}>{staffPerf.scopeNote}</div>
           {staffPerf.rows.length === 0 ? (
@@ -324,29 +376,6 @@ export default function ReportsPage() {
               <tbody>
                 {staffPerf.rows.map((s) => (
                   <tr key={s.staffId}><td>{s.staffName}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {punctuality && (
-        <div className={styles.card + " " + styles.section}>
-          <div className={styles.sectionHeader}>
-            <h3 className={styles.sectionTitle}>Doctor punctuality (last 90 days)</h3>
-          </div>
-          <div className={styles.rule}>{punctuality.accessNote}</div>
-          {punctuality.entries.length === 0 ? (
-            <div className={styles.muted}>No delays announced.</div>
-          ) : (
-            <table className={styles.table}>
-              <thead><tr><th>Doctor</th><th>Delays</th><th>Avg minutes</th><th>Same-day repeats</th></tr></thead>
-              <tbody>
-                {punctuality.entries.map((e) => (
-                  <tr key={e.doctorId}>
-                    <td>{e.doctorName}</td><td>{e.delayCount}</td><td>{e.avgDelayMinutes}</td><td>{e.sameDayRepeatDays}</td>
-                  </tr>
                 ))}
               </tbody>
             </table>
@@ -474,6 +503,35 @@ export default function ReportsPage() {
           )}
         </div>
       )}
+        </>
+      )}
+      {tab === "punctuality" && (
+        <>
+          <div className={styles.rule}>Last 90 days — not affected by the period.</div>
+          {punctuality ? (
+            <div className={styles.card + " " + styles.section}>
+              <div className={styles.sectionHeader}>
+                <h3 className={styles.sectionTitle}>Doctor punctuality</h3>
+              </div>
+              <div className={styles.rule}>{punctuality.accessNote}</div>
+              {punctuality.entries.length === 0 ? (
+                <div className={styles.muted}>No delays in the last 90 days.</div>
+              ) : (
+                <table className={styles.table}>
+                  <thead><tr><th>Doctor</th><th>Delay events</th><th>Avg minutes</th><th>Same-day repeat</th></tr></thead>
+                  <tbody>
+                    {punctuality.entries.map((e) => (
+                      <tr key={e.doctorId}>
+                        <td>{e.doctorName}</td><td>{e.delayCount}</td><td>{e.avgDelayMinutes}</td><td>{e.sameDayRepeatDays}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ) : (
+            <div className={styles.muted}>Punctuality isn&apos;t available for your role.</div>
+          )}
         </>
       )}
     </main>

@@ -76,7 +76,7 @@
 
 .btnDanger {
   composes: btn;
-  border-color: rgba(240, 69, 92, 0.35);
+  border-color: color-mix(in srgb, var(--nb-danger-500) 35%, transparent);
   color: var(--nb-danger-500);
 }
 

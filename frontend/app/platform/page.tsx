@@ -4,10 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./platform.module.css";
-import { API_BASE, OperatorProfile, ROLE_LABELS, SURFACES } from "./surfaces";
+import Icon from "../components/ui/Icon";
+import { ErrorState, Skeleton } from "../components/ui/StateViews";
+import { usePlatformFetch } from "./platformApi";
+import { API_BASE, groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
 
 export default function PlatformHomePage() {
   const router = useRouter();
+  const fetchAuthed = usePlatformFetch();
   const [profile, setProfile] = useState<OperatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,21 +22,13 @@ export default function PlatformHomePage() {
     router.replace("/platform/login");
   }, [router]);
 
-  useEffect(() => {
-    const token = localStorage.getItem("nabd_platform_access_token");
-    if (!token) {
-      router.replace("/platform/login");
-      return;
-    }
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/platform/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 401) {
-          clearSessionAndRedirect();
-          return;
-        }
+        const res = await fetchAuthed("/platform/auth/me");
+        if (!res) return; // session gone, already redirecting to login
         if (!res.ok) {
           setError("Couldn't load your profile. Try again.");
           return;
@@ -44,7 +40,11 @@ export default function PlatformHomePage() {
         setLoading(false);
       }
     })();
-  }, [router, clearSessionAndRedirect]);
+  }, [fetchAuthed]);
+
+  useEffect(() => {
+    void Promise.resolve().then(load);
+  }, [load]);
 
   async function logout() {
     const token = localStorage.getItem("nabd_platform_access_token");
@@ -60,7 +60,7 @@ export default function PlatformHomePage() {
   if (loading) {
     return (
       <main className={styles.page}>
-        <div className={styles.state}>Loading…</div>
+        <Skeleton rows={5} label="Loading Command Centre" />
       </main>
     );
   }
@@ -68,12 +68,13 @@ export default function PlatformHomePage() {
   if (error || !profile) {
     return (
       <main className={styles.page}>
-        <div className={styles.errorState}>{error ?? "Something went wrong."}</div>
+        <ErrorState message={error ?? "Something went wrong."} onRetry={load} />
       </main>
     );
   }
 
-  const surfaces = SURFACES.filter((s) => profile.permissions.includes(s.permission));
+  // Command Centre is the page we're on — list only the other surfaces, grouped as in the nav.
+  const groups = groupBySection(visibleSurfaces(profile.permissions).filter((s) => s.href !== "/platform"));
 
   return (
     <main className={styles.page}>
@@ -88,16 +89,23 @@ export default function PlatformHomePage() {
       </div>
 
       <div className={styles.card}>
-        {surfaces.length === 0 ? (
+        {groups.length === 0 ? (
           <div className={styles.state}>Nothing else is available to your role yet.</div>
         ) : (
-          <ul className={styles.navList}>
-            {surfaces.map((s) => (
-              <li key={s.href}>
-                <Link className={styles.navLink} href={s.href}>{s.label}</Link>
-              </li>
-            ))}
-          </ul>
+          groups.map((g) => (
+            <section key={g.section}>
+              <div className={styles.sectionLabel}>{g.section}</div>
+              <ul className={styles.navList}>
+                {g.items.map((s) => (
+                  <li key={s.href}>
+                    <Link className={styles.navLink} href={s.href}>
+                      <Icon name={s.icon} size={16} /> {s.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))
         )}
       </div>
     </main>

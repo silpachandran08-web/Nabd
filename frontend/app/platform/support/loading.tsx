@@ -1,10 +1,11 @@
+import { Skeleton } from "../../components/ui/StateViews";
 import styles from "./support.module.css";
 
 // See fleet/loading.tsx for why this exists — same route-transition gap, every /platform/* page.
 export default function Loading() {
   return (
     <main className={styles.page}>
-      <div className={styles.state}>Loading…</div>
+      <Skeleton rows={6} label="Loading" />
     </main>
   );
 }

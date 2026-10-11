@@ -50,7 +50,7 @@
 }
 
 .pillCount {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nb-surface-3);
   border-radius: 999px;
   padding: 1px 7px;
   font-size: 11px;
@@ -84,30 +84,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  max-width: 220px;
+  max-width: 260px;
 }
-
-.flagChip {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  padding: 2px 7px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.flagDanger { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
-.flagWarn { background: rgba(232, 179, 60, 0.14); color: #e0a63a; }
-.flagUrgent { background: rgba(255, 138, 61, 0.15); color: #ff8a3d; }
 
 .pickerRow {
   display: flex;
+  width: 100%;
   justify-content: space-between;
   align-items: center;
+  min-height: 44px;
   padding: var(--nb-space-8) var(--nb-space-12);
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
   border-radius: var(--nb-radius-md);
   cursor: pointer;
   margin-bottom: 2px;
@@ -184,37 +175,15 @@
   resize: vertical;
 }
 
-.rowFlagged {
-  border-left: 3px solid var(--nb-danger-500);
+/* Colour is only a reinforcement: every flagged row also carries an icon + text pill. The marker
+   sits on the first cell (borders on <tr> are unreliable in collapsed tables) and is logical so
+   it flips in RTL. */
+.rowFlagged td:first-child {
+  border-inline-start: 3px solid var(--nb-danger-500);
 }
 
-.rowUrgent {
-  border-left: 3px solid #ff8a3d;
-}
-
-.pillDone {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(52, 211, 153, 0.14);
-  color: #34d399;
-}
-
-.pillDanger {
-  composes: pillDone;
-  background: var(--nb-danger-tint);
-  color: var(--nb-danger-500);
-}
-
-.pillNeutral {
-  composes: pillDone;
-  background: var(--nb-surface-3);
-  color: var(--nb-text-tertiary);
+.rowUrgent td:first-child {
+  border-inline-start: 3px solid var(--nb-urgent-500);
 }
 
 .smallBtn {
@@ -232,7 +201,50 @@
 .headerActions {
   display: flex;
   gap: var(--nb-space-8);
+  flex-wrap: wrap;
 }
+
+.actionsGap { margin-bottom: var(--nb-space-12); }
+.cardGap { margin-bottom: var(--nb-space-12); }
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+}
+
+.rowError {
+  margin-top: var(--nb-space-4);
+  color: var(--nb-danger-500);
+  font-size: 12px;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+  margin-bottom: var(--nb-space-12);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-danger-tint);
+  color: var(--nb-danger-500);
+  font-size: 13px;
+}
+
+.summaryDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-space-4);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--nb-danger-500);
+}
+
+.flagLine { display: flex; align-items: center; gap: var(--nb-space-8); }
+.modalNote { margin: 0 0 var(--nb-space-12); }
+.pushStart { margin-inline-end: auto; }
 
 .header {
   margin-bottom: var(--nb-space-16);
@@ -270,7 +282,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -306,19 +318,6 @@
   color: var(--nb-text-tertiary);
 }
 
-.pillVitals {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(240, 175, 69, 0.14);
-  color: #e0a63a;
-}
-
 .actionBtn {
   height: 30px;
   padding: 0 var(--nb-space-12);
@@ -347,7 +346,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--nb-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -357,11 +356,45 @@
 .modal {
   width: 380px;
   max-width: 90%;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   background: var(--nb-surface-1);
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-lg);
   padding: var(--nb-space-24);
 }
+
+.modalWide { width: 560px; }
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--nb-space-12);
+}
+
+.unitInput { position: relative; }
+.unitInput .input { padding-inline-end: 52px; }
+.unit {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: var(--nb-space-12);
+  display: flex;
+  align-items: center;
+  color: var(--nb-text-tertiary);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.fieldError,
+.fieldWarn {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-4);
+  margin-top: var(--nb-space-4);
+  font-size: 12px;
+}
+.fieldError { color: var(--nb-danger-500); }
+.fieldWarn { color: var(--nb-warn-500); }
 
 .modalTitle {
   font-size: 16px;
@@ -438,4 +471,43 @@
   background: var(--nb-surface-3);
   color: var(--nb-text-disabled);
   cursor: not-allowed;
+}
+
+/* ── Responsive (DESIGN.md §4): tablet <=1024, mobile <=430 ───────────────────────────────── */
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24); }
+  .layout { grid-template-columns: 1fr; }
+  .sidebarStack { flex-direction: row; }
+  .sidebarStack > * { flex: 1; }
+  .smallBtn, .actionBtn, .pillFilter, .tab, .cancelBtn, .submitBtn, .input, .select { min-height: 44px; }
+  .textarea { min-height: 88px; }
+  .pillCount { font-size: 11px; }
+}
+
+@media (pointer: coarse) {
+  .textarea { min-height: 88px; }
+}
+
+@media (max-width: 430px) {
+  .page { padding: var(--nb-space-16); }
+  .sidebarStack { flex-direction: column; }
+  .headerRight { justify-content: flex-start; }
+  .fieldGrid { grid-template-columns: 1fr; }
+  .overlay { align-items: flex-end; }
+  .modal, .modalWide {
+    width: 100%;
+    max-width: none;
+    max-height: 92vh;
+    border-radius: var(--nb-radius-lg) var(--nb-radius-lg) 0 0;
+  }
+  .modalActions { flex-wrap: wrap; }
+
+  /* Tables become one card per row; each cell is labelled by its data-label. */
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table thead { position: absolute; inset-inline-start: -9999px; }
+  .table tr { padding: var(--nb-space-8) 0; border-bottom: 1px solid var(--nb-border-default); }
+  .table td { display: flex; justify-content: space-between; align-items: center; gap: var(--nb-space-12); border-bottom: none; padding: var(--nb-space-8) var(--nb-space-16); text-align: end; }
+  .table td::before { content: attr(data-label); flex: none; color: var(--nb-text-tertiary); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; text-align: start; }
+  .table td:empty { display: none; }
+  .flagList { max-width: none; justify-content: flex-end; }
 }

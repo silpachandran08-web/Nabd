@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
+import { formatMoney } from "../../lib/money";
+import { getIdentity } from "../../lib/session";
+import { can } from "../../lib/permissions";
+import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number };
@@ -51,6 +55,11 @@ function round2(n: number): number {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const region = getIdentity()?.tenantRegion;
+  // UI gating only (absent, not disabled) — the API enforces the same grants.
+  const canBill = can("billing:create");   // POST /billing/checkout/{id}
+  const canPay = can("billing:edit");      // POST /billing/invoices/{id}/payments
+  const canAdvance = can("queue:edit");    // PATCH /queue/{id}/status
   const params = useParams<{ queueEntryId: string }>();
   const queueEntryId = params.queueEntryId;
 
@@ -209,6 +218,10 @@ export default function CheckoutPage() {
     try {
       const sequence = resolveSequence(flowSteps);
       const next = sequence[sequence.indexOf(context.queueStatus) + 1];
+      if (!next) {
+        setContinueError("This visit has no next step to continue to.");
+        return;
+      }
       const res = await authedFetch(`/queue/${queueEntryId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: next }),
@@ -275,8 +288,8 @@ export default function CheckoutPage() {
             <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
               <span className={styles.chargeName}>{c.name}</span>
               <span className={styles.chargePrice}>
-                {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{c.baseAmount.toFixed(2)}</span>}
-                {context.currency} {price.toFixed(2)}
+                {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{formatMoney(c.baseAmount, context.currency)}</span>}
+                {formatMoney(price, context.currency)}
               </span>
             </button>
           );
@@ -301,9 +314,9 @@ export default function CheckoutPage() {
                       <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity + 1)}>+</button>
                     </span>
                   </td>
-                  <td>{i.unitPrice.toFixed(2)}</td>
+                  <td>{formatMoney(i.unitPrice, context.currency)}</td>
                   <td>{i.taxRatePercent}%</td>
-                  <td>{(i.unitPrice * i.quantity).toFixed(2)}</td>
+                  <td>{formatMoney(i.unitPrice * i.quantity, context.currency)}</td>
                   <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
                 </tr>
               ))}
@@ -314,14 +327,14 @@ export default function CheckoutPage() {
 
       <div className={styles.card}>
         <div className={styles.totals}>
-          <div className={styles.totalsRow}><span>Subtotal</span><span>{subtotal.toFixed(2)}</span></div>
+          <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(subtotal, context.currency)}</span></div>
           <div className={styles.totalsRow}>
             <span>Discount</span>
             <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </div>
-          <div className={styles.totalsRow}><span>Tax</span><span>{tax.toFixed(2)}</span></div>
-          <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : ""}{roundOff.toFixed(2)}</span></div>
-          <div className={styles.totalsRowMain}><span>Total</span><span>{context.currency} {previewTotal.toFixed(2)}</span></div>
+          <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
+          <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
+          <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
         </div>
         <p className={styles.muted}>The total is computed from line items and can never be typed over.</p>
         {createError && <div className={styles.errorState}>{createError}</div>}
@@ -352,7 +365,7 @@ export default function CheckoutPage() {
 
       {context.prescribedItems.length > 0 && (
         <div className={styles.banner}>
-          Prescribed: {context.prescribedItems.map((i) => i.drugName).join(", ")}
+          Prescription ready: {context.prescribedItems.length} {context.prescribedItems.length === 1 ? "item" : "items"}
           <span className={styles.bannerSub}>No separate dispense screen — add matching Pharmacy charges below if in stock.</span>
         </div>
       )}
@@ -368,9 +381,9 @@ export default function CheckoutPage() {
                   <tr key={li.chargeCode}>
                     <td>{li.chargeName}<div className={styles.muted}>{li.category}</div></td>
                     <td>{li.quantity}</td>
-                    <td>{li.unitPrice.toFixed(2)}</td>
+                    <td>{formatMoney(li.unitPrice, invoice.currency)}</td>
                     <td>{li.taxRatePercent}</td>
-                    <td>{(li.lineTotal ?? li.unitPrice * li.quantity).toFixed(2)}</td>
+                    <td>{formatMoney(li.lineTotal ?? li.unitPrice * li.quantity, invoice.currency)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -380,13 +393,13 @@ export default function CheckoutPage() {
                 <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Payments</h2>
                 {invoice.payments.map((p) => (
                   <div key={p.id} className={styles.paymentRow}>
-                    <span>{p.method}</span>
-                    <span>{invoice.currency} {p.amount.toFixed(2)}</span>
+                    <span>{paymentMethodLabel(p.method, region)}</span>
+                    <span>{formatMoney(p.amount, invoice.currency)}</span>
                   </div>
                 ))}
               </>
             )}
-            {!showAddMore && (
+            {!showAddMore && canBill && (
               <button type="button" className={styles.backBtn} style={{ marginTop: "16px" }} onClick={() => setShowAddMore(true)}>
                 + Add more charges
               </button>
@@ -395,16 +408,16 @@ export default function CheckoutPage() {
 
           <div className={styles.card}>
             <div className={styles.totals}>
-              <div className={styles.totalsRow}><span>Subtotal</span><span>{invoice.subtotal.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Discount</span><span>-{invoice.discount.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Tax</span><span>{invoice.tax.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Round-off</span><span>{invoice.roundOff >= 0 ? "+" : ""}{invoice.roundOff.toFixed(2)}</span></div>
-              <div className={styles.totalsRowMain}><span>Total</span><span>{invoice.currency} {invoice.total.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Paid</span><span>{invoice.paid.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Balance due</span><span>{invoice.balanceDue.toFixed(2)}</span></div>
+              <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(invoice.subtotal, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Discount</span><span>−{formatMoney(invoice.discount, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(invoice.tax, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Round-off</span><span>{invoice.roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(invoice.roundOff), invoice.currency)}</span></div>
+              <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(invoice.total, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Paid</span><span>{formatMoney(invoice.paid, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Balance due</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
             </div>
 
-            {context.queueStatus === "billing_pending" && (
+            {context.queueStatus === "billing_pending" && canAdvance && (
               <>
                 <p className={styles.muted} style={{ marginTop: "12px" }}>
                   This is an interim billing stop — the visit continues after this.
@@ -416,7 +429,7 @@ export default function CheckoutPage() {
               </>
             )}
 
-            {context.queueStatus === "checkout_pending" && (
+            {context.queueStatus === "checkout_pending" && canBill && (
               <>
                 <p className={styles.muted} style={{ marginTop: "12px" }}>
                   {invoice.balanceDue > 0 ? "Record the remaining payment, then complete checkout." : "Nothing further to charge for this visit."}
@@ -428,12 +441,12 @@ export default function CheckoutPage() {
               </>
             )}
 
-            {invoice.status !== "paid" && (
+            {invoice.status !== "paid" && canPay && (
               <form onSubmit={submitPayment}>
                 <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Record payment</h2>
                 <div className={styles.paymentMethods}>
-                  {["cash", "card", "upi", "other"].map((m) => (
-                    <button type="button" key={m} className={method === m ? styles.methodBtnActive : styles.methodBtn} onClick={() => setMethod(m)}>{m}</button>
+                  {PAYMENT_METHODS.map((m) => (
+                    <button type="button" key={m} className={method === m ? styles.methodBtnActive : styles.methodBtn} onClick={() => setMethod(m)}>{paymentMethodLabel(m, region)}</button>
                   ))}
                 </div>
                 <input className={styles.discountInput} style={{ width: "100%", marginBottom: "8px" }} type="number" step="0.01"
@@ -446,7 +459,8 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {(!invoice || showAddMore) && picker}
+      {!canBill && !invoice && <div className={styles.state}>No invoice has been generated for this visit yet.</div>}
+      {canBill && (!invoice || showAddMore) && picker}
     </main>
   );
 }

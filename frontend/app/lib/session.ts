@@ -74,6 +74,7 @@ const LANDING_RULES: [permission: string, path: string][] = [
   ["nursing:view", "/nursing"],
   ["clinical:edit", "/consult"],
   ["queue:view", "/arrivals"],
+  ["pharmacy:view", "/pharmacy"],
   ["reports:view", "/reports"],
   ["setup:view", "/setup"],
 ];

@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import styles from "./access.module.css";
+import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
+import StatusPill from "../../components/ui/StatusPill";
+import RoleDenied from "../../components/platform/RoleDenied";
+import { GrantStatusPill } from "../../components/platform/statusPills";
+import { problemDetail, usePlatformFetch } from "../platformApi";
 
 // Matches GET /v1/platform/support-access/grants (SupportAccessController).
 type Grant = {
@@ -20,16 +24,13 @@ type Grant = {
 
 type TenantOption = { id: string; name: string; slug: string };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
-function status(g: Grant): { label: string; className: string } {
-  if (g.revokedAt) return { label: "Revoked", className: styles.pillRevoked };
-  if (!g.active) return { label: "Expired", className: styles.pillExpired };
-  return { label: "Active", className: styles.pillActive };
+function grantState(g: Grant): "active" | "expired" | "revoked" {
+  if (g.revokedAt) return "revoked";
+  return g.active ? "active" : "expired";
 }
 
 export default function SupportAccessPage() {
-  const router = useRouter();
+  const authedFetch = usePlatformFetch();
   const [grants, setGrants] = useState<Grant[]>([]);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,33 +41,14 @@ export default function SupportAccessPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actingOn, setActingOn] = useState<string | null>(null);
-
-  const authedFetch = useCallback(
-    (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_platform_access_token");
-      if (!token) {
-        router.replace("/platform/login");
-        return null;
-      }
-      return fetch(`${API_BASE}${path}`, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
-      });
-    },
-    [router]
-  );
+  const [revokeError, setRevokeError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const grantsRes = await authedFetch("/platform/support-access/grants");
-      if (!grantsRes) return;
-      if (grantsRes.status === 401) {
-        localStorage.removeItem("nabd_platform_access_token");
-        router.replace("/platform/login");
-        return;
-      }
+      if (!grantsRes) return; // session gone, already redirecting to login
       if (grantsRes.status === 403) {
         setForbidden(true);
         return;
@@ -87,7 +69,7 @@ export default function SupportAccessPage() {
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, router]);
+  }, [authedFetch]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -116,13 +98,11 @@ export default function SupportAccessPage() {
     try {
       const res = await authedFetch("/platform/support-access/grants", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenantId, reason }),
       });
       if (!res) return;
       if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        setFormError(body?.detail ?? "Couldn't request access. Try again.");
+        setFormError(await problemDetail(res, "Couldn't request access. Try again."));
         return;
       }
       const grant: Grant = await res.json();
@@ -135,13 +115,19 @@ export default function SupportAccessPage() {
 
   async function revoke(id: string) {
     setActingOn(id);
+    setRevokeError(null);
     try {
       const res = await authedFetch(`/platform/support-access/grants/${id}/revoke`, { method: "POST" });
-      if (res?.ok) {
-        setGrants((prev) =>
-          prev.map((g) => (g.id === id ? { ...g, active: false, revokedAt: new Date().toISOString() } : g))
-        );
+      if (!res) return;
+      if (!res.ok) {
+        setRevokeError(await problemDetail(res, "Couldn't revoke the grant. Try again."));
+        return;
       }
+      setGrants((prev) =>
+        prev.map((g) => (g.id === id ? { ...g, active: false, revokedAt: new Date().toISOString() } : g))
+      );
+    } catch {
+      setRevokeError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setActingOn(null);
     }
@@ -150,7 +136,7 @@ export default function SupportAccessPage() {
   return (
     <main className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Support access</h1>
+        <h1 className={styles.title}>Support Access</h1>
         <p className={styles.subtitle}>Consented, time-boxed and audited — 60 minutes, no clinical fields.</p>
       </div>
 
@@ -189,23 +175,25 @@ export default function SupportAccessPage() {
           </form>
 
           <div className={styles.policy}>
-            <span className={styles.policyItem}><span className={`${styles.dot} ${styles.dotAllowed}`} /> Tenant metadata</span>
-            <span className={styles.policyItem}><span className={`${styles.dot} ${styles.dotAllowed}`} /> Audit logs</span>
-            <span className={styles.policyItem}><span className={`${styles.dot} ${styles.dotBlocked}`} /> Full clinical fields</span>
-            <span className={styles.policyItem}><span className={`${styles.dot} ${styles.dotBlocked}`} /> Prescription content</span>
+            <span className={styles.policyItem}><StatusPill tone="ok" icon="check" label="Tenant metadata" /></span>
+            <span className={styles.policyItem}><StatusPill tone="ok" icon="check" label="Audit logs" /></span>
+            <span className={styles.policyItem}><StatusPill tone="danger" icon="x" label="Full clinical fields — blocked" /></span>
+            <span className={styles.policyItem}><StatusPill tone="danger" icon="x" label="Prescription content — blocked" /></span>
           </div>
         </>
       )}
 
+      {revokeError && <div className={styles.formError} role="alert">{revokeError}</div>}
+
       <div className={styles.card}>
         {loading ? (
-          <div className={styles.state}>Loading…</div>
+          <Skeleton rows={5} label="Loading grants" />
         ) : forbidden ? (
-          <div className={styles.state}>Your role doesn&apos;t have access to support sessions.</div>
+          <RoleDenied surface="Support access" />
         ) : error ? (
-          <div className={styles.errorState}>{error}</div>
+          <ErrorState message={error} onRetry={load} />
         ) : grants.length === 0 ? (
-          <div className={styles.state}>No support access grants yet.</div>
+          <EmptyState icon="user" title="No support access grants yet" hint="Request a time-boxed grant above when a clinic asks for help." />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -221,16 +209,16 @@ export default function SupportAccessPage() {
               </thead>
               <tbody>
                 {grants.map((g) => {
-                  const s = status(g);
+                  const state = grantState(g);
                   return (
                     <tr key={g.id}>
                       <td>{g.operatorName} <span className={styles.muted}>({g.operatorRole})</span></td>
                       <td>{g.reason}</td>
                       <td>{new Date(g.grantedAt).toLocaleString()}</td>
                       <td>{new Date(g.expiresAt).toLocaleString()}</td>
-                      <td><span className={`${styles.pill} ${s.className}`}>{s.label}</span></td>
+                      <td><GrantStatusPill state={state} /></td>
                       <td>
-                        {s.label === "Active" && (
+                        {state === "active" && (
                           <button
                             className={styles.revokeBtn}
                             disabled={actingOn === g.id}

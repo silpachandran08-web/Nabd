@@ -1,7 +1,9 @@
 target/
 *.class
 .DS_Store
-.claude/
+.claude/*
+!.claude/agents/
+!.claude/skills/
 *.log
 .env.dev
 .vercel

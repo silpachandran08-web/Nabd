@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 import styles from "./patients.module.css";
+import StatusPill from "../components/ui/StatusPill";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 type Problem = { title: string; detail: string };
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
+
+// PatientMatchCandidateResponse.matchScore is a 0-1 fraction (1.0 = exact phone match, else name similarity).
+function formatScore(score: number): string {
+  if (!Number.isFinite(score)) return "—";
+  return `${Math.round(Math.min(1, Math.max(0, score)) * 100)}%`;
+}
 
 function useEscape(onClose: () => void) {
   useEffect(() => {
@@ -18,88 +25,6 @@ function useEscape(onClose: () => void) {
 async function detail(res: Response, fallback: string): Promise<string> {
   const p: Problem | null = await res.json().catch(() => null);
   return p?.detail || p?.title || fallback;
-}
-
-/**
- * Check in from the registry. With a booking today it checks in against it (POST /queue/check-in
- * with appointmentId); otherwise it's a walk-in for the chosen doctor.
- */
-export function CheckInDialog({ patient, authedFetch, onClose, onDone }: {
-  patient: { id: string; name: string; nextAppointmentToday: boolean; nextAppointmentId: string | null;
-    nextDoctorId: string | null; nextDoctorName: string | null; nextAppointment: string | null };
-  authedFetch: AuthedFetch; onClose: () => void; onDone: (token: number) => void;
-}) {
-  const booked = patient.nextAppointmentToday && patient.nextAppointmentId && patient.nextDoctorId;
-  const [doctors, setDoctors] = useState<{ id: string; name: string }[] | null>(null);
-  const [doctorId, setDoctorId] = useState(patient.nextDoctorId ?? "");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  useEscape(onClose);
-
-  useEffect(() => {
-    if (booked) return;
-    let cancelled = false;
-    void Promise.resolve().then(async () => {
-      const res = await authedFetch("/staff/roster");
-      if (cancelled || !res) return;
-      const list: { id: string; name: string }[] = res.ok ? await res.json() : [];
-      if (!cancelled) setDoctors(list);
-    });
-    return () => { cancelled = true; };
-  }, [booked, authedFetch]);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      const body = booked
-        ? { patientId: patient.id, doctorId: patient.nextDoctorId, appointmentId: patient.nextAppointmentId }
-        : { patientId: patient.id, doctorId };
-      const res = await authedFetch("/queue/check-in", { method: "POST", body: JSON.stringify(body) });
-      if (!res) return;
-      if (!res.ok) {
-        setError(await detail(res, "Couldn't check the patient in."));
-        return;
-      }
-      const entry: { tokenNumber: number } = await res.json();
-      onDone(entry.tokenNumber);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const time = patient.nextAppointment
-    ? new Date(patient.nextAppointment).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
-  return (
-    <div className={styles.dialogOverlay} onClick={onClose}>
-      <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="checkin-title"
-        onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h2 id="checkin-title" className={styles.dialogTitle}>Check in {patient.name}</h2>
-        {booked ? (
-          <p className={styles.dialogSub}>Today&apos;s {time} appointment with {patient.nextDoctorName}.</p>
-        ) : (
-          <>
-            <p className={styles.dialogSub}>No booking today — this checks them in as a walk-in.</p>
-            <label className={styles.fieldLabel} htmlFor="checkin-doctor">Doctor</label>
-            <select id="checkin-doctor" className={styles.input} value={doctorId} onChange={(e) => setDoctorId(e.target.value)} autoFocus>
-              <option value="">{doctors === null ? "Loading…" : "Choose a doctor"}</option>
-              {(doctors ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </>
-        )}
-        {error && <div className={styles.errorState} role="alert">{error}</div>}
-        <div className={styles.dialogActions}>
-          <button type="button" className={styles.secondaryBtn} onClick={onClose}>Cancel</button>
-          <button type="submit" className={styles.primaryBtn} disabled={saving || (!booked && !doctorId)}>
-            {saving ? "Checking in…" : "Check in"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
 }
 
 /**
@@ -186,6 +111,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
             {candidates.map((c) => (
               <div key={c.patientId} className={styles.candidateRow}>
                 <span><span className={styles.patientName}>{c.name}</span><span className={styles.mrn}>{c.phone}</span></span>
+                <StatusPill tone="info" icon="users" label={`Match ${formatScore(c.matchScore)}`} />
                 <button type="button" className={styles.secondaryBtn} onClick={() => onOpenExisting(c.patientId)}>Open</button>
               </div>
             ))}

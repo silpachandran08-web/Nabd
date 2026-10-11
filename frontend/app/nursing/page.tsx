@@ -3,6 +3,11 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./nursing.module.css";
+import Icon from "../components/ui/Icon";
+import StatusPill from "../components/ui/StatusPill";
+import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
+import { can } from "../lib/permissions";
+import { getIdentity } from "../lib/session";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
@@ -20,14 +25,69 @@ type Row = QueueEntry & {
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
 };
 // A patient's clinical-flags chips: allergy (danger), chronic condition (warn), presenting
-// complaint (urgent) — same three-tier severity the wireframe's Vitals Worklist uses.
-type Flag = { kind: "danger" | "warn" | "urgent"; text: string };
+// complaint (neutral info). "Urgent" is reserved for the queue's priority flag (rendered
+// separately) — a routine complaint such as "cough" must never look urgent.
+type Flag = { kind: "danger" | "warn" | "info"; text: string };
 function flagsFor(r: { allergies: string[]; chronicConditions: string[]; presentingComplaint: string | null }): Flag[] {
   return [
     ...r.allergies.map((a): Flag => ({ kind: "danger", text: `Allergy: ${a}` })),
     ...r.chronicConditions.map((c): Flag => ({ kind: "warn", text: c })),
-    ...(r.presentingComplaint ? [{ kind: "urgent", text: r.presentingComplaint } as Flag] : []),
+    ...(r.presentingComplaint ? [{ kind: "info", text: r.presentingComplaint } as Flag] : []),
   ];
+}
+const FLAG_ICON = { danger: "alert", warn: "pulse", info: "info" } as const;
+
+function statusLabel(s: string): string {
+  const t = s.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+const hhmm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+// Vitals validation. HARD limits are physiologically impossible values (almost certainly a typo
+// such as temp 370) and block saving; SOFT ranges are the usual adult range and only raise a
+// non-blocking "check value" chip while typing. The backend's own abnormal flags (shown after
+// save, age-banded) remain the authority; the API itself enforces no range — these client numbers are a typing aid, never a clinical decision.
+type VitalKey = "heightCm" | "weightKg" | "bpSystolic" | "bpDiastolic" | "pulseBpm" | "tempCelsius" | "spo2Percent";
+const VITAL_FIELDS: { key: VitalKey; label: string; unit: string; min: number; max: number; soft?: [number, number]; step: string }[] = [
+  { key: "heightCm", label: "Height", unit: "cm", min: 30, max: 250, step: "0.1" },
+  { key: "weightKg", label: "Weight", unit: "kg", min: 0.3, max: 400, step: "0.1" },
+  { key: "bpSystolic", label: "BP systolic", unit: "mmHg", min: 40, max: 300, soft: [90, 140], step: "1" },
+  { key: "bpDiastolic", label: "BP diastolic", unit: "mmHg", min: 20, max: 200, soft: [60, 90], step: "1" },
+  { key: "pulseBpm", label: "Pulse", unit: "bpm", min: 20, max: 300, soft: [60, 100], step: "1" },
+  { key: "tempCelsius", label: "Temp", unit: "°C", min: 25, max: 45, soft: [36, 37.8], step: "0.1" },
+  { key: "spo2Percent", label: "SpO2", unit: "%", min: 50, max: 100, soft: [95, 100], step: "1" },
+];
+type VitalsForm = Record<VitalKey, string>;
+const EMPTY_VITALS: VitalsForm = { heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" };
+
+function vitalsErrors(f: VitalsForm): Partial<Record<VitalKey | "form", string>> {
+  const errs: Partial<Record<VitalKey | "form", string>> = {};
+  let any = false;
+  for (const d of VITAL_FIELDS) {
+    const raw = f[d.key].trim();
+    if (raw === "") continue;
+    any = true;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) errs[d.key] = "Enter a number.";
+    else if (d.step === "1" && !Number.isInteger(n)) errs[d.key] = "Enter a whole number.";
+    else if (n < d.min || n > d.max) errs[d.key] = `Must be ${d.min}–${d.max} ${d.unit}. Check the value.`;
+  }
+  if (!any) errs.form = "Enter at least one measurement before saving.";
+  const hasSys = f.bpSystolic.trim() !== "";
+  const hasDia = f.bpDiastolic.trim() !== "";
+  if (hasSys !== hasDia) errs[hasSys ? "bpDiastolic" : "bpSystolic"] = "Enter both blood-pressure values.";
+  else if (hasSys && !errs.bpSystolic && !errs.bpDiastolic && Number(f.bpSystolic) <= Number(f.bpDiastolic)) {
+    errs.bpSystolic = "Systolic must be higher than diastolic.";
+  }
+  return errs;
+}
+
+function softWarning(key: VitalKey, raw: string): string | null {
+  const d = VITAL_FIELDS.find((x) => x.key === key);
+  if (!d?.soft || raw.trim() === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < d.min || n > d.max) return null;
+  return n < d.soft[0] || n > d.soft[1] ? `Outside usual range (${d.soft[0]}–${d.soft[1]} ${d.unit}) — recheck` : null;
 }
 const VISIT_LABEL: Record<string, string> = {
   walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
@@ -55,6 +115,7 @@ type ProcedureOrder = {
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
 type Problem = { title: string; detail: string };
+const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view" } as const;
 type Tab = "vitals" | "priority" | "administration" | "procedures" | "activity";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -129,13 +190,18 @@ function NursingWorklist() {
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [staff, setStaff] = useState<StaffOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sectionFailed, setSectionFailed] = useState(false);
+  const [dateLine, setDateLine] = useState("");
   const [forbidden, setForbidden] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [, setNow] = useState(() => Date.now());
 
   const [vitalsEntryId, setVitalsEntryId] = useState<string | null>(null);
-  const [vitalsForm, setVitalsForm] = useState({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
+  const [vitalsForm, setVitalsForm] = useState<VitalsForm>(EMPTY_VITALS);
+  const [vitalsTouched, setVitalsTouched] = useState<Partial<Record<VitalKey, boolean>>>({});
+  const [vitalsAttempted, setVitalsAttempted] = useState(false);
   const [vitalsError, setVitalsError] = useState<string | null>(null);
   const [vitalsFlags, setVitalsFlags] = useState<string[] | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
@@ -169,6 +235,21 @@ function NursingWorklist() {
     });
   }, [searchParams, router]);
 
+  // Day label (client-only: depends on the clock and the token's region). Saudi tenants show Hijri
+  // primary + Gregorian secondary (DESIGN.md); everyone else Gregorian.
+  useEffect(() => {
+    void Promise.resolve().then(() => {
+      const now = new Date();
+      const greg = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+      if (getIdentity()?.tenantRegion === "KSA") {
+        const hijri = new Intl.DateTimeFormat("en-SA-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now);
+        setDateLine(`Today · ${hijri} · ${greg}`);
+      } else {
+        setDateLine(`Today · ${greg}`);
+      }
+    });
+  }, []);
+
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
@@ -191,7 +272,6 @@ function NursingWorklist() {
   );
 
   const load = useCallback(async () => {
-    setError(null);
     try {
       const [queueRes, priorityRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
         authedFetch("/queue"), authedFetch("/queue?priority=true"), authedFetch("/staff/roster"),
@@ -207,6 +287,7 @@ function NursingWorklist() {
         setError("Couldn't load the nursing worklist. Try again.");
         return;
       }
+      setForbidden(false);
       const entries: QueueEntry[] = await queueRes.json();
       const staffMap = new Map<string, string>();
       if (staffRes?.ok) {
@@ -228,6 +309,8 @@ function NursingWorklist() {
       // entirely) rather than assuming from status alone.
       const RECORDED_STATUSES = ["vitals_done", "in_consult", "procedures_pending", "checkout_pending", "completed"];
       const withVitals = async (list: Row[]) => (await Promise.all(list.map(async (r): Promise<Row | null> => {
+        // Reading recorded vitals needs clinical:view; without it the Recorded view simply stays empty.
+        if (!can(PERM.vitalsRead)) return null;
         const vRes = await authedFetch(`/clinical/vitals/${r.id}`);
         if (!vRes?.ok) return null;
         const v: { recordedAt: string; abnormalFlags: string[] } = await vRes.json();
@@ -241,7 +324,14 @@ function NursingWorklist() {
       if (adminRes?.ok) setAdministrationOrders(await adminRes.json());
       if (procRes?.ok) setProcedureOrders(await procRes.json());
       if (activityRes?.ok) setActivity(await activityRes.json());
+      // A 403 on a secondary list just means that section isn't theirs; anything else is a failure
+      // the nurse should hear about rather than see as a silently empty tab.
+      setSectionFailed([priorityRes, adminRes, procRes, activityRes, staffRes].some((r) => r && !r.ok && r.status !== 403));
+      setError(null);
+      setLoaded(true);
     } catch {
+      // Keep whatever was last loaded on screen (and any open dialog mounted); the page shows an
+      // inline banner with Retry instead of replacing the worklist.
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
@@ -264,9 +354,16 @@ function NursingWorklist() {
     return () => clearInterval(id);
   }, []);
 
+  function retryLoad() {
+    setLoading(true);
+    void load();
+  }
+
   function openVitalsModal(entryId: string) {
     setVitalsEntryId(entryId);
-    setVitalsForm({ heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" });
+    setVitalsForm(EMPTY_VITALS);
+    setVitalsTouched({});
+    setVitalsAttempted(false);
     setVitalsError(null);
     setVitalsFlags(null);
   }
@@ -281,6 +378,9 @@ function NursingWorklist() {
     e.preventDefault();
     if (!vitalsEntryId) return;
     setVitalsError(null);
+    // An empty or implausible save must never move the visit on to the doctor with no vitals.
+    setVitalsAttempted(true);
+    if (Object.keys(vitalsErrors(vitalsForm)).length > 0) return;
     setVitalsSubmitting(true);
     try {
       const num = (v: string) => (v.trim() === "" ? null : Number(v));
@@ -320,9 +420,9 @@ function NursingWorklist() {
     load();
   }
 
-  function openUrgentPicker() {
+  function openUrgentPicker(entryId = "") {
     setShowUrgentPicker(true);
-    setUrgentEntryId("");
+    setUrgentEntryId(entryId);
     setUrgentReasonCode(URGENT_REASON_CODES[0]);
     setUrgentOtherReason("");
     setUrgentError(null);
@@ -441,28 +541,33 @@ function NursingWorklist() {
     load();
   }
 
+  const [procRowError, setProcRowError] = useState<Record<string, string>>({});
+
   async function setProcedureStatus(id: string, status: string) {
-    setActionError(null);
+    setProcRowError((prev) => { const n = { ...prev }; delete n[id]; return n; });
     const res = await authedFetch(`/nursing/procedure-orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
     if (res && !res.ok) {
       const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't update the procedure." }));
-      setActionError(p.detail || "Couldn't update the procedure.");
+      setProcRowError((prev) => ({ ...prev, [id]: p.detail || "Couldn't update the procedure." }));
     }
     load();
   }
 
   // ── NB-119: signed consent gates starting the procedure ────────────────────
   const [consentModal, setConsentModal] = useState<{ orderId: string; signedName: string } | null>(null);
+  const [consentError, setConsentError] = useState<string | null>(null);
 
   async function submitConsent() {
     if (!consentModal || !consentModal.signedName.trim()) return;
-    setActionError(null);
+    setConsentError(null);
     const res = await authedFetch(`/nursing/procedure-orders/${consentModal.orderId}/consent`, {
       method: "POST", body: JSON.stringify({ signedName: consentModal.signedName }),
     });
     if (res && !res.ok) {
+      // Stay open: consent that failed to record must not look recorded.
       const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record consent." }));
-      setActionError(p.detail || "Couldn't record consent.");
+      setConsentError(p.detail || "Couldn't record consent.");
+      return;
     }
     setConsentModal(null);
     load();
@@ -481,13 +586,25 @@ function NursingWorklist() {
     URL.revokeObjectURL(url);
   }
 
-  if (loading) return <main className={styles.page}><div className={styles.state}>Loading…</div></main>;
-  if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to the nursing worklist.</div></main>;
-  if (error) return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
+  const allow = (permission: string) => !loading && can(permission);
+  if (forbidden) return <main className={styles.page}><EmptyState icon="shield" title="No access to the nursing worklist" hint="Your role doesn't include the nursing worklist." /></main>;
 
   const visibleVitalsRows = vitalsFilter === "due" ? rows : vitalsFilter === "recorded" ? recordedRows : [...rows, ...recordedRows];
   const urgentCandidates = [...rows, ...recordedRows].filter((r) => !r.priority);
   const outOfRangeCount = recordedRows.filter((r) => r.vitalsOutOfRange).length;
+  const staffName = (id: string | null) => (id ? staff.find((s) => s.id === id)?.name ?? null : null);
+  const canCaptureVitals = allow(PERM.vitalsWrite);
+  const canCreateOrders = allow(PERM.create);
+  const canEditOrders = allow(PERM.edit);
+  const showSkeleton = !loaded && !error;
+  const showLoadError = !loaded && !!error;
+  const vitalsEmpty = {
+    due: { title: "No one is waiting for vitals", hint: "New arrivals appear here as soon as reception checks them in." },
+    recorded: { title: "No vitals recorded yet today", hint: "Patients whose vitals you capture will show up here." },
+    all: { title: "No patients on the worklist", hint: "Nobody has been checked in for vitals today." },
+  }[vitalsFilter];
+  const vErrors = vitalsErrors(vitalsForm);
+  const vitalsRow = vitalsEntryId ? [...rows, ...recordedRows].find((r) => r.id === vitalsEntryId) : undefined;
   // ClinicNav's "Vaccines & Injections" sidebar item deep-links here (?tab=vaccines) even though
   // no backend exists for it — not one of the 5 real tabs, so it's checked from the raw query
   // param (validTab() would just fall it back to "vitals") and shown as its own honest section.
@@ -497,11 +614,13 @@ function NursingWorklist() {
     <main className={styles.page}>
       <div className={styles.headerRow}>
         <div>
-          <h1 className={styles.title}>Nursing Worklist</h1>
-          <p className={styles.subtitle}>Vitals, priority triage, administration, procedures and today&apos;s activity.</p>
+          <h1 className={styles.title}>{tab === "vitals" || isVaccinesView ? "Vitals Worklist" : TABS.find((t) => t.key === tab)?.label}</h1>
+          <p className={styles.subtitle}>
+            {loaded && <>{rows.length} awaiting vitals{dateLine ? " · " : ""}</>}{dateLine}
+          </p>
         </div>
         <div className={styles.headerRight}>
-          {tab === "vitals" && (
+          {loaded && tab === "vitals" && (
             <div className={styles.filterPills}>
               <button className={vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("due")}>
                 Vitals due <span className={styles.pillCount}>{rows.length}</span>
@@ -514,13 +633,13 @@ function NursingWorklist() {
               </button>
             </div>
           )}
-          <button className={styles.smallBtn} onClick={() => router.push("/packages")}>Package Sessions →</button>
+          {allow(PERM.packages) && <button className={styles.smallBtn} onClick={() => router.push("/packages")}>Package Sessions →</button>}
         </div>
       </div>
 
       {isVaccinesView ? (
         <div className={styles.card}>
-          <div className={styles.state}>Vaccines &amp; injections isn&apos;t available yet.</div>
+          <EmptyState icon="syringe" title="Vaccines & injections isn't available yet" />
         </div>
       ) : (
         <>
@@ -530,19 +649,34 @@ function NursingWorklist() {
         ))}
       </div>
 
-      {actionError && <div className={styles.errorState} style={{ padding: "8px 0" }}>{actionError}</div>}
+      {actionError && <div className={styles.banner} role="alert"><Icon name="alert" size={16} />{actionError}</div>}
+      {loaded && error && (
+        <div className={styles.banner} role="alert">
+          <Icon name="alert" size={16} />{error} Showing the last loaded data.
+          <button type="button" className={styles.smallBtn} onClick={retryLoad}>Retry</button>
+        </div>
+      )}
+      {loaded && !error && sectionFailed && (
+        <div className={styles.banner} role="alert">
+          <Icon name="alert" size={16} />Some sections couldn&apos;t be refreshed.
+          <button type="button" className={styles.smallBtn} onClick={retryLoad}>Retry</button>
+        </div>
+      )}
 
-      {tab === "vitals" && (
+      {showSkeleton && <Skeleton rows={6} label="Loading nursing worklist" />}
+      {showLoadError && <div className={styles.card}><ErrorState message={error} onRetry={retryLoad} /></div>}
+
+      {loaded && tab === "vitals" && (
         <>
-          <div className={styles.headerActions} style={{ marginBottom: "12px" }}>
-            <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}>Capture vitals</button>
-            <button className={styles.smallBtn} onClick={openUrgentPicker}>Mark urgent</button>
+          <div className={`${styles.headerActions} ${styles.actionsGap}`}>
+            {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}>Capture vitals</button>}
+            <button className={styles.smallBtn} onClick={() => openUrgentPicker()}>Mark urgent</button>
           </div>
 
           <div className={styles.layout}>
             <div className={styles.card}>
               {visibleVitalsRows.length === 0 ? (
-                <div className={styles.state}>Nobody is waiting on vitals right now.</div>
+                <EmptyState icon="pulse" title={vitalsEmpty.title} hint={vitalsEmpty.hint} />
               ) : (
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
@@ -550,33 +684,27 @@ function NursingWorklist() {
                     <tbody>
                       {visibleVitalsRows.map((r) => {
                         const flags = flagsFor(r);
-                        const hasDanger = r.priority || flags.some((f) => f.kind === "danger");
-                        const hasUrgent = flags.some((f) => f.kind === "urgent");
-                        const rowClass = hasDanger ? styles.rowFlagged : hasUrgent ? styles.rowUrgent : undefined;
+                        const hasAllergy = flags.some((f) => f.kind === "danger");
+                        const rowClass = hasAllergy ? styles.rowFlagged : r.priority ? styles.rowUrgent : undefined;
                         return (
                           <tr key={r.id} className={rowClass}>
-                            <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                            <td className={styles.muted}>{VISIT_LABEL[r.source] ?? r.source}</td>
-                            <td>
-                              {flags.length === 0 ? <span className={styles.muted}>—</span> : (
+                            <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
+                            <td data-label="Visit" className={styles.muted}>{VISIT_LABEL[r.source] ?? r.source}</td>
+                            <td data-label="Clinical flags">
+                              {flags.length === 0 && !r.priority ? <span className={styles.muted}>No flags</span> : (
                                 <div className={styles.flagList}>
-                                  {flags.map((f, i) => (
-                                    <span key={i} className={`${styles.flagChip} ${f.kind === "danger" ? styles.flagDanger : f.kind === "warn" ? styles.flagWarn : styles.flagUrgent}`}>
-                                      {f.text}
-                                    </span>
-                                  ))}
+                                  {r.priority && <StatusPill tone="urgent" label={r.priorityReason ? `Urgent: ${r.priorityReason}` : "Urgent"} icon="alert" />}
+                                  {flags.map((f, i) => <StatusPill key={i} tone={f.kind} label={f.text} icon={FLAG_ICON[f.kind]} />)}
                                 </div>
                               )}
                             </td>
-                            <td className={styles.muted}>
-                              {r.lastVitalsAt ? new Date(r.lastVitalsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
-                            </td>
-                            <td>
+                            <td data-label="Last vitals" className={styles.muted}>{r.lastVitalsAt ? hhmm(r.lastVitalsAt) : "—"}</td>
+                            <td data-label="Status">
                               {r.status === "vitals_pending"
-                                ? <span className={styles.pillVitals}>waiting</span>
-                                : <span className={r.vitalsOutOfRange ? styles.pillDanger : styles.pillDone}>{r.status.replace("_", " ")}</span>}
+                                ? <StatusPill tone="warn" label="Waiting" icon="clock" />
+                                : <StatusPill tone={r.vitalsOutOfRange ? "danger" : "ok"} label={r.vitalsOutOfRange ? `${statusLabel(r.status)} · out of range` : statusLabel(r.status)} icon={r.vitalsOutOfRange ? "alert" : "check"} />}
                             </td>
-                            <td>{r.status === "vitals_pending" && <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Capture vitals</button>}</td>
+                            <td data-label="">{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Capture vitals</button>}</td>
                           </tr>
                         );
                       })}
@@ -590,39 +718,54 @@ function NursingWorklist() {
               <div className={styles.card}>
                 <div className={styles.sideTitle}>Vitals summary</div>
                 <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedRows.length}</span></div>
-                <div className={styles.summaryRow}><span>Out of range</span><span className={styles.summaryValue} style={outOfRangeCount > 0 ? { color: "var(--nb-danger-500)" } : undefined}>{outOfRangeCount}</span></div>
+                <div className={styles.summaryRow}>
+                  <span>Out of range</span>
+                  <span className={outOfRangeCount > 0 ? styles.summaryDanger : styles.summaryValue}>
+                    {outOfRangeCount > 0 && <Icon name="alert" size={14} />} {outOfRangeCount}
+                  </span>
+                </div>
               </div>
 
               {/* No backend exists for vaccines/injections yet (filed separately) — shown as an
                   honest "not available" card rather than fabricated due-dates. */}
               <div className={styles.card}>
                 <div className={styles.sideTitle}>Vaccines &amp; injections due</div>
-                <div className={styles.state} style={{ padding: "var(--nb-space-16)" }}>Not available yet.</div>
+                <div className={styles.state}>Not available yet.</div>
               </div>
             </div>
           </div>
         </>
       )}
 
-      {tab === "priority" && (
+      {loaded && tab === "priority" && (
         <div className={styles.card}>
           {priorityRows.length === 0 ? (
-            <div className={styles.state}>No priority patients flagged right now.</div>
+            <EmptyState icon="alert" title="No priority patients flagged" hint="Patients flagged urgent by reception or nursing appear here." />
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Patient</th><th>Flagged</th><th>Reason</th><th>Acknowledged</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Patient</th><th>Flagged</th><th>Reason</th><th>Acknowledged</th><th>State</th><th></th></tr></thead>
                 <tbody>
-                  {priorityRows.map((r) => (
-                    <tr key={r.id} className={styles.rowFlagged}>
-                      <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                      <td className={styles.muted}>{r.priorityFlaggedAt ? new Date(r.priorityFlaggedAt).toLocaleTimeString() : "—"}</td>
-                      <td>{r.priorityReason}</td>
-                      <td className={styles.muted}>{r.priorityAcknowledgedAt ? new Date(r.priorityAcknowledgedAt).toLocaleTimeString() : "Not yet"}</td>
-                      <td><span className={styles.pillNeutral}>{r.status.replace("_", " ")}</span></td>
-                      <td>{!r.priorityAcknowledgedAt && <button className={styles.actionBtn} onClick={() => acknowledgePriority(r.id)}>Acknowledge</button>}</td>
-                    </tr>
-                  ))}
+                  {priorityRows.map((r) => {
+                    const flaggedBy = staffName(r.priorityFlaggedBy);
+                    const ackBy = staffName(r.priorityAcknowledgedBy);
+                    return (
+                      <tr key={r.id} className={styles.rowUrgent}>
+                        <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
+                        <td data-label="Flagged" className={styles.muted}>
+                          {r.priorityFlaggedAt ? hhmm(r.priorityFlaggedAt) : "—"}{flaggedBy ? ` · by ${flaggedBy}` : ""}
+                        </td>
+                        <td data-label="Reason">{r.priorityReason}</td>
+                        <td data-label="Acknowledged" className={styles.muted}>
+                          {r.priorityAcknowledgedAt
+                            ? <>{ackBy ? `${ackBy} · ` : ""}{hhmm(r.priorityAcknowledgedAt)}</>
+                            : <StatusPill tone="urgent" label="Awaiting acknowledgement" icon="clock" />}
+                        </td>
+                        <td data-label="State"><StatusPill tone={r.priorityAcknowledgedAt ? "info" : "neutral"} label={statusLabel(r.status)} icon={r.priorityAcknowledgedAt ? "check" : "list"} /></td>
+                        <td data-label="">{!r.priorityAcknowledgedAt && <button className={styles.actionBtn} onClick={() => acknowledgePriority(r.id)}>Acknowledge</button>}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -630,14 +773,16 @@ function NursingWorklist() {
         </div>
       )}
 
-      {tab === "administration" && (
+      {loaded && tab === "administration" && (
         <>
-          <div className={styles.headerActions} style={{ marginBottom: "12px" }}>
-            <button className={styles.actionBtn} onClick={() => setShowAdminForm(true)}>+ New order</button>
-          </div>
+          {canCreateOrders && (
+            <div className={`${styles.headerActions} ${styles.actionsGap}`}>
+              <button className={styles.actionBtn} onClick={() => setShowAdminForm(true)}>+ New order</button>
+            </div>
+          )}
           <div className={styles.card}>
             {administrationOrders.length === 0 ? (
-              <div className={styles.state}>No administration orders today.</div>
+              <EmptyState icon="syringe" title="No administration orders today" hint="Orders placed by doctors for administration appear here." />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -645,21 +790,21 @@ function NursingWorklist() {
                   <tbody>
                     {administrationOrders.map((o) => (
                       <tr key={o.id}>
-                        <td>{o.patientName}</td>
-                        <td>{o.drugName} · {o.dose}</td>
-                        <td>{o.orderedByName}</td>
-                        <td>{o.route}{o.site ? ` · ${o.site}` : ""}</td>
-                        <td>
-                          {o.status === "not_started" && <span className={styles.pillNeutral}>Not started</span>}
-                          {o.status === "administered" && <span className={styles.pillDone}>Administered · witness {o.witnessedByName}</span>}
-                          {o.status === "refused" && <span className={styles.pillDanger}>Refused: {o.refuseReason}</span>}
+                        <td data-label="Patient">{o.patientName}</td>
+                        <td data-label="Ordered item">{o.drugName} · {o.dose}</td>
+                        <td data-label="Ordered by">{o.orderedByName}</td>
+                        <td data-label="Route & site">{o.route}{o.site ? ` · ${o.site}` : ""}</td>
+                        <td data-label="State">
+                          {o.status === "not_started" && <StatusPill tone="neutral" label="Not started" />}
+                          {o.status === "administered" && <StatusPill tone="ok" label={`Administered · witness ${o.witnessedByName}`} />}
+                          {o.status === "refused" && <StatusPill tone="danger" label={`Refused: ${o.refuseReason}`} icon="x" />}
                         </td>
-                        <td>
-                          {o.status === "not_started" && (
-                            <>
-                              <button className={styles.smallBtn} onClick={() => setWitnessModal({ orderId: o.id, witnessId: "" })}>Administer</button>{" "}
+                        <td data-label="">
+                          {o.status === "not_started" && canEditOrders && (
+                            <div className={styles.rowActions}>
+                              <button className={styles.smallBtn} onClick={() => setWitnessModal({ orderId: o.id, witnessId: "" })}>Administer</button>
                               <button className={styles.smallBtn} onClick={() => setRefuseModal({ orderId: o.id, reason: "" })}>Refuse</button>
-                            </>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -672,22 +817,25 @@ function NursingWorklist() {
         </>
       )}
 
-      {tab === "procedures" && (
+      {loaded && tab === "procedures" && (
         <>
           {proceduresPendingRows.length > 0 && (
-            <div className={styles.card} style={{ marginBottom: "12px" }}>
+            <div className={`${styles.card} ${styles.cardGap}`}>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Wait</th><th>Status</th><th></th></tr></thead>
                   <tbody>
                     {proceduresPendingRows.map((r) => (
-                      <tr key={r.id} className={r.priority ? styles.rowFlagged : undefined}>
-                        <td>#{r.tokenNumber}</td>
-                        <td><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                        <td>{r.doctorName}</td>
-                        <td className={styles.muted}>{waitMinutes(r.createdAt)}m</td>
-                        <td><span className={styles.pillVitals}>procedures pending</span></td>
-                        <td><button className={styles.actionBtn} onClick={() => continueAfterProcedures(r)}>Procedures done, continue</button></td>
+                      <tr key={r.id} className={r.priority ? styles.rowUrgent : undefined}>
+                        <td data-label="Token">#{r.tokenNumber}</td>
+                        <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
+                        <td data-label="Doctor">{r.doctorName}</td>
+                        <td data-label="Wait" className={styles.muted}>{waitMinutes(r.createdAt)}m</td>
+                        <td data-label="Status">
+                          {r.priority && <StatusPill tone="urgent" label="Urgent" icon="alert" />}
+                          <StatusPill tone="warn" label="Procedures pending" icon="clock" />
+                        </td>
+                        <td data-label=""><button className={styles.actionBtn} onClick={() => continueAfterProcedures(r)}>Procedures done, continue</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -695,41 +843,53 @@ function NursingWorklist() {
               </div>
             </div>
           )}
-          <div className={styles.headerActions} style={{ marginBottom: "12px" }}>
-            <button className={styles.actionBtn} onClick={() => setShowProcForm(true)}>+ New procedure</button>
-          </div>
+          {canCreateOrders && (
+            <div className={`${styles.headerActions} ${styles.actionsGap}`}>
+              <button className={styles.actionBtn} onClick={() => setShowProcForm(true)}>+ New procedure</button>
+            </div>
+          )}
           <div className={styles.card}>
             {procedureOrders.length === 0 ? (
-              <div className={styles.state}>No procedures scheduled today.</div>
+              <EmptyState icon="list" title="No procedures scheduled today" hint="Procedure orders for today appear here." />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead><tr><th>Patient</th><th>Procedure</th><th>Consent</th><th>Preparation</th><th>State</th><th></th></tr></thead>
                   <tbody>
-                    {procedureOrders.map((p) => (
-                      <tr key={p.id}>
-                        <td>{p.patientName}</td>
-                        <td>{p.chargeName}</td>
-                        <td className={styles.muted}>
-                          {p.consentSignedName ? `✓ signed by ${p.consentSignedName}` : "Not signed"}
-                          {!p.consentSignedName && (
-                            <>{" "}<button className={styles.smallBtn} onClick={() => setConsentModal({ orderId: p.id, signedName: "" })}>Record consent</button></>
-                          )}
-                        </td>
-                        <td className={styles.muted}>{p.prepNotes ?? "—"}</td>
-                        <td>
-                          {p.status === "ordered" && <span className={styles.pillNeutral}>Not started</span>}
-                          {p.status === "prepped" && <span className={styles.pillVitals}>In progress</span>}
-                          {p.status === "completed" && <span className={styles.pillDone}>Completed{p.billed ? " · billed" : " · pending bill"}</span>}
-                        </td>
-                        <td>
-                          {p.status === "ordered" && <button className={styles.smallBtn} onClick={() => setProcedureStatus(p.id, "prepped")}>Mark prepped</button>}
-                          {(p.status === "ordered" || p.status === "prepped") && (
-                            <>{" "}<button className={styles.smallBtn} onClick={() => setProcedureStatus(p.id, "completed")}>Complete</button></>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {procedureOrders.map((p) => {
+                      const consented = !!p.consentSignedName;
+                      const open = p.status === "ordered" || p.status === "prepped";
+                      return (
+                        <tr key={p.id}>
+                          <td data-label="Patient">{p.patientName}</td>
+                          <td data-label="Procedure">{p.chargeName}</td>
+                          <td data-label="Consent">
+                            {consented
+                              ? <StatusPill tone="ok" label={`Signed · ${p.consentSignedName}${p.consentSignedAt ? ` · ${hhmm(p.consentSignedAt)}` : ""}`} />
+                              : <div className={styles.rowActions}>
+                                  <StatusPill tone="danger" label="Consent missing" icon="alert" />
+                                  {canEditOrders && <button className={styles.smallBtn} onClick={() => { setConsentError(null); setConsentModal({ orderId: p.id, signedName: "" }); }}>Record consent</button>}
+                                </div>}
+                          </td>
+                          <td data-label="Preparation" className={styles.muted}>{p.prepNotes ?? "—"}</td>
+                          <td data-label="State">
+                            {p.status === "ordered" && <StatusPill tone="neutral" label="Not started" />}
+                            {p.status === "prepped" && <StatusPill tone="info" label="In progress" icon="sync" />}
+                            {p.status === "completed" && <StatusPill tone="ok" label={`Completed${p.billed ? " · billed" : " · pending bill"}`} />}
+                          </td>
+                          <td data-label="">
+                            {open && !consented && <StatusPill tone="warn" label="Blocked until consent" icon="clock" />}
+                            {open && consented && canEditOrders && (
+                              <div className={styles.rowActions}>
+                                {p.status === "ordered" && <button className={styles.smallBtn} onClick={() => setProcedureStatus(p.id, "prepped")}>Mark prepped</button>}
+                                <button className={styles.smallBtn} onClick={() => setProcedureStatus(p.id, "completed")}>Complete</button>
+                              </div>
+                            )}
+                            {procRowError[p.id] && <div className={styles.rowError} role="alert">{procRowError[p.id]}</div>}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -738,14 +898,14 @@ function NursingWorklist() {
         </>
       )}
 
-      {tab === "activity" && (
+      {loaded && tab === "activity" && (
         <>
-          <div className={styles.headerActions} style={{ marginBottom: "12px" }}>
+          <div className={`${styles.headerActions} ${styles.actionsGap}`}>
             <button className={styles.smallBtn} onClick={exportActivityCsv} disabled={activity.length === 0}>Export for handover</button>
           </div>
           <div className={styles.card}>
             {activity.length === 0 ? (
-              <div className={styles.state}>Nothing completed yet today.</div>
+              <EmptyState icon="check" title="Nothing completed yet today" hint="Completed vitals, administrations and procedures appear here." />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
@@ -753,9 +913,9 @@ function NursingWorklist() {
                   <tbody>
                     {activity.map((a, i) => (
                       <tr key={i}>
-                        <td>{a.patientName}</td>
-                        <td>{a.activity}</td>
-                        <td className={styles.muted}>{new Date(a.occurredAt).toLocaleTimeString()}</td>
+                        <td data-label="Patient">{a.patientName}</td>
+                        <td data-label="Activity">{a.activity}</td>
+                        <td data-label="Time" className={styles.muted}>{hhmm(a.occurredAt)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -770,10 +930,10 @@ function NursingWorklist() {
 
       {vitalsEntryId && vitalsFlags && (
         <div className={styles.overlay} onClick={closeVitalsModal}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div className={styles.modal} role="dialog" aria-modal="true" aria-label="Vitals saved" onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Vitals saved</h2>
             <div className={styles.formError} role="alert">
-              {vitalsFlags.map((f) => <div key={f}>⚠ {f}</div>)}
+              {vitalsFlags.map((f) => <div key={f} className={styles.flagLine}><Icon name="alert" size={14} />{f}</div>)}
             </div>
             <div className={styles.modalActions}>
               <button type="button" className={styles.submitBtn} onClick={closeVitalsModal}>Done</button>
@@ -782,42 +942,58 @@ function NursingWorklist() {
         </div>
       )}
 
-      {vitalsEntryId && !vitalsFlags && (
-        <div className={styles.overlay} onClick={closeVitalsModal}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitVitals}>
-            <h2 className={styles.modalTitle}>Record vitals</h2>
-            {([
-              ["heightCm", "Height (cm)"], ["weightKg", "Weight (kg)"],
-              ["bpSystolic", "BP systolic"], ["bpDiastolic", "BP diastolic"],
-              ["pulseBpm", "Pulse (bpm)"], ["tempCelsius", "Temp (°C)"], ["spo2Percent", "SpO2 (%)"],
-            ] as const).map(([key, label]) => (
-              <div className={styles.field} key={key}>
-                <label className={styles.label} htmlFor={key}>{label}</label>
-                <input id={key} type="number" step="any" className={styles.input} value={vitalsForm[key]}
-                  onChange={(e) => setVitalsForm((prev) => ({ ...prev, [key]: e.target.value }))} />
-              </div>
-            ))}
+      {/* Overlay click deliberately does NOT close the capture form: a stray tap must not discard
+          half-typed vitals. Cancel is the explicit way out. */}
+      {vitalsEntryId && !vitalsFlags && canCaptureVitals && (
+        <div className={styles.overlay}>
+          <form className={`${styles.modal} ${styles.modalWide}`} role="dialog" aria-modal="true" aria-labelledby="vitalsTitle" noValidate onSubmit={submitVitals}>
+            <h2 className={styles.modalTitle} id="vitalsTitle">Capture vitals{vitalsRow ? ` — ${vitalsRow.patientName}` : ""}</h2>
+            {vitalsAttempted && vErrors.form && <div className={styles.formError} role="alert">{vErrors.form}</div>}
+            <div className={styles.fieldGrid}>
+              {VITAL_FIELDS.map((d) => {
+                const showErr = (vitalsAttempted || vitalsTouched[d.key]) ? vErrors[d.key] : undefined;
+                const warn = showErr ? null : softWarning(d.key, vitalsForm[d.key]);
+                return (
+                  <div className={styles.field} key={d.key}>
+                    <label className={styles.label} htmlFor={d.key}>{d.label} ({d.unit})</label>
+                    <div className={styles.unitInput}>
+                      <input id={d.key} type="number" inputMode="decimal" step={d.step} min={d.min} max={d.max}
+                        className={styles.input} value={vitalsForm[d.key]} aria-invalid={!!showErr}
+                        aria-describedby={showErr || warn ? `${d.key}-msg` : undefined}
+                        onBlur={() => setVitalsTouched((prev) => ({ ...prev, [d.key]: true }))}
+                        onChange={(e) => setVitalsForm((prev) => ({ ...prev, [d.key]: e.target.value }))} />
+                      <span className={styles.unit} aria-hidden="true">{d.unit}</span>
+                    </div>
+                    {showErr && <div className={styles.fieldError} id={`${d.key}-msg`} role="alert"><Icon name="alert" size={12} />{showErr}</div>}
+                    {warn && <div className={styles.fieldWarn} id={`${d.key}-msg`}><Icon name="info" size={12} />{warn}</div>}
+                  </div>
+                );
+              })}
+            </div>
             {vitalsError && <div className={styles.formError} role="alert">{vitalsError}</div>}
             <div className={styles.modalActions}>
+              {vitalsRow && !vitalsRow.priority && (
+                <button type="button" className={`${styles.smallBtn} ${styles.pushStart}`} onClick={() => openUrgentPicker(vitalsRow.id)}>Mark urgent</button>
+              )}
               <button type="button" className={styles.cancelBtn} onClick={closeVitalsModal}>Cancel</button>
-              <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save vitals"}</button>
+              <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save and mark ready"}</button>
             </div>
           </form>
         </div>
       )}
 
-      {showCapturePicker && (
+      {showCapturePicker && canCaptureVitals && (
         <div className={styles.overlay} onClick={() => setShowCapturePicker(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Capture vitals — pick a patient</h2>
             {rows.length === 0 ? (
-              <div className={styles.state}>Nobody is waiting on vitals right now.</div>
+              <EmptyState icon="pulse" title="No one is waiting for vitals" hint="New arrivals appear here as soon as reception checks them in." />
             ) : (
               rows.map((r) => (
-                <div key={r.id} className={styles.pickerRow} onClick={() => { setShowCapturePicker(false); openVitalsModal(r.id); }}>
+                <button type="button" key={r.id} className={styles.pickerRow} onClick={() => { setShowCapturePicker(false); openVitalsModal(r.id); }}>
                   <span className={styles.patientName}>{r.patientName}</span>
                   <span className={styles.muted}>{waitMinutes(r.createdAt)}m waiting</span>
-                </div>
+                </button>
               ))
             )}
             <div className={styles.modalActions}>
@@ -862,7 +1038,7 @@ function NursingWorklist() {
         </div>
       )}
 
-      {showAdminForm && (
+      {showAdminForm && canCreateOrders && (
         <div className={styles.overlay} onClick={() => setShowAdminForm(false)}>
           <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitAdminOrder}>
             <h2 className={styles.modalTitle}>New administration order</h2>
@@ -897,11 +1073,11 @@ function NursingWorklist() {
         </div>
       )}
 
-      {witnessModal && (
+      {witnessModal && canEditOrders && (
         <div className={styles.overlay} onClick={() => setWitnessModal(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Confirm the five rights, then witness</h2>
-            <p className={styles.muted} style={{ marginBottom: "12px" }}>Right patient, right drug, right dose, right route, right time — confirmed before administering.</p>
+            <p className={`${styles.muted} ${styles.modalNote}`}>Right patient, right drug, right dose, right route, right time — confirmed before administering.</p>
             <div className={styles.field}>
               <label className={styles.label}>Witnessed by</label>
               <select className={styles.select} value={witnessModal.witnessId} onChange={(e) => setWitnessModal({ ...witnessModal, witnessId: e.target.value })}>
@@ -917,7 +1093,7 @@ function NursingWorklist() {
         </div>
       )}
 
-      {consentModal && (
+      {consentModal && canEditOrders && (
         <div className={styles.overlay} onClick={() => setConsentModal(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Record consent</h2>
@@ -926,6 +1102,7 @@ function NursingWorklist() {
               <input className={styles.input} value={consentModal.signedName}
                 onChange={(e) => setConsentModal({ ...consentModal, signedName: e.target.value })} />
             </div>
+            {consentError && <div className={styles.formError} role="alert">{consentError}</div>}
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={() => setConsentModal(null)}>Cancel</button>
               <button type="button" className={styles.submitBtn} disabled={!consentModal.signedName.trim()} onClick={submitConsent}>Record consent</button>
@@ -934,7 +1111,7 @@ function NursingWorklist() {
         </div>
       )}
 
-      {refuseModal && (
+      {refuseModal && canEditOrders && (
         <div className={styles.overlay} onClick={() => setRefuseModal(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Refuse administration</h2>
@@ -950,7 +1127,7 @@ function NursingWorklist() {
         </div>
       )}
 
-      {showProcForm && (
+      {showProcForm && canCreateOrders && (
         <div className={styles.overlay} onClick={() => setShowProcForm(false)}>
           <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitProcOrder}>
             <h2 className={styles.modalTitle}>New procedure order</h2>

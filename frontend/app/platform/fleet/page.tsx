@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./fleet.module.css";
+import { usePlatformFetch } from "../platformApi";
+import { ErrorState, Skeleton, EmptyState } from "../../components/ui/StateViews";
+import RoleDenied from "../../components/platform/RoleDenied";
+import { TenantStatusPill } from "../../components/platform/statusPills";
 
 // Matches GET /v1/platform/tenants (api/openapi.yaml has no Platform paths yet — see PlatformAuthController).
 type TenantSummary = {
@@ -27,20 +31,9 @@ type SupportGrant = { active: boolean };
 
 const REGION_NAMES: Record<string, string> = { IN: "India", KSA: "Saudi Arabia" };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
-const STATUS_CLASS: Record<string, string> = {
-  provisioning: styles.pillProvisioning,
-  trialing: styles.pillTrialing,
-  active: styles.pillActive,
-  overdue: styles.pillOverdue,
-  suspended: styles.pillSuspended,
-  offboarding: styles.pillOffboarding,
-  offboarded: styles.pillOffboarded,
-};
-
 export default function FleetPage() {
   const router = useRouter();
+  const fetchAuthed = usePlatformFetch();
   const [rows, setRows] = useState<TenantSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,24 +45,14 @@ export default function FleetPage() {
   const [activeSupportSessions, setActiveSupportSessions] = useState<number | null>(null);
 
   const fetchPage = useCallback(async (cursor: string | null, append: boolean) => {
-    const token = localStorage.getItem("nabd_platform_access_token");
-    if (!token) {
-      router.replace("/platform/login");
-      return;
-    }
-    append ? setLoadingMore(true) : setLoading(true);
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
-      const url = new URL(`${API_BASE}/platform/tenants`);
-      url.searchParams.set("limit", "50");
-      if (cursor) url.searchParams.set("cursor", cursor);
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_platform_access_token");
-        router.replace("/platform/login");
-        return;
-      }
+      const params = new URLSearchParams({ limit: "50" });
+      if (cursor) params.set("cursor", cursor);
+      const res = await fetchAuthed(`/platform/tenants?${params}`);
+      if (!res) return; // session gone, already redirecting to login
       if (res.status === 403) {
         setForbidden(true);
         return;
@@ -88,12 +71,11 @@ export default function FleetPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [router]);
+  }, [fetchAuthed]);
 
   useEffect(() => {
-    fetchPage(null, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void Promise.resolve().then(() => fetchPage(null, false));
+  }, [fetchPage]);
 
   // Separate from fetchPage on purpose: these three feed the KPI grid, not the paginated table,
   // and "Load more" must never re-fetch them. Each is independently optional — a role that can see
@@ -101,27 +83,23 @@ export default function FleetPage() {
   // still gets a working page, just with that one tile/column showing "not available" instead of 403ing.
   useEffect(() => {
     void (async () => {
-      const token = localStorage.getItem("nabd_platform_access_token");
-      if (!token) return;
-      const headers = { Authorization: `Bearer ${token}` };
-
-      const summaryRes = await fetch(`${API_BASE}/platform/tenants/summary`, { headers }).catch(() => null);
+      const summaryRes = await fetchAuthed("/platform/tenants/summary").catch(() => null);
       if (summaryRes?.ok) setSummary(await summaryRes.json());
 
-      const meRes = await fetch(`${API_BASE}/platform/auth/me`, { headers }).catch(() => null);
+      const meRes = await fetchAuthed("/platform/auth/me").catch(() => null);
       if (!meRes?.ok) return;
       const me: OperatorProfile = await meRes.json();
       const allowed = me.permissions.includes("support_access:view");
       setCanRequestSupportAccess(allowed);
       if (!allowed) return;
 
-      const grantsRes = await fetch(`${API_BASE}/platform/support-access/grants`, { headers }).catch(() => null);
+      const grantsRes = await fetchAuthed("/platform/support-access/grants").catch(() => null);
       if (grantsRes?.ok) {
         const grants: SupportGrant[] = await grantsRes.json();
         setActiveSupportSessions(grants.filter((g) => g.active).length);
       }
     })();
-  }, []);
+  }, [fetchAuthed]);
 
   function requestSupportAccessFor(tenantId: string) {
     sessionStorage.setItem("nabd_fleet_support_access_tenant_id", tenantId);
@@ -132,7 +110,7 @@ export default function FleetPage() {
     <main className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Clinic fleet</h1>
+          <h1 className={styles.title}>Clinics</h1>
           <p className={styles.subtitle}>Every clinic provisioned on the platform.</p>
         </div>
         {!loading && !error && !forbidden && <span className={styles.count}>{rows.length} loaded</span>}
@@ -167,13 +145,13 @@ export default function FleetPage() {
 
       <div className={styles.card}>
         {loading ? (
-          <div className={styles.state}>Loading…</div>
+          <Skeleton rows={6} label="Loading clinics" />
         ) : forbidden ? (
-          <div className={styles.state}>Your role doesn&apos;t have access to the clinic fleet.</div>
+          <RoleDenied surface="The clinic fleet" />
         ) : error ? (
-          <div className={styles.errorState}>{error}</div>
+          <ErrorState message={error} onRetry={() => fetchPage(null, false)} />
         ) : rows.length === 0 ? (
-          <div className={styles.state}>No clinics provisioned yet.</div>
+          <EmptyState icon="building" title="No clinics provisioned yet" hint="Clinics appear here once a provisioning job creates them." />
         ) : (
           <>
             <div className={styles.tableWrap}>
@@ -197,7 +175,7 @@ export default function FleetPage() {
                       </td>
                       <td>{t.region}</td>
                       <td>
-                        <span className={`${styles.pill} ${STATUS_CLASS[t.status] ?? ""}`}>{t.status}</span>
+                        <TenantStatusPill status={t.status} />
                       </td>
                       <td className={t.brandName ? undefined : styles.muted}>{t.brandName ?? "—"}</td>
                       <td className={t.ownerEmail ? undefined : styles.muted}>

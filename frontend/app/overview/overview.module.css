@@ -1,13 +1,10 @@
-/* Owner home (DESIGN.md "Owner / Clinic Manager · Home"): KPI row, then a main column and a
-   right-hand column (day close, staff active, quick access). Amber/blue have no design token yet,
-   so they're local to this page. */
+/* Owner home (DESIGN.md "Owner / Clinic Manager · Home"): setup card, KPI row, then a main column and a
+   right-hand column (day close, staff active, quick access). */
 .page {
-  --ov-amber: #f5b544;
-  --ov-amber-tint: rgba(245, 181, 68, 0.12);
-  --ov-info: #6aa8ff;
-  --ov-info-tint: rgba(106, 168, 255, 0.12);
-  --ov-ok: #4ccf8f;
-  --ov-ok-tint: rgba(76, 207, 143, 0.12);
+  /* Chart series (DESIGN §8.22) — not yet in globals.css */
+  --ov-series-1: #b32284;
+  --ov-series-2: #b23908;
+  --ov-series-3: #155bd6;
   min-height: 100%;
   padding: var(--nb-space-32);
   max-width: 1320px;
@@ -135,7 +132,7 @@
 .pct {
   font-size: 12px;
   color: var(--nb-text-tertiary);
-  text-align: right;
+  text-align: end;
   font-variant-numeric: tabular-nums;
 }
 
@@ -164,20 +161,20 @@
 }
 
 .alertDanger { background: var(--nb-danger-tint); border-color: var(--nb-danger-500); }
-.alertWarn { background: var(--ov-amber-tint); border-color: var(--ov-amber); }
-.alertOk { background: var(--ov-ok-tint); border-color: var(--ov-ok); }
-.alertInfo { background: var(--ov-info-tint); border-color: var(--ov-info); }
+.alertWarn { background: var(--nb-warn-tint); border-color: var(--nb-warn-500); }
+.alertOk { background: var(--nb-ok-tint); border-color: var(--nb-ok-500); }
+.alertInfo { background: var(--nb-info-tint); border-color: var(--nb-info-500); }
 
 .dayClose {
   composes: card;
-  background: var(--ov-amber-tint);
-  border-color: var(--ov-amber);
+  background: var(--nb-warn-tint);
+  border-color: var(--nb-warn-500);
 }
 
 .dayCloseClear {
   composes: card;
-  background: var(--ov-ok-tint);
-  border-color: var(--ov-ok);
+  background: var(--nb-ok-tint);
+  border-color: var(--nb-ok-500);
 }
 
 .dayCloseLabel {
@@ -185,13 +182,13 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--ov-amber);
+  color: var(--nb-warn-500);
   margin-bottom: var(--nb-space-8);
 }
 
 .dayCloseLabelClear {
   composes: dayCloseLabel;
-  color: var(--ov-ok);
+  color: var(--nb-ok-500);
 }
 
 .dayCloseText {
@@ -323,3 +320,26 @@
 .inlineLink {
   color: var(--nb-accent-500);
 }
+
+/* Skeleton tiles (OWN-015) */
+.skelKpis { composes: kpis; }
+.skelTile { height: 96px; border-radius: var(--nb-radius-lg); background: var(--nb-surface-2); animation: ovPulse 1.4s ease-in-out infinite; }
+@keyframes ovPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .skelTile { animation: none; } }
+
+/* Activation checklist card (OWN-009 / SCS-03) */
+.setupCard { composes: card; margin-bottom: var(--nb-space-16); border-color: var(--nb-accent-500); }
+.setupHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--nb-space-12); margin-bottom: var(--nb-space-12); }
+.setupTitle { font-size: 16px; font-weight: 600; margin: 0; }
+.setupSub { font-size: 12px; color: var(--nb-text-secondary); margin: 2px 0 0; }
+.hideBtn { min-height: 32px; padding: 0 var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.progressTrack { height: 6px; border-radius: 3px; background: var(--nb-surface-3); overflow: hidden; margin-bottom: var(--nb-space-12); }
+.progressFill { height: 100%; background: var(--nb-accent-gradient); }
+.stepList { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--nb-space-4) var(--nb-space-16); }
+.stepRow { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-8); padding: var(--nb-space-8) 0; border-bottom: 1px solid var(--nb-border-subtle); font-size: 14px; min-width: 0; }
+.stepLink { color: var(--nb-text-primary); text-decoration: none; overflow-wrap: anywhere; }
+.stepLink:hover { color: var(--nb-accent-500); }
+.stepNote { font-size: 12px; color: var(--nb-text-tertiary); margin: var(--nb-space-12) 0 0; }
+@media (max-width: 640px) { .stepList { grid-template-columns: minmax(0, 1fr); } }
+
+.retry { margin-top: var(--nb-space-12); }

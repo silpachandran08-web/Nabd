@@ -5,6 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./setup.module.css";
 import WhatsAppTemplates from "./WhatsAppTemplates";
 import TimezoneSelect from "./TimezoneSelect";
+import PharmacyPanel from "../components/setup/PharmacyPanel";
+import Icon from "../components/ui/Icon";
+import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
+import { can } from "../lib/permissions";
+import { getIdentity } from "../lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -23,12 +28,6 @@ type ImportJob = { id: string; importType: string; fileName: string; status: str
 type ExportJob = { id: string; exportType: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type Licence = { id: string; licenceType: string; holderId: string | null; holderName: string | null; number: string; issuingBody: string | null; expiryDate: string; region: string; status: string };
 type StaffSummary = { id: string; name: string; roleName: string };
-type PharmacySettings = { mode: "external" | "hybrid" | "in_house" };
-type PharmacyItem = { id: string; code: string; name: string; isRx: boolean; hsnCode: string | null; price: number; taxRatePercent: number; stockQty: number; active: boolean };
-type DispensingQueueEntry = {
-  prescriptionId: string; queueEntryId: string; patientName: string; doctorName: string; signedAt: string;
-  items: { drugName: string; dosage: string | null; frequency: string | null }[];
-};
 
 const TABS = [
   { key: "checklist", label: "Checklist" },
@@ -48,6 +47,19 @@ const TABS = [
 ];
 
 const isSetupTab = (t: string | null): t is string => TABS.some((x) => x.key === t);
+
+// Each tab loads only its own data, so one tab's missing grant or failing endpoint can't blank the others.
+const TAB_DATA: Record<string, string[]> = {
+  checklist: ["checklist"], profile: ["profile"], charges: ["charges"], policies: ["policies"], consent: ["consent"],
+  holidays: ["holidays"], shifts: ["shifts", "staff"], subscription: ["subscription"], data: ["importJobs", "exportJobs"],
+  licences: ["licences"], payroll: [],
+};
+
+function csvCell(v: string | number): string {
+  let t = String(v ?? "");
+  if (typeof v === "string" && /^[=+\-@\t\r]/.test(t)) t = `'${t}`; // neutralise spreadsheet formula injection
+  return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+}
 
 // ?tab= deep links (the owner sidebar's Compliance & Audit and Plan & Modules open the Licences and
 // Subscription tabs) read useSearchParams, which needs a Suspense boundary for static prerender.
@@ -85,9 +97,12 @@ function SetupPageInner() {
   const [exportJobs, setExportJobs] = useState<ExportJob[]>([]);
   const [licences, setLicences] = useState<Licence[]>([]);
   const [staff, setStaff] = useState<StaffSummary[]>([]);
-  const [pharmacySettings, setPharmacySettings] = useState<PharmacySettings | null>(null);
-  const [pharmacyItems, setPharmacyItems] = useState<PharmacyItem[]>([]);
-  const [dispensingQueue, setDispensingQueue] = useState<DispensingQueueEntry[]>([]);
+  const [canPharmacy, setCanPharmacy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [payrollMonth, setPayrollMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [payrollError, setPayrollError] = useState<string | null>(null);
+  const [payrollLoading, setPayrollLoading] = useState(false);
+  const [specialtyDraft, setSpecialtyDraft] = useState("");
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("nabd_access_token");
@@ -121,22 +136,20 @@ function SetupPageInner() {
         }
         return res.json();
       };
-      const [cl, pr, ch, po, co, ho, sh, su, ij, ej, li, st, ps, pi, dq] = await Promise.all([
-        fetchJson<ChecklistItem[]>("/setup/checklist"),
-        fetchJson<Profile>("/setup/profile"),
-        fetchJson<Charge[]>("/setup/charges"),
-        fetchJson<Policy[]>("/setup/policies"),
-        fetchJson<ConsentContact>("/setup/consent-contact"),
-        fetchJson<Holiday[]>("/setup/holidays"),
-        fetchJson<Shift[]>("/setup/shifts"),
-        fetchJson<Subscription>("/setup/subscription"),
-        fetchJson<ImportJob[]>("/setup/import-jobs"),
-        fetchJson<ExportJob[]>("/setup/export-jobs"),
-        fetchJson<Licence[]>("/setup/licences"),
-        fetchJson<StaffSummary[]>("/setup/staff"),
-        fetchJson<PharmacySettings>("/pharmacy/settings"),
-        fetchJson<PharmacyItem[]>("/pharmacy/items"),
-        fetchJson<DispensingQueueEntry[]>("/pharmacy/dispensing-queue"),
+      const wanted = new Set(TAB_DATA[tab] ?? []);
+      const [cl, pr, ch, po, co, ho, sh, su, ij, ej, li, st] = await Promise.all([
+        wanted.has("checklist") ? fetchJson<ChecklistItem[]>("/setup/checklist") : null,
+        wanted.has("profile") ? fetchJson<Profile>("/setup/profile") : null,
+        wanted.has("charges") ? fetchJson<Charge[]>("/setup/charges") : null,
+        wanted.has("policies") ? fetchJson<Policy[]>("/setup/policies") : null,
+        wanted.has("consent") ? fetchJson<ConsentContact>("/setup/consent-contact") : null,
+        wanted.has("holidays") ? fetchJson<Holiday[]>("/setup/holidays") : null,
+        wanted.has("shifts") ? fetchJson<Shift[]>("/setup/shifts") : null,
+        wanted.has("subscription") ? fetchJson<Subscription>("/setup/subscription") : null,
+        wanted.has("importJobs") ? fetchJson<ImportJob[]>("/setup/import-jobs") : null,
+        wanted.has("exportJobs") ? fetchJson<ExportJob[]>("/setup/export-jobs") : null,
+        wanted.has("licences") ? fetchJson<Licence[]>("/setup/licences") : null,
+        wanted.has("staff") ? fetchJson<StaffSummary[]>("/setup/staff") : null,
       ]);
       if (cl) setChecklist(cl);
       if (pr) setProfile(pr);
@@ -150,22 +163,22 @@ function SetupPageInner() {
       if (ej) setExportJobs(ej);
       if (li) setLicences(li);
       if (st) setStaff(st);
-      if (ps) setPharmacySettings(ps);
-      if (pi) setPharmacyItems(pi);
-      if (dq) setDispensingQueue(dq);
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, [authedFetch, tab]);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body itself never calls setState
     // synchronously (react-hooks/set-state-in-effect) — loadAll does, immediately.
-    void Promise.resolve().then(loadAll);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void Promise.resolve().then(() => {
+      setCanPharmacy(can("pharmacy:view"));
+      setNotice(null);
+      return loadAll();
+    });
+  }, [loadAll]);
 
   const post = async (path: string, body: unknown) => {
     const res = await authedFetch(path, { method: "POST", body: JSON.stringify(body) });
@@ -206,7 +219,17 @@ function SetupPageInner() {
       whatsappNumber: profile.whatsappNumber,
       specialties: profile.specialties,
     };
-    if (await patch("/setup/profile", body)) loadAll();
+    if (await patch("/setup/profile", body)) {
+      setNotice("Profile saved.");
+      loadAll();
+    }
+  };
+
+  const addSpecialty = () => {
+    const v = specialtyDraft.trim();
+    setSpecialtyDraft("");
+    if (!profile || !v || profile.specialties.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+    setProfile({ ...profile, specialties: [...profile.specialties, v] });
   };
 
   // effectiveFrom has no visible input below — defaulted to today (matching the column's own
@@ -216,7 +239,7 @@ function SetupPageInner() {
     e.preventDefault();
     if (!newCharge.code || !newCharge.name || !newCharge.category || newCharge.baseAmount == null || !newCharge.effectiveFrom) return;
     if (await post("/setup/charges", newCharge)) {
-      setNewCharge({ active: true, displayOrder: 0 });
+      setNewCharge({ active: true, displayOrder: 0, effectiveFrom: new Date().toLocaleDateString("en-CA") });
       loadAll();
     }
   };
@@ -261,9 +284,39 @@ function SetupPageInner() {
     }
   };
 
-  const loadPayroll = async (month: string) => {
-    const res = await authedFetch(`/setup/payroll-export?month=${month}`);
-    if (res?.ok) setPayroll(await res.json());
+  const loadPayroll = useCallback(async (month: string) => {
+    setPayrollLoading(true);
+    setPayrollError(null);
+    try {
+      const res = await authedFetch(`/setup/payroll-export?month=${encodeURIComponent(month)}`);
+      if (!res) return;
+      if (res.ok) setPayroll(await res.json());
+      else {
+        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
+        setPayrollError(p.detail || "Couldn't load the payroll export.");
+      }
+    } catch {
+      setPayrollError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setPayrollLoading(false);
+    }
+  }, [authedFetch]);
+
+  useEffect(() => {
+    if (tab !== "payroll") return;
+    void Promise.resolve().then(() => loadPayroll(payrollMonth));
+  }, [tab, payrollMonth, loadPayroll]);
+
+  const exportPayrollCsv = () => {
+    const head = ["Staff", "Role", "Days", "Hours", "Salary", "Notes"];
+    const lines = [head, ...payroll.map((r) => [r.staffName, r.role, r.days, r.hours, r.salary, r.notes])]
+      .map((row) => row.map(csvCell).join(","));
+    const url = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `payroll-${payrollMonth}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const createImport = async (importType: string) => {
@@ -274,33 +327,22 @@ function SetupPageInner() {
     if (await post("/setup/export-jobs", { exportType })) loadAll();
   };
 
-  const [newLicence, setNewLicence] = useState<Partial<Licence>>({ region: "IN", licenceType: "clinician" });
+  // The API only accepts IN or KSA; default to the clinic's own region (fixed at provisioning).
+  const licenceRegion = getIdentity()?.tenantRegion === "KSA" ? "KSA" : "IN";
+  const [newLicence, setNewLicence] = useState<Partial<Licence>>({ region: licenceRegion, licenceType: "clinician" });
   const addLicence = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLicence.licenceType || !newLicence.number || !newLicence.expiryDate || !newLicence.region) return;
     if (await post("/setup/licences", newLicence)) {
-      setNewLicence({ region: "IN", licenceType: "clinician" });
-      loadAll();
-    }
-  };
-
-  const updatePharmacyMode = async (mode: string) => {
-    if (await patch("/pharmacy/settings", { mode })) loadAll();
-  };
-
-  const [newPharmacyItem, setNewPharmacyItem] = useState<Partial<PharmacyItem>>({ isRx: false, stockQty: 0, taxRatePercent: 0 });
-  const addPharmacyItem = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPharmacyItem.name || newPharmacyItem.price == null) return;
-    if (await post("/pharmacy/items", newPharmacyItem)) {
-      setNewPharmacyItem({ isRx: false, stockQty: 0, taxRatePercent: 0 });
+      setNewLicence({ region: licenceRegion, licenceType: "clinician" });
       loadAll();
     }
   };
 
   const renderContent = () => {
-    if (loading) return <div className={styles.state}>Loading…</div>;
-    if (error) return <div className={styles.errorState}>{error}</div>;
+    if (tab === "pharmacy") return canPharmacy ? <PharmacyPanel authedFetch={authedFetch} /> : null;
+    if (loading && (TAB_DATA[tab]?.length ?? 0) > 0) return <div className={styles.card}><Skeleton rows={5} label="Loading" /></div>;
+    if (error) return <div className={styles.card}><ErrorState message={error} onRetry={loadAll} /></div>;
 
     switch (tab) {
       case "checklist":
@@ -334,9 +376,15 @@ function SetupPageInner() {
             <h2 className={styles.cardTitle}>Clinic profile</h2>
             {profile && (
               <form onSubmit={saveProfile}>
+                {notice && <div className={styles.notice} role="status"><Icon name="check" size={14} /> {notice}</div>}
                 <div className={styles.field}>
-                  <label className={styles.label}>Clinic name</label>
-                  <input className={styles.input} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+                  <label className={styles.label} htmlFor="clinic-name">Clinic name</label>
+                  <input id="clinic-name" className={styles.input} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+                </div>
+                <div className={styles.regionLock}>
+                  <Icon name="shield" size={14} />
+                  <span className={styles.regionNote}>Region is locked irreversibly since provisioning — SYS-14 / NFR-04.</span>
+                  <strong>{profile.region}</strong>
                 </div>
                 <div className={styles.row}>
                   <div className={styles.field}>
@@ -363,8 +411,26 @@ function SetupPageInner() {
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.label}>Specialties (comma separated)</label>
-                  <input className={styles.input} value={profile.specialties.join(", ")} onChange={(e) => setProfile({ ...profile, specialties: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} />
+                  <label className={styles.label} htmlFor="clinic-specialty">Specialties</label>
+                  <div className={styles.chips}>
+                    {profile.specialties.map((sp) => (
+                      <span key={sp} className={styles.chip}>
+                        {sp}
+                        <button type="button" className={styles.chipX} aria-label={`Remove ${sp}`} onClick={() => setProfile({ ...profile, specialties: profile.specialties.filter((x) => x !== sp) })}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className={styles.chipAdd}>
+                    <input
+                      id="clinic-specialty"
+                      className={styles.input}
+                      value={specialtyDraft}
+                      placeholder="Type a specialty and press Enter"
+                      onChange={(e) => setSpecialtyDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSpecialty(); } }}
+                    />
+                    <button type="button" className={styles.smallBtn} onClick={addSpecialty}>Add</button>
+                  </div>
                 </div>
                 <div className={styles.actions}>
                   <button className={styles.btnPrimary} type="submit">Save profile</button>
@@ -393,11 +459,11 @@ function SetupPageInner() {
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Base amount</label>
-                  <input className={styles.input} type="number" value={newCharge.baseAmount ?? ""} onChange={(e) => setNewCharge({ ...newCharge, baseAmount: Number(e.target.value) })} />
+                  <input className={styles.input} type="number" min="0" step="0.01" value={newCharge.baseAmount ?? ""} onChange={(e) => setNewCharge({ ...newCharge, baseAmount: Number(e.target.value) })} />
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label}>Tax rate %</label>
-                  <input className={styles.input} type="number" step="0.01" value={newCharge.taxRatePercent ?? ""} onChange={(e) => setNewCharge({ ...newCharge, taxRatePercent: Number(e.target.value) })} />
+                  <input className={styles.input} type="number" min="0" step="0.01" value={newCharge.taxRatePercent ?? ""} onChange={(e) => setNewCharge({ ...newCharge, taxRatePercent: Number(e.target.value) })} />
                 </div>
               </div>
               <div className={styles.actions}>
@@ -566,29 +632,46 @@ function SetupPageInner() {
         return (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Simple payroll export</h2>
-            <div className={styles.field}>
-              <label className={styles.label}>Month</label>
-              <input className={styles.input} type="month" defaultValue={new Date().toISOString().slice(0, 7)} onChange={(e) => loadPayroll(e.target.value)} />
+            <div className={styles.row}>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="payroll-month">Month</label>
+                <input id="payroll-month" className={styles.input} type="month" value={payrollMonth} onChange={(e) => e.target.value && setPayrollMonth(e.target.value)} />
+              </div>
+              <div className={styles.field}>
+                <span className={styles.label}>&nbsp;</span>
+                {payroll.length > 0 && !payrollError && <button type="button" className={styles.btnPrimary} onClick={exportPayrollCsv}>Export CSV</button>}
+              </div>
             </div>
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>Staff</th><th>Role</th><th>Days</th><th>Hours</th><th>Salary</th><th>Notes</th></tr>
-                </thead>
-                <tbody>
-                  {payroll.map((r) => (
-                    <tr key={r.staffId}>
-                      <td>{r.staffName}</td>
-                      <td>{r.role}</td>
-                      <td>{r.days}</td>
-                      <td>{r.hours}</td>
-                      <td>{r.salary}</td>
-                      <td>{r.notes}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <p className={styles.subtitle} style={{ marginBottom: "var(--nb-space-16)" }}>
+              Statutory contributions (PF/ESI for India, GOSI for KSA) are not calculated here — apply them in your payroll system after export.
+            </p>
+            {payrollLoading ? (
+              <Skeleton rows={4} label="Loading payroll" />
+            ) : payrollError ? (
+              <ErrorState message={payrollError} onRetry={() => loadPayroll(payrollMonth)} />
+            ) : payroll.length === 0 ? (
+              <EmptyState title="No payroll rows for this month" hint="Pick another month, or add shifts so hours can be summed." icon="list" />
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr><th>Staff</th><th>Role</th><th>Days</th><th>Hours</th><th>Salary</th><th>Notes</th></tr>
+                  </thead>
+                  <tbody>
+                    {payroll.map((r) => (
+                      <tr key={r.staffId}>
+                        <td>{r.staffName}</td>
+                        <td>{r.role}</td>
+                        <td>{r.days}</td>
+                        <td>{r.hours}</td>
+                        <td>{r.salary}</td>
+                        <td>{r.notes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         );
       case "subscription":
@@ -700,110 +783,6 @@ function SetupPageInner() {
             </div>
           </div>
         );
-      case "pharmacy":
-        return (
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>Pharmacy</h2>
-            <p className={styles.subtitle}>
-              In External mode every inventory and dispensing screen is completely absent. Hybrid mode
-              (one-tap dispense, simple stock) is the only mode with live item management here — In-house
-              (batch &amp; expiry, controlled-drug register) is a later phase and not built yet.
-            </p>
-            <div className={styles.tabs} style={{ marginBottom: "var(--nb-space-16)" }}>
-              {(["external", "hybrid", "in_house"] as const).map((m) => (
-                <button key={m} className={pharmacySettings?.mode === m ? styles.tabActive : styles.tab} onClick={() => updatePharmacyMode(m)}>
-                  {m === "in_house" ? "In-house" : m[0].toUpperCase() + m.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            {pharmacySettings?.mode !== "hybrid" && (
-              <div className={styles.empty}>
-                {pharmacySettings?.mode === "in_house"
-                  ? "In-house pharmacy (batch & expiry tracking, controlled-drug register) isn't available yet — switch to Hybrid mode to add or edit items. Existing items stay visible below, read-only."
-                  : "Switch to Hybrid mode to add or edit items. Existing items stay visible below, read-only."}
-              </div>
-            )}
-            {pharmacySettings?.mode === "hybrid" && (
-              <form onSubmit={addPharmacyItem}>
-                <div className={styles.row}>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Name</label>
-                    <input className={styles.input} value={newPharmacyItem.name ?? ""} onChange={(e) => setNewPharmacyItem({ ...newPharmacyItem, name: e.target.value })} />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Price</label>
-                    <input className={styles.input} type="number" step="0.01" value={newPharmacyItem.price ?? ""} onChange={(e) => setNewPharmacyItem({ ...newPharmacyItem, price: Number(e.target.value) })} />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Tax rate %</label>
-                    <input className={styles.input} type="number" step="0.01" value={newPharmacyItem.taxRatePercent ?? 0} onChange={(e) => setNewPharmacyItem({ ...newPharmacyItem, taxRatePercent: Number(e.target.value) })} />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Stock qty</label>
-                    <input className={styles.input} type="number" value={newPharmacyItem.stockQty ?? 0} onChange={(e) => setNewPharmacyItem({ ...newPharmacyItem, stockQty: Number(e.target.value) })} />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>HSN code</label>
-                    <input className={styles.input} value={newPharmacyItem.hsnCode ?? ""} onChange={(e) => setNewPharmacyItem({ ...newPharmacyItem, hsnCode: e.target.value })} />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Rx</label>
-                    <select className={styles.select} value={newPharmacyItem.isRx ? "yes" : "no"} onChange={(e) => setNewPharmacyItem({ ...newPharmacyItem, isRx: e.target.value === "yes" })}>
-                      <option value="no">Non-Rx</option>
-                      <option value="yes">Rx</option>
-                    </select>
-                  </div>
-                </div>
-                <div className={styles.actions}>
-                  <button className={styles.btnPrimary} type="submit">Add item</button>
-                </div>
-              </form>
-            )}
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead>
-                  <tr><th>Code</th><th>Name</th><th>Price</th><th>Tax %</th><th>Stock</th><th>Rx</th><th>HSN</th></tr>
-                </thead>
-                <tbody>
-                  {pharmacyItems.map((i) => (
-                    <tr key={i.id}>
-                      <td>{i.code}</td>
-                      <td>{i.name}</td>
-                      <td>{i.price}</td>
-                      <td>{i.taxRatePercent}</td>
-                      <td>{i.stockQty}</td>
-                      <td><span className={i.isRx ? styles.pillActive : styles.pillInactive}>{i.isRx ? "Rx" : "Non-Rx"}</span></td>
-                      <td>{i.hsnCode ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
-            <p className={styles.subtitle}>Signed prescriptions still ahead of checkout — pick up here or on that patient&apos;s billing screen.</p>
-            {dispensingQueue.length === 0 ? (
-              <div className={styles.empty}>Nothing waiting to be dispensed.</div>
-            ) : (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead><tr><th>Patient</th><th>Doctor</th><th>Drugs</th><th>Signed at</th></tr></thead>
-                  <tbody>
-                    {dispensingQueue.map((q) => (
-                      <tr key={q.prescriptionId}>
-                        <td>{q.patientName}</td>
-                        <td>{q.doctorName}</td>
-                        <td>{q.items.map((i) => i.drugName).join(", ")}</td>
-                        <td>{new Date(q.signedAt).toLocaleTimeString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        );
       case "whatsapp":
         return <WhatsAppTemplates authedFetch={authedFetch} />;
       default:
@@ -815,23 +794,14 @@ function SetupPageInner() {
     <main className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Clinic Setup & Administration</h1>
+          <h1 className={styles.title}>Clinic Setup</h1>
           <p className={styles.subtitle}>Configure the clinic before going live.</p>
         </div>
-        <div style={{ display: "flex", gap: "12px" }}>
-          <button className={styles.wizardBtn} onClick={() => router.push("/arrivals")}>Today · Arrivals</button>
-          <button className={styles.wizardBtn} onClick={() => router.push("/nursing")}>Nursing Worklist</button>
-          <button className={styles.wizardBtn} onClick={() => router.push("/patients")}>Patients</button>
-          <button className={styles.wizardBtn} onClick={() => router.push("/consult")}>Consultation Workspace</button>
-          <button className={styles.wizardBtn} onClick={() => router.push("/packages")}>Treatment Packages</button>
-          <button className={styles.wizardBtn} onClick={() => router.push("/staff")}>Staff & Access</button>
-          <button className={styles.wizardBtn} onClick={() => router.push("/reports")}>Owner Insights</button>
-          <button className={styles.wizardBtn} onClick={() => router.push("/setup/wizard")}>Open setup wizard</button>
-        </div>
+        <button className={styles.wizardBtn} onClick={() => router.push("/setup/wizard")}>Open setup wizard</button>
       </div>
 
       <div className={styles.tabs}>
-        {TABS.map((t) => (
+        {TABS.filter((t) => t.key !== "pharmacy" || canPharmacy).map((t) => (
           <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => selectTab(t.key)}>
             {t.label}
           </button>

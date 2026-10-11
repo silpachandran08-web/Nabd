@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
+import { formatMoney } from "../../lib/money";
+import { can } from "../../lib/permissions";
+import { getIdentity } from "../../lib/session";
+import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
 
 // NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
 // /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
@@ -27,6 +31,9 @@ function round2(n: number): number {
 
 export default function OtcCheckoutPage() {
   const router = useRouter();
+  const region = getIdentity()?.tenantRegion;
+  const canCheckout = can("billing:create"); // the API requires billing:create; absent otherwise
+  const canPay = can("billing:edit"); // POST /billing/invoices/{id}/payments requires billing:edit
 
   const [context, setContext] = useState<OtcContext | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -200,9 +207,9 @@ export default function OtcCheckoutPage() {
                   <tr key={li.chargeCode}>
                     <td>{li.chargeName}<div className={styles.muted}>{li.category}</div></td>
                     <td>{li.quantity}</td>
-                    <td>{li.unitPrice.toFixed(2)}</td>
+                    <td>{formatMoney(li.unitPrice, invoice.currency)}</td>
                     <td>{li.taxRatePercent}</td>
-                    <td>{(li.lineTotal ?? li.unitPrice * li.quantity).toFixed(2)}</td>
+                    <td>{formatMoney(li.lineTotal ?? li.unitPrice * li.quantity, invoice.currency)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -212,8 +219,8 @@ export default function OtcCheckoutPage() {
                 <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Payments</h2>
                 {invoice.payments.map((p) => (
                   <div key={p.id} className={styles.paymentRow}>
-                    <span>{p.method}</span>
-                    <span>{invoice.currency} {p.amount.toFixed(2)}</span>
+                    <span>{paymentMethodLabel(p.method, region)}</span>
+                    <span>{formatMoney(p.amount, invoice.currency)}</span>
                   </div>
                 ))}
               </>
@@ -222,21 +229,21 @@ export default function OtcCheckoutPage() {
 
           <div className={styles.card}>
             <div className={styles.totals}>
-              <div className={styles.totalsRow}><span>Subtotal</span><span>{invoice.subtotal.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Discount</span><span>-{invoice.discount.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Tax</span><span>{invoice.tax.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Round-off</span><span>{invoice.roundOff >= 0 ? "+" : ""}{invoice.roundOff.toFixed(2)}</span></div>
-              <div className={styles.totalsRowMain}><span>Total</span><span>{invoice.currency} {invoice.total.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Paid</span><span>{invoice.paid.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Balance due</span><span>{invoice.balanceDue.toFixed(2)}</span></div>
+              <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(invoice.subtotal, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Discount</span><span>−{formatMoney(invoice.discount, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(invoice.tax, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Round-off</span><span>{invoice.roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(invoice.roundOff), invoice.currency)}</span></div>
+              <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(invoice.total, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Paid</span><span>{formatMoney(invoice.paid, invoice.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Balance due</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
             </div>
 
-            {invoice.status !== "paid" && (
+            {invoice.status !== "paid" && canPay && (
               <form onSubmit={submitPayment}>
                 <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Record payment</h2>
                 <div className={styles.paymentMethods}>
-                  {["cash", "card", "upi", "other"].map((m) => (
-                    <button type="button" key={m} className={method === m ? styles.methodBtnActive : styles.methodBtn} onClick={() => setMethod(m)}>{m}</button>
+                  {PAYMENT_METHODS.map((m) => (
+                    <button type="button" key={m} className={method === m ? styles.methodBtnActive : styles.methodBtn} onClick={() => setMethod(m)}>{paymentMethodLabel(m, region)}</button>
                   ))}
                 </div>
                 <input className={styles.discountInput} style={{ width: "100%", marginBottom: "8px" }} type="number" step="0.01"
@@ -265,7 +272,7 @@ export default function OtcCheckoutPage() {
             {visibleCharges.map((c) => (
               <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
                 <span className={styles.chargeName}>{c.name}</span>
-                <span className={styles.chargePrice}>{context.currency} {c.baseAmount.toFixed(2)}</span>
+                <span className={styles.chargePrice}>{formatMoney(c.baseAmount, context.currency)}</span>
               </button>
             ))}
           </div>
@@ -288,9 +295,9 @@ export default function OtcCheckoutPage() {
                           <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity + 1)}>+</button>
                         </span>
                       </td>
-                      <td>{i.unitPrice.toFixed(2)}</td>
+                      <td>{formatMoney(i.unitPrice, context.currency)}</td>
                       <td>{i.taxRatePercent}%</td>
-                      <td>{(i.unitPrice * i.quantity).toFixed(2)}</td>
+                      <td>{formatMoney(i.unitPrice * i.quantity, context.currency)}</td>
                       <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
                     </tr>
                   ))}
@@ -301,20 +308,22 @@ export default function OtcCheckoutPage() {
 
           <div className={styles.card}>
             <div className={styles.totals}>
-              <div className={styles.totalsRow}><span>Subtotal</span><span>{subtotal.toFixed(2)}</span></div>
+              <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(subtotal, context.currency)}</span></div>
               <div className={styles.totalsRow}>
                 <span>Discount</span>
                 <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
               </div>
-              <div className={styles.totalsRow}><span>Tax</span><span>{tax.toFixed(2)}</span></div>
-              <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : ""}{roundOff.toFixed(2)}</span></div>
-              <div className={styles.totalsRowMain}><span>Total</span><span>{context.currency} {previewTotal.toFixed(2)}</span></div>
+              <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
+              <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
+              <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
             </div>
             <p className={styles.muted}>No patient record or queue token is created for a counter sale.</p>
             {createError && <div className={styles.errorState}>{createError}</div>}
-            <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0}>
-              {creating ? "Generating…" : "Checkout"}
-            </button>
+            {canCheckout && (
+              <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0}>
+                {creating ? "Generating…" : "Checkout"}
+              </button>
+            )}
           </div>
         </div>
       )}

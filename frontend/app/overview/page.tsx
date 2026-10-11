@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./overview.module.css";
-import { getIdentity, getPermissions } from "../lib/session";
+import { getIdentity, getPermissions, isOwner } from "../lib/session";
+import StatusPill from "../components/ui/StatusPill";
+import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -22,9 +24,32 @@ type Overview = {
 };
 type Licence = { id: string; licenceType: string; holderName: string | null; number: string; issuingBody: string | null; expiryDate: string };
 type Subscription = { plan: string; status: string };
+// GET /v1/setup/checklist (same rows the Setup > Checklist tab reads).
+type ChecklistItem = { step: string; status: "pending" | "skipped" | "done"; skippedAt: string | null; doneAt: string | null };
 
 const METHOD_LABELS: Record<string, string> = { cash: "Cash", card: "Card", upi: "Digital / UPI", other: "Other" };
-const METHOD_COLORS: Record<string, string> = { cash: "#5fd4d0", card: "#6aa8ff", upi: "#4ccf8f", other: "#b08cff" };
+// Chart series colours (DESIGN §8.22), never the reserved state colours; each row also carries its label.
+const METHOD_COLORS: Record<string, string> = { cash: "var(--ov-series-1)", upi: "var(--ov-series-2)", card: "var(--ov-series-3)", other: "var(--nb-text-tertiary)" };
+
+// Setup tab each checklist step lives on; unknown steps fall back to the Setup home.
+function setupHref(step: string): string {
+  const k = step.toLowerCase();
+  const tab = k.includes("profile") ? "profile"
+    : k.includes("doctor") || k.includes("schedule") || k.includes("shift") ? "shifts"
+    : k.includes("price") || k.includes("charge") ? "charges"
+    : k.includes("whatsapp") ? "whatsapp"
+    : k.includes("consent") ? "consent"
+    : k.includes("pharmacy") ? "pharmacy"
+    : k.includes("depart") ? "departments"
+    : k.includes("licen") ? "licences"
+    : null;
+  return tab ? `/setup?tab=${tab}` : "/setup";
+}
+const stepLabel = (step: string) => {
+  const t = step.replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
+const hideKey = (tenant: string) => `nabd_setup_card_hidden:${tenant}`;
 const LICENCE_TYPE_LABELS: Record<string, string> = { facility: "Facility", clinician: "Clinician" }; // LicenceWriteRequest's two types
 const LICENCE_WARNING_DAYS = 30; // same window SetupRepository.computeLicenceStatus uses
 
@@ -55,6 +80,9 @@ export default function OverviewPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [licences, setLicences] = useState<Licence[] | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistItem[] | null>(null);
+  const [setupHidden, setSetupHidden] = useState(false);
+  const [canSwitchClinic, setCanSwitchClinic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [money, setMoney] = useState<Intl.NumberFormat | null>(null);
@@ -80,13 +108,15 @@ export default function OverviewPage() {
 
   const load = useCallback(async () => {
     setError(null);
+    setForbidden(false);
     try {
       // Licences and plan live under Setup; only asked for when this role can read them.
       const canSetup = getPermissions().includes("setup:view");
-      const [ovRes, licRes, subRes] = await Promise.all([
+      const [ovRes, licRes, subRes, clRes] = await Promise.all([
         authedFetch("/reports/overview"),
         canSetup ? authedFetch("/setup/licences") : Promise.resolve(null),
         canSetup ? authedFetch("/setup/subscription") : Promise.resolve(null),
+        canSetup ? authedFetch("/setup/checklist") : Promise.resolve(null),
       ]);
       if (!ovRes) return;
       if (ovRes.status === 403) {
@@ -100,6 +130,12 @@ export default function OverviewPage() {
       setData(await ovRes.json());
       if (licRes?.ok) setLicences(await licRes.json());
       if (subRes?.ok) setSubscription(await subRes.json());
+      if (clRes?.ok) setChecklist(await clRes.json());
+      try {
+        setSetupHidden(localStorage.getItem(hideKey(getIdentity()?.tenantName ?? "")) === "1");
+        // The owner's workspace picker needs the pending owner token from the owner login.
+        setCanSwitchClinic(isOwner() && !!sessionStorage.getItem("nabd_owner_pending_token"));
+      } catch { /* storage blocked: card simply stays visible */ }
       const region = getIdentity()?.tenantRegion;
       setMoney(new Intl.NumberFormat(region === "KSA" ? "en-SA" : "en-IN", {
         style: "currency", currency: region === "KSA" ? "SAR" : "INR", maximumFractionDigits: 0,
@@ -117,13 +153,20 @@ export default function OverviewPage() {
   }, [load]);
 
   if (forbidden) {
-    return <main className={styles.page}><p className={styles.state}>You don&apos;t have access to the clinic overview.</p></main>;
+    return <main className={styles.page}><EmptyState icon="shield" title="You don't have access to the clinic overview." /></main>;
   }
   if (error) {
-    return <main className={styles.page}><div className={styles.error} role="alert">{error}</div></main>;
+    return <main className={styles.page}><ErrorState message={error} onRetry={() => void load()} /></main>;
   }
   if (!data || !money) {
-    return <main className={styles.page}><p className={styles.state}>Loading…</p></main>;
+    return (
+      <main className={styles.page} aria-busy="true">
+        <div className={styles.skelKpis} aria-hidden="true">
+          {[0, 1, 2, 3].map((i) => <div key={i} className={styles.skelTile} />)}
+        </div>
+        <Skeleton rows={5} label="Loading today's overview" />
+      </main>
+    );
   }
 
   const today = localDate(data.date);
@@ -135,6 +178,14 @@ export default function OverviewPage() {
   // Same rule as Billing & Day Close: only consultations with no bill block the close.
   const blocked = !data.dayClose.closed && data.dayClose.unbilledConsultations > 0;
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const doneSteps = (checklist ?? []).filter((c) => c.status === "done").length;
+  const totalSteps = checklist?.length ?? 0;
+  const setupPct = totalSteps > 0 ? Math.round((doneSteps / totalSteps) * 100) : 0;
+  const showSetup = checklist !== null && totalSteps > 0 && doneSteps < totalSteps && !setupHidden;
+  const hideSetup = () => {
+    setSetupHidden(true);
+    try { localStorage.setItem(hideKey(getIdentity()?.tenantName ?? ""), "1"); } catch { /* per-viewer convenience only */ }
+  };
 
   return (
     <main className={styles.page}>
@@ -144,6 +195,32 @@ export default function OverviewPage() {
         {" · "}{plural(data.visits.total, "visit", "visits")}
         {" · "}{data.activeStaff.length} staff active
       </p>
+
+      {showSetup && checklist && (
+        <section className={styles.setupCard} aria-label="Finish setting up your clinic">
+          <div className={styles.setupHead}>
+            <div>
+              <h2 className={styles.setupTitle}>Finish setting up your clinic</h2>
+              <p className={styles.setupSub}>{doneSteps} of {totalSteps} · {setupPct}%</p>
+            </div>
+            <button type="button" className={styles.hideBtn} onClick={hideSetup}>Hide</button>
+          </div>
+          <div className={styles.progressTrack} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={setupPct} aria-label="Setup progress">
+            <div className={styles.progressFill} style={{ width: `${setupPct}%` }} />
+          </div>
+          <ul className={styles.stepList}>
+            {checklist.map((c) => (
+              <li key={c.step} className={styles.stepRow}>
+                <Link className={styles.stepLink} href={setupHref(c.step)}>{stepLabel(c.step)}</Link>
+                {c.status === "done" ? <StatusPill tone="ok" label="Done" />
+                  : c.status === "skipped" ? <StatusPill tone="neutral" label="Skipped" icon="list" />
+                  : <StatusPill tone="warn" label="To do" />}
+              </li>
+            ))}
+          </ul>
+          <p className={styles.stepNote}>Open a step to finish it. Hiding this card only affects this browser.</p>
+        </section>
+      )}
 
       <div className={styles.kpis}>
         <div className={styles.card}>
@@ -176,7 +253,7 @@ export default function OverviewPage() {
               <p className={styles.empty}>No payments recorded yet today.</p>
             ) : (
               <>
-                <div className={styles.splitBar}>
+                <div className={styles.splitBar} aria-hidden="true">
                   {data.paymentSplit.map((p) => (
                     <div key={p.method} style={{ width: `${(Number(p.amount) / splitTotal) * 100}%`, background: METHOD_COLORS[p.method] ?? METHOD_COLORS.other }} />
                   ))}
@@ -290,6 +367,22 @@ export default function OverviewPage() {
             </div>
             <span className={styles.chevron} aria-hidden="true">›</span>
           </Link>
+          <Link className={styles.quickLink} href="/account">
+            <div>
+              <div className={styles.quickTitle}>Account &amp; Security</div>
+              <div className={styles.quickSub}>Two-step sign-in, active sessions, emergency access</div>
+            </div>
+            <span className={styles.chevron} aria-hidden="true">›</span>
+          </Link>
+          {canSwitchClinic && (
+            <Link className={styles.quickLink} href="/owner/workspaces">
+              <div>
+                <div className={styles.quickTitle}>Switch clinic</div>
+                <div className={styles.quickSub}>Open another clinic or branch you own</div>
+              </div>
+              <span className={styles.chevron} aria-hidden="true">›</span>
+            </Link>
+          )}
         </div>
       </div>
     </main>

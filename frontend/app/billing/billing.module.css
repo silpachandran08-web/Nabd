@@ -1,12 +1,12 @@
-/* Billing & Day Close (DESIGN.md owner screen). Amber/green/red/blue have no design token yet — local here. */
+/* Billing & Day Close (DESIGN.md owner screen). Aliases onto the shared --nb-* status tokens. */
 .page {
-  --bl-amber: #f5b544;
-  --bl-amber-tint: rgba(245, 181, 68, 0.12);
-  --bl-ok: #34d399;
-  --bl-ok-tint: rgba(52, 211, 153, 0.12);
-  --bl-bad: #ff6b6b;
-  --bl-bad-tint: rgba(255, 77, 79, 0.1);
-  --bl-info: #6aa8ff;
+  --bl-amber: var(--nb-warn-500);
+  --bl-amber-tint: var(--nb-warn-tint);
+  --bl-ok: var(--nb-ok-500);
+  --bl-ok-tint: var(--nb-ok-tint);
+  --bl-bad: var(--nb-danger-500);
+  --bl-bad-tint: var(--nb-danger-tint);
+  --bl-info: var(--nb-info-500);
   min-height: 100%;
   padding: var(--nb-space-32);
   max-width: 1400px;
@@ -22,7 +22,7 @@
 .pillBad { composes: pill; color: var(--bl-bad); border-color: var(--bl-bad); background: var(--bl-bad-tint); }
 .pillOk { composes: pill; color: var(--bl-ok); border-color: var(--bl-ok); background: var(--bl-ok-tint); }
 .pillWarn { composes: pill; color: var(--bl-amber); border-color: var(--bl-amber); background: var(--bl-amber-tint); }
-.pillLocked { composes: pill; color: #b48cf0; border-color: #b48cf0; background: rgba(180, 140, 240, 0.12); }
+.pillLocked { composes: pill; color: var(--nb-sync-500); border-color: var(--nb-sync-500); background: var(--nb-sync-tint); }
 
 .btn { height: 40px; padding: 0 var(--nb-space-16); border-radius: 12px; border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .btnPrimary { composes: btn; border: 0; background: var(--nb-accent-gradient); color: var(--nb-on-accent); }
@@ -35,12 +35,12 @@
 .kpiValue { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .kpiSub { font-size: 11px; color: var(--nb-text-secondary); margin-top: 2px; }
 
-.alert { border: 1px solid rgba(255, 77, 79, 0.45); background: var(--bl-bad-tint); border-radius: var(--nb-radius-lg); margin-bottom: var(--nb-space-16); overflow: hidden; }
+.alert { border: 1px solid var(--nb-danger-500); background: var(--bl-bad-tint); border-radius: var(--nb-radius-lg); margin-bottom: var(--nb-space-16); overflow: hidden; }
 .alertHead { padding: var(--nb-space-12) var(--nb-space-16); }
 .alertTitle { color: var(--bl-bad); font-weight: 600; font-size: 15px; }
 .alertText { font-size: 12px; color: var(--nb-text-secondary); margin-top: 2px; }
-.alertRow { display: flex; align-items: center; gap: var(--nb-space-12); padding: var(--nb-space-12) var(--nb-space-16); border-top: 1px solid rgba(255, 77, 79, 0.2); }
-.token { font-size: 12px; font-weight: 700; color: var(--bl-bad); border: 1px solid rgba(255, 77, 79, 0.45); border-radius: 8px; padding: 6px 10px; min-width: 52px; text-align: center; }
+.alertRow { display: flex; align-items: center; gap: var(--nb-space-12); padding: var(--nb-space-12) var(--nb-space-16); border-top: 1px solid var(--nb-danger-tint); }
+.token { font-size: 12px; font-weight: 700; color: var(--bl-bad); border: 1px solid var(--nb-danger-500); border-radius: 8px; padding: 6px 10px; min-width: 52px; text-align: center; }
 .rowMain { flex: 1; min-width: 0; }
 .rowName { font-weight: 600; font-size: 14px; }
 .rowSub { font-size: 12px; color: var(--nb-text-secondary); }

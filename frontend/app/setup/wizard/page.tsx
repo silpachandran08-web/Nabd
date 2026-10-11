@@ -4,12 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./wizard.module.css";
 import TimezoneSelect from "../TimezoneSelect";
+import { can } from "../../lib/permissions";
+import { MODE_DESC, type PharmacyMode } from "../../components/setup/PharmacyPanel";
+import pharmacyStyles from "../../components/setup/pharmacy.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 type Problem = { title: string; detail: string };
 type ChecklistItem = { step: string; status: "pending" | "skipped" | "done" };
 type Profile = { name: string; region: string; timezone: string; taxIdType: string | null; taxId: string | null; whatsappNumber: string | null; specialties: string[] };
+
+// Wizard wording -> backend mode (PHA-013). The full module is behind CAD-11.
+const PHARMACY_CHOICES: { mode: PharmacyMode; title: string; hint: string }[] = [
+  { mode: "external", title: "None", hint: MODE_DESC.external },
+  { mode: "hybrid", title: "Dispense at desk", hint: MODE_DESC.hybrid },
+  { mode: "in_house", title: "Full pharmacy", hint: `${MODE_DESC.in_house} The full module is behind CAD-11.` },
+];
 
 const STEPS = [
   { key: "welcome", title: "Welcome" },
@@ -31,6 +41,9 @@ export default function SetupWizardPage() {
   const [error, setError] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [profile, setProfile] = useState<Profile>({ name: "", region: "IN", timezone: "UTC", taxIdType: null, taxId: null, whatsappNumber: null, specialties: [] });
+
+  const [canPharmacy, setCanPharmacy] = useState(false);
+  const [pharmacyMode, setPharmacyMode] = useState<PharmacyMode | null>(null);
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("nabd_access_token");
@@ -62,6 +75,12 @@ export default function SetupWizardPage() {
       }
       const profileRes = await authedFetch("/setup/profile");
       if (profileRes?.ok) setProfile(await profileRes.json());
+      // Reading the mode needs pharmacy:view, changing it pharmacy:edit; the picker is for editors only.
+      setCanPharmacy(can("pharmacy:edit"));
+      if (can("pharmacy:view")) {
+        const phRes = await authedFetch("/pharmacy/settings");
+        if (phRes?.ok) setPharmacyMode((await phRes.json()).mode);
+      }
       setLoading(false);
     }
     // Deferred to a microtask so the effect body itself never calls setState
@@ -104,6 +123,12 @@ export default function SetupWizardPage() {
       await mark("done");
       next();
     }
+  };
+
+  const savePharmacy = async () => {
+    if (canPharmacy && pharmacyMode && !(await patch("/pharmacy/settings", { mode: pharmacyMode }))) return;
+    await mark("done");
+    next();
   };
 
   const next = () => {
@@ -199,7 +224,23 @@ export default function SetupWizardPage() {
         return (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Pharmacy mode</h2>
-            <p className={styles.text}>Choose the pharmacy operating mode: None / Dispense-at-desk / Full pharmacy. This can be changed later from Clinic Setup.</p>
+            <p className={styles.text}>Choose the pharmacy operating mode. This can be changed later from Clinic Setup.</p>
+            {canPharmacy ? (
+              <div className={pharmacyStyles.choices} role="radiogroup" aria-label="Pharmacy mode">
+                {PHARMACY_CHOICES.map((c) => (
+                  <label key={c.mode} className={`${pharmacyStyles.choice} ${pharmacyMode === c.mode ? pharmacyStyles.choiceOn : ""}`}>
+                    <input type="radio" name="pharmacy-mode" checked={pharmacyMode === c.mode} onChange={() => setPharmacyMode(c.mode)} />
+                    <span>
+                      <span className={pharmacyStyles.choiceTitle}>{c.title}</span>
+                      <br />
+                      <span className={pharmacyStyles.choiceHint}>{c.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.text}>Pharmacy mode is set by a user who can edit pharmacy settings. You can skip this step.</p>
+            )}
           </div>
         );
       case "whatsapp":
@@ -274,6 +315,8 @@ export default function SetupWizardPage() {
           )}
           {currentStep === "profile" || currentStep === "tax" ? (
             <button className={styles.btnPrimary} onClick={saveProfile}>Save & continue</button>
+          ) : currentStep === "pharmacy" ? (
+            <button className={styles.btnPrimary} onClick={savePharmacy}>Save & continue</button>
           ) : currentStep === "go_live" ? (
             <button className={styles.btnPrimary} onClick={finish}>Finish</button>
           ) : (

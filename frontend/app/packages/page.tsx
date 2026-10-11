@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./packages.module.css";
+import { can } from "../lib/permissions";
+import StatusPill from "../components/ui/StatusPill";
+import { ErrorState, Skeleton } from "../components/ui/StateViews";
 
 // Matches GET/POST/PATCH /v1/packages/** (PackageController) — E14 Treatment Packages.
 type PackageItem = { id: string; itemType: string; name: string; quantity: number; unitListPrice: number; taxRatePercent: number; listValue: number };
@@ -56,6 +59,9 @@ const STATUS_PILL: Record<string, string> = {
   on_sale: styles.pillActive, draft: styles.pillWarn, inactive: styles.pillInactive,
   pending: styles.pillWarn, approved: styles.pillDone,
 };
+// Sell-package wizard (wireframe pksell SELLSTEPS).
+const SELL_STEPS = ["Patient", "Package", "Eligibility", "Review", "Payment", "Invoice & card"];
+const PAY_METHODS: [string, string][] = [["cash", "Cash"], ["card", "Card"], ["upi", "UPI"], ["other", "Bank transfer"]];
 const EMPTY_ITEM: ItemDraft = { itemType: "service_session", name: "", quantity: "1", unitListPrice: "0", taxRatePercent: "0" };
 
 function money(n: number): string {
@@ -232,7 +238,13 @@ export default function PackagesPage() {
   }
 
   async function deactivate(id: string) {
-    await authedFetch(`/packages/${id}/deactivate`, { method: "POST" });
+    setActionError(null);
+    const res = await authedFetch(`/packages/${id}/deactivate`, { method: "POST" });
+    if (res && !res.ok) {
+      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't deactivate." }));
+      setActionError(p.detail || "Couldn't deactivate.");
+      return;
+    }
     await loadAll();
   }
 
@@ -241,7 +253,9 @@ export default function PackagesPage() {
   const [sellResults, setSellResults] = useState<PatientOption[]>([]);
   const [sellPatient, setSellPatient] = useState<PatientOption | null>(null);
   const [sellPackageId, setSellPackageId] = useState("");
-  const [sellMethod, setSellMethod] = useState("upi");
+  const [sellMethod, setSellMethod] = useState("");
+  const [sellStep, setSellStep] = useState(0);
+  const [sold, setSold] = useState<InstanceT | null>(null);
   const [sellError, setSellError] = useState<string | null>(null);
   const [selling, setSelling] = useState(false);
 
@@ -257,17 +271,21 @@ export default function PackagesPage() {
   }
 
   function openSellForm() {
-    setSellQuery(""); setSellResults([]); setSellPatient(null); setSellPackageId(""); setSellMethod("upi"); setSellError(null);
+    setSellQuery(""); setSellResults([]); setSellPatient(null); setSellPackageId(""); setSellMethod(""); setSellError(null);
+    setSellStep(0); setSold(null);
     setMode("sell");
   }
 
   const sellPackage = packages.find((p) => p.id === sellPackageId) ?? null;
 
-  async function submitSale(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitSale() {
     setSellError(null);
     if (!sellPatient || !sellPackageId) {
       setSellError("Pick a patient and a package.");
+      return;
+    }
+    if (!sellMethod) {
+      setSellError("Choose a payment method.");
       return;
     }
     setSelling(true);
@@ -283,9 +301,10 @@ export default function PackagesPage() {
         return;
       }
       const instance: InstanceT = await res.json();
-      setMode("list");
+      // The invoice exists from here on: stay in the wizard on the "Invoice & card" step.
+      setSold(instance);
+      setSellStep(5);
       await loadAll();
-      await openInstance(instance.id);
     } finally {
       setSelling(false);
     }
@@ -380,9 +399,15 @@ export default function PackagesPage() {
     await afterInstanceAction(res);
   }
 
-  if (loading) return <main className={styles.page}><div className={styles.state}>Loading…</div></main>;
+  if (loading) return <main className={styles.page}><Skeleton rows={6} label="Loading treatment packages" /></main>;
   if (forbidden) return <main className={styles.page}><div className={styles.state}>Your role doesn&apos;t have access to Treatment Packages.</div></main>;
-  if (error) return <main className={styles.page}><div className={styles.errorState}>{error}</div></main>;
+  if (error) return <main className={styles.page}><ErrorState message={error} onRetry={() => void loadAll()} /></main>;
+
+  // Restricted actions are absent, not disabled (RBAC: Packages create / edit / approve are separate grants).
+  const canCreate = can("packages:create");
+  const canEdit = can("packages:edit");
+  const canApprove = can("packages:approve");
+  const visibleTabs = TABS.filter((t) => t.key === "liability" ? canApprove : t.key === "settings" ? canEdit : true);
 
   const visiblePackages = catalogueFilter === "all" ? packages : packages.filter((p) => p.status === catalogueFilter);
 
@@ -393,14 +418,14 @@ export default function PackagesPage() {
           <h1 className={styles.title}>Treatment Packages</h1>
           <p className={styles.subtitle}>Bundled sessions and combination programmes, sold once, redeemed over time.</p>
         </div>
-        {mode === "list" && !selectedInstanceId && tab === "packages" && (
+        {mode === "list" && !selectedInstanceId && tab === "packages" && (canCreate) && (
           <div className={styles.headerActions}>
             <button className={styles.secondaryBtn} onClick={openSellForm}>Sell package</button>
             <button className={styles.wizardBtn} onClick={openNewForm}>New package</button>
           </div>
         )}
         {(mode !== "list" || selectedInstanceId) && (
-          <button className={styles.backBtn} onClick={() => { setMode("list"); setSelectedInstanceId(null); setSelectedInstance(null); setRefundPreview(null); }}>← Back</button>
+          <button className={styles.backBtn} onClick={() => { setMode("list"); setSelectedInstanceId(null); setSelectedInstance(null); setRefundPreview(null); setSold(null); }}>← Back</button>
         )}
       </div>
 
@@ -409,6 +434,7 @@ export default function PackagesPage() {
       {selectedInstanceId && selectedInstance ? (
         <InstanceDetail
           instance={selectedInstance}
+          canEdit={canEdit} canApprove={canApprove}
           onBook={book}
           onRedeem={redeem}
           extendDate={extendDate} setExtendDate={setExtendDate}
@@ -539,70 +565,164 @@ export default function PackagesPage() {
             <button type="submit" className={styles.btnPrimary} disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Save as draft"}</button>
           </div>
         </form>
-      ) : mode === "sell" ? (
-        <form className={styles.card} onSubmit={submitSale}>
+      ) : mode === "sell" && canCreate ? (
+        <div className={styles.card}>
           <h2 className={styles.cardTitle}>Sell a package</h2>
-          <div className={styles.field}>
-            <label className={styles.label}>Patient</label>
-            {sellPatient ? (
-              <div className={styles.itemLine}>
-                <span>{sellPatient.name} · {sellPatient.phone}</span>
-                <button type="button" className={styles.btnSmall} onClick={() => setSellPatient(null)}>Change</button>
-              </div>
-            ) : (
-              <>
-                <input className={styles.input} placeholder="Search patient by name or phone…" value={sellQuery} onChange={(e) => onSellQueryChange(e.target.value)} />
-                {sellResults.map((p) => (
-                  <button type="button" key={p.id} className={styles.btn} style={{ display: "block", width: "100%", textAlign: "left", marginTop: "4px" }}
-                    onClick={() => { setSellPatient(p); setSellResults([]); }}>{p.name} · {p.phone} · {p.mrn}</button>
-                ))}
-              </>
-            )}
-          </div>
+          <ol className={styles.steps} aria-label="Sell package steps">
+            {SELL_STEPS.map((label, i) => (
+              <li key={label} className={i === sellStep ? styles.stepOn : i < sellStep ? styles.stepDone : styles.step}
+                aria-current={i === sellStep ? "step" : undefined}>
+                <span className={styles.stepNum}>{i < sellStep ? "✓" : i + 1}</span> {label}
+              </li>
+            ))}
+          </ol>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Package</label>
-            <select className={styles.select} value={sellPackageId} onChange={(e) => setSellPackageId(e.target.value)}>
-              <option value="">Select an on-sale package…</option>
+          {sellStep === 0 && (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="sell-patient">Select the patient</label>
+              {sellPatient ? (
+                <div className={styles.itemLine}>
+                  <span>{sellPatient.name} · {sellPatient.phone}</span>
+                  <button type="button" className={styles.btnSmall} onClick={() => setSellPatient(null)}>Change</button>
+                </div>
+              ) : (
+                <>
+                  <input id="sell-patient" className={styles.input} placeholder="Search patient by name or phone…" value={sellQuery} onChange={(e) => onSellQueryChange(e.target.value)} />
+                  {sellResults.map((p) => (
+                    <button type="button" key={p.id} className={`${styles.btn} ${styles.resultBtn}`}
+                      onClick={() => { setSellPatient(p); setSellResults([]); }}>{p.name} · {p.phone} · {p.mrn}</button>
+                  ))}
+                </>
+              )}
+              <p className={styles.muted}>Not registered yet? Register the patient at Arrivals first, then come back.</p>
+            </div>
+          )}
+
+          {sellStep === 1 && (
+            <div className={styles.field}>
+              <div className={styles.label}>Select the package</div>
+              {packages.filter((p) => p.status === "on_sale").length === 0 && <div className={styles.empty}>No packages are on sale.</div>}
               {packages.filter((p) => p.status === "on_sale").map((p) => (
-                <option key={p.id} value={p.id}>{p.name} — {money(p.price)} ({p.validityDays}d)</option>
+                <button type="button" key={p.id} aria-pressed={sellPackageId === p.id}
+                  className={`${sellPackageId === p.id ? styles.btnPrimary : styles.btn} ${styles.resultBtn}`}
+                  onClick={() => setSellPackageId(p.id)}>
+                  {p.name} — {money(p.price)} ({p.validityDays}d){p.saveAmount > 0 ? ` · save ${p.savePercent}%` : ""}
+                </button>
               ))}
-            </select>
-          </div>
+            </div>
+          )}
 
-          {sellPackage && (
+          {sellStep === 2 && sellPackage && sellPatient && (() => {
+            const conflict = instances.find((i) => i.patientId === sellPatient.id && i.packageId === sellPackage.id && (i.status === "active" || i.status === "grace"));
+            const doctorNames = sellPackage.eligibleDoctorIds.map((id) => staff.find((s) => s.id === id)?.name).filter(Boolean);
+            return (
+              <>
+                <div className={styles.flagRow}>
+                  {conflict
+                    ? <StatusPill tone="warn" label="Already has this package" />
+                    : <StatusPill tone="ok" label="Eligibility confirmed" />}
+                  <span className={styles.muted}>
+                    {conflict
+                      ? `${sellPatient.name} already has an ${conflict.status} ${sellPackage.name}. Check this is a deliberate second purchase.`
+                      : `No conflicting active package for ${sellPatient.name}.`}
+                  </span>
+                </div>
+                {sellPackage.doctorLeaveWarning && <div className={styles.bannerWarn}>{sellPackage.doctorLeaveWarning}</div>}
+                <h3 className={styles.cardTitle}>Eligibility rules</h3>
+                <div className={styles.itemLine}><span>Doctors</span><span>{doctorNames.length > 0 ? doctorNames.join(", ") : "All doctors"}</span></div>
+                <div className={styles.itemLine}><span>Validity starts</span><span>{sellPackage.validityStarts === "first_session" ? "First session" : "Purchase date"}</span></div>
+                <div className={styles.itemLine}><span>Validity</span><span>{sellPackage.validityDays} days + {sellPackage.graceDays} days grace</span></div>
+              </>
+            );
+          })()}
+
+          {sellStep === 3 && sellPackage && (
             <>
-              {sellPackage.doctorLeaveWarning && <div className={styles.bannerWarn}>{sellPackage.doctorLeaveWarning}</div>}
-              <div className={styles.card} style={{ margin: "0 0 16px" }}>
-                <div className={styles.itemLine}><span>List value</span><span>{money(sellPackage.listValue)}</span></div>
-                <div className={styles.itemLine}><span>Package price</span><span>{money(sellPackage.price)}</span></div>
-                <div className={styles.itemLine}><span>Patient saves</span><span>{money(sellPackage.saveAmount)} ({sellPackage.savePercent}%)</span></div>
-                {sellPackage.items.map((i) => (
-                  <div key={i.id} className={styles.itemLine}><span>{i.name} × {i.quantity}</span><span>{money(i.listValue)}</span></div>
-                ))}
+              <div className={styles.statGrid}>
+                <div className={styles.statCard}><div className={styles.statLabel}>Separate value</div><div className={styles.statValue}>{money(sellPackage.listValue)}</div></div>
+                <div className={styles.statCard}><div className={styles.statLabel}>Package price</div><div className={styles.statValue}>{money(sellPackage.price)}</div><div className={styles.muted}>{sellPackage.taxInclusive ? "incl. tax" : "excl. tax"}</div></div>
+                <div className={styles.statCard}><div className={styles.statLabel}>Patient saves</div><div className={styles.statValue}>{money(sellPackage.saveAmount)}</div><div className={styles.muted}>{sellPackage.savePercent}%</div></div>
+              </div>
+              <h3 className={styles.cardTitle}>Included items</h3>
+              {sellPackage.items.map((i) => (
+                <div key={i.id} className={styles.itemLine}><span>{i.name} × {i.quantity}</span><span>{money(i.listValue)}</span></div>
+              ))}
+              {sellPatient && <p className={styles.muted}>Selling to {sellPatient.name} · {sellPatient.phone}</p>}
+            </>
+          )}
+
+          {sellStep === 4 && sellPackage && (
+            <>
+              <div className={styles.field}>
+                <div className={styles.label}>Payment method</div>
+                <div className={styles.methodRow}>
+                  {PAY_METHODS.map(([v, label]) => (
+                    <button type="button" key={v} aria-pressed={sellMethod === v} className={sellMethod === v ? styles.btnPrimary : styles.btn} onClick={() => setSellMethod(v)}>
+                      {sellMethod === v ? "✓ " : ""}{label}
+                    </button>
+                  ))}
+                </div>
+                <p className={styles.muted}>Full payment only in this build — scheduled instalments are a later phase.</p>
+              </div>
+              <div className={styles.itemLine}><span>Due now</span><strong>{money(sellPackage.price)}</strong></div>
+              <div className={styles.flagRow}>
+                {sellMethod ? <StatusPill tone="ok" label="Ready to collect" /> : <StatusPill tone="warn" label="Choose a method" />}
               </div>
             </>
           )}
 
-          <div className={styles.field}>
-            <label className={styles.label}>Payment method</label>
-            <div style={{ display: "flex", gap: "8px" }}>
-              {[["cash", "Cash"], ["card", "Card"], ["upi", "UPI"], ["other", "Bank transfer"]].map(([v, label]) => (
-                <button type="button" key={v} className={sellMethod === v ? styles.btnPrimary : styles.btn} onClick={() => setSellMethod(v)}>{label}</button>
-              ))}
-            </div>
-          </div>
+          {sellStep === 5 && sold && (
+            <>
+              <div className={styles.flagRow}>
+                <StatusPill tone="ok" label="Sold — invoice issued" />
+                <span className={styles.muted}>{sold.packageName} · {sold.patientName}</span>
+              </div>
+              <div className={styles.statGrid}>
+                <div className={styles.statCard}><div className={styles.statLabel}>Total</div><div className={styles.statValue}>{money(sold.soldPrice)}</div></div>
+                <div className={styles.statCard}><div className={styles.statLabel}>Tax</div><div className={styles.statValue}>{money(sold.soldTax)}</div></div>
+                <div className={styles.statCard}><div className={styles.statLabel}>Invoice</div><div className={styles.statValue}>{sold.invoiceNumber}</div></div>
+              </div>
+              <h3 className={styles.cardTitle}>Tax allocated by list-price ratio</h3>
+              {(() => {
+                const listTotal = sold.items.reduce((sum, i) => sum + i.unitListPrice * i.quantityTotal, 0);
+                return sold.items.map((i) => (
+                  <div key={i.id} className={styles.itemLine}>
+                    <span>
+                      {i.name}
+                      <span className={styles.muted}> · {listTotal > 0 ? Math.round((i.unitListPrice * i.quantityTotal / listTotal) * 100) : 0}% of list · {i.taxRatePercent > 0 ? `tax ${i.taxRatePercent}%` : "exempt"}</span>
+                    </span>
+                    <span>{money(i.allocatedPrice)}</span>
+                  </div>
+                ));
+              })()}
+              <h3 className={styles.cardTitle}>Digital package card</h3>
+              <p className={styles.muted}>Sending the card on WhatsApp isn&apos;t available yet. Open the active package to see its sessions and ledger.</p>
+            </>
+          )}
 
-          {sellError && <div className={styles.errorState}>{sellError}</div>}
+          {sellError && <div className={styles.errorState} role="alert">{sellError}</div>}
           <div className={styles.actions}>
-            <button type="button" className={styles.btn} onClick={() => setMode("list")}>Cancel</button>
-            <button type="submit" className={styles.btnPrimary} disabled={selling || !sellPatient || !sellPackageId}>{selling ? "Selling…" : "Sell package"}</button>
+            {sellStep < 5 && <button type="button" className={styles.btn} onClick={() => setMode("list")}>Cancel</button>}
+            {sellStep > 0 && sellStep < 5 && <button type="button" className={styles.btn} onClick={() => { setSellError(null); setSellStep(sellStep - 1); }}>Back</button>}
+            {sellStep < 4 && (
+              <button type="button" className={styles.btnPrimary}
+                disabled={(sellStep === 0 && !sellPatient) || (sellStep >= 1 && !sellPackageId)}
+                onClick={() => setSellStep(sellStep + 1)}>Continue</button>
+            )}
+            {sellStep === 4 && (
+              <button type="button" className={styles.btnPrimary} disabled={selling || !sellMethod} onClick={() => void submitSale()}>
+                {selling ? "Selling…" : sellMethod ? "Sell package" : "Choose a payment method"}
+              </button>
+            )}
+            {sellStep === 5 && sold && (
+              <button type="button" className={styles.btnPrimary} onClick={() => { const id = sold.id; setMode("list"); setSold(null); void openInstance(id); }}>Open the active package</button>
+            )}
           </div>
-        </form>
+        </div>
       ) : (
         <>
           <div className={styles.tabs}>
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => setTab(t.key)}>{t.label}</button>
             ))}
           </div>
@@ -638,12 +758,14 @@ export default function PackagesPage() {
                         <div className={styles.salePrice}>{money(p.price)}</div>
                         <div className={styles.muted}>{p.taxInclusive ? "Tax inclusive" : "Tax exclusive"} · {p.validityDays} days + {p.graceDays}d grace</div>
                       </div>
-                      <div className={styles.cardActions}>
-                        <button className={styles.btnSmall} onClick={() => openEditForm(p)}>Edit</button>
-                        {p.status === "on_sale"
-                          ? <button className={styles.btnSmall} onClick={() => deactivate(p.id)}>Deactivate</button>
-                          : <button className={styles.btnSmall} onClick={() => activate(p.id)}>{p.belowFloor ? "Fix the price first" : "Activate"}</button>}
-                      </div>
+                      {canEdit && (
+                        <div className={styles.cardActions}>
+                          <button className={styles.btnSmall} onClick={() => openEditForm(p)}>Edit</button>
+                          {p.status === "on_sale"
+                            ? <button className={styles.btnSmall} onClick={() => deactivate(p.id)}>Deactivate</button>
+                            : <button className={styles.btnSmall} onClick={() => activate(p.id)}>{p.belowFloor ? "Fix the price first" : "Activate"}</button>}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -675,8 +797,8 @@ export default function PackagesPage() {
                       </td>
                       <td>{money(item.allocatedPrice)}</td>
                       <td>
-                        <button className={styles.btnSmall} onClick={() => book(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Book</button>{" "}
-                        <button className={styles.btnSmall} onClick={() => redeem(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Redeem</button>{" "}
+                        {canEdit && <button className={styles.btnSmall} onClick={() => book(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Book</button>}{" "}
+                        {canEdit && <button className={styles.btnSmall} onClick={() => redeem(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Redeem</button>}{" "}
                         <button className={styles.btnSmall} onClick={() => openInstance(inst.id)}>Ledger</button>
                       </td>
                     </tr>
@@ -700,7 +822,7 @@ export default function PackagesPage() {
                       <td>{e.expiresOn}</td>
                       <td>{money(e.valueLeft)}</td>
                       <td><span className={`${styles.pill} ${e.reminderSentForTier ? styles.pillDone : styles.pillWarn}`}>{e.reminderSentForTier ? "Sent" : `${e.alertTier}-day reminder due`}</span></td>
-                      <td><button className={styles.btnSmall} onClick={() => sendReminder(e.instanceId)} disabled={e.reminderSentForTier}>Send reminder</button></td>
+                      <td>{canEdit && <button className={styles.btnSmall} onClick={() => sendReminder(e.instanceId)} disabled={e.reminderSentForTier}>Send reminder</button>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -722,7 +844,7 @@ export default function PackagesPage() {
                       <td>{money(r.refundAmount)}</td>
                       <td>{money(r.amountOwed)}</td>
                       <td><span className={`${styles.pill} ${STATUS_PILL[r.status]}`}>{r.status}{r.creditNoteNumber ? ` · ${r.creditNoteNumber}` : ""}</span></td>
-                      <td>{r.status === "pending" && <button className={styles.btnSmall} onClick={() => approveRefund(r.id)}>Approve</button>}</td>
+                      <td>{canApprove && r.status === "pending" && <button className={styles.btnSmall} onClick={() => approveRefund(r.id)}>Approve</button>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -731,7 +853,7 @@ export default function PackagesPage() {
             </div>
           )}
 
-          {tab === "liability" && liability && (
+          {tab === "liability" && canApprove && liability && (
             <div className={styles.statGrid}>
               <div className={styles.statCard}><div className={styles.statLabel}>Active patient packages</div><div className={styles.statValue}>{liability.activePatientPackages}</div></div>
               <div className={styles.statCard}><div className={styles.statLabel}>Sessions owed</div><div className={styles.statValue}>{liability.sessionsOwed}</div></div>
@@ -744,7 +866,7 @@ export default function PackagesPage() {
             </div>
           )}
 
-          {tab === "settings" && (
+          {tab === "settings" && canEdit && (
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>Pricing rules</h2>
               <div className={styles.field}>
@@ -803,10 +925,11 @@ function InstanceTable({ instances, onOpen, showInvoice }: { instances: Instance
 }
 
 function InstanceDetail({
-  instance, onBook, onRedeem, extendDate, setExtendDate, extendReason, setExtendReason, onExtend,
+  instance, canEdit, canApprove, onBook, onRedeem, extendDate, setExtendDate, extendReason, setExtendReason, onExtend,
   refundPreview, onLoadRefundPreview, refundReason, setRefundReason, onRequestRefund,
 }: {
   instance: InstanceT;
+  canEdit: boolean; canApprove: boolean;
   onBook: (itemId: string) => void;
   onRedeem: (itemId: string) => void;
   extendDate: string; setExtendDate: (v: string) => void;
@@ -838,8 +961,8 @@ function InstanceDetail({
                 <td>{item.quantityConsumed}/{item.quantityTotal}</td>
                 <td>{money(item.allocatedPrice)}</td>
                 <td>
-                  <button className={styles.btnSmall} onClick={() => onBook(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Book next session</button>{" "}
-                  <button className={styles.btnSmall} onClick={() => onRedeem(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Redeem after completed service</button>
+                  {canEdit && <button className={styles.btnSmall} onClick={() => onBook(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Book next session</button>}{" "}
+                  {canEdit && <button className={styles.btnSmall} onClick={() => onRedeem(item.id)} disabled={item.quantityConsumed >= item.quantityTotal}>Redeem after completed service</button>}
                 </td>
               </tr>
             ))}
@@ -859,7 +982,7 @@ function InstanceDetail({
       ))}
 
       <div className={styles.row} style={{ marginTop: "24px" }}>
-        <div className={styles.card} style={{ margin: 0 }}>
+        {canApprove && <div className={styles.card} style={{ margin: 0 }}>
           <h2 className={styles.cardTitle}>Extend (manager approval required)</h2>
           <div className={styles.field}>
             <label className={styles.label}>New expiry date</label>
@@ -870,9 +993,9 @@ function InstanceDetail({
             <input className={styles.input} value={extendReason} onChange={(e) => setExtendReason(e.target.value)} />
           </div>
           <button className={styles.btn} onClick={onExtend}>Extend</button>
-        </div>
+        </div>}
 
-        <div className={styles.card} style={{ margin: 0 }}>
+        {canEdit && <div className={styles.card} style={{ margin: 0 }}>
           <h2 className={styles.cardTitle}>Refund (consumed items valued at full list price)</h2>
           {!refundPreview ? (
             <button className={styles.btn} onClick={onLoadRefundPreview}>Calculate refund</button>
@@ -892,7 +1015,7 @@ function InstanceDetail({
               <button className={styles.btn} onClick={onRequestRefund}>Request refund</button>
             </>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   );

@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./billing.module.css";
+import Dialog from "../../components/ui/Dialog";
+import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
+import RoleDenied, { ReadOnlyNote } from "../../components/platform/RoleDenied";
+import { DiscountStatusPill, TenantStatusPill } from "../../components/platform/statusPills";
+import { formatMoney } from "../../lib/money";
+import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
 
 // Matches GET/POST /v1/platform/billing/* (BillingController) and GET /v1/platform/tenants (FleetController)
 // and GET /v1/platform/plans (PlanController) for the tenant/plan pickers.
@@ -37,33 +43,38 @@ type Discount = {
 };
 type TenantOption = { id: string; name: string; slug: string };
 type PlanOption = { id: string; code: string; name: string; monthlyPriceCents: number; currency: string; active: boolean };
-type Problem = { title: string; detail: string };
+// SSA-08: sales approve discounts up to this share themselves; anything above waits for a super admin.
+const DISCOUNT_CAP_PERCENT = 15;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
-const STATUS_CLASS: Record<string, string> = {
-  provisioning: styles.pillProvisioning,
-  trialing: styles.pillTrialing,
-  active: styles.pillActive,
-  overdue: styles.pillOverdue,
-  suspended: styles.pillSuspended,
-  offboarding: styles.pillOffboarding,
-  offboarded: styles.pillOffboarded,
+// What each lifecycle move does to the clinic and its patients (wireframe pxtActionNote). Reason is
+// mandatory and the move is audited by the server.
+const TRANSITION_EFFECT: Record<string, { title: string; note: string }> = {
+  overdue: {
+    title: "Mark as payment overdue",
+    note: "Starts the 14-day grace period. Everything keeps working; only the owner sees a payment banner. After day 14 the clinic is suspended.",
+  },
+  suspended: {
+    title: "Suspend this clinic",
+    note: "The clinic becomes read-only: no booking and no billing, history stays readable. Patients are told \"The clinic is temporarily offline — please call the clinic\". Reactivating restores full access.",
+  },
+  active: {
+    title: "Reactivate this clinic",
+    note: "Restores full access immediately: booking, billing and patient messaging resume.",
+  },
 };
-
-const DISCOUNT_STATUS_CLASS: Record<string, string> = {
-  auto_approved: styles.pillAuto,
-  approved: styles.pillApproved,
-  pending: styles.pillPending,
-  rejected: styles.pillRejected,
-};
+const MIN_REASON = 10;
 
 export default function BillingPage() {
   const router = useRouter();
+  const access = useOperatorAccess();
   const [tab, setTab] = useState<"subscriptions" | "discounts">("subscriptions");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingMove, setPendingMove] = useState<{ tenantId: string; tenantName: string; toStatus: string } | null>(null);
+  const [moveReason, setMoveReason] = useState("");
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [discounts, setDiscounts] = useState<Discount[]>([]);
@@ -84,30 +95,12 @@ export default function BillingPage() {
   const [discSaving, setDiscSaving] = useState(false);
   const [discError, setDiscError] = useState<string | null>(null);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_platform_access_token");
-      if (!token) {
-        router.replace("/platform/login");
-        return null;
-      }
-      const res = await fetch(`${API_BASE}${path}`, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_platform_access_token");
-        router.replace("/platform/login");
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  const authedFetch = usePlatformFetch();
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setLoadError(null);
     try {
       const subsRes = await authedFetch("/platform/billing/subscriptions?limit=100");
       if (!subsRes) return;
@@ -116,7 +109,7 @@ export default function BillingPage() {
         return;
       }
       if (!subsRes.ok) {
-        setError("Couldn't load billing data. Try again.");
+        setLoadError("Couldn't load billing data. Try again.");
         return;
       }
       setSubscriptions((await subsRes.json()).data);
@@ -137,7 +130,7 @@ export default function BillingPage() {
         setError("Couldn't load plans — check you have Pricing & Packaging access.");
       }
     } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setLoadError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -162,8 +155,7 @@ export default function BillingPage() {
       });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save subscription." }));
-        setSubError(p.detail || "Couldn't save subscription.");
+        setSubError(await problemDetail(res, "Couldn't save subscription."));
         return;
       }
       setSubTenantId("");
@@ -176,11 +168,23 @@ export default function BillingPage() {
     }
   }
 
-  async function transition(tenantId: string, toStatus: string) {
-    const reason = window.prompt(`Reason for moving this clinic to "${toStatus}"?`);
-    if (!reason) return;
+  function askTransition(s: Subscription, toStatus: string) {
+    setMoveReason("");
+    setMoveError(null);
+    setPendingMove({ tenantId: s.tenantId, tenantName: s.tenantName, toStatus });
+  }
+
+  async function confirmTransition(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pendingMove) return;
+    const reason = moveReason.trim();
+    if (reason.length < MIN_REASON) {
+      setMoveError(`Give a reason of at least ${MIN_REASON} characters — it is written to the audit log.`);
+      return;
+    }
+    const { tenantId, toStatus } = pendingMove;
     setBusyId(tenantId);
-    setError(null);
+    setMoveError(null);
     try {
       const res = await authedFetch(`/platform/billing/subscriptions/${tenantId}/transitions`, {
         method: "POST",
@@ -188,10 +192,10 @@ export default function BillingPage() {
       });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't update status." }));
-        setError(p.detail || "Couldn't update status.");
+        setMoveError(await problemDetail(res, "Couldn't update status."));
         return;
       }
+      setPendingMove(null);
       load();
     } finally {
       setBusyId(null);
@@ -214,8 +218,7 @@ export default function BillingPage() {
       });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't request discount." }));
-        setDiscError(p.detail || "Couldn't request discount.");
+        setDiscError(await problemDetail(res, "Couldn't request discount."));
         return;
       }
       setDiscTenantId("");
@@ -234,8 +237,7 @@ export default function BillingPage() {
       const res = await authedFetch(`/platform/billing/discounts/${id}/${action}`, { method: "POST" });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't review discount." }));
-        setError(p.detail || "Couldn't review discount.");
+        setError(await problemDetail(res, "Couldn't review discount."));
         return;
       }
       load();
@@ -243,6 +245,9 @@ export default function BillingPage() {
       setBusyId(null);
     }
   }
+
+  const effect = pendingMove ? TRANSITION_EFFECT[pendingMove.toStatus] : null;
+  const dangerMove = pendingMove?.toStatus === "suspended";
 
   return (
     <main className={styles.page}>
@@ -253,69 +258,75 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {!forbidden && (
+      {!forbidden && !loadError && (
         <div className={styles.tabs}>
           <button className={tab === "subscriptions" ? styles.tabActive : styles.tab} onClick={() => setTab("subscriptions")}>Subscriptions</button>
           <button className={tab === "discounts" ? styles.tabActive : styles.tab} onClick={() => setTab("discounts")}>Discounts</button>
         </div>
       )}
 
+      {!forbidden && access.ready && access.readOnly && <ReadOnlyNote />}
+
       {error && <div className={styles.formError} role="alert">{error}</div>}
 
       {loading ? (
-        <div className={styles.card}><div className={styles.state}>Loading…</div></div>
+        <div className={styles.card}><Skeleton rows={6} label="Loading billing" /></div>
       ) : forbidden ? (
-        <div className={styles.card}><div className={styles.state}>Your role doesn&apos;t have access to billing & revenue.</div></div>
+        <div className={styles.card}><RoleDenied surface="Billing & revenue" /></div>
+      ) : loadError ? (
+        <div className={styles.card}><ErrorState message={loadError} onRetry={load} /></div>
       ) : tab === "subscriptions" ? (
         <>
-          <form className={styles.formCard} onSubmit={submitSubscription}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="subTenant">Clinic</label>
-              <select id="subTenant" className={styles.select} value={subTenantId} onChange={(e) => setSubTenantId(e.target.value)}>
-                <option value="">Select a clinic…</option>
-                {tenants.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>)}
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="subPlan">Plan</label>
-              <select id="subPlan" className={styles.select} value={subPlanId} onChange={(e) => setSubPlanId(e.target.value)}>
-                <option value="">Select a plan…</option>
-                {plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({(p.monthlyPriceCents / 100).toFixed(2)} {p.currency})</option>)}
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="subMrr">MRR</label>
-              <input id="subMrr" type="number" min="0" step="0.01" className={styles.input} value={subMrr} onChange={(e) => setSubMrr(e.target.value)} />
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="subRenewal">Renewal date</label>
-              <input id="subRenewal" type="date" className={styles.input} value={subRenewal} onChange={(e) => setSubRenewal(e.target.value)} />
-            </div>
-            <button className={styles.submit} type="submit" disabled={subSaving}>{subSaving ? "Saving…" : "Set plan"}</button>
-            {plans.length === 0 && (
-              // Full-width so it wraps onto its own line below the field row instead of
-              // stretching the Plan field taller than its siblings — .formCard bottom-aligns
-              // every field (align-items: flex-end), so a taller Plan field used to knock
-              // Clinic/MRR/Renewal date and Set plan out of alignment with it.
-              <p className={styles.planHint}>
-                No plans exist yet.{" "}
-                <button type="button" className={styles.actionBtn} onClick={() => router.push("/platform/plans")}>
-                  Create one in Pricing &amp; Packaging
-                </button>
-              </p>
-            )}
-            {subError && <div className={styles.formError} role="alert">{subError}</div>}
-          </form>
+          {access.canBill && (
+            <form className={styles.formCard} onSubmit={submitSubscription}>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="subTenant">Clinic</label>
+                <select id="subTenant" className={styles.select} value={subTenantId} onChange={(e) => setSubTenantId(e.target.value)}>
+                  <option value="">Select a clinic…</option>
+                  {tenants.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>)}
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="subPlan">Plan</label>
+                <select id="subPlan" className={styles.select} value={subPlanId} onChange={(e) => setSubPlanId(e.target.value)}>
+                  <option value="">Select a plan…</option>
+                  {plans.map((p) => <option key={p.id} value={p.id}>{p.name} ({formatMoney(p.monthlyPriceCents / 100, p.currency)})</option>)}
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="subMrr">MRR</label>
+                <input id="subMrr" type="number" min="0" step="0.01" className={styles.input} value={subMrr} onChange={(e) => setSubMrr(e.target.value)} />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="subRenewal">Renewal date</label>
+                <input id="subRenewal" type="date" className={styles.input} value={subRenewal} onChange={(e) => setSubRenewal(e.target.value)} />
+              </div>
+              <button className={styles.submit} type="submit" disabled={subSaving}>{subSaving ? "Saving…" : "Set plan"}</button>
+              {plans.length === 0 && (
+                // Full-width so it wraps onto its own line below the field row instead of
+                // stretching the Plan field taller than its siblings — .formCard bottom-aligns
+                // every field (align-items: flex-end), so a taller Plan field used to knock
+                // Clinic/MRR/Renewal date and Set plan out of alignment with it.
+                <p className={styles.planHint}>
+                  No plans exist yet.{" "}
+                  <button type="button" className={styles.actionBtn} onClick={() => router.push("/platform/plans")}>
+                    Create one in Pricing &amp; Packaging
+                  </button>
+                </p>
+              )}
+              {subError && <div className={styles.formError} role="alert">{subError}</div>}
+            </form>
+          )}
 
           <div className={styles.card}>
             {subscriptions.length === 0 ? (
-              <div className={styles.state}>No subscriptions yet.</div>
+              <EmptyState icon="receipt" title="No subscriptions yet" hint={access.canBill ? "Pick a clinic and a plan above to start its subscription." : undefined} />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Clinic</th><th>Plan</th><th>MRR</th><th>Renewal</th><th>Seats</th><th>Status</th><th></th>
+                      <th>Clinic</th><th>Plan</th><th>MRR</th><th>Renewal</th><th>Seats</th><th>Status</th>{access.canBill && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -323,27 +334,29 @@ export default function BillingPage() {
                       <tr key={s.id}>
                         <td><span className={styles.tenantName}>{s.tenantName}</span><span className={styles.tenantSlug}>{s.tenantSlug}</span></td>
                         <td>{s.planName}</td>
-                        <td>{(s.mrrCents / 100).toFixed(2)} {s.currency}</td>
+                        <td>{formatMoney(s.mrrCents / 100, s.currency)}</td>
                         <td>{s.renewalDate}</td>
                         <td className={s.seatsUsed > s.seatLimit ? undefined : styles.muted}>{s.seatsUsed} / {s.seatLimit}</td>
-                        <td><span className={`${styles.pill} ${STATUS_CLASS[s.tenantStatus] ?? ""}`}>{s.tenantStatus}</span></td>
-                        <td>
-                          {s.tenantStatus === "active" && (
-                            <>
-                              <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => transition(s.tenantId, "overdue")}>Mark overdue</button>
-                              <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => transition(s.tenantId, "suspended")}>Suspend</button>
-                            </>
-                          )}
-                          {s.tenantStatus === "overdue" && (
-                            <>
-                              <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => transition(s.tenantId, "active")}>Reactivate</button>
-                              <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => transition(s.tenantId, "suspended")}>Suspend</button>
-                            </>
-                          )}
-                          {s.tenantStatus === "suspended" && (
-                            <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => transition(s.tenantId, "active")}>Reactivate</button>
-                          )}
-                        </td>
+                        <td><TenantStatusPill status={s.tenantStatus} /></td>
+                        {access.canBill && (
+                          <td>
+                            {s.tenantStatus === "active" && (
+                              <>
+                                <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => askTransition(s, "overdue")}>Mark overdue</button>
+                                <button className={styles.rejectBtn} disabled={busyId === s.tenantId} onClick={() => askTransition(s, "suspended")}>Suspend</button>
+                              </>
+                            )}
+                            {s.tenantStatus === "overdue" && (
+                              <>
+                                <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => askTransition(s, "active")}>Reactivate</button>
+                                <button className={styles.rejectBtn} disabled={busyId === s.tenantId} onClick={() => askTransition(s, "suspended")}>Suspend</button>
+                              </>
+                            )}
+                            {s.tenantStatus === "suspended" && (
+                              <button className={styles.actionBtn} disabled={busyId === s.tenantId} onClick={() => askTransition(s, "active")}>Reactivate</button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -354,35 +367,40 @@ export default function BillingPage() {
         </>
       ) : (
         <>
-          <form className={styles.formCard} onSubmit={submitDiscount}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="discTenant">Clinic</label>
-              <select id="discTenant" className={styles.select} value={discTenantId} onChange={(e) => setDiscTenantId(e.target.value)}>
-                <option value="">Select a clinic…</option>
-                {tenants.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>)}
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="discPercent">Percent off</label>
-              <input id="discPercent" type="number" min="0.01" max="100" step="0.01" className={styles.input} value={discPercent} onChange={(e) => setDiscPercent(e.target.value)} />
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="discReason">Reason</label>
-              <input id="discReason" className={styles.input} value={discReason} onChange={(e) => setDiscReason(e.target.value)} placeholder="Why does this clinic get a discount?" />
-            </div>
-            <button className={styles.submit} type="submit" disabled={discSaving}>{discSaving ? "Requesting…" : "Request discount"}</button>
-            {discError && <div className={styles.formError} role="alert">{discError}</div>}
-          </form>
+          <p className={styles.capNote}>
+            Sales approve up to {DISCOUNT_CAP_PERCENT}% themselves. Anything above stops here until a super admin approves — and the approval is logged by name.
+          </p>
+          {access.canBill && (
+            <form className={styles.formCard} onSubmit={submitDiscount}>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="discTenant">Clinic</label>
+                <select id="discTenant" className={styles.select} value={discTenantId} onChange={(e) => setDiscTenantId(e.target.value)}>
+                  <option value="">Select a clinic…</option>
+                  {tenants.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>)}
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="discPercent">Percent off</label>
+                <input id="discPercent" type="number" min="0.01" max="100" step="0.01" className={styles.input} value={discPercent} onChange={(e) => setDiscPercent(e.target.value)} />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="discReason">Reason</label>
+                <input id="discReason" className={styles.input} value={discReason} onChange={(e) => setDiscReason(e.target.value)} placeholder="Why does this clinic get a discount?" />
+              </div>
+              <button className={styles.submit} type="submit" disabled={discSaving}>{discSaving ? "Requesting…" : "Request discount"}</button>
+              {discError && <div className={styles.formError} role="alert">{discError}</div>}
+            </form>
+          )}
 
           <div className={styles.card}>
             {discounts.length === 0 ? (
-              <div className={styles.state}>No discount requests yet.</div>
+              <EmptyState icon="receipt" title="No discount requests yet" />
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Clinic</th><th>Requested by</th><th>%</th><th>Reason</th><th>Status</th><th>Reviewed by</th><th></th>
+                      <th>Clinic</th><th>Requested by</th><th>%</th><th>Reason</th><th>Status</th><th>Reviewed by</th>{access.isSuper && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -392,16 +410,18 @@ export default function BillingPage() {
                         <td>{d.requestedByName}</td>
                         <td>{d.percent}%</td>
                         <td>{d.reason}</td>
-                        <td><span className={`${styles.pill} ${DISCOUNT_STATUS_CLASS[d.status] ?? ""}`}>{d.status.replace("_", " ")}</span></td>
+                        <td><DiscountStatusPill status={d.status} /></td>
                         <td className={d.reviewedByName ? undefined : styles.muted}>{d.reviewedByName ?? "—"}</td>
-                        <td>
-                          {d.status === "pending" && (
-                            <>
-                              <button className={styles.actionBtn} disabled={busyId === d.id} onClick={() => reviewDiscount(d.id, "approve")}>Approve</button>
-                              <button className={styles.rejectBtn} disabled={busyId === d.id} onClick={() => reviewDiscount(d.id, "reject")}>Reject</button>
-                            </>
-                          )}
-                        </td>
+                        {access.isSuper && (
+                          <td>
+                            {d.status === "pending" && (
+                              <>
+                                <button className={styles.actionBtn} disabled={busyId === d.id} onClick={() => reviewDiscount(d.id, "approve")}>Approve (super admin)</button>
+                                <button className={styles.rejectBtn} disabled={busyId === d.id} onClick={() => reviewDiscount(d.id, "reject")}>Reject</button>
+                              </>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -410,6 +430,38 @@ export default function BillingPage() {
             )}
           </div>
         </>
+      )}
+
+      {pendingMove && effect && (
+        <Dialog title={`${effect.title} — ${pendingMove.tenantName}`} onClose={() => setPendingMove(null)}>
+          <form className={styles.dialogForm} onSubmit={confirmTransition}>
+            <p className={dangerMove ? styles.effectNoteDanger : styles.effectNote}>{effect.note}</p>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="moveReason">Reason (written to the audit log)</label>
+              <textarea
+                id="moveReason"
+                className={styles.textarea}
+                value={moveReason}
+                onChange={(e) => setMoveReason(e.target.value)}
+                minLength={MIN_REASON}
+                required
+                autoFocus
+              />
+              <span className={styles.hint}>At least {MIN_REASON} characters.</span>
+            </div>
+            {moveError && <div className={styles.formError} role="alert">{moveError}</div>}
+            <div className={styles.dialogActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => setPendingMove(null)}>Cancel</button>
+              <button
+                type="submit"
+                className={dangerMove ? styles.dangerSubmit : styles.submit}
+                disabled={busyId === pendingMove.tenantId || moveReason.trim().length < MIN_REASON}
+              >
+                {busyId === pendingMove.tenantId ? "Saving…" : effect.title}
+              </button>
+            </div>
+          </form>
+        </Dialog>
       )}
     </main>
   );

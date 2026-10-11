@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
+import Icon, { type IconName } from "./components/ui/Icon";
 import { getIdentity, getPermissions, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -17,19 +18,20 @@ const WAITING_STATUSES = ["checked_in", "waiting", "billing_pending", "vitals_pe
 // Reception's items follow DESIGN.md's Receptionist sidebar (Today / Arrivals, Queue &
 // Appointments, Patients, Checkout & Billing, Treatment Packages); its Messages item is left out —
 // there's no inbox page to open yet.
-const NAV_ITEMS: { href: string; label: string; permission: string | null }[] = [
-  { href: "/arrivals", label: "Today / Arrivals", permission: "queue:view" },
-  { href: "/schedule", label: "Queue & Appointments", permission: "queue:view" },
-  { href: "/patients", label: "Patients", permission: "patients:view" },
+const NAV_ITEMS: { href: string; label: string; short: string; icon: IconName; permission: string | null }[] = [
+  { href: "/arrivals", label: "Today / Arrivals", short: "Today", icon: "home", permission: "queue:view" },
+  { href: "/schedule", label: "Queue & Appointments", short: "Queue", icon: "calendar", permission: "queue:view" },
+  { href: "/patients", label: "Patients", short: "Patients", icon: "users", permission: "patients:view" },
   // clinical:edit, not clinical:view — reception can be granted clinical:view (e.g. for billing
   // lookups) without being a clinician; see lib/session.ts's LANDING_RULES for the full reasoning.
-  { href: "/consult", label: "Consultation Workspace", permission: "clinical:edit" },
-  { href: "/billing", label: "Checkout & Billing", permission: "billing:view" },
-  { href: "/packages", label: "Treatment Packages", permission: "packages:view" },
-  { href: "/staff", label: "Staff & Access", permission: "staff:view" },
-  { href: "/reports", label: "Owner Insights", permission: "reports:view" },
-  { href: "/setup", label: "Setup", permission: "setup:view" },
-  { href: "/account", label: "My account", permission: null },
+  { href: "/consult", label: "Consultation Workspace", short: "Consult", icon: "stethoscope", permission: "clinical:edit" },
+  { href: "/pharmacy", label: "Pharmacy", short: "Pharmacy", icon: "syringe", permission: "pharmacy:view" },
+  { href: "/billing", label: "Checkout & Billing", short: "Billing", icon: "receipt", permission: "billing:view" },
+  { href: "/packages", label: "Treatment Packages", short: "Packages", icon: "package", permission: "packages:view" },
+  { href: "/staff", label: "Staff & Access", short: "Staff", icon: "shield", permission: "staff:view" },
+  { href: "/reports", label: "Owner Insights", short: "Insights", icon: "chart", permission: "reports:view" },
+  { href: "/setup", label: "Setup", short: "Setup", icon: "settings", permission: "setup:view" },
+  { href: "/account", label: "My account", short: "Account", icon: "user", permission: null },
 ];
 
 // DESIGN.md's Nurse sidebar, exactly: Today, Waiting Patients, Vitals, Vaccines & Injections,
@@ -38,12 +40,12 @@ const NAV_ITEMS: { href: string; label: string; permission: string | null }[] = 
 // of being a separate page. Vaccines & Injections has no backend at all (filed separately) — it
 // still links through, landing on the page's own honest "not available yet" state rather than
 // being omitted, since the wireframe names it as a destination.
-const NURSING_ITEMS: { label: string; tab?: string; filter?: string }[] = [
-  { label: "Today", filter: "due" },
-  { label: "Waiting Patients", filter: "all" },
-  { label: "Vitals", filter: "recorded" },
-  { label: "Vaccines & Injections", tab: "vaccines" },
-  { label: "Administration History", tab: "administration" },
+const NURSING_ITEMS: { label: string; short: string; icon: IconName; tab?: string; filter?: string }[] = [
+  { label: "Today", short: "Today", icon: "home", filter: "due" },
+  { label: "Waiting Patients", short: "Waiting", icon: "clock", filter: "all" },
+  { label: "Vitals", short: "Vitals", icon: "pulse", filter: "recorded" },
+  { label: "Vaccines & Injections", short: "Vaccines", icon: "syringe", tab: "vaccines" },
+  { label: "Administration History", short: "History", icon: "list", tab: "administration" },
 ];
 
 // DESIGN.md's Owner / Clinic Manager sidebar, in its order. The owner holds every grant (so the
@@ -51,21 +53,21 @@ const NURSING_ITEMS: { label: string; tab?: string; filter?: string }[] = [
 // Owner role never shows a link it can't open. Clinic Operations covers Schedule and its Live
 // Queue tab (Arrivals); Compliance & Audit and Plan & Modules have no page of their own yet, so
 // they open Setup's Licences and Subscription tabs.
-type OwnerItem = { label: string; href: string; permission: string; active: (path: string, tab: string | null) => boolean };
+type OwnerItem = { label: string; short: string; icon: IconName; href: string; permission: string; active: (path: string, tab: string | null) => boolean };
 const OWNER_ITEMS: OwnerItem[] = [
-  { label: "Overview", href: "/overview", permission: "reports:view", active: (p) => p === "/overview" },
-  { label: "Clinic Operations", href: "/schedule", permission: "queue:view",
+  { label: "Overview", short: "Overview", icon: "home", href: "/overview", permission: "reports:view", active: (p) => p === "/overview" },
+  { label: "Clinic Operations", short: "Clinic", icon: "calendar", href: "/schedule", permission: "queue:view",
     active: (p) => p === "/schedule" || p === "/arrivals" },
-  { label: "Billing & Day Close", href: "/billing", permission: "billing:view",
+  { label: "Billing & Day Close", short: "Billing", icon: "receipt", href: "/billing", permission: "billing:view",
     active: (p) => p === "/billing" || p.startsWith("/checkout") },
-  { label: "Treatment Packages", href: "/packages", permission: "packages:view", active: (p) => p.startsWith("/packages") },
-  { label: "Reports", href: "/reports", permission: "reports:view", active: (p) => p.startsWith("/reports") },
-  { label: "Staff & Access", href: "/staff", permission: "staff:view", active: (p) => p.startsWith("/staff") },
-  { label: "Clinic Setup", href: "/setup", permission: "setup:view",
+  { label: "Treatment Packages", short: "Packages", icon: "package", href: "/packages", permission: "packages:view", active: (p) => p.startsWith("/packages") },
+  { label: "Reports", short: "Reports", icon: "chart", href: "/reports", permission: "reports:view", active: (p) => p.startsWith("/reports") },
+  { label: "Staff & Access", short: "Staff", icon: "shield", href: "/staff", permission: "staff:view", active: (p) => p.startsWith("/staff") },
+  { label: "Clinic Setup", short: "Setup", icon: "settings", href: "/setup", permission: "setup:view",
     active: (p, tab) => p.startsWith("/setup") && tab !== "licences" && tab !== "subscription" },
-  { label: "Compliance & Audit", href: "/setup?tab=licences", permission: "setup:view",
+  { label: "Compliance & Audit", short: "Audit", icon: "shield", href: "/setup?tab=licences", permission: "setup:view",
     active: (p, tab) => p === "/setup" && tab === "licences" },
-  { label: "Plan & Modules", href: "/setup?tab=subscription", permission: "setup:view",
+  { label: "Plan & Modules", short: "Plan", icon: "list", href: "/setup?tab=subscription", permission: "setup:view",
     active: (p, tab) => p === "/setup" && tab === "subscription" },
 ];
 
@@ -111,6 +113,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [showMenu, setShowMenu] = useState(false);
   const [sessionLabel, setSessionLabel] = useState("—");
   const [signingOut, setSigningOut] = useState(false);
+  const [showMore, setShowMore] = useState(false);
+  const [showClinic, setShowClinic] = useState(false);
+  const [plan, setPlan] = useState<{ plan: string; status: string } | null>(null);
   const [badges, setBadges] = useState<Record<string, number>>({});
 
   // Hydration-safe: render nothing until this mounts and can read localStorage, then reflect
@@ -145,6 +150,22 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     return () => { cancelled = true; };
   }, [pathname, skip]);
 
+  // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
+  useEffect(() => {
+    if (skip || !isOwner() || !getPermissions().includes("setup:view")) return;
+    const token = localStorage.getItem("nabd_access_token");
+    if (!token) return;
+    let cancelled = false;
+    void fetch(`${API_BASE}/setup/subscription`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (cancelled || !res.ok) return;
+        const body: { plan: string; status: string } = await res.json();
+        if (!cancelled) setPlan({ plan: body.plan, status: body.status });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [skip]);
+
   if (skip || !permissions || permissions.length === 0) return null;
 
   // A Nurse's sidebar is DESIGN.md's own dedicated worklist nav, never the generic module list —
@@ -157,7 +178,25 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   if (items.length === 0 && !showNursing && !showOwner) return null;
   const currentTab = searchParams.get("tab");
 
-  if (collapsed) return <nav className={styles.navCollapsed} aria-hidden="true" />;
+  type Entry = { key: string; href: string; label: string; short: string; icon: IconName; active: boolean; badge?: number };
+  const entries: Entry[] = [
+    ...ownerItems.map((item) => ({
+      key: item.label, href: item.href, label: item.label, short: item.short, icon: item.icon,
+      active: !!pathname && item.active(pathname, currentTab),
+    })),
+    ...(showNursing ? NURSING_ITEMS.map((item) => ({
+      key: item.label, href: nursingHref(item), label: item.label, short: item.short, icon: item.icon,
+      active: isNursingItemActive(item, pathname, searchParams),
+    })) : []),
+    ...items.map((item) => ({
+      key: item.href, href: item.href, label: item.label, short: item.short, icon: item.icon,
+      active: !!pathname && (pathname.startsWith(item.href) || (item.href === "/billing" && pathname.startsWith("/checkout"))),
+      badge: badges[item.href],
+    })),
+  ];
+  // Mobile bottom nav: max 5 destinations (DESIGN.md §4) — 4 items + "More" when there are more.
+  const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;
+  const overflowEntries = entries.length > 5 ? entries.slice(4) : [];
 
   function openMenu() {
     setSessionLabel(formatExpiry(getSessionExpiresAt()));
@@ -167,54 +206,73 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   async function handleSignOut() {
     setSigningOut(true);
     await signOut();
-    router.replace("/login");
+    router.replace(owner ? "/owner/login" : "/login");
   }
 
   return (
-    <nav className={styles.nav}>
+    <>
+    <nav className={`${styles.nav} ${collapsed ? styles.navRail : ""}`} aria-label="Main">
       <div className={styles.brand}>nabd</div>
 
-      {identity && (
+      {identity && (owner ? (
+        <div className={styles.clinicWrap}>
+          <button type="button" className={`${styles.clinicInfo} ${styles.clinicButton}`} aria-haspopup="menu"
+            aria-expanded={showClinic} onClick={() => setShowClinic((v) => !v)}>
+            <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
+            <div className={styles.clinicText}>
+              <div className={styles.clinicName}>{identity.tenantName}</div>
+              {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
+            </div>
+            <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
+          </button>
+          {showClinic && (
+            <>
+              <div className={styles.menuBackdrop} onClick={() => setShowClinic(false)} />
+              <div className={styles.clinicMenu} role="menu">
+                <div className={styles.menuHeader}>Clinic</div>
+                <div className={styles.clinicCurrent} role="menuitem" aria-current="true">
+                  <Icon name="check" size={14} /> {identity.tenantName}
+                </div>
+                <Link href="/owner/workspaces" role="menuitem" className={styles.clinicSwitch} onClick={() => setShowClinic(false)}>
+                  Switch workspace
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
         <div className={styles.clinicInfo}>
-          <div className={styles.clinicIcon}>🏥</div>
+          <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
           <div className={styles.clinicText}>
             <div className={styles.clinicName}>{identity.tenantName}</div>
             {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
           </div>
         </div>
-      )}
+      ))}
 
       <div className={styles.links}>
-        {ownerItems.map((item) => (
+        {entries.map((e) => (
           <Link
-            key={item.label}
-            href={item.href}
-            className={`${styles.link} ${pathname && item.active(pathname, currentTab) ? styles.linkActive : ""}`}
+            key={e.key}
+            href={e.href}
+            title={e.label}
+            aria-current={e.active ? "page" : undefined}
+            className={`${styles.link} ${e.active ? styles.linkActive : ""}`}
           >
-            {item.label}
-          </Link>
-        ))}
-        {showNursing && NURSING_ITEMS.map((item) => (
-          <Link
-            key={item.label}
-            href={nursingHref(item)}
-            className={`${styles.link} ${isNursingItemActive(item, pathname, searchParams) ? styles.linkActive : ""}`}
-          >
-            {item.label}
-          </Link>
-        ))}
-        {items.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`${styles.link} ${pathname?.startsWith(item.href)
-              || (item.href === "/billing" && pathname?.startsWith("/checkout")) ? styles.linkActive : ""}`}
-          >
-            {item.label}
-            {!!badges[item.href] && <span className={styles.badge}>{badges[item.href]}</span>}
+            <Icon name={e.icon} />
+            <span className={styles.linkLabel}>{e.label}</span>
+            <span className={styles.linkShort} aria-hidden="true">{e.short}</span>
+            {!!e.badge && <span className={styles.badge}>{e.badge}</span>}
           </Link>
         ))}
       </div>
+
+      {owner && plan && (
+        <Link href="/setup?tab=subscription" className={styles.planChip}>
+          <span className={styles.planName}>Plan: {plan.plan}</span>
+          <span className={styles.planSub}>{plan.status.replace(/_/g, " ")} · view catalog</span>
+        </Link>
+      )}
 
       {identity && (
         <div className={styles.identityWrap}>
@@ -234,10 +292,21 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                   <span>Active role</span>
                   <span className={styles.menuRowValue}>{identity.roleName}</span>
                 </div>
+                {owner && identity.tenantRegion && (
+                  <div className={styles.menuRow}>
+                    <span>Region</span>
+                    <span className={styles.menuRowValue}>{identity.tenantRegion}</span>
+                  </div>
+                )}
                 <div className={styles.menuRow}>
                   <span>Session</span>
                   <span className={styles.menuRowValue}>{sessionLabel}</span>
                 </div>
+                {owner && (
+                  <Link href="/account" className={styles.menuLink} onClick={() => setShowMenu(false)}>
+                    Account &amp; Security
+                  </Link>
+                )}
                 <button type="button" className={styles.menuSignOut} onClick={handleSignOut} disabled={signingOut}>
                   {signingOut ? "Signing out…" : "Sign out"}
                 </button>
@@ -254,5 +323,41 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         </div>
       )}
     </nav>
+    <nav className={styles.bottomNav} data-bottom-nav aria-label="Main">
+      {primaryEntries.map((e) => (
+        <Link key={e.key} href={e.href} aria-current={e.active ? "page" : undefined}
+          className={`${styles.bottomLink} ${e.active ? styles.bottomLinkActive : ""}`}>
+          <span className={styles.bottomIcon}>
+            <Icon name={e.icon} size={20} />
+            {!!e.badge && <span className={styles.bottomBadge}>{e.badge}</span>}
+          </span>
+          {e.short}
+        </Link>
+      ))}
+      {overflowEntries.length > 0 && (
+        <div className={styles.moreWrap}>
+          {showMore && (
+            <>
+              <div className={styles.menuBackdrop} onClick={() => setShowMore(false)} />
+              <div className={styles.moreMenu} role="menu">
+                {overflowEntries.map((e) => (
+                  <Link key={e.key} href={e.href} role="menuitem" onClick={() => setShowMore(false)}
+                    className={`${styles.moreItem} ${e.active ? styles.linkActive : ""}`}>
+                    <Icon name={e.icon} />
+                    {e.label}
+                  </Link>
+                ))}
+              </div>
+            </>
+          )}
+          <button type="button" className={styles.bottomLink} aria-expanded={showMore} aria-haspopup="menu"
+            onClick={() => setShowMore((v) => !v)}>
+            <span className={styles.bottomIcon}><Icon name="more" size={20} /></span>
+            More
+          </button>
+        </div>
+      )}
+    </nav>
+    </>
   );
 }

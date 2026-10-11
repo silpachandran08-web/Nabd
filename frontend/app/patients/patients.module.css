@@ -63,7 +63,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -138,7 +138,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--nb-scrim);
   display: flex;
   justify-content: flex-end;
   z-index: 10;
@@ -149,15 +149,17 @@
   max-width: 100%;
   height: 100%;
   background: var(--nb-surface-1);
-  border-left: 1px solid var(--nb-border-default);
+  border-inline-start: 1px solid var(--nb-border-default);
   padding: var(--nb-space-24);
   overflow-y: auto;
 }
 
 .drawerHeader {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: var(--nb-space-16);
 }
 
@@ -304,8 +306,8 @@
 }
 
 .dueBanner {
-  background: rgba(240, 175, 69, 0.14);
-  border: 1px solid rgba(240, 175, 69, 0.3);
+  background: var(--nb-warn-tint);
+  border: 1px solid var(--nb-warn-500);
   border-radius: var(--nb-radius-md);
   padding: var(--nb-space-12) var(--nb-space-16);
   margin-bottom: var(--nb-space-16);
@@ -444,14 +446,14 @@
   min-width: 17px;
   padding: 0 5px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nb-surface-3);
   line-height: 16px;
   text-align: center;
 }
 .flash {
-  border: 1px solid rgba(52, 211, 153, 0.4);
-  background: rgba(52, 211, 153, 0.1);
-  color: #34d399;
+  border: 1px solid var(--nb-ok-500);
+  background: var(--nb-ok-tint);
+  color: var(--nb-ok-500);
   border-radius: var(--nb-radius-md);
   padding: var(--nb-space-8) var(--nb-space-12);
   font-size: 13px;
@@ -463,8 +465,8 @@
   height: 34px;
   flex: none;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1fb8c7, #3ee0c4);
-  color: #04231f;
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
   font-size: 11px;
   font-weight: 700;
   display: flex;
@@ -474,21 +476,7 @@
 .avatarMuted { composes: avatar; background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
 .nowrap { white-space: nowrap; }
 .flags { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-.flag {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 9px;
-  border-radius: 999px;
-  border: 1px solid;
-  white-space: nowrap;
-}
-.flagInfo { composes: flag; color: #6aa8ff; border-color: rgba(106, 168, 255, 0.5); background: rgba(106, 168, 255, 0.08); }
-.flagWarn { composes: flag; color: #f5b544; border-color: rgba(245, 181, 68, 0.5); background: rgba(245, 181, 68, 0.08); }
-.flagOrange { composes: flag; color: #ff8a3d; border-color: rgba(255, 138, 61, 0.5); background: rgba(255, 138, 61, 0.08); }
-.flagBad { composes: flag; color: #ff6b6b; border-color: rgba(255, 77, 79, 0.5); background: rgba(255, 77, 79, 0.08); }
-.flagDup { composes: flag; color: #b48cf0; border-color: rgba(180, 140, 240, 0.5); background: rgba(180, 140, 240, 0.08); }
-.flagMuted { composes: flag; color: var(--nb-text-tertiary); border-color: var(--nb-border-default); }
-.actionCell { text-align: right; white-space: nowrap; }
+.actionCell { text-align: end; white-space: nowrap; }
 .checkInBtn {
   height: 38px;
   padding: 0 var(--nb-space-24);
@@ -506,7 +494,7 @@
 .dialogOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--nb-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -542,7 +530,24 @@
   background: var(--nb-surface-2);
   color: var(--nb-text-primary);
   font-family: inherit;
-  text-align: left;
+  text-align: start;
   cursor: pointer;
 }
 .dialogActions { display: flex; justify-content: flex-end; gap: var(--nb-space-8); margin-top: var(--nb-space-12); }
+
+.guardianCell { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8); }
+.toothStatus { font-size: 10px; color: var(--nb-text-secondary); text-align: center; }
+.errorInline { font-size: 13px; color: var(--nb-danger-500); }
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24); }
+}
+@media (max-width: 430px) {
+  .page { padding: var(--nb-space-16); }
+  .header { flex-wrap: wrap; }
+  .filterBar { flex-wrap: nowrap; overflow-x: auto; }
+  .filter, .filterOn { flex: none; }
+  .toothGrid { grid-template-columns: repeat(4, 1fr); }
+  .allergyForm { grid-template-columns: 1fr; }
+  .fieldRow { grid-template-columns: 1fr; }
+}

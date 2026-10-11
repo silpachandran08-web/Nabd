@@ -52,9 +52,9 @@
 
 .stepSkipped {
   composes: step;
-  border-color: #e8b33c;
-  color: #e8b33c;
-  background: rgba(232, 179, 60, 0.14);
+  border-color: var(--nb-warn-500);
+  color: var(--nb-warn-500);
+  background: var(--nb-warn-tint);
 }
 
 .card {

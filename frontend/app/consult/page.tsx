@@ -1,37 +1,51 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Dialog from "../components/ui/Dialog";
+import Icon from "../components/ui/Icon";
+import StatusPill, { type PillTone } from "../components/ui/StatusPill";
+import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
+import { can } from "../lib/permissions";
+import { useClinicalContext } from "../components/consult/clinical";
+import ConflictDialog from "../components/consult/ConflictDialog";
+import DentalDrawer from "../components/consult/DentalDrawer";
+import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
+import FollowUpPanel from "../components/consult/FollowUpPanel";
+import MedicinesList from "../components/consult/MedicinesList";
+import PreConsultDialog from "../components/consult/PreConsultDialog";
+import SafetyStrip from "../components/consult/SafetyStrip";
+import VitalsCard from "../components/consult/VitalsCard";
+import {
+  age, DONE_STATUSES, initials, minutesSince, rxItemLine, statusLabel, WAITING_STATUSES,
+  type PatientDetail, type Prescription, type PrescriptionItem, type Problem, type QueueEntry, type Row,
+} from "../components/consult/shared";
+import p from "../components/consult/consultParts.module.css";
 import styles from "./consult.module.css";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
-type QueueEntry = {
-  id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
-  queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
-};
-type Row = QueueEntry & { patientName: string };
 type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
-type PatientDetail = {
-  id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string;
-  allergies: string[]; chronicConditions: string[]; activePackages: number; outstandingBalance?: number; lastVisitAt: string | null;
-};
 type Note = {
   id: string; queueEntryId: string; patientId: string; doctorId: string;
   subjective: string | null; objective: string | null; assessment: string | null; plan: string | null;
   diagnosis: string | null; status: string; signedAt: string | null; updatedAt: string;
 };
-type NoteDraft = { subjective: string; objective: string; assessment: string; plan: string; diagnosis: string };
-type PrescriptionItem = {
-  id?: string; drugName: string; dosage: string; frequency: string; duration: string;
-  instructions: string; allergyOverrideReason: string; allergyWarning?: string | null;
-  pregnancyWarning?: string | null; controlledSubstanceWarning?: string | null;
-};
-type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
-type Problem = { title: string; detail: string };
+type NoteDraft = NoteFields;
 type FavouriteRxSet = { id: string; doctorId: string | null; name: string; items: PrescriptionItem[] };
 type DoseResult = { weightKg: number; mgPerKg: number; totalDoseMg: number; ruleSource: string };
 type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis: string | null; createdAt: string };
+type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
+type Step = "reason" | "examine" | "assess" | "plan" | "close";
+
+const STEPS: { id: Step; label: string; hint: string }[] = [
+  { id: "reason", label: "Reason", hint: "Read the complaint and vitals" },
+  { id: "examine", label: "Examine", hint: "Record history and findings" },
+  { id: "assess", label: "Assess", hint: "Assessment and diagnosis" },
+  { id: "plan", label: "Plan", hint: "Treatment and prescription" },
+  { id: "close", label: "Close", hint: "Review and hand off" },
+];
 
 const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "", allergyOverrideReason: "" };
 
@@ -47,26 +61,27 @@ function normalizeRxItem(i: PrescriptionItem): PrescriptionItem {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const AUTOSAVE_MS = 10_000;
+const LOCAL_DRAFT_MS = 800;
 const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
-// NB-116: matches CheckoutService.FOLLOW_UP_WINDOW_DAYS — pre-fills the date picker instead of
-// leaving it blank; the doctor can still override it.
-const FOLLOW_UP_WINDOW_DAYS = 14;
-function defaultFollowUpDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + FOLLOW_UP_WINDOW_DAYS);
-  return d.toLocaleDateString("en-CA"); // local YYYY-MM-DD; toISOString() would give the UTC date
-}
-
-const STATUS_CLASS: Record<string, string> = {
-  checked_in: styles.pillWaiting,
-  waiting: styles.pillWaiting,
-  vitals_pending: styles.pillVitals,
-  vitals_done: styles.pillReady,
-  in_consult: styles.pillConsult,
-  checkout_pending: styles.pillDone,
-  completed: styles.pillDone,
-  no_show: styles.pillNoShow,
+const VISIT_LABEL: Record<string, string> = {
+  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
+  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
 };
+
+const STATUS_TONE: Record<string, { tone: PillTone; icon?: Parameters<typeof StatusPill>[0]["icon"] }> = {
+  checked_in: { tone: "neutral", icon: "clock" },
+  waiting: { tone: "neutral", icon: "clock" },
+  vitals_pending: { tone: "warn", icon: "pulse" },
+  vitals_done: { tone: "info", icon: "check" },
+  in_consult: { tone: "sync", icon: "stethoscope" },
+  checkout_pending: { tone: "ok", icon: "receipt" },
+  completed: { tone: "ok", icon: "check" },
+  no_show: { tone: "danger", icon: "x" },
+};
+function StatusBadge({ status }: { status: string }) {
+  const t = STATUS_TONE[status] ?? { tone: "neutral" as PillTone };
+  return <StatusPill tone={t.tone} icon={t.icon} label={statusLabel(status)} />;
+}
 
 function decodeJwt(token: string): Record<string, unknown> {
   try {
@@ -79,13 +94,13 @@ function decodeJwt(token: string): Record<string, unknown> {
   }
 }
 
-function age(dob: string): number {
-  const d = new Date(dob);
-  const now = new Date();
-  let a = now.getFullYear() - d.getFullYear();
-  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) a--;
-  return a;
+function toFields(n: Note): NoteFields {
+  return { subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "", diagnosis: n.diagnosis ?? "" };
 }
+const sameFields = (a: NoteFields, b: NoteFields) => (Object.keys(a) as (keyof NoteFields)[]).every((k) => a[k] === b[k]);
+const isStep = (v: string | null): v is Step => STEPS.some((s) => s.id === v);
+
+type StatusFilter = "all" | "waiting" | "in_consult" | "done";
 
 export default function ConsultPage() {
   const router = useRouter();
@@ -93,16 +108,31 @@ export default function ConsultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+  const [scope, setScope] = useState<"mine" | "all">("mine");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [selfId, setSelfId] = useState("");
+  const [now, setNow] = useState(0);
 
   const [activeEntry, setActiveEntry] = useState<Row | null>(null);
   const [activePatient, setActivePatient] = useState<PatientDetail | null>(null);
+  const [step, setStep] = useState<Step>("reason");
   const [note, setNote] = useState<NoteDraft>(BLANK_DRAFT);
   const [noteStatus, setNoteStatus] = useState<"draft" | "signed">("draft");
   const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [online, setOnline] = useState(true);
+  const [conflict, setConflict] = useState<{ mine: NoteFields; server: NoteFields; serverUpdatedAt: string | null } | null>(null);
+  const [conflictOpen, setConflictOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+  const [closeAck, setCloseAck] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  const [followUpLabel, setFollowUpLabel] = useState<string | null>(null);
+  const [preview, setPreview] = useState<Row | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [showDental, setShowDental] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [transferTargets, setTransferTargets] = useState<TransferTarget[] | null>(null);
   const [transferDepartmentId, setTransferDepartmentId] = useState("");
@@ -113,10 +143,10 @@ export default function ConsultPage() {
   const [rxStatus, setRxStatus] = useState<"draft" | "signed">("draft");
   const [rxSaving, setRxSaving] = useState(false);
   const [rxError, setRxError] = useState<string | null>(null);
-  const [followUpDate, setFollowUpDate] = useState("");
-  const [followUpBusy, setFollowUpBusy] = useState(false);
-  const [followUpMessage, setFollowUpMessage] = useState<string | null>(null);
-  const [previousMeds, setPreviousMeds] = useState<Prescription[]>([]);
+  const [showSignConfirm, setShowSignConfirm] = useState(false);
+  const [signAck, setSignAck] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [signError, setSignError] = useState<string | null>(null);
   const [favouriteSets, setFavouriteSets] = useState<FavouriteRxSet[]>([]);
   const [newSetName, setNewSetName] = useState("");
   const [doseMgPerKg, setDoseMgPerKg] = useState("");
@@ -127,12 +157,20 @@ export default function ConsultPage() {
   const [amendReason, setAmendReason] = useState("");
   const [amendDiagnosis, setAmendDiagnosis] = useState("");
   const [amending, setAmending] = useState(false);
+
   const dirtyRef = useRef(dirty);
   const noteRef = useRef(note);
+  const conflictRef = useRef(conflict);
+  const baseUpdatedRef = useRef<string | null>(null); // server note's updatedAt when we last synced
+  const needsServerCheckRef = useRef(false); // compare with the server copy before the next PATCH
+  const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openSeqRef = useRef(0);
+  const deepLinkRef = useRef<{ entry: string; step: Step | null } | null>(null);
   useEffect(() => {
     dirtyRef.current = dirty;
     noteRef.current = note;
-  }, [dirty, note]);
+    conflictRef.current = conflict;
+  }, [dirty, note, conflict]);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -155,17 +193,21 @@ export default function ConsultPage() {
     [router]
   );
 
-  const load = useCallback(async () => {
+  const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, activeEntry?.patientId ?? null, activeEntry?.id ?? null);
+
+  const load = useCallback(async (which: "mine" | "all" = "mine") => {
     setLoading(true);
     setError(null);
+    setForbidden(false);
     const token = localStorage.getItem("nabd_access_token");
     if (!token) {
       router.replace("/login");
       return;
     }
     const self = String(decodeJwt(token).sub ?? "");
+    setSelfId(self);
     try {
-      const res = await authedFetch(`/queue?doctorId=${self}`);
+      const res = await authedFetch(which === "mine" ? `/queue?doctorId=${self}` : "/queue");
       if (!res) return;
       if (res.status === 403) {
         setForbidden(true);
@@ -176,38 +218,133 @@ export default function ConsultPage() {
         return;
       }
       const entries: QueueEntry[] = await res.json();
-      const withNames = await Promise.all(entries.map(async (e) => {
-        const pRes = await authedFetch(`/patients/${e.patientId}`);
-        const name = pRes?.ok ? (await pRes.json()).name : "Unknown patient";
-        return { ...e, patientName: name };
+      // One patient request per distinct patient (not per row): the detail carries the allergy,
+      // chronic-condition and package flags shown in the list. There is no batch endpoint yet.
+      const byPatient = new Map<string, Promise<PatientDetail | null>>();
+      for (const e of entries) {
+        if (!byPatient.has(e.patientId)) {
+          byPatient.set(e.patientId, authedFetch(`/patients/${e.patientId}`).then(async (r) => (r?.ok ? ((await r.json()) as PatientDetail) : null)).catch(() => null));
+        }
+      }
+      const withNames = await Promise.all(entries.map(async (e): Promise<Row> => {
+        const patient = (await byPatient.get(e.patientId)) ?? null;
+        return { ...e, patientName: patient?.name ?? "Unknown patient", patient };
       }));
       setRows(withNames);
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
+      setNow(Date.now());
     }
   }, [authedFetch, router]);
 
   useEffect(() => {
-    void Promise.resolve().then(load);
+    void Promise.resolve().then(() => {
+      const q = new URLSearchParams(window.location.search);
+      const entry = q.get("entry");
+      if (entry) deepLinkRef.current = { entry, step: isStep(q.get("step")) ? (q.get("step") as Step) : null };
+      setOnline(navigator.onLine);
+      return load("mine");
+    });
   }, [load]);
 
+  // Wait times re-render once a minute.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const on = () => { setOnline(true); needsServerCheckRef.current = true; };
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+
+  function changeScope(next: "mine" | "all") {
+    setScope(next);
+    void load(next);
+  }
+
+  // Keep the visit and step in the URL so My Day (and a reload) can deep-link into the workspace.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (activeEntry) {
+      url.searchParams.set("entry", activeEntry.id);
+      url.searchParams.set("step", step);
+    } else {
+      url.searchParams.delete("entry");
+      url.searchParams.delete("step");
+    }
+    window.history.replaceState(null, "", url);
+  }, [activeEntry, step]);
+
+  // ---- note persistence ---------------------------------------------------------------------
+
+  function scheduleLocalDraft(entryId: string) {
+    if (localTimerRef.current) clearTimeout(localTimerRef.current);
+    localTimerRef.current = setTimeout(() => {
+      if (!dirtyRef.current) return;
+      void writeDraft({ entryId, note: noteRef.current, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
+    }, LOCAL_DRAFT_MS);
+  }
+
   async function saveNote(entryId: string) {
-    setSaving(true);
+    if (conflictRef.current) return null; // never overwrite while a conflict is unresolved
+    const sent = noteRef.current;
+    if (!navigator.onLine) {
+      setSaveState("offline");
+      await writeDraft({ entryId, note: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
+      needsServerCheckRef.current = true;
+      return null;
+    }
+    setSaveState("saving");
     try {
-      const res = await authedFetch(`/clinical/notes/${entryId}`, { method: "PATCH", body: JSON.stringify(noteRef.current) });
+      if (needsServerCheckRef.current) {
+        const g = await authedFetch(`/clinical/notes/${entryId}`);
+        if (g?.status === 200) {
+          const server: Note = await g.json();
+          if (server.updatedAt !== baseUpdatedRef.current && !sameFields(toFields(server), sent)) {
+            setConflict({ mine: sent, server: toFields(server), serverUpdatedAt: server.updatedAt });
+            setConflictOpen(true);
+            setSaveState("error");
+            return null;
+          }
+          baseUpdatedRef.current = server.updatedAt;
+        } else if (g && g.status !== 404) {
+          setSaveState("error");
+          return g;
+        }
+        needsServerCheckRef.current = false;
+      }
+      const res = await authedFetch(`/clinical/notes/${entryId}`, { method: "PATCH", body: JSON.stringify(sent) });
       if (res?.ok) {
-        setDirty(false);
+        if (noteRef.current === sent) setDirty(false);
         setLastSavedAt(new Date());
+        setSaveState("saved");
+        try {
+          const saved: Partial<Note> = await res.clone().json();
+          if (typeof saved.updatedAt === "string") baseUpdatedRef.current = saved.updatedAt;
+        } catch { /* body not needed */ }
+        if (noteRef.current === sent) void deleteDraft(entryId);
+      } else {
+        setSaveState("error");
+        needsServerCheckRef.current = true;
+        await writeDraft({ entryId, note: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
       }
       return res;
-    } finally {
-      setSaving(false);
+    } catch {
+      setSaveState(navigator.onLine ? "error" : "offline");
+      needsServerCheckRef.current = true;
+      await writeDraft({ entryId, note: sent, baseUpdatedAt: baseUpdatedRef.current, savedAt: new Date().toISOString() });
+      return null;
     }
   }
 
-  // Autosave every 10s while there are unsaved changes — cleared when the shell closes.
+  // Autosave every 10s while there are unsaved changes — cleared when the shell closes. A failed
+  // save keeps `dirty` set, so this retries on the next tick.
   useEffect(() => {
     if (!activeEntry) return;
     const id = setInterval(() => {
@@ -217,27 +354,73 @@ export default function ConsultPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEntry?.id]);
 
-  async function startConsult(row: Row) {
-    const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
-    if (!res?.ok) return;
-    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: "in_consult" } : r)));
-    openConsult({ ...row, status: "in_consult" });
+  // On reconnect, retry straight away (the server copy is compared first).
+  useEffect(() => {
+    if (online && activeEntry && dirtyRef.current) void saveNote(activeEntry.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online]);
+
+  // ---- opening visits -----------------------------------------------------------------------
+
+  function openRow(row: Row) {
+    setPreviewError(null);
+    if (row.status === "in_consult" && row.doctorId === selfId) void openConsult(row);
+    else setPreview(row);
   }
 
-  async function openConsult(row: Row) {
+  async function startConsult(row: Row) {
+    setStarting(true);
+    setPreviewError(null);
+    try {
+      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
+      if (!res) return;
+      if (!res.ok) {
+        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't start the consultation." }));
+        setPreviewError(pr.detail || "Couldn't start the consultation.");
+        return;
+      }
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: "in_consult" } : r)));
+      setPreview(null);
+      void openConsult({ ...row, status: "in_consult" });
+    } catch {
+      setPreviewError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  async function switchTo(row: Row) {
+    if (!activeEntry || row.id === activeEntry.id) return;
+    if (dirtyRef.current) {
+      const r = await saveNote(activeEntry.id);
+      if (!r?.ok) {
+        setShellError("Couldn't save the note, so the patient was not switched. Your changes are kept on this device; try again.");
+        return;
+      }
+    }
+    openRow(row);
+  }
+
+  async function openConsult(row: Row, wantStep?: Step) {
+    const seq = ++openSeqRef.current;
+    const stale = () => seq !== openSeqRef.current;
     setActiveEntry(row);
-    setActivePatient(null);
+    setActivePatient(row.patient);
+    setStep(wantStep ?? "reason");
     setNote(BLANK_DRAFT);
     setNoteStatus("draft");
     setDirty(false);
     setLastSavedAt(null);
+    setSaveState("idle");
+    setConflict(null);
+    setNotice(null);
     setShellError(null);
+    setCloseAck(false);
+    setFollowUpLabel(null);
+    setShowDental(false);
     setRxItems([]);
     setRxStatus("draft");
     setRxError(null);
-    setFollowUpDate(defaultFollowUpDate());
-    setFollowUpMessage(null);
-    setPreviousMeds([]);
     setFavouriteSets([]);
     setNewSetName("");
     setDoseMgPerKg("");
@@ -247,76 +430,148 @@ export default function ConsultPage() {
     setShowAmendForm(false);
     setAmendReason("");
     setAmendDiagnosis("");
+    baseUpdatedRef.current = null;
+    needsServerCheckRef.current = false;
 
-    // NB-105: previous medicines fetched right alongside everything else the pad needs, and
-    // rendered inside the same Prescription card below — no separate screen to visit.
-    const prevRxRes = await authedFetch(`/clinical/patients/${row.patientId}/prescriptions`);
-    if (prevRxRes?.ok) setPreviousMeds(await prevRxRes.json());
+    try {
+      const setsRes = await authedFetch("/clinical/rx-sets");
+      if (stale()) return;
+      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
 
-    const setsRes = await authedFetch("/clinical/rx-sets");
-    if (setsRes?.ok) setFavouriteSets(await setsRes.json());
+      const pRes = await authedFetch(`/patients/${row.patientId}`);
+      if (stale()) return;
+      if (pRes?.ok) setActivePatient(await pRes.json());
 
-    const pRes = await authedFetch(`/patients/${row.patientId}`);
-    if (pRes?.ok) setActivePatient(await pRes.json());
-
-    const nRes = await authedFetch(`/clinical/notes/${row.id}`);
-    if (nRes?.status === 200) {
-      const n: Note = await nRes.json();
-      setNote({ subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "", diagnosis: n.diagnosis ?? "" });
-      setNoteStatus(n.status as "draft" | "signed");
-      if (n.status === "signed") {
-        const aRes = await authedFetch(`/clinical/notes/${row.id}/amendments`);
-        if (aRes?.ok) setAmendments(await aRes.json());
+      const nRes = await authedFetch(`/clinical/notes/${row.id}`);
+      if (stale()) return;
+      let server: Note | null = null;
+      if (nRes?.status === 200) {
+        server = await nRes.json();
+        baseUpdatedRef.current = server!.updatedAt;
+        setNote(toFields(server!));
+        setNoteStatus(server!.status as "draft" | "signed");
+        if (server!.status === "signed") {
+          const aRes = await authedFetch(`/clinical/notes/${row.id}/amendments`);
+          if (stale()) return;
+          if (aRes?.ok) setAmendments(await aRes.json());
+        }
+      } else if (nRes && nRes.status !== 404) {
+        setShellError("Couldn't load the note. Reload before typing so nothing is overwritten.");
       }
-    }
 
-    const rRes = await authedFetch(`/clinical/prescriptions/${row.id}`);
-    if (rRes?.status === 200) {
-      const rx: Prescription = await rRes.json();
-      setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
-      setRxStatus(rx.status as "draft" | "signed");
-    } else {
-      setRxItems([{ ...BLANK_RX_ITEM }]);
+      // A local draft means the last save never reached the server (offline, crash, reload).
+      const draft = await readDraft(row.id);
+      if (stale()) return;
+      if (draft) {
+        const serverFields = server ? toFields(server) : BLANK_DRAFT;
+        if (server?.status === "signed") {
+          void deleteDraft(row.id);
+          setNotice("A local draft was discarded because the note is already signed.");
+        } else if (sameFields(draft.note, serverFields)) {
+          void deleteDraft(row.id);
+        } else if ((server?.updatedAt ?? null) === draft.baseUpdatedAt) {
+          setNote(draft.note);
+          setDirty(true);
+          needsServerCheckRef.current = true;
+          setNotice(`Restored an unsaved local draft from ${new Date(draft.savedAt).toLocaleString()}.`);
+        } else {
+          setConflict({ mine: draft.note, server: serverFields, serverUpdatedAt: server?.updatedAt ?? null });
+          setConflictOpen(true);
+          setNotice("The note changed on the server since your local draft. Choose what to keep.");
+        }
+      }
+
+      const rRes = await authedFetch(`/clinical/prescriptions/${row.id}`);
+      if (stale()) return;
+      if (rRes?.status === 200) {
+        const rx: Prescription = await rRes.json();
+        setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
+        setRxStatus(rx.status as "draft" | "signed");
+      } else {
+        setRxItems([{ ...BLANK_RX_ITEM }]);
+      }
+    } catch {
+      if (!stale()) setShellError("Couldn't reach the server. Check your connection, then reopen the visit.");
     }
   }
+
+  // Deep link (?entry=&step=) once the queue is loaded.
+  useEffect(() => {
+    const link = deepLinkRef.current;
+    if (!link || loading || rows.length === 0) return;
+    deepLinkRef.current = null;
+    const row = rows.find((r) => r.id === link.entry);
+    if (!row) return;
+    if (row.status === "in_consult" && row.doctorId === selfId) void Promise.resolve().then(() => openConsult(row, link.step ?? undefined));
+    else void Promise.resolve().then(() => setPreview(row));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, loading, selfId]);
+
+  // ---- prescription -------------------------------------------------------------------------
 
   function updateRxItem(index: number, field: keyof PrescriptionItem, value: string) {
     setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   }
-
-  function addRxItem() {
-    setRxItems((prev) => [...prev, { ...BLANK_RX_ITEM }]);
-  }
-
-  function removeRxItem(index: number) {
-    setRxItems((prev) => prev.filter((_, i) => i !== index));
-  }
+  function addRxItem() { setRxItems((prev) => [...prev, { ...BLANK_RX_ITEM }]); }
+  function removeRxItem(index: number) { setRxItems((prev) => prev.filter((_, i) => i !== index)); }
 
   async function saveRx() {
-    if (!activeEntry) return;
+    if (!activeEntry) return false;
     setRxSaving(true);
     setRxError(null);
     try {
       const items = rxItems.filter((i) => i.drugName.trim() !== "");
       const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}`, { method: "PATCH", body: JSON.stringify({ items }) });
       if (!res?.ok) {
-        const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't save prescription." }));
-        setRxError(p.detail || "Couldn't save prescription.");
+        const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't save prescription." }));
+        setRxError(pr?.detail || "Couldn't save prescription.");
         return false;
       }
       const rx: Prescription = await res.json();
       setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
       return true;
+    } catch {
+      setRxError("Couldn't reach the server. Check your connection and try again.");
+      return false;
     } finally {
       setRxSaving(false);
     }
   }
 
-  async function signRx() {
-    if (!activeEntry) return;
+  // Step 1 of signing: save (so the server re-checks allergy/pregnancy/controlled rules), then ask
+  // the doctor to confirm what is being signed. A save that the server rejects stays on the pad.
+  async function reviewAndSign() {
+    if (!rxItems.some((i) => i.drugName.trim() !== "")) {
+      setRxError("Add at least one drug before signing.");
+      return;
+    }
     if (!(await saveRx())) return;
-    const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}/sign`, { method: "POST" });
-    if (res?.ok) setRxStatus("signed");
+    setSignAck(false);
+    setSignError(null);
+    setShowSignConfirm(true);
+  }
+
+  async function confirmSignRx() {
+    if (!activeEntry) return;
+    setSigning(true);
+    setSignError(null);
+    try {
+      const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}/sign`, { method: "POST" });
+      if (!res) return;
+      if (!res.ok) {
+        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't sign the prescription." }));
+        setSignError(pr.detail || "Couldn't sign the prescription.");
+        return;
+      }
+      setRxStatus("signed");
+      setShowSignConfirm(false);
+      setNotice("Prescription signed.");
+      reloadCtx();
+    } catch {
+      setSignError("Couldn't reach the server. The prescription was not signed; try again.");
+    } finally {
+      setSigning(false);
+    }
   }
 
   async function calculateDose() {
@@ -324,8 +579,8 @@ export default function ConsultPage() {
     setDoseError(null);
     const res = await authedFetch(`/clinical/patients/${activePatient.id}/dose-calculator?mgPerKg=${doseMgPerKg}`);
     if (!res?.ok) {
-      const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
-      setDoseError(p.detail || "Couldn't calculate dose.");
+      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
+      setDoseError(pr?.detail || "Couldn't calculate dose.");
       setDoseResult(null);
       return;
     }
@@ -352,8 +607,8 @@ export default function ConsultPage() {
       setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
       setRxError(null);
     } else {
-      const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't apply set." }));
-      setRxError(p.detail || "Couldn't apply set.");
+      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't apply set." }));
+      setRxError(pr?.detail || "Couldn't apply set.");
     }
   }
 
@@ -377,74 +632,101 @@ export default function ConsultPage() {
     }
   }
 
-  async function scheduleFollowUp() {
-    if (!activeEntry || !activePatient || !followUpDate) return;
-    setFollowUpBusy(true);
-    setFollowUpMessage(null);
-    try {
-      const startTime = new Date(`${followUpDate}T10:00:00`).toISOString();
-      const res = await authedFetch("/appointments", {
-        method: "POST",
-        body: JSON.stringify({ patientId: activePatient.id, doctorId: activeEntry.doctorId, startTime, isFollowUp: true }),
-      });
-      if (!res?.ok) {
-        const p: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't schedule the follow-up." }));
-        setFollowUpMessage(p.detail || "Couldn't schedule the follow-up.");
-        return;
-      }
-      setFollowUpMessage(`Follow-up booked for ${followUpDate}.`);
-    } finally {
-      setFollowUpBusy(false);
-    }
-  }
-
   function updateField(field: keyof NoteDraft, value: string) {
     setNote((prev) => ({ ...prev, [field]: value }));
     setDirty(true);
+    if (activeEntry) scheduleLocalDraft(activeEntry.id);
   }
 
-  function closeShell() {
-    setActiveEntry(null);
-    load();
+  function resolveConflict(merged: NoteFields) {
+    const rebase = conflict?.serverUpdatedAt ?? null;
+    setConflict(null);
+    setConflictOpen(false);
+    conflictRef.current = null;
+    setNote(merged);
+    setDirty(true);
+    if (activeEntry) {
+      // Re-base on the server copy the doctor just compared against.
+      needsServerCheckRef.current = true;
+      baseUpdatedRef.current = rebase;
+      scheduleLocalDraft(activeEntry.id);
+    }
+    setNotice("Choices applied. The note will be saved after one more check against the server copy.");
   }
+
+  async function closeShell() {
+    if (activeEntry && dirtyRef.current) {
+      const r = await saveNote(activeEntry.id);
+      if (!r?.ok) {
+        setShellError("Couldn't save the note. It is kept on this device; stay on this page and try again.");
+        return;
+      }
+    }
+    openSeqRef.current++;
+    setActiveEntry(null);
+    void load(scope);
+  }
+
+  // ---- close consultation (DOC-029) ---------------------------------------------------------
+
+  const hasDrugs = rxItems.some((i) => i.drugName.trim() !== "");
+  const noteEmpty = Object.values(note).every((v) => v.trim() === "");
+  const closeIssues: string[] = [];
+  if (noteStatus !== "signed") {
+    if (note.diagnosis.trim() === "") closeIssues.push("No diagnosis is entered.");
+    if (noteEmpty) closeIssues.push("The note is empty.");
+  }
+  if (hasDrugs && rxStatus !== "signed") closeIssues.push("The prescription is not signed, so the patient would leave without it.");
+  const handoffPending = noteStatus === "signed" && activeEntry?.status !== "checkout_pending";
+  const closedOut = noteStatus === "signed" && activeEntry?.status === "checkout_pending";
 
   async function completeConsultation() {
     if (!activeEntry) return;
     setCompleting(true);
     setShellError(null);
     try {
-      // Always flush a save first — even an untouched note needs one draft row to exist before it
-      // can be signed, and this also catches the last few seconds of typing the 10s interval hasn't.
-      const saveRes = await saveNote(activeEntry.id);
-      if (!saveRes?.ok) {
-        setShellError("Couldn't save the note. Try again before completing.");
-        return;
-      }
-      const signRes = await authedFetch(`/clinical/notes/${activeEntry.id}/sign`, { method: "POST" });
-      if (!signRes?.ok) {
-        const p: Problem = await signRes?.json().catch(() => ({ title: "Error", detail: "Couldn't sign the note." }));
-        setShellError(p.detail || "Couldn't sign the note.");
-        return;
+      if (noteStatus !== "signed") {
+        // Always flush a save first — even an untouched note needs one draft row to exist before it
+        // can be signed, and this also catches the last few seconds of typing the 10s interval hasn't.
+        needsServerCheckRef.current = needsServerCheckRef.current || dirtyRef.current;
+        const saveRes = await saveNote(activeEntry.id);
+        if (!saveRes?.ok) {
+          setShellError(conflictRef.current ? "The note changed on the server. Resolve the differences before closing." : "Couldn't save the note. Try again before completing.");
+          return;
+        }
+        const signRes = await authedFetch(`/clinical/notes/${activeEntry.id}/sign`, { method: "POST" });
+        if (!signRes?.ok) {
+          const pr: Problem = await signRes?.json().catch(() => ({ title: "Error", detail: "Couldn't sign the note." }));
+          setShellError(pr?.detail || "Couldn't sign the note.");
+          return;
+        }
+        setNoteStatus("signed");
       }
       const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
       if (!statusRes?.ok) {
-        setShellError("Note signed, but couldn't move the patient to checkout. Try again.");
+        setShellError("Note signed, but couldn't move the patient to checkout. Use “Retry checkout handoff”.");
         return;
       }
-      setNoteStatus("signed");
       setActiveEntry((prev) => (prev ? { ...prev, status: "checkout_pending" } : prev));
-      // Stay in the shell (don't auto-close): the signed banner below is also where the doctor
-      // schedules a follow-up (NB-116) — closing here would make that control unreachable.
+      setNotice("Sent to checkout. Reception can see this visit now.");
+      // Stay in the workspace (don't auto-close): follow-up and amendments remain reachable.
+    } catch {
+      setShellError(noteStatus === "signed" || handoffPending
+        ? "Couldn't reach the server. Retry the checkout handoff when you're back online."
+        : "Couldn't reach the server. The note was not signed; try again.");
     } finally {
       setCompleting(false);
     }
   }
+
+  // ---- transfer -----------------------------------------------------------------------------
 
   async function openTransfer() {
     if (!activeEntry) return;
     setTransferError(null);
     setTransferDepartmentId("");
     setTransferDoctorId("");
+    setTransferTargets(null);
     setShowTransfer(true);
     const res = await authedFetch(`/departments/${activeEntry.departmentId}/transfer-targets`);
     if (!res?.ok) {
@@ -466,282 +748,506 @@ export default function ConsultPage() {
       });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't transfer the patient." }));
-        setTransferError(p.detail || "Couldn't transfer the patient.");
+        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't transfer the patient." }));
+        setTransferError(pr.detail || "Couldn't transfer the patient.");
         return;
       }
       setShowTransfer(false);
-      closeShell();
+      void closeShell();
     } finally {
       setTransferring(false);
     }
   }
 
+  // ---- shared render pieces -----------------------------------------------------------------
+
+  const dialogs = (
+    <>
+      {preview && (
+        <PreConsultDialog
+          row={preview}
+          authedFetch={authedFetch}
+          starting={starting}
+          error={previewError}
+          onClose={() => { setPreview(null); setPreviewError(null); }}
+          onStart={preview.status === "vitals_done" && preview.doctorId === selfId ? () => startConsult(preview) : undefined}
+          onOpenVisit={(preview.status === "checkout_pending" || preview.status === "completed") && !dirty
+            ? () => { const r = preview; setPreview(null); void openConsult(r); }
+            : undefined}
+        />
+      )}
+    </>
+  );
+
   if (activeEntry) {
+    const pat = activePatient;
+    const saveBadge = !online || saveState === "offline"
+      ? <StatusPill tone="sync" icon="sync" label="Offline · local draft" />
+      : saveState === "saving" ? <StatusPill tone="sync" icon="sync" label="Saving…" />
+      : saveState === "error" ? <StatusPill tone="danger" label="Couldn't save — retrying" />
+      : dirty ? <StatusPill tone="warn" icon="clock" label="Unsaved changes" />
+      : lastSavedAt ? <StatusPill tone="ok" label={`Saved ${lastSavedAt.toLocaleTimeString()}`} />
+      : null;
+    const locked = noteStatus === "signed";
+    const flaggedItems = rxItems.filter((i) => i.allergyWarning || i.pregnancyWarning || i.controlledSubstanceWarning);
+    const signedBlocked = closeIssues.length > 0 && !closeAck;
+    const primaryLabel = completing ? "Working…" : handoffPending ? "Retry checkout handoff" : closedOut ? "Sent to checkout" : "Sign note and send to checkout";
+
     return (
-      <main className={styles.page}>
+      <main className={`${styles.page} ${styles.pageWide}`}>
         <div className={styles.strip}>
           <div className={styles.stripIdentity}>
-            <button className={styles.backBtn} onClick={closeShell}>← Queue</button>
-            {activePatient && (
-              <>
-                <span className={styles.stripName}>{activePatient.name}</span>
-                <span className={styles.stripMeta}>{activePatient.mrn} · {age(activePatient.dob)} · {activePatient.gender} · Token #{activeEntry.tokenNumber}</span>
-              </>
-            )}
-            <span className={`${styles.pill} ${STATUS_CLASS[activeEntry.status] ?? ""}`}>{activeEntry.status.replace("_", " ")}</span>
-          </div>
-          <div className={styles.stripActions}>
-            <span className={styles.saveStatus}>
-              {saving ? "Saving…" : dirty ? "Unsaved changes" : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString()}` : ""}
-            </span>
-            {activeEntry.status === "in_consult" && (
-              <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>
-                Transfer to another department
-              </button>
-            )}
-            <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || noteStatus === "signed"}>
-              {completing ? "Completing…" : "Complete consultation"}
-            </button>
-          </div>
-        </div>
-
-        {shellError && <div className={styles.errorState} role="alert">{shellError}</div>}
-
-        {showTransfer && (
-          <div onClick={() => setShowTransfer(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: 380, background: "var(--nb-surface-1)", border: "1px solid var(--nb-border-default)", borderRadius: "var(--nb-radius-lg)", padding: 24 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 16px", color: "var(--nb-text-primary)" }}>Transfer to another department</h2>
-              {transferTargets === null ? (
-                <p style={{ color: "var(--nb-text-secondary)", fontSize: 13 }}>Loading…</p>
-              ) : transferTargets.length === 0 ? (
-                <p style={{ color: "var(--nb-text-secondary)", fontSize: 13 }}>This department isn&apos;t configured to transfer patients anywhere.</p>
-              ) : (
+            <button className={styles.backBtn} onClick={closeShell}>Queue</button>
+            {pat && <span className={styles.avatar} aria-hidden="true">{initials(pat.name)}</span>}
+            <span className={styles.stripText}>
+              {pat && (
                 <>
-                  <div style={{ marginBottom: 12 }}>
-                    <label style={{ display: "block", fontSize: 12, color: "var(--nb-text-secondary)", marginBottom: 4 }}>Department</label>
-                    <select
-                      value={transferDepartmentId}
-                      onChange={(e) => { setTransferDepartmentId(e.target.value); setTransferDoctorId(""); }}
-                      style={{ width: "100%", height: 36, background: "var(--nb-surface-3)", border: "1px solid var(--nb-border-default)", borderRadius: 8, padding: "0 12px", color: "var(--nb-text-primary)", fontSize: 13, boxSizing: "border-box" }}
-                    >
-                      <option value="">Select a department…</option>
-                      {transferTargets.map((t) => (
-                        <option key={t.departmentId} value={t.departmentId}>{t.departmentName}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {transferDepartmentId && (
-                    <div style={{ marginBottom: 12 }}>
-                      <label style={{ display: "block", fontSize: 12, color: "var(--nb-text-secondary)", marginBottom: 4 }}>Doctor</label>
-                      <select
-                        value={transferDoctorId}
-                        onChange={(e) => setTransferDoctorId(e.target.value)}
-                        style={{ width: "100%", height: 36, background: "var(--nb-surface-3)", border: "1px solid var(--nb-border-default)", borderRadius: 8, padding: "0 12px", color: "var(--nb-text-primary)", fontSize: 13, boxSizing: "border-box" }}
-                      >
-                        <option value="">Select a doctor…</option>
-                        {transferTargets.find((t) => t.departmentId === transferDepartmentId)?.doctors.map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  <span className={styles.stripName}>{pat.name}</span>
+                  <span className={styles.stripMeta}>{pat.mrn} · {age(pat.dob)} · {pat.gender} · Token #{activeEntry.tokenNumber}</span>
                 </>
               )}
-              {transferError && <div className={styles.errorState}>{transferError}</div>}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-                <button className={styles.backBtn} onClick={() => setShowTransfer(false)}>Cancel</button>
-                <button className={styles.completeBtn} onClick={submitTransfer} disabled={transferring || !transferDepartmentId || !transferDoctorId}>
-                  {transferring ? "Transferring…" : "Transfer"}
+              {activeEntry.presentingComplaint?.trim() && <span className={styles.stripComplaint}>Reason: {activeEntry.presentingComplaint}</span>}
+            </span>
+            <StatusBadge status={activeEntry.status} />
+            {saveBadge}
+          </div>
+        </div>
+
+        {!online && (
+          <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
+            <Icon name="sync" size={16} />
+            <span>You&apos;re offline. The note is saved on this device and will never silently overwrite server data; it is compared with the server copy when you reconnect.</span>
+          </div>
+        )}
+        {shellError && <div className={styles.errorState} role="alert">{shellError}</div>}
+        {notice && (
+          <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
+            <Icon name="info" size={16} />
+            <span>{notice} <button type="button" className={p.linkBtn} onClick={() => setNotice(null)}>Dismiss</button></span>
+          </div>
+        )}
+        {conflict && (
+          <div className={`${p.notice} ${p.noticeWarn}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
+            <Icon name="alert" size={16} />
+            <span>Saving is paused: this note changed on the server. <button type="button" className={p.linkBtn} onClick={() => setConflictOpen(true)}>Review differences</button></span>
+          </div>
+        )}
+
+        <SafetyStrip patient={pat} ctx={ctx} onRetry={reloadCtx} />
+
+        <div className={styles.workspace}>
+          <aside className={styles.today} aria-label="Today's patients">
+            <h2 className={styles.todayTitle}>Today&apos;s patients</h2>
+            <ul className={styles.todayList}>
+              {rows.map((r) => (
+                <li key={r.id}>
+                  <button type="button" className={`${styles.todayBtn} ${r.id === activeEntry.id ? styles.todayBtnOn : ""}`} aria-current={r.id === activeEntry.id ? "true" : undefined} onClick={() => switchTo(r)}>
+                    <span><strong>#{r.tokenNumber}</strong> {r.patientName}</span>
+                    <span className={styles.flags}>
+                      {(r.patient?.allergies.length ?? 0) > 0 && <StatusPill tone="danger" label="Allergy" />}
+                      {r.priority && <StatusPill tone="urgent" label="Urgent" />}
+                      <StatusBadge status={r.status} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+
+          <div className={styles.centerCol}>
+            <nav aria-label="Consultation steps">
+              <ol className={styles.steps}>
+                {STEPS.map((s, i) => (
+                  <li key={s.id}>
+                    <button type="button" className={`${styles.stepBtn} ${step === s.id ? styles.stepBtnOn : ""}`} aria-current={step === s.id ? "step" : undefined} onClick={() => setStep(s.id)}>
+                      <span className={styles.stepName}>{i + 1}. {s.label}</span>
+                      <span className={styles.stepHint}>{s.hint}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+
+            {locked && (
+              <div className={styles.signedBanner}>
+                <span>This note is signed and locked.</span>
+                <span className={styles.followUpControls}>
+                  <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
+                    {showAmendForm ? "Cancel amendment" : "Amend note"}
+                  </button>
+                </span>
+              </div>
+            )}
+
+            {showAmendForm && (
+              <div className={styles.card} style={{ padding: "16px" }}>
+                <div className={styles.noteField}>
+                  <label className={styles.noteLabel} htmlFor="amendReason">Reason for amendment</label>
+                  <input id="amendReason" className={styles.input} value={amendReason} onChange={(e) => setAmendReason(e.target.value)} />
+                </div>
+                <div className={styles.noteField} style={{ marginBlockStart: "8px" }}>
+                  <label className={styles.noteLabel} htmlFor="amendDiagnosis">Corrected diagnosis (optional)</label>
+                  <input id="amendDiagnosis" className={styles.input} value={amendDiagnosis} onChange={(e) => setAmendDiagnosis(e.target.value)} />
+                </div>
+                <button className={styles.completeBtn} style={{ marginBlockStart: "8px" }} onClick={submitAmendment} disabled={amending || !amendReason.trim()}>
+                  {amending ? "Saving…" : "Save amendment"}
                 </button>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {activePatient && (
-          <div className={activePatient.allergies.length === 0 ? styles.allergyBannerNone : styles.allergyBannerSome}>
-            {activePatient.allergies.length === 0 ? "No known allergies" : `⚠ Allergies: ${activePatient.allergies.join(", ")}`}
-          </div>
-        )}
-
-        {noteStatus === "signed" && (
-          <div className={styles.signedBanner}>
-            <span>This note is signed and locked.</span>
-            <span className={styles.followUpControls}>
-              Schedule a follow-up:
-              <input type="date" className={styles.followUpInput} value={followUpDate} onChange={(e) => setFollowUpDate(e.target.value)} />
-              <button className={styles.actionBtn} onClick={scheduleFollowUp} disabled={followUpBusy || !followUpDate}>
-                {followUpBusy ? "Booking…" : "Schedule follow-up"}
-              </button>
-              {followUpMessage && <span>{followUpMessage}</span>}
-            </span>
-            <span className={styles.followUpControls}>
-              <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
-                {showAmendForm ? "Cancel amendment" : "Amend note"}
-              </button>
-            </span>
-          </div>
-        )}
-
-        {showAmendForm && (
-          <div className={styles.card} style={{ padding: "16px", marginTop: "8px" }}>
-            <div className={styles.noteField}>
-              <label className={styles.noteLabel} htmlFor="amendReason">Reason for amendment</label>
-              <input id="amendReason" className={styles.input} value={amendReason} onChange={(e) => setAmendReason(e.target.value)} />
-            </div>
-            <div className={styles.noteField} style={{ marginTop: "8px" }}>
-              <label className={styles.noteLabel} htmlFor="amendDiagnosis">Corrected diagnosis (optional)</label>
-              <input id="amendDiagnosis" className={styles.input} value={amendDiagnosis} onChange={(e) => setAmendDiagnosis(e.target.value)} />
-            </div>
-            <button className={styles.completeBtn} style={{ marginTop: "8px" }} onClick={submitAmendment} disabled={amending || !amendReason.trim()}>
-              {amending ? "Saving…" : "Save amendment"}
-            </button>
-          </div>
-        )}
-
-        {amendments.length > 0 && (
-          <div className={styles.card} style={{ padding: "16px", marginTop: "8px" }}>
-            <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Amendment history</div>
-            {amendments.map((a) => (
-              <div key={a.id} className={styles.previousMedsRow}>
-                <span className={styles.saveStatus}>{new Date(a.createdAt).toLocaleString()} — </span>
-                {a.reason}{a.diagnosis ? ` (diagnosis: ${a.diagnosis})` : ""}
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className={styles.card} style={{ padding: "24px" }}>
-          <div className={styles.noteGrid}>
-            {(["subjective", "objective", "assessment", "plan"] as const).map((field) => (
-              <div className={styles.noteField} key={field}>
-                <label className={styles.noteLabel} htmlFor={field}>{field}</label>
-                <textarea
-                  id={field}
-                  className={styles.textarea}
-                  value={note[field]}
-                  disabled={noteStatus === "signed"}
-                  onChange={(e) => updateField(field, e.target.value)}
-                />
-              </div>
-            ))}
-            <div className={styles.noteField}>
-              <label className={styles.noteLabel} htmlFor="diagnosis">diagnosis</label>
-              <input
-                id="diagnosis"
-                className={styles.input}
-                value={note.diagnosis}
-                disabled={noteStatus === "signed"}
-                onChange={(e) => updateField("diagnosis", e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.card} style={{ padding: "24px", marginTop: "16px" }}>
-          <div className={styles.rxHeader}>
-            <h3 className={styles.rxTitle}>Prescription {rxStatus === "signed" && <span className={styles.signedTag}>signed</span>}</h3>
-            {rxStatus !== "signed" && (
-              <div className={styles.rxHeaderActions}>
-                <button className={styles.backBtn} onClick={saveRx} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
-                <button className={styles.completeBtn} onClick={signRx} disabled={rxSaving}>Sign prescription</button>
+            {amendments.length > 0 && (
+              <div className={styles.card} style={{ padding: "16px" }}>
+                <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Amendment history</div>
+                {amendments.map((a) => (
+                  <div key={a.id} className={styles.previousMedsRow}>
+                    <span className={styles.saveStatus}>{new Date(a.createdAt).toLocaleString()} — </span>
+                    {a.reason}{a.diagnosis ? ` (diagnosis: ${a.diagnosis})` : ""}
+                  </div>
+                ))}
               </div>
             )}
-          </div>
-          {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
-          {rxItems.map((item, i) => {
-            const conflict = !!rxError && rxError.includes(item.drugName) && item.drugName.trim() !== "";
-            return (
-              <div key={i}>
-                <div className={styles.rxRow}>
-                  <input className={styles.input} placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"}
-                    onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
-                  <input className={styles.input} placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"}
-                    onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
-                  <input className={styles.input} placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"}
-                    onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
-                  <input className={styles.input} placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"}
-                    onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
-                  <input className={styles.input} placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"}
-                    onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
-                  {conflict && (
-                    <input className={styles.input} placeholder="Allergy override reason" value={item.allergyOverrideReason}
-                      onChange={(e) => updateRxItem(i, "allergyOverrideReason", e.target.value)} />
-                  )}
-                  {rxStatus !== "signed" && rxItems.length > 1 && (
-                    <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
-                  )}
+
+            {step === "reason" && (
+              <>
+                <section className={p.card} aria-label="Presenting complaint">
+                  <h3 className={p.cardTitle}>Presenting complaint</h3>
+                  {activeEntry.presentingComplaint?.trim()
+                    ? <p className={p.complaint}>{activeEntry.presentingComplaint}</p>
+                    : <p className={p.muted}>No reason was recorded at check-in. Ask the patient.</p>}
+                </section>
+                <VitalsCard vitals={ctx.vitals} onRetry={reloadCtx} />
+                <section className={p.card} aria-label="Visit timeline">
+                  <h3 className={p.cardTitle}>Visit timeline</h3>
+                  <ol className={p.timeline}>
+                    <li>
+                      <span className={p.timelineDot}><Icon name="check" size={14} /></span>
+                      <span>Checked in{activeEntry.createdAt ? ` · ${new Date(activeEntry.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
+                    </li>
+                    <li>
+                      <span className={p.timelineDot}><Icon name={ctx.vitals.status === "ok" ? "check" : "alert"} size={14} /></span>
+                      <span>
+                        {ctx.vitals.status === "ok" ? `Vitals recorded${ctx.vitals.data?.recordedAt ? ` · ${new Date(ctx.vitals.data.recordedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}`
+                          : ctx.vitals.status === "none" ? "Vitals not recorded yet"
+                          : ctx.vitals.status === "error" ? "Vitals status unavailable" : "Checking vitals…"}
+                      </span>
+                    </li>
+                    <li>
+                      <span className={p.timelineDot}><Icon name="stethoscope" size={14} /></span>
+                      <span>{activeEntry.status === "in_consult" ? "In consultation" : `Status: ${statusLabel(activeEntry.status)}`}</span>
+                    </li>
+                  </ol>
+                </section>
+                <div><button type="button" className={p.btn} onClick={() => setStep("examine")}>Continue to Examine</button></div>
+              </>
+            )}
+
+            {step === "examine" && (
+              <>
+                <div className={styles.card} style={{ padding: "24px" }}>
+                  <div className={styles.noteGrid}>
+                    {(["subjective", "objective"] as const).map((field) => (
+                      <div className={styles.noteField} key={field}>
+                        <label className={styles.noteLabel} htmlFor={field}>{field}</label>
+                        <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked} onChange={(e) => updateField(field, e.target.value)} />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                {/* NB-107: severity-scaled — only "severe" ever blocked the save (rxError above); a
-                    moderate/mild match still shows here as a passive warning. */}
-                {item.allergyWarning && !conflict && (
-                  <div className={styles.rxWarning}>⚠ Matches recorded allergy: {item.allergyWarning}</div>
+                {can("specialty_dental:view") && (
+                  <section className={p.card} aria-label="Specialty tools">
+                    <h3 className={p.cardTitle}>Specialty tools</h3>
+                    <div className={p.row}>
+                      <button type="button" className={p.btn} onClick={() => setShowDental(true)}>
+                        <Icon name="stethoscope" size={16} /> Tooth chart
+                      </button>
+                      <span className={p.muted}>Opens beside this note with {pat?.name ?? "the patient"}&apos;s chart.</span>
+                    </div>
+                  </section>
                 )}
-                {item.pregnancyWarning && (
-                  <div className={styles.rxWarning}>⚠ {item.pregnancyWarning}</div>
-                )}
-                {item.controlledSubstanceWarning && (
-                  <div className={styles.rxWarning}>⚠ {item.controlledSubstanceWarning}</div>
-                )}
-              </div>
-            );
-          })}
-          {rxStatus !== "signed" && (
-            <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>
-          )}
+              </>
+            )}
 
-          <div className={styles.previousMeds}>
-            <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Weight-based dose calculator</div>
-            <div className={styles.rxRow}>
-              <input className={styles.input} placeholder="mg/kg" value={doseMgPerKg} onChange={(e) => setDoseMgPerKg(e.target.value)} />
-              <button type="button" className={styles.backBtn} onClick={calculateDose} disabled={!doseMgPerKg}>Calculate</button>
-              {doseResult && (
-                <span className={styles.saveStatus}>
-                  {doseResult.totalDoseMg} mg total ({doseResult.weightKg} kg × {doseResult.mgPerKg} mg/kg)
-                </span>
-              )}
-            </div>
-            {doseError && <div className={styles.errorState} role="alert">{doseError}</div>}
+            {step === "assess" && (
+              <div className={styles.card} style={{ padding: "24px" }}>
+                <div className={styles.noteGrid}>
+                  <div className={styles.noteField}>
+                    <label className={styles.noteLabel} htmlFor="assessment">assessment</label>
+                    <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked} onChange={(e) => updateField("assessment", e.target.value)} />
+                  </div>
+                  <div className={styles.noteField}>
+                    <label className={styles.noteLabel} htmlFor="diagnosis">diagnosis</label>
+                    <input id="diagnosis" className={styles.input} value={note.diagnosis} disabled={locked} onChange={(e) => updateField("diagnosis", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === "plan" && (
+              <>
+                <div className={styles.card} style={{ padding: "24px" }}>
+                  <div className={styles.noteField}>
+                    <label className={styles.noteLabel} htmlFor="plan">plan</label>
+                    <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked} onChange={(e) => updateField("plan", e.target.value)} />
+                  </div>
+                </div>
+
+                <div className={styles.card} style={{ padding: "24px" }}>
+                  <div className={styles.rxHeader}>
+                    <h3 className={styles.rxTitle}>Prescription {rxStatus === "signed" && <StatusPill tone="ok" label="Signed" />}</h3>
+                    {rxStatus !== "signed" && (
+                      <div className={styles.rxHeaderActions}>
+                        <button className={styles.backBtn} onClick={saveRx} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
+                        <button className={styles.completeBtn} onClick={reviewAndSign} disabled={rxSaving}>Review and sign</button>
+                      </div>
+                    )}
+                  </div>
+                  {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
+                  {rxItems.map((item, i) => {
+                    const conflictRow = !!rxError && rxError.includes(item.drugName) && item.drugName.trim() !== "";
+                    return (
+                      <div key={i}>
+                        <div className={styles.rxRow}>
+                          <input className={styles.input} aria-label="Drug name" placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
+                          <input className={styles.input} aria-label="Dosage" placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
+                          <input className={styles.input} aria-label="Frequency" placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
+                          <input className={styles.input} aria-label="Duration" placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
+                          <input className={styles.input} aria-label="Instructions" placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
+                          {conflictRow && (
+                            <input className={styles.input} aria-label="Allergy override reason" placeholder="Allergy override reason" value={item.allergyOverrideReason} onChange={(e) => updateRxItem(i, "allergyOverrideReason", e.target.value)} />
+                          )}
+                          {rxStatus !== "signed" && rxItems.length > 1 && (
+                            <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
+                          )}
+                        </div>
+                        {/* NB-107: severity-scaled — only "severe" ever blocked the save (rxError above); a
+                            moderate/mild match still shows here as a passive warning. */}
+                        {item.allergyWarning && !conflictRow && (
+                          <div className={styles.rxWarning}><Icon name="alert" size={12} /> Matches recorded allergy: {item.allergyWarning}</div>
+                        )}
+                        {item.pregnancyWarning && <div className={styles.rxWarning}><Icon name="alert" size={12} /> {item.pregnancyWarning}</div>}
+                        {item.controlledSubstanceWarning && <div className={styles.rxWarning}><Icon name="alert" size={12} /> {item.controlledSubstanceWarning}</div>}
+                      </div>
+                    );
+                  })}
+                  {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
+
+                  <div className={styles.previousMeds}>
+                    <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Weight-based dose calculator</div>
+                    <div className={styles.rxRow}>
+                      <input className={styles.input} aria-label="mg per kg" placeholder="mg/kg" value={doseMgPerKg} onChange={(e) => setDoseMgPerKg(e.target.value)} />
+                      <button type="button" className={styles.backBtn} onClick={calculateDose} disabled={!doseMgPerKg}>Calculate</button>
+                      {doseResult && (
+                        <span className={styles.saveStatus}>
+                          {doseResult.totalDoseMg} mg total ({doseResult.weightKg} kg × {doseResult.mgPerKg} mg/kg)
+                        </span>
+                      )}
+                    </div>
+                    {doseError && <div className={styles.errorState} role="alert">{doseError}</div>}
+                  </div>
+
+                  <div className={styles.previousMeds}>
+                    <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>
+                    {favouriteSets.length === 0 ? (
+                      <div className={styles.saveStatus}>No saved sets yet.</div>
+                    ) : (
+                      favouriteSets.map((set) => (
+                        <div key={set.id} className={styles.previousMedsRow}>
+                          <span>{set.name} ({set.items.map((i) => i.drugName).join(", ")})</span>{" "}
+                          {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={() => applySet(set.id)}>Apply</button>}
+                        </div>
+                      ))
+                    )}
+                    {rxStatus !== "signed" && (
+                      <div className={styles.rxRow} style={{ marginBlockStart: "8px" }}>
+                        <input className={styles.input} aria-label="New set name" placeholder="Save current items as set…" value={newSetName} onChange={(e) => setNewSetName(e.target.value)} />
+                        <button type="button" className={styles.backBtn} onClick={saveCurrentAsSet} disabled={!newSetName.trim()}>Save set</button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={styles.previousMeds}>
+                    <div className={styles.rxTitle} style={{ fontSize: "12px", marginBlockEnd: "8px" }}>Previous medicines</div>
+                    <MedicinesList prescriptions={ctx.prescriptions} onRetry={reloadCtx} />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {step === "close" && (
+              <section className={p.card} aria-label="Close consultation">
+                <h3 className={p.cardTitle}>Close consultation</h3>
+                <div className={p.stack}>
+                  <ul className={p.list}>
+                    <li className={p.listRow}>
+                      <strong>Note</strong>
+                      {locked ? <StatusPill tone="ok" label="Signed" /> : <StatusPill tone="warn" label="Draft — will be signed" />}
+                      <span className={p.muted}>Diagnosis: {note.diagnosis.trim() || "not entered"}</span>
+                    </li>
+                    <li className={p.listRow}>
+                      <strong>Prescription</strong>
+                      {!hasDrugs ? <StatusPill tone="neutral" icon="list" label="None" />
+                        : rxStatus === "signed" ? <StatusPill tone="ok" label="Signed" />
+                        : <StatusPill tone="danger" label="Not signed" />}
+                      {hasDrugs && <span className={p.muted}>{rxItems.filter((i) => i.drugName.trim()).map((i) => i.drugName).join(", ")}</span>}
+                      {hasDrugs && rxStatus !== "signed" && <button type="button" className={p.linkBtn} onClick={() => setStep("plan")}>Go to prescription</button>}
+                    </li>
+                    <li className={p.listRow}>
+                      <strong>Follow-up</strong>
+                      {followUpLabel ? <StatusPill tone="ok" label={`Set · ${followUpLabel}`} /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
+                    </li>
+                    <li className={p.listRow}>
+                      <strong>Checkout</strong>
+                      <span className={p.muted}>Visible to reception as soon as you close.</span>
+                    </li>
+                  </ul>
+                  <p className={p.muted}>Referral letters, certificates, visit summaries and diagnostic requests aren&apos;t available yet.</p>
+
+                  {closeIssues.length > 0 && !closedOut && (
+                    <div className={`${p.notice} ${p.noticeDanger}`} role="alert">
+                      <Icon name="alert" size={16} />
+                      <span>
+                        Check before closing:
+                        <ul style={{ margin: "4px 0 0", paddingInlineStart: "18px" }}>{closeIssues.map((t) => <li key={t}>{t}</li>)}</ul>
+                        <label className={p.check} style={{ marginBlockStart: "8px" }}>
+                          <input type="checkbox" checked={closeAck} onChange={(e) => setCloseAck(e.target.checked)} />
+                          I understand and want to close anyway.
+                        </label>
+                      </span>
+                    </div>
+                  )}
+                  {handoffPending && (
+                    <div className={`${p.notice} ${p.noticeWarn}`} role="status">
+                      <Icon name="alert" size={16} />
+                      <span>The note is signed but the patient has not reached checkout yet.</span>
+                    </div>
+                  )}
+                  {closedOut && <div className={`${p.notice} ${p.noticeOk}`} role="status"><Icon name="check" size={16} /><span>Sent to checkout.</span></div>}
+                </div>
+              </section>
+            )}
           </div>
 
-          <div className={styles.previousMeds}>
-            <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>
-            {favouriteSets.length === 0 ? (
-              <div className={styles.saveStatus}>No saved sets yet.</div>
+          <aside className={styles.tools} aria-label="Contextual tools">
+            <section className={p.card} aria-label="Prescription summary">
+              <h3 className={p.cardTitle}>
+                Prescription
+                {!hasDrugs ? <StatusPill tone="neutral" icon="list" label="None" /> : rxStatus === "signed" ? <StatusPill tone="ok" label="Signed" /> : <StatusPill tone="warn" label="Draft" />}
+              </h3>
+              {hasDrugs ? <ul className={p.list}>{rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}</li>)}</ul> : <p className={p.muted}>No drugs added.</p>}
+              <button type="button" className={p.linkBtn} onClick={() => setStep("plan")}>Open prescription</button>
+            </section>
+            <FollowUpPanel authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} />
+            <section className={p.card} aria-label="Package">
+              <h3 className={p.cardTitle}>Package</h3>
+              {pat && pat.activePackages > 0
+                ? <p className={p.muted}>{pat.activePackages} active package{pat.activePackages === 1 ? "" : "s"}. <Link href="/packages" className={p.linkBtn}>Open packages</Link></p>
+                : <p className={p.muted}>No active package.</p>}
+            </section>
+          </aside>
+        </div>
+
+        <div className={styles.actionBar}>
+          <div className={styles.stripActions}>{saveBadge ?? <span className={styles.saveStatus}>No changes yet</span>}</div>
+          <div className={styles.stripActions}>
+            {activeEntry.status === "in_consult" && (
+              <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>Transfer to another department</button>
+            )}
+            {step !== "close" ? (
+              <button className={styles.completeBtn} onClick={() => setStep("close")}>Close consultation</button>
             ) : (
-              favouriteSets.map((set) => (
-                <div key={set.id} className={styles.previousMedsRow}>
-                  <span>{set.name} ({set.items.map((i) => i.drugName).join(", ")})</span>{" "}
-                  {rxStatus !== "signed" && (
-                    <button type="button" className={styles.backBtn} onClick={() => applySet(set.id)}>Apply</button>
-                  )}
-                </div>
-              ))
-            )}
-            {rxStatus !== "signed" && (
-              <div className={styles.rxRow} style={{ marginTop: "8px" }}>
-                <input className={styles.input} placeholder="Save current items as set…" value={newSetName} onChange={(e) => setNewSetName(e.target.value)} />
-                <button type="button" className={styles.backBtn} onClick={saveCurrentAsSet} disabled={!newSetName.trim()}>Save set</button>
-              </div>
+              <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || closedOut || signedBlocked || !!conflict}>
+                {primaryLabel}
+              </button>
             )}
           </div>
-
-          {previousMeds.length > 0 && (
-            <div className={styles.previousMeds}>
-              <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Previous medicines</div>
-              {previousMeds.map((rx) => (
-                <div key={rx.id} className={styles.previousMedsRow}>
-                  {rx.signedAt && <span className={styles.saveStatus}>{new Date(rx.signedAt).toLocaleDateString()} — </span>}
-                  {rx.items.map((i) => i.drugName).join(", ")}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
+
+        {conflict && conflictOpen && <ConflictDialog mine={conflict.mine} server={conflict.server} onResolve={resolveConflict} onClose={() => setConflictOpen(false)} />}
+
+        {showSignConfirm && (
+          <Dialog title="Sign prescription" onClose={() => setShowSignConfirm(false)}>
+            <p className={p.muted}>Signing locks this prescription and can&apos;t be undone.</p>
+            <ul className={p.list} style={{ marginBlockStart: "var(--nb-space-12)" }}>
+              {rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}{i.instructions ? ` — ${i.instructions}` : ""}</li>)}
+            </ul>
+            {flaggedItems.length > 0 && (
+              <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockStart: "var(--nb-space-12)" }}>
+                <Icon name="alert" size={16} />
+                <span>
+                  Safety warnings on this prescription:
+                  <ul style={{ margin: "4px 0 0", paddingInlineStart: "18px" }}>
+                    {flaggedItems.map((i, n) => (
+                      <li key={n}>{i.drugName}: {[i.allergyWarning && `allergy — ${i.allergyWarning}`, i.pregnancyWarning, i.controlledSubstanceWarning].filter(Boolean).join("; ")}</li>
+                    ))}
+                  </ul>
+                  <label className={p.check} style={{ marginBlockStart: "8px" }}>
+                    <input type="checkbox" checked={signAck} onChange={(e) => setSignAck(e.target.checked)} />
+                    I have reviewed these warnings.
+                  </label>
+                </span>
+              </div>
+            )}
+            {signError && <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockStart: "var(--nb-space-12)" }}>{signError}</div>}
+            <div className={p.dialogActions}>
+              <button type="button" className={p.btn} onClick={() => setShowSignConfirm(false)}>Cancel</button>
+              <button type="button" className={p.btnPrimary} onClick={confirmSignRx} disabled={signing || (flaggedItems.length > 0 && !signAck)}>
+                {signing ? "Signing…" : "Sign prescription"}
+              </button>
+            </div>
+          </Dialog>
+        )}
+
+        {showTransfer && (
+          <Dialog title="Transfer to another department" onClose={() => setShowTransfer(false)}>
+            {transferTargets === null ? (
+              <Skeleton rows={2} label="Loading transfer options" />
+            ) : transferTargets.length === 0 ? (
+              <p className={p.muted}>This department isn&apos;t configured to transfer patients anywhere.</p>
+            ) : (
+              <>
+                <div className={styles.formRow}>
+                  <label className={styles.fieldLabel} htmlFor="trDept">Department</label>
+                  <select id="trDept" className={styles.select} value={transferDepartmentId} onChange={(e) => { setTransferDepartmentId(e.target.value); setTransferDoctorId(""); }}>
+                    <option value="">Select a department…</option>
+                    {transferTargets.map((t) => <option key={t.departmentId} value={t.departmentId}>{t.departmentName}</option>)}
+                  </select>
+                </div>
+                {transferDepartmentId && (
+                  <div className={styles.formRow}>
+                    <label className={styles.fieldLabel} htmlFor="trDoc">Doctor</label>
+                    <select id="trDoc" className={styles.select} value={transferDoctorId} onChange={(e) => setTransferDoctorId(e.target.value)}>
+                      <option value="">Select a doctor…</option>
+                      {transferTargets.find((t) => t.departmentId === transferDepartmentId)?.doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+            {transferError && <div className={`${p.notice} ${p.noticeDanger}`} role="alert">{transferError}</div>}
+            <div className={p.dialogActions}>
+              <button type="button" className={p.btn} onClick={() => setShowTransfer(false)}>Cancel</button>
+              <button type="button" className={p.btnPrimary} onClick={submitTransfer} disabled={transferring || !transferDepartmentId || !transferDoctorId}>
+                {transferring ? "Transferring…" : "Transfer"}
+              </button>
+            </div>
+          </Dialog>
+        )}
+
+        {showDental && pat && (
+          <DentalDrawer authedFetch={authedFetch} patientId={pat.id} patientName={pat.name} onClose={() => setShowDental(false)} />
+        )}
+        {dialogs}
       </main>
     );
   }
+
+  // ---- queue list ---------------------------------------------------------------------------
+
+  const visible = rows.filter((r) =>
+    statusFilter === "all" ? true
+    : statusFilter === "waiting" ? WAITING_STATUSES.includes(r.status)
+    : statusFilter === "in_consult" ? r.status === "in_consult"
+    : DONE_STATUSES.includes(r.status));
 
   return (
     <main className={styles.page}>
@@ -750,38 +1256,79 @@ export default function ConsultPage() {
         <p className={styles.subtitle}>Today&apos;s queue.</p>
       </div>
 
+      <div className={styles.toolbar}>
+        <div className={styles.seg} role="group" aria-label="Queue scope">
+          {([["mine", "My patients"], ["all", "All clinic"]] as const).map(([id, label]) => (
+            <button key={id} type="button" className={`${styles.segBtn} ${scope === id ? styles.segBtnOn : ""}`} aria-pressed={scope === id} onClick={() => changeScope(id)}>{label}</button>
+          ))}
+        </div>
+        <div className={styles.seg} role="group" aria-label="Status filter">
+          {([["all", "All"], ["waiting", "Waiting"], ["in_consult", "In consult"], ["done", "Done"]] as const).map(([id, label]) => (
+            <button key={id} type="button" className={`${styles.segBtn} ${statusFilter === id ? styles.segBtnOn : ""}`} aria-pressed={statusFilter === id} onClick={() => setStatusFilter(id)}>{label}</button>
+          ))}
+        </div>
+      </div>
+
       <div className={styles.card}>
         {loading ? (
-          <div className={styles.state}>Loading…</div>
+          <div style={{ padding: "0 16px" }}><Skeleton rows={5} label="Loading today's queue" /></div>
         ) : forbidden ? (
-          <div className={styles.state}>Your role doesn&apos;t have access to the queue.</div>
+          <EmptyState icon="shield" title="No access to the queue" hint="Your role doesn't include the consultation queue." />
         ) : error ? (
-          <div className={styles.errorState}>{error}</div>
+          <ErrorState message={error} onRetry={() => void load(scope)} />
         ) : rows.length === 0 ? (
-          <div className={styles.state}>No patients in today&apos;s queue.</div>
+          <EmptyState title="Nothing here today" hint={scope === "mine" ? "No patients are assigned to you in today's queue. Switch to All clinic to see everyone." : "No patients are in today's queue."}
+            action={<Link href="/patients" className={styles.actionBtnGhost} style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>Open patients</Link>} />
+        ) : visible.length === 0 ? (
+          <EmptyState title="No patients match this filter" hint="Choose another status to see the rest of the queue." />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th>Token</th><th>Patient</th><th>Status</th><th></th></tr>
+                <tr><th>Patient</th><th className={styles.hideNarrow}>Visit type</th><th>Clinical flags</th><th className={styles.hideNarrow}>Wait · arrival</th><th>Status</th><th><span className={p.srOnly}>Action</span></th></tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td className={styles.token}>{r.priority && <span className={styles.priorityDot} />}#{r.tokenNumber}</td>
-                    <td>{r.patientName}</td>
-                    <td><span className={`${styles.pill} ${STATUS_CLASS[r.status] ?? ""}`}>{r.status.replace("_", " ")}</span></td>
-                    <td>
-                      {r.status === "vitals_done" && <button className={styles.actionBtn} onClick={() => startConsult(r)}>Start consult</button>}
-                      {r.status === "in_consult" && <button className={styles.actionBtn} onClick={() => openConsult(r)}>Resume</button>}
-                    </td>
-                  </tr>
-                ))}
+                {visible.map((r) => {
+                  const waiting = WAITING_STATUSES.includes(r.status);
+                  const mins = waiting && now ? minutesSince(r.createdAt, now) : null;
+                  const mine = r.doctorId === selfId;
+                  const pt = r.patient;
+                  return (
+                    <tr key={r.id}>
+                      <td className={styles.token}>
+                        #{r.tokenNumber} {r.patientName}
+                        <span className={styles.subline}>{[pt ? `${age(pt.dob)} y` : null, r.presentingComplaint?.trim() || null].filter(Boolean).join(" · ") || "No reason recorded"}</span>
+                      </td>
+                      <td className={styles.hideNarrow}>{r.appointmentId ? "Appointment" : (VISIT_LABEL[r.source ?? ""] ?? "Walk-in")}</td>
+                      <td>
+                        <div className={styles.flags}>
+                          {r.priority && <StatusPill tone="urgent" label={r.priorityReason ? `Urgent: ${r.priorityReason}` : "Urgent"} />}
+                          {pt && pt.allergies.length > 0 && <StatusPill tone="danger" label="Allergy" />}
+                          {pt && pt.chronicConditions.length > 0 && <StatusPill tone="warn" icon="pulse" label="Chronic" />}
+                          {pt && pt.activePackages > 0 && <StatusPill tone="info" icon="package" label="Package" />}
+                          {!pt && <StatusPill tone="warn" label="Flags unavailable" />}
+                        </div>
+                      </td>
+                      <td className={styles.hideNarrow}>
+                        {waiting ? <>{mins !== null ? `${mins} min` : "—"}{r.createdAt ? <span className={styles.subline}>{new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span> : null}</> : "—"}
+                      </td>
+                      <td><StatusBadge status={r.status} /></td>
+                      <td>
+                        {r.status === "in_consult" && mine
+                          ? <button className={styles.actionBtn} onClick={() => openRow(r)}>Resume</button>
+                          : r.status === "vitals_done" && mine
+                            ? <button className={styles.actionBtn} onClick={() => openRow(r)}>Start consultation</button>
+                            : <button className={styles.actionBtnGhost} onClick={() => openRow(r)}>Summary</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+      {dialogs}
     </main>
   );
 }

@@ -27,17 +27,30 @@
   margin: 0;
 }
 
-.registerBtn {
+.headerActions {
+  display: flex;
+  gap: var(--nb-space-8);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.secondaryBtn {
   height: 40px;
   padding: 0 var(--nb-space-16);
-  border: none;
+  border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);
-  background: var(--nb-accent-gradient);
-  color: var(--nb-on-accent);
+  background: transparent;
+  color: var(--nb-text-primary);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.secondaryBtn:hover {
+  background: var(--nb-surface-2);
+  border-color: var(--nb-border-strong);
 }
 
 .tabs {
@@ -57,6 +70,19 @@
   flex-wrap: wrap;
 }
 
+.primaryAction {
+  height: 34px;
+  padding: 0 var(--nb-space-16);
+  border: none;
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .tab {
   height: 34px;
   padding: 0 var(--nb-space-12);
@@ -68,6 +94,30 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+}
+
+/* Inline count chip (flex, not float) — REC-003's wireframe treatment, applied to the tab counts. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--nb-surface-3);
+  color: var(--nb-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabActive .chip {
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
 }
 
 .tabActive {
@@ -102,7 +152,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -124,22 +174,41 @@
   border-bottom: none;
 }
 
-.table tr:hover td {
+.row {
+  cursor: pointer;
+}
+
+.row:hover td {
   background: var(--nb-surface-2);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--nb-accent-500);
+  outline-offset: -2px;
+}
+
+.priorityTag {
+  margin-inline-start: var(--nb-space-8);
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--nb-space-8);
+  justify-content: flex-end;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .token {
   font-weight: 600;
   color: var(--nb-text-primary);
-}
-
-.priorityDot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--nb-danger-500);
-  margin-right: 6px;
 }
 
 .patientName {
@@ -157,25 +226,6 @@
 .muted {
   color: var(--nb-text-tertiary);
 }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.pillWaiting { background: var(--nb-surface-3); color: var(--nb-text-secondary); }
-.pillVitals { background: rgba(240, 175, 69, 0.14); color: #e0a63a; }
-.pillReady,
-.pillConsult { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillDone { background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
-.pillNoShow { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
 
 .actionBtn {
   height: 28px;
@@ -250,57 +300,6 @@
   font-size: 12px;
 }
 
-/* Record vitals / Mark priority / Announce delay — quick confirmations, centered per DESIGN.md
-   §8.11 (modal reserved for that; drawer is for anything more like a form/navigation). */
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-}
-
-.modal {
-  width: 460px;
-  max-width: 92%;
-  max-height: 85vh;
-  overflow-y: auto;
-  background: var(--nb-surface-1);
-  border: 1px solid var(--nb-border-default);
-  border-radius: var(--nb-radius-lg);
-  padding: var(--nb-space-24);
-}
-
-/* Register walk-in — DESIGN.md §8.10: "the default container for register-walk-in", docked to
-   the inline-end edge (right in LTR), not a centered modal covering the page. */
-.drawerOverlay {
-  position: fixed;
-  inset: 0;
-  background: var(--nb-scrim);
-  z-index: 10;
-}
-
-.drawer {
-  position: fixed;
-  inset-block: 0;
-  inset-inline-end: 0;
-  width: 480px;
-  max-width: 92vw;
-  overflow-y: auto;
-  background: var(--nb-surface-overlay);
-  border-inline-start: 1px solid var(--nb-border-default);
-  padding: var(--nb-space-24);
-  z-index: 11;
-}
-
-.modalTitle {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 var(--nb-space-16);
-}
-
 .field {
   display: flex;
   flex-direction: column;
@@ -340,15 +339,23 @@
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);
   margin-top: var(--nb-space-8);
-  max-height: 160px;
+  max-height: 240px;
   overflow-y: auto;
 }
 
 .searchResultRow {
+  display: block;
+  width: 100%;
+  min-height: 40px;
   padding: var(--nb-space-8) var(--nb-space-12);
-  font-size: 13px;
-  cursor: pointer;
+  background: transparent;
+  border: none;
   border-bottom: 1px solid var(--nb-border-subtle);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
 }
 
 .searchResultRow:last-child {
@@ -453,4 +460,243 @@
   composes: segment;
   background: var(--nb-accent-gradient);
   color: var(--nb-on-accent);
+}
+
+/* Side column, doctor rows and callback list */
+.sideCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-16);
+  min-width: 0;
+}
+
+.doctorRowStack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--nb-space-4);
+}
+
+.doctorLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nb-space-8);
+  width: 100%;
+}
+
+.delayLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nb-space-8);
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--nb-text-secondary);
+}
+
+.alignStart {
+  align-self: flex-start;
+}
+
+.callbackNote {
+  font-size: 12px;
+  color: var(--nb-text-secondary);
+}
+
+.appointmentRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--nb-space-12);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  font-size: 13px;
+}
+
+.appointmentRow:last-child {
+  border-bottom: none;
+}
+
+/* Detail rail (drawer) */
+.railStatus {
+  display: flex;
+  gap: var(--nb-space-8);
+  flex-wrap: wrap;
+  margin-bottom: var(--nb-space-12);
+}
+
+.railNote {
+  margin: 0 0 var(--nb-space-12);
+  font-size: 13px;
+  color: var(--nb-text-secondary);
+}
+
+.railList {
+  margin: 0 0 var(--nb-space-16);
+  display: grid;
+  gap: var(--nb-space-8);
+}
+
+.railList div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--nb-space-12);
+  padding-block: var(--nb-space-4);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  font-size: 13px;
+}
+
+.railList dt {
+  color: var(--nb-text-tertiary);
+}
+
+.railList dd {
+  margin: 0;
+  color: var(--nb-text-primary);
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.railActions {
+  display: flex;
+  gap: var(--nb-space-8);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--nb-space-16);
+}
+
+/* Duplicate review (REC-019) */
+.matchList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-8);
+  margin-top: var(--nb-space-12);
+}
+
+.matchRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  background: var(--nb-surface-2);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  font-size: 13px;
+}
+
+/* Responsive (REC-007): tablet <=1024, phone <=430 (DESIGN.md §4). */
+@media (max-width: 1024px) {
+  .page {
+    padding: var(--nb-space-24) var(--nb-space-16);
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .colVisit {
+    display: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .page {
+    padding: var(--nb-space-16) var(--nb-space-12);
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerActions {
+    justify-content: flex-start;
+  }
+
+  .segmented {
+    width: 100%;
+  }
+
+  .segment,
+  .segmentActive {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Tabs and quick actions scroll sideways instead of wrapping into a wall of buttons. */
+  .tabs,
+  .quickActions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: var(--nb-space-4);
+  }
+
+  .tab,
+  .tabActive,
+  .actionBtn,
+  .primaryAction {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .colDoctor {
+    display: none;
+  }
+
+  /* Worklist rows become stacked cards. */
+  .table thead {
+    display: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tr,
+  .table td {
+    display: block;
+    width: 100%;
+  }
+
+  .table tr {
+    padding: var(--nb-space-8) 0;
+    border-bottom: 1px solid var(--nb-border-subtle);
+  }
+
+  .table tr:last-child {
+    border-bottom: none;
+  }
+
+  .table td {
+    border-bottom: none;
+    padding: var(--nb-space-4) var(--nb-space-16);
+    white-space: normal;
+  }
+
+  .table td[data-label]::before {
+    content: attr(data-label);
+    display: inline-block;
+    min-width: 64px;
+    margin-inline-end: var(--nb-space-8);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--nb-text-tertiary);
+  }
+
+  .rowActions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .matchRow {
+    grid-template-columns: 1fr;
+  }
+
+  .modalActions {
+    flex-direction: column-reverse;
+  }
+
+  .modalActions > button {
+    width: 100%;
+  }
 }

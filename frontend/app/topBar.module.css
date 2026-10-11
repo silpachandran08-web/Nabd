@@ -135,3 +135,7 @@
     animation: none;
   }
 }
+
+@media (max-width: 430px) {
+  .iconBtn, .kbd { display: none; }
+}
