@@ -79,7 +79,8 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
   const ownerAction: { label: string; href: string; permission?: string } | undefined = isOwner() && pathname !== "/billing" && getPermissions().includes("billing:approve")
     ? { label: "Start day close", href: "/billing?action=close" }
     : undefined;
-  const action = (pathname ? PRIMARY_ACTIONS[pathname] : undefined) ?? ownerAction;
+  // The owner's day-close action wins over a page-level shortcut (wireframe PRIMARY.owner).
+  const action = ownerAction ?? (pathname ? PRIMARY_ACTIONS[pathname] : undefined);
   const primaryAction = action && (!action.permission || getPermissions().includes(action.permission)) ? action : undefined;
 
   return (

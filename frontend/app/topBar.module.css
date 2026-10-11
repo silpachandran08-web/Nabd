@@ -33,6 +33,7 @@
   height: 36px;
   padding: 0 var(--nb-space-12);
   flex: 1;
+  min-width: 0;
   max-width: 420px;
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);
@@ -107,21 +108,21 @@
 }
 
 .syncOnline {
-  background: rgba(52, 211, 153, 0.14);
-  color: #34d399;
+  background: var(--nb-success-tint);
+  color: var(--nb-success-500);
 }
 
 .syncOnline .syncDot {
-  background: #34d399;
+  background: var(--nb-success-500);
 }
 
 .syncOffline {
-  background: rgba(139, 147, 245, 0.15);
-  color: #8b93f5;
+  background: var(--nb-info-tint);
+  color: var(--nb-info-500);
 }
 
 .syncOffline .syncDot {
-  background: #8b93f5;
+  background: var(--nb-info-500);
   animation: nbPulse 1.6s infinite;
 }
 
@@ -137,5 +138,8 @@
 }
 
 @media (max-width: 430px) {
-  .iconBtn, .kbd { display: none; }
+  .iconBtn, .kbd, .spacer { display: none; }
+  .bar { padding: 0 var(--nb-space-12); gap: var(--nb-space-8); }
+  .primaryAction { padding: 0 var(--nb-space-12); white-space: nowrap; }
+  .syncPill { padding: 0 var(--nb-space-8); }
 }
