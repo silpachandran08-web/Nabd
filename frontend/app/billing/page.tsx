@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./billing.module.css";
-import { getPermissions } from "../lib/session";
+import { getIdentity, getPermissions } from "../lib/session";
+import { can } from "../lib/permissions";
+import Icon, { type IconName } from "../components/ui/Icon";
+import { paymentMethodLabel } from "../components/checkout/paymentMethods";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -41,6 +44,8 @@ export default function BillingPage() {
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [canApprove, setCanApprove] = useState(false);
+  const [canSetup, setCanSetup] = useState(false);
+  const [region, setRegion] = useState<string | undefined>(undefined);
   const [counted, setCounted] = useState(""); // cash counted, as typed
   const [dialog, setDialog] = useState<"close" | "reopen" | null>(null);
 
@@ -69,6 +74,8 @@ export default function BillingPage() {
     setError(null);
     try {
       setCanApprove(getPermissions().includes("billing:approve"));
+      setCanSetup(can("setup:view"));
+      setRegion(getIdentity()?.tenantRegion);
       const res = await authedFetch("/billing/day-close");
       if (!res) return;
       if (res.status === 403) {
@@ -79,7 +86,13 @@ export default function BillingPage() {
         setError("Couldn't load today's billing. Try again.");
         return;
       }
-      setS(await res.json());
+      const summary = await res.json();
+      setS(summary);
+      // The owner top bar's "Start day close" lands here with ?action=close.
+      if (new URLSearchParams(window.location.search).get("action") === "close"
+        && getPermissions().includes("billing:approve") && summary.today && summary.close?.status !== "closed") {
+        setDialog("close");
+      }
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     }
@@ -108,18 +121,19 @@ export default function BillingPage() {
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const signed = (v: number) => (v > 0 ? "+" : v < 0 ? "−" : "") + money.format(Math.abs(v));
 
-  const kpis: [string, string, string][] = [
-    ["Total billed", money.format(Number(s.totals.billed)), plural(s.totals.bills, "bill", "bills")],
+  const upiLabel = paymentMethodLabel("upi", region);
+  const kpis: [string, string, string, IconName, string][] = [
+    ["Total billed", money.format(Number(s.totals.billed)), plural(s.totals.bills, "bill", "bills"), "receipt", "info"],
     ["Total collected", money.format(Number(s.totals.collected)),
-      Number(s.totals.billed) > 0 ? `${Math.round((Number(s.totals.collected) / Number(s.totals.billed)) * 100)}% of billed` : "nothing billed yet"],
-    ["Cash", money.format(expectedCash), "expected in drawer"],
-    ["Card", money.format(Number(m.card.amount)), plural(m.card.transactions, "transaction", "transactions")],
-    ["UPI", money.format(Number(m.upi.amount)), plural(m.upi.transactions, "transaction", "transactions")],
-    ["Outstanding balances", money.format(Number(s.outstanding.amount)), plural(s.outstanding.patients, "patient", "patients")],
-    ["Refunds recorded", "—", "not tracked yet"],
-    [`${s.taxLabel} collected`, money.format(Number(s.totals.tax)), "reconciles to line items"],
-    ["Pending checkouts", String(s.pendingCheckouts), "on the reception worklist"],
-    ["Consultations without a bill", String(s.unbilled.length), s.unbilled.length ? "blocks day close" : "nothing blocking"],
+      Number(s.totals.billed) > 0 ? `${Math.round((Number(s.totals.collected) / Number(s.totals.billed)) * 100)}% of billed` : "nothing billed yet", "check", "ok"],
+    ["Cash", money.format(expectedCash), "expected in drawer", "list", "ok"],
+    ["Card", money.format(Number(m.card.amount)), plural(m.card.transactions, "transaction", "transactions"), "list", "info"],
+    [upiLabel, money.format(Number(m.upi.amount)), plural(m.upi.transactions, "transaction", "transactions"), "sync", "sync"],
+    ["Outstanding balances", money.format(Number(s.outstanding.amount)), plural(s.outstanding.patients, "patient", "patients"), "clock", "warn"],
+    ["Refunds recorded", "—", "out of scope this pass", "refresh", "neutral"],
+    [`${s.taxLabel} collected`, money.format(Number(s.totals.tax)), "reconciles to line items", "shield", "info"],
+    ["Pending checkouts", String(s.pendingCheckouts), "on the reception worklist", "users", "warn"],
+    ["Consultations without a bill", String(s.unbilled.length), s.unbilled.length ? "blocks day close" : "nothing blocking", s.unbilled.length ? "alert" : "check", s.unbilled.length ? "danger" : "ok"],
   ];
 
   return (
@@ -135,7 +149,7 @@ export default function BillingPage() {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <Link className={styles.btn} href="/setup?tab=charges">Charges &amp; Taxes</Link>
+          {canSetup && <Link className={styles.btn} href="/setup?tab=charges">Charges &amp; Taxes</Link>}
           {canApprove && s.today && (closed
             ? <button type="button" className={styles.btnPrimary} onClick={() => setDialog("reopen")}>Unlock day</button>
             : <button type="button" className={styles.btnPrimary} onClick={() => setDialog("close")}>Start day close</button>)}
@@ -145,10 +159,13 @@ export default function BillingPage() {
       {error && <div className={styles.error} role="alert">{error}</div>}
 
       <div className={styles.kpis}>
-        {kpis.map(([label, value, sub], i) => (
+        {kpis.map(([label, value, sub, icon, tone], i) => (
           <div key={label} className={styles.kpi}>
-            <div className={styles.kpiLabel}>{label}</div>
-            <div className={styles.kpiValue} style={i === 9 && s.unbilled.length ? { color: "var(--bl-bad)" } : undefined}>{value}</div>
+            <div className={styles.kpiLabel}>
+              <span style={{ color: `var(--nb-${tone}-500, var(--nb-text-tertiary))`, display: "inline-flex", marginInlineEnd: 6, verticalAlign: "middle" }}><Icon name={icon} size={13} /></span>
+              {label}
+            </div>
+            <div className={styles.kpiValue} style={i === 9 && s.unbilled.length ? { color: "var(--nb-danger-500)" } : undefined}>{value}</div>
             <div className={styles.kpiSub}>{sub}</div>
           </div>
         ))}
@@ -233,7 +250,7 @@ export default function BillingPage() {
         <section className={styles.card} aria-label="Card and digital settlement">
           <div className={styles.cardHead}>Card &amp; digital settlement</div>
           <div className={styles.line}><span>Card settlement total</span><span className={styles.amtOk}>{money.format(Number(m.card.amount))}</span></div>
-          <div className={styles.line}><span>UPI</span><span className={styles.amtOk}>{money.format(Number(m.upi.amount))}</span></div>
+          <div className={styles.line}><span>{upiLabel}</span><span className={styles.amtOk}>{money.format(Number(m.upi.amount))}</span></div>
           {Number(m.other.amount) > 0 && (
             <div className={styles.line}><span>Other</span><span className={styles.amtOk}>{money.format(Number(m.other.amount))}</span></div>
           )}
@@ -352,7 +369,7 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
             <label className={styles.countLabel} htmlFor="close-note">
               Note{beyond ? ` (required — off by more than ${money.format(Number(summary.cashTolerance))})` : " (optional)"}
             </label>
-            <textarea id="close-note" className={styles.textarea} value={note} onChange={(e) => setNote(e.target.value)} />
+            <textarea id="close-note" className={styles.textarea} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         )}
         {error && <div className={styles.error} role="alert" style={{ marginTop: 12 }}>{error}</div>}
@@ -410,7 +427,7 @@ function ReopenDialog({ authedFetch, onClose, onDone }: {
           ))}
         </fieldset>
         {choice === "other" && (
-          <input aria-label="Other reason" className={styles.input} style={{ width: "100%", marginTop: 8 }} value={other} autoFocus
+          <input aria-label="Other reason" maxLength={500} className={styles.input} style={{ width: "100%", marginTop: 8 }} value={other} autoFocus
             onChange={(e) => setOther(e.target.value)} placeholder="What needs correcting?" />
         )}
         {error && <div className={styles.error} role="alert" style={{ marginTop: 12 }}>{error}</div>}
