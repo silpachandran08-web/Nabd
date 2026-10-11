@@ -68,7 +68,7 @@ class PrescriptionRepository {
     }
 
     List<PrescriptionItemRow> findItems(UUID tenantId, UUID prescriptionId) {
-        return jdbc.query("SELECT * FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
+        return jdbc.query("SELECT *, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
                         "ORDER BY display_order",
                 itemMapper(), tenantId, prescriptionId);
     }
@@ -87,9 +87,11 @@ class PrescriptionRepository {
         int order = 0;
         for (PrescriptionItemRow item : items) {
             jdbc.update("INSERT INTO prescription_items (tenant_id, prescription_id, drug_name, dosage, frequency, " +
-                            "  duration, instructions, allergy_override_reason, display_order) VALUES (?,?,?,?,?,?,?,?,?)",
+                            "  duration, instructions, allergy_override_reason, display_order, overrides) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb)",
                     tenantId, prescriptionId, item.drugName(), item.dosage(), item.frequency(), item.duration(),
-                    item.instructions(), item.allergyOverrideReason(), order++);
+                    item.instructions(), item.allergyOverrideReason(), order++,
+                    item.overridesJson() == null ? "[]" : item.overridesJson());
         }
     }
 
@@ -167,6 +169,7 @@ class PrescriptionRepository {
                 rs.getString("duration"),
                 rs.getString("instructions"),
                 rs.getString("allergy_override_reason"),
-                rs.getInt("display_order"));
+                rs.getInt("display_order"),
+                rs.getString("overrides_json"));
     }
 }

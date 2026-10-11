@@ -21,7 +21,7 @@ type QueueEntry = {
 };
 type Row = QueueEntry & {
   patientName: string; patientMrn: string; doctorName: string;
-  allergies: string[]; chronicConditions: string[];
+  allergies: string[]; chronicConditions: string[]; dob: string | null;
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
 };
 // A patient's clinical-flags chips: allergy (danger), chronic condition (warn), presenting
@@ -41,7 +41,7 @@ function statusLabel(s: string): string {
   const t = s.replace(/_/g, " ");
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-const hhmm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 // Vitals validation. HARD limits are physiologically impossible values (almost certainly a typo
 // such as temp 370) and block saving; SOFT ranges are the usual adult range and only raise a
@@ -82,9 +82,17 @@ function vitalsErrors(f: VitalsForm): Partial<Record<VitalKey | "form", string>>
   return errs;
 }
 
-function softWarning(key: VitalKey, raw: string): string | null {
+// The soft ranges are adult ranges: for a child (or when the age is unknown) showing "outside usual
+// range" would mislead, so no hint is given; the server's age-banded flags still appear after save.
+function isAdult(dob: string | null): boolean {
+  if (!dob) return false;
+  const born = new Date(dob).getTime();
+  return Number.isFinite(born) && Date.now() - born >= 18 * 365.25 * 86_400_000;
+}
+
+function softWarning(key: VitalKey, raw: string, adult: boolean): string | null {
   const d = VITAL_FIELDS.find((x) => x.key === key);
-  if (!d?.soft || raw.trim() === "") return null;
+  if (!adult || !d?.soft || raw.trim() === "") return null;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < d.min || n > d.max) return null;
   return n < d.soft[0] || n > d.soft[1] ? `Outside usual range (${d.soft[0]}–${d.soft[1]} ${d.unit}) — recheck` : null;
@@ -115,7 +123,7 @@ type ProcedureOrder = {
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
 type Problem = { title: string; detail: string };
-const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view" } as const;
+const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueEdit: "queue:edit" } as const;
 type Tab = "vitals" | "priority" | "administration" | "procedures" | "activity";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -297,10 +305,10 @@ function NursingWorklist() {
       }
       const withNames = async (list: QueueEntry[]) => Promise.all(list.map(async (e) => {
         const pRes = await authedFetch(`/patients/${e.patientId}`);
-        const p: { name?: string; mrn?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
+        const p: { name?: string; mrn?: string; dob?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
         return {
           ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—",
-          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
+          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [], dob: p?.dob ?? null,
           lastVitalsAt: null, vitalsOutOfRange: false,
         };
       }));
@@ -596,6 +604,8 @@ function NursingWorklist() {
   const canCaptureVitals = allow(PERM.vitalsWrite);
   const canCreateOrders = allow(PERM.create);
   const canEditOrders = allow(PERM.edit);
+  // Flagging and acknowledging priority call POST /queue/{id}/reorder and /priority/acknowledge (queue:edit).
+  const canFlagPriority = allow(PERM.queueEdit);
   const showSkeleton = !loaded && !error;
   const showLoadError = !loaded && !!error;
   const vitalsEmpty = {
@@ -670,7 +680,7 @@ function NursingWorklist() {
         <>
           <div className={`${styles.headerActions} ${styles.actionsGap}`}>
             {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}>Capture vitals</button>}
-            <button className={styles.smallBtn} onClick={() => openUrgentPicker()}>Mark urgent</button>
+            {canFlagPriority && <button className={styles.smallBtn} onClick={() => openUrgentPicker()}>Mark urgent</button>}
           </div>
 
           <div className={styles.layout}>
@@ -762,7 +772,7 @@ function NursingWorklist() {
                             : <StatusPill tone="urgent" label="Awaiting acknowledgement" icon="clock" />}
                         </td>
                         <td data-label="State"><StatusPill tone={r.priorityAcknowledgedAt ? "info" : "neutral"} label={statusLabel(r.status)} icon={r.priorityAcknowledgedAt ? "check" : "list"} /></td>
-                        <td data-label="">{!r.priorityAcknowledgedAt && <button className={styles.actionBtn} onClick={() => acknowledgePriority(r.id)}>Acknowledge</button>}</td>
+                        <td data-label="">{!r.priorityAcknowledgedAt && canFlagPriority && <button className={styles.actionBtn} onClick={() => acknowledgePriority(r.id)}>Acknowledge</button>}</td>
                       </tr>
                     );
                   })}
@@ -952,7 +962,7 @@ function NursingWorklist() {
             <div className={styles.fieldGrid}>
               {VITAL_FIELDS.map((d) => {
                 const showErr = (vitalsAttempted || vitalsTouched[d.key]) ? vErrors[d.key] : undefined;
-                const warn = showErr ? null : softWarning(d.key, vitalsForm[d.key]);
+                const warn = showErr ? null : softWarning(d.key, vitalsForm[d.key], isAdult(vitalsRow?.dob ?? null));
                 return (
                   <div className={styles.field} key={d.key}>
                     <label className={styles.label} htmlFor={d.key}>{d.label} ({d.unit})</label>
@@ -972,7 +982,7 @@ function NursingWorklist() {
             </div>
             {vitalsError && <div className={styles.formError} role="alert">{vitalsError}</div>}
             <div className={styles.modalActions}>
-              {vitalsRow && !vitalsRow.priority && (
+              {canFlagPriority && vitalsRow && !vitalsRow.priority && (
                 <button type="button" className={`${styles.smallBtn} ${styles.pushStart}`} onClick={() => openUrgentPicker(vitalsRow.id)}>Mark urgent</button>
               )}
               <button type="button" className={styles.cancelBtn} onClick={closeVitalsModal}>Cancel</button>
@@ -1003,7 +1013,7 @@ function NursingWorklist() {
         </div>
       )}
 
-      {showUrgentPicker && (
+      {showUrgentPicker && canFlagPriority && (
         <div className={styles.overlay} onClick={() => setShowUrgentPicker(false)}>
           <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitMarkUrgent}>
             <h2 className={styles.modalTitle}>Mark urgent</h2>

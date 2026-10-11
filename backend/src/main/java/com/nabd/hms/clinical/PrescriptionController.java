@@ -49,8 +49,8 @@ public class PrescriptionController {
 
     @PostMapping("/prescriptions/{queueEntryId}/sign")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.sign(tenantId(jwt), queueEntryId);
+    public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
+        return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), RequestMeta.clientIp(http));
     }
 
     @GetMapping("/patients/{patientId}/prescriptions")

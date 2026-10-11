@@ -8,18 +8,21 @@ import Icon from "../components/ui/Icon";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
+import { getIdentity } from "../lib/session";
 import { useClinicalContext } from "../components/consult/clinical";
+import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
 import DentalDrawer from "../components/consult/DentalDrawer";
 import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
+import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import SafetyStrip from "../components/consult/SafetyStrip";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
   age, DONE_STATUSES, initials, minutesSince, rxItemLine, statusLabel, WAITING_STATUSES,
-  type PatientDetail, type Prescription, type PrescriptionItem, type Problem, type QueueEntry, type Row,
+  type PatientDetail, type Prescription, type PrescriptionItem, type Problem, type QueueEntry, type Row, type RxWarning,
 } from "../components/consult/shared";
 import p from "../components/consult/consultParts.module.css";
 import styles from "./consult.module.css";
@@ -47,7 +50,7 @@ const STEPS: { id: Step; label: string; hint: string }[] = [
   { id: "close", label: "Close", hint: "Review and hand off" },
 ];
 
-const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "", allergyOverrideReason: "" };
+const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "" };
 
 // The API returns nullable dosage/frequency/duration/instructions (a favourite set commonly omits
 // duration) — every input below is a controlled component, so null must become "" before it renders.
@@ -55,7 +58,6 @@ function normalizeRxItem(i: PrescriptionItem): PrescriptionItem {
   return {
     ...i,
     dosage: i.dosage ?? "", frequency: i.frequency ?? "", duration: i.duration ?? "", instructions: i.instructions ?? "",
-    allergyOverrideReason: i.allergyOverrideReason ?? "",
   };
 }
 
@@ -112,6 +114,9 @@ export default function ConsultPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selfId, setSelfId] = useState("");
   const [now, setNow] = useState(0);
+  // The URL mirrors the open visit, but only once a ?entry= deep link has been read; otherwise the
+  // mirror effect would strip the params on mount, before the deep link is consumed.
+  const [urlReady, setUrlReady] = useState(false);
 
   const [activeEntry, setActiveEntry] = useState<Row | null>(null);
   const [activePatient, setActivePatient] = useState<PatientDetail | null>(null);
@@ -145,6 +150,10 @@ export default function ConsultPage() {
   const [rxError, setRxError] = useState<string | null>(null);
   const [showSignConfirm, setShowSignConfirm] = useState(false);
   const [signAck, setSignAck] = useState(false);
+  const [rxDirty, setRxDirty] = useState(false); // edits since the last save: the warnings shown are then out of date
+  const [override, setOverride] = useState<{ index: number; warning: RxWarning } | null>(null);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
+  const [showAllergies, setShowAllergies] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
   const [favouriteSets, setFavouriteSets] = useState<FavouriteRxSet[]>([]);
@@ -244,6 +253,7 @@ export default function ConsultPage() {
       const q = new URLSearchParams(window.location.search);
       const entry = q.get("entry");
       if (entry) deepLinkRef.current = { entry, step: isStep(q.get("step")) ? (q.get("step") as Step) : null };
+      else setUrlReady(true);
       setOnline(navigator.onLine);
       return load("mine");
     });
@@ -270,6 +280,7 @@ export default function ConsultPage() {
 
   // Keep the visit and step in the URL so My Day (and a reload) can deep-link into the workspace.
   useEffect(() => {
+    if (!urlReady) return;
     const url = new URL(window.location.href);
     if (activeEntry) {
       url.searchParams.set("entry", activeEntry.id);
@@ -279,7 +290,7 @@ export default function ConsultPage() {
       url.searchParams.delete("step");
     }
     window.history.replaceState(null, "", url);
-  }, [activeEntry, step]);
+  }, [activeEntry, step, urlReady]);
 
   // ---- note persistence ---------------------------------------------------------------------
 
@@ -421,6 +432,9 @@ export default function ConsultPage() {
     setRxItems([]);
     setRxStatus("draft");
     setRxError(null);
+    setRxDirty(false);
+    setOverride(null);
+    setShowAllergies(false);
     setFavouriteSets([]);
     setNewSetName("");
     setDoseMgPerKg("");
@@ -498,8 +512,9 @@ export default function ConsultPage() {
   // Deep link (?entry=&step=) once the queue is loaded.
   useEffect(() => {
     const link = deepLinkRef.current;
-    if (!link || loading || rows.length === 0) return;
+    if (!link || loading) return;
     deepLinkRef.current = null;
+    setUrlReady(true);
     const row = rows.find((r) => r.id === link.entry);
     if (!row) return;
     if (row.status === "in_consult" && row.doctorId === selfId) void Promise.resolve().then(() => openConsult(row, link.step ?? undefined));
@@ -509,30 +524,48 @@ export default function ConsultPage() {
 
   // ---- prescription -------------------------------------------------------------------------
 
-  function updateRxItem(index: number, field: keyof PrescriptionItem, value: string) {
-    setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  // Editing a line drops its warnings from view (they were computed for the old text); the server
+  // recomputes them on the next save, and signing is checked again on the server regardless.
+  function updateRxItem(index: number, field: "drugName" | "dosage" | "frequency" | "duration" | "instructions", value: string) {
+    setRxDirty(true);
+    setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value, ...(field === "drugName" ? { warnings: undefined } : {}) } : item)));
   }
-  function addRxItem() { setRxItems((prev) => [...prev, { ...BLANK_RX_ITEM }]); }
-  function removeRxItem(index: number) { setRxItems((prev) => prev.filter((_, i) => i !== index)); }
+  function addRxItem() { setRxDirty(true); setRxItems((prev) => [...prev, { ...BLANK_RX_ITEM }]); }
+  function removeRxItem(index: number) { setRxDirty(true); setRxItems((prev) => prev.filter((_, i) => i !== index)); }
+  function focusDrug(index: number) {
+    const el = document.getElementById(`rx-drug-${index}`) as HTMLInputElement | null;
+    el?.focus();
+    el?.select();
+  }
 
-  async function saveRx() {
-    if (!activeEntry) return false;
+  // Saves the pad and returns the saved prescription (with the server's current warnings), or null.
+  // Only the fields the API accepts are sent; a recorded decision is carried by the server unless a new
+  // one is passed in `overrides` (keyed by item index).
+  async function saveRx(overrides?: { index: number; kind: string; reasonCode: string; note: string }): Promise<Prescription | null> {
+    if (!activeEntry) return null;
     setRxSaving(true);
     setRxError(null);
     try {
-      const items = rxItems.filter((i) => i.drugName.trim() !== "");
+      const items = rxItems
+        .map((i, index) => ({ i, index }))
+        .filter(({ i }) => i.drugName.trim() !== "")
+        .map(({ i, index }) => ({
+          drugName: i.drugName, dosage: i.dosage, frequency: i.frequency, duration: i.duration, instructions: i.instructions,
+          overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined }] : undefined,
+        }));
       const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}`, { method: "PATCH", body: JSON.stringify({ items }) });
       if (!res?.ok) {
         const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't save prescription." }));
         setRxError(pr?.detail || "Couldn't save prescription.");
-        return false;
+        return null;
       }
       const rx: Prescription = await res.json();
       setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
-      return true;
+      setRxDirty(false);
+      return rx;
     } catch {
       setRxError("Couldn't reach the server. Check your connection and try again.");
-      return false;
+      return null;
     } finally {
       setRxSaving(false);
     }
@@ -545,7 +578,11 @@ export default function ConsultPage() {
       setRxError("Add at least one drug before signing.");
       return;
     }
-    if (!(await saveRx())) return;
+    const saved = await saveRx();
+    if (!saved) return;
+    if (saved.items.some((i) => (i.warnings ?? []).some((w) => w.requiresDecision && !w.resolved))) {
+      return; // the warning cards and the "Resolve the warning first" button now show what is open
+    }
     setSignAck(false);
     setSignError(null);
     setShowSignConfirm(true);
@@ -561,6 +598,13 @@ export default function ConsultPage() {
       if (!res.ok) {
         const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't sign the prescription." }));
         setSignError(pr.detail || "Couldn't sign the prescription.");
+        // The server re-checks safety at signing (e.g. an allergy recorded since the last save): show its current view.
+        const fresh = await authedFetch(`/clinical/prescriptions/${activeEntry.id}`);
+        if (fresh?.ok) {
+          const rx: Prescription = await fresh.json();
+          setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
+          setRxDirty(false);
+        }
         return;
       }
       setRxStatus("signed");
@@ -572,6 +616,15 @@ export default function ConsultPage() {
     } finally {
       setSigning(false);
     }
+  }
+
+  async function confirmOverride(reasonCode: string, note: string) {
+    if (!override) return;
+    setOverrideError(null);
+    const saved = await saveRx({ index: override.index, kind: override.warning.kind, reasonCode, note });
+    if (!saved) { setOverrideError("The decision was not recorded. Nothing was changed; try again."); return; }
+    setOverride(null);
+    setNotice("Decision recorded and audited.");
   }
 
   async function calculateDose() {
@@ -605,6 +658,7 @@ export default function ConsultPage() {
     if (res?.ok) {
       const rx: Prescription = await res.json();
       setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
+      setRxDirty(false);
       setRxError(null);
     } else {
       const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't apply set." }));
@@ -704,7 +758,8 @@ export default function ConsultPage() {
       }
       const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
       if (!statusRes?.ok) {
-        setShellError("Note signed, but couldn't move the patient to checkout. Use “Retry checkout handoff”.");
+        const pr: Problem | null = await statusRes?.json().catch(() => null);
+        setShellError(`Note signed, but couldn't move the patient to checkout${pr?.detail ? ` (${pr.detail})` : ""}. Use “Retry checkout handoff”.`);
         return;
       }
       setActiveEntry((prev) => (prev ? { ...prev, status: "checkout_pending" } : prev));
@@ -789,7 +844,10 @@ export default function ConsultPage() {
       : lastSavedAt ? <StatusPill tone="ok" label={`Saved ${lastSavedAt.toLocaleTimeString()}`} />
       : null;
     const locked = noteStatus === "signed";
-    const flaggedItems = rxItems.filter((i) => i.allergyWarning || i.pregnancyWarning || i.controlledSubstanceWarning);
+    const openWarnings = rxItems.reduce((n, i) => n + (i.warnings ?? []).filter((w) => w.requiresDecision && !w.resolved).length, 0);
+    // Advisory warnings (moderate/mild allergy) don't block but are acknowledged at signing; decisions already recorded are shown, not re-asked.
+    const advisoryItems = rxItems.filter((i) => (i.warnings ?? []).some((w) => !w.requiresDecision));
+    const doctorName = getIdentity()?.staffName ?? "";
     const signedBlocked = closeIssues.length > 0 && !closeAck;
     const primaryLabel = completing ? "Working…" : handoffPending ? "Retry checkout handoff" : closedOut ? "Sent to checkout" : "Sign note and send to checkout";
 
@@ -833,7 +891,7 @@ export default function ConsultPage() {
           </div>
         )}
 
-        <SafetyStrip patient={pat} ctx={ctx} onRetry={reloadCtx} />
+        <SafetyStrip patient={pat} ctx={ctx} onRetry={reloadCtx} onManageAllergies={can("clinical:view") ? () => setShowAllergies(true) : undefined} />
 
         <div className={styles.workspace}>
           <aside className={styles.today} aria-label="Today's patients">
@@ -996,39 +1054,41 @@ export default function ConsultPage() {
                     <h3 className={styles.rxTitle}>Prescription {rxStatus === "signed" && <StatusPill tone="ok" label="Signed" />}</h3>
                     {rxStatus !== "signed" && (
                       <div className={styles.rxHeaderActions}>
-                        <button className={styles.backBtn} onClick={saveRx} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
-                        <button className={styles.completeBtn} onClick={reviewAndSign} disabled={rxSaving}>Review and sign</button>
+                        <button className={styles.backBtn} onClick={() => void saveRx()} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
+                        <button className={styles.completeBtn} onClick={reviewAndSign} disabled={rxSaving || (openWarnings > 0 && !rxDirty)}>
+                          {openWarnings > 0 && !rxDirty ? "Resolve the warning first" : "Review and sign"}
+                        </button>
                       </div>
                     )}
                   </div>
                   {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
-                  {rxItems.map((item, i) => {
-                    const conflictRow = !!rxError && rxError.includes(item.drugName) && item.drugName.trim() !== "";
-                    return (
-                      <div key={i}>
-                        <div className={styles.rxRow}>
-                          <input className={styles.input} aria-label="Drug name" placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
-                          <input className={styles.input} aria-label="Dosage" placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
-                          <input className={styles.input} aria-label="Frequency" placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
-                          <input className={styles.input} aria-label="Duration" placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
-                          <input className={styles.input} aria-label="Instructions" placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
-                          {conflictRow && (
-                            <input className={styles.input} aria-label="Allergy override reason" placeholder="Allergy override reason" value={item.allergyOverrideReason} onChange={(e) => updateRxItem(i, "allergyOverrideReason", e.target.value)} />
-                          )}
-                          {rxStatus !== "signed" && rxItems.length > 1 && (
-                            <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
-                          )}
-                        </div>
-                        {/* NB-107: severity-scaled — only "severe" ever blocked the save (rxError above); a
-                            moderate/mild match still shows here as a passive warning. */}
-                        {item.allergyWarning && !conflictRow && (
-                          <div className={styles.rxWarning}><Icon name="alert" size={12} /> Matches recorded allergy: {item.allergyWarning}</div>
+                  {openWarnings > 0 && rxStatus !== "signed" && (
+                    <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-12)" }}>
+                      <Icon name="alert" size={16} />
+                      <span>{openWarnings} safety warning{openWarnings === 1 ? "" : "s"} need{openWarnings === 1 ? "s" : ""} a decision before this prescription can be signed.</span>
+                    </div>
+                  )}
+                  {rxItems.map((item, i) => (
+                    <div key={i}>
+                      <div className={styles.rxRow}>
+                        <input id={`rx-drug-${i}`} className={styles.input} aria-label="Drug name" placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
+                        <input className={styles.input} aria-label="Dosage" placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
+                        <input className={styles.input} aria-label="Frequency" placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
+                        <input className={styles.input} aria-label="Duration" placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
+                        <input className={styles.input} aria-label="Instructions" placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
+                        {rxStatus !== "signed" && rxItems.length > 1 && (
+                          <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
                         )}
-                        {item.pregnancyWarning && <div className={styles.rxWarning}><Icon name="alert" size={12} /> {item.pregnancyWarning}</div>}
-                        {item.controlledSubstanceWarning && <div className={styles.rxWarning}><Icon name="alert" size={12} /> {item.controlledSubstanceWarning}</div>}
                       </div>
-                    );
-                  })}
+                      <RxWarnings
+                        item={item}
+                        locked={rxStatus === "signed"}
+                        onOverride={(warning) => { setOverrideError(null); setOverride({ index: i, warning }); }}
+                        onChangeMedicine={() => focusDrug(i)}
+                        onRemove={rxItems.length > 1 ? () => removeRxItem(i) : undefined}
+                      />
+                    </div>
+                  ))}
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
 
                   <div className={styles.previousMeds}>
@@ -1170,14 +1230,27 @@ export default function ConsultPage() {
             <ul className={p.list} style={{ marginBlockStart: "var(--nb-space-12)" }}>
               {rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}{i.instructions ? ` — ${i.instructions}` : ""}</li>)}
             </ul>
-            {flaggedItems.length > 0 && (
-              <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockStart: "var(--nb-space-12)" }}>
+            {rxItems.some((i) => (i.warnings ?? []).some((w) => w.decision)) && (
+              <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockStart: "var(--nb-space-12)" }}>
+                <Icon name="info" size={16} />
+                <span>
+                  Decisions recorded on this prescription:
+                  <ul style={{ margin: "4px 0 0", paddingInlineStart: "18px" }}>
+                    {rxItems.flatMap((i) => (i.warnings ?? []).filter((w) => w.decision).map((w) => (
+                      <li key={`${i.drugName}-${w.kind}`}>{i.drugName}: {WARNING_TITLE[w.kind]} — {w.decision?.reasonLabel ?? w.decision?.reasonCode}{w.decision?.byName ? ` (${w.decision.byName})` : ""}</li>
+                    )))}
+                  </ul>
+                </span>
+              </div>
+            )}
+            {advisoryItems.length > 0 && (
+              <div className={`${p.notice} ${p.noticeWarn}`} role="alert" style={{ marginBlockStart: "var(--nb-space-12)" }}>
                 <Icon name="alert" size={16} />
                 <span>
-                  Safety warnings on this prescription:
+                  Advisory warnings on this prescription:
                   <ul style={{ margin: "4px 0 0", paddingInlineStart: "18px" }}>
-                    {flaggedItems.map((i, n) => (
-                      <li key={n}>{i.drugName}: {[i.allergyWarning && `allergy — ${i.allergyWarning}`, i.pregnancyWarning, i.controlledSubstanceWarning].filter(Boolean).join("; ")}</li>
+                    {advisoryItems.map((i, n) => (
+                      <li key={n}>{i.drugName}: {(i.warnings ?? []).filter((w) => !w.requiresDecision).map((w) => `${WARNING_TITLE[w.kind].toLowerCase()} — ${w.message}`).join("; ")}</li>
                     ))}
                   </ul>
                   <label className={p.check} style={{ marginBlockStart: "8px" }}>
@@ -1190,7 +1263,7 @@ export default function ConsultPage() {
             {signError && <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockStart: "var(--nb-space-12)" }}>{signError}</div>}
             <div className={p.dialogActions}>
               <button type="button" className={p.btn} onClick={() => setShowSignConfirm(false)}>Cancel</button>
-              <button type="button" className={p.btnPrimary} onClick={confirmSignRx} disabled={signing || (flaggedItems.length > 0 && !signAck)}>
+              <button type="button" className={p.btnPrimary} onClick={confirmSignRx} disabled={signing || (advisoryItems.length > 0 && !signAck)}>
                 {signing ? "Signing…" : "Sign prescription"}
               </button>
             </div>
@@ -1231,6 +1304,17 @@ export default function ConsultPage() {
               </button>
             </div>
           </Dialog>
+        )}
+
+        {override && rxItems[override.index] && (
+          <OverrideDialog item={rxItems[override.index]} warning={override.warning} doctorName={doctorName} busy={rxSaving} error={overrideError}
+            onConfirm={confirmOverride} onClose={() => setOverride(null)} />
+        )}
+
+        {showAllergies && pat && (
+          <AllergyRegister authedFetch={authedFetch} patientId={pat.id} patientName={pat.name} canEdit={can("clinical:edit")}
+            onClose={() => setShowAllergies(false)}
+            onChanged={() => { reloadCtx(); void authedFetch(`/patients/${pat.id}`).then(async (r) => { if (r?.ok) setActivePatient(await r.json()); }); }} />
         )}
 
         {showDental && pat && (

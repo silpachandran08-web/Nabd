@@ -26,6 +26,7 @@ tags:
   - name: Patients
   - name: Queue
   - name: Audit
+  - name: Clinical
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -1058,6 +1059,106 @@ paths:
                   data: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } }
                   page: { $ref: "#/components/schemas/PageMeta" }
 
+  # ------------------------------------------------- Clinical (allergies, Rx)
+  /clinical/patients/{patientId}/allergies:
+    parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: Active allergy register of a patient
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Allergy" } } } } }
+    post:
+      tags: [Clinical]
+      summary: Add an allergy (fast add). Severity is mandatory; audited.
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AllergyWrite" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Allergy" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /clinical/allergies/{id}:
+    patch:
+      tags: [Clinical]
+      summary: Correct an allergy (partial update). A reason is mandatory; the original is kept in the append-only history.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AllergyCorrection" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Allergy" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /clinical/allergies/{id}/deactivate:
+    patch:
+      tags: [Clinical]
+      summary: Remove an allergy from the active register. A reason is mandatory (400 reason-required without one); the row and its history are kept.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 500 } } } } }
+      responses:
+        "200": { description: Removed }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /clinical/patients/{patientId}/allergies/history:
+    get:
+      tags: [Clinical]
+      summary: Append-only allergy history (added, corrected, removed, documented none) with reasons and actors
+      x-required-permission: clinical:view
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AllergyEvent" } } } } }
+  /clinical/patients/{patientId}/allergies/status:
+    parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: "Allergy status: recorded, none_documented or not_assessed (nothing recorded is NOT the same as none)"
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AllergyStatus" } } } }
+    put:
+      tags: [Clinical]
+      summary: Document "no known allergies" (who and when are stamped by the server; audited)
+      x-required-permission: clinical:edit
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AllergyStatus" } } } }
+  /clinical/prescriptions/{queueEntryId}:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: Prescription with structured safety warnings per line
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+    patch:
+      tags: [Clinical]
+      summary: Replace the draft items. A line may carry overrides (named reason per warning kind); an omitted override for the same drug and warning is kept, never silently cleared.
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItemWrite" } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/sign:
+    post:
+      tags: [Clinical]
+      summary: Sign. Re-checks every warning server-side against the CURRENT register; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. Audited.
+      x-required-permission: clinical:edit
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Signed, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1119,6 +1220,128 @@ components:
               page: { $ref: "#/components/schemas/PageMeta" }
 
   schemas:
+    Allergy:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        substance: { type: string }
+        category: { type: string, enum: [drug, food, environmental, other], nullable: true }
+        severity: { type: string, enum: [mild, moderate, severe] }
+        reaction: { type: string, nullable: true }
+        source: { type: string, enum: [clinician, patient_reported, outside_record], nullable: true }
+        active: { type: boolean }
+        recordedBy: { type: string, format: uuid }
+        recordedByName: { type: string, nullable: true }
+        recordedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    AllergyWrite:
+      type: object
+      required: [substance, severity]
+      properties:
+        substance: { type: string, maxLength: 200 }
+        category: { type: string, enum: [drug, food, environmental, other] }
+        severity: { type: string, enum: [mild, moderate, severe] }
+        reaction: { type: string, maxLength: 500 }
+        source: { type: string, enum: [clinician, patient_reported, outside_record] }
+    AllergyCorrection:
+      type: object
+      required: [reason]
+      properties:
+        substance: { type: string, maxLength: 200 }
+        category: { type: string, enum: [drug, food, environmental, other] }
+        severity: { type: string, enum: [mild, moderate, severe] }
+        reaction: { type: string, maxLength: 500 }
+        source: { type: string, enum: [clinician, patient_reported, outside_record] }
+        reason: { type: string, maxLength: 500 }
+    AllergyEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        allergyId: { type: string, format: uuid, nullable: true }
+        event: { type: string }
+        substance: { type: string, nullable: true }
+        before: { type: object, additionalProperties: true, nullable: true }
+        after: { type: object, additionalProperties: true, nullable: true }
+        reason: { type: string, nullable: true }
+        actorId: { type: string, format: uuid }
+        actorName: { type: string, nullable: true }
+        occurredAt: { type: string, format: date-time }
+    AllergyStatus:
+      type: object
+      properties:
+        state: { type: string, enum: [recorded, none_documented, not_assessed] }
+        activeCount: { type: integer }
+        documentedBy: { type: string, format: uuid, nullable: true }
+        documentedByName: { type: string, nullable: true }
+        documentedAt: { type: string, format: date-time, nullable: true }
+    RxWarningDecision:
+      type: object
+      required: [kind, reasonCode]
+      properties:
+        kind: { type: string, enum: [allergy, pregnancy, controlled] }
+        reasonCode: { type: string, description: One of the codes offered in the warning's reasonOptions }
+        note: { type: string, maxLength: 500 }
+    PrescriptionItemWrite:
+      type: object
+      required: [drugName]
+      properties:
+        drugName: { type: string }
+        dosage: { type: string }
+        frequency: { type: string }
+        duration: { type: string }
+        instructions: { type: string }
+        overrides: { type: array, items: { $ref: "#/components/schemas/RxWarningDecision" } }
+    RxWarning:
+      type: object
+      properties:
+        kind: { type: string, enum: [allergy, pregnancy, controlled] }
+        severity: { type: string, description: "mild|moderate|severe for allergies, caution otherwise" }
+        message: { type: string }
+        matched: { type: string, nullable: true }
+        requiresDecision: { type: boolean }
+        resolved: { type: boolean }
+        reasonOptions:
+          type: array
+          items: { type: object, properties: { code: { type: string }, label: { type: string } } }
+        decision:
+          nullable: true
+          type: object
+          properties:
+            kind: { type: string }
+            reasonCode: { type: string }
+            reasonLabel: { type: string }
+            note: { type: string, nullable: true }
+            by: { type: string, format: uuid }
+            byName: { type: string, nullable: true }
+            at: { type: string, format: date-time }
+    PrescriptionItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        drugName: { type: string }
+        dosage: { type: string, nullable: true }
+        frequency: { type: string, nullable: true }
+        duration: { type: string, nullable: true }
+        instructions: { type: string, nullable: true }
+        allergyOverrideReason: { type: string, nullable: true }
+        displayOrder: { type: integer }
+        allergyWarning: { type: string, nullable: true }
+        pregnancyWarning: { type: string, nullable: true }
+        controlledSubstanceWarning: { type: string, nullable: true }
+        warnings: { type: array, items: { $ref: "#/components/schemas/RxWarning" } }
+    Prescription:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        queueEntryId: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        signedAt: { type: string, format: date-time, nullable: true }
+        items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
+        unresolvedWarnings: { type: integer }
     Problem:
       type: object
       description: RFC 7807

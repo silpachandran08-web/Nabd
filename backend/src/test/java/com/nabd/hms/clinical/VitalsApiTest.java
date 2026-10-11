@@ -84,4 +84,30 @@ class VitalsApiTest extends ApiTestBase {
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    @Test
+    void emptyImplausibleOrInconsistentVitalsAreRejectedAndDoNotAdvanceTheVisit() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "nurse6@a.com", "+919800010006", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V6", "+919999950006");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "vitals_pending");
+        String url = "/v1/clinical/vitals/" + queueEntryId;
+
+        assertThat(exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of()), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("tempCelsius", 370)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("bpSystolic", 80, "bpDiastolic", 90)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("bpSystolic", 120)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<java.util.List> list = exchange("/v1/queue?doctorId=" + staff.id(), HttpMethod.GET, authed(token), java.util.List.class);
+        Map<?, ?> entry = (Map<?, ?>) list.getBody().stream()
+                .filter(e -> queueEntryId.equals(((Map<?, ?>) e).get("id"))).findFirst().orElseThrow();
+        assertThat(entry.get("status")).isEqualTo("vitals_pending");
+    }
 }

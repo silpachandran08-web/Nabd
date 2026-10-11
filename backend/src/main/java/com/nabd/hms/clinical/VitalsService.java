@@ -54,6 +54,21 @@ public class VitalsService {
         tenantContext.set(tenantId);
         QueueEntrySnapshot snapshot = repo.findQueueEntrySnapshot(tenantId, queueEntryId).orElseThrow(this::notFound);
 
+        // An empty save must never move the visit on to the doctor with no vitals, and BP is a pair.
+        if (req.heightCm() == null && req.weightKg() == null && req.bpSystolic() == null && req.bpDiastolic() == null
+                && req.pulseBpm() == null && req.tempCelsius() == null && req.spo2Percent() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "no-measurement", "No measurement",
+                    "Enter at least one measurement before saving vitals.");
+        }
+        if ((req.bpSystolic() == null) != (req.bpDiastolic() == null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "incomplete-blood-pressure", "Incomplete blood pressure",
+                    "Enter both systolic and diastolic blood pressure, or neither.");
+        }
+        if (req.bpSystolic() != null && req.bpSystolic() <= req.bpDiastolic()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-blood-pressure", "Invalid blood pressure",
+                    "Systolic pressure must be higher than diastolic pressure.");
+        }
+
         repo.upsert(tenantId, queueEntryId, snapshot.patientId(), req.heightCm(), req.weightKg(),
                 req.bpSystolic(), req.bpDiastolic(), req.pulseBpm(), req.tempCelsius(), req.spo2Percent(),
                 callerStaffId);
