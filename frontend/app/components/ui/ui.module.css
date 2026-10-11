@@ -1,0 +1,34 @@
+/* Shared primitives: status pills, loading/empty/error states, dialog. Tokens only. */
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; white-space: nowrap; }
+.pill_ok { background: var(--nb-ok-tint); color: var(--nb-ok-500); }
+.pill_warn { background: var(--nb-warn-tint); color: var(--nb-warn-500); }
+.pill_danger { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
+.pill_info { background: var(--nb-info-tint); color: var(--nb-info-500); }
+.pill_sync { background: var(--nb-sync-tint); color: var(--nb-sync-500); }
+.pill_urgent { background: var(--nb-urgent-tint); color: var(--nb-urgent-500); }
+.pill_neutral { background: var(--nb-surface-3); color: var(--nb-text-secondary); }
+
+.skeletonWrap { display: flex; flex-direction: column; gap: var(--nb-space-8); padding: var(--nb-space-16) 0; }
+.skeletonRow { height: 44px; border-radius: var(--nb-radius-md); background: linear-gradient(90deg, var(--nb-surface-1), var(--nb-surface-3), var(--nb-surface-1)); background-size: 200% 100%; animation: nbShimmer 1.4s linear infinite; }
+@keyframes nbShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeletonRow { animation: none; } }
+
+.state { display: flex; flex-direction: column; align-items: center; gap: var(--nb-space-8); padding: var(--nb-space-32) var(--nb-space-16); text-align: center; color: var(--nb-text-tertiary); }
+.stateError { color: var(--nb-danger-500); }
+.stateTitle { color: var(--nb-text-primary); font-size: 14px; font-weight: 600; }
+.stateHint { color: var(--nb-text-secondary); font-size: 12px; max-width: 360px; }
+.stateBtn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 var(--nb-space-16); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+.scrim { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: var(--nb-space-16); background: var(--nb-scrim); }
+.dialog { width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); outline: none; }
+.dialog_md { max-width: 480px; }
+.dialog_lg { max-width: 720px; }
+.dialog_drawer { max-width: 480px; height: calc(100vh - 32px); margin-inline-start: auto; }
+.dialogHead { display: flex; align-items: center; justify-content: space-between; padding: var(--nb-space-16) var(--nb-space-24); border-bottom: 1px solid var(--nb-border-subtle); }
+.dialogTitle { margin: 0; font-size: 16px; font-weight: 600; }
+.dialogClose { width: 44px; height: 44px; margin-inline-end: -12px; border: none; background: transparent; color: var(--nb-text-secondary); font-size: 22px; cursor: pointer; }
+.dialogBody { padding: var(--nb-space-24); overflow-y: auto; }
+@media (max-width: 767px) {
+  .scrim { align-items: flex-end; padding: 0; }
+  .dialog, .dialog_drawer { max-width: none; height: auto; max-height: 92vh; border-radius: var(--nb-radius-lg) var(--nb-radius-lg) 0 0; }
+}
