@@ -82,7 +82,7 @@
 
 .formError {
   background: var(--nb-danger-tint);
-  border: 1px solid rgba(240, 69, 92, 0.35);
+  border: 1px solid color-mix(in srgb, var(--nb-danger-500) 35%, transparent);
   color: var(--nb-danger-500);
   border-radius: var(--nb-radius-md);
   padding: var(--nb-space-12);
@@ -116,7 +116,7 @@
 }
 
 .submit:focus-visible {
-  outline: 2px solid #45dde8;
+  outline: 2px solid var(--nb-accent-500);
   outline-offset: 2px;
 }
 

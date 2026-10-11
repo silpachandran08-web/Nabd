@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Dialog from "../components/ui/Dialog";
+import Icon from "../components/ui/Icon";
+import StatusPill, { type PillTone } from "../components/ui/StatusPill";
+import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
+import PermissionMatrix from "../components/staff/PermissionMatrix";
 import styles from "./staff.module.css";
 
 // Matches GET /v1/staff (StaffController) and GET /v1/roles (RoleController).
@@ -20,15 +25,17 @@ type ModuleGrant = {
   module: string; view: boolean; create: boolean; edit: boolean; delete: boolean;
   approve: boolean; refundDiscount: boolean; export: boolean;
 };
-type Role = { id: string; name: string; builtIn: boolean; grants: ModuleGrant[] };
-type Department = { id: string; name: string; requiresVitals: boolean; isDefault: boolean; active: boolean };
+type Role = { id: string; name: string; builtIn: boolean; grants: ModuleGrant[]; mfaRequired: boolean };
+type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 // GlobalExceptionHandler serializes RFC 7807 ProblemDetail — the machine-readable
 // error code lives in `type` (a "…/errors/<slug>" URI), not `title` (human text).
 type Problem = { type?: string; title: string; detail: string };
 
 type ActionKey = "view" | "create" | "edit" | "delete" | "approve" | "refundDiscount" | "export";
 type Grid = Record<string, Record<ActionKey, boolean>>;
-type Builder = { mode: "create" | "edit" | "view"; sourceId?: string; name: string; grid: Grid };
+// mfaRequired and grants for modules this grid has no row for are carried through unchanged: the role
+// PATCH replaces the whole role, so omitting them would silently switch MFA off / drop access.
+type Builder = { mode: "create" | "edit" | "view"; sourceId?: string; name: string; grid: Grid; mfaRequired: boolean; extraGrants: ModuleGrant[] };
 
 // NB-049's module list — matches what every controller's @PreAuthorize actually checks.
 const MODULES: { key: string; label: string }[] = [
@@ -64,6 +71,10 @@ function gridFromGrants(grants: ModuleGrant[]): Grid {
   return grid;
 }
 
+function extraGrantsOf(role: Role): ModuleGrant[] {
+  return role.grants.filter((g) => !MODULES.some((m) => m.key === g.module));
+}
+
 function grantsFromGrid(grid: Grid): ModuleGrant[] {
   return MODULES.filter((m) => ACTIONS.some((a) => grid[m.key][a.key])).map((m) => ({ module: m.key, ...grid[m.key] }));
 }
@@ -75,11 +86,22 @@ const SCOPE_LABELS: Record<string, string> = {
   all_clinic_patients: "All clinic patients",
 };
 
-const STATUS_PILL: Record<Staff["status"], string> = {
-  invited: styles.pillInvited,
-  active: styles.pillActive,
-  suspended: styles.pillSuspended,
+const STATUS_PILL: Record<Staff["status"], { tone: PillTone; label: string }> = {
+  invited: { tone: "info", label: "Invited" },
+  active: { tone: "ok", label: "Active" },
+  suspended: { tone: "danger", label: "Suspended" },
 };
+
+// Short relative time for "Last active"; the absolute time stays in the cell's title.
+function relativeTime(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} h ago`;
+  const days = Math.floor(hrs / 24);
+  return days < 30 ? `${days} d ago` : new Date(iso).toLocaleDateString();
+}
 
 function decodePermissions(token: string): string[] {
   try {
@@ -105,6 +127,11 @@ export default function StaffAccessPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
+
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [cloneOpen, setCloneOpen] = useState(false);
+  const [cloneSourceId, setCloneSourceId] = useState("");
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteName, setInviteName] = useState("");
@@ -210,19 +237,24 @@ export default function StaffAccessPage() {
     return roles.find((r) => r.id === roleId)?.name ?? "—";
   }
 
+  // Counts come from the staff pages loaded so far (RoleResponse has no user count).
+  function roleUserCount(roleId: string): number {
+    return staff.filter((s) => s.roleId === roleId).length;
+  }
+
   function openNewRole() {
     setBuilderError(null);
-    setBuilder({ mode: "create", name: "", grid: gridFromGrants([]) });
+    setBuilder({ mode: "create", name: "", grid: gridFromGrants([]), mfaRequired: false, extraGrants: [] });
   }
 
   function openCloneRole(role: Role) {
     setBuilderError(null);
-    setBuilder({ mode: "create", name: `${role.name} (copy)`, grid: gridFromGrants(role.grants) });
+    setBuilder({ mode: "create", name: `${role.name} (copy)`, grid: gridFromGrants(role.grants), mfaRequired: role.mfaRequired, extraGrants: extraGrantsOf(role) });
   }
 
   function openRole(role: Role, canEdit: boolean) {
     setBuilderError(null);
-    setBuilder({ mode: role.builtIn || !canEdit ? "view" : "edit", sourceId: role.id, name: role.name, grid: gridFromGrants(role.grants) });
+    setBuilder({ mode: role.builtIn || !canEdit ? "view" : "edit", sourceId: role.id, name: role.name, grid: gridFromGrants(role.grants), mfaRequired: role.mfaRequired, extraGrants: extraGrantsOf(role) });
   }
 
   function toggleCell(moduleKey: string, actionKey: ActionKey) {
@@ -256,7 +288,7 @@ export default function StaffAccessPage() {
       setBuilderError("Name the role.");
       return;
     }
-    const grants = grantsFromGrid(builder.grid);
+    const grants = [...grantsFromGrid(builder.grid), ...builder.extraGrants];
     if (grants.length === 0) {
       setBuilderError("Grant at least one permission.");
       return;
@@ -266,7 +298,7 @@ export default function StaffAccessPage() {
       const isEdit = builder.mode === "edit";
       const res = await authedFetch(isEdit ? `/roles/${builder.sourceId}` : "/roles", {
         method: isEdit ? "PATCH" : "POST",
-        body: JSON.stringify({ name, grants }),
+        body: JSON.stringify({ name, grants, mfaRequired: builder.mfaRequired }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -313,6 +345,7 @@ export default function StaffAccessPage() {
       setInviteRoleId("");
       setInviteScope("all_clinic_patients");
       setInviteDepartmentId("");
+      setInviteOpen(false);
     } finally {
       setInviting(false);
     }
@@ -383,6 +416,8 @@ export default function StaffAccessPage() {
     }
   }
 
+  const selectedRole = roles.find((r) => r.id === selectedRoleId) ?? roles[0] ?? null;
+
   const canInvite = permissions.includes("staff:create");
   const canSuspend = permissions.includes("staff:delete");
   const canEditRoles = permissions.includes("staff:edit");
@@ -394,13 +429,152 @@ export default function StaffAccessPage() {
           <h1 className={styles.title}>Staff & Access</h1>
           <p className={styles.subtitle}>{staff.length} team member{staff.length === 1 ? "" : "s"}</p>
         </div>
-        <button className={styles.actionBtn} onClick={() => router.push("/account")}>My Account & Security</button>
+        <div className={styles.headerActions}>
+          {canInvite && (
+            <button className={styles.actionBtn} onClick={() => { setCloneSourceId(roles[0]?.id ?? ""); setCloneOpen(true); }}>
+              <Icon name="list" size={14} /> Clone role
+            </button>
+          )}
+          {canInvite && (
+            <button className={styles.inviteBtn} onClick={() => { setInviteFormError(null); setInviteOpen(true); }}>
+              <Icon name="plus" size={14} /> Invite staff
+            </button>
+          )}
+          <button className={styles.actionBtn} onClick={() => router.push("/account")}>My Account & Security</button>
+        </div>
       </div>
 
-      {error && <div className={styles.formError} role="alert">{error}</div>}
+      {error && !loading && staff.length > 0 && <div className={styles.formError} role="alert">{error}</div>}
 
-      {canInvite && (
-        <form className={styles.formCard} onSubmit={submitInvite}>
+      {lastInvite && (
+        <div className={styles.inviteBanner}>
+          <span>Invite link for {lastInvite.name} — no email service yet, share this by hand:</span>
+          <span className={styles.inviteLink}>{lastInvite.link}</span>
+        </div>
+      )}
+
+      <div className={styles.card}>
+        {loading ? (
+          <Skeleton rows={5} label="Loading staff" />
+        ) : forbidden ? (
+          <EmptyState icon="shield" title="Your role doesn't have access to staff management." />
+        ) : error && staff.length === 0 ? (
+          <ErrorState message={error} onRetry={load} />
+        ) : staff.length === 0 ? (
+          <EmptyState icon="users" title="No staff yet." hint={canInvite ? "Use Invite staff to add the first team member." : undefined} />
+        ) : (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Staff member</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Restriction</th>
+                  <th>Active</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <span className={styles.staffName}>{s.name}</span>
+                      <span className={styles.staffEmail}>{s.email}</span>
+                    </td>
+                    <td><span className={`${styles.pill} ${styles.pillRole}`}>{roleName(s.roleId)}</span></td>
+                    <td><StatusPill tone={STATUS_PILL[s.status].tone} label={STATUS_PILL[s.status].label} /></td>
+                    <td className={styles.muted}>{s.scope === "all_clinic_patients" ? "None" : (SCOPE_LABELS[s.scope] ?? s.scope)}</td>
+                    <td className={styles.muted} title={s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : undefined}>{s.lastSeenAt ? relativeTime(s.lastSeenAt) : "—"}</td>
+                    <td>
+                      {canSuspend && s.status === "active" && (
+                        <button className={styles.actionBtn} disabled={suspending === s.id} onClick={() => suspend(s.id)}>
+                          {suspending === s.id ? "…" : "Suspend"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {nextCursor && !loading && !forbidden && (
+          <div className={styles.footer}>
+            <button className={styles.loadMore} onClick={loadMore} disabled={loadingMore}>
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!loading && !forbidden && (
+        <>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Role presets</h2>
+            {canInvite && <button className={styles.actionBtn} onClick={openNewRole}>+ New role</button>}
+          </div>
+          <div className={styles.rolesLayout}>
+            <aside className={styles.card} aria-label="Role presets">
+              {roles.length === 0 ? (
+                <EmptyState icon="shield" title="No roles available." />
+              ) : (
+                <ul className={styles.presetList}>
+                  {roles.map((r) => {
+                    const active = r.id === selectedRole?.id;
+                    return (
+                      <li key={r.id} className={`${styles.preset} ${active ? styles.presetActive : ""}`}>
+                        <button type="button" className={styles.presetMain} aria-pressed={active} onClick={() => setSelectedRoleId(r.id)}>
+                          <span className={styles.staffName}>{r.name}</span>
+                          <span className={styles.staffEmail}>
+                            {roleUserCount(r.id)}{nextCursor ? "+" : ""} user{roleUserCount(r.id) === 1 && !nextCursor ? "" : "s"}
+                          </span>
+                        </button>
+                        <span className={`${styles.pill} ${r.builtIn ? styles.pillBuiltIn : styles.pillCustom}`}>{r.builtIn ? "Built-in" : "Custom"}</span>
+                        <button className={styles.actionBtn} onClick={() => openRole(r, canEditRoles)}>
+                          {r.builtIn || !canEditRoles ? "View" : "Edit"}
+                        </button>
+                        {canInvite && <button className={styles.actionBtn} onClick={() => openCloneRole(r)}>Clone</button>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <p className={styles.note}>Anything a user lacks is removed from the interface — hidden, not greyed out.</p>
+            </aside>
+            {selectedRole && <PermissionMatrix roleName={selectedRole.name} grants={selectedRole.grants} modules={MODULES} />}
+          </div>
+
+          {breakGlass.length > 0 && (
+            <>
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>Emergency access — currently elevated</h2>
+              </div>
+              <div className={styles.card}>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead><tr><th>Staff</th><th>Reason</th><th>Activated</th><th>Expires</th></tr></thead>
+                    <tbody>
+                      {breakGlass.map((g) => (
+                        <tr key={g.id}>
+                          <td className={styles.staffName}>{g.staffName}</td>
+                          <td>{g.reason}</td>
+                          <td className={styles.muted}>{new Date(g.activatedAt).toLocaleString()}</td>
+                          <td className={styles.muted}>{new Date(g.expiresAt).toLocaleTimeString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {inviteOpen && canInvite && (
+        <Dialog title="Invite staff" onClose={() => setInviteOpen(false)}>
+      <form className={styles.dialogForm} onSubmit={submitInvite}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="inviteName">Name</label>
             <input id="inviteName" className={styles.input} value={inviteName} onChange={(e) => setInviteName(e.target.value)} required />
@@ -429,12 +603,12 @@ export default function StaffAccessPage() {
               <option value="own_patients_only">Own patients only</option>
             </select>
           </div>
-          {departments.length > 0 && (
+          {departments.some((d) => d.active) && (
             <div className={styles.field}>
               <label className={styles.label} htmlFor="inviteDepartment">Department</label>
               <select id="inviteDepartment" className={styles.select} value={inviteDepartmentId} onChange={(e) => setInviteDepartmentId(e.target.value)}>
                 <option value="">Clinic default</option>
-                {departments.map((d) => (
+                {departments.filter((d) => d.active).map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
@@ -444,121 +618,32 @@ export default function StaffAccessPage() {
             {inviting ? "Inviting…" : "Invite staff"}
           </button>
           {inviteFormError && <div className={styles.formError} role="alert">{inviteFormError}</div>}
-          {lastInvite && (
-            <div className={styles.inviteBanner}>
-              <span>Invite link for {lastInvite.name} — no email service yet, share this by hand:</span>
-              <span className={styles.inviteLink}>{lastInvite.link}</span>
-            </div>
-          )}
         </form>
+        </Dialog>
       )}
 
-      <div className={styles.card}>
-        {loading ? (
-          <div className={styles.state}>Loading…</div>
-        ) : forbidden ? (
-          <div className={styles.state}>Your role doesn&apos;t have access to staff management.</div>
-        ) : staff.length === 0 ? (
-          <div className={styles.state}>No staff yet.</div>
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Staff member</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Scope</th>
-                  <th>Last active</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {staff.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <span className={styles.staffName}>{s.name}</span>
-                      <span className={styles.staffEmail}>{s.email}</span>
-                    </td>
-                    <td><span className={`${styles.pill} ${styles.pillRole}`}>{roleName(s.roleId)}</span></td>
-                    <td><span className={`${styles.pill} ${STATUS_PILL[s.status]}`}>{s.status}</span></td>
-                    <td className={styles.muted}>{SCOPE_LABELS[s.scope] ?? s.scope}</td>
-                    <td className={styles.muted}>{s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : "—"}</td>
-                    <td>
-                      {canSuspend && s.status === "active" && (
-                        <button className={styles.actionBtn} disabled={suspending === s.id} onClick={() => suspend(s.id)}>
-                          {suspending === s.id ? "…" : "Suspend"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {nextCursor && !loading && !forbidden && (
-          <div className={styles.footer}>
-            <button className={styles.loadMore} onClick={loadMore} disabled={loadingMore}>
-              {loadingMore ? "Loading…" : "Load more"}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {!loading && !forbidden && (
-        <>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Roles</h2>
-            {canInvite && <button className={styles.actionBtn} onClick={openNewRole}>+ New role</button>}
-          </div>
-          <div className={styles.card}>
-            <div className={styles.tableWrap}>
-              <table className={styles.table}>
-                <thead><tr><th>Name</th><th>Type</th><th></th></tr></thead>
-                <tbody>
-                  {roles.map((r) => (
-                    <tr key={r.id}>
-                      <td className={styles.staffName}>{r.name}</td>
-                      <td><span className={`${styles.pill} ${r.builtIn ? styles.pillBuiltIn : styles.pillCustom}`}>{r.builtIn ? "Built-in" : "Custom"}</span></td>
-                      <td>
-                        <button className={styles.actionBtn} onClick={() => openRole(r, canEditRoles)}>
-                          {r.builtIn || !canEditRoles ? "View" : "Edit"}
-                        </button>
-                        {canInvite && <button className={styles.actionBtn} style={{ marginLeft: "8px" }} onClick={() => openCloneRole(r)}>Clone</button>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {cloneOpen && canInvite && (
+        <Dialog title="Clone role" onClose={() => setCloneOpen(false)}>
+          <form
+            className={styles.dialogForm}
+            onSubmit={(e) => {
+              e.preventDefault();
+              const role = roles.find((r) => r.id === cloneSourceId);
+              if (!role) return;
+              setCloneOpen(false);
+              openCloneRole(role);
+            }}
+          >
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="cloneSource">Start from</label>
+              <select id="cloneSource" className={styles.select} value={cloneSourceId} onChange={(e) => setCloneSourceId(e.target.value)} required>
+                {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
             </div>
-          </div>
-
-          {breakGlass.length > 0 && (
-            <>
-              <div className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Emergency access — currently elevated</h2>
-              </div>
-              <div className={styles.card}>
-                <div className={styles.tableWrap}>
-                  <table className={styles.table}>
-                    <thead><tr><th>Staff</th><th>Reason</th><th>Activated</th><th>Expires</th></tr></thead>
-                    <tbody>
-                      {breakGlass.map((g) => (
-                        <tr key={g.id}>
-                          <td className={styles.staffName}>{g.staffName}</td>
-                          <td>{g.reason}</td>
-                          <td className={styles.muted}>{new Date(g.activatedAt).toLocaleString()}</td>
-                          <td className={styles.muted}>{new Date(g.expiresAt).toLocaleTimeString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-        </>
+            <p className={styles.stepUpText}>You can rename the copy and adjust its permissions before saving.</p>
+            <button className={styles.submit} type="submit" disabled={!cloneSourceId}>Continue</button>
+          </form>
+        </Dialog>
       )}
 
       {builder && (

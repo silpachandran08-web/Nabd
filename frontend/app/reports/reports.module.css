@@ -1,4 +1,8 @@
 .page {
+  /* Chart series (DESIGN §8.22) — not yet in globals.css */
+  --rp-series-1: #b32284;
+  --rp-series-2: #b23908;
+  --rp-series-3: #155bd6;
   min-height: 100%;
   padding: var(--nb-space-32);
   max-width: 1080px;
@@ -195,9 +199,9 @@
 }
 
 .infoNote {
-  border: 1px solid rgba(106, 168, 255, 0.45);
-  background: rgba(106, 168, 255, 0.1);
-  color: #8fbcff;
+  border: 1px solid color-mix(in srgb, var(--nb-info-500) 45%, transparent);
+  background: var(--nb-info-tint);
+  color: var(--nb-info-500);
   border-radius: var(--nb-radius-md);
   padding: var(--nb-space-12) var(--nb-space-16);
   font-size: 15px;
@@ -235,18 +239,18 @@
   margin-bottom: var(--nb-space-16);
 }
 
-.statInfo { color: #6aa8ff; }
-.statWarn { color: #f5b544; }
+.statInfo { color: var(--nb-info-500); }
+.statWarn { color: var(--nb-warn-500); }
 .statAcc { color: var(--nb-accent-500); }
 
 .tileWarn {
   composes: card; /* card directly — a two-level composes chain lost the box */
-  border-color: rgba(245, 181, 68, 0.45);
+  border-color: color-mix(in srgb, var(--nb-warn-500) 45%, transparent);
 }
 
 .tileInfo {
   composes: card; /* card directly — a two-level composes chain lost the box */
-  border-color: rgba(106, 168, 255, 0.35);
+  border-color: color-mix(in srgb, var(--nb-info-500) 35%, transparent);
 }
 
 .cardLabel {
@@ -319,7 +323,7 @@
 .hbar {
   height: 14px;
   border-radius: 3px;
-  background: #c2378a;
+  background: var(--rp-series-1);
   min-width: 2px;
 }
 
@@ -332,3 +336,6 @@
 @media (max-width: 900px) {
   .stats4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.dayCloseRow { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-16); flex-wrap: wrap; }
+.dayCloseRow a { display: inline-flex; align-items: center; text-decoration: none; }

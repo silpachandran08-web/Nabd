@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import styles from "./login.module.css";
 import { decodeAccessToken, landingPathFor } from "../lib/session";
 
@@ -499,6 +500,7 @@ export default function LoginPage() {
         <button className={styles.linkBtn} type="button" onClick={() => { setFormError(null); setView("otpRequest"); }}>
           Sign in with WhatsApp OTP instead
         </button>
+        <Link className={styles.linkBtn} href="/owner/login">Clinic owner? Sign in here</Link>
       </div>
     </main>
   );

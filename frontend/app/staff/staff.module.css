@@ -109,7 +109,7 @@
 .inviteBanner {
   width: 100%;
   background: var(--nb-accent-tint);
-  border: 1px solid rgba(46, 211, 224, 0.3);
+  border: 1px solid var(--nb-accent-500);
   border-radius: var(--nb-radius-md);
   padding: var(--nb-space-12);
   font-size: 13px;
@@ -146,7 +146,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -201,9 +201,6 @@
 }
 
 .pillRole { background: var(--nb-surface-3); color: var(--nb-text-secondary); }
-.pillActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillInvited { background: rgba(240, 175, 69, 0.14); color: #e0a63a; }
-.pillSuspended { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
 
 .actionBtn {
   height: 28px;
@@ -226,7 +223,7 @@
 .stepUpOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--nb-scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -384,4 +381,24 @@
 .matrixTable input[type="checkbox"]:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+.headerActions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: center; }
+.headerActions button { display: inline-flex; align-items: center; gap: 6px; }
+.dialogForm { display: flex; flex-direction: column; gap: var(--nb-space-12); }
+.dialogForm .input, .dialogForm .select { width: 100%; }
+.rolesLayout { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: var(--nb-space-16); align-items: start; }
+.presetList { list-style: none; margin: 0; padding: 0; }
+.preset { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8); padding: var(--nb-space-12) var(--nb-space-16); border-bottom: 1px solid var(--nb-border-subtle); }
+.presetActive { background: var(--nb-accent-tint); }
+.presetMain { flex: 1 1 140px; min-width: 0; text-align: start; background: none; border: none; padding: 0; color: inherit; font-family: inherit; cursor: pointer; }
+.note { margin: 0; padding: var(--nb-space-12) var(--nb-space-16); font-size: 12px; color: var(--nb-text-tertiary); }
+
+@media (max-width: 1024px) {
+  .rolesLayout { grid-template-columns: minmax(0, 1fr); }
+  .page { padding: var(--nb-space-16); }
+}
+@media (max-width: 430px) {
+  .header { flex-direction: column; align-items: stretch; }
+  .headerActions > button { flex: 1 1 100%; justify-content: center; }
 }

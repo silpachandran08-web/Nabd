@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import styles from "../../login/login.module.css";
 
 // Matches POST /v1/owners/auth/login (OwnerController) — a separate top-level identity from any
@@ -29,6 +30,14 @@ export default function OwnerLoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, pin }),
       });
+      if (res.status === 429) {
+        setFormError("Too many attempts. Wait a minute before trying again.");
+        return;
+      }
+      if (res.status === 423) {
+        setFormError("Too many failed attempts. Try again later.");
+        return;
+      }
       const body = await res.json();
       if (!res.ok) {
         setFormError((body as Problem).detail || "Email or PIN is incorrect.");
@@ -81,6 +90,7 @@ export default function OwnerLoginPage() {
           </button>
         </form>
         <p className={styles.hint}>This is your owner account, separate from any one clinic&apos;s staff login.</p>
+        <Link className={styles.linkBtn} href="/login">Clinic staff? Sign in to your clinic</Link>
       </div>
     </main>
   );
