@@ -326,7 +326,13 @@ function PatientsList() {
 
   async function deactivateAllergy(id: string) {
     if (!drawerPatient) return;
-    const res = await authedFetch(`/clinical/allergies/${id}/deactivate`, { method: "PATCH" });
+    const reason = window.prompt("Reason for removing this allergy (recorded in the allergy history):")?.trim();
+    if (!reason) return;
+    const res = await authedFetch(`/clinical/allergies/${id}/deactivate`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    });
     if (res?.ok) {
       refreshAllergies(drawerPatient.id);
       const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
