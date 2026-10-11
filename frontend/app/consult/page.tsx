@@ -112,6 +112,9 @@ export default function ConsultPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selfId, setSelfId] = useState("");
   const [now, setNow] = useState(0);
+  // The URL mirrors the open visit, but only once a ?entry= deep link has been read; otherwise the
+  // mirror effect would strip the params on mount, before the deep link is consumed.
+  const [urlReady, setUrlReady] = useState(false);
 
   const [activeEntry, setActiveEntry] = useState<Row | null>(null);
   const [activePatient, setActivePatient] = useState<PatientDetail | null>(null);
@@ -244,6 +247,7 @@ export default function ConsultPage() {
       const q = new URLSearchParams(window.location.search);
       const entry = q.get("entry");
       if (entry) deepLinkRef.current = { entry, step: isStep(q.get("step")) ? (q.get("step") as Step) : null };
+      else setUrlReady(true);
       setOnline(navigator.onLine);
       return load("mine");
     });
@@ -270,6 +274,7 @@ export default function ConsultPage() {
 
   // Keep the visit and step in the URL so My Day (and a reload) can deep-link into the workspace.
   useEffect(() => {
+    if (!urlReady) return;
     const url = new URL(window.location.href);
     if (activeEntry) {
       url.searchParams.set("entry", activeEntry.id);
@@ -279,7 +284,7 @@ export default function ConsultPage() {
       url.searchParams.delete("step");
     }
     window.history.replaceState(null, "", url);
-  }, [activeEntry, step]);
+  }, [activeEntry, step, urlReady]);
 
   // ---- note persistence ---------------------------------------------------------------------
 
@@ -498,8 +503,9 @@ export default function ConsultPage() {
   // Deep link (?entry=&step=) once the queue is loaded.
   useEffect(() => {
     const link = deepLinkRef.current;
-    if (!link || loading || rows.length === 0) return;
+    if (!link || loading) return;
     deepLinkRef.current = null;
+    setUrlReady(true);
     const row = rows.find((r) => r.id === link.entry);
     if (!row) return;
     if (row.status === "in_consult" && row.doctorId === selfId) void Promise.resolve().then(() => openConsult(row, link.step ?? undefined));
@@ -704,7 +710,8 @@ export default function ConsultPage() {
       }
       const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
       if (!statusRes?.ok) {
-        setShellError("Note signed, but couldn't move the patient to checkout. Use “Retry checkout handoff”.");
+        const pr: Problem | null = await statusRes?.json().catch(() => null);
+        setShellError(`Note signed, but couldn't move the patient to checkout${pr?.detail ? ` (${pr.detail})` : ""}. Use “Retry checkout handoff”.`);
         return;
       }
       setActiveEntry((prev) => (prev ? { ...prev, status: "checkout_pending" } : prev));
