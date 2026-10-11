@@ -237,7 +237,7 @@ export default function ReportsPage() {
       {m?.includesToday && <div className={styles.infoNote} role="note">ⓘ Today is still in progress — figures are provisional</div>}
 
       <div className={styles.segmented} role="tablist" aria-label="Report">
-        {TABS.map(([key, label]) => (
+        {TABS.filter(([key]) => key !== "packages" || can("packages:view")).map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key}
             className={tab === key ? styles.segOn : styles.seg} onClick={() => setTab(key)}>{label}</button>
         ))}
