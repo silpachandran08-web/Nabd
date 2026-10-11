@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "../../setup/setup.module.css";
 import ph from "./pharmacy.module.css";
 import Icon from "../ui/Icon";
@@ -81,6 +81,18 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<PharmacyItem | null>(null);
+  // Stock changes (V2-004): +/- opens a reason dialog and posts a delta (or a counted total) to the stock-adjustments
+  // endpoint; the server keeps an immutable movement row and an audit event. Never an absolute overwrite from a stale list.
+  const [adjusting, setAdjusting] = useState<{ item: PharmacyItem; mode: "delta" | "total"; qty: string; reason: string; error: string | null } | null>(null);
+  const [adjustBusy, setAdjustBusy] = useState(false);
+  const [deactivating, setDeactivating] = useState<{ item: PharmacyItem; reason: string; error: string | null } | null>(null);
+  const [deactivateBusy, setDeactivateBusy] = useState(false);
+  // Stable identities: the shared Dialog re-runs its focus effect whenever onClose changes, which would pull focus
+  // out of the field being typed in (and make Space close the dialog).
+  const closeEdit = useCallback(() => setEditing(null), [setEditing]);
+  const closeAdjust = useCallback(() => setAdjusting(null), [setAdjusting]);
+  const closeDeactivate = useCallback(() => setDeactivating(null), [setDeactivating]);
+  const reasonRef = useRef<HTMLInputElement>(null);
   const [newItem, setNewItem] = useState<Partial<PharmacyItem>>({ isRx: false, stockQty: 0, taxRatePercent: 0 });
 
   const load = useCallback(async () => {
@@ -134,28 +146,70 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
     }
   };
 
-  // PATCH replaces the whole item, so every field comes from the loaded row. The API's item body has
-  // no code or active field (codes are generated; there is no deactivate), so neither is sent.
-  const itemBody = (i: PharmacyItem, over: Partial<PharmacyItem>) => {
-    const m = { ...i, ...over };
-    return { name: m.name, isRx: m.isRx, hsnCode: m.hsnCode || null, price: m.price, taxRatePercent: m.taxRatePercent, stockQty: m.stockQty };
+  // PATCH edits name, price, tax, Rx flag and HSN only. Stock is never sent here: it changes through the stock
+  // adjustment endpoint, so an edit made from a stale list cannot overwrite a newer count. Code and active are
+  // not part of the item body (codes are generated; activation has its own endpoint).
+  const itemBody = (i: PharmacyItem) => ({
+    name: i.name, isRx: i.isRx, hsnCode: i.hsnCode || null, price: i.price, taxRatePercent: i.taxRatePercent,
+  });
+
+  const openAdjust = (item: PharmacyItem, direction: 1 | -1) => {
+    setNotice(null);
+    setAdjusting({ item, mode: "delta", qty: direction === 1 ? "1" : "-1", reason: "", error: null });
   };
 
-  const stepStock = async (i: PharmacyItem, delta: number) => {
-    const stockQty = Math.max(0, i.stockQty + delta);
-    if (stockQty === i.stockQty) return;
-    setBusyId(i.id);
+  const submitAdjust = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjusting) return;
+    const qty = Number(adjusting.qty);
+    const reason = adjusting.reason.trim();
+    const delta = adjusting.mode === "delta";
+    if (adjusting.qty.trim() === "" || !Number.isInteger(qty)) { setAdjusting({ ...adjusting, error: "Enter a whole number." }); return; }
+    if (delta && qty === 0) { setAdjusting({ ...adjusting, error: "Enter a change other than 0." }); return; }
+    if (!delta && qty < 0) { setAdjusting({ ...adjusting, error: "A counted total cannot be negative." }); return; }
+    if (delta && adjusting.item.stockQty + qty < 0) { setAdjusting({ ...adjusting, error: `Only ${adjusting.item.stockQty} in stock, so it cannot go down by ${-qty}.` }); return; }
+    if (reason.length < 3) { setAdjusting({ ...adjusting, error: "A reason is required (at least 3 characters)." }); reasonRef.current?.focus(); return; }
+    setAdjustBusy(true);
+    try {
+      const res = await authedFetch(`/pharmacy/items/${adjusting.item.id}/stock-adjustments`, {
+        method: "POST", body: JSON.stringify(delta ? { delta: qty, reason } : { setTo: qty, reason }),
+      });
+      if (!res) return;
+      if (!res.ok) { setAdjusting({ ...adjusting, error: await problemText(res) }); return; }
+      setNotice({ text: `Stock of ${adjusting.item.name} updated.` });
+      setAdjusting(null);
+      await load(); // the server's count is authoritative: a concurrent sale or second pharmacist shows up here
+    } catch {
+      setAdjusting({ ...adjusting, error: "Couldn't reach the server. Nothing was changed; try again." });
+    } finally {
+      setAdjustBusy(false);
+    }
+  };
+
+  const setActive = async (item: PharmacyItem, active: boolean, reason?: string): Promise<boolean> => {
+    setBusyId(item.id);
     setNotice(null);
-    // Read-modify-write on the loaded row: reload afterwards so a concurrent sale is never hidden.
-    if (await send("PATCH", `/pharmacy/items/${i.id}`, itemBody(i, { stockQty }))) await load();
+    const ok = await send("PATCH", `/pharmacy/items/${item.id}/status`, { active, reason: reason || undefined });
+    if (ok) { setNotice({ text: `${item.name} ${active ? "activated" : "deactivated"}.` }); await load(); }
     setBusyId(null);
+    return ok;
+  };
+
+  const submitDeactivate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deactivating) return;
+    setDeactivateBusy(true);
+    const ok = await setActive(deactivating.item, false, deactivating.reason.trim());
+    setDeactivateBusy(false);
+    if (ok) setDeactivating(null);
+    else setDeactivating({ ...deactivating, error: "Couldn't deactivate the item. Nothing was changed." });
   };
 
   const saveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editing) return;
     if (!editing.name.trim() || !(editing.price >= 0)) return;
-    if (await send("PATCH", `/pharmacy/items/${editing.id}`, itemBody(editing, {}))) {
+    if (await send("PATCH", `/pharmacy/items/${editing.id}`, itemBody(editing))) {
       setNotice({ text: `${editing.name} saved.` });
       setEditing(null);
       await load();
@@ -265,9 +319,9 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
                       <td>{i.taxRatePercent}</td>
                       <td>
                         <div className={ph.stepper}>
-                          {canWrite && <button type="button" className={ph.stepBtn} aria-label={`Decrease stock of ${i.name}`} disabled={busyId === i.id || i.stockQty <= 0} onClick={() => stepStock(i, -1)}>−</button>}
+                          {canWrite && <button type="button" className={ph.stepBtn} aria-label={`Decrease stock of ${i.name}`} disabled={busyId === i.id || i.stockQty <= 0} onClick={() => openAdjust(i, -1)}>−</button>}
                           <span className={ph.qty}>{i.stockQty}</span>
-                          {canWrite && <button type="button" className={ph.stepBtn} aria-label={`Increase stock of ${i.name}`} disabled={busyId === i.id} onClick={() => stepStock(i, 1)}>+</button>}
+                          {canWrite && <button type="button" className={ph.stepBtn} aria-label={`Increase stock of ${i.name}`} disabled={busyId === i.id} onClick={() => openAdjust(i, 1)}>+</button>}
                           {i.stockQty === 0 ? <StatusPill tone="danger" label="Out of stock" /> : i.stockQty <= LOW_STOCK ? <StatusPill tone="warn" label="Low" /> : null}
                         </div>
                       </td>
@@ -276,7 +330,10 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
                       <td><StatusPill tone={i.active ? "ok" : "neutral"} label={i.active ? "Active" : "Inactive"} icon={i.active ? "check" : "x"} /></td>
                       {canWrite && (
                         <td>
-                          <button type="button" className={styles.smallBtn} onClick={() => setEditing(i)}>Edit</button>
+                          <button type="button" className={styles.smallBtn} onClick={() => setEditing(i)}>Edit</button>{" "}
+                          {i.active
+                            ? <button type="button" className={styles.smallBtn} disabled={busyId === i.id} onClick={() => setDeactivating({ item: i, reason: "", error: null })}>Deactivate</button>
+                            : <button type="button" className={styles.smallBtn} disabled={busyId === i.id} onClick={() => void setActive(i, true)}>Activate</button>}
                         </td>
                       )}
                     </tr>
@@ -329,7 +386,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
       )}
 
       {editing && (
-        <Dialog title={`Edit ${editing.name}`} size="drawer" onClose={() => setEditing(null)}>
+        <Dialog title={`Edit ${editing.name}`} size="drawer" onClose={closeEdit}>
           <form onSubmit={saveEdit}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-name">Name</label>
@@ -349,8 +406,53 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
             </div>
             <label className={ph.check}><input type="checkbox" checked={editing.isRx} onChange={(e) => setEditing({ ...editing, isRx: e.target.checked })} /> Prescription only (Rx)</label>
             <div className={styles.actions}>
-              <button type="button" className={styles.btn} onClick={() => setEditing(null)}>Cancel</button>
+              <button type="button" className={styles.btn} onClick={closeEdit}>Cancel</button>
               <button type="submit" className={styles.btnPrimary}>Save item</button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+
+      {adjusting && (
+        <Dialog title={`Change stock · ${adjusting.item.name}`} size="drawer" onClose={closeAdjust}>
+          <form onSubmit={submitAdjust}>
+            <p className={styles.subtitle} style={{ marginBlockEnd: "var(--nb-space-16)" }}>Current stock: {adjusting.item.stockQty}. Every change is logged with who, when and why, and cannot be edited afterwards.</p>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pa-mode">Type of change</label>
+              <select id="pa-mode" className={styles.select} value={adjusting.mode} onChange={(e) => setAdjusting({ ...adjusting, mode: e.target.value as "delta" | "total", qty: e.target.value === "total" ? String(adjusting.item.stockQty) : "1", error: null })}>
+                <option value="delta">Add or remove units (+/−)</option>
+                <option value="total">Set to a counted total (stock-take)</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pa-qty">{adjusting.mode === "delta" ? "Change (negative to remove)" : "Counted total"}</label>
+              <input id="pa-qty" className={styles.input} type="number" step="1" value={adjusting.qty} onChange={(e) => setAdjusting({ ...adjusting, qty: e.target.value, error: null })} required />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pa-reason">Reason (required)</label>
+              <input id="pa-reason" ref={reasonRef} className={styles.input} maxLength={500} placeholder="e.g. Supplier delivery, damaged, stock-take" value={adjusting.reason} onChange={(e) => setAdjusting({ ...adjusting, reason: e.target.value, error: null })} required />
+            </div>
+            {adjusting.error && <div className={`${ph.notice} ${ph.noticeError}`} role="alert"><Icon name="alert" size={14} /> {adjusting.error}</div>}
+            <div className={styles.actions}>
+              <button type="button" className={styles.btn} onClick={closeAdjust}>Cancel</button>
+              <button type="submit" className={styles.btnPrimary} disabled={adjustBusy}>{adjustBusy ? "Saving…" : "Record change"}</button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+
+      {deactivating && (
+        <Dialog title={`Deactivate ${deactivating.item.name}`} size="drawer" onClose={closeDeactivate}>
+          <form onSubmit={submitDeactivate}>
+            <p className={styles.subtitle} style={{ marginBlockEnd: "var(--nb-space-16)" }}>A deactivated item no longer appears at checkout. Its history and stock count stay, and you can activate it again at any time.</p>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="pd-reason">Reason (optional)</label>
+              <input id="pd-reason" className={styles.input} maxLength={500} value={deactivating.reason} onChange={(e) => setDeactivating({ ...deactivating, reason: e.target.value, error: null })} />
+            </div>
+            {deactivating.error && <div className={`${ph.notice} ${ph.noticeError}`} role="alert"><Icon name="alert" size={14} /> {deactivating.error}</div>}
+            <div className={styles.actions}>
+              <button type="button" className={styles.btn} onClick={closeDeactivate}>Cancel</button>
+              <button type="submit" className={styles.btnPrimary} disabled={deactivateBusy}>{deactivateBusy ? "Saving…" : "Deactivate"}</button>
             </div>
           </form>
         </Dialog>
