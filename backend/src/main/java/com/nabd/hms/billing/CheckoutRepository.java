@@ -16,6 +16,7 @@ import java.util.UUID;
 import static com.nabd.hms.billing.CheckoutModels.ChargeRow;
 import static com.nabd.hms.billing.CheckoutModels.InvoiceRow;
 import static com.nabd.hms.billing.CheckoutModels.LineItemInput;
+import static com.nabd.hms.billing.CheckoutModels.PharmacyChargeRow;
 import static com.nabd.hms.billing.CheckoutModels.LineItemRow;
 import static com.nabd.hms.billing.CheckoutModels.PaymentRow;
 import static com.nabd.hms.billing.CheckoutModels.PrescribedItemRow;
@@ -151,6 +152,16 @@ class CheckoutRepository {
         jdbc.update("UPDATE invoices SET subtotal = ?, discount = ?, tax = ?, round_off = ?, total = ? " +
                         "WHERE tenant_id = ? AND id = ?",
                 subtotal, discount, tax, roundOff, total, tenantId, invoiceId);
+    }
+
+    /** V3-004: the catalogue row for a stocked (pharmacy) code, active or not; empty for any non-pharmacy code. */
+    Optional<PharmacyChargeRow> findPharmacyCharge(UUID tenantId, String chargeCode) {
+        return jdbc.query(
+                "SELECT name, category, base_amount, tax_rate_percent, active FROM charge_catalogue " +
+                        "WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
+                (rs, i) -> new PharmacyChargeRow(rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
+                        rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active")),
+                tenantId, chargeCode).stream().findFirst();
     }
 
     /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same

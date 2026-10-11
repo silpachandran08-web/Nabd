@@ -387,6 +387,38 @@ class PharmacyApiTest extends ApiTestBase {
         assertThat(on.getBody().get("active")).isEqualTo(true);
     }
 
+    // V3-004: a stale tab or direct API call cannot sell a deactivated item, and cannot choose the price of a stocked one.
+    @Test
+    void checkoutRefusesAnInactiveItemAndPricesStockedItemsFromTheCatalogue() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "pharm-v34@a.com", "+919600000050", false);
+        String token = loginAndGetAccessToken(staff);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        String code = addHybridItem(token, "Recalled batch", 5);
+        String id = itemId(token);
+
+        String entry = checkoutPendingEntry(token, staff.id(), "Stale Tab", "+919999940050");
+        ResponseEntity<Map> cheap = exchange("/v1/billing/checkout/" + entry, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", code, "chargeName", "Anything", "category", "Pharmacy",
+                        "quantity", 1, "unitPrice", 1.00, "taxRatePercent", 0)))), Map.class);
+        assertThat(cheap.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> line = (Map<?, ?>) ((List<?>) cheap.getBody().get("lineItems")).get(0);
+        assertThat(line.get("chargeName")).isEqualTo("Recalled batch");
+        assertThat(new java.math.BigDecimal(line.get("unitPrice").toString())).isEqualByComparingTo("350.00");
+
+        exchange("/v1/pharmacy/items/" + id + "/status", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("active", false, "reason", "Recalled")), Map.class);
+        String entry2 = checkoutPendingEntry(token, staff.id(), "Stale Tab Two", "+919999940051");
+        ResponseEntity<Map> blocked = exchange("/v1/billing/checkout/" + entry2, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", code, "chargeName", "Recalled batch", "category", "Pharmacy",
+                        "quantity", 1, "unitPrice", 350.00, "taxRatePercent", 12)))), Map.class);
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(blocked.getBody().get("type")).asString().contains("item-inactive");
+        ResponseEntity<List> items = exchange("/v1/pharmacy/items", HttpMethod.GET, authed(token), List.class);
+        assertThat(((Map<?, ?>) items.getBody().get(0)).get("stockQty")).isEqualTo(4); // only the first sale dispensed
+    }
+
     @Test
     void viewOnlyPharmacyRoleCannotAdjustStockOrToggleActive() {
         SeededTenant tenant = seedTenant();

@@ -13,6 +13,10 @@ final class CheckoutModels {
                       BigDecimal followUpAmount, BigDecimal taxRatePercent) {
     }
 
+    /** V3-004: the authoritative catalogue row behind a pharmacy (stocked) charge code. */
+    record PharmacyChargeRow(String name, String category, BigDecimal baseAmount, BigDecimal taxRatePercent, boolean active) {
+    }
+
     record QueueEntryContext(UUID patientId, UUID doctorId, UUID departmentId, String queueStatus, boolean hasAppointment) {
     }
 
