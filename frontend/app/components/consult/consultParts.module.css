@@ -60,3 +60,16 @@
   .teeth { grid-template-columns: repeat(2, 1fr); }
   .dialogActions > * { flex: 1 1 100%; justify-content: center; }
 }
+
+/* Rx warning decision cards and override dialog (DOC-031/032) */
+.warnStack { display: flex; flex-direction: column; gap: var(--nb-space-8); margin-block: var(--nb-space-4) var(--nb-space-12); }
+.warnCard { align-items: flex-start; }
+.warnBody { display: flex; flex-direction: column; gap: var(--nb-space-4); min-width: 0; overflow-wrap: anywhere; }
+.fieldset { border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); display: flex; flex-direction: column; gap: var(--nb-space-8); margin: 0; }
+.legend { padding-inline: var(--nb-space-4); font-size: 12px; font-weight: 600; color: var(--nb-text-secondary); }
+.textarea { min-height: 64px; width: 100%; box-sizing: border-box; background: var(--nb-surface-3); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); color: var(--nb-text-primary); font: inherit; font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: 12px; color: var(--nb-text-secondary); min-width: 0; }
+.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--nb-space-8); }
+.radioRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.allergyItem { border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.history { max-block-size: 240px; overflow-y: auto; }

@@ -28,7 +28,7 @@ export function mergeAllergies(patient: PatientDetail | null, ctx: ClinicalConte
   return { items, state, severityMissing: ctx.allergies.status === "error" || ctx.allergies.status === "none" };
 }
 
-export default function SafetyStrip({ patient, ctx, onRetry, sticky = true }: { patient: PatientDetail | null; ctx: ClinicalContext; onRetry: () => void; sticky?: boolean }) {
+export default function SafetyStrip({ patient, ctx, onRetry, sticky = true, onManageAllergies }: { patient: PatientDetail | null; ctx: ClinicalContext; onRetry: () => void; sticky?: boolean; onManageAllergies?: () => void }) {
   const { items, state, severityMissing } = mergeAllergies(patient, ctx);
 
   const conds = (ctx.conditions.status === "ok" ? (ctx.conditions.data ?? []).filter((c) => c.status !== "resolved").map((c) => c.condition) : []);
@@ -57,7 +57,10 @@ export default function SafetyStrip({ patient, ctx, onRetry, sticky = true }: { 
               {severityMissing && <span className={s.muted}>Severity unavailable — register not loaded. <button type="button" className={s.linkBtn} onClick={onRetry}>Retry</button></span>}
             </>
           ) : state === "none" ? (
-            <span className={s.safetyValue}>None recorded</span>
+            // "None recorded" (nobody asked) is not "no known allergies" (a clinician documented it).
+            ctx.allergyStatus.status === "ok" && ctx.allergyStatus.data?.state === "none_documented"
+              ? <span className={s.safetyValue}>No known allergies · documented{ctx.allergyStatus.data.documentedByName ? ` by ${ctx.allergyStatus.data.documentedByName}` : ""}</span>
+              : <span className={s.safetyValue}>None recorded · not yet asked</span>
           ) : state === "loading" ? (
             <span className={s.safetyValue}>Checking allergies…</span>
           ) : (
@@ -65,6 +68,7 @@ export default function SafetyStrip({ patient, ctx, onRetry, sticky = true }: { 
               Couldn&apos;t confirm allergies — ask the patient. <button type="button" className={s.linkBtn} onClick={onRetry}>Retry</button>
             </span>
           )}
+          {onManageAllergies && <button type="button" className={s.linkBtn} onClick={onManageAllergies}>Allergy register</button>}
         </span>
       </div>
 
