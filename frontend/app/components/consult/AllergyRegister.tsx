@@ -118,7 +118,8 @@ export default function AllergyRegister({
     const cur = allergies?.find((a) => a.id === fixing.id);
     const body: Record<string, string> = { reason: fixing.reason.trim() };
     if (cur && fixing.substance.trim() !== cur.substance) body.substance = fixing.substance.trim();
-    if (cur && fixing.category !== (cur.category ?? "")) body.category = fixing.category;
+    // The API cannot clear a category (null = unchanged, "" is rejected), so an empty value is never sent.
+    if (cur && fixing.category !== "" && fixing.category !== (cur.category ?? "")) body.category = fixing.category;
     if (cur && fixing.severity !== cur.severity) body.severity = fixing.severity;
     if (cur && fixing.reaction.trim() !== (cur.reaction ?? "")) body.reaction = fixing.reaction.trim();
     if (Object.keys(body).length === 1) { setError("Change at least one field to record a correction."); return; }
@@ -175,7 +176,7 @@ export default function AllergyRegister({
                           <label className={s.field}>Substance<input className={s.input} value={fixing.substance} onChange={(e) => setFixing({ ...fixing, substance: e.target.value })} /></label>
                           <label className={s.field}>Category
                             <select className={s.input} value={fixing.category} onChange={(e) => setFixing({ ...fixing, category: e.target.value })}>
-                              <option value="">Not set</option>{CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                              {!a.category && <option value="">Not set</option>}{CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                             </select>
                           </label>
                           <label className={s.field}>Severity
