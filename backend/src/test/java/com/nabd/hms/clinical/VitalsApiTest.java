@@ -110,4 +110,58 @@ class VitalsApiTest extends ApiTestBase {
                 .filter(e -> queueEntryId.equals(((Map<?, ?>) e).get("id"))).findFirst().orElseThrow();
         assertThat(entry.get("status")).isEqualTo("vitals_pending");
     }
+
+    // V2-008: a null / omitted field keeps the stored value; a partial save must not wipe the other measurements.
+    @Test
+    void aSecondSaveWithOnlyPulseKeepsTheOtherMeasurementsAndCorrectionsAreAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "nurse-v28@a.com", "+919800010028", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V28", "+919999950028");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "vitals_pending");
+        String url = "/v1/clinical/vitals/" + queueEntryId;
+        exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("heightCm", 170, "weightKg", 68, "bpSystolic", 120,
+                "bpDiastolic", 80, "pulseBpm", 72, "tempCelsius", 37.0, "spo2Percent", 98)), Map.class);
+
+        java.util.HashMap<String, Object> pulseOnly = new java.util.HashMap<>();
+        pulseOnly.put("pulseBpm", 90);
+        pulseOnly.put("heightCm", null);
+        pulseOnly.put("bpSystolic", null);
+        ResponseEntity<Map> resp = exchange(url, HttpMethod.PATCH, authedJsonBody(token, pulseOnly), Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Number) resp.getBody().get("pulseBpm")).intValue()).isEqualTo(90);
+        assertThat(((Number) resp.getBody().get("bpSystolic")).intValue()).isEqualTo(120);
+        assertThat(((Number) resp.getBody().get("heightCm")).doubleValue()).isEqualTo(170.0);
+        assertThat(((Number) resp.getBody().get("spo2Percent")).intValue()).isEqualTo(98);
+
+        Map<String, Object> audited = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT before, after FROM audit_log WHERE tenant_id = ? AND action = 'vitals.corrected' ORDER BY created_at DESC LIMIT 1",
+                tenant.id()));
+        assertThat(audited.get("before").toString()).contains("72");
+        assertThat(audited.get("after").toString()).contains("90");
+    }
+
+    // V1-011: genuine neonatal / shock / hypothermic readings are accepted; impossible ones are still refused.
+    @Test
+    void neonatalAndCriticalReadingsAreAcceptedButImpossibleOnesAreNot() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "nurse-v11@a.com", "+919800010011", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V11", "+919999950011");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "vitals_pending");
+        String url = "/v1/clinical/vitals/" + queueEntryId;
+
+        ResponseEntity<Map> critical = exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "weightKg", 0.6, "heightCm", 32, "bpSystolic", 35, "bpDiastolic", 20, "spo2Percent", 42, "tempCelsius", 28.5)), Map.class);
+        assertThat(critical.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> impossible = exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("spo2Percent", 0)), Map.class);
+        assertThat(impossible.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(String.valueOf(impossible.getBody().get("detail"))).contains("spo2Percent");
+    }
 }

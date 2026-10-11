@@ -40,6 +40,10 @@ public class GlobalExceptionHandler {
                 .map(this::toFieldError)
                 .toList();
         problem.setProperty("errors", errors);
+        // A readable summary so clients that show only `detail` still name the field (field names and the
+        // constraint's message only, never the rejected value).
+        problem.setDetail(errors.stream().limit(3).map(e -> e.get("field") + ": " + e.get("message"))
+                .collect(java.util.stream.Collectors.joining("; ")));
         return withTraceId(problem);
     }
 
