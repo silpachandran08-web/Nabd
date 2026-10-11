@@ -768,11 +768,12 @@ paths:
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
     patch:
       tags: [Patients]
+      summary: Partial update — absent properties are left unchanged, explicit null clears guardianId/address/nationalId
       x-required-permission: patients:edit
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: "#/components/schemas/PatientWrite" } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/PatientPatch" } } }
       responses:
         "200": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1525,6 +1526,22 @@ components:
         nationalId:
           type: [string, "null"]
           description: "Aadhaar/Iqama — column-level encrypted at rest (NB-140), never returned in list responses"
+
+    PatientPatch:
+      type: object
+      description: >
+        True partial update. Only properties present in the body are written; absent ones are left
+        unchanged (so revoking a guardian is {"guardianId": null} and cannot touch address/nationalId).
+        guardianId, address and nationalId accept an explicit null to clear. name/phone/dob/gender
+        cannot be null. A minor (computed from the resulting dob) must keep a guardian.
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        dob: { type: string, format: date }
+        gender: { type: string, enum: [male, female, other] }
+        guardianId: { type: [string, "null"], format: uuid }
+        address: { type: [string, "null"] }
+        nationalId: { type: [string, "null"], description: "Column-level encrypted at rest; never returned" }
 
     Patient:
       type: object

@@ -211,11 +211,20 @@ class PatientRepository {
         return id;
     }
 
-    void update(UUID tenantId, UUID id, String name, String phone, LocalDate dob, String gender,
-                UUID guardianId, String address, byte[] nationalIdEnc) {
-        jdbc.update("UPDATE patients SET name=?, phone=?, dob=?, gender=?, guardian_id=?, address=?, national_id_enc=? " +
-                        "WHERE tenant_id = ? AND id = ? AND status = 'active'",
-                name, phone, Date.valueOf(dob), gender, guardianId, address, nationalIdEnc, tenantId, id);
+    /**
+     * Partial update: writes ONLY the given columns (column name -> value; a null value clears that
+     * column). Columns not in the map are never touched, so PATCH cannot wipe address, national_id_enc
+     * or guardian_id unless the caller explicitly sent them. Keys are fixed literals from the service.
+     */
+    void update(UUID tenantId, UUID id, java.util.Map<String, Object> changes) {
+        if (changes.isEmpty()) {
+            return;
+        }
+        java.util.List<Object> args = new java.util.ArrayList<>(changes.values());
+        args.add(tenantId);
+        args.add(id);
+        String set = String.join(", ", changes.keySet().stream().map(c -> c + "=?").toList());
+        jdbc.update("UPDATE patients SET " + set + " WHERE tenant_id = ? AND id = ? AND status = 'active'", args.toArray());
     }
 
     /** Writes both the status flip and the merge log row (NB-072) — same transaction, same connection. */
