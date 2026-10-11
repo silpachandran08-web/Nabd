@@ -8,16 +8,19 @@ import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 
 // Every field optional (whoever is taking vitals may not have every instrument to hand), but VitalsService
-// rejects a request with no measurement at all. The bounds are PLAUSIBILITY limits, values that are
-// physiologically impossible and almost certainly a typing error (temp 370, SpO2 150). They are not clinical
-// normal ranges (see VitalsRanges for the abnormal flags) and never alter a value: out of bounds is a 400.
-// They mirror the nursing screen's hard limits and need clinical sign-off before go-live (NB-321).
+// rejects a request with no measurement at all. A null field means "leave the stored value unchanged" (PATCH);
+// a measurement is corrected by sending a new value, never by silently blanking it (V2-008).
+// The bounds are PLAUSIBILITY limits, values that are physiologically impossible and almost certainly a typing
+// error (temp 370, SpO2 150). They are deliberately wide at the low end so that genuine neonatal, preterm,
+// shock, cyanotic and hypothermic readings can be recorded (V1-011): they are not age-banded and not clinical
+// normal ranges (see VitalsRanges for the abnormal flags), and they never alter a value: out of bounds is a 400.
+// The numbers mirror the VITAL_FIELDS table in frontend/app/nursing/page.tsx and need clinical sign-off (NB-321).
 public record VitalsWriteRequest(
-        @DecimalMin("30") @DecimalMax("250") BigDecimal heightCm,
-        @DecimalMin("0.3") @DecimalMax("400") BigDecimal weightKg,
-        @Min(40) @Max(300) Integer bpSystolic,
-        @Min(20) @Max(200) Integer bpDiastolic,
+        @DecimalMin("20") @DecimalMax("250") BigDecimal heightCm,
+        @DecimalMin("0.2") @DecimalMax("400") BigDecimal weightKg,
+        @Min(20) @Max(300) Integer bpSystolic,
+        @Min(10) @Max(200) Integer bpDiastolic,
         @Min(20) @Max(300) Integer pulseBpm,
-        @DecimalMin("25") @DecimalMax("45") BigDecimal tempCelsius,
-        @Min(50) @Max(100) Integer spo2Percent) {
+        @DecimalMin("20") @DecimalMax("45") BigDecimal tempCelsius,
+        @Min(1) @Max(100) Integer spo2Percent) {
 }

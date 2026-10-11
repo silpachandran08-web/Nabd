@@ -62,7 +62,7 @@ public class AllergyController {
     @PatchMapping("/allergies/{id}/deactivate")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public void deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                            @RequestBody(required = false) AllergyRemovalRequest req, HttpServletRequest http) {
+                            @Valid @RequestBody(required = false) AllergyRemovalRequest req, HttpServletRequest http) {
         service.deactivate(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 

@@ -31,6 +31,20 @@ class AllergyRepository {
                 mapper(), tenantId, patientId);
     }
 
+    /** V1-004/V1-005: transaction-scoped advisory lock on one patient's allergy register. Prescription save/sign and
+     * every register write take it first, so an allergy recorded or downgraded concurrently cannot slip between a
+     * sign-time warning check and the status flip. Always acquired before any row lock. */
+    void lockRegister(UUID tenantId, UUID patientId) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", rs -> {
+        }, "allergy-register:" + tenantId + ":" + patientId);
+    }
+
+    /** V1-005: row lock so a correction reads the values it is about to change, not a stale copy. */
+    Optional<AllergyRow> findByIdForUpdate(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT * FROM patient_allergies WHERE tenant_id = ? AND id = ? FOR UPDATE", mapper(), tenantId, id)
+                .stream().findFirst();
+    }
+
     Optional<AllergyRow> findById(UUID tenantId, UUID id) {
         return jdbc.query("SELECT * FROM patient_allergies WHERE tenant_id = ? AND id = ?", mapper(), tenantId, id)
                 .stream().findFirst();

@@ -103,9 +103,18 @@ class BillingRepository {
                 discountMapper(), Timestamp.from(afterCreatedAt), afterId, limit);
     }
 
-    void updateDiscountStatus(UUID id, String status, UUID reviewedBy, Instant reviewedAt) {
-        jdbc.update("UPDATE master.discount_requests SET status = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?",
+    /** Returns affected rows. Only a still-pending request can be reviewed, so two reviewers racing cannot both
+     * approve (which would apply the discount twice) or flip each other's decision. */
+    int updateDiscountStatus(UUID id, String status, UUID reviewedBy, Instant reviewedAt) {
+        return jdbc.update("UPDATE master.discount_requests SET status = ?, reviewed_by = ?, reviewed_at = ? " +
+                        "WHERE id = ? AND status = 'pending'",
                 status, reviewedBy, Timestamp.from(reviewedAt), id);
+    }
+
+    Optional<BillingModels.OperatorInfo> findOperatorInfo(UUID operatorId) {
+        return jdbc.query("SELECT name, role FROM master.operators WHERE id = ?",
+                (rs, i) -> new BillingModels.OperatorInfo(rs.getString("name"), rs.getString("role")), operatorId)
+                .stream().findFirst();
     }
 
     private RowMapper<SubscriptionRow> subscriptionMapper() {

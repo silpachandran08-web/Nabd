@@ -72,6 +72,7 @@ public class AllergyService {
         if (substance.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "Substance is required.");
         }
+        repo.lockRegister(tenantId, patientId);
         boolean duplicate = repo.findActiveByPatient(tenantId, patientId).stream()
                 .anyMatch(a -> a.substance().trim().equalsIgnoreCase(substance));
         if (duplicate) {
@@ -94,7 +95,12 @@ public class AllergyService {
     @Transactional
     public AllergyResponse correct(UUID tenantId, UUID id, UUID callerStaffId, String ipAddress, AllergyCorrectionRequest req) {
         tenantContext.set(tenantId);
-        AllergyRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        // V1-005: take the patient's register lock, then the row lock, and merge against the locked values. Two
+        // concurrent corrections now run one after the other, each seeing the other's result, so a stale
+        // read can no longer write an old severity back. Each applied correction has its own history row.
+        AllergyRow unlocked = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        repo.lockRegister(tenantId, unlocked.patientId());
+        AllergyRow current = repo.findByIdForUpdate(tenantId, id).orElseThrow(this::notFound);
         if (!current.active()) {
             throw new ApiException(HttpStatus.CONFLICT, "allergy-removed", "Allergy removed",
                     "This allergy was removed from the register and can no longer be corrected. Record it again if it applies.");
@@ -134,7 +140,9 @@ public class AllergyService {
         if (reason.isEmpty()) {
             throw reasonRequired();
         }
-        AllergyRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        AllergyRow unlocked = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        repo.lockRegister(tenantId, unlocked.patientId());
+        AllergyRow current = repo.findByIdForUpdate(tenantId, id).orElseThrow(this::notFound);
         if (!current.active()) {
             return; // already removed: idempotent, nothing further to record
         }
@@ -188,6 +196,7 @@ public class AllergyService {
         if (!repo.patientExists(tenantId, patientId)) {
             throw notFound();
         }
+        repo.lockRegister(tenantId, patientId);
         if (!repo.findActiveByPatient(tenantId, patientId).isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "allergies-recorded", "Allergies are recorded",
                     "This patient has active allergies on the register, so 'no known allergies' cannot be documented.");

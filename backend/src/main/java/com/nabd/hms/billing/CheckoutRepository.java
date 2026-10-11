@@ -126,7 +126,7 @@ class CheckoutRepository {
     void appendLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items, int startOrder) {
         int order = startOrder;
         for (LineItemInput item : items) {
-            decrementPharmacyStockIfApplicable(tenantId, item.chargeCode(), item.quantity());
+            decrementPharmacyStockIfApplicable(tenantId, invoiceId, item.chargeCode(), item.quantity());
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
@@ -156,18 +156,26 @@ class CheckoutRepository {
     /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same
      * transaction — "one invoice, one-tap stock deduction", the wireframe's own words. Non-pharmacy
      * charges (stock_qty IS NULL) are untouched. */
-    private void decrementPharmacyStockIfApplicable(UUID tenantId, String chargeCode, int quantity) {
-        List<Integer> stock = jdbc.query("SELECT stock_qty FROM charge_catalogue WHERE tenant_id = ? AND code = ?",
-                (rs, i) -> (Integer) rs.getObject("stock_qty"), tenantId, chargeCode);
-        if (stock.isEmpty() || stock.get(0) == null) {
+    private void decrementPharmacyStockIfApplicable(UUID tenantId, UUID invoiceId, String chargeCode, int quantity) {
+        List<UUID> pharmacy = jdbc.query("SELECT id FROM charge_catalogue WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
+                (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, chargeCode);
+        if (pharmacy.isEmpty()) {
             return;
         }
-        int updated = jdbc.update(
-                "UPDATE charge_catalogue SET stock_qty = stock_qty - ? WHERE tenant_id = ? AND code = ? AND stock_qty >= ?",
-                quantity, tenantId, chargeCode, quantity);
-        if (updated == 0) {
+        // The guarded UPDATE takes the row lock, so it serialises with a manual stock adjustment (PharmacyService).
+        List<Integer> after = jdbc.query(
+                "UPDATE charge_catalogue SET stock_qty = stock_qty - ? WHERE tenant_id = ? AND code = ? AND stock_qty >= ? " +
+                        "RETURNING stock_qty",
+                (rs, i) -> rs.getInt("stock_qty"), quantity, tenantId, chargeCode, quantity);
+        if (after.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Insufficient stock",
                     "Not enough stock for " + chargeCode + " to dispense " + quantity + " unit(s).");
+        }
+        // Immutable movement row (V51): every stock change, including a checkout dispense, leaves one.
+        if (quantity > 0) {
+            jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, invoice_id) " +
+                            "VALUES (?,?,'dispense',?,?,?,?,?)",
+                    tenantId, pharmacy.get(0), -quantity, after.get(0) + quantity, after.get(0), "Dispensed at checkout", invoiceId);
         }
     }
 

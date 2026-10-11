@@ -10,6 +10,13 @@ import java.util.Set;
  * no nav entry and no create button for it anywhere; onboarding_provisioning being super_admin +
  * implementation only is what makes tenant creation exclusive to those two roles (NB-258's future
  * create-tenant endpoint gates on that authority, nothing further needed here).
+ *
+ * Surfaces grant ":view" only. Money-moving actions on billing_revenue carry two finer authorities
+ * (V2-005) so that the read-only {@code commercial} role, which shares billing_revenue:view, cannot write:
+ * {@code billing_revenue:edit} (change a subscription, move it through dunning states, request a
+ * discount: super_admin + billing) and {@code billing_revenue:approve} (approve or reject an above-cap
+ * discount: super_admin only, per the SSA-08 note "a super-admin approval request"). The JWT is issued
+ * with these at login, so an operator signed in before this change re-authenticates to pick them up.
  */
 final class PlatformPermissions {
 
@@ -33,10 +40,20 @@ final class PlatformPermissions {
             Map.entry("audit_compliance", Set.of("super_admin", "sre", "compliance_dpo"))
     );
 
+    /** Finer-grained authorities beyond ":view"; each lists exactly the roles that hold it. */
+    private static final Map<String, Set<String>> ACTION_ROLES = Map.of(
+            "billing_revenue:edit", Set.of("super_admin", "billing"),
+            "billing_revenue:approve", Set.of("super_admin")
+    );
+
     static List<String> forRole(String role) {
-        return SURFACE_ROLES.entrySet().stream()
-                .filter(e -> e.getValue().contains(role))
-                .map(e -> e.getKey() + ":view")
+        return java.util.stream.Stream.concat(
+                        SURFACE_ROLES.entrySet().stream()
+                                .filter(e -> e.getValue().contains(role))
+                                .map(e -> e.getKey() + ":view"),
+                        ACTION_ROLES.entrySet().stream()
+                                .filter(e -> e.getValue().contains(role))
+                                .map(Map.Entry::getKey))
                 .sorted()
                 .toList();
     }

@@ -29,7 +29,8 @@ export default function RxWarnings({
   item, locked, onOverride, onChangeMedicine, onRemove,
 }: {
   item: PrescriptionItem; locked: boolean;
-  onOverride: (w: RxWarning) => void; onChangeMedicine: () => void; onRemove?: () => void;
+  /** Absent for someone who may not record a decision (not the visit's doctor, no clinical:approve): the button is then not rendered. */
+  onOverride?: (w: RxWarning) => void; onChangeMedicine: () => void; onRemove?: () => void;
 }) {
   const warnings = item.warnings ?? [];
   if (warnings.length === 0) return null;
@@ -53,13 +54,15 @@ export default function RxWarnings({
               {open && !locked && (
                 <span className={s.row}>
                   <button type="button" className={s.btn} onClick={onChangeMedicine}>Change medicine</button>
-                  <button type="button" className={s.btn} onClick={() => onOverride(w)}>
-                    {w.kind === "controlled" ? "Record acknowledgement" : "Override with a clinical reason"}
-                  </button>
+                  {onOverride && (
+                    <button type="button" className={s.btn} onClick={() => onOverride(w)}>
+                      {w.kind === "controlled" ? "Record acknowledgement" : "Override with a clinical reason"}
+                    </button>
+                  )}
                   {onRemove && <button type="button" className={s.btn} onClick={onRemove}>Remove medicine</button>}
                 </span>
               )}
-              {w.decision && !locked && (
+              {w.decision && !locked && onOverride && (
                 <span><button type="button" className={s.linkBtn} onClick={() => onOverride(w)}>Change reason</button></span>
               )}
             </div>

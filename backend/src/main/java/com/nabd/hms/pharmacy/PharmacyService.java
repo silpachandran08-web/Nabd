@@ -1,9 +1,13 @@
 package com.nabd.hms.pharmacy;
 
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemResponse;
+import com.nabd.hms.pharmacy.dto.PharmacyItemStatusRequest;
+import com.nabd.hms.pharmacy.dto.PharmacyStockAdjustmentRequest;
+import com.nabd.hms.pharmacy.dto.PharmacyStockMovementResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemWriteRequest;
 import com.nabd.hms.pharmacy.dto.PharmacySettingsResponse;
 import com.nabd.hms.pharmacy.dto.PharmacySettingsWriteRequest;
@@ -11,9 +15,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
+import static com.nabd.hms.pharmacy.PharmacyModels.ActorInfo;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingQueueRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
 
@@ -28,10 +35,12 @@ public class PharmacyService {
 
     private final PharmacyRepository repo;
     private final TenantContext tenantContext;
+    private final AuditService auditService;
 
-    PharmacyService(PharmacyRepository repo, TenantContext tenantContext) {
+    PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -54,14 +63,21 @@ public class PharmacyService {
     }
 
     @Transactional
-    public PharmacyItemResponse addItem(UUID tenantId, PharmacyItemWriteRequest req) {
+    public PharmacyItemResponse addItem(UUID tenantId, UUID callerStaffId, String ipAddress, PharmacyItemWriteRequest req) {
         tenantContext.set(tenantId);
         requireHybridMode(tenantId);
         String code = "PHM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         UUID id = repo.insertItem(tenantId, code, req);
+        int opening = req.stockQtyOrZero();
+        if (opening > 0) {
+            // Opening stock is a stock change like any other: it gets a movement row and an audit event.
+            recordAdjustment(tenantId, callerStaffId, ipAddress, id, 0, opening, "Opening stock");
+        }
         return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
     }
 
+    /** Edits name, price, tax, Rx flag and HSN. A stockQty in the body is ignored on purpose (V2-004): stock only
+     * changes through {@link #adjustStock}, so an edit from a stale list can no longer overwrite a newer count. */
     @Transactional
     public PharmacyItemResponse updateItem(UUID tenantId, UUID id, PharmacyItemWriteRequest req) {
         tenantContext.set(tenantId);
@@ -70,6 +86,84 @@ public class PharmacyService {
             throw notFound();
         }
         return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+    }
+
+    /** V2-004: relative (delta) or stock-take (setTo) change, reason mandatory. The item row is locked, the new
+     * count is computed from the locked value, and an immutable movement row plus an audit event record it. */
+    @Transactional
+    public PharmacyItemResponse adjustStock(UUID tenantId, UUID callerStaffId, String ipAddress, UUID id,
+                                             PharmacyStockAdjustmentRequest req) {
+        tenantContext.set(tenantId);
+        requireHybridMode(tenantId);
+        if ((req.delta() == null) == (req.setTo() == null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
+                    "Send exactly one of 'delta' (a change) or 'setTo' (a counted total).");
+        }
+        String reason = req.reason().trim();
+        if (reason.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
+                    "A reason is required for every stock change.");
+        }
+        PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(this::notFound);
+        long target = req.setTo() != null ? req.setTo() : (long) item.stockQty() + req.delta();
+        if (target < 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "insufficient-stock", "Stock cannot go below zero",
+                    "Only " + item.stockQty() + " in stock, so the count cannot be reduced by " + (-req.delta()) + ".");
+        }
+        if (target == item.stockQty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "no-change", "Nothing to change",
+                    "The stock count is already " + item.stockQty() + ".");
+        }
+        recordAdjustment(tenantId, callerStaffId, ipAddress, id, item.stockQty(), (int) target, reason);
+        return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+    }
+
+    /** V2-007: activate / deactivate. Idempotent; only a real change is audited. */
+    @Transactional
+    public PharmacyItemResponse setActive(UUID tenantId, UUID callerStaffId, String ipAddress, UUID id,
+                                           PharmacyItemStatusRequest req) {
+        tenantContext.set(tenantId);
+        requireHybridMode(tenantId);
+        PharmacyItemRow item = repo.lockItem(tenantId, id).orElseThrow(this::notFound);
+        boolean active = Boolean.TRUE.equals(req.active());
+        if (item.active() != active) {
+            repo.setActive(tenantId, id, active);
+            Map<String, Object> before = new LinkedHashMap<>();
+            before.put("active", item.active());
+            Map<String, Object> after = new LinkedHashMap<>();
+            after.put("active", active);
+            after.put("itemCode", item.code());
+            after.put("reason", req.reason() == null || req.reason().isBlank() ? null : req.reason().trim());
+            audit(tenantId, callerStaffId, ipAddress, active ? "pharmacy.item_activated" : "pharmacy.item_deactivated", id, before, after);
+        }
+        return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+    }
+
+    @Transactional
+    public List<PharmacyStockMovementResponse> movements(UUID tenantId, UUID id) {
+        tenantContext.set(tenantId);
+        repo.findItem(tenantId, id).orElseThrow(this::notFound);
+        return repo.listMovements(tenantId, id).stream()
+                .map(m -> new PharmacyStockMovementResponse(m.id(), m.kind(), m.delta(), m.qtyBefore(), m.qtyAfter(), m.reason(),
+                        m.actorId(), m.actorName(), m.occurredAt()))
+                .toList();
+    }
+
+    private void recordAdjustment(UUID tenantId, UUID staffId, String ip, UUID itemId, int before, int after, String reason) {
+        repo.setStock(tenantId, itemId, after);
+        repo.insertMovement(tenantId, itemId, "adjustment", after - before, before, after, reason, staffId);
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        beforeState.put("stockQty", before);
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        afterState.put("stockQty", after);
+        afterState.put("delta", after - before);
+        afterState.put("reason", reason);
+        audit(tenantId, staffId, ip, "pharmacy.stock_adjusted", itemId, beforeState, afterState);
+    }
+
+    private void audit(UUID tenantId, UUID staffId, String ip, String action, UUID itemId, Object before, Object after) {
+        ActorInfo actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, action, "pharmacy_item", itemId, before, after);
     }
 
     /** NB-179: live query, not a job — "within five seconds of consultation close" is trivially true

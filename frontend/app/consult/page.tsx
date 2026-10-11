@@ -845,6 +845,8 @@ export default function ConsultPage() {
       : null;
     const locked = noteStatus === "signed";
     const openWarnings = rxItems.reduce((n, i) => n + (i.warnings ?? []).filter((w) => w.requiresDecision && !w.resolved).length, 0);
+    // Recording a warning decision and signing are the visit doctor's (or a clinical:approve holder's); the server enforces it (403 not-prescriber), the UI simply doesn't offer it to anyone else.
+    const mayDecideRx = activeEntry.doctorId === selfId || can("clinical:approve");
     // Advisory warnings (moderate/mild allergy) don't block but are acknowledged at signing; decisions already recorded are shown, not re-asked.
     const advisoryItems = rxItems.filter((i) => (i.warnings ?? []).some((w) => !w.requiresDecision));
     const doctorName = getIdentity()?.staffName ?? "";
@@ -1055,12 +1057,15 @@ export default function ConsultPage() {
                     {rxStatus !== "signed" && (
                       <div className={styles.rxHeaderActions}>
                         <button className={styles.backBtn} onClick={() => void saveRx()} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
-                        <button className={styles.completeBtn} onClick={reviewAndSign} disabled={rxSaving || (openWarnings > 0 && !rxDirty)}>
-                          {openWarnings > 0 && !rxDirty ? "Resolve the warning first" : "Review and sign"}
-                        </button>
+                        {mayDecideRx && (
+                          <button className={styles.completeBtn} onClick={reviewAndSign} disabled={rxSaving || (openWarnings > 0 && !rxDirty)}>
+                            {openWarnings > 0 && !rxDirty ? "Resolve the warning first" : "Review and sign"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
+                  {rxStatus !== "signed" && <p className={p.muted}>The allergy check matches drug names and common drug classes only. It is not a drug database, so confirm against the patient&apos;s record.</p>}
                   {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
                   {openWarnings > 0 && rxStatus !== "signed" && (
                     <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-12)" }}>
@@ -1083,7 +1088,7 @@ export default function ConsultPage() {
                       <RxWarnings
                         item={item}
                         locked={rxStatus === "signed"}
-                        onOverride={(warning) => { setOverrideError(null); setOverride({ index: i, warning }); }}
+                        onOverride={mayDecideRx ? (warning) => { setOverrideError(null); setOverride({ index: i, warning }); } : undefined}
                         onChangeMedicine={() => focusDrug(i)}
                         onRemove={rxItems.length > 1 ? () => removeRxItem(i) : undefined}
                       />

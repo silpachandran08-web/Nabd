@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -9,6 +10,11 @@ import org.springframework.http.ResponseEntity;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -240,5 +246,144 @@ class PrescriptionApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/clinical/prescriptions/" + UUID.randomUUID(), HttpMethod.GET, authed(token), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    /** Clinical grants without {@code approve}: view/edit/create only, like a nurse who can prepare a line. */
+    private static ModuleGrant clinicalEditNoApprove() {
+        return new ModuleGrant("clinical", true, true, true, false, false, false, false);
+    }
+
+    private SeededStaff seedNurse(SeededTenant tenant, String email, String phone) {
+        UUID nurseRole = seedRole(tenant.id(), "Nurse", false, clinicalEditNoApprove(), fullGrant("queue"), fullGrant("patients"));
+        return seedStaff(tenant, nurseRole, email, phone, false);
+    }
+
+    // V1-007: a nurse (clinical:edit, not the visit doctor, no clinical:approve) cannot record a decision or sign.
+    @Test
+    void aNurseCannotOverrideOrSignAnotherCliniciansPrescription() {
+        SeededTenant tenant = seedTenant();
+        UUID doctorRole = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, doctorRole, "doc-v7a@a.com", "+919800030001", false);
+        SeededStaff nurse = seedNurse(tenant, "nurse-v7a@a.com", "+919800030002");
+        String docToken = loginAndGetAccessToken(doc);
+        String nurseToken = loginAndGetAccessToken(nurse);
+        String patientId = registerPatient(docToken, "V7a", "+919999970001");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(docToken, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        String queueEntryId = checkIn(docToken, patientId, doc.id());
+        String path = "/v1/clinical/prescriptions/" + queueEntryId;
+
+        // The nurse may prepare the draft line ...
+        ResponseEntity<Map> draft = exchange(path, HttpMethod.PATCH, authedJsonBody(nurseToken, Map.of(
+                "items", List.of(Map.of("drugName", "Amoxicillin", "dosage", "500mg")))), Map.class);
+        assertThat(draft.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(draft.getBody().get("unresolvedWarnings")).isEqualTo(1);
+
+        // ... but cannot record the override decision,
+        ResponseEntity<Map> override = exchange(path, HttpMethod.PATCH, authedJsonBody(nurseToken, Map.of(
+                "items", List.of(Map.of("drugName", "Amoxicillin", "dosage", "500mg",
+                        "overrides", List.of(Map.of("kind", "allergy", "reasonCode", "no_suitable_alternative")))))), Map.class);
+        assertThat(override.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(override.getBody().get("type")).asString().contains("not-prescriber");
+
+        // the visit's doctor records it,
+        ResponseEntity<Map> doctorOverride = exchange(path, HttpMethod.PATCH, authedJsonBody(docToken, Map.of(
+                "items", List.of(Map.of("drugName", "Amoxicillin", "dosage", "500mg",
+                        "overrides", List.of(Map.of("kind", "allergy", "reasonCode", "no_suitable_alternative")))))), Map.class);
+        assertThat(doctorOverride.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(doctorOverride.getBody().get("unresolvedWarnings")).isEqualTo(0);
+
+        // and the nurse still cannot sign it.
+        ResponseEntity<Map> nurseSign = exchange(path + "/sign", HttpMethod.POST, authed(nurseToken), Map.class);
+        assertThat(nurseSign.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(nurseSign.getBody().get("type")).asString().contains("not-prescriber");
+        ResponseEntity<Map> stillDraft = exchange(path, HttpMethod.GET, authed(docToken), Map.class);
+        assertThat(stillDraft.getBody().get("status")).isEqualTo("draft");
+
+        assertThat(exchange(path + "/sign", HttpMethod.POST, authed(docToken), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void aCoveringClinicianWithClinicalApproveMayDecideAndSign() {
+        SeededTenant tenant = seedTenant();
+        UUID ownerRole = seedFullAccessRole(tenant.id());
+        SeededStaff visitDoctor = seedStaff(tenant, ownerRole, "doc-v7b@a.com", "+919800030003", false);
+        UUID coverRole = seedRole(tenant.id(), "Covering doctor", false, fullGrant("clinical"), fullGrant("queue"), fullGrant("patients"));
+        SeededStaff cover = seedStaff(tenant, coverRole, "cover-v7b@a.com", "+919800030004", false);
+        String docToken = loginAndGetAccessToken(visitDoctor);
+        String coverToken = loginAndGetAccessToken(cover);
+        String patientId = registerPatient(docToken, "V7b", "+919999970003");
+        String queueEntryId = checkIn(docToken, patientId, visitDoctor.id());
+        String path = "/v1/clinical/prescriptions/" + queueEntryId;
+        exchange(path, HttpMethod.PATCH, authedJsonBody(docToken, Map.of("items", List.of(Map.of("drugName", "Cetirizine", "dosage", "10mg")))), Map.class);
+
+        ResponseEntity<Map> signed = exchange(path + "/sign", HttpMethod.POST, authed(coverToken), Map.class);
+
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(signed.getBody().get("status")).isEqualTo("signed");
+    }
+
+    // V1-004: sign and save race. Whatever the interleaving, a signed prescription never carries an unresolved
+    // allergy warning and its items are never changed after signing.
+    @Test
+    void signRacingASaveNeverLeavesASignedPrescriptionWithAnUnresolvedWarning() throws Exception {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-v4@a.com", "+919800030010", false);
+        String token = loginAndGetAccessToken(doc);
+        // Distinct names: NB-060's fuzzy duplicate check would otherwise intercept near-identical test patients.
+        String[] names = {"Anwar Pillai", "Beena Kurup", "Chetan Dubey", "Divya Menon", "Eshaan Verma", "Farida Shaikh", "Gopal Nair", "Hema Rao"};
+        for (int round = 0; round < names.length; round++) {
+            String patientId = registerPatient(token, names[round], "+9199999701" + (20 + round));
+            exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                    authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+            String entry = checkIn(token, patientId, doc.id());
+            String path = "/v1/clinical/prescriptions/" + entry;
+            exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+
+            CountDownLatch go = new CountDownLatch(1);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            Callable<ResponseEntity<Map>> sign = () -> {
+                go.await();
+                return exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class);
+            };
+            Callable<ResponseEntity<Map>> save = () -> {
+                go.await();
+                return exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                        "items", List.of(Map.of("drugName", "Amoxicillin", "dosage", "500mg")))), Map.class);
+            };
+            Future<ResponseEntity<Map>> signF = pool.submit(sign);
+            Future<ResponseEntity<Map>> saveF = pool.submit(save);
+            go.countDown();
+            signF.get();
+            saveF.get();
+            pool.shutdown();
+
+            ResponseEntity<Map> finalRx = exchange(path, HttpMethod.GET, authed(token), Map.class);
+            if ("signed".equals(finalRx.getBody().get("status"))) {
+                assertThat(finalRx.getBody().get("unresolvedWarnings")).as("round %d", round).isEqualTo(0);
+            }
+        }
+    }
+
+    // V1-004 backstop: the database refuses to change items of a signed prescription, whatever the app does.
+    @Test
+    void theDatabaseRefusesToChangeItemsOfASignedPrescription() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-v4b@a.com", "+919800030011", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "V4b", "+919999970011");
+        String entry = checkIn(token, patientId, doc.id());
+        exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+        exchange("/v1/clinical/prescriptions/" + entry + "/sign", HttpMethod.POST, authed(token), Map.class);
+
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.update("UPDATE prescription_items SET drug_name = 'Tampered' WHERE tenant_id = ?", tenant.id())));
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM prescription_items WHERE tenant_id = ?", tenant.id())));
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.update("UPDATE prescriptions SET status = 'draft' WHERE tenant_id = ?", tenant.id())));
     }
 }

@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.billing;
 
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.Cursor;
 import com.nabd.hms.platform.billing.dto.DiscountPage;
 import com.nabd.hms.platform.billing.dto.DiscountRequestCreate;
@@ -15,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.billing.BillingModels.DiscountRow;
@@ -33,13 +36,15 @@ public class DiscountService {
     private static final BigDecimal AUTO_APPROVE_CAP_PERCENT = new BigDecimal("15");
 
     private final BillingRepository repo;
+    private final AuditService auditService;
 
-    DiscountService(BillingRepository repo) {
+    DiscountService(BillingRepository repo, AuditService auditService) {
         this.repo = repo;
+        this.auditService = auditService;
     }
 
     @Transactional
-    public DiscountResponse request(UUID operatorId, DiscountRequestCreate req) {
+    public DiscountResponse request(UUID operatorId, DiscountRequestCreate req, String ipAddress) {
         SubscriptionRow subscription = repo.findByTenant(req.tenantId()).orElseThrow(this::noSubscription);
 
         boolean autoApprove = req.percent().compareTo(AUTO_APPROVE_CAP_PERCENT) <= 0;
@@ -53,26 +58,56 @@ public class DiscountService {
         } else {
             log.info("discount {} queued for approval: tenant {} {}% (above {}% cap)", id, req.tenantId(), req.percent(), AUTO_APPROVE_CAP_PERCENT);
         }
-        return toResponse(repo.findDiscountById(id).orElseThrow());
+        DiscountRow created = repo.findDiscountById(id).orElseThrow();
+        audit(operatorId, ipAddress, autoApprove ? "platform_billing.discount_auto_approved" : "platform_billing.discount_requested", created);
+        return toResponse(created);
     }
 
     @Transactional
-    public DiscountResponse approve(UUID id, UUID operatorId) {
+    public DiscountResponse approve(UUID id, UUID operatorId, String ipAddress) {
         DiscountRow row = pendingOrThrow(id);
         requireNotSelfReview(row, operatorId);
         SubscriptionRow subscription = repo.findByTenant(row.tenantId()).orElseThrow(this::noSubscription);
+        // Claim the review first (guarded on status = 'pending'), then apply: a racing second reviewer gets 0 rows
+        // and the discount is applied exactly once.
+        if (repo.updateDiscountStatus(id, "approved", operatorId, Instant.now()) == 0) {
+            throw alreadyReviewed();
+        }
         applyDiscount(subscription, row.percent());
-        repo.updateDiscountStatus(id, "approved", operatorId, Instant.now());
         log.info("discount {} approved by {}: tenant {} {}%", id, operatorId, row.tenantId(), row.percent());
-        return toResponse(repo.findDiscountById(id).orElseThrow());
+        DiscountRow reviewed = repo.findDiscountById(id).orElseThrow();
+        audit(operatorId, ipAddress, "platform_billing.discount_approved", reviewed);
+        return toResponse(reviewed);
     }
 
     @Transactional
-    public DiscountResponse reject(UUID id, UUID operatorId) {
+    public DiscountResponse reject(UUID id, UUID operatorId, String ipAddress) {
         DiscountRow row = pendingOrThrow(id);
         requireNotSelfReview(row, operatorId);
-        repo.updateDiscountStatus(id, "rejected", operatorId, Instant.now());
-        return toResponse(repo.findDiscountById(id).orElseThrow());
+        if (repo.updateDiscountStatus(id, "rejected", operatorId, Instant.now()) == 0) {
+            throw alreadyReviewed();
+        }
+        DiscountRow reviewed = repo.findDiscountById(id).orElseThrow();
+        audit(operatorId, ipAddress, "platform_billing.discount_rejected", reviewed);
+        return toResponse(reviewed);
+    }
+
+    private void audit(UUID operatorId, String ipAddress, String action, DiscountRow d) {
+        BillingModels.OperatorInfo operator = repo.findOperatorInfo(operatorId).orElseThrow(this::notFound);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("discountId", d.id().toString());
+        after.put("percent", d.percent());
+        after.put("status", d.status());
+        after.put("requestedBy", d.requestedBy().toString());
+        after.put("reviewedBy", d.reviewedBy() == null ? null : d.reviewedBy().toString());
+        after.put("reason", d.reason());
+        auditService.record(d.tenantId(), "operator", operatorId, operator.name(), operator.role(), ipAddress,
+                action, "discount_request", d.id(), null, after);
+    }
+
+    private ApiException alreadyReviewed() {
+        return new ApiException(HttpStatus.BAD_REQUEST, "discount-not-pending", "Discount not pending",
+                "This discount request has already been reviewed.");
     }
 
     public DiscountPage list(int limit, String cursor) {

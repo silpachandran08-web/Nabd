@@ -19,4 +19,7 @@ final class BillingModels {
                         BigDecimal percent, String reason, String status, UUID reviewedBy, String reviewedByName,
                         Instant reviewedAt, Instant createdAt) {
     }
+
+    record OperatorInfo(String name, String role) {
+    }
 }

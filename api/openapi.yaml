@@ -27,6 +27,7 @@ tags:
   - name: Queue
   - name: Audit
   - name: Clinical
+  - name: Pharmacy
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -1082,7 +1083,7 @@ paths:
   /clinical/allergies/{id}:
     patch:
       tags: [Clinical]
-      summary: Correct an allergy (partial update). A reason is mandatory; the original is kept in the append-only history.
+      summary: Correct an allergy (partial update). A reason is mandatory; the original is kept in the append-only history. Corrections of the same allergy are serialised (row lock), so a concurrent correction can never write back an older severity; each applied correction has its own history row. An empty category is not accepted (omit the field to leave it unchanged).
       x-required-permission: clinical:edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -1094,7 +1095,7 @@ paths:
   /clinical/allergies/{id}/deactivate:
     patch:
       tags: [Clinical]
-      summary: Remove an allergy from the active register. A reason is mandatory (400 reason-required without one); the row and its history are kept.
+      summary: Remove an allergy from the active register. A reason is mandatory (400 reason-required without one; the 500-character cap is validated, 400 validation-failed); the row and its history are kept.
       x-required-permission: clinical:edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -1135,7 +1136,7 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
     patch:
       tags: [Clinical]
-      summary: Replace the draft items. A line may carry overrides (named reason per warning kind); an omitted override for the same drug and warning is kept, never silently cleared.
+      summary: Replace the draft items. A line may carry overrides (named reason per warning kind); an omitted override for the same drug and warning is kept, never silently cleared. Anyone with clinical:edit may prepare the draft, but RECORDING a decision (an override) is limited to the visit's doctor or a holder of clinical:approve (403 not-prescriber otherwise). The save is serialised with sign and with allergy-register writes (row lock), so it can never change a signed prescription.
       x-required-permission: clinical:edit
       requestBody:
         required: true
@@ -1149,16 +1150,69 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden. 403 not-prescriber when an override is sent by someone who is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
-      summary: Sign. Re-checks every warning server-side against the CURRENT register; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. Audited.
+      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). Audited.
       x-required-permission: clinical:edit
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Signed, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden. 403 not-prescriber: caller is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  # ------------------------------------------------------------ Pharmacy (Hybrid mode)
+  /pharmacy/items/{id}/stock-adjustments:
+    post:
+      tags: [Pharmacy]
+      summary: >
+        Change an item's stock by hand: send exactly one of `delta` (relative, +/-) or `setTo` (counted total after a stock-take),
+        and a mandatory `reason`. The item row is locked, the new count is computed from the locked value, and an immutable
+        stock-movement row plus an audit event (pharmacy.stock_adjusted) record who, when and why. This is the only way to change
+        stock by hand: PATCH /pharmacy/items/{id} ignores `stockQty` (it edits name, price, tax, Rx flag and HSN only).
+        400 insufficient-stock when the result would be below zero; 400 no-change when the count would not change;
+        400 pharmacy-mode-not-hybrid outside Hybrid mode.
+      x-required-permission: pharmacy:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyStockAdjustment" } } }
+      responses:
+        "200": { description: The item with its new stock count, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /pharmacy/items/{id}/status:
+    patch:
+      tags: [Pharmacy]
+      summary: Activate or deactivate an item (idempotent; audited as pharmacy.item_activated / pharmacy.item_deactivated). An inactive item no longer appears at checkout; its history and stock count stay.
+      x-required-permission: pharmacy:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [active]
+              properties:
+                active: { type: boolean }
+                reason: { type: [string, "null"], maxLength: 500 }
+      responses:
+        "200": { description: The item, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /pharmacy/items/{id}/stock-movements:
+    get:
+      tags: [Pharmacy]
+      summary: Immutable stock-movement log of an item (manual adjustments and checkout dispenses), newest first, last 200
+      x-required-permission: pharmacy:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PharmacyStockMovement" } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
 components:
   securitySchemes:
@@ -1331,6 +1385,38 @@ components:
         pregnancyWarning: { type: string, nullable: true }
         controlledSubstanceWarning: { type: string, nullable: true }
         warnings: { type: array, items: { $ref: "#/components/schemas/RxWarning" } }
+    PharmacyItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        isRx: { type: boolean }
+        hsnCode: { type: [string, "null"] }
+        price: { type: number }
+        taxRatePercent: { type: number }
+        stockQty: { type: integer, minimum: 0 }
+        active: { type: boolean }
+    PharmacyStockAdjustment:
+      type: object
+      required: [reason]
+      description: Exactly one of delta or setTo.
+      properties:
+        delta: { type: [integer, "null"], minimum: -1000000, maximum: 1000000, description: Relative change; negative removes units }
+        setTo: { type: [integer, "null"], minimum: 0, maximum: 10000000, description: Counted total after a stock-take }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    PharmacyStockMovement:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [adjustment, dispense] }
+        delta: { type: integer }
+        qtyBefore: { type: integer }
+        qtyAfter: { type: integer }
+        reason: { type: string }
+        actorId: { type: [string, "null"], format: uuid }
+        actorName: { type: [string, "null"] }
+        occurredAt: { type: string, format: date-time }
     Prescription:
       type: object
       properties:

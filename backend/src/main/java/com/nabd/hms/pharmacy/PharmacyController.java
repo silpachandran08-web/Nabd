@@ -1,10 +1,15 @@
 package com.nabd.hms.pharmacy;
 
 import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
+import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.pharmacy.dto.PharmacyItemResponse;
+import com.nabd.hms.pharmacy.dto.PharmacyItemStatusRequest;
+import com.nabd.hms.pharmacy.dto.PharmacyStockAdjustmentRequest;
+import com.nabd.hms.pharmacy.dto.PharmacyStockMovementResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemWriteRequest;
 import com.nabd.hms.pharmacy.dto.PharmacySettingsResponse;
 import com.nabd.hms.pharmacy.dto.PharmacySettingsWriteRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,8 +59,9 @@ public class PharmacyController {
     @PostMapping("/items")
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public ResponseEntity<PharmacyItemResponse> addItem(@AuthenticationPrincipal Jwt jwt,
-                                                         @Valid @RequestBody PharmacyItemWriteRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.addItem(tenantId(jwt), req));
+                                                         @Valid @RequestBody PharmacyItemWriteRequest req, HttpServletRequest http) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.addItem(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), req));
     }
 
     @PatchMapping("/items/{id}")
@@ -63,6 +69,28 @@ public class PharmacyController {
     public PharmacyItemResponse updateItem(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                             @Valid @RequestBody PharmacyItemWriteRequest req) {
         return service.updateItem(tenantId(jwt), id, req);
+    }
+
+    /** V2-004: the only way to change stock by hand. Relative (`delta`) or stock-take (`setTo`), reason required. */
+    @PostMapping("/items/{id}/stock-adjustments")
+    @PreAuthorize("hasAuthority('pharmacy:edit')")
+    public PharmacyItemResponse adjustStock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                             @Valid @RequestBody PharmacyStockAdjustmentRequest req, HttpServletRequest http) {
+        return service.adjustStock(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req);
+    }
+
+    /** V2-007: activate / deactivate an item. */
+    @PatchMapping("/items/{id}/status")
+    @PreAuthorize("hasAuthority('pharmacy:edit')")
+    public PharmacyItemResponse setStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                           @Valid @RequestBody PharmacyItemStatusRequest req, HttpServletRequest http) {
+        return service.setActive(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req);
+    }
+
+    @GetMapping("/items/{id}/stock-movements")
+    @PreAuthorize("hasAuthority('pharmacy:view')")
+    public List<PharmacyStockMovementResponse> stockMovements(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.movements(tenantId(jwt), id);
     }
 
     @GetMapping("/dispensing-queue")
@@ -73,5 +101,9 @@ public class PharmacyController {
 
     private UUID tenantId(Jwt jwt) {
         return UUID.fromString(jwt.getClaimAsString("tenantId"));
+    }
+
+    private UUID staffId(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
     }
 }

@@ -212,6 +212,11 @@ public class PatientService {
                         required + " cannot be cleared.");
             }
         }
+        // V1-015: a blank-but-present national ID must not act as a silent clear; clearing is an explicit null.
+        if (req.has("nationalId") && req.nationalId() != null && req.nationalId().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed",
+                    "nationalId cannot be blank. Send null to clear it.");
+        }
         LocalDate dob = req.has("dob") ? req.dob() : before.dob();
         UUID guardianId = req.has("guardianId") ? req.guardianId() : before.guardianId();
         validateGuardian(tenantId, dob, guardianId);
@@ -225,6 +230,7 @@ public class PatientService {
         if (req.has("address")) changes.put("address", req.address());
         if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(req.nationalId()));
         repo.update(tenantId, id, changes);
+        auditUpdate(tenantId, callerStaffId, id, before, req, changes.get("phone"));
         // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
         // the one place that needs to keep guardian_access consent (and the audit trail) in step —
         // covers grant, revoke (new guardianId is null) and reassignment alike.
@@ -233,6 +239,32 @@ public class PatientService {
         }
         log.info("patient {} updated by {} (tenant {})", id, callerStaffId, tenantId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** V1-015: every PATCH that changes something leaves a `patient.updated` audit row. Field NAMES only: no name,
+     * phone, address or national-ID values (PHI) go into the payload. `cleared` names the fields that were emptied, so
+     * a destructive clear of the national ID or address is visible. Guardian changes keep their own detailed events. */
+    private void auditUpdate(UUID tenantId, UUID callerStaffId, UUID id, PatientRow before, PatientPatchRequest req,
+                             Object normalisedPhone) {
+        List<String> changed = new java.util.ArrayList<>();
+        List<String> cleared = new java.util.ArrayList<>();
+        if (req.has("name") && !Objects.equals(before.name(), req.name())) changed.add("name");
+        if (req.has("phone") && !Objects.equals(before.phone(), normalisedPhone)) changed.add("phone");
+        if (req.has("dob") && !Objects.equals(before.dob(), req.dob())) changed.add("dob");
+        if (req.has("gender") && !Objects.equals(before.gender(), req.gender())) changed.add("gender");
+        if (req.has("guardianId") && !Objects.equals(before.guardianId(), req.guardianId())) changed.add("guardianId");
+        if (req.has("address") && !Objects.equals(before.address(), req.address())) {
+            changed.add("address");
+            if (req.address() == null) cleared.add("address");
+        }
+        if (req.has("nationalId")) {
+            changed.add("nationalId");
+            if (req.nationalId() == null) cleared.add("nationalId");
+        }
+        if (changed.isEmpty()) {
+            return;
+        }
+        audit(tenantId, callerStaffId, "patient.updated", id, null, Map.of("fields", changed, "cleared", cleared));
     }
 
     private static Object valueOf(PatientPatchRequest req, String property) {

@@ -60,6 +60,12 @@ class PrescriptionRepository {
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
+    /** V1-004: row lock (held to the end of the transaction) that serialises upsert/sign on one prescription. */
+    Optional<PrescriptionRow> lockByQueueEntry(UUID tenantId, UUID queueEntryId) {
+        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
+                prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
+    }
+
     /** NB-105: previous medicines, most recent first — signed only, a draft isn't a real prescription yet. */
     List<PrescriptionRow> findSignedByPatient(UUID tenantId, UUID patientId) {
         return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
@@ -95,9 +101,9 @@ class PrescriptionRepository {
         }
     }
 
-    /** Idempotent — signing an already-signed prescription is a no-op, not an error. */
-    void sign(UUID tenantId, UUID prescriptionId) {
-        jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
+    /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed. */
+    int sign(UUID tenantId, UUID prescriptionId) {
+        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
                 "WHERE tenant_id = ? AND id = ? AND status = 'draft'", tenantId, prescriptionId);
     }
 
