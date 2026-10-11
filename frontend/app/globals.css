@@ -142,6 +142,10 @@ button:active {
 
 /* Mobile: bottom nav (64px + safe area) takes the space the sidebar had. */
 @media (max-width: 430px) {
+  .appShell:has([data-bottom-nav]) {
+    --nb-mnav-h: calc(64px + env(safe-area-inset-bottom));
+  }
+
   .appShell:has([data-bottom-nav]) .appShellContent {
     padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
