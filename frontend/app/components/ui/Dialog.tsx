@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import styles from "./ui.module.css";
 
 // Open dialogs, innermost last. Only the top one answers Escape and Tab, so a confirm opened from a
@@ -26,11 +26,13 @@ export default function Dialog({
   // Callers pass inline arrows, so onClose changes identity on every parent render. Read it through a
   // ref so the effect below runs once per open: re-running it on each keystroke or autosave tick
   // would restore focus to the opener and then yank it to the Close button mid-typing.
+  // The opener is read before the children mount: a child's autoFocus would otherwise be captured
+  // here instead, and closing would drop focus to <body>.
+  const [opener] = useState(() => (typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null)));
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; });
 
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
     const node = ref.current;
     const focusable = () =>
       Array.from(node?.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])') ?? []);
@@ -56,9 +58,9 @@ export default function Dialog({
     return () => {
       document.removeEventListener("keydown", onKey);
       openStack.splice(openStack.indexOf(me), 1);
-      previous?.focus?.();
+      opener?.focus?.();
     };
-  }, []);
+  }, [opener]);
 
   return (
     <div className={styles.scrim} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
