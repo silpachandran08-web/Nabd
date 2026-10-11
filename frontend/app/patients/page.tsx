@@ -385,6 +385,10 @@ function PatientsList() {
         body: JSON.stringify({ reason }),
       });
       if (res?.ok) {
+        // Drop the removed name now; the refresh below is not awaited and the banner must not keep naming it.
+        const gone = removeAllergy;
+        setAllergies((l) => l.filter((x) => x.id !== gone.id));
+        setDrawerPatient((p) => (p ? { ...p, allergies: p.allergies.filter((n) => n !== gone.substance) } : p));
         setRemoveAllergy(null);
         refreshAllergies(drawerPatient.id);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
@@ -775,6 +779,7 @@ function PatientsList() {
                     if (names.length > 0) return (
                       <div className={styles.allergyBannerSome}>
                         <StatusPill tone="danger" label="Allergies" /> {names.join(", ")}
+                        {allergyLoad === "error" && <div role="alert">Couldn&apos;t confirm the current allergies. These names may be outdated and the list may be incomplete.</div>}
                       </div>
                     );
                     if (!clinicalView) return <div className={styles.allergyBannerNone}>Allergy information isn&apos;t available to your role.</div>;
