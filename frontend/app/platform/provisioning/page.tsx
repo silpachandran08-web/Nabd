@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import styles from "./provisioning.module.css";
 import InviteLink from "./InviteLink";
+import Dialog from "../../components/ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { JobStatusPill } from "../../components/platform/statusPills";
@@ -258,9 +259,8 @@ export default function ProvisioningPage() {
               </div>
 
               {access.canWrite && showNewTenant && (
-                <div className={styles.overlay} onClick={() => setShowNewTenant(false)}>
-                  <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-                    <h2 className={styles.modalTitle}>Provision a new tenant</h2>
+                <Dialog title="Provision a new tenant" onClose={() => setShowNewTenant(false)}>
+                  <form className={styles.dialogForm} onSubmit={submit}>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="path">Path</label>
                       <div className={styles.segmented}>
@@ -316,7 +316,7 @@ export default function ProvisioningPage() {
                       <button type="submit" className={styles.submit} disabled={saving}>{saving ? "Provisioning…" : "Provision tenant"}</button>
                     </div>
                   </form>
-                </div>
+                </Dialog>
               )}
 
               <div className={styles.jobList}>
