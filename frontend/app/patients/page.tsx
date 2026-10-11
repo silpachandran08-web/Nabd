@@ -6,6 +6,7 @@ import styles from "./patients.module.css";
 import { RegisterDialog } from "./RegistryDialogs";
 import { CheckInDialog } from "../components/arrivals/CheckInDialog";
 import Dialog from "../components/ui/Dialog";
+import ConfirmDialog from "./ConfirmDialog";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
@@ -23,6 +24,8 @@ type PatientDetail = Patient & {
   guardianName: string | null;
   guardianConsentGrantedAt: string | null;
 };
+// GET /clinical/patients/{id}/allergies/status. "not_assessed" (nobody asked) is NOT "none_documented".
+type AllergyStatus = { state: "recorded" | "none_documented" | "not_assessed"; activeCount: number; documentedByName: string | null; documentedAt: string | null };
 type Allergy = { id: string; substance: string; severity: string; reaction: string | null; active: boolean };
 type Condition = { id: string; condition: string; status: string; reviewDueDate: string | null };
 // GET /v1/patients/registry (PatientController.registry → PatientRegistryResponse)
@@ -131,7 +134,13 @@ function PatientsList() {
   const [drawerTab, setDrawerTab] = useState<"overview" | "dental">("overview");
 
   const [allergies, setAllergies] = useState<Allergy[]>([]);
-  const [newAllergy, setNewAllergy] = useState({ substance: "", severity: "moderate", reaction: "" });
+  // Severity starts unset: an unknown severity must never be guessed, so Add stays unavailable until a clinician picks one.
+  const [newAllergy, setNewAllergy] = useState({ substance: "", severity: "", reaction: "" });
+  const [allergyStatus, setAllergyStatus] = useState<AllergyStatus | null>(null);
+  const [removeAllergy, setRemoveAllergy] = useState<Allergy | null>(null);
+  const [confirmGuardian, setConfirmGuardian] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [allergyBusy, setAllergyBusy] = useState(false);
   // Never claim "none recorded" for a register that failed to load.
   const [allergyLoad, setAllergyLoad] = useState<"loading" | "ok" | "error">("loading");
@@ -256,7 +265,11 @@ function PatientsList() {
     setHistoryToothId(null);
     setHistoryEntries([]);
     setNewSupernumerary({ nearToothNumber: 11, status: "healthy", note: "" });
-    setNewAllergy({ substance: "", severity: "moderate", reaction: "" });
+    setNewAllergy({ substance: "", severity: "", reaction: "" });
+    setAllergyStatus(null);
+    setRemoveAllergy(null);
+    setConfirmGuardian(false);
+    setConfirmError(null);
     setPhoneShown(false);
     setAllergyLoad("loading");
     setConditionLoad("loading");
@@ -321,17 +334,26 @@ function PatientsList() {
   }
 
   async function refreshAllergies(patientId: string, seq = openSeq.current) {
+    // The status is dropped first so a stale "none documented" can never sit next to a changed register.
+    setAllergyStatus(null);
     try {
-      const res = await authedFetch(`/clinical/patients/${patientId}/allergies`);
+      const [res, stRes] = await Promise.all([
+        authedFetch(`/clinical/patients/${patientId}/allergies`),
+        authedFetch(`/clinical/patients/${patientId}/allergies/status`),
+      ]);
       if (seq !== openSeq.current) return;
-      if (res?.ok) { setAllergies(await res.json()); setAllergyLoad("ok"); } else if (res) setAllergyLoad("error");
+      if (res?.ok && stRes?.ok) {
+        setAllergies(await res.json());
+        setAllergyStatus(await stRes.json());
+        setAllergyLoad("ok");
+      } else if (res || stRes) setAllergyLoad("error");
     } catch {
       if (seq === openSeq.current) setAllergyLoad("error");
     }
   }
 
   async function addAllergy() {
-    if (!drawerPatient || !newAllergy.substance.trim()) return;
+    if (!drawerPatient || !newAllergy.substance.trim() || !newAllergy.severity) return;
     setAllergyBusy(true);
     setActionError(null);
     try {
@@ -340,7 +362,7 @@ function PatientsList() {
         body: JSON.stringify(newAllergy),
       });
       if (res?.ok) {
-        setNewAllergy({ substance: "", severity: "moderate", reaction: "" });
+        setNewAllergy({ substance: "", severity: "", reaction: "" });
         refreshAllergies(drawerPatient.id);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
@@ -352,25 +374,26 @@ function PatientsList() {
     }
   }
 
-  async function deactivateAllergy(id: string) {
-    if (!drawerPatient) return;
-    // ponytail: window.prompt for the reason — replace with a Dialog when the drawer gets one.
-    const reason = window.prompt("Reason for removing this allergy (recorded in the allergy history):")?.trim();
-    if (!reason) return;
-    setActionError(null);
+  async function deactivateAllergy(reason: string) {
+    if (!drawerPatient || !removeAllergy) return;
+    setConfirmBusy(true);
+    setConfirmError(null);
     try {
-      const res = await authedFetch(`/clinical/allergies/${id}/deactivate`, {
+      const res = await authedFetch(`/clinical/allergies/${removeAllergy.id}/deactivate`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason }),
       });
       if (res?.ok) {
+        setRemoveAllergy(null);
         refreshAllergies(drawerPatient.id);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
-      } else if (res) setActionError("Couldn't remove the allergy. It is still on record.");
+      } else if (res) setConfirmError("Couldn't remove the allergy. It is still on record.");
     } catch {
-      setActionError("Couldn't reach the server. The allergy is still on record.");
+      setConfirmError("Couldn't reach the server. The allergy is still on record.");
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -413,19 +436,23 @@ function PatientsList() {
    * and withdraws the guardian_access consent in the same write. */
   async function revokeGuardian() {
     if (!drawerPatient) return;
-    setActionError(null);
+    setConfirmBusy(true);
+    setConfirmError(null);
     try {
       const res = await authedFetch(`/patients/${drawerPatient.id}`, {
         method: "PATCH",
         body: JSON.stringify({ guardianId: null }),
       });
       if (res?.ok) {
+        setConfirmGuardian(false);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
         void load(q, filter);
-      } else if (res) setActionError("Couldn't revoke guardian access. It is still active.");
+      } else if (res) setConfirmError("Couldn't revoke guardian access. It is still active.");
     } catch {
-      setActionError("Couldn't reach the server. Guardian access is still active.");
+      setConfirmError("Couldn't reach the server. Guardian access is still active.");
+    } finally {
+      setConfirmBusy(false);
     }
   }
 
@@ -743,17 +770,25 @@ function PatientsList() {
                 <>
                   {actionError && <div className={styles.errorInline} role="alert">{actionError}</div>}
                   {/* Never assert "no known allergies" for a role that can't see the allergy data. */}
-                  {drawerPatient.allergies.length > 0 ? (
-                    <div className={styles.allergyBannerSome}>
-                      <StatusPill tone="danger" label="Allergies" /> {drawerPatient.allergies.join(", ")}
-                    </div>
-                  ) : clinicalView && allergyLoad === "error" ? (
-                    <div className={styles.allergyBannerNone}>Allergy status couldn&apos;t be confirmed. Don&apos;t assume there are none.</div>
-                  ) : clinicalView ? (
-                    <div className={styles.allergyBannerNone}>No known allergies</div>
-                  ) : (
-                    <div className={styles.allergyBannerNone}>Allergy information isn&apos;t available to your role.</div>
-                  )}
+                  {(() => {
+                    const names = [...new Set([...drawerPatient.allergies, ...allergies.filter((x) => x.active).map((x) => x.substance)])];
+                    if (names.length > 0) return (
+                      <div className={styles.allergyBannerSome}>
+                        <StatusPill tone="danger" label="Allergies" /> {names.join(", ")}
+                      </div>
+                    );
+                    if (!clinicalView) return <div className={styles.allergyBannerNone}>Allergy information isn&apos;t available to your role.</div>;
+                    if (allergyLoad === "error" || (allergyLoad === "ok" && allergyStatus?.state === "recorded")) {
+                      return <div className={styles.allergyBannerNone}>Allergy status couldn&apos;t be confirmed. Don&apos;t assume there are none.</div>;
+                    }
+                    if (allergyLoad === "loading" || !allergyStatus) return <Skeleton rows={1} label="Checking allergies" />;
+                    // Only an explicit clinician statement may say "no known allergies"; nobody-asked is not that.
+                    return allergyStatus.state === "none_documented" ? (
+                      <div className={styles.allergyBannerNone}>No known allergies · documented{allergyStatus.documentedByName ? ` by ${allergyStatus.documentedByName}` : ""}</div>
+                    ) : (
+                      <div className={styles.allergyBannerNone}>None recorded · not yet asked. This is not the same as no known allergies. Ask the patient.</div>
+                    );
+                  })()}
 
                   <div className={styles.statGrid}>
                     <div className={styles.section}>
@@ -797,7 +832,7 @@ function PatientsList() {
                           )}
                         </span>
                         {!drawerPatient.isMinor && patientsEdit && (
-                          <button className={styles.linkBtn} onClick={revokeGuardian}>Revoke access</button>
+                          <button className={styles.linkBtn} onClick={() => { setConfirmError(null); setConfirmGuardian(true); }}>Revoke access</button>
                         )}
                       </div>
                       {drawerPatient.isMinor && (
@@ -847,7 +882,7 @@ function PatientsList() {
                           allergies.map((a) => (
                             <div key={a.id} className={styles.allergyRow}>
                               <span>{a.substance} · {a.severity}{a.reaction ? ` · ${a.reaction}` : ""}</span>
-                              {clinicalEdit && <button className={styles.linkBtn} onClick={() => deactivateAllergy(a.id)}>Remove</button>}
+                              {clinicalEdit && <button className={styles.linkBtn} onClick={() => { setConfirmError(null); setRemoveAllergy(a); }}>Remove</button>}
                             </div>
                           ))
                         )}
@@ -857,13 +892,14 @@ function PatientsList() {
                               onChange={(e) => setNewAllergy((p) => ({ ...p, substance: e.target.value }))} />
                             <select className={styles.smallInput} aria-label="Severity" value={newAllergy.severity}
                               onChange={(e) => setNewAllergy((p) => ({ ...p, severity: e.target.value }))}>
+                              <option value="" disabled>Severity…</option>
                               <option value="mild">mild</option>
                               <option value="moderate">moderate</option>
                               <option value="severe">severe</option>
                             </select>
                             <input className={styles.smallInput} aria-label="Reaction" placeholder="Reaction (optional)" value={newAllergy.reaction}
                               onChange={(e) => setNewAllergy((p) => ({ ...p, reaction: e.target.value }))} />
-                            <button className={styles.linkBtn} disabled={allergyBusy || !newAllergy.substance.trim()} onClick={addAllergy}>Add</button>
+                            <button className={styles.linkBtn} disabled={allergyBusy || !newAllergy.substance.trim() || !newAllergy.severity} onClick={addAllergy}>Add</button>
                           </div>
                         )}
                       </div>
@@ -918,6 +954,16 @@ function PatientsList() {
             </>
           )}
         </Dialog>
+      )}
+      {removeAllergy && drawerPatient && (
+        <ConfirmDialog title="Remove allergy" confirmLabel="Remove allergy" reasonLabel="Reason for removing (required; kept in the allergy history)"
+          message={`${removeAllergy.substance} (${removeAllergy.severity}) will come off ${drawerPatient.name}'s active allergies. The entry stays in the history.`}
+          busy={confirmBusy} error={confirmError} onConfirm={(reason) => void deactivateAllergy(reason)} onClose={() => setRemoveAllergy(null)} />
+      )}
+      {confirmGuardian && drawerPatient && (
+        <ConfirmDialog title="Revoke guardian access" confirmLabel="Revoke access"
+          message={`${drawerPatient.guardianName ?? "The guardian"} will no longer be able to act for ${drawerPatient.name}, and the guardian consent is withdrawn.`}
+          busy={confirmBusy} error={confirmError} onConfirm={() => void revokeGuardian()} onClose={() => setConfirmGuardian(false)} />
       )}
     </main>
   );
