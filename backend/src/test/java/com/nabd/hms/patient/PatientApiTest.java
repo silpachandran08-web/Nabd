@@ -445,6 +445,19 @@ class PatientApiTest extends ApiTestBase {
         assertThat(row.get("address")).isNull();
         assertThat(row.get("national_id_enc")).isNull();
 
+        // V1-015: the clear is audited by field name; no PHI value is in the payload.
+        Map<String, Object> audited = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT after::text AS after FROM audit_log WHERE tenant_id = ? AND action = 'patient.updated' AND entity_id = ? " +
+                        "ORDER BY created_at DESC LIMIT 1", tenant.id(), patientId));
+        assertThat(audited.get("after").toString()).contains("nationalId").contains("address").contains("cleared");
+        assertThat(audited.get("after").toString()).doesNotContain("111122223333").doesNotContain("Old addr");
+
+        // V1-015: a blank-but-present national ID is rejected, not treated as a silent clear.
+        java.util.Map<String, Object> blankId = new java.util.HashMap<>();
+        blankId.put("nationalId", "   ");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, blankId), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
         java.util.Map<String, Object> nullName = new java.util.HashMap<>();
         nullName.put("name", null);
         assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, nullName), Map.class)
