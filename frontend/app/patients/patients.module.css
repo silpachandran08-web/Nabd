@@ -286,6 +286,8 @@
 }
 
 .smallInput {
+  min-inline-size: 0; /* grid items default to min-content; without this the reaction field pushes Add out of the drawer */
+  inline-size: 100%;
   height: 32px;
   background: var(--nb-surface-3);
   border: 1px solid var(--nb-border-default);
