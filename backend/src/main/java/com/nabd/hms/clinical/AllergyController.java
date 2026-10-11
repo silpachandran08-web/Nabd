@@ -1,7 +1,13 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.clinical.dto.AllergyCorrectionRequest;
+import com.nabd.hms.clinical.dto.AllergyEventResponse;
+import com.nabd.hms.clinical.dto.AllergyRemovalRequest;
 import com.nabd.hms.clinical.dto.AllergyResponse;
+import com.nabd.hms.clinical.dto.AllergyStatusResponse;
 import com.nabd.hms.clinical.dto.AllergyWriteRequest;
+import com.nabd.hms.common.RequestMeta;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -39,14 +46,42 @@ public class AllergyController {
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
     public AllergyResponse add(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
-                                @Valid @RequestBody AllergyWriteRequest req) {
-        return service.add(tenantId(jwt), patientId, staffId(jwt), req);
+                                @Valid @RequestBody AllergyWriteRequest req, HttpServletRequest http) {
+        return service.add(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
+    /** Correction (partial update) with a mandatory reason; the original stays in the history. */
+    @PatchMapping("/allergies/{id}")
+    @PreAuthorize("hasAuthority('clinical:edit')")
+    public AllergyResponse correct(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                    @Valid @RequestBody AllergyCorrectionRequest req, HttpServletRequest http) {
+        return service.correct(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
+    }
+
+    /** Removal needs a reason; a body-less call is rejected (400 reason-required). */
     @PatchMapping("/allergies/{id}/deactivate")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public void deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        service.deactivate(tenantId(jwt), id);
+    public void deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                            @RequestBody(required = false) AllergyRemovalRequest req, HttpServletRequest http) {
+        service.deactivate(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
+    }
+
+    @GetMapping("/patients/{patientId}/allergies/history")
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public List<AllergyEventResponse> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
+        return service.history(tenantId(jwt), patientId);
+    }
+
+    @GetMapping("/patients/{patientId}/allergies/status")
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public AllergyStatusResponse status(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
+        return service.status(tenantId(jwt), patientId);
+    }
+
+    @PutMapping("/patients/{patientId}/allergies/status")
+    @PreAuthorize("hasAuthority('clinical:edit')")
+    public AllergyStatusResponse documentNone(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId, HttpServletRequest http) {
+        return service.documentNoKnownAllergies(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http));
     }
 
     private UUID tenantId(Jwt jwt) {
