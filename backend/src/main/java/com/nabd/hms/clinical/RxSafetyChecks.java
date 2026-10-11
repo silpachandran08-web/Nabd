@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 
 /**
  * NB-111/NB-113: same shape as PrescriptionService's existing allergy check — a small, named,
@@ -28,16 +27,6 @@ final class RxSafetyChecks {
 
     private static final List<String> KSA_CONTROLLED_DRUGS = List.of(
             "tramadol", "alprazolam", "diazepam", "codeine", "morphine", "fentanyl");
-
-    /** Drug-class membership for allergies recorded by class ("Penicillin", "Sulfa", "NSAID"): illustrative,
-     * short, not a drug database (same limitation as the lists above). A class allergy flags these names. */
-    private static final Map<String, List<String>> ALLERGY_CLASSES = Map.of(
-            "penicillin", List.of("amoxicillin", "amoxycillin", "ampicillin", "flucloxacillin", "cloxacillin", "piperacillin",
-                    "phenoxymethylpenicillin", "benzylpenicillin", "co-amoxiclav", "amoxiclav", "augmentin"),
-            "sulfa", List.of("sulfamethoxazole", "sulphamethoxazole", "cotrimoxazole", "co-trimoxazole", "trimethoprim-sulfa",
-                    "sulfasalazine", "sulfadiazine", "bactrim"),
-            "nsaid", List.of("ibuprofen", "diclofenac", "naproxen", "ketorolac", "indomethacin", "mefenamic", "aspirin", "etoricoxib",
-                    "celecoxib", "piroxicam"));
 
     static final String KIND_ALLERGY = "allergy";
     static final String KIND_PREGNANCY = "pregnancy";
@@ -64,19 +53,11 @@ final class RxSafetyChecks {
         return reasonOptions(kind).stream().filter(o -> o.code().equals(code)).map(RxReasonOption::label).findFirst().orElse(null);
     }
 
-    /** True when the (lower-cased) drug name contains the recorded substance, or the substance is a class
-     * (penicillin / sulfa / NSAID) and the drug is a known member of it. */
+    /** True when the drug name contains the recorded substance, or the substance and the drug share a drug class
+     * (see {@link AllergyDrugClasses}: penicillins, cephalosporins, sulfonamide antibiotics, NSAIDs and others,
+     * with spelling variants and brand names). Name-based only; it leans towards a needless warning over a miss. */
     static boolean allergyMatches(String drugName, String substance) {
-        String drug = drugName.toLowerCase().trim();
-        String sub = substance.toLowerCase().trim();
-        if (sub.isEmpty()) {
-            return false;
-        }
-        if (drug.contains(sub)) {
-            return true;
-        }
-        return ALLERGY_CLASSES.entrySet().stream()
-                .anyMatch(e -> sub.contains(e.getKey()) && e.getValue().stream().anyMatch(drug::contains));
+        return AllergyDrugClasses.matches(drugName, substance);
     }
 
     /** NB-113: fires for any patient of childbearing potential — female, roughly 12-55 — regardless of specialty. */
