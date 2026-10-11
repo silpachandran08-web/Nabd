@@ -1,3 +1,4 @@
+import { Skeleton } from "../components/ui/StateViews";
 import styles from "./platform.module.css";
 
 // See fleet/loading.tsx for why this exists — covers the same gap right after a successful
@@ -5,7 +6,7 @@ import styles from "./platform.module.css";
 export default function Loading() {
   return (
     <main className={styles.page}>
-      <div className={styles.state}>Loading…</div>
+      <Skeleton rows={6} label="Loading" />
     </main>
   );
 }

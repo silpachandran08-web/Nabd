@@ -144,7 +144,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -186,30 +186,6 @@
   color: var(--nb-text-tertiary);
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.pillProvisioning,
-.pillTrialing { background: var(--nb-surface-3); color: var(--nb-text-secondary); }
-.pillActive,
-.pillApproved,
-.pillAuto { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillOverdue,
-.pillOffboarding,
-.pillPending { background: rgba(240, 175, 69, 0.14); color: #e0a63a; }
-.pillSuspended,
-.pillOffboarded,
-.pillRejected { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
-
 .actionBtn {
   height: 28px;
   padding: 0 var(--nb-space-12);
@@ -221,11 +197,11 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  margin-right: var(--nb-space-8);
+  margin-inline-end: var(--nb-space-8);
 }
 
 .actionBtn:last-child {
-  margin-right: 0;
+  margin-inline-end: 0;
 }
 
 .actionBtn:disabled {
@@ -236,7 +212,7 @@
 .rejectBtn {
   composes: actionBtn;
   color: var(--nb-danger-500);
-  border-color: rgba(240, 68, 56, 0.3);
+  border-color: var(--nb-danger-500);
 }
 
 .state {
@@ -274,4 +250,91 @@
 .loadMore:disabled {
   color: var(--nb-text-disabled);
   cursor: not-allowed;
+}
+
+.capNote {
+  margin: 0 0 var(--nb-space-16);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-warn-tint);
+  color: var(--nb-text-primary);
+  font-size: 12.5px;
+}
+
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-12);
+}
+
+.effectNote {
+  margin: 0;
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-info-tint);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.effectNoteDanger {
+  composes: effectNote;
+  background: var(--nb-danger-tint);
+}
+
+.textarea {
+  min-height: 88px;
+  padding: var(--nb-space-8) var(--nb-space-12);
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  color: var(--nb-text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--nb-text-tertiary);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--nb-space-8);
+}
+
+.cancelBtn {
+  height: 40px;
+  padding: 0 var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dangerSubmit {
+  composes: submit;
+  background: var(--nb-danger-600);
+  color: #fff;
+}
+
+.dangerSubmit:disabled {
+  background: var(--nb-surface-3);
+  color: var(--nb-text-disabled);
+}
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24) var(--nb-space-16); }
+}
+
+@media (max-width: 430px) {
+  .formCard { align-items: stretch; flex-direction: column; }
+  .select, .input { min-width: 0; width: 100%; }
+  .submit { width: 100%; }
+  .tabs { overflow-x: auto; }
 }

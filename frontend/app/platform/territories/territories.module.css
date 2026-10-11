@@ -113,3 +113,7 @@
   composes: state;
   color: var(--nb-danger-500);
 }
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24) var(--nb-space-16); }
+}

@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import styles from "./support.module.css";
+import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
+import RoleDenied from "../../components/platform/RoleDenied";
+import StatusPill from "../../components/ui/StatusPill";
+import { PriorityPill, TicketStatusPill } from "../../components/platform/statusPills";
+import { problemDetail, usePlatformFetch } from "../platformApi";
 
 // Matches GET /v1/platform/support/tickets (TicketAdminController) — a bare array, no cursor
 // pagination like fleet's list; ticket volume doesn't need it yet.
@@ -25,22 +29,6 @@ type Ticket = {
   createdAt: string;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
-const STATUS_CLASS: Record<string, string> = {
-  open: styles.pillOpen,
-  in_progress: styles.pillIn_progress,
-  resolved: styles.pillResolved,
-  closed: styles.pillClosed,
-};
-
-const PRIORITY_CLASS: Record<string, string> = {
-  low: styles.pillLow,
-  normal: styles.pillNormal,
-  high: styles.pillHigh,
-  urgent: styles.pillUrgent,
-};
-
 // One next action per status — mirrors the open -> in_progress -> resolved -> closed chain
 // TicketService.ALLOWED_TRANSITIONS enforces server-side; closed is terminal, no action shown.
 const NEXT_ACTION: Record<string, { toStatus: string; label: string }> = {
@@ -50,30 +38,20 @@ const NEXT_ACTION: Record<string, { toStatus: string; label: string }> = {
 };
 
 export default function SupportTicketsPage() {
-  const router = useRouter();
+  const fetchAuthed = usePlatformFetch();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [actingOn, setActingOn] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const fetchTickets = useCallback(async () => {
-    const token = localStorage.getItem("nabd_platform_access_token");
-    if (!token) {
-      router.replace("/platform/login");
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/platform/support/tickets`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_platform_access_token");
-        router.replace("/platform/login");
-        return;
-      }
+      const res = await fetchAuthed("/platform/support/tickets");
+      if (!res) return; // session gone, already redirecting to login
       if (res.status === 403) {
         setForbidden(true);
         return;
@@ -88,7 +66,7 @@ export default function SupportTicketsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [fetchAuthed]);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body itself never calls setState
@@ -97,19 +75,22 @@ export default function SupportTicketsPage() {
   }, [fetchTickets]);
 
   async function act(id: string, toStatus: string) {
-    const token = localStorage.getItem("nabd_platform_access_token");
-    if (!token) return;
     setActingOn(id);
+    setActionError(null);
     try {
-      const res = await fetch(`${API_BASE}/platform/support/tickets/${id}/transitions`, {
+      const res = await fetchAuthed(`/platform/support/tickets/${id}/transitions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ toStatus }),
       });
-      if (res.ok) {
-        const updated: Ticket = await res.json();
-        setTickets((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      if (!res) return;
+      if (!res.ok) {
+        setActionError(await problemDetail(res, "Couldn't update the ticket. Try again."));
+        return;
       }
+      const updated: Ticket = await res.json();
+      setTickets((prev) => prev.map((t) => (t.id === id ? updated : t)));
+    } catch {
+      setActionError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setActingOn(null);
     }
@@ -119,21 +100,23 @@ export default function SupportTicketsPage() {
     <main className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Support tickets</h1>
+          <h1 className={styles.title}>Support Tickets</h1>
           <p className={styles.subtitle}>Raised by clinic owners, staff and doctors — breached SLAs sort first.</p>
         </div>
         {!loading && !error && !forbidden && <span className={styles.count}>{tickets.length} total</span>}
       </div>
 
+      {actionError && <div className={styles.actionError} role="alert">{actionError}</div>}
+
       <div className={styles.card}>
         {loading ? (
-          <div className={styles.state}>Loading…</div>
+          <Skeleton rows={6} label="Loading tickets" />
         ) : forbidden ? (
-          <div className={styles.state}>Your role doesn&apos;t have access to support tickets.</div>
+          <RoleDenied surface="Support tickets" />
         ) : error ? (
-          <div className={styles.errorState}>{error}</div>
+          <ErrorState message={error} onRetry={fetchTickets} />
         ) : tickets.length === 0 ? (
-          <div className={styles.state}>No tickets raised yet.</div>
+          <EmptyState icon="inbox" title="No tickets raised yet" hint="Tickets raised by clinic staff land here, breached SLAs first." />
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -162,14 +145,14 @@ export default function SupportTicketsPage() {
                         {t.raisedByName} <span className={styles.muted}>({t.raisedByRole})</span>
                       </td>
                       <td>
-                        <span className={`${styles.pill} ${PRIORITY_CLASS[t.priority] ?? ""}`}>{t.priority}</span>
+                        <PriorityPill priority={t.priority} />
                       </td>
                       <td>
-                        <span className={`${styles.pill} ${STATUS_CLASS[t.status] ?? ""}`}>{t.status}</span>
+                        <TicketStatusPill status={t.status} />
                       </td>
                       <td className={t.slaBreached ? styles.slaBreached : styles.slaDue}>
                         {new Date(t.slaDueAt).toLocaleString()}
-                        {t.slaBreached ? " · breached" : ""}
+                        {t.slaBreached && <span className={styles.slaPill}><StatusPill tone="danger" label="SLA breached" /></span>}
                       </td>
                       <td>
                         {next && (

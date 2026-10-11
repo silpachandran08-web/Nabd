@@ -102,7 +102,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -155,11 +155,13 @@
 .diff {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
-  color: var(--nb-text-tertiary);
-  max-width: 260px;
+  color: var(--nb-text-secondary);
+  display: inline-block;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: bottom;
 }
 
 .footer {
@@ -197,4 +199,119 @@
 .errorState {
   composes: state;
   color: var(--nb-danger-500);
+}
+
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 var(--nb-space-16);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filterError {
+  width: 100%;
+  padding: var(--nb-space-8) var(--nb-space-12);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-danger-tint);
+  color: var(--nb-danger-500);
+  font-size: 13px;
+}
+
+.exportHint {
+  margin: calc(-1 * var(--nb-space-8)) 0 var(--nb-space-16);
+  font-size: 12px;
+  color: var(--nb-text-tertiary);
+}
+
+.linkBtn {
+  margin-inline-start: var(--nb-space-8);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--nb-accent-500);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.drawer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-16);
+}
+
+.drawerMeta {
+  font-size: 12px;
+  color: var(--nb-text-secondary);
+}
+
+.diffTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.diffTable th {
+  text-align: start;
+  font-size: 11px;
+  color: var(--nb-text-tertiary);
+  padding: var(--nb-space-4) var(--nb-space-8);
+  border-bottom: 1px solid var(--nb-border-subtle);
+}
+
+.diffTable td {
+  padding: var(--nb-space-8);
+  border-bottom: 1px solid var(--nb-border-subtle);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.diffBefore {
+  background: var(--nb-danger-tint);
+}
+
+.diffAfter {
+  background: var(--nb-ok-tint);
+}
+
+.raw summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--nb-text-secondary);
+}
+
+.rawLabel {
+  margin-top: var(--nb-space-8);
+  font-size: 11px;
+  color: var(--nb-text-tertiary);
+}
+
+.pre {
+  margin: var(--nb-space-4) 0 0;
+  padding: var(--nb-space-8);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-3);
+  font-size: 11px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24) var(--nb-space-16); }
+}
+
+@media (max-width: 430px) {
+  .filterCard { flex-direction: column; align-items: stretch; }
+  .select, .input { min-width: 0; width: 100%; }
 }

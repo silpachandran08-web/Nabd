@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import styles from "./territories.module.css";
+import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
+import RoleDenied from "../../components/platform/RoleDenied";
+import { formatMoney } from "../../lib/money";
+import { usePlatformFetch } from "../platformApi";
 
 // Matches GET /v1/platform/territories (TerritoryController). Region-level, not state-level — tenants
 // only carry a region (IN/KSA), no state/city field, and there's no aggregator-demand data yet (NB-227).
@@ -19,12 +22,10 @@ type RegionSummary = {
   newClinicsLast30d: number;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
 const REGION_NAME: Record<string, string> = { IN: "India", KSA: "Saudi Arabia" };
 
 export default function TerritoriesPage() {
-  const router = useRouter();
+  const fetchAuthed = usePlatformFetch();
   const [regions, setRegions] = useState<RegionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,17 +35,8 @@ export default function TerritoriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("nabd_platform_access_token");
-      if (!token) {
-        router.replace("/platform/login");
-        return;
-      }
-      const res = await fetch(`${API_BASE}/platform/territories`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_platform_access_token");
-        router.replace("/platform/login");
-        return;
-      }
+      const res = await fetchAuthed("/platform/territories");
+      if (!res) return; // session gone, already redirecting to login
       if (res.status === 403) {
         setForbidden(true);
         return;
@@ -59,7 +51,7 @@ export default function TerritoriesPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [fetchAuthed]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -68,16 +60,20 @@ export default function TerritoriesPage() {
   return (
     <main className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Territories</h1>
-        <p className={styles.subtitle}>Region-level coverage — India and Saudi Arabia are independently deployed stacks.</p>
+        <h1 className={styles.title}>Territories &amp; Coverage</h1>
+        <p className={styles.subtitle}>
+          Data residency is not a sales territory: it is pinned once per installation and never changes. Territories are purely commercial.
+        </p>
       </div>
 
       {loading ? (
-        <div className={styles.state}>Loading…</div>
+        <Skeleton rows={5} label="Loading territories" />
       ) : forbidden ? (
-        <div className={styles.state}>Your role doesn&apos;t have access to territories.</div>
+        <RoleDenied surface="Territories" />
       ) : error ? (
-        <div className={styles.errorState}>{error}</div>
+        <ErrorState message={error} onRetry={load} />
+      ) : regions.length === 0 ? (
+        <EmptyState icon="chart" title="No coverage yet" hint="Regions appear once a clinic is provisioned in them." />
       ) : (
         <div className={styles.grid}>
           {regions.map((r) => (
@@ -98,7 +94,7 @@ export default function TerritoriesPage() {
                 </div>
                 <div className={styles.stat}>
                   <span className={styles.statLabel}>MRR</span>
-                  <span className={styles.statValue}>{(r.mrrCents / 100).toFixed(0)} {r.currency}</span>
+                  <span className={styles.statValue}>{formatMoney(r.mrrCents / 100, r.currency)}</span>
                 </div>
                 <div className={styles.stat}>
                   <span className={styles.statLabel}>New (30d)</span>

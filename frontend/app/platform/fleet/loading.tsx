@@ -1,3 +1,4 @@
+import { Skeleton } from "../../components/ui/StateViews";
 import styles from "./fleet.module.css";
 
 // Next.js shows this automatically during the route-transition gap between clicking a Command
@@ -6,7 +7,7 @@ import styles from "./fleet.module.css";
 export default function Loading() {
   return (
     <main className={styles.page}>
-      <div className={styles.state}>Loading…</div>
+      <Skeleton rows={6} label="Loading" />
     </main>
   );
 }

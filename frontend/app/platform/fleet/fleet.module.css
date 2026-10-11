@@ -100,7 +100,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -141,25 +141,6 @@
 .muted {
   color: var(--nb-text-tertiary);
 }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-}
-
-.pillProvisioning,
-.pillTrialing { background: var(--nb-surface-3); color: var(--nb-text-secondary); }
-.pillActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillOverdue,
-.pillOffboarding { background: rgba(240, 175, 69, 0.14); color: #e0a63a; }
-.pillSuspended,
-.pillOffboarded { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
 
 .actionBtn {
   height: 28px;
@@ -215,4 +196,8 @@
 .loadMore:disabled {
   color: var(--nb-text-disabled);
   cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24) var(--nb-space-16); }
 }

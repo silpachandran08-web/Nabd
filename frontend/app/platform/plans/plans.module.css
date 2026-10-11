@@ -132,7 +132,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -162,20 +162,6 @@
   color: var(--nb-text-tertiary);
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-}
-
-.pillActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillInactive { background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
-
 .actionBtn {
   height: 28px;
   padding: 0 var(--nb-space-12);
@@ -199,4 +185,14 @@
 .errorState {
   composes: state;
   color: var(--nb-danger-500);
+}
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24) var(--nb-space-16); }
+}
+
+@media (max-width: 430px) {
+  .formCard { align-items: stretch; flex-direction: column; }
+  .select, .input { min-width: 0; width: 100%; }
+  .submit { width: 100%; }
 }

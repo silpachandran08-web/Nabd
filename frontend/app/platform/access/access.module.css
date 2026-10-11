@@ -136,7 +136,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -164,22 +164,6 @@
 .muted {
   color: var(--nb-text-tertiary);
 }
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.pillActive { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillExpired { background: var(--nb-surface-3); color: var(--nb-text-tertiary); }
-.pillRevoked { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
 
 .revokeBtn {
   height: 28px;
@@ -209,4 +193,8 @@
 .errorState {
   composes: state;
   color: var(--nb-danger-500);
+}
+
+@media (max-width: 1024px) {
+  .page { padding: var(--nb-space-24) var(--nb-space-16); }
 }
