@@ -1,0 +1,62 @@
+/* Consultation workspace parts. Tokens only; logical properties so RTL works. */
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Clinical safety strip (DOC-021) */
+.safety { display: flex; flex-wrap: wrap; gap: var(--nb-space-8) var(--nb-space-16); align-items: flex-start; padding: var(--nb-space-12) var(--nb-space-16); margin-block-end: var(--nb-space-16); background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); }
+.safetySticky { position: sticky; inset-block-start: 0; z-index: 20; box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.6); }
+.safetyChip { display: flex; align-items: flex-start; gap: var(--nb-space-8); min-width: 0; font-size: 13px; color: var(--nb-text-primary); }
+.safetyLabel { display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--nb-text-tertiary); }
+.safetyValue { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.safetyAllergy { padding-inline-start: var(--nb-space-12); border-inline-start: 3px solid var(--nb-danger-500); background: var(--nb-danger-tint); border-radius: var(--nb-radius-md); padding-block: var(--nb-space-4); padding-inline-end: var(--nb-space-12); }
+.safetyAllergy .safetyLabel, .safetyAllergy .safetyValue { color: var(--nb-danger-500); }
+.safetyWarn { color: var(--nb-warn-500); }
+.safetyIcon { flex: none; margin-block-start: 2px; }
+.allergyList { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--nb-space-4) var(--nb-space-12); }
+.linkBtn { background: none; border: none; padding: 0; min-height: 24px; color: var(--nb-accent-500); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+
+/* Vitals card (DOC-023) */
+.card { background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-lg); padding: var(--nb-space-16); }
+.cardTitle { margin: 0 0 var(--nb-space-12); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--nb-text-tertiary); display: flex; align-items: center; gap: var(--nb-space-8); flex-wrap: wrap; }
+.vitalsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--nb-space-8); margin: 0; }
+.vital { background: var(--nb-surface-3); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); }
+.vital dt { font-size: 11px; color: var(--nb-text-tertiary); }
+.vital dd { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: var(--nb-space-4); }
+.vitalFlag { background: var(--nb-danger-tint); }
+.vitalFlag dd { color: var(--nb-danger-500); }
+.muted { color: var(--nb-text-secondary); font-size: 13px; }
+.complaint { margin: 0 0 var(--nb-space-16); font-size: 15px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-12); }
+.timeline li { display: flex; gap: var(--nb-space-12); align-items: flex-start; font-size: 13px; }
+.timelineDot { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: var(--nb-surface-3); color: var(--nb-text-secondary); }
+
+/* Panels / buttons */
+.stack { display: flex; flex-direction: column; gap: var(--nb-space-16); }
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--nb-space-8); }
+.btn { min-height: 36px; padding: 0 var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--nb-space-8); }
+.btn:disabled { color: var(--nb-text-disabled); cursor: not-allowed; }
+.btnPrimary { min-height: 36px; padding: 0 var(--nb-space-16); border: none; border-radius: var(--nb-radius-md); background: var(--nb-accent-gradient); color: var(--nb-on-accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: var(--nb-space-8); }
+.btnPrimary:disabled { background: var(--nb-surface-3); color: var(--nb-text-disabled); cursor: not-allowed; }
+.chip { min-height: 36px; padding: 0 var(--nb-space-12); border-radius: 999px; border: 1px solid var(--nb-border-default); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.chipOn { background: var(--nb-accent-tint); color: var(--nb-accent-500); border-color: var(--nb-accent-500); }
+.input { min-height: 36px; background: var(--nb-surface-3); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: 0 var(--nb-space-12); color: var(--nb-text-primary); font: inherit; font-size: 14px; }
+.notice { display: flex; gap: var(--nb-space-8); align-items: flex-start; padding: var(--nb-space-12); border-radius: var(--nb-radius-md); font-size: 13px; }
+.noticeWarn { background: var(--nb-warn-tint); color: var(--nb-warn-500); }
+.noticeDanger { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
+.noticeInfo { background: var(--nb-info-tint); color: var(--nb-info-500); }
+.noticeOk { background: var(--nb-ok-tint); color: var(--nb-ok-500); }
+.check { display: flex; gap: var(--nb-space-8); align-items: flex-start; font-size: 13px; min-height: 24px; }
+.slots { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--nb-space-8); font-size: 13px; }
+.listRow { display: flex; align-items: baseline; gap: var(--nb-space-8); flex-wrap: wrap; }
+.statGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--nb-space-8); }
+.stat { background: var(--nb-surface-3); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); font-size: 13px; }
+.dialogActions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: var(--nb-space-8); margin-block-start: var(--nb-space-16); }
+
+/* Dental drawer (DOC-051) */
+.teeth { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--nb-space-8); }
+.tooth { display: flex; flex-direction: column; gap: var(--nb-space-4); background: var(--nb-surface-3); border-radius: var(--nb-radius-md); padding: var(--nb-space-8); font-size: 12px; }
+.tooth select { min-height: 36px; background: var(--nb-surface-1); color: var(--nb-text-primary); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); font: inherit; font-size: 12px; }
+@media (max-width: 430px) {
+  .teeth { grid-template-columns: repeat(2, 1fr); }
+  .dialogActions > * { flex: 1 1 100%; justify-content: center; }
+}
