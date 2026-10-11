@@ -323,47 +323,62 @@ class PrescriptionApiTest extends ApiTestBase {
         assertThat(signed.getBody().get("status")).isEqualTo("signed");
     }
 
-    // V1-004: sign and save race. Whatever the interleaving, a signed prescription never carries an unresolved
-    // allergy warning and its items are never changed after signing.
+    // V1-004 / V3-006: sign and save take the patient's allergy-register advisory lock first, then the prescription
+    // row lock. Deterministic proof: this test holds each lock in its own transaction, starts a sign request, and
+    // waits until Postgres itself reports a backend blocked on a lock (pg_stat_activity). Only after the lock is
+    // released may the request finish. Removing lockRegister / FOR UPDATE makes the "blocked" poll time out.
+    // shortcut: proves each lock blocks sign, not the ordering between the two or the sign-vs-save interleaving.
     @Test
-    void signRacingASaveNeverLeavesASignedPrescriptionWithAnUnresolvedWarning() throws Exception {
+    void signWaitsForTheRegisterLockAndForThePrescriptionRowLock() throws Exception {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff doc = seedStaff(tenant, roleId, "doc-v4@a.com", "+919800030010", false);
         String token = loginAndGetAccessToken(doc);
-        // Distinct names: NB-060's fuzzy duplicate check would otherwise intercept near-identical test patients.
-        String[] names = {"Anwar Pillai", "Beena Kurup", "Chetan Dubey", "Divya Menon", "Eshaan Verma", "Farida Shaikh", "Gopal Nair", "Hema Rao"};
-        for (int round = 0; round < names.length; round++) {
-            String patientId = registerPatient(token, names[round], "+9199999701" + (20 + round));
-            exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
-                    authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
-            String entry = checkIn(token, patientId, doc.id());
-            String path = "/v1/clinical/prescriptions/" + entry;
-            exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            // One fresh draft per lock: a signed prescription cannot be signed again.
+            for (boolean advisory : new boolean[]{true, false}) {
+                String patientId = registerPatient(token, advisory ? "Anwar Pillai" : "Beena Kurup", advisory ? "+919999970120" : "+919999970121");
+                String entry = checkIn(token, patientId, doc.id());
+                String path = "/v1/clinical/prescriptions/" + entry;
+                exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+                String lockSql = advisory
+                        ? "SELECT pg_advisory_xact_lock(hashtextextended('allergy-register:" + tenant.id() + ":" + patientId + "', 0))"
+                        : "SELECT id FROM prescriptions WHERE tenant_id = '" + tenant.id() + "' AND queue_entry_id = '" + entry + "' FOR UPDATE";
 
-            CountDownLatch go = new CountDownLatch(1);
-            ExecutorService pool = Executors.newFixedThreadPool(2);
-            Callable<ResponseEntity<Map>> sign = () -> {
-                go.await();
-                return exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class);
-            };
-            Callable<ResponseEntity<Map>> save = () -> {
-                go.await();
-                return exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
-                        "items", List.of(Map.of("drugName", "Amoxicillin", "dosage", "500mg")))), Map.class);
-            };
-            Future<ResponseEntity<Map>> signF = pool.submit(sign);
-            Future<ResponseEntity<Map>> saveF = pool.submit(save);
-            go.countDown();
-            signF.get();
-            saveF.get();
-            pool.shutdown();
-
-            ResponseEntity<Map> finalRx = exchange(path, HttpMethod.GET, authed(token), Map.class);
-            if ("signed".equals(finalRx.getBody().get("status"))) {
-                assertThat(finalRx.getBody().get("unresolvedWarnings")).as("round %d", round).isEqualTo(0);
+                // The sign request is submitted while this transaction holds the lock; the lock is released when the lambda returns.
+                Future<ResponseEntity<Map>> signF = inTenantTx(tenant.id(), () -> {
+                    jdbc.query(lockSql, rs -> {
+                    });
+                    Future<ResponseEntity<Map>> f = pool.submit(() -> exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class));
+                    try {
+                        assertThat(waitUntilABackendIsBlockedOnALock()).as("sign is blocked by: %s", lockSql).isTrue();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(e);
+                    }
+                    assertThat(f.isDone()).as("sign must not finish while the lock is held").isFalse();
+                    return f;
+                });
+                ResponseEntity<Map> signed = signF.get(15, java.util.concurrent.TimeUnit.SECONDS);
+                assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
             }
+        } finally {
+            pool.shutdownNow();
         }
+    }
+
+    /** Polls pg_stat_activity until some backend is waiting on a heavyweight lock (row or advisory); false after ~10 s. */
+    private boolean waitUntilABackendIsBlockedOnALock() throws InterruptedException {
+        for (int i = 0; i < 100; i++) {
+            Integer blocked = jdbc.queryForObject(
+                    "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()", Integer.class);
+            if (blocked != null && blocked > 0) {
+                return true;
+            }
+            Thread.sleep(100);
+        }
+        return false;
     }
 
     // V1-004 backstop: the database refuses to change items of a signed prescription, whatever the app does.
@@ -385,5 +400,42 @@ class PrescriptionApiTest extends ApiTestBase {
                 inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM prescription_items WHERE tenant_id = ?", tenant.id())));
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
                 inTenantTx(tenant.id(), () -> jdbc.update("UPDATE prescriptions SET status = 'draft' WHERE tenant_id = ?", tenant.id())));
+    }
+
+    // V3-002: the remaining holes in the signed-Rx backstop: re-parenting items out of it, deleting its header (which
+    // cascades to the items) and TRUNCATE. Each must fail and leave the signed prescription intact.
+    @Test
+    void theDatabaseRefusesToMoveDeleteOrTruncateASignedPrescription() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-v4c@a.com", "+919800030012", false);
+        String token = loginAndGetAccessToken(doc);
+        String signedEntry = checkIn(token, registerPatient(token, "V4c Signed", "+919999970012"), doc.id());
+        String draftEntry = checkIn(token, registerPatient(token, "V4c Draft", "+919999970013"), doc.id());
+        for (String e : new String[]{signedEntry, draftEntry}) {
+            exchange("/v1/clinical/prescriptions/" + e, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                    "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+        }
+        exchange("/v1/clinical/prescriptions/" + signedEntry + "/sign", HttpMethod.POST, authed(token), Map.class);
+
+        // (a) move the signed Rx's items onto the draft
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.update(
+                        "UPDATE prescription_items SET prescription_id = (SELECT p.id FROM prescriptions p WHERE p.tenant_id = ? AND p.status = 'draft') " +
+                                "WHERE tenant_id = ? AND prescription_id IN (SELECT p.id FROM prescriptions p WHERE p.tenant_id = ? AND p.status = 'signed')",
+                        tenant.id(), tenant.id(), tenant.id())));
+        // (b) delete the signed header (would cascade to its items)
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM prescriptions WHERE tenant_id = ? AND status = 'signed'", tenant.id())));
+        // (c) TRUNCATE on either table
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE prescription_items")));
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE prescriptions CASCADE")));
+
+        Integer signedItems = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM prescription_items i JOIN prescriptions p ON p.id = i.prescription_id " +
+                        "WHERE i.tenant_id = ? AND p.status = 'signed'", Integer.class, tenant.id()));
+        assertThat(signedItems).isEqualTo(1);
     }
 }

@@ -12,12 +12,22 @@ CREATE OR REPLACE FUNCTION prescription_items_locked_when_signed() RETURNS trigg
 DECLARE
   parent_status text;
 BEGIN
-  SELECT status INTO parent_status FROM prescriptions
-   WHERE id = (CASE WHEN TG_OP = 'DELETE' THEN OLD.prescription_id ELSE NEW.prescription_id END);
-  -- No parent row visible = the parent is being deleted (ON DELETE CASCADE) or is outside this tenant: allow.
-  IF parent_status = 'signed' THEN
-    RAISE EXCEPTION 'prescription is signed: its items cannot be changed (% on prescription_items)', TG_OP
-      USING ERRCODE = 'integrity_constraint_violation';
+  -- V3-002: check every parent the row touches. An UPDATE that re-parents an item must be refused when the
+  -- OLD parent is signed (moving items out of a signed Rx), as well as when the NEW parent is (moving one in).
+  -- No parent row visible = the parent is being deleted (ON DELETE CASCADE of a draft) or is outside this tenant: allow.
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    SELECT status INTO parent_status FROM prescriptions WHERE id = OLD.prescription_id;
+    IF parent_status = 'signed' THEN
+      RAISE EXCEPTION 'prescription is signed: its items cannot be changed (% on prescription_items)', TG_OP
+        USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+  END IF;
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    SELECT status INTO parent_status FROM prescriptions WHERE id = NEW.prescription_id;
+    IF parent_status = 'signed' THEN
+      RAISE EXCEPTION 'prescription is signed: its items cannot be changed (% on prescription_items)', TG_OP
+        USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
   END IF;
   IF TG_OP = 'DELETE' THEN
     RETURN OLD;
@@ -44,11 +54,44 @@ DROP TRIGGER IF EXISTS trg_prescriptions_signed_final ON prescriptions;
 CREATE TRIGGER trg_prescriptions_signed_final BEFORE UPDATE ON prescriptions
   FOR EACH ROW EXECUTE FUNCTION prescriptions_signed_is_final();
 
+-- V3-002: deleting a signed header would cascade to its items (the items trigger then sees no parent and allows it),
+-- and row triggers do not fire on TRUNCATE. Refuse both, for the header and for the items.
+CREATE OR REPLACE FUNCTION prescriptions_signed_no_delete() RETURNS trigger AS $$
+BEGIN
+  IF OLD.status = 'signed' THEN
+    RAISE EXCEPTION 'prescription is signed and cannot be deleted'
+      USING ERRCODE = 'integrity_constraint_violation';
+  END IF;
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prescriptions_signed_no_delete ON prescriptions;
+CREATE TRIGGER trg_prescriptions_signed_no_delete BEFORE DELETE ON prescriptions
+  FOR EACH ROW EXECUTE FUNCTION prescriptions_signed_no_delete();
+
+CREATE OR REPLACE FUNCTION prescriptions_no_truncate() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'TRUNCATE is not permitted on %: signed prescriptions are final', TG_TABLE_NAME
+    USING ERRCODE = 'integrity_constraint_violation';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prescriptions_no_truncate ON prescriptions;
+CREATE TRIGGER trg_prescriptions_no_truncate BEFORE TRUNCATE ON prescriptions
+  FOR EACH STATEMENT EXECUTE FUNCTION prescriptions_no_truncate();
+DROP TRIGGER IF EXISTS trg_prescription_items_no_truncate ON prescription_items;
+CREATE TRIGGER trg_prescription_items_no_truncate BEFORE TRUNCATE ON prescription_items
+  FOR EACH STATEMENT EXECUTE FUNCTION prescriptions_no_truncate();
+
 -- 2. Pharmacy stock movements: one immutable row per stock change (manual adjustment or checkout dispense).
 --    charge_catalogue.stock_qty stays the current balance; this table is the "why/who/when" and is what
 --    the balance can be reconciled against. Rows are never updated or deleted.
 CREATE TABLE IF NOT EXISTS pharmacy_stock_movements (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- V3-003: occurred_at defaults to the transaction START, which is not the order the item row lock was taken in.
+  -- seq is assigned at INSERT, always after the item row lock, so it follows the qty_before/qty_after chain exactly.
+  seq         bigint GENERATED ALWAYS AS IDENTITY,
   tenant_id   uuid NOT NULL REFERENCES tenants(id),
   item_id     uuid NOT NULL REFERENCES charge_catalogue(id),
   kind        text NOT NULL CHECK (kind IN ('adjustment', 'dispense')),
@@ -62,7 +105,7 @@ CREATE TABLE IF NOT EXISTS pharmacy_stock_movements (
   CHECK (qty_after = qty_before + delta)
 );
 CREATE INDEX IF NOT EXISTS idx_pharmacy_stock_movements_item
-  ON pharmacy_stock_movements (tenant_id, item_id, occurred_at DESC);
+  ON pharmacy_stock_movements (tenant_id, item_id, seq DESC);
 
 ALTER TABLE pharmacy_stock_movements ENABLE ROW LEVEL SECURITY;
 DO $$

@@ -89,7 +89,7 @@ class PharmacyRepository {
         return jdbc.query(
                 "SELECT m.id, m.kind, m.delta, m.qty_before, m.qty_after, m.reason, m.actor_id, s.name AS actor_name, m.occurred_at " +
                         "FROM pharmacy_stock_movements m LEFT JOIN staff s ON s.id = m.actor_id " +
-                        "WHERE m.tenant_id = ? AND m.item_id = ? ORDER BY m.occurred_at DESC, m.id LIMIT 200",
+                        "WHERE m.tenant_id = ? AND m.item_id = ? ORDER BY m.seq DESC LIMIT 200",
                 (rs, i) -> new StockMovementRow(UUID.fromString(rs.getString("id")), rs.getString("kind"), rs.getInt("delta"),
                         rs.getInt("qty_before"), rs.getInt("qty_after"), rs.getString("reason"),
                         rs.getString("actor_id") == null ? null : UUID.fromString(rs.getString("actor_id")),

@@ -250,6 +250,11 @@ class PharmacyApiTest extends ApiTestBase {
         assertThat(newest.get("qtyBefore")).isEqualTo(7);
         assertThat(newest.get("qtyAfter")).isEqualTo(12);
         assertThat(newest.get("reason")).isEqualTo("Stock-take 11 Oct");
+        // V3-003: listed order is the order the stock actually changed, so each row's before equals the next-older row's after.
+        for (int i = 0; i + 1 < movements.getBody().size(); i++) {
+            assertThat(((Map<?, ?>) movements.getBody().get(i)).get("qtyBefore"))
+                    .isEqualTo(((Map<?, ?>) movements.getBody().get(i + 1)).get("qtyAfter"));
+        }
     }
 
     @Test
@@ -285,6 +290,8 @@ class PharmacyApiTest extends ApiTestBase {
                 inTenantTx(tenant.id(), () -> jdbc.update("UPDATE pharmacy_stock_movements SET reason = 'edited' WHERE tenant_id = ?", tenant.id())));
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
                 inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM pharmacy_stock_movements WHERE tenant_id = ?", tenant.id())));
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE pharmacy_stock_movements")));
     }
 
     // V2-004: editing an item no longer writes stock, so a stale edit cannot overwrite a newer count.
