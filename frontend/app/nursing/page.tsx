@@ -169,10 +169,6 @@ function NursingWorklist() {
   const [recordedRows, setRecordedRows] = useState<Row[]>([]);
   const [vitalsFilter, setVitalsFilter] = useState<VitalsFilter>(() => validFilter(searchParams.get("filter")));
 
-  function changeTab(key: Tab) {
-    router.replace(key === "vitals" ? "/nursing" : `/nursing?tab=${key}`);
-  }
-
   function changeFilter(f: VitalsFilter) {
     router.replace(f === "due" ? "/nursing" : `/nursing?filter=${f}`);
   }
@@ -637,11 +633,6 @@ function NursingWorklist() {
         </div>
       ) : (
         <>
-      <div className={styles.tabs}>
-        {TABS.map((t) => (
-          <button key={t.key} className={tab === t.key ? styles.tabActive : styles.tab} onClick={() => changeTab(t.key)}>{t.label}</button>
-        ))}
-      </div>
 
       {actionError && <div className={styles.banner} role="alert"><Icon name="alert" size={16} />{actionError}</div>}
       {loaded && error && (
@@ -665,7 +656,6 @@ function NursingWorklist() {
           <div className={`${styles.headerActions} ${styles.actionsGap}`}>
             {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}><Icon name="pulse" size={14} />Capture vitals</button>}
             {canFlagPriority && <button className={styles.secondaryBtn} onClick={() => openUrgentPicker()}><Icon name="bolt" size={14} />Mark urgent</button>}
-            {allow(PERM.packages) && <button className={styles.secondaryBtn} onClick={() => router.push("/packages")}><Icon name="package" size={14} />Package sessions</button>}
           </div>
 
           <div className={styles.layout}>
