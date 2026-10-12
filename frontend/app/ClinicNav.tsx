@@ -75,9 +75,9 @@ const OWNER_ITEMS: OwnerItem[] = [
 // non-owner, non-nursing role with clinical:edit; each item still needs its own permission. Billing
 // and Arrivals are deliberately not here (the doctor works from My Day). /my-day is built by DOC-002.
 export const MY_DAY_HREF = "/my-day";
-type DoctorItem = { label: string; short: string; icon: IconName; href: string; permission: string; badgeKey?: string };
+type DoctorItem = { label: string; short: string; icon: IconName; href: string; permission: string; alsoPermission?: string; badgeKey?: string };
 const DOCTOR_ITEMS: DoctorItem[] = [
-  { label: "My Day", short: "My Day", icon: "sun", href: MY_DAY_HREF, permission: "clinical:edit", badgeKey: MY_DAY_HREF },
+  { label: "My Day", short: "My Day", icon: "sun", href: MY_DAY_HREF, permission: "clinical:edit", alsoPermission: "queue:view", badgeKey: MY_DAY_HREF },
   { label: "Patients", short: "Patients", icon: "users", href: "/patients", permission: "patients:view" },
   { label: "Consultation Workspace", short: "Consult", icon: "stethoscope", href: "/consult", permission: "clinical:edit" },
   { label: "Treatment Packages", short: "Packages", icon: "package", href: "/packages", permission: "packages:view" },
@@ -251,7 +251,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const showOwner = ownerItems.length > 0;
   const showNursing = !showOwner && hasNursingGrant(permissions);
   const showDoctor = !showOwner && !showNursing && !owner && permissions.includes("clinical:edit");
-  const doctorItems = showDoctor ? DOCTOR_ITEMS.filter((item) => permissions.includes(item.permission)) : [];
+  const doctorItems = showDoctor ? DOCTOR_ITEMS.filter((item) => permissions.includes(item.permission) && (!item.alsoPermission || permissions.includes(item.alsoPermission))) : [];
   const items = showOwner || showNursing || showDoctor ? [] : NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
   if (items.length === 0 && !showNursing && !showOwner && doctorItems.length === 0) return null;
   const currentTab = searchParams.get("tab");
