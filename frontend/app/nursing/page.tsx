@@ -4,10 +4,13 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./nursing.module.css";
 import Icon from "../components/ui/Icon";
+import Dialog from "../components/ui/Dialog";
+import AccessGate from "../components/ui/AccessGate";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
+import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalKey, type VitalsForm } from "../lib/vitals";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
@@ -21,7 +24,7 @@ type QueueEntry = {
 };
 type Row = QueueEntry & {
   patientName: string; patientMrn: string; doctorName: string;
-  allergies: string[]; chronicConditions: string[];
+  allergies: string[]; chronicConditions: string[]; dob: string | null;
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
 };
 // A patient's clinical-flags chips: allergy (danger), chronic condition (warn), presenting
@@ -41,50 +44,19 @@ function statusLabel(s: string): string {
   const t = s.replace(/_/g, " ");
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-const hhmm = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-// Vitals validation. HARD limits are physiologically impossible values (almost certainly a typo
-// such as temp 370) and block saving; SOFT ranges are the usual adult range and only raise a
-// non-blocking "check value" chip while typing. The backend's own abnormal flags (shown after
-// save, age-banded) remain the authority; the API itself enforces no range — these client numbers are a typing aid, never a clinical decision.
-type VitalKey = "heightCm" | "weightKg" | "bpSystolic" | "bpDiastolic" | "pulseBpm" | "tempCelsius" | "spo2Percent";
-const VITAL_FIELDS: { key: VitalKey; label: string; unit: string; min: number; max: number; soft?: [number, number]; step: string }[] = [
-  { key: "heightCm", label: "Height", unit: "cm", min: 30, max: 250, step: "0.1" },
-  { key: "weightKg", label: "Weight", unit: "kg", min: 0.3, max: 400, step: "0.1" },
-  { key: "bpSystolic", label: "BP systolic", unit: "mmHg", min: 40, max: 300, soft: [90, 140], step: "1" },
-  { key: "bpDiastolic", label: "BP diastolic", unit: "mmHg", min: 20, max: 200, soft: [60, 90], step: "1" },
-  { key: "pulseBpm", label: "Pulse", unit: "bpm", min: 20, max: 300, soft: [60, 100], step: "1" },
-  { key: "tempCelsius", label: "Temp", unit: "°C", min: 25, max: 45, soft: [36, 37.8], step: "0.1" },
-  { key: "spo2Percent", label: "SpO2", unit: "%", min: 50, max: 100, soft: [95, 100], step: "1" },
-];
-type VitalsForm = Record<VitalKey, string>;
-const EMPTY_VITALS: VitalsForm = { heightCm: "", weightKg: "", bpSystolic: "", bpDiastolic: "", pulseBpm: "", tempCelsius: "", spo2Percent: "" };
-
-function vitalsErrors(f: VitalsForm): Partial<Record<VitalKey | "form", string>> {
-  const errs: Partial<Record<VitalKey | "form", string>> = {};
-  let any = false;
-  for (const d of VITAL_FIELDS) {
-    const raw = f[d.key].trim();
-    if (raw === "") continue;
-    any = true;
-    const n = Number(raw);
-    if (!Number.isFinite(n)) errs[d.key] = "Enter a number.";
-    else if (d.step === "1" && !Number.isInteger(n)) errs[d.key] = "Enter a whole number.";
-    else if (n < d.min || n > d.max) errs[d.key] = `Must be ${d.min}–${d.max} ${d.unit}. Check the value.`;
-  }
-  if (!any) errs.form = "Enter at least one measurement before saving.";
-  const hasSys = f.bpSystolic.trim() !== "";
-  const hasDia = f.bpDiastolic.trim() !== "";
-  if (hasSys !== hasDia) errs[hasSys ? "bpDiastolic" : "bpSystolic"] = "Enter both blood-pressure values.";
-  else if (hasSys && !errs.bpSystolic && !errs.bpDiastolic && Number(f.bpSystolic) <= Number(f.bpDiastolic)) {
-    errs.bpSystolic = "Systolic must be higher than diastolic.";
-  }
-  return errs;
+// The soft ranges are adult ranges: for a child (or when the age is unknown) showing "outside usual
+// range" would mislead, so no hint is given; the server's age-banded flags still appear after save.
+function isAdult(dob: string | null): boolean {
+  if (!dob) return false;
+  const born = new Date(dob).getTime();
+  return Number.isFinite(born) && Date.now() - born >= 18 * 365.25 * 86_400_000;
 }
 
-function softWarning(key: VitalKey, raw: string): string | null {
+function softWarning(key: VitalKey, raw: string, adult: boolean): string | null {
   const d = VITAL_FIELDS.find((x) => x.key === key);
-  if (!d?.soft || raw.trim() === "") return null;
+  if (!adult || !d?.soft || raw.trim() === "") return null;
   const n = Number(raw);
   if (!Number.isFinite(n) || n < d.min || n > d.max) return null;
   return n < d.soft[0] || n > d.soft[1] ? `Outside usual range (${d.soft[0]}–${d.soft[1]} ${d.unit}) — recheck` : null;
@@ -115,7 +87,7 @@ type ProcedureOrder = {
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
 type Problem = { title: string; detail: string };
-const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view" } as const;
+const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueEdit: "queue:edit" } as const;
 type Tab = "vitals" | "priority" | "administration" | "procedures" | "activity";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -160,9 +132,11 @@ function resolveSequence(steps: { stepType: string }[]): string[] {
 
 export default function NursingPage() {
   return (
-    <Suspense fallback={null}>
-      <NursingWorklist />
-    </Suspense>
+    <AccessGate permission="nursing:view" surface="Nursing">
+      <Suspense fallback={null}>
+        <NursingWorklist />
+      </Suspense>
+    </AccessGate>
   );
 }
 
@@ -297,10 +271,10 @@ function NursingWorklist() {
       }
       const withNames = async (list: QueueEntry[]) => Promise.all(list.map(async (e) => {
         const pRes = await authedFetch(`/patients/${e.patientId}`);
-        const p: { name?: string; mrn?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
+        const p: { name?: string; mrn?: string; dob?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
         return {
           ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—",
-          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
+          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [], dob: p?.dob ?? null,
           lastVitalsAt: null, vitalsOutOfRange: false,
         };
       }));
@@ -383,14 +357,9 @@ function NursingWorklist() {
     if (Object.keys(vitalsErrors(vitalsForm)).length > 0) return;
     setVitalsSubmitting(true);
     try {
-      const num = (v: string) => (v.trim() === "" ? null : Number(v));
       const res = await authedFetch(`/clinical/vitals/${vitalsEntryId}`, {
         method: "PATCH",
-        body: JSON.stringify({
-          heightCm: num(vitalsForm.heightCm), weightKg: num(vitalsForm.weightKg),
-          bpSystolic: num(vitalsForm.bpSystolic), bpDiastolic: num(vitalsForm.bpDiastolic),
-          pulseBpm: num(vitalsForm.pulseBpm), tempCelsius: num(vitalsForm.tempCelsius), spo2Percent: num(vitalsForm.spo2Percent),
-        }),
+        body: JSON.stringify(vitalsPayload(vitalsForm)),
       });
       if (!res) return;
       if (!res.ok) {
@@ -596,6 +565,8 @@ function NursingWorklist() {
   const canCaptureVitals = allow(PERM.vitalsWrite);
   const canCreateOrders = allow(PERM.create);
   const canEditOrders = allow(PERM.edit);
+  // Flagging and acknowledging priority call POST /queue/{id}/reorder and /priority/acknowledge (queue:edit).
+  const canFlagPriority = allow(PERM.queueEdit);
   const showSkeleton = !loaded && !error;
   const showLoadError = !loaded && !!error;
   const vitalsEmpty = {
@@ -670,7 +641,7 @@ function NursingWorklist() {
         <>
           <div className={`${styles.headerActions} ${styles.actionsGap}`}>
             {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}>Capture vitals</button>}
-            <button className={styles.smallBtn} onClick={() => openUrgentPicker()}>Mark urgent</button>
+            {canFlagPriority && <button className={styles.smallBtn} onClick={() => openUrgentPicker()}>Mark urgent</button>}
           </div>
 
           <div className={styles.layout}>
@@ -762,7 +733,7 @@ function NursingWorklist() {
                             : <StatusPill tone="urgent" label="Awaiting acknowledgement" icon="clock" />}
                         </td>
                         <td data-label="State"><StatusPill tone={r.priorityAcknowledgedAt ? "info" : "neutral"} label={statusLabel(r.status)} icon={r.priorityAcknowledgedAt ? "check" : "list"} /></td>
-                        <td data-label="">{!r.priorityAcknowledgedAt && <button className={styles.actionBtn} onClick={() => acknowledgePriority(r.id)}>Acknowledge</button>}</td>
+                        <td data-label="">{!r.priorityAcknowledgedAt && canFlagPriority && <button className={styles.actionBtn} onClick={() => acknowledgePriority(r.id)}>Acknowledge</button>}</td>
                       </tr>
                     );
                   })}
@@ -929,9 +900,8 @@ function NursingWorklist() {
       )}
 
       {vitalsEntryId && vitalsFlags && (
-        <div className={styles.overlay} onClick={closeVitalsModal}>
-          <div className={styles.modal} role="dialog" aria-modal="true" aria-label="Vitals saved" onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Vitals saved</h2>
+        <Dialog title="Vitals saved" onClose={closeVitalsModal}>
+          <div>
             <div className={styles.formError} role="alert">
               {vitalsFlags.map((f) => <div key={f} className={styles.flagLine}><Icon name="alert" size={14} />{f}</div>)}
             </div>
@@ -939,20 +909,21 @@ function NursingWorklist() {
               <button type="button" className={styles.submitBtn} onClick={closeVitalsModal}>Done</button>
             </div>
           </div>
-        </div>
+        </Dialog>
       )}
 
-      {/* Overlay click deliberately does NOT close the capture form: a stray tap must not discard
-          half-typed vitals. Cancel is the explicit way out. */}
+      {/* Shared Dialog gives focus-in/restore, Tab trap and Escape. Escape and a backdrop tap close it only
+          while nothing is typed: a stray tap must not discard half-typed vitals; Cancel is the explicit way out. */}
       {vitalsEntryId && !vitalsFlags && canCaptureVitals && (
-        <div className={styles.overlay}>
-          <form className={`${styles.modal} ${styles.modalWide}`} role="dialog" aria-modal="true" aria-labelledby="vitalsTitle" noValidate onSubmit={submitVitals}>
-            <h2 className={styles.modalTitle} id="vitalsTitle">Capture vitals{vitalsRow ? ` — ${vitalsRow.patientName}` : ""}</h2>
+        <Dialog title={`Capture vitals${vitalsRow ? ` — ${vitalsRow.patientName}` : ""}`} size="lg"
+          onClose={() => { if (!vitalsSubmitting && VITAL_FIELDS.every((d) => vitalsForm[d.key].trim() === "")) closeVitalsModal(); }}>
+          <form noValidate onSubmit={submitVitals}>
+            <p className={styles.muted}>{VITALS_BLANK_HINT}</p>
             {vitalsAttempted && vErrors.form && <div className={styles.formError} role="alert">{vErrors.form}</div>}
             <div className={styles.fieldGrid}>
               {VITAL_FIELDS.map((d) => {
                 const showErr = (vitalsAttempted || vitalsTouched[d.key]) ? vErrors[d.key] : undefined;
-                const warn = showErr ? null : softWarning(d.key, vitalsForm[d.key]);
+                const warn = showErr ? null : softWarning(d.key, vitalsForm[d.key], isAdult(vitalsRow?.dob ?? null));
                 return (
                   <div className={styles.field} key={d.key}>
                     <label className={styles.label} htmlFor={d.key}>{d.label} ({d.unit})</label>
@@ -972,14 +943,14 @@ function NursingWorklist() {
             </div>
             {vitalsError && <div className={styles.formError} role="alert">{vitalsError}</div>}
             <div className={styles.modalActions}>
-              {vitalsRow && !vitalsRow.priority && (
+              {canFlagPriority && vitalsRow && !vitalsRow.priority && (
                 <button type="button" className={`${styles.smallBtn} ${styles.pushStart}`} onClick={() => openUrgentPicker(vitalsRow.id)}>Mark urgent</button>
               )}
               <button type="button" className={styles.cancelBtn} onClick={closeVitalsModal}>Cancel</button>
               <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save and mark ready"}</button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {showCapturePicker && canCaptureVitals && (
@@ -1003,7 +974,7 @@ function NursingWorklist() {
         </div>
       )}
 
-      {showUrgentPicker && (
+      {showUrgentPicker && canFlagPriority && (
         <div className={styles.overlay} onClick={() => setShowUrgentPicker(false)}>
           <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitMarkUrgent}>
             <h2 className={styles.modalTitle}>Mark urgent</h2>

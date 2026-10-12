@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./wizard.module.css";
 import TimezoneSelect from "../TimezoneSelect";
+import AccessGate from "../../components/ui/AccessGate";
 import { can } from "../../lib/permissions";
 import { MODE_DESC, type PharmacyMode } from "../../components/setup/PharmacyPanel";
 import pharmacyStyles from "../../components/setup/pharmacy.module.css";
@@ -35,6 +36,14 @@ const STEPS = [
 ];
 
 export default function SetupWizardPage() {
+  return (
+    <AccessGate permission="setup:view" surface="Clinic Setup">
+      <SetupWizard />
+    </AccessGate>
+  );
+}
+
+function SetupWizard() {
   const router = useRouter();
   const [stepIndex, setStepIndex] = useState(0);
   const [loading, setLoading] = useState(true);

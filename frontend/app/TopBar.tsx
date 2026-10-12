@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import styles from "./topBar.module.css";
 import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./lib/session";
+import { can } from "./lib/permissions";
 
 const SEARCH_INPUT_ID = "nb-global-search";
 
@@ -15,7 +16,7 @@ const SEARCH_INPUT_ID = "nb-global-search";
 // The Receptionist's Queue & Appointments board carries "Register walk-in", which opens the
 // Arrivals page's own walk-in dialog (?action=walkin) — only for those who can check in.
 const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?: string }> = {
-  "/nursing": { label: "Capture vitals", href: "/nursing?action=capture" },
+  "/nursing": { label: "Capture vitals", href: "/nursing?action=capture", permission: "clinical:edit" },
   "/schedule": { label: "Register walk-in", href: "/arrivals?action=walkin", permission: "queue:create" },
 };
 
@@ -57,7 +58,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
       const isShortcut = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k";
       const isSlash = e.key === "/" && !typing;
-      if (isShortcut || isSlash) {
+      if ((isShortcut || isSlash) && can("patients:view")) {
         e.preventDefault();
         document.getElementById(SEARCH_INPUT_ID)?.focus();
       }
@@ -79,8 +80,12 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
   const ownerAction: { label: string; href: string; permission?: string } | undefined = isOwner() && pathname !== "/billing" && getPermissions().includes("billing:approve")
     ? { label: "Start day close", href: "/billing?action=close" }
     : undefined;
-  const action = (pathname ? PRIMARY_ACTIONS[pathname] : undefined) ?? ownerAction;
-  const primaryAction = action && (!action.permission || getPermissions().includes(action.permission)) ? action : undefined;
+  // The owner's day-close action wins over a page-level shortcut (wireframe PRIMARY.owner).
+  const action = ownerAction ?? (pathname ? PRIMARY_ACTIONS[pathname] : undefined);
+  const primaryAction = action && (!action.permission || can(action.permission)) ? action : undefined;
+
+  // Patient search lands on /patients, so a role without patients:view gets no search box at all.
+  const canSearch = can("patients:view");
 
   return (
     <div className={styles.bar}>
@@ -88,18 +93,20 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
         aria-label={collapsed ? "Show sidebar" : "Hide sidebar"} title={collapsed ? "Show sidebar" : "Hide sidebar"}>
         ☰
       </button>
-      <form className={styles.search} onSubmit={submitSearch}>
-        <span className={styles.searchIcon} aria-hidden="true">⌕</span>
-        <input
-          id={SEARCH_INPUT_ID}
-          className={styles.searchInput}
-          placeholder="Search patient by name or phone"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <span className={styles.kbd}>/</span>
-      </form>
-      <span className={styles.kbd}>⌘K</span>
+      {canSearch && <>
+        <form className={styles.search} onSubmit={submitSearch}>
+          <span className={styles.searchIcon} aria-hidden="true">⌕</span>
+          <input
+            id={SEARCH_INPUT_ID}
+            className={styles.searchInput}
+            placeholder="Search patient by name or phone"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <span className={styles.kbd}>/</span>
+        </form>
+        <span className={styles.kbd}>⌘K</span>
+      </>}
       <div className={styles.spacer} />
       {primaryAction && (
         <button type="button" className={styles.primaryAction} onClick={() => router.push(primaryAction.href)}>

@@ -60,6 +60,12 @@ class PrescriptionRepository {
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
+    /** V1-004: row lock (held to the end of the transaction) that serialises upsert/sign on one prescription. */
+    Optional<PrescriptionRow> lockByQueueEntry(UUID tenantId, UUID queueEntryId) {
+        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
+                prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
+    }
+
     /** NB-105: previous medicines, most recent first — signed only, a draft isn't a real prescription yet. */
     List<PrescriptionRow> findSignedByPatient(UUID tenantId, UUID patientId) {
         return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
@@ -68,7 +74,7 @@ class PrescriptionRepository {
     }
 
     List<PrescriptionItemRow> findItems(UUID tenantId, UUID prescriptionId) {
-        return jdbc.query("SELECT * FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
+        return jdbc.query("SELECT *, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
                         "ORDER BY display_order",
                 itemMapper(), tenantId, prescriptionId);
     }
@@ -87,15 +93,17 @@ class PrescriptionRepository {
         int order = 0;
         for (PrescriptionItemRow item : items) {
             jdbc.update("INSERT INTO prescription_items (tenant_id, prescription_id, drug_name, dosage, frequency, " +
-                            "  duration, instructions, allergy_override_reason, display_order) VALUES (?,?,?,?,?,?,?,?,?)",
+                            "  duration, instructions, allergy_override_reason, display_order, overrides) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb)",
                     tenantId, prescriptionId, item.drugName(), item.dosage(), item.frequency(), item.duration(),
-                    item.instructions(), item.allergyOverrideReason(), order++);
+                    item.instructions(), item.allergyOverrideReason(), order++,
+                    item.overridesJson() == null ? "[]" : item.overridesJson());
         }
     }
 
-    /** Idempotent — signing an already-signed prescription is a no-op, not an error. */
-    void sign(UUID tenantId, UUID prescriptionId) {
-        jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
+    /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed. */
+    int sign(UUID tenantId, UUID prescriptionId) {
+        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
                 "WHERE tenant_id = ? AND id = ? AND status = 'draft'", tenantId, prescriptionId);
     }
 
@@ -167,6 +175,7 @@ class PrescriptionRepository {
                 rs.getString("duration"),
                 rs.getString("instructions"),
                 rs.getString("allergy_override_reason"),
-                rs.getInt("display_order"));
+                rs.getInt("display_order"),
+                rs.getString("overrides_json"));
     }
 }

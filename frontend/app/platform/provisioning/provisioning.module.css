@@ -240,6 +240,12 @@
   gap: var(--nb-space-12);
 }
 
+.dialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-12);
+}
+
 .modalTitle {
   font-size: 16px;
   font-weight: 600;

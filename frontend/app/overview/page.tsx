@@ -34,8 +34,9 @@ const METHOD_COLORS: Record<string, string> = { cash: "var(--ov-series-1)", upi:
 // Setup tab each checklist step lives on; unknown steps fall back to the Setup home.
 function setupHref(step: string): string {
   const k = step.toLowerCase();
-  const tab = k.includes("profile") ? "profile"
-    : k.includes("doctor") || k.includes("schedule") || k.includes("shift") ? "shifts"
+  if (k.includes("doctor")) return "/staff"; // the Doctors step is adding clinicians
+  const tab = k.includes("profile") || k.includes("tax") ? "profile"
+    : k.includes("schedule") || k.includes("shift") ? "shifts"
     : k.includes("price") || k.includes("charge") ? "charges"
     : k.includes("whatsapp") ? "whatsapp"
     : k.includes("consent") ? "consent"

@@ -173,16 +173,16 @@ class PlatformAuthApiTest extends ApiTestBase {
         assertThat(resp.getBody().get("role")).isEqualTo("billing");
         assertThat((List<String>) resp.getBody().get("permissions"))
                 .containsExactlyInAnyOrder("command_centre:view", "clinics_fleet:view",
-                        "billing_revenue:view", "pricing_packaging:view");
+                        "billing_revenue:view", "billing_revenue:edit", "pricing_packaging:view");
     }
 
     @Test
-    void superAdminMeSeesAllFourteenSurfaces() {
+    void superAdminMeSeesAllFourteenSurfacesPlusTheThreeWriteAuthorities() {
         SeededOperator operator = seedOperator("super1@nabd.health", "super_admin", false);
         String token = platformLoginAndGetAccessToken(operator);
 
         ResponseEntity<Map> resp = exchange("/v1/platform/auth/me", HttpMethod.GET, authed(token), Map.class);
-        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(14);
+        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(17);
     }
 
     @Test

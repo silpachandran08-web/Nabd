@@ -7,7 +7,7 @@
 .yes { color: var(--nb-ok-500); background: var(--nb-ok-tint); }
 .no { color: var(--nb-text-tertiary); background: var(--nb-surface-3); }
 .na { color: var(--nb-text-disabled); border: 1px dashed var(--nb-border-default); }
-.scroll { overflow-x: auto; }
+.scroll { position: relative; overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th, .table td { padding: var(--nb-space-8); border-bottom: 1px solid var(--nb-border-subtle); text-align: center; }
 .table thead th { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--nb-text-tertiary); white-space: nowrap; }

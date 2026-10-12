@@ -18,6 +18,10 @@ class DiscountApiTest extends ApiTestBase {
         return platformLoginAndGetAccessToken(seedOperator(email, "billing", false));
     }
 
+    private String superAdminToken(String email) {
+        return platformLoginAndGetAccessToken(seedOperator(email, "super_admin", false));
+    }
+
     private UUID subscribedTenant(String requesterToken, int mrrCents) {
         SeededTenant tenant = seedTenant();
         UUID planId = seedPlan("plan-" + tenant.slug(), mrrCents, "INR", 5);
@@ -50,7 +54,7 @@ class DiscountApiTest extends ApiTestBase {
     @Test
     void aboveCapDiscountQueuesAndOnlyAppliesOnApproval() {
         String requester = billingToken("billing6@nabd.internal");
-        String approver = billingToken("billing7@nabd.internal");
+        String approver = superAdminToken("super7@nabd.internal");
         UUID tenantId = subscribedTenant(requester, 100000);
 
         ResponseEntity<Map> requested = exchange("/v1/platform/billing/discounts", HttpMethod.POST,
@@ -72,7 +76,7 @@ class DiscountApiTest extends ApiTestBase {
 
     @Test
     void requesterCannotApproveTheirOwnDiscountRequest() {
-        String token = billingToken("billing8@nabd.internal");
+        String token = superAdminToken("super8@nabd.internal"); // holds billing_revenue:approve, so the maker-checker rule is what stops it
         UUID tenantId = subscribedTenant(token, 100000);
         ResponseEntity<Map> requested = exchange("/v1/platform/billing/discounts", HttpMethod.POST,
                 authedJsonBody(token, Map.of("tenantId", tenantId.toString(), "percent", 30, "reason", "self")), Map.class);
@@ -87,7 +91,7 @@ class DiscountApiTest extends ApiTestBase {
     @Test
     void rejectingAPendingDiscountLeavesMrrUnchanged() {
         String requester = billingToken("billing9@nabd.internal");
-        String reviewer = billingToken("billing10@nabd.internal");
+        String reviewer = superAdminToken("super10@nabd.internal");
         UUID tenantId = subscribedTenant(requester, 100000);
         ResponseEntity<Map> requested = exchange("/v1/platform/billing/discounts", HttpMethod.POST,
                 authedJsonBody(requester, Map.of("tenantId", tenantId.toString(), "percent", 40, "reason", "big ask")), Map.class);
@@ -112,5 +116,64 @@ class DiscountApiTest extends ApiTestBase {
                 authedJsonBody(token, Map.of("tenantId", tenant.id().toString(), "percent", 5, "reason", "n/a")), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    // V2-005: billing can request and auto-approve within the cap, but cannot approve or reject above-cap requests.
+    @Test
+    void billingRoleCannotApproveOrRejectAboveCapDiscounts() {
+        String requester = billingToken("billing12@nabd.internal");
+        String otherBilling = billingToken("billing13@nabd.internal");
+        UUID tenantId = subscribedTenant(requester, 100000);
+        ResponseEntity<Map> requested = exchange("/v1/platform/billing/discounts", HttpMethod.POST,
+                authedJsonBody(requester, Map.of("tenantId", tenantId.toString(), "percent", 25, "reason", "enterprise")), Map.class);
+        String id = (String) requested.getBody().get("id");
+
+        assertThat(exchange("/v1/platform/billing/discounts/" + id + "/approve", HttpMethod.POST, authed(otherBilling), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange("/v1/platform/billing/discounts/" + id + "/reject", HttpMethod.POST, authed(otherBilling), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        ResponseEntity<Map> list = exchange("/v1/platform/billing/discounts", HttpMethod.GET, authed(otherBilling), Map.class);
+        assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK); // reads stay available to billing_revenue:view
+    }
+
+    // V2-005: commercial shares billing_revenue:view but is read-only.
+    @Test
+    void commercialRoleIsReadOnlyOnBilling() {
+        String billing = billingToken("billing14@nabd.internal");
+        UUID tenantId = subscribedTenant(billing, 100000);
+        String commercial = platformLoginAndGetAccessToken(seedOperator("commercial2@nabd.internal", "commercial", false));
+
+        assertThat(exchange("/v1/platform/billing/subscriptions", HttpMethod.GET, authed(commercial), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(exchange("/v1/platform/billing/discounts", HttpMethod.POST,
+                authedJsonBody(commercial, Map.of("tenantId", tenantId.toString(), "percent", 5, "reason", "x")), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange("/v1/platform/billing/subscriptions/" + tenantId + "/transitions", HttpMethod.POST,
+                authedJsonBody(commercial, Map.of("toStatus", "suspended", "reason", "no authority here")), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange("/v1/platform/billing/subscriptions/" + tenantId, HttpMethod.POST,
+                authedJsonBody(commercial, Map.of("planId", UUID.randomUUID().toString(), "mrrCents", 1,
+                        "renewalDate", LocalDate.now().plusDays(30).toString())), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void approvingADiscountIsAudited() {
+        String requester = billingToken("billing15@nabd.internal");
+        String approver = superAdminToken("super15@nabd.internal");
+        UUID tenantId = subscribedTenant(requester, 100000);
+        ResponseEntity<Map> requested = exchange("/v1/platform/billing/discounts", HttpMethod.POST,
+                authedJsonBody(requester, Map.of("tenantId", tenantId.toString(), "percent", 25, "reason", "audit me")), Map.class);
+        String id = (String) requested.getBody().get("id");
+        exchange("/v1/platform/billing/discounts/" + id + "/approve", HttpMethod.POST, authed(approver), Map.class);
+
+        // second approval of the same request is refused, and the discount is applied once
+        assertThat(exchange("/v1/platform/billing/discounts/" + id + "/approve", HttpMethod.POST, authed(approver), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        Integer rows = inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'platform_billing.discount_approved'", Integer.class, tenantId));
+        assertThat(rows).isEqualTo(1);
     }
 }

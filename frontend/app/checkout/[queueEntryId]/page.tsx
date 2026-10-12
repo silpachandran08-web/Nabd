@@ -299,7 +299,7 @@ export default function CheckoutPage() {
       <div className={styles.card}>
         <h2 className={styles.cardTitle}>{invoice ? "New charges to add" : "Selected line items"}</h2>
         {items.length === 0 ? (
-          <div className={styles.muted}>Pick a charge from the left.</div>
+          <div className={styles.muted}>Pick a charge from the list to add it.</div>
         ) : (
           <table className={styles.table}>
             <thead><tr><th>Charge</th><th>Qty</th><th>Unit price</th><th>Tax</th><th>Line total</th><th></th></tr></thead>

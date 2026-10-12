@@ -44,7 +44,8 @@ class VitalsRepository {
                 (rs, i) -> rs.getBigDecimal("weight_kg"), tenantId, patientId).stream().findFirst();
     }
 
-    /** Freely correctable — no signed/locked concept for vitals. */
+    /** Freely correctable — no signed/locked concept for vitals. A null argument keeps the stored value (V2-008),
+     * so a second save carrying only a pulse can no longer wipe the height, weight, BP, temperature and SpO2. */
     void upsert(UUID tenantId, UUID queueEntryId, UUID patientId, BigDecimal heightCm, BigDecimal weightKg,
                 Integer bpSystolic, Integer bpDiastolic, Integer pulseBpm, BigDecimal tempCelsius,
                 Integer spo2Percent, UUID recordedBy) {
@@ -52,13 +53,24 @@ class VitalsRepository {
                 "INSERT INTO vitals (tenant_id, queue_entry_id, patient_id, height_cm, weight_kg, bp_systolic, " +
                         "  bp_diastolic, pulse_bpm, temp_celsius, spo2_percent, recorded_by) " +
                         "VALUES (?,?,?,?,?,?,?,?,?,?,?) " +
-                        "ON CONFLICT (queue_entry_id) DO UPDATE SET height_cm = EXCLUDED.height_cm, " +
-                        "  weight_kg = EXCLUDED.weight_kg, bp_systolic = EXCLUDED.bp_systolic, " +
-                        "  bp_diastolic = EXCLUDED.bp_diastolic, pulse_bpm = EXCLUDED.pulse_bpm, " +
-                        "  temp_celsius = EXCLUDED.temp_celsius, spo2_percent = EXCLUDED.spo2_percent, " +
+                        "ON CONFLICT (queue_entry_id) DO UPDATE SET " +
+                        "  height_cm = COALESCE(EXCLUDED.height_cm, vitals.height_cm), " +
+                        "  weight_kg = COALESCE(EXCLUDED.weight_kg, vitals.weight_kg), " +
+                        "  bp_systolic = COALESCE(EXCLUDED.bp_systolic, vitals.bp_systolic), " +
+                        "  bp_diastolic = COALESCE(EXCLUDED.bp_diastolic, vitals.bp_diastolic), " +
+                        "  pulse_bpm = COALESCE(EXCLUDED.pulse_bpm, vitals.pulse_bpm), " +
+                        "  temp_celsius = COALESCE(EXCLUDED.temp_celsius, vitals.temp_celsius), " +
+                        "  spo2_percent = COALESCE(EXCLUDED.spo2_percent, vitals.spo2_percent), " +
                         "  recorded_by = EXCLUDED.recorded_by, recorded_at = now()",
                 tenantId, queueEntryId, patientId, heightCm, weightKg, bpSystolic, bpDiastolic, pulseBpm,
                 tempCelsius, spo2Percent, recordedBy);
+    }
+
+    Optional<VitalsModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new VitalsModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
     }
 
     private RowMapper<VitalsRow> mapper() {

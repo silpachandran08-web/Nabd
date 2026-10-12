@@ -7,6 +7,8 @@ import com.nabd.hms.platform.billing.dto.SubscriptionPage;
 import com.nabd.hms.platform.billing.dto.SubscriptionResponse;
 import com.nabd.hms.platform.billing.dto.SubscriptionTransitionRequest;
 import com.nabd.hms.platform.billing.dto.SubscriptionUpsertRequest;
+import com.nabd.hms.common.RequestMeta;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** Gated on billing_revenue:view (NB-257's matrix) — super_admin, billing, commercial. */
+/** Reads need billing_revenue:view (NB-257's matrix: super_admin, billing, commercial). Writes need billing_revenue:edit
+ * (super_admin, billing); approving or rejecting a discount needs billing_revenue:approve (super_admin) — V2-005. */
 @RestController
 @RequestMapping("/v1/platform/billing")
 @PreAuthorize("hasAuthority('billing_revenue:view')")
@@ -44,12 +47,14 @@ public class BillingController {
     }
 
     @PostMapping("/subscriptions/{tenantId}")
+    @PreAuthorize("hasAuthority('billing_revenue:edit')")
     public SubscriptionResponse upsertSubscription(@PathVariable UUID tenantId,
                                                      @Valid @RequestBody SubscriptionUpsertRequest req) {
         return billingService.upsert(tenantId, req);
     }
 
     @PostMapping("/subscriptions/{tenantId}/transitions")
+    @PreAuthorize("hasAuthority('billing_revenue:edit')")
     public SubscriptionResponse transition(@PathVariable UUID tenantId,
                                             @Valid @RequestBody SubscriptionTransitionRequest req,
                                             @AuthenticationPrincipal Jwt jwt) {
@@ -63,19 +68,22 @@ public class BillingController {
     }
 
     @PostMapping("/discounts")
+    @PreAuthorize("hasAuthority('billing_revenue:edit')")
     public ResponseEntity<DiscountResponse> requestDiscount(@Valid @RequestBody DiscountRequestCreate req,
-                                                              @AuthenticationPrincipal Jwt jwt) {
-        DiscountResponse created = discountService.request(UUID.fromString(jwt.getSubject()), req);
+                                                              @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        DiscountResponse created = discountService.request(UUID.fromString(jwt.getSubject()), req, RequestMeta.clientIp(http));
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PostMapping("/discounts/{id}/approve")
-    public DiscountResponse approveDiscount(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return discountService.approve(id, UUID.fromString(jwt.getSubject()));
+    @PreAuthorize("hasAuthority('billing_revenue:approve')")
+    public DiscountResponse approveDiscount(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return discountService.approve(id, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 
     @PostMapping("/discounts/{id}/reject")
-    public DiscountResponse rejectDiscount(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return discountService.reject(id, UUID.fromString(jwt.getSubject()));
+    @PreAuthorize("hasAuthority('billing_revenue:approve')")
+    public DiscountResponse rejectDiscount(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return discountService.reject(id, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 }

@@ -187,6 +187,7 @@
 }
 
 .smallBtn {
+  white-space: nowrap;
   height: 28px;
   padding: 0 var(--nb-space-10, 10px);
   border: 1px solid var(--nb-border-default);
@@ -319,6 +320,7 @@
 }
 
 .actionBtn {
+  white-space: nowrap;
   height: 30px;
   padding: 0 var(--nb-space-12);
   border: none;
@@ -350,7 +352,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
+  z-index: 100;
 }
 
 .modal {
@@ -509,5 +511,6 @@
   .table td { display: flex; justify-content: space-between; align-items: center; gap: var(--nb-space-12); border-bottom: none; padding: var(--nb-space-8) var(--nb-space-16); text-align: end; }
   .table td::before { content: attr(data-label); flex: none; color: var(--nb-text-tertiary); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; text-align: start; }
   .table td:empty { display: none; }
-  .flagList { max-width: none; justify-content: flex-end; }
+  .flagList { max-width: none; min-inline-size: 0; flex: 1; justify-content: flex-end; }
+  .flagList > * { white-space: normal; max-inline-size: 100%; }
 }

@@ -4,6 +4,7 @@ import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.VitalsResponse;
 import com.nabd.hms.clinical.dto.VitalsWriteRequest;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.QueueService;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
@@ -14,7 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.VitalsModels.QueueEntrySnapshot;
@@ -34,9 +38,12 @@ public class VitalsService {
     private final TenantContext tenantContext;
 
     private final ClinicClock clock;
+    private final AuditService auditService;
 
-    VitalsService(VitalsRepository repo, QueueService queueService, TenantContext tenantContext, ClinicClock clock) {
+    VitalsService(VitalsRepository repo, QueueService queueService, TenantContext tenantContext, ClinicClock clock,
+                  AuditService auditService) {
         this.clock = clock;
+        this.auditService = auditService;
         this.repo = repo;
         this.queueService = queueService;
         this.tenantContext = tenantContext;
@@ -54,6 +61,22 @@ public class VitalsService {
         tenantContext.set(tenantId);
         QueueEntrySnapshot snapshot = repo.findQueueEntrySnapshot(tenantId, queueEntryId).orElseThrow(this::notFound);
 
+        // An empty save must never move the visit on to the doctor with no vitals, and BP is a pair.
+        if (req.heightCm() == null && req.weightKg() == null && req.bpSystolic() == null && req.bpDiastolic() == null
+                && req.pulseBpm() == null && req.tempCelsius() == null && req.spo2Percent() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "no-measurement", "No measurement",
+                    "Enter at least one measurement before saving vitals.");
+        }
+        if ((req.bpSystolic() == null) != (req.bpDiastolic() == null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "incomplete-blood-pressure", "Incomplete blood pressure",
+                    "Enter both systolic and diastolic blood pressure, or neither.");
+        }
+        if (req.bpSystolic() != null && req.bpSystolic() <= req.bpDiastolic()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-blood-pressure", "Invalid blood pressure",
+                    "Systolic pressure must be higher than diastolic pressure.");
+        }
+
+        VitalsRow previous = repo.findByQueueEntry(tenantId, queueEntryId).orElse(null);
         repo.upsert(tenantId, queueEntryId, snapshot.patientId(), req.heightCm(), req.weightKg(),
                 req.bpSystolic(), req.bpDiastolic(), req.pulseBpm(), req.tempCelsius(), req.spo2Percent(),
                 callerStaffId);
@@ -62,7 +85,43 @@ public class VitalsService {
             queueService.updateStatus(tenantId, callerStaffId, queueEntryId, new QueueStatusUpdateRequest("vitals_done"));
         }
         VitalsRow row = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        auditCorrection(tenantId, callerStaffId, queueEntryId, previous, row);
         return toResponse(tenantId, row);
+    }
+
+    /** A later save that changes an already-recorded value is a correction of a clinical measurement: the old and new
+     * values of the fields that changed go to the audit trail (nothing is overwritten without a trace). Measured values are
+     * kept here on purpose: vitals has no history table and the upsert overwrites the row, so audit_log is the only record
+     * of the old reading (see the PHI policy on AuditService). */
+    private void auditCorrection(UUID tenantId, UUID staffId, UUID queueEntryId, VitalsRow before, VitalsRow after) {
+        if (before == null) {
+            return;
+        }
+        Map<String, Object> was = new LinkedHashMap<>();
+        Map<String, Object> now = new LinkedHashMap<>();
+        diff("heightCm", before.heightCm(), after.heightCm(), was, now);
+        diff("weightKg", before.weightKg(), after.weightKg(), was, now);
+        diff("bpSystolic", before.bpSystolic(), after.bpSystolic(), was, now);
+        diff("bpDiastolic", before.bpDiastolic(), after.bpDiastolic(), was, now);
+        diff("pulseBpm", before.pulseBpm(), after.pulseBpm(), was, now);
+        diff("tempCelsius", before.tempCelsius(), after.tempCelsius(), was, now);
+        diff("spo2Percent", before.spo2Percent(), after.spo2Percent(), was, now);
+        if (now.isEmpty()) {
+            return;
+        }
+        VitalsModels.ActorInfo actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
+        now.put("queueEntryId", queueEntryId.toString());
+        auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), null, "vitals.corrected", "vitals",
+                after.id(), was, now);
+    }
+
+    private static void diff(String field, Object before, Object after, Map<String, Object> was, Map<String, Object> now) {
+        boolean same = before instanceof java.math.BigDecimal b && after instanceof java.math.BigDecimal a
+                ? b.compareTo(a) == 0 : Objects.equals(before, after);
+        if (!same) {
+            was.put(field, before);
+            now.put(field, after);
+        }
     }
 
     private VitalsResponse toResponse(UUID tenantId, VitalsRow v) {

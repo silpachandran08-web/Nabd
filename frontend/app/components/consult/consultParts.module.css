@@ -3,7 +3,7 @@
 
 /* Clinical safety strip (DOC-021) */
 .safety { display: flex; flex-wrap: wrap; gap: var(--nb-space-8) var(--nb-space-16); align-items: flex-start; padding: var(--nb-space-12) var(--nb-space-16); margin-block-end: var(--nb-space-16); background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); }
-.safetySticky { position: sticky; inset-block-start: 0; z-index: 20; box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.6); }
+.safetySticky { position: sticky; inset-block-start: var(--nb-topbar-h, 64px); z-index: 20; box-shadow: 0 6px 12px -8px rgba(0, 0, 0, 0.6); }
 .safetyChip { display: flex; align-items: flex-start; gap: var(--nb-space-8); min-width: 0; font-size: 13px; color: var(--nb-text-primary); }
 .safetyLabel { display: block; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--nb-text-tertiary); }
 .safetyValue { display: block; font-weight: 500; overflow-wrap: anywhere; }
@@ -13,6 +13,8 @@
 .safetyIcon { flex: none; margin-block-start: 2px; }
 .allergyList { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: var(--nb-space-4) var(--nb-space-12); }
 .linkBtn { background: none; border: none; padding: 0; min-height: 24px; color: var(--nb-accent-500); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+/* 44px target on coarse pointers (V2-018); only the standalone links, not inline Retry/Dismiss. */
+@media (pointer: coarse) { .linkBtnTouch { min-height: 44px; min-inline-size: 44px; } }
 
 /* Vitals card (DOC-023) */
 .card { background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-lg); padding: var(--nb-space-16); }
@@ -60,3 +62,16 @@
   .teeth { grid-template-columns: repeat(2, 1fr); }
   .dialogActions > * { flex: 1 1 100%; justify-content: center; }
 }
+
+/* Rx warning decision cards and override dialog (DOC-031/032) */
+.warnStack { display: flex; flex-direction: column; gap: var(--nb-space-8); margin-block: var(--nb-space-4) var(--nb-space-12); }
+.warnCard { align-items: flex-start; }
+.warnBody { display: flex; flex-direction: column; gap: var(--nb-space-4); min-width: 0; overflow-wrap: anywhere; }
+.fieldset { border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); display: flex; flex-direction: column; gap: var(--nb-space-8); margin: 0; }
+.legend { padding-inline: var(--nb-space-4); font-size: 12px; font-weight: 600; color: var(--nb-text-secondary); }
+.textarea { min-height: 64px; width: 100%; box-sizing: border-box; background: var(--nb-surface-3); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); color: var(--nb-text-primary); font: inherit; font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: 12px; color: var(--nb-text-secondary); min-width: 0; }
+.formGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--nb-space-8); }
+.radioRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.allergyItem { border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.history { max-block-size: 240px; overflow-y: auto; }

@@ -97,8 +97,8 @@ export type OperatorAccess = {
   /** false until /auth/me has answered; while false, write controls stay absent (safe default). */
   ready: boolean;
   canWrite: boolean; // super_admin, implementation — tenants, provisioning
-  canBill: boolean; // super_admin, billing — plans, subscriptions, discount requests
-  isSuper: boolean; // super_admin — discount approvals above the cap
+  canBill: boolean; // super_admin, billing — plans, subscriptions, discount requests (server: billing_revenue:edit)
+  isSuper: boolean; // super_admin — discount approvals above the cap (server: billing_revenue:approve, V2-005)
   readOnly: boolean; // commercial, compliance_dpo — wireframe's read-only note
 };
 

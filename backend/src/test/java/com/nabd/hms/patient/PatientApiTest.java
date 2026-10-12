@@ -352,8 +352,10 @@ class PatientApiTest extends ApiTestBase {
         ResponseEntity<List> due = exchange("/v1/patients/guardian-reviews-due", HttpMethod.GET, authed(token), List.class);
         assertThat(due.getBody()).anyMatch(r -> patientId.equals(((Map<?, ?>) r).get("patientId")));
 
-        ResponseEntity<Map> handover = exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
-                "name", "Newly Adult", "phone", "+919888800026", "dob", dob, "gender", "female")), Map.class);
+        // PATCH is a true partial update (CGV-001): the handover must say guardianId:null explicitly
+        java.util.Map<String, Object> clearGuardian = new java.util.HashMap<>();
+        clearGuardian.put("guardianId", null);
+        ResponseEntity<Map> handover = exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, clearGuardian), Map.class);
         assertThat(handover.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class);
@@ -367,6 +369,116 @@ class PatientApiTest extends ApiTestBase {
                 "SELECT COUNT(*) FROM audit_log WHERE entity_id = ? AND action = 'patient.guardian_revoke'",
                 Long.class, UUID.fromString(patientId)));
         assertThat(revokeAudit).isEqualTo(1);
+    }
+
+    @Test
+    void revokingGuardianViaPartialPatchKeepsAddressAndNationalId() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam5@a.com", "+919300000024", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatientWithDob(token, "Guardian D", "+919888800027", "1975-03-03");
+        String dob = java.time.LocalDate.now().minusYears(19).toString();
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Has Address", "phone", "+919888800028", "dob", dob, "gender", "female", "guardianId", guardianId,
+                "address", "12 Test Street", "nationalId", "123456789012")), Map.class);
+        UUID patientId = UUID.fromString((String) created.getBody().get("id"));
+
+        java.util.Map<String, Object> revoke = new java.util.HashMap<>();
+        revoke.put("guardianId", null);
+        ResponseEntity<Map> patched = exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, revoke), Map.class);
+        assertThat(patched.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        String address = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT address FROM patients WHERE id = ?", String.class, patientId));
+        byte[] nationalIdEnc = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT national_id_enc FROM patients WHERE id = ?", byte[].class, patientId));
+        assertThat(address).isEqualTo("12 Test Street");
+        assertThat(nationalIdEnc).isNotNull();
+        assertThat(new String(cipher.decrypt(nationalIdEnc), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("123456789012");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody().get("guardianId")).isNull();
+    }
+
+    @Test
+    void partialPatchOfNameLeavesGuardianAddressAndNationalIdUntouched() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam6@a.com", "+919300000025", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatientWithDob(token, "Guardian E", "+919888800029", "1976-04-04");
+        String dob = java.time.LocalDate.now().minusYears(7).toString();
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Small Child", "phone", "+919888800030", "dob", dob, "gender", "male", "guardianId", guardianId,
+                "address", "Addr 1", "nationalId", "987654321098")), Map.class);
+        UUID patientId = UUID.fromString((String) created.getBody().get("id"));
+
+        ResponseEntity<Map> patched = exchange("/v1/patients/" + patientId, HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("name", "Renamed Child")), Map.class);
+        assertThat(patched.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(patched.getBody().get("name")).isEqualTo("Renamed Child");
+
+        Map<String, Object> row = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT address, national_id_enc, guardian_id FROM patients WHERE id = ?", patientId));
+        assertThat(row.get("address")).isEqualTo("Addr 1");
+        assertThat(row.get("national_id_enc")).isNotNull();
+        assertThat(row.get("guardian_id")).isNotNull();
+    }
+
+    @Test
+    void explicitNullClearsAddressAndNationalIdAndRequiredFieldsCannotBeNulled() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam7@a.com", "+919300000026", false);
+        String token = loginAndGetAccessToken(staff);
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Adult Clear", "phone", "+919888800031", "dob", "1985-05-05", "gender", "male",
+                "address", "Old addr", "nationalId", "111122223333")), Map.class);
+        UUID patientId = UUID.fromString((String) created.getBody().get("id"));
+
+        java.util.Map<String, Object> clear = new java.util.HashMap<>();
+        clear.put("address", null);
+        clear.put("nationalId", null);
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, clear), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<String, Object> row = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT address, national_id_enc FROM patients WHERE id = ?", patientId));
+        assertThat(row.get("address")).isNull();
+        assertThat(row.get("national_id_enc")).isNull();
+
+        // V1-015: the clear is audited by field name; no PHI value is in the payload.
+        Map<String, Object> audited = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT after::text AS after FROM audit_log WHERE tenant_id = ? AND action = 'patient.updated' AND entity_id = ? " +
+                        "ORDER BY created_at DESC LIMIT 1", tenant.id(), patientId));
+        assertThat(audited.get("after").toString()).contains("nationalId").contains("address").contains("cleared");
+        assertThat(audited.get("after").toString()).doesNotContain("111122223333").doesNotContain("Old addr");
+
+        // V1-015: a blank-but-present national ID is rejected, not treated as a silent clear.
+        java.util.Map<String, Object> blankId = new java.util.HashMap<>();
+        blankId.put("nationalId", "   ");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, blankId), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // V3-010: same for a blank address, and clearing a national ID that is already empty is a no-op with no audit row.
+        java.util.Map<String, Object> blankAddress = new java.util.HashMap<>();
+        blankAddress.put("address", "  ");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, blankAddress), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        Integer auditsBefore = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'patient.updated' AND entity_id = ?",
+                Integer.class, tenant.id(), patientId));
+        java.util.Map<String, Object> clearAgain = new java.util.HashMap<>();
+        clearAgain.put("nationalId", null);
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, clearAgain), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+        Integer auditsAfter = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'patient.updated' AND entity_id = ?",
+                Integer.class, tenant.id(), patientId));
+        assertThat(auditsAfter).isEqualTo(auditsBefore);
+
+        java.util.Map<String, Object> nullName = new java.util.HashMap<>();
+        nullName.put("name", null);
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.PATCH, authedJsonBody(token, nullName), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

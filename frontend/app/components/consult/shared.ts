@@ -15,15 +15,29 @@ export type PatientDetail = {
 };
 export type Row = QueueEntry & { patientName: string; patient: PatientDetail | null };
 
+// A safety warning on one prescription line (RxWarningResponse). Lines that requiresDecision block
+// signing until a decision with a named reason is recorded (who/when are set by the server).
+export type RxReasonOption = { code: string; label: string };
+export type RxDecision = { kind: string; reasonCode: string; reasonLabel: string | null; note: string | null; by: string | null; byName: string | null; at: string | null };
+export type RxWarning = {
+  kind: "allergy" | "pregnancy" | "controlled"; severity: string; message: string; matched: string;
+  requiresDecision: boolean; resolved: boolean; reasonOptions: RxReasonOption[]; decision: RxDecision | null;
+};
+export type RxDecisionInput = { kind: string; reasonCode: string; note?: string };
 export type PrescriptionItem = {
   id?: string; drugName: string; dosage: string; frequency: string; duration: string;
-  instructions: string; allergyOverrideReason: string; allergyWarning?: string | null;
+  instructions: string; allergyOverrideReason?: string | null; allergyWarning?: string | null;
   pregnancyWarning?: string | null; controlledSubstanceWarning?: string | null;
+  warnings?: RxWarning[]; overrides?: RxDecisionInput[];
 };
-export type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
+export type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[]; unresolvedWarnings?: number };
 export type Problem = { title: string; detail: string };
 
-export type Allergy = { id: string; substance: string; severity: string; reaction: string | null; active: boolean };
+export type Allergy = {
+  id: string; substance: string; severity: string; reaction: string | null; active: boolean;
+  category?: string | null; source?: string | null; recordedBy?: string; recordedByName?: string | null; recordedAt?: string; updatedAt?: string | null;
+};
+export type AllergyStatus = { state: "recorded" | "none_documented" | "not_assessed"; activeCount: number; documentedByName: string | null; documentedAt: string | null };
 export type Condition = { id: string; condition: string; status: string; reviewDueDate: string | null };
 export type Encounter = { queueEntryId: string; occurredAt: string; diagnosis: string | null; assessment: string | null; medications: string | null };
 export type Vitals = {

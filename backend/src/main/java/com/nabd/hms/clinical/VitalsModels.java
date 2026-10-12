@@ -19,4 +19,7 @@ final class VitalsModels {
      * attempt an illegal same-state transition). */
     record QueueEntrySnapshot(UUID patientId, String status) {
     }
+
+    record ActorInfo(String name, String role) {
+    }
 }

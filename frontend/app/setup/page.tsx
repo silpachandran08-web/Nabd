@@ -7,6 +7,7 @@ import WhatsAppTemplates from "./WhatsAppTemplates";
 import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
 import Icon from "../components/ui/Icon";
+import AccessGate from "../components/ui/AccessGate";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
@@ -65,9 +66,11 @@ function csvCell(v: string | number): string {
 // Subscription tabs) read useSearchParams, which needs a Suspense boundary for static prerender.
 export default function SetupPage() {
   return (
-    <Suspense fallback={null}>
-      <SetupPageInner />
-    </Suspense>
+    <AccessGate permission="setup:view" surface="Clinic Setup">
+      <Suspense fallback={null}>
+        <SetupPageInner />
+      </Suspense>
+    </AccessGate>
   );
 }
 
@@ -99,7 +102,7 @@ function SetupPageInner() {
   const [staff, setStaff] = useState<StaffSummary[]>([]);
   const [canPharmacy, setCanPharmacy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [payrollMonth, setPayrollMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [payrollMonth, setPayrollMonth] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }) // local month, not UTC;
   const [payrollError, setPayrollError] = useState<string | null>(null);
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [specialtyDraft, setSpecialtyDraft] = useState("");

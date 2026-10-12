@@ -12,6 +12,11 @@ import java.util.UUID;
  * one write path every module should call — the append-only guarantee and the per-tenant hash
  * chain both live in V14__audit_log.sql (triggers, not application code), so nothing here can
  * accidentally weaken them. See that migration's header for the two tamper defenses.
+ *
+ * <p>PHI policy (V3-013), one place: audit_log is the access-controlled, hash-chained store for before/after of
+ * PHI actions, so it MAY hold clinical values where the change would otherwise be unrecoverable because the source
+ * row is overwritten in place (allergy.corrected, vitals.corrected). It must NOT hold direct identifiers or
+ * secrets (name, phone, address, national ID, PIN, free-text notes): patient.updated records field names only.
  */
 @Component
 public class AuditService {

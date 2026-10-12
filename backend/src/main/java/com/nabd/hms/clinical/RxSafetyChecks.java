@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.clinical.dto.RxReasonOption;
+
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.ZoneOffset;
@@ -25,6 +27,38 @@ final class RxSafetyChecks {
 
     private static final List<String> KSA_CONTROLLED_DRUGS = List.of(
             "tramadol", "alprazolam", "diazepam", "codeine", "morphine", "fentanyl");
+
+    static final String KIND_ALLERGY = "allergy";
+    static final String KIND_PREGNANCY = "pregnancy";
+    static final String KIND_CONTROLLED = "controlled";
+
+    /** Named reasons per warning kind (wireframe rxoverride). The code is stored; the label is for display. */
+    static List<RxReasonOption> reasonOptions(String kind) {
+        return switch (kind) {
+            case KIND_ALLERGY -> List.of(
+                    new RxReasonOption("prior_mild_reaction_only", "Documented prior mild reaction only"),
+                    new RxReasonOption("no_suitable_alternative", "No suitable therapeutic alternative"),
+                    new RxReasonOption("direct_supervision", "Given under direct supervision"));
+            case KIND_PREGNANCY -> List.of(
+                    new RxReasonOption("benefit_outweighs_risk", "Clinical benefit outweighs risk"),
+                    new RxReasonOption("no_lower_risk_alternative", "No lower-risk alternative available"),
+                    new RxReasonOption("obstetric_consultation", "Documented obstetric consultation"));
+            case KIND_CONTROLLED -> List.of(
+                    new RxReasonOption("documentation_confirmed", "Additional documentation recorded"));
+            default -> List.of();
+        };
+    }
+
+    static String reasonLabel(String kind, String code) {
+        return reasonOptions(kind).stream().filter(o -> o.code().equals(code)).map(RxReasonOption::label).findFirst().orElse(null);
+    }
+
+    /** True when the drug name contains the recorded substance, or the substance and the drug share a drug class
+     * (see {@link AllergyDrugClasses}: penicillins, cephalosporins, sulfonamide antibiotics, NSAIDs and others,
+     * with spelling variants and brand names). Name-based only; it leans towards a needless warning over a miss. */
+    static boolean allergyMatches(String drugName, String substance) {
+        return AllergyDrugClasses.matches(drugName, substance);
+    }
 
     /** NB-113: fires for any patient of childbearing potential — female, roughly 12-55 — regardless of specialty. */
     static String pregnancyWarning(String drugName, String gender, LocalDate dob, LocalDate today) {

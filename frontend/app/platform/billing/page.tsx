@@ -70,6 +70,7 @@ export default function BillingPage() {
   const [tab, setTab] = useState<"subscriptions" | "discounts">("subscriptions");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [plansUnavailable, setPlansUnavailable] = useState(false); // only surfaced to roles that can set plans
   const [forbidden, setForbidden] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<{ tenantId: string; tenantName: string; toStatus: string } | null>(null);
@@ -101,6 +102,7 @@ export default function BillingPage() {
     setLoading(true);
     setError(null);
     setLoadError(null);
+    setPlansUnavailable(false);
     try {
       const subsRes = await authedFetch("/platform/billing/subscriptions?limit=100");
       if (!subsRes) return;
@@ -127,7 +129,7 @@ export default function BillingPage() {
         // Pricing & Packaging access is a separate authority (pricing_packaging:view) from billing —
         // a role with billing access but not that one would otherwise see a silently empty Plan
         // dropdown with no clue why, same confusion an empty-but-successful load already causes.
-        setError("Couldn't load plans — check you have Pricing & Packaging access.");
+        setPlansUnavailable(true);
       }
     } catch {
       setLoadError("Couldn't reach the server. Check your connection and try again.");
@@ -268,6 +270,7 @@ export default function BillingPage() {
       {!forbidden && access.ready && access.readOnly && <ReadOnlyNote />}
 
       {error && <div className={styles.formError} role="alert">{error}</div>}
+      {plansUnavailable && access.canBill && <div className={styles.formError} role="alert">Couldn&apos;t load plans — check you have Pricing &amp; Packaging access.</div>}
 
       {loading ? (
         <div className={styles.card}><Skeleton rows={6} label="Loading billing" /></div>
@@ -414,7 +417,7 @@ export default function BillingPage() {
                         <td className={d.reviewedByName ? undefined : styles.muted}>{d.reviewedByName ?? "—"}</td>
                         {access.isSuper && (
                           <td>
-                            {d.status === "pending" && (
+                            {d.status === "pending" && d.requestedBy !== access.profile?.id && ( // the requester can't review their own request (DiscountService)
                               <>
                                 <button className={styles.actionBtn} disabled={busyId === d.id} onClick={() => reviewDiscount(d.id, "approve")}>Approve (super admin)</button>
                                 <button className={styles.rejectBtn} disabled={busyId === d.id} onClick={() => reviewDiscount(d.id, "reject")}>Reject</button>

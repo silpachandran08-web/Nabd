@@ -34,6 +34,7 @@ import static com.nabd.hms.billing.CheckoutModels.ChargeRow;
 import static com.nabd.hms.billing.CheckoutModels.InvoiceRow;
 import static com.nabd.hms.billing.CheckoutModels.LineItemInput;
 import static com.nabd.hms.billing.CheckoutModels.LineItemRow;
+import static com.nabd.hms.billing.CheckoutModels.PharmacyChargeRow;
 import static com.nabd.hms.billing.CheckoutModels.QueueEntryContext;
 
 /**
@@ -119,25 +120,26 @@ public class CheckoutService {
                     "This visit isn't at a billing stop yet — its status is " + ctx.queueStatus() + ".");
         }
 
+        List<LineItemRequest> lineItems = resolvePharmacyLines(tenantId, req.lineItems());
         Optional<InvoiceRow> existing = repo.findInvoiceByQueueEntry(tenantId, queueEntryId);
         UUID invoiceId;
         if (existing.isEmpty()) {
-            if (req.lineItems().isEmpty()) {
+            if (lineItems.isEmpty()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
                         "Add at least one charge before checking out.");
             }
-            Totals t = computeTotals(req.lineItems(), List.of(), req.discountOrZero());
+            Totals t = computeTotals(lineItems, List.of(), req.discountOrZero());
             invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
                     t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId);
-            repo.insertLineItems(tenantId, invoiceId, req.lineItems().stream().map(this::toLineItemInput).toList());
+            repo.insertLineItems(tenantId, invoiceId, lineItems.stream().map(this::toLineItemInput).toList());
             log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         } else {
             invoiceId = existing.get().id();
             List<LineItemRow> existingItems = repo.findLineItems(tenantId, invoiceId);
-            Totals t = computeTotals(req.lineItems(), existingItems, req.discountOrZero());
-            if (!req.lineItems().isEmpty()) {
-                repo.appendLineItems(tenantId, invoiceId, req.lineItems().stream().map(this::toLineItemInput).toList(),
+            Totals t = computeTotals(lineItems, existingItems, req.discountOrZero());
+            if (!lineItems.isEmpty()) {
+                repo.appendLineItems(tenantId, invoiceId, lineItems.stream().map(this::toLineItemInput).toList(),
                         repo.nextLineItemOrder(tenantId, invoiceId));
             }
             repo.updateInvoiceTotals(tenantId, invoiceId, t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total());
@@ -184,8 +186,9 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
                     "Add at least one charge before checking out.");
         }
-        Totals t = computeTotals(req);
-        List<LineItemInput> items = req.lineItems().stream().map(this::toLineItemInput).toList();
+        List<LineItemRequest> lineItems = resolvePharmacyLines(tenantId, req.lineItems());
+        Totals t = computeTotals(lineItems, List.of(), req.discountOrZero());
+        List<LineItemInput> items = lineItems.stream().map(this::toLineItemInput).toList();
 
         UUID invoiceId = repo.insertInvoice(tenantId, null, patientId, null, t.subtotal(), t.discount(), t.tax(),
                 t.roundOff(), t.total(), staffId);
@@ -196,10 +199,6 @@ public class CheckoutService {
     }
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total) {
-    }
-
-    private Totals computeTotals(CheckoutRequest req) {
-        return computeTotals(req.lineItems(), List.of(), req.discountOrZero());
     }
 
     /** NB-355: totals over new (not-yet-persisted) line items plus, when extending an
@@ -273,6 +272,31 @@ public class CheckoutService {
 
     private ChargeResponse toChargeResponse(ChargeRow c) {
         return new ChargeResponse(c.id(), c.code(), c.name(), c.category(), c.baseAmount(), c.followUpAmount(), c.taxRatePercent());
+    }
+
+    /**
+     * V3-004: a stocked pharmacy line is sold at the catalogue's price, name, category and tax, never the client's
+     * (the request fields stay for API compatibility and are ignored for these lines), and an inactive item is
+     * refused with a 409. Non-pharmacy lines keep the client's values: follow-up and doctor-override pricing
+     * legitimately differ from base_amount, and only pharmacy stock is physical.
+     */
+    private List<LineItemRequest> resolvePharmacyLines(UUID tenantId, List<LineItemRequest> lines) {
+        List<LineItemRequest> resolved = new java.util.ArrayList<>(lines.size());
+        for (LineItemRequest li : lines) {
+            var pharmacy = repo.findPharmacyCharge(tenantId, li.chargeCode());
+            if (pharmacy.isEmpty()) {
+                resolved.add(li);
+                continue;
+            }
+            PharmacyChargeRow item = pharmacy.get();
+            if (!item.active()) {
+                throw new ApiException(HttpStatus.CONFLICT, "item-inactive", "Item no longer sold",
+                        item.name() + " has been deactivated and can't be billed. Remove it from the bill.");
+            }
+            resolved.add(new LineItemRequest(li.chargeCode(), item.name(), item.category(), li.quantity(),
+                    item.baseAmount(), item.taxRatePercent()));
+        }
+        return resolved;
     }
 
     private LineItemInput toLineItemInput(LineItemRequest li) {

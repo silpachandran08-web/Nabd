@@ -9,7 +9,7 @@ class PlatformPermissionsTest {
 
     @Test
     void superAdminSeesEverySurface() {
-        assertThat(PlatformPermissions.forRole("super_admin")).hasSize(14);
+        assertThat(PlatformPermissions.forRole("super_admin").stream().filter(p -> p.endsWith(":view"))).hasSize(14);
     }
 
     @Test
@@ -52,7 +52,7 @@ class PlatformPermissionsTest {
     void billingSeesRevenueAndPricingOnly() {
         assertThat(PlatformPermissions.forRole("billing"))
                 .containsExactlyInAnyOrder("command_centre:view", "clinics_fleet:view",
-                        "billing_revenue:view", "pricing_packaging:view");
+                        "billing_revenue:view", "billing_revenue:edit", "pricing_packaging:view");
     }
 
     @Test
@@ -66,6 +66,25 @@ class PlatformPermissionsTest {
     void everyRoleSeesTheCommandCentre() {
         for (String role : new String[]{"super_admin", "implementation", "support_engineer", "billing", "sre", "commercial", "compliance_dpo"}) {
             assertThat(PlatformPermissions.forRole(role)).contains("command_centre:view");
+        }
+    }
+
+    // V2-005: only super_admin may approve above-cap discounts; edit (change subscriptions, request discounts) is super_admin + billing.
+    @Test
+    void billingWriteAuthoritiesAreFinerThanTheViewGrant() {
+        assertThat(PlatformPermissions.forRole("super_admin")).contains("billing_revenue:edit", "billing_revenue:approve");
+        assertThat(PlatformPermissions.forRole("billing")).contains("billing_revenue:edit").doesNotContain("billing_revenue:approve");
+        for (String role : new String[]{"commercial", "implementation", "support_engineer", "sre", "compliance_dpo"}) {
+            assertThat(PlatformPermissions.forRole(role)).doesNotContain("billing_revenue:edit", "billing_revenue:approve");
+        }
+    }
+
+    // V3-001: lifecycle transitions are finer than tenant_detail:view; only super_admin holds tenant_detail:edit.
+    @Test
+    void tenantLifecycleWriteIsSuperAdminOnly() {
+        assertThat(PlatformPermissions.forRole("super_admin")).contains("tenant_detail:edit");
+        for (String role : new String[]{"implementation", "support_engineer", "compliance_dpo", "billing", "sre", "commercial"}) {
+            assertThat(PlatformPermissions.forRole(role)).doesNotContain("tenant_detail:edit");
         }
     }
 }

@@ -13,7 +13,8 @@ final class PrescriptionModels {
     }
 
     record PrescriptionItemRow(UUID id, UUID prescriptionId, String drugName, String dosage, String frequency,
-                                String duration, String instructions, String allergyOverrideReason, int displayOrder) {
+                                String duration, String instructions, String allergyOverrideReason, int displayOrder,
+                                String overridesJson) {
     }
 
     /** For AuditService's actor_name/actor_role snapshot fields (NB-108). */

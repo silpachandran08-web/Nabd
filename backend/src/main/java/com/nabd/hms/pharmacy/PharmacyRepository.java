@@ -10,9 +10,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.pharmacy.PharmacyModels.ActorInfo;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingItemRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingQueueRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
+import static com.nabd.hms.pharmacy.PharmacyModels.StockMovementRow;
 
 /** Pharmacy items are charge_catalogue rows tagged with a non-null stock_qty — no parallel item
  * table, so a dispensed item is automatically a billable Fast Checkout charge (see
@@ -56,6 +58,52 @@ class PharmacyRepository {
                 itemMapper(), tenantId, id).stream().findFirst();
     }
 
+    /** V2-004: row lock held to the end of the transaction, so a manual adjustment and a checkout dispense
+     * on the same item run one after the other and each sees the other's result. */
+    Optional<PharmacyItemRow> lockItem(UUID tenantId, UUID id) {
+        return jdbc.query(
+                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active " +
+                        "FROM charge_catalogue WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL FOR UPDATE",
+                itemMapper(), tenantId, id).stream().findFirst();
+    }
+
+    void setStock(UUID tenantId, UUID id, int newQty) {
+        jdbc.update("UPDATE charge_catalogue SET stock_qty = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
+                newQty, tenantId, id);
+    }
+
+    void setActive(UUID tenantId, UUID id, boolean active) {
+        jdbc.update("UPDATE charge_catalogue SET active = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
+                active, tenantId, id);
+    }
+
+    /** Append-only (trigger-enforced in V51): one row per stock change. */
+    void insertMovement(UUID tenantId, UUID itemId, String kind, int delta, int qtyBefore, int qtyAfter, String reason,
+                        UUID actorId) {
+        jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, actor_id) " +
+                        "VALUES (?,?,?,?,?,?,?,?)",
+                tenantId, itemId, kind, delta, qtyBefore, qtyAfter, reason, actorId);
+    }
+
+    List<StockMovementRow> listMovements(UUID tenantId, UUID itemId) {
+        return jdbc.query(
+                "SELECT m.id, m.kind, m.delta, m.qty_before, m.qty_after, m.reason, m.actor_id, s.name AS actor_name, m.occurred_at " +
+                        "FROM pharmacy_stock_movements m LEFT JOIN staff s ON s.id = m.actor_id " +
+                        "WHERE m.tenant_id = ? AND m.item_id = ? ORDER BY m.seq DESC LIMIT 200",
+                (rs, i) -> new StockMovementRow(UUID.fromString(rs.getString("id")), rs.getString("kind"), rs.getInt("delta"),
+                        rs.getInt("qty_before"), rs.getInt("qty_after"), rs.getString("reason"),
+                        rs.getString("actor_id") == null ? null : UUID.fromString(rs.getString("actor_id")),
+                        rs.getString("actor_name"), rs.getTimestamp("occurred_at").toInstant()),
+                tenantId, itemId);
+    }
+
+    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
+    }
+
     UUID insertItem(UUID tenantId, String code, PharmacyItemWriteRequest req) {
         UUID id = UUID.randomUUID();
         jdbc.update(
@@ -66,12 +114,14 @@ class PharmacyRepository {
         return id;
     }
 
+    /** Name, price, tax, Rx flag and HSN only. Stock is never written here (V2-004): it changes through
+     * stock adjustments (delta or stock-take) and checkout dispenses, each of which leaves a movement row. */
     int updateItem(UUID tenantId, UUID id, PharmacyItemWriteRequest req) {
         return jdbc.update(
                 "UPDATE charge_catalogue SET name = ?, base_amount = ?, tax_rate_percent = ?, is_rx = ?, " +
-                        "hsn_code = ?, stock_qty = ?, updated_at = now() " +
+                        "hsn_code = ?, updated_at = now() " +
                         "WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
-                req.name(), req.price(), req.taxRatePercentOrZero(), req.isRx(), req.hsnCode(), req.stockQtyOrZero(),
+                req.name(), req.price(), req.taxRatePercentOrZero(), req.isRx(), req.hsnCode(),
                 tenantId, id);
     }
 
