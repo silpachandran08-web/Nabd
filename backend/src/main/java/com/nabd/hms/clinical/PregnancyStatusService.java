@@ -71,6 +71,11 @@ public class PregnancyStatusService {
         // Same advisory lock as prescription save/sign: a status change cannot slip between a sign-time warning check and the sign.
         allergyRepo.lockRegister(tenantId, patientId);
         StatusRow before = repo.find(tenantId, patientId).orElse(null);
+        if (before != null && before.status().equals(req.status())
+                && java.util.Objects.equals(before.expectedDeliveryDate(), req.expectedDeliveryDate())) {
+            // Nothing changed: no history event, no audit row, and recorded_by / recorded_at keep the original attestation.
+            return current(tenantId, patientId);
+        }
         repo.upsert(tenantId, patientId, req.status(), req.expectedDeliveryDate(), callerStaffId);
         Map<String, Object> after = snapshot(req.status(), req.expectedDeliveryDate() == null ? null : req.expectedDeliveryDate().toString());
         Map<String, Object> beforeSnap = before == null ? null

@@ -98,6 +98,9 @@ public class ClinicalDocumentService {
         if ("issued".equals(row.status())) {
             throw issued();
         }
+        if (req.body() == null) {
+            return toResponse(row); // no body supplied: leave the draft unchanged rather than wiping it
+        }
         Map<String, String> body = ClinicalDocumentRules.sanitise(row.type(), req.body());
         if (repo.updateDraftBody(tenantId, id, toJson(body)) == 0) {
             throw issued();
