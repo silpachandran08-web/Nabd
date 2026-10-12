@@ -893,7 +893,7 @@ export default function ConsultPage() {
           </div>
         )}
 
-        <SafetyStrip patient={pat} ctx={ctx} onRetry={reloadCtx} onManageAllergies={can("clinical:view") ? () => setShowAllergies(true) : undefined} />
+        <SafetyStrip patient={pat} ctx={ctx} onRetry={reloadCtx} onManageAllergies={can("clinical:view") ? () => setShowAllergies(true) : undefined} canEditPregnancy={can("clinical:edit")} authedFetch={authedFetch} />
 
         <div className={styles.workspace}>
           <aside className={styles.today} aria-label="Today's patients">

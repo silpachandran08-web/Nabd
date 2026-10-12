@@ -75,3 +75,9 @@
 .radioRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
 .allergyItem { border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); display: flex; flex-direction: column; gap: var(--nb-space-8); }
 .history { max-block-size: 240px; overflow-y: auto; }
+
+/* Pregnancy / lactation status (DOC-021) */
+.pregForm { display: flex; flex-direction: column; gap: var(--nb-space-8); margin-block-start: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); min-inline-size: 0; }
+.pregOption { display: flex; align-items: center; gap: var(--nb-space-8); font-size: 13px; min-block-size: 32px; }
+.pregDate { background: var(--nb-surface-2); color: var(--nb-text-primary); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-sm); padding: var(--nb-space-4) var(--nb-space-8); font: inherit; }
+.pregActions { display: flex; gap: var(--nb-space-16); }
