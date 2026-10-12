@@ -237,6 +237,13 @@
     padding-block-end: 0 !important;
   }
 
+  /* The app is dark; the paper must not inherit it when "background graphics" is on. */
+  :global(html):has(.sheet),
+  :global(body):has(.sheet) {
+    background: Canvas !important;
+    color: CanvasText !important;
+  }
+
   .page {
     padding: 0;
     max-inline-size: none;
