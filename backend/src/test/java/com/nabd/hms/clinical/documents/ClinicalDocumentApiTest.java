@@ -170,7 +170,7 @@ class ClinicalDocumentApiTest extends ApiTestBase {
         for (Map<String, Object> empty : List.<Map<String, Object>>of(Map.of(), java.util.Collections.singletonMap("body", null))) {
             ResponseEntity<Map> resp = exchange("/v1/clinical/documents/" + id, HttpMethod.PATCH, authedJsonBody(v.token(), empty), Map.class);
             assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-            assertThat((Map<?, ?>) resp.getBody().get("body")).containsEntry("referredTo", "ENT").containsEntry("reason", "Keep me");
+            assertThat((Map<String, Object>) resp.getBody().get("body")).containsEntry("referredTo", "ENT").containsEntry("reason", "Keep me");
         }
         // an explicit empty object is still a deliberate replace
         ResponseEntity<Map> cleared = exchange("/v1/clinical/documents/" + id, HttpMethod.PATCH,
