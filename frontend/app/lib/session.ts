@@ -4,6 +4,7 @@
 // tenantName/tenantRegion/staffName/roleName are display-only (AuthService.mintTokenPair) — for
 // ClinicNav's clinic-info card and signed-in-as footer, never for authorization.
 type AccessTokenClaims = {
+  sub?: string;
   permissions?: string[];
   tenantName?: string;
   tenantRegion?: string;
