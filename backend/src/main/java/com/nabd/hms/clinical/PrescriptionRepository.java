@@ -31,13 +31,16 @@ class PrescriptionRepository {
                 tenantId, queueEntryId).stream().findFirst();
     }
 
-    record PatientProfile(String gender, java.time.LocalDate dob) {
+    /** pregnancyStatus: the recorded DOC-021 status (pregnant | lactating | not_pregnant | unknown) or null when nobody has documented it. */
+    record PatientProfile(String gender, java.time.LocalDate dob, String pregnancyStatus) {
     }
 
     /** NB-113: pregnancy/lactation warning needs sex + age; NB-111/NB-112 reuse dob for age too. */
     Optional<PatientProfile> findPatientProfile(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT gender, dob FROM patients WHERE tenant_id = ? AND id = ?",
-                (rs, i) -> new PatientProfile(rs.getString("gender"), rs.getDate("dob").toLocalDate()),
+        return jdbc.query("SELECT p.gender, p.dob, ps.status AS pregnancy_status FROM patients p " +
+                        "LEFT JOIN patient_pregnancy_status ps ON ps.tenant_id = p.tenant_id AND ps.patient_id = p.id " +
+                        "WHERE p.tenant_id = ? AND p.id = ?",
+                (rs, i) -> new PatientProfile(rs.getString("gender"), rs.getDate("dob").toLocalDate(), rs.getString("pregnancy_status")),
                 tenantId, patientId).stream().findFirst();
     }
 

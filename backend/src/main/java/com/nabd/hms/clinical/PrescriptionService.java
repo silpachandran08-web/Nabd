@@ -344,7 +344,13 @@ public class PrescriptionService {
         findMatch(allergies, drugName).ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
                 a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
         String preg = profile == null ? null : RxSafetyChecks.pregnancyWarning(drugName, profile.gender(), profile.dob(), today);
-        if (preg != null) {
+        // DOC-021: a recorded pregnant/lactating status escalates (severity, wording and a fresh decision: `matched`
+        // differs from the generic one, so an earlier generic override does not carry over). Never weakens: any other
+        // status falls through to the unchanged rule above.
+        String recorded = profile == null ? null : RxSafetyChecks.recordedStatusWarning(drugName, profile.pregnancyStatus());
+        if (recorded != null) {
+            found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "severe", recorded, profile.pregnancyStatus(), true));
+        } else if (preg != null) {
             found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "caution", preg, "pregnancy/lactation", true));
         }
         String controlled = RxSafetyChecks.controlledSubstanceWarning(drugName, region);

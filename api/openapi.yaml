@@ -1127,6 +1127,54 @@ paths:
       x-required-permission: clinical:edit
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AllergyStatus" } } } }
+  /clinical/patients/{patientId}/pregnancy-status:
+    parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: "Pregnancy / lactation status. not_documented (nobody has recorded it) is NEVER the same as not_pregnant"
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PregnancyStatus" } } } }
+        "404": { description: Patient not found }
+    put:
+      tags: [Clinical]
+      summary: Record an explicit status (who and when are stamped by the server; appended to the history and audited). Never set automatically. A recorded pregnant or lactating status escalates the prescription pregnancy warning (severity severe, a fresh decision is required); other statuses leave the existing rule unchanged.
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [not_pregnant, pregnant, lactating, unknown] }
+                expectedDeliveryDate: { type: [string, "null"], format: date, description: "Only with status pregnant" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PregnancyStatus" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /clinical/patients/{patientId}/pregnancy-status/history:
+    get:
+      tags: [Clinical]
+      summary: Append-only history of recorded pregnancy / lactation statuses, newest first
+      x-required-permission: clinical:view
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    before: { type: [object, "null"], description: "{status, expectedDeliveryDate}; null for the first statement" }
+                    after: { type: object }
+                    actorId: { type: string, format: uuid }
+                    actorName: { type: [string, "null"] }
+                    occurredAt: { type: string, format: date-time }
   /clinical/prescriptions/{queueEntryId}:
     parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1412,6 +1460,14 @@ components:
         documentedBy: { type: [string, "null"], format: uuid }
         documentedByName: { type: [string, "null"] }
         documentedAt: { type: [string, "null"], format: date-time }
+    PregnancyStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [not_documented, not_pregnant, pregnant, lactating, unknown] }
+        expectedDeliveryDate: { type: [string, "null"], format: date }
+        recordedBy: { type: [string, "null"], format: uuid }
+        recordedByName: { type: [string, "null"] }
+        recordedAt: { type: [string, "null"], format: date-time }
     RxWarningDecision:
       type: object
       required: [kind, reasonCode]
