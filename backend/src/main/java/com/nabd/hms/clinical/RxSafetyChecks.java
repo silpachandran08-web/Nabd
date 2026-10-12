@@ -74,6 +74,22 @@ final class RxSafetyChecks {
                 : null;
     }
 
+    /** DOC-021: escalation when a clinician has RECORDED the patient as pregnant or lactating. It applies to any
+     * patient the status is recorded for (no sex/age gate) and only ever adds to {@link #pregnancyWarning}; any
+     * other status (not_pregnant, unknown, not documented) returns null so the caller behaves exactly as before. */
+    static String recordedStatusWarning(String drugName, String pregnancyStatus) {
+        if (!matches(drugName, PREGNANCY_RISK_DRUGS)) {
+            return null;
+        }
+        if ("pregnant".equals(pregnancyStatus)) {
+            return "Warning: patient is recorded as PREGNANT; this drug is on the pregnancy-risk list";
+        }
+        if ("lactating".equals(pregnancyStatus)) {
+            return "Warning: patient is recorded as LACTATING; this drug is on the pregnancy/lactation-risk list";
+        }
+        return null;
+    }
+
     /** NB-111: correct rule set by tenant region — India Schedule H1 vs KSA SFDA controlled list. */
     static String controlledSubstanceWarning(String drugName, String region) {
         List<String> list = "KSA".equals(region) ? KSA_CONTROLLED_DRUGS : INDIA_SCHEDULE_H1_DRUGS;

@@ -10,6 +10,8 @@ public record StaffPatchRequest(
         UUID roleId,
         @Pattern(regexp = "own_patients_only|all_clinic_patients") String scope,
         List<String> fieldGrants,
-        UUID departmentId
+        UUID departmentId,
+        /** DOC-N1: null = leave unchanged; an empty string clears it; otherwise 1-40 of letters, digits, space . / - */
+        @Pattern(regexp = "|[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}") String professionalRegistrationNo
 ) {
 }

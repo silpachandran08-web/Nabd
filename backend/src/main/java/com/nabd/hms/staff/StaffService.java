@@ -1,6 +1,7 @@
 package com.nabd.hms.staff;
 
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.Cursor;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.StepUpVerifier;
@@ -25,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.nabd.hms.staff.StaffRoleModels.StaffRow;
@@ -40,14 +43,16 @@ public class StaffService {
     private final TenantContext tenantContext;
     private final PasswordEncoder pinEncoder;
     private final StepUpVerifier stepUpVerifier;
+    private final AuditService auditService;
 
     StaffService(StaffRepository staffRepo, RoleRepository roleRepo, TenantContext tenantContext,
-                 PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier) {
+                 PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService) {
         this.staffRepo = staffRepo;
         this.roleRepo = roleRepo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.stepUpVerifier = stepUpVerifier;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -103,7 +108,7 @@ public class StaffService {
     }
 
     @Transactional
-    public StaffResponse patch(UUID tenantId, UUID callerStaffId, UUID id, StaffPatchRequest req) {
+    public StaffResponse patch(UUID tenantId, UUID callerStaffId, UUID id, StaffPatchRequest req, String ipAddress) {
         tenantContext.set(tenantId);
         StaffRow current = staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
 
@@ -118,6 +123,25 @@ public class StaffService {
 
         staffRepo.update(tenantId, id, roleId, scope, fieldGrants, departmentId);
         log.info("staff {} updated by {} (role {}, scope {})", id, callerStaffId, roleId, scope);
+
+        // DOC-N1: the registration number is printed on prescriptions, so a change is audited. The audit row records
+        // that it was set / changed / cleared, not the number itself, and the number is never written to the log.
+        if (req.professionalRegistrationNo() != null) {
+            String next = req.professionalRegistrationNo().trim();
+            String normalised = next.isEmpty() ? null : next;
+            String previous = current.professionalRegistrationNo();
+            if (!java.util.Objects.equals(previous, normalised)) {
+                staffRepo.updateProfessionalRegistrationNo(tenantId, id, normalised);
+                String change = previous == null ? "set" : normalised == null ? "cleared" : "changed";
+                StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
+                String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("field", "professionalRegistrationNo");
+                detail.put("change", change);
+                auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,
+                        ipAddress, "staff.registration_no_" + change, "staff", id, null, detail);
+            }
+        }
         return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
     }
 
@@ -151,7 +175,8 @@ public class StaffService {
 
     private StaffResponse toResponse(StaffRow row) {
         return new StaffResponse(row.id(), row.email(), row.name(), row.mobilePhone(), row.roleId(), row.status(),
-                row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants(), row.departmentId(), row.lastSeenAt());
+                row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants(), row.departmentId(), row.lastSeenAt(),
+                row.professionalRegistrationNo());
     }
 
     private ApiException staffConflict(DataIntegrityViolationException e) {

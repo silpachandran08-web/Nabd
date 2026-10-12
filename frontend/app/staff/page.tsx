@@ -7,6 +7,7 @@ import Icon from "../components/ui/Icon";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
 import PermissionMatrix from "../components/staff/PermissionMatrix";
+import RegistrationNoDialog from "../components/staff/RegistrationNoDialog";
 import styles from "./staff.module.css";
 
 // Matches GET /v1/staff (StaffController) and GET /v1/roles (RoleController).
@@ -19,6 +20,7 @@ type Staff = {
   status: "invited" | "active" | "suspended";
   scope: string;
   lastSeenAt: string | null;
+  professionalRegistrationNo?: string | null;
 };
 type StaffPage = { data: Staff[]; page: { nextCursor: string | null; limit: number } };
 type ModuleGrant = {
@@ -152,6 +154,7 @@ export default function StaffAccessPage() {
   const [stepUpBusy, setStepUpBusy] = useState(false);
   const [stepUpError, setStepUpError] = useState<string | null>(null);
   const [suspending, setSuspending] = useState<string | null>(null);
+  const [regEdit, setRegEdit] = useState<Staff | null>(null);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -416,6 +419,24 @@ export default function StaffAccessPage() {
     }
   }
 
+  async function saveRegistrationNo(target: Staff, value: string): Promise<string | null> {
+    try {
+      // "" clears it (null/absent would leave it unchanged).
+      const res = await authedFetch(`/staff/${target.id}`, { method: "PATCH", body: JSON.stringify({ professionalRegistrationNo: value }) });
+      if (!res) return null;
+      if (!res.ok) {
+        const body: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
+        return body.detail || "Couldn't save the registration number.";
+      }
+      const saved: Staff = await res.json();
+      setStaff((prev) => prev.map((x) => (x.id === saved.id ? { ...x, professionalRegistrationNo: saved.professionalRegistrationNo ?? null } : x)));
+      setRegEdit(null);
+      return null;
+    } catch {
+      return "Couldn't reach the server. The registration number was not saved.";
+    }
+  }
+
   const selectedRole = roles.find((r) => r.id === selectedRoleId) ?? roles[0] ?? null;
 
   const canInvite = permissions.includes("staff:create");
@@ -487,6 +508,11 @@ export default function StaffAccessPage() {
                     <td className={styles.muted}>{s.scope === "all_clinic_patients" ? "None" : (SCOPE_LABELS[s.scope] ?? s.scope)}</td>
                     <td className={styles.muted} title={s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : undefined}>{s.lastSeenAt ? relativeTime(s.lastSeenAt) : "—"}</td>
                     <td>
+                      {canEditRoles && (
+                        <button className={styles.actionBtn} onClick={() => setRegEdit(s)}>
+                          {s.professionalRegistrationNo ? "Reg. no." : "Add reg. no."}
+                        </button>
+                      )}
                       {canSuspend && s.status === "active" && (
                         <button className={styles.actionBtn} disabled={suspending === s.id} onClick={() => suspend(s.id)}>
                           {suspending === s.id ? "…" : "Suspend"}
@@ -570,6 +596,11 @@ export default function StaffAccessPage() {
             </>
           )}
         </>
+      )}
+
+      {regEdit && canEditRoles && (
+        <RegistrationNoDialog staffName={regEdit.name} current={regEdit.professionalRegistrationNo ?? null}
+          onSave={(v) => saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)} />
       )}
 
       {inviteOpen && canInvite && (

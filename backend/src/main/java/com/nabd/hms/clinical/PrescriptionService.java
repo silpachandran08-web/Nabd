@@ -2,6 +2,7 @@ package com.nabd.hms.clinical;
 
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
+import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetItemResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
@@ -62,7 +63,7 @@ public class PrescriptionService {
 
     /** Role-matrix permission (module `clinical`, action `approve`) that lets someone other than the visit's doctor
      * record a warning decision or sign a prescription. */
-    static final String PERMISSION_CLINICAL_APPROVE = "clinical:approve";
+    public static final String PERMISSION_CLINICAL_APPROVE = "clinical:approve";
 
     private static final String DOSE_RULE_SOURCE = "Weight-based mg/kg calculation v1 (clinician-supplied rate; no coded per-drug formulary)";
 
@@ -139,7 +140,7 @@ public class PrescriptionService {
         List<StoredDecision> kept = new ArrayList<>();
         for (PrescriptionItemRequest item : items) {
             List<StoredDecision> decisions = new ArrayList<>();
-            for (Detected d : detect(item.drugName(), allergies, profile, region, today)) {
+            for (Detected d : detectLine(item.drugName(), item.brandName(), allergies, profile, region, today)) {
                 if (!d.requiresDecision()) {
                     continue;
                 }
@@ -169,7 +170,9 @@ public class PrescriptionService {
             }
             kept.addAll(decisions);
             rows.add(new PrescriptionItemRow(null, prescriptionId, item.drugName(), item.dosage(), item.frequency(),
-                    item.duration(), item.instructions(), allergyLabel(decisions), 0, toJson(decisions)));
+                    item.duration(), item.instructions(), allergyLabel(decisions), 0, toJson(decisions),
+                    blankToNull(item.brandName()), blankToNull(item.sigPattern()), blankToNull(item.route()),
+                    item.quantity(), blankToNull(item.quantityUnit())));
         }
         // A decision that no longer applies (drug changed or removed, warning gone) is withdrawn on the record, not dropped silently.
         for (PrescriptionItemRow old : existing) {
@@ -264,6 +267,11 @@ public class PrescriptionService {
             m.put("dosage", i.dosage());
             m.put("frequency", i.frequency());
             m.put("duration", i.duration());
+            m.put("brandName", i.brandName());
+            m.put("route", i.route());
+            m.put("sigPattern", i.sigPattern());
+            m.put("quantity", i.quantity() == null ? null : i.quantity().toPlainString());
+            m.put("quantityUnit", i.quantityUnit());
             m.put("decisions", i.warnings().stream().filter(w -> w.decision() != null)
                     .map(w -> Map.of("kind", w.kind(), "reasonCode", w.decision().reasonCode(), "by", String.valueOf(w.decision().by()))).toList());
             return m;
@@ -277,7 +285,12 @@ public class PrescriptionService {
     /** V1-007: the visit's own doctor, or someone holding the explicit clinical:approve grant. Draft editing stays
      * open to clinical:edit (a nurse may prepare a line); recording a warning decision and signing do not. */
     private static boolean mayDecide(QueueEntryOwner owner, UUID callerStaffId, boolean callerCanApprove) {
-        return callerCanApprove || (owner.doctorId() != null && owner.doctorId().equals(callerStaffId));
+        return mayActAsVisitDoctor(owner.doctorId(), callerStaffId, callerCanApprove);
+    }
+
+    /** The same rule for other legal-weight outputs of a visit (clinical documents): the visit's doctor or clinical:approve. */
+    public static boolean mayActAsVisitDoctor(UUID visitDoctorId, UUID callerStaffId, boolean callerCanApprove) {
+        return callerCanApprove || (visitDoctorId != null && visitDoctorId.equals(callerStaffId));
     }
 
     private ApiException notPrescriber(String what) {
@@ -299,7 +312,7 @@ public class PrescriptionService {
                     String allergyWarning = null;
                     String pregnancyWarning = null;
                     String controlledWarning = null;
-                    for (Detected d : detect(i.drugName(), allergies, profile, region, today)) {
+                    for (Detected d : detectLine(i.drugName(), i.brandName(), allergies, profile, region, today)) {
                         StoredDecision held = !d.requiresDecision() ? null : stored.stream()
                                 .filter(s -> s.kind().equals(d.kind()) && sameMatch(s.matched(), d.matched())
                                         && RxSafetyChecks.reasonLabel(d.kind(), s.reasonCode()) != null)
@@ -318,7 +331,8 @@ public class PrescriptionService {
                     }
                     return new PrescriptionItemResponse(i.id(), i.drugName(), i.dosage(), i.frequency(), i.duration(),
                             i.instructions(), i.allergyOverrideReason(), i.displayOrder(), allergyWarning,
-                            pregnancyWarning, controlledWarning, warnings);
+                            pregnancyWarning, controlledWarning, warnings, i.brandName(), i.sigPattern(), i.route(),
+                            i.quantity(), i.quantityUnit());
                 })
                 .toList();
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
@@ -344,7 +358,13 @@ public class PrescriptionService {
         findMatch(allergies, drugName).ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
                 a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
         String preg = profile == null ? null : RxSafetyChecks.pregnancyWarning(drugName, profile.gender(), profile.dob(), today);
-        if (preg != null) {
+        // DOC-021: a recorded pregnant/lactating status escalates (severity, wording and a fresh decision: `matched`
+        // differs from the generic one, so an earlier generic override does not carry over). Never weakens: any other
+        // status falls through to the unchanged rule above.
+        String recorded = profile == null ? null : RxSafetyChecks.recordedStatusWarning(drugName, profile.pregnancyStatus());
+        if (recorded != null) {
+            found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "severe", recorded, profile.pregnancyStatus(), true));
+        } else if (preg != null) {
             found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "caution", preg, "pregnancy/lactation", true));
         }
         String controlled = RxSafetyChecks.controlledSubstanceWarning(drugName, region);
@@ -352,6 +372,44 @@ public class PrescriptionService {
             found.add(new Detected(RxSafetyChecks.KIND_CONTROLLED, "caution", controlled, "controlled substance", true));
         }
         return found;
+    }
+
+    /** DOC-033: the safety checks run on the generic text AND the brand text. A brand can never hide a conflict the
+     * generic would show, nor the other way round. A finding already raised by the generic is not duplicated. */
+    private List<Detected> detectLine(String drugName, String brandName, List<AllergyRow> allergies,
+                                      PrescriptionRepository.PatientProfile profile, String region, LocalDate today) {
+        List<Detected> found = new ArrayList<>(detect(drugName, allergies, profile, region, today));
+        if (brandName != null && !brandName.isBlank() && !brandName.trim().equalsIgnoreCase(drugName.trim())) {
+            for (Detected d : detect(brandName, allergies, profile, region, today)) {
+                boolean dup = found.stream().anyMatch(f -> f.kind().equals(d.kind()) && sameMatch(f.matched(), d.matched()));
+                if (!dup) {
+                    found.add(d);
+                }
+            }
+        }
+        return found;
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /** DOC-033: type-ahead over the tenant's own pharmacy item master and prescribing history. Not a formulary. */
+    @Transactional
+    public List<DrugSuggestionResponse> searchDrugs(UUID tenantId, String q, int limit) {
+        tenantContext.set(tenantId);
+        String term = q == null ? "" : q.trim().toLowerCase(java.util.Locale.ROOT);
+        if (term.length() < 2) {
+            return List.of();
+        }
+        if (term.length() > 60) {
+            term = term.substring(0, 60);
+        }
+        String escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        int capped = Math.max(1, Math.min(limit, 20));
+        return repo.searchDrugs(tenantId, "%" + escaped + "%", escaped + "%", capped).stream()
+                .map(r -> new DrugSuggestionResponse(r.name().trim(), r.source(), r.code(), r.inStock(), r.prescriptionOnly()))
+                .toList();
     }
 
     /** The most severe matching allergy wins (severe, then moderate, then mild). */

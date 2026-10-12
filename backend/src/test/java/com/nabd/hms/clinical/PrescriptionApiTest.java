@@ -438,4 +438,191 @@ class PrescriptionApiTest extends ApiTestBase {
                         "WHERE i.tenant_id = ? AND p.status = 'signed'", Integer.class, tenant.id()));
         assertThat(signedItems).isEqualTo(1);
     }
+
+    // DOC-021 x Rx safety (NOT EXECUTED in the authoring environment: no Docker/Testcontainers).
+    // Covers PrescriptionRepository.findPatientProfile (LEFT JOIN patient_pregnancy_status), the severe escalation,
+    // the fresh decision it demands and the sign gate.
+    @Test
+    void aRecordedPregnantStatusEscalatesTheRxWarningRequiresAFreshDecisionAndNeverWeakensTheBaseline() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc21a@a.com", "+919800021001", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "P21a", "phone", "+919999921001", "dob", "1995-01-01", "gender", "female")), Map.class).getBody().get("id");
+        String entry = checkIn(token, patientId, doc.id());
+        String path = "/v1/clinical/prescriptions/" + entry;
+        Map<String, Object> line = Map.of("drugName", "Warfarin", "dosage", "5mg");
+
+        // No status row (LEFT JOIN yields NULL): the unchanged baseline caution for a woman of childbearing age.
+        ResponseEntity<Map> baseline = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("items", List.of(line))), Map.class);
+        assertThat(baseline.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> baseWarning = pregnancyWarning(baseline);
+        assertThat(baseWarning.get("severity")).isEqualTo("caution");
+        assertThat(baseWarning.get("matched")).isEqualTo("pregnancy/lactation");
+
+        // Decide the baseline warning, then record the patient as pregnant.
+        exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("items", List.of(Map.of("drugName", "Warfarin", "dosage", "5mg",
+                "overrides", List.of(Map.of("kind", "pregnancy", "reasonCode", "obstetric_consultation")))))), Map.class);
+        exchange("/v1/clinical/patients/" + patientId + "/pregnancy-status", HttpMethod.PUT,
+                authedJsonBody(token, Map.of("status", "pregnant")), Map.class);
+
+        // The recorded status escalates to severe, matched differs, so the earlier generic decision does not carry over.
+        ResponseEntity<Map> escalated = exchange(path, HttpMethod.GET, authed(token), Map.class);
+        Map<?, ?> severe = pregnancyWarning(escalated);
+        assertThat(severe.get("severity")).isEqualTo("severe");
+        assertThat(severe.get("matched")).isEqualTo("pregnant");
+        assertThat(severe.get("requiresDecision")).isEqualTo(true);
+        assertThat(severe.get("resolved")).isEqualTo(false);
+        assertThat(escalated.getBody().get("unresolvedWarnings")).isEqualTo(1);
+
+        // Sign gate: refused while the escalated warning is undecided, allowed once a named reason is recorded.
+        ResponseEntity<Map> refused = exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(refused.getBody().get("type")).asString().contains("warning-unresolved");
+        ResponseEntity<Map> decided = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("items", List.of(Map.of(
+                "drugName", "Warfarin", "dosage", "5mg",
+                "overrides", List.of(Map.of("kind", "pregnancy", "reasonCode", "obstetric_consultation")))))), Map.class);
+        assertThat(decided.getBody().get("unresolvedWarnings")).isEqualTo(0);
+
+        // Lactating also escalates (same severity, its own matched value).
+        exchange("/v1/clinical/patients/" + patientId + "/pregnancy-status", HttpMethod.PUT,
+                authedJsonBody(token, Map.of("status", "lactating")), Map.class);
+        Map<?, ?> lactating = pregnancyWarning(exchange(path, HttpMethod.GET, authed(token), Map.class));
+        assertThat(lactating.get("severity")).isEqualTo("severe");
+        assertThat(lactating.get("matched")).isEqualTo("lactating");
+
+        // not_pregnant (and unknown) never remove the baseline: still at least a caution that needs a decision.
+        for (String status : new String[]{"not_pregnant", "unknown"}) {
+            exchange("/v1/clinical/patients/" + patientId + "/pregnancy-status", HttpMethod.PUT,
+                    authedJsonBody(token, Map.of("status", status)), Map.class);
+            Map<?, ?> after = pregnancyWarning(exchange(path, HttpMethod.GET, authed(token), Map.class));
+            assertThat(after.get("severity")).as(status).isEqualTo("caution");
+            assertThat(after.get("matched")).as(status).isEqualTo("pregnancy/lactation");
+            assertThat(after.get("requiresDecision")).as(status).isEqualTo(true);
+        }
+    }
+
+    @Test
+    void aRecordedPregnantStatusEscalatesForAPatientWhoseBaselineRuleDoesNotApply() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc21b@a.com", "+919800021002", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P21b", "+919999921002"); // male: no baseline warning
+        String entry = checkIn(token, patientId, doc.id());
+        String path = "/v1/clinical/prescriptions/" + entry;
+        ResponseEntity<Map> none = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Warfarin", "dosage", "5mg")))), Map.class);
+        assertThat(none.getBody().get("unresolvedWarnings")).isEqualTo(0);
+
+        exchange("/v1/clinical/patients/" + patientId + "/pregnancy-status", HttpMethod.PUT,
+                authedJsonBody(token, Map.of("status", "pregnant")), Map.class);
+
+        Map<?, ?> severe = pregnancyWarning(exchange(path, HttpMethod.GET, authed(token), Map.class));
+        assertThat(severe.get("severity")).isEqualTo("severe");
+        assertThat(exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    /** The single kind=pregnancy entry of the first item's structured warnings. */
+    private static Map<?, ?> pregnancyWarning(ResponseEntity<Map> prescription) {
+        List<?> items = (List<?>) prescription.getBody().get("items");
+        List<?> warnings = (List<?>) ((Map<?, ?>) items.get(0)).get("warnings");
+        List<? extends Map<?, ?>> pregnancy = warnings.stream().map(w -> (Map<?, ?>) w)
+                .filter(w -> "pregnancy".equals(w.get("kind"))).toList();
+        assertThat(pregnancy).hasSize(1);
+        return pregnancy.get(0);
+    }
+
+    // DOC-033 (NOT EXECUTED in the authoring environment: no Docker/Testcontainers).
+    @Test
+    void structuredFieldsRoundTripAndABrandCannotHideAnAllergyConflict() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc33@a.com", "+919800033001", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P33", "+919999933001");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        String entry = checkIn(token, patientId, doc.id());
+
+        // generic is innocuous, the brand text carries the allergen: the line must still need a decision
+        ResponseEntity<Map> saved = exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "brandName", "Penicillin-X", "sigPattern", "1-0-1",
+                        "route", "oral", "quantity", 10, "quantityUnit", "tablets")))), Map.class);
+        assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(saved.getBody().get("unresolvedWarnings")).isEqualTo(1);
+        Map<?, ?> line = (Map<?, ?>) ((List<?>) saved.getBody().get("items")).get(0);
+        assertThat(line.get("brandName")).isEqualTo("Penicillin-X");
+        assertThat(line.get("sigPattern")).isEqualTo("1-0-1");
+        assertThat(line.get("route")).isEqualTo("oral");
+        assertThat(line.get("quantityUnit")).isEqualTo("tablets");
+        ResponseEntity<Map> refused = exchange("/v1/clinical/prescriptions/" + entry + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        // an old client that omits the new fields still works
+        ResponseEntity<Map> legacy = exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+        assertThat(legacy.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(legacy.getBody().get("unresolvedWarnings")).isEqualTo(0);
+    }
+
+    @Test
+    void drugSearchIsTenantScopedTrimmedAndMatchesPharmacyItemsAndHistory() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc33b@a.com", "+919800033002", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Amoxicillin 500mg capsule", "isRx", true, "price", 12.50, "stockQty", 5)), Map.class);
+        String entry = checkIn(token, registerPatient(token, "P33b", "+919999933002"), doc.id());
+        exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Amlodipine")))), Map.class);
+
+        ResponseEntity<List> hits = exchange("/v1/clinical/drugs/search?q=am&limit=5", HttpMethod.GET, authed(token), List.class);
+        assertThat(hits.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(hits.getBody().toString()).contains("Amoxicillin 500mg capsule").contains("Amlodipine");
+        assertThat(exchange("/v1/clinical/drugs/search?q=a", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        assertThat(exchange("/v1/clinical/drugs/search?q=%25", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        // Surrounding whitespace is trimmed (this reaches the SQL path: "am" after trimming has two characters).
+        assertThat(exchange("/v1/clinical/drugs/search?q=%20am%20", HttpMethod.GET, authed(token), List.class).getBody().toString())
+                .contains("Amoxicillin 500mg capsule");
+        // 2+ characters containing LIKE wildcards must be matched literally (ESCAPE path), never as "match everything".
+        // a%  a_  (and a backslash) all start with a seeded-name prefix letter, so a wildcard bug would return both drugs.
+        for (String wildcard : new String[]{"a%25", "a_", "%25%25", "_m", "a%5C"}) {
+            assertThat(exchange("/v1/clinical/drugs/search?q=" + wildcard, HttpMethod.GET, authed(token), List.class).getBody())
+                    .as("q=" + wildcard).isEmpty();
+        }
+
+        SeededTenant other = seedTenant();
+        UUID otherRole = seedFullAccessRole(other.id());
+        String otherToken = loginAndGetAccessToken(seedStaff(other, otherRole, "doc33c@b.com", "+919800033003", false));
+        assertThat(exchange("/v1/clinical/drugs/search?q=am", HttpMethod.GET, authed(otherToken), List.class).getBody()).isEmpty();
+    }
+
+    // DOC-N1 (written, not executed here: needs Docker/Testcontainers).
+    @Test
+    void printHeaderIsRefusedForADraftAndCarriesPrescriberAndRegistrationNoOnceSigned() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-print@a.com", "+919800020091", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/staff/" + doc.id(), HttpMethod.PATCH, authedJsonBody(token, Map.of("professionalRegistrationNo", "KMC 78412")), Map.class);
+        String patientId = registerPatient(token, "P-print", "+919999960091");
+        String queueEntryId = checkIn(token, patientId, doc.id());
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg", "frequency", "BD", "duration", "3 days")))), Map.class);
+        String path = "/v1/clinical/prescriptions/" + queueEntryId + "/print-header";
+
+        ResponseEntity<Map> draft = exchange(path, HttpMethod.GET, authed(token), Map.class);
+        assertThat(draft.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(draft.getBody().get("type")).asString().contains("prescription-not-signed");
+
+        exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        ResponseEntity<Map> signed = exchange(path, HttpMethod.GET, authed(token), Map.class);
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(signed.getBody().get("prescriberId")).isEqualTo(doc.id().toString());
+        assertThat(signed.getBody().get("professionalRegistrationNo")).isEqualTo("KMC 78412");
+        assertThat(signed.getBody().get("clinicName")).isNotNull();
+    }
 }

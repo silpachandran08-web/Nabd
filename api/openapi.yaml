@@ -1127,6 +1127,64 @@ paths:
       x-required-permission: clinical:edit
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AllergyStatus" } } } }
+  /clinical/patients/{patientId}/pregnancy-status:
+    parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: "Pregnancy / lactation status. not_documented (nobody has recorded it) is NEVER the same as not_pregnant"
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PregnancyStatus" } } } }
+        "404": { description: Patient not found }
+    put:
+      tags: [Clinical]
+      summary: Record an explicit status (who and when are stamped by the server; appended to the history and audited). Never set automatically. A recorded pregnant or lactating status escalates the prescription pregnancy warning (severity severe, a fresh decision is required); other statuses leave the existing rule unchanged. Re-sending the status and date already recorded is a no-op (no history event, no audit row, recorded by / at unchanged; the current state is returned).
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [not_pregnant, pregnant, lactating, unknown] }
+                expectedDeliveryDate: { type: [string, "null"], format: date, description: "Only with status pregnant" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PregnancyStatus" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /clinical/patients/{patientId}/pregnancy-status/history:
+    get:
+      tags: [Clinical]
+      summary: Append-only history of recorded pregnancy / lactation statuses, newest first
+      x-required-permission: clinical:view
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    before: { type: [object, "null"], description: "{status, expectedDeliveryDate}; null for the first statement" }
+                    after: { type: object }
+                    actorId: { type: string, format: uuid }
+                    actorName: { type: [string, "null"] }
+                    occurredAt: { type: string, format: date-time }
+  /clinical/drugs/search:
+    get:
+      tags: [Clinical]
+      summary: "DOC-033. Drug name type-ahead for the prescription pad, built only from this tenant's pharmacy item master (active stocked items) and names it has prescribed before. Returns [] for q shorter than 2 characters. Names only, no PII. Not a clinical formulary; free-text entry always remains possible."
+      x-required-permission: clinical:view (or clinical:edit)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 8, minimum: 1, maximum: 20 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DrugSuggestion" } } } } }
   /clinical/prescriptions/{queueEntryId}:
     parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1153,6 +1211,16 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden. 403 not-prescriber when an override is sent by someone who is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/print-header:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: Header data for printing a SIGNED prescription (clinic, prescriber of record, professional registration number). 409 prescription-not-signed for a draft. The registration number is null when none is on file; the printout must then omit it.
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PrescriptionPrintHeader" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Prescription not signed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
@@ -1164,6 +1232,74 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden. 403 not-prescriber: caller is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/visits/{queueEntryId}/documents:
+    get:
+      tags: [Clinical]
+      summary: Clinical documents (visit summary, referral letter, certificate) of a visit, oldest first
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ClinicalDocument" } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Clinical]
+      summary: Create a DRAFT document for the visit. body holds only the labelled fields of that type, as typed by the doctor (unknown keys are 400); blank values are dropped. The server fills nothing in.
+      x-required-permission: clinical:edit
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocumentCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /clinical/visits/{queueEntryId}/documents/summary-prefill:
+    get:
+      tags: [Clinical]
+      summary: Starting values for a visit summary, read from the visit's SIGNED note (diagnosis, assessment, plan) and SIGNED prescription (one line per medicine). Unsigned sources contribute nothing (noteSigned / prescriptionSigned say which). Nothing is stored; the doctor edits then creates the document.
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocumentSummaryPrefill" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /clinical/documents/{id}:
+    get:
+      tags: [Clinical]
+      summary: One clinical document (header snapshot present once issued)
+      x-required-permission: clinical:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Clinical]
+      summary: Replace the fields of a DRAFT document (a request with no body field leaves the draft unchanged). 409 document-issued once issued.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocumentUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/documents/{id}/issue:
+    post:
+      tags: [Clinical]
+      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Issued, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden. not-prescriber: caller is neither the visit's doctor nor holds clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /clinical/vitals/{queueEntryId}:
     get:
@@ -1357,6 +1493,53 @@ components:
               page: { $ref: "#/components/schemas/PageMeta" }
 
   schemas:
+    ClinicalDocumentCreate:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [visit_summary, referral, certificate] }
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    ClinicalDocumentUpdate:
+      type: object
+      properties:
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    ClinicalDocumentBody:
+      type: object
+      description: >
+        Plain text fields typed by the doctor, max 4000 characters each. Allowed keys per type -
+        visit_summary - diagnosis, assessment, plan, medicines, patientInstructions;
+        referral - referredTo, department, reason, findings, notes;
+        certificate - purpose, findings, restFrom (yyyy-mm-dd), restTo (yyyy-mm-dd), remarks.
+      additionalProperties: { type: string }
+    ClinicalDocumentSummaryPrefill:
+      type: object
+      properties:
+        noteSigned: { type: boolean }
+        prescriptionSigned: { type: boolean }
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    ClinicalDocument:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        queueEntryId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        type: { type: string, enum: [visit_summary, referral, certificate] }
+        status: { type: string, enum: [draft, issued] }
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+        header:
+          type: [object, "null"]
+          description: Snapshot taken at issue time; null while a draft. Never changes afterwards.
+          properties:
+            clinic: { type: object, properties: { name: { type: [string, "null"] }, region: { type: [string, "null"] } } }
+            doctor: { type: object, properties: { id: { type: string, format: uuid }, name: { type: [string, "null"] } } }
+            patient: { type: object, properties: { name: { type: string }, mrn: { type: string }, dob: { type: string, format: date }, gender: { type: string } } }
+            visit: { type: object, properties: { queueEntryId: { type: string, format: uuid }, date: { type: string, format: date } } }
+            issuedBy: { type: object, properties: { id: { type: string, format: uuid }, name: { type: [string, "null"] } } }
+        issuedBy: { type: [string, "null"], format: uuid }
+        issuedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     Allergy:
       type: object
       properties:
@@ -1412,6 +1595,14 @@ components:
         documentedBy: { type: [string, "null"], format: uuid }
         documentedByName: { type: [string, "null"] }
         documentedAt: { type: [string, "null"], format: date-time }
+    PregnancyStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [not_documented, not_pregnant, pregnant, lactating, unknown] }
+        expectedDeliveryDate: { type: [string, "null"], format: date }
+        recordedBy: { type: [string, "null"], format: uuid }
+        recordedByName: { type: [string, "null"] }
+        recordedAt: { type: [string, "null"], format: date-time }
     RxWarningDecision:
       type: object
       required: [kind, reasonCode]
@@ -1429,6 +1620,20 @@ components:
         duration: { type: string }
         instructions: { type: string }
         overrides: { type: array, items: { $ref: "#/components/schemas/RxWarningDecision" } }
+        brandName: { type: [string, "null"], maxLength: 200, description: "DOC-033. Brand/product text. The safety checks (allergy, pregnancy, controlled) run on drugName AND brandName." }
+        sigPattern: { type: [string, "null"], maxLength: 40, description: "DOC-033. Morning-noon-night pattern as entered, e.g. 1-0-1. `frequency` stays the free-text sig." }
+        route: { type: [string, "null"], maxLength: 40, description: "DOC-033. Route as entered (oral, topical, ...); not interpreted by the server." }
+        quantity: { type: [number, "null"], exclusiveMinimum: 0, description: "DOC-033. Quantity to dispense, as entered by the doctor; never derived or converted by the server." }
+        quantityUnit: { type: [string, "null"], maxLength: 40, description: "DOC-033. Unit of quantity as entered (tablets, ml, ...); never converted." }
+    DrugSuggestion:
+      type: object
+      description: "DOC-033. A type-ahead suggestion from the tenant's own data. Not a clinical formulary: no dose, strength or class."
+      properties:
+        name: { type: string }
+        source: { type: string, enum: [pharmacy, history], description: "pharmacy = the tenant's pharmacy item master; history = a name this tenant has prescribed before" }
+        code: { type: [string, "null"], description: "Pharmacy item code (pharmacy only)" }
+        inStock: { type: [boolean, "null"] }
+        prescriptionOnly: { type: [boolean, "null"] }
     RxWarning:
       type: object
       properties:
@@ -1466,6 +1671,11 @@ components:
         pregnancyWarning: { type: [string, "null"] }
         controlledSubstanceWarning: { type: [string, "null"] }
         warnings: { type: array, items: { $ref: "#/components/schemas/RxWarning" } }
+        brandName: { type: [string, "null"] }
+        sigPattern: { type: [string, "null"] }
+        route: { type: [string, "null"] }
+        quantity: { type: [number, "null"] }
+        quantityUnit: { type: [string, "null"] }
     PharmacySettings:
       type: object
       properties:
@@ -1558,6 +1768,17 @@ components:
         actorId: { type: [string, "null"], format: uuid }
         actorName: { type: [string, "null"] }
         occurredAt: { type: string, format: date-time }
+    PrescriptionPrintHeader:
+      type: object
+      properties:
+        prescriptionId: { type: string, format: uuid }
+        signedAt: { type: [string, "null"], format: date-time }
+        clinicName: { type: string }
+        clinicRegion: { type: string, enum: [IN, KSA] }
+        clinicPhone: { type: [string, "null"], description: "Clinic WhatsApp number from clinic setup" }
+        prescriberId: { type: [string, "null"], format: uuid, description: "Who signed (the visit's doctor or a clinical:approve holder)" }
+        prescriberName: { type: [string, "null"] }
+        professionalRegistrationNo: { type: [string, "null"], description: "From the staff record; null when not set" }
     Prescription:
       type: object
       properties:
@@ -1670,6 +1891,11 @@ components:
         fieldGrants:
           type: array
           items: { type: string, example: "no_financial_fields" }
+        departmentId: { type: [string, "null"], format: uuid }
+        professionalRegistrationNo:
+          type: [string, "null"]
+          pattern: "^$|^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$"
+          description: "DOC-N1. Omitted/null = unchanged; empty string = clear; otherwise 1-40 characters of letters, digits, space . / -. Audited (the audit row records set/changed/cleared, not the value). Requires staff:edit."
 
     Staff:
       type: object
@@ -1684,6 +1910,7 @@ components:
         emailVerified: { type: boolean }
         mobileVerified: { type: boolean, description: "Patient data is unreachable until both this and emailVerified are true (NB-041)" }
         lastSeenAt: { type: [string, "null"], format: date-time }
+        professionalRegistrationNo: { type: [string, "null"], description: "DOC-N1. Medical council / SCFHS registration number; null when not set" }
 
     RoleWrite:
       type: object

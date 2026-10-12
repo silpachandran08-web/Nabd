@@ -18,7 +18,9 @@ import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
+import RxPad from "../components/consult/RxPad";
 import SafetyStrip from "../components/consult/SafetyStrip";
+import VisitOutputs from "../components/consult/VisitOutputs";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
   age, DONE_STATUSES, initials, minutesSince, rxItemLine, statusLabel, WAITING_STATUSES,
@@ -526,9 +528,10 @@ export default function ConsultPage() {
 
   // Editing a line drops its warnings from view (they were computed for the old text); the server
   // recomputes them on the next save, and signing is checked again on the server regardless.
-  function updateRxItem(index: number, field: "drugName" | "dosage" | "frequency" | "duration" | "instructions", value: string) {
+  // DOC-033: the structured pad (RxPad) edits several fields at once; the name fields keep that rule.
+  function patchRxItem(index: number, patch: Partial<PrescriptionItem>) {
     setRxDirty(true);
-    setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value, ...(field === "drugName" ? { warnings: undefined } : {}) } : item)));
+    setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch, ...("drugName" in patch || "brandName" in patch ? { warnings: undefined } : {}) } : item)));
   }
   function addRxItem() { setRxDirty(true); setRxItems((prev) => [...prev, { ...BLANK_RX_ITEM }]); }
   function removeRxItem(index: number) { setRxDirty(true); setRxItems((prev) => prev.filter((_, i) => i !== index)); }
@@ -551,6 +554,8 @@ export default function ConsultPage() {
         .filter(({ i }) => i.drugName.trim() !== "")
         .map(({ i, index }) => ({
           drugName: i.drugName, dosage: i.dosage, frequency: i.frequency, duration: i.duration, instructions: i.instructions,
+          brandName: i.brandName?.trim() || undefined, sigPattern: i.sigPattern || undefined, route: i.route || undefined,
+          quantity: i.quantity ?? undefined, quantityUnit: i.quantityUnit?.trim() || undefined,
           overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined }] : undefined,
         }));
       const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}`, { method: "PATCH", body: JSON.stringify({ items }) });
@@ -893,7 +898,7 @@ export default function ConsultPage() {
           </div>
         )}
 
-        <SafetyStrip patient={pat} ctx={ctx} onRetry={reloadCtx} onManageAllergies={can("clinical:view") ? () => setShowAllergies(true) : undefined} />
+        <SafetyStrip patient={pat} ctx={ctx} onRetry={reloadCtx} onManageAllergies={can("clinical:view") ? () => setShowAllergies(true) : undefined} canEditPregnancy={can("clinical:edit")} authedFetch={authedFetch} />
 
         <div className={styles.workspace}>
           <aside className={styles.today} aria-label="Today's patients">
@@ -1054,6 +1059,11 @@ export default function ConsultPage() {
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.rxHeader}>
                     <h3 className={styles.rxTitle}>Prescription {rxStatus === "signed" && <StatusPill tone="ok" label="Signed" />}</h3>
+                    {rxStatus === "signed" && can("clinical:view") && (
+                      <div className={styles.rxHeaderActions}>
+                        <Link className={styles.backBtn} style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }} href={`/consult/rx/${activeEntry.id}/print`}>Print prescription</Link>
+                      </div>
+                    )}
                     {rxStatus !== "signed" && (
                       <div className={styles.rxHeaderActions}>
                         <button className={styles.backBtn} onClick={() => void saveRx()} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
@@ -1075,16 +1085,11 @@ export default function ConsultPage() {
                   )}
                   {rxItems.map((item, i) => (
                     <div key={i}>
-                      <div className={styles.rxRow}>
-                        <input id={`rx-drug-${i}`} className={styles.input} aria-label="Drug name" placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
-                        <input className={styles.input} aria-label="Dosage" placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
-                        <input className={styles.input} aria-label="Frequency" placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
-                        <input className={styles.input} aria-label="Duration" placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
-                        <input className={styles.input} aria-label="Instructions" placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
+                      <RxPad item={item} index={i} locked={rxStatus === "signed"} authedFetch={authedFetch} onChange={(patch) => patchRxItem(i, patch)}>
                         {rxStatus !== "signed" && rxItems.length > 1 && (
                           <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
                         )}
-                      </div>
+                      </RxPad>
                       <RxWarnings
                         item={item}
                         locked={rxStatus === "signed"}
@@ -1165,7 +1170,7 @@ export default function ConsultPage() {
                       <span className={p.muted}>Visible to reception as soon as you close.</span>
                     </li>
                   </ul>
-                  <p className={p.muted}>Referral letters, certificates, visit summaries and diagnostic requests aren&apos;t available yet.</p>
+                  <VisitOutputs authedFetch={authedFetch} queueEntryId={activeEntry.id} patientName={activeEntry.patientName} patient={pat} />
 
                   {closeIssues.length > 0 && !closedOut && (
                     <div className={`${p.notice} ${p.noticeDanger}`} role="alert">

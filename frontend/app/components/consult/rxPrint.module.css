@@ -1,0 +1,261 @@
+/* DOC-N1: printable signed prescription. The sheet is a paper document, so it is always light
+   (system colours + color-scheme) whatever the dark app theme is; no colour literals. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-16);
+  padding: var(--nb-space-24);
+  max-inline-size: 960px;
+  margin-inline: auto;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nb-space-12);
+  justify-content: space-between;
+}
+
+.toolbarTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--nb-text-primary);
+}
+
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding-block: var(--nb-space-8);
+  padding-inline: var(--nb-space-16);
+  border-radius: var(--nb-radius-md);
+  border: 1px solid var(--nb-border-default);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  min-block-size: 40px;
+}
+
+.btnPrimary {
+  background: var(--nb-accent-gradient);
+  color: var(--nb-on-accent);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.notice {
+  display: flex;
+  gap: var(--nb-space-8);
+  align-items: flex-start;
+  padding: var(--nb-space-12) var(--nb-space-16);
+  border-radius: var(--nb-radius-md);
+  border: 1px solid var(--nb-border-default);
+  background: var(--nb-warn-tint);
+  color: var(--nb-text-primary);
+  font-size: 13px;
+}
+
+.noticeInfo {
+  background: var(--nb-info-tint);
+}
+
+.sheet {
+  color-scheme: light;
+  background: Canvas;
+  color: CanvasText;
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-32);
+  display: flex;
+  flex-direction: column;
+  gap: var(--nb-space-20);
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.letterhead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--nb-space-16);
+  padding-block-end: var(--nb-space-16);
+  border-block-end: 2px solid CanvasText;
+}
+
+.clinicName {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.muted {
+  color: GrayText;
+}
+
+.prescriber {
+  text-align: end;
+}
+
+.prescriberName {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8) var(--nb-space-32);
+}
+
+.metaItem {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 140px;
+}
+
+.metaLabel {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: GrayText;
+}
+
+.allergyBox {
+  border: 1px solid CanvasText;
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12) var(--nb-space-16);
+  break-inside: avoid;
+}
+
+.allergyList {
+  margin: var(--nb-space-4) 0 0;
+  padding-inline-start: var(--nb-space-20);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: GrayText;
+}
+
+.meds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.med {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: var(--nb-space-12);
+  padding-block: var(--nb-space-12);
+  border-block-end: 1px solid GrayText;
+  break-inside: avoid;
+}
+
+.medNo {
+  font-weight: 600;
+}
+
+.medName {
+  font-weight: 700;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.medFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-4) var(--nb-space-24);
+  margin-block-start: var(--nb-space-4);
+}
+
+.medField {
+  display: inline-flex;
+  gap: var(--nb-space-8);
+}
+
+.medInstructions {
+  margin-block-start: var(--nb-space-4);
+  overflow-wrap: anywhere;
+}
+
+.signature {
+  margin-block-start: var(--nb-space-16);
+  padding-block-start: var(--nb-space-12);
+  border-block-start: 1px solid GrayText;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--nb-space-12);
+  break-inside: avoid;
+}
+
+.screenOnly {
+  display: initial;
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: var(--nb-space-16);
+  }
+  .sheet {
+    padding: var(--nb-space-16);
+  }
+  .prescriber {
+    text-align: start;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  /* Hide the app shell (sidebar, top bar, bottom nav) only on the page that holds a printable sheet. */
+  :global(.appShell):has(.sheet) > :not(:global(.appShellContent)) {
+    display: none !important;
+  }
+  :global(.appShell):has(.sheet) :global(.appShellContent) > :not(:global(.appShellBody)) {
+    display: none !important;
+  }
+  :global(.appShell):has(.sheet) :global(.appShellContent) {
+    padding-block-end: 0 !important;
+  }
+
+  /* The app is dark; the paper must not inherit it when "background graphics" is on. */
+  :global(html):has(.sheet),
+  :global(body):has(.sheet) {
+    background: Canvas !important;
+    color: CanvasText !important;
+  }
+
+  .page {
+    padding: 0;
+    max-inline-size: none;
+    gap: 0;
+  }
+  .toolbar,
+  .notice,
+  .screenOnly {
+    display: none !important;
+  }
+  .sheet {
+    padding: 0;
+    border-radius: 0;
+  }
+}

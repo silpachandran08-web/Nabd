@@ -3,7 +3,8 @@
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
 import type { ClinicalContext } from "./clinical";
-import { daysAgoLabel, SEVERITY_ORDER, type PatientDetail } from "./shared";
+import PregnancyChip from "./PregnancyChip";
+import { daysAgoLabel, SEVERITY_ORDER, type AuthedFetch, type PatientDetail } from "./shared";
 import s from "./consultParts.module.css";
 
 type AllergyItem = { text: string; severity?: string; reaction?: string | null };
@@ -28,7 +29,7 @@ export function mergeAllergies(patient: PatientDetail | null, ctx: ClinicalConte
   return { items, state, severityMissing: ctx.allergies.status === "error" || ctx.allergies.status === "none" };
 }
 
-export default function SafetyStrip({ patient, ctx, onRetry, sticky = true, onManageAllergies }: { patient: PatientDetail | null; ctx: ClinicalContext; onRetry: () => void; sticky?: boolean; onManageAllergies?: () => void }) {
+export default function SafetyStrip({ patient, ctx, onRetry, sticky = true, onManageAllergies, canEditPregnancy = false, authedFetch }: { patient: PatientDetail | null; ctx: ClinicalContext; onRetry: () => void; sticky?: boolean; onManageAllergies?: () => void; canEditPregnancy?: boolean; authedFetch?: AuthedFetch }) {
   const { items, state, severityMissing } = mergeAllergies(patient, ctx);
 
   const conds = (ctx.conditions.status === "ok" ? (ctx.conditions.data ?? []).filter((c) => c.status !== "resolved").map((c) => c.condition) : []);
@@ -89,6 +90,8 @@ export default function SafetyStrip({ patient, ctx, onRetry, sticky = true, onMa
           <span className={s.safetyValue}>{patient ? daysAgoLabel(patient.lastVisitAt) : "—"}</span>
         </span>
       </div>
+
+      <PregnancyChip patient={patient} ctx={ctx} canEdit={canEditPregnancy} authedFetch={authedFetch} onSaved={onRetry} />
 
       {patient && patient.activePackages > 0 && (
         <div className={s.safetyChip}>

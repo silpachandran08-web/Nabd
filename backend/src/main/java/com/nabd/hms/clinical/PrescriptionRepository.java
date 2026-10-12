@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
 import static com.nabd.hms.clinical.PrescriptionModels.ActorInfo;
+import static com.nabd.hms.clinical.PrescriptionModels.DrugSuggestionRow;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetItemRow;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetRow;
 import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionItemRow;
@@ -31,13 +32,16 @@ class PrescriptionRepository {
                 tenantId, queueEntryId).stream().findFirst();
     }
 
-    record PatientProfile(String gender, java.time.LocalDate dob) {
+    /** pregnancyStatus: the recorded DOC-021 status (pregnant | lactating | not_pregnant | unknown) or null when nobody has documented it. */
+    record PatientProfile(String gender, java.time.LocalDate dob, String pregnancyStatus) {
     }
 
     /** NB-113: pregnancy/lactation warning needs sex + age; NB-111/NB-112 reuse dob for age too. */
     Optional<PatientProfile> findPatientProfile(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT gender, dob FROM patients WHERE tenant_id = ? AND id = ?",
-                (rs, i) -> new PatientProfile(rs.getString("gender"), rs.getDate("dob").toLocalDate()),
+        return jdbc.query("SELECT p.gender, p.dob, ps.status AS pregnancy_status FROM patients p " +
+                        "LEFT JOIN patient_pregnancy_status ps ON ps.tenant_id = p.tenant_id AND ps.patient_id = p.id " +
+                        "WHERE p.tenant_id = ? AND p.id = ?",
+                (rs, i) -> new PatientProfile(rs.getString("gender"), rs.getDate("dob").toLocalDate(), rs.getString("pregnancy_status")),
                 tenantId, patientId).stream().findFirst();
     }
 
@@ -93,11 +97,13 @@ class PrescriptionRepository {
         int order = 0;
         for (PrescriptionItemRow item : items) {
             jdbc.update("INSERT INTO prescription_items (tenant_id, prescription_id, drug_name, dosage, frequency, " +
-                            "  duration, instructions, allergy_override_reason, display_order, overrides) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb)",
+                            "  duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, " +
+                            "  route, quantity, quantity_unit) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb,?,?,?,?,?)",
                     tenantId, prescriptionId, item.drugName(), item.dosage(), item.frequency(), item.duration(),
                     item.instructions(), item.allergyOverrideReason(), order++,
-                    item.overridesJson() == null ? "[]" : item.overridesJson());
+                    item.overridesJson() == null ? "[]" : item.overridesJson(),
+                    item.brandName(), item.sigPattern(), item.route(), item.quantity(), item.quantityUnit());
         }
     }
 
@@ -105,6 +111,28 @@ class PrescriptionRepository {
     int sign(UUID tenantId, UUID prescriptionId) {
         return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
                 "WHERE tenant_id = ? AND id = ? AND status = 'draft'", tenantId, prescriptionId);
+    }
+
+    /** DOC-033: type-ahead source. Pharmacy item master (active stocked items) first, then distinct names this tenant
+     * has prescribed before that the master does not already list. `like` is an already-escaped, lower-cased pattern.
+     * Names only: no patient, doctor or prescription identifiers leave this query. */
+    List<DrugSuggestionRow> searchDrugs(UUID tenantId, String likePattern, String prefixPattern, int limit) {
+        return jdbc.query(
+                "SELECT name, source, code, in_stock, rx_only FROM (" +
+                        " SELECT c.name AS name, 'pharmacy' AS source, c.code AS code, (c.stock_qty > 0) AS in_stock, c.is_rx AS rx_only, " +
+                        "   0 AS src_rank FROM charge_catalogue c " +
+                        "  WHERE c.tenant_id = ? AND c.stock_qty IS NOT NULL AND c.active AND lower(c.name) LIKE ? ESCAPE '\\' " +
+                        " UNION ALL " +
+                        " SELECT min(i.drug_name) AS name, 'history' AS source, NULL AS code, NULL::boolean AS in_stock, NULL::boolean AS rx_only, " +
+                        "   1 AS src_rank FROM prescription_items i " +
+                        "  WHERE i.tenant_id = ? AND lower(i.drug_name) LIKE ? ESCAPE '\\' " +
+                        "    AND NOT EXISTS (SELECT 1 FROM charge_catalogue c2 WHERE c2.tenant_id = i.tenant_id " +
+                        "      AND c2.stock_qty IS NOT NULL AND c2.active AND lower(c2.name) = lower(i.drug_name)) " +
+                        "  GROUP BY lower(i.drug_name) " +
+                        ") s ORDER BY (CASE WHEN lower(name) LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END), src_rank, lower(name) LIMIT ?",
+                (rs, i) -> new DrugSuggestionRow(rs.getString("name"), rs.getString("source"), rs.getString("code"),
+                        (Boolean) rs.getObject("in_stock"), (Boolean) rs.getObject("rx_only")),
+                tenantId, likePattern, tenantId, likePattern, prefixPattern, limit);
     }
 
     // ── favourite Rx sets (NB-114) ───────────────────────────────────────
@@ -176,6 +204,11 @@ class PrescriptionRepository {
                 rs.getString("instructions"),
                 rs.getString("allergy_override_reason"),
                 rs.getInt("display_order"),
-                rs.getString("overrides_json"));
+                rs.getString("overrides_json"),
+                rs.getString("brand_name"),
+                rs.getString("sig_pattern"),
+                rs.getString("route"),
+                rs.getBigDecimal("quantity"),
+                rs.getString("quantity_unit"));
     }
 }

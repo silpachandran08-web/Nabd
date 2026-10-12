@@ -41,7 +41,7 @@ class StaffRepository {
         return jdbc.query(
                 "SELECT s.id, s.tenant_id, s.role_id, s.email, s.name, s.mobile_phone, s.status, s.scope, " +
                         "s.email_verified, s.mobile_verified, s.mfa_enabled, s.department_id, " +
-                        "s.field_grants, null::timestamptz AS last_seen_at, s.created_at " +
+                        "s.field_grants, null::timestamptz AS last_seen_at, s.created_at, null::text AS professional_registration_no " +
                         "FROM find_staff_by_invite_token_hash(?) s " +
                         "WHERE s.invite_expires_at > now()",
                 staffMapper(), tokenHash
@@ -84,6 +84,12 @@ class StaffRepository {
                 roleId, scope, fieldGrants.toArray(new String[0]), departmentId, tenantId, id);
     }
 
+    /** DOC-N1: separate from update() so a PATCH that does not mention the registration number cannot touch it. */
+    void updateProfessionalRegistrationNo(UUID tenantId, UUID id, String registrationNo) {
+        jdbc.update("UPDATE staff SET professional_registration_no = ? WHERE tenant_id = ? AND id = ?",
+                registrationNo, tenantId, id);
+    }
+
     void suspend(UUID tenantId, UUID id) {
         jdbc.update("UPDATE staff SET status = 'suspended' WHERE tenant_id = ? AND id = ?", tenantId, id);
     }
@@ -105,7 +111,7 @@ class StaffRepository {
         return "SELECT s.id, s.tenant_id, s.role_id, s.email, s.name, s.mobile_phone, s.status, s.scope, " +
                 "s.email_verified, s.mobile_verified, s.mfa_enabled, s.department_id, " +
                 "s.field_grants, (SELECT max(last_seen_at) FROM sessions x WHERE x.staff_id = s.id) AS last_seen_at, " +
-                "s.created_at FROM staff s ";
+                "s.created_at, s.professional_registration_no FROM staff s ";
     }
 
     private RowMapper<StaffRow> staffMapper() {
@@ -131,7 +137,8 @@ class StaffRepository {
                     fieldGrants,
                     departmentId == null ? null : UUID.fromString(departmentId),
                     lastSeen == null ? null : lastSeen.toInstant(),
-                    rs.getTimestamp("created_at").toInstant());
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getString("professional_registration_no"));
         };
     }
 }

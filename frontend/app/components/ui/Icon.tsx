@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 // One monoline family, stroke 1.75 (DESIGN.md §3). Paths are 24x24, drawn by hand — no icon
 // package dependency. Icons are decorative by default (aria-hidden); pass `label` to expose one.
 const PATHS = {
+  sun: "M12 16a4 4 0 100-8 4 4 0 000 8zM12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4",
   home: "M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10",
   calendar: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4",
   users: "M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6M16 4.3a3.5 3.5 0 010 6.4M18 14.4c2 .8 3.5 2.7 3.5 5.6",

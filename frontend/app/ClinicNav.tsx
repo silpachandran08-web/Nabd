@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
-import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
+import { decodeAccessToken, getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 // Same "waiting" bucket as the Arrivals page's own tab counts (arrivals/page.tsx bucketOf).
@@ -70,6 +70,30 @@ const OWNER_ITEMS: OwnerItem[] = [
   { label: "Plan & Modules", short: "Plan", icon: "list", href: "/setup?tab=subscription", permission: "setup:view",
     active: (p, tab) => p === "/setup" && tab === "subscription" },
 ];
+
+// DESIGN.md / wireframe Doctor sidebar (NabdShell.html doctor list), in its order. A doctor is a
+// non-owner, non-nursing role with clinical:edit; each item still needs its own permission. Billing
+// and Arrivals are deliberately not here (the doctor works from My Day). /my-day is built by DOC-002.
+export const MY_DAY_HREF = "/my-day";
+type DoctorItem = { label: string; short: string; icon: IconName; href: string; permission: string; alsoPermission?: string; badgeKey?: string };
+const DOCTOR_ITEMS: DoctorItem[] = [
+  { label: "My Day", short: "My Day", icon: "sun", href: MY_DAY_HREF, permission: "clinical:edit", alsoPermission: "queue:view", badgeKey: MY_DAY_HREF },
+  { label: "Patients", short: "Patients", icon: "users", href: "/patients", permission: "patients:view" },
+  { label: "Consultation Workspace", short: "Consult", icon: "stethoscope", href: "/consult", permission: "clinical:edit" },
+  { label: "Treatment Packages", short: "Packages", icon: "package", href: "/packages", permission: "packages:view" },
+  { label: "Schedule", short: "Schedule", icon: "calendar", href: "/schedule", permission: "queue:view" },
+];
+// Wireframe doctor items whose page does not exist yet. Not linked (no dead links) and not shown
+// disabled (restricted/unavailable UI is absent): when a page ships, move its entry into DOCTOR_ITEMS
+// at the wireframe position (after Consultation Workspace: Prescriptions & Templates; after Schedule:
+// Encounters, Follow-ups, External Reports, Clinical Documents, Specialty Workspace, Clinical Settings, More).
+export const DOCTOR_PLANNED = [
+  "Prescriptions & Templates", "Encounters", "Follow-ups", "External Reports",
+  "Clinical Documents", "Specialty Workspace", "Clinical Settings", "More",
+] as const;
+function isDoctorNav(perms: string[]): boolean {
+  return !isOwner() && !hasNursingGrant(perms) && perms.includes("clinical:edit");
+}
 
 function nursingHref(item: NursingItem): string {
   if (item.href) return item.href;
@@ -138,7 +162,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // ponytail: no polling — a count can lag until the next page change; poll if reception asks.
   useEffect(() => {
     const perms = getPermissions();
-    if (skip || isOwner() || hasNursingGrant(perms) || !perms.includes("queue:view")) return;
+    if (skip || isOwner() || hasNursingGrant(perms) || isDoctorNav(perms) || !perms.includes("queue:view")) return;
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
     let cancelled = false;
@@ -151,6 +175,26 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           "/arrivals": rows.filter((r) => WAITING_STATUSES.includes(r.status)).length,
           "/billing": rows.filter((r) => r.status === "checkout_pending").length,
         });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pathname, skip]);
+
+  // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view).
+  // The JWT subject is the staff id (AuthService.mintTokenPair); no queue:view = no badge.
+  useEffect(() => {
+    const perms = getPermissions();
+    if (skip || !isDoctorNav(perms) || !perms.includes("queue:view")) return;
+    const token = localStorage.getItem("nabd_access_token");
+    const me = token ? decodeAccessToken(token)?.sub : undefined;
+    if (!token || !me) return;
+    let cancelled = false;
+    void fetch(`${API_BASE}/queue?doctorId=${encodeURIComponent(me)}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        if (cancelled || !res.ok) return;
+        const rows: { status: string; doctorId?: string }[] = await res.json();
+        if (cancelled || !Array.isArray(rows)) return;
+        setBadges((b) => ({ ...b, [MY_DAY_HREF]: rows.filter((r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status)).length }));
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -206,8 +250,10 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const ownerItems = owner ? OWNER_ITEMS.filter((item) => permissions.includes(item.permission)) : [];
   const showOwner = ownerItems.length > 0;
   const showNursing = !showOwner && hasNursingGrant(permissions);
-  const items = showOwner || showNursing ? [] : NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
-  if (items.length === 0 && !showNursing && !showOwner) return null;
+  const showDoctor = !showOwner && !showNursing && !owner && permissions.includes("clinical:edit");
+  const doctorItems = showDoctor ? DOCTOR_ITEMS.filter((item) => permissions.includes(item.permission) && (!item.alsoPermission || permissions.includes(item.alsoPermission))) : [];
+  const items = showOwner || showNursing || showDoctor ? [] : NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
+  if (items.length === 0 && !showNursing && !showOwner && doctorItems.length === 0) return null;
   const currentTab = searchParams.get("tab");
 
   type Entry = { key: string; href: string; label: string; short: string; icon: IconName; active: boolean; badge?: number };
@@ -221,6 +267,11 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       active: isNursingItemActive(item, pathname, searchParams),
       badge: item.badgeKey ? badges[`nursing:${item.badgeKey}`] : undefined,
     })) : []),
+    ...doctorItems.map((item) => ({
+      key: item.label, href: item.href, label: item.label, short: item.short, icon: item.icon,
+      active: !!pathname && pathname.startsWith(item.href),
+      badge: item.badgeKey ? badges[item.badgeKey] : undefined,
+    })),
     ...items.map((item) => ({
       key: item.href, href: item.href, label: item.label, short: item.short, icon: item.icon,
       active: !!pathname && (pathname.startsWith(item.href) || (item.href === "/billing" && pathname.startsWith("/checkout"))),

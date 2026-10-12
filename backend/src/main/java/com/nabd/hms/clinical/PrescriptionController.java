@@ -1,6 +1,7 @@
 package com.nabd.hms.clinical;
 
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
+import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
@@ -64,6 +65,14 @@ public class PrescriptionController {
     public DoseCalculationResponse calculateDose(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
                                                   @RequestParam BigDecimal mgPerKg) {
         return service.calculateDose(tenantId(jwt), patientId, mgPerKg);
+    }
+
+    /** DOC-033: drug type-ahead from the tenant's own pharmacy item master and prescribing history (names only). */
+    @GetMapping("/drugs/search")
+    @PreAuthorize("hasAuthority('clinical:view') or hasAuthority('clinical:edit')")
+    public List<DrugSuggestionResponse> searchDrugs(@AuthenticationPrincipal Jwt jwt, @RequestParam String q,
+                                                     @RequestParam(defaultValue = "8") int limit) {
+        return service.searchDrugs(tenantId(jwt), q, limit);
     }
 
     @PostMapping("/rx-sets")
