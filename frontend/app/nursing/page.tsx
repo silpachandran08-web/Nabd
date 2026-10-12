@@ -27,6 +27,8 @@ type Row = QueueEntry & {
   allergies: string[]; chronicConditions: string[];
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
   dob: string | null; gender: string | null; hasAppointment: boolean;
+  // The patient record could not be read (no patients:view, 404, 5xx): allergies are UNKNOWN, not absent.
+  flagsUnknown: boolean;
 };
 // A patient's clinical-flags chips: allergy (danger), chronic condition (warn), presenting
 // complaint (neutral info). "Urgent" is reserved for the queue's priority flag (rendered
@@ -291,7 +293,7 @@ function NursingWorklist() {
           ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—",
           allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
           lastVitalsAt: null, vitalsOutOfRange: false,
-          dob: p?.dob ?? null, gender: p?.gender ?? null, hasAppointment: !!e.appointmentId,
+          dob: p?.dob ?? null, gender: p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
         };
       }));
       // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today —
@@ -684,8 +686,9 @@ function NursingWorklist() {
                               </span>
                             </td>
                             <td data-label="Clinical flags" className={styles.flagCell}>
-                              {flags.length === 0 && !r.priority ? <span className={styles.muted}>No flags</span> : (
+                              {flags.length === 0 && !r.priority && !r.flagsUnknown ? <span className={styles.muted}>No flags</span> : (
                                 <div className={styles.flagList}>
+                                  {r.flagsUnknown && <StatusPill tone="warn" label="Allergies unknown: record unavailable" icon="alert" />}
                                   {r.priority && <StatusPill tone="urgent" label={r.priorityReason ? `Urgent: ${r.priorityReason}` : "Urgent"} icon="alert" />}
                                   {flags.map((f, i) => <StatusPill key={i} tone={f.kind} label={f.text} icon={FLAG_ICON[f.kind]} />)}
                                 </div>
