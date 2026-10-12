@@ -71,15 +71,111 @@ class ClinicalDocumentApiTest extends ApiTestBase {
         ResponseEntity<Map> again = exchange("/v1/clinical/documents/" + id + "/issue", HttpMethod.POST, authed(v.token()), Map.class);
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
 
-        // database backstop: even a direct UPDATE of an issued row is refused
-        Integer changed = null;
-        try {
-            changed = inTenantTx(UUID.fromString(v.doctor().tenantId().toString()),
-                    () -> jdbc.update("UPDATE clinical_documents SET body = '{}'::jsonb WHERE id = ?::uuid", id));
-        } catch (RuntimeException expected) {
-            // integrity_constraint_violation from clinical_documents_issued_is_final()
+        // database backstop (V54): each of these must fail with the trigger's own message, not just "any exception"
+        UUID tenantId = v.doctor().tenantId();
+        assertIssuedIsFinal(tenantId, () -> jdbc.update("UPDATE clinical_documents SET body = '{}'::jsonb WHERE id = ?::uuid", id), "update");
+        assertIssuedIsFinal(tenantId, () -> jdbc.update("DELETE FROM clinical_documents WHERE id = ?::uuid", id), "delete");
+        Integer stillThere = inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM clinical_documents WHERE id = ?::uuid AND status = 'issued'", Integer.class, id));
+        assertThat(stillThere).isEqualTo(1);
+    }
+
+    /** The V54 trigger raises integrity_constraint_violation with "clinical document is issued and cannot be <op>". */
+    private void assertIssuedIsFinal(UUID tenantId, java.util.function.Supplier<Integer> statement, String op) {
+        org.springframework.dao.DataIntegrityViolationException e = org.junit.jupiter.api.Assertions.assertThrows(
+                org.springframework.dao.DataIntegrityViolationException.class,
+                () -> inTenantTx(tenantId, () -> statement.get()));
+        assertThat(e.getMostSpecificCause().getMessage()).contains("clinical document is issued and cannot be " + op);
+    }
+
+    @Test
+    void theDatabaseStillAllowsEditingAndDeletingADraftAndIssuingIt() {
+        Visit v = seedVisit(seedTenant());
+        UUID tenantId = v.doctor().tenantId();
+        String draft = (String) createReferral(v, Map.of("referredTo", "ENT")).getBody().get("id");
+        String toDelete = (String) createReferral(v, Map.of("referredTo", "Delete me")).getBody().get("id");
+
+        assertThat(inTenantTx(tenantId, () -> jdbc.update(
+                "UPDATE clinical_documents SET body = '{\"referredTo\":\"Edited\"}'::jsonb WHERE id = ?::uuid", draft))).isEqualTo(1);
+        assertThat(inTenantTx(tenantId, () -> jdbc.update(
+                "DELETE FROM clinical_documents WHERE id = ?::uuid AND status = 'draft'", toDelete))).isEqualTo(1);
+        // draft -> issued is the one permitted transition (the CHECK needs issued_at, issued_by and header together)
+        assertThat(inTenantTx(tenantId, () -> jdbc.update(
+                "UPDATE clinical_documents SET status = 'issued', issued_at = now(), issued_by = ?, header = '{}'::jsonb WHERE id = ?::uuid",
+                v.doctor().id(), draft))).isEqualTo(1);
+        assertThat(inTenantTx(tenantId, () -> jdbc.queryForObject(
+                "SELECT status FROM clinical_documents WHERE id = ?::uuid", String.class, draft))).isEqualTo("issued");
+    }
+
+    @Test
+    void onlyTheVisitDoctorOrClinicalApproveMayIssueButAnyClinicalEditorMayDraft() {
+        SeededTenant tenant = seedTenant();
+        Visit v = seedVisit(tenant);
+        UUID nurseRole = seedRole(tenant.id(), "Nurse", false, new com.nabd.hms.common.ModuleGrant("clinical", true, true, true, false, false, false, false));
+        String nurse = loginAndGetAccessToken(seedStaff(tenant, nurseRole, "nurse-doc@a.com", "+919600030005", false));
+        UUID coverRole = seedRole(tenant.id(), "Covering doctor", false, fullGrant("clinical"));
+        String cover = loginAndGetAccessToken(seedStaff(tenant, coverRole, "cover-doc@a.com", "+919600030006", false));
+
+        // a nurse can draft and edit ...
+        ResponseEntity<Map> created = exchange("/v1/clinical/visits/" + v.queueEntryId() + "/documents", HttpMethod.POST,
+                authedJsonBody(nurse, Map.of("type", "referral", "body", Map.of("referredTo", "ENT", "reason", "Hearing loss"))), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String id = (String) created.getBody().get("id");
+        assertThat(exchange("/v1/clinical/documents/" + id, HttpMethod.PATCH,
+                authedJsonBody(nurse, Map.of("body", Map.of("referredTo", "ENT", "reason", "Hearing loss, left"))), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // ... but cannot issue it in the doctor's name; the draft stays a draft
+        ResponseEntity<Map> refused = exchange("/v1/clinical/documents/" + id + "/issue", HttpMethod.POST, authed(nurse), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(refused.getBody().get("type")).asString().contains("not-prescriber");
+        assertThat(exchange("/v1/clinical/documents/" + id, HttpMethod.GET, authed(v.token()), Map.class).getBody().get("status"))
+                .isEqualTo("draft");
+
+        // a clinician holding clinical:approve may issue; the header still names the visit doctor
+        ResponseEntity<Map> issued = exchange("/v1/clinical/documents/" + id + "/issue", HttpMethod.POST, authed(cover), Map.class);
+        assertThat(issued.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> header = (Map<?, ?>) issued.getBody().get("header");
+        assertThat(((Map<?, ?>) header.get("doctor")).get("id")).isEqualTo(v.doctor().id().toString());
+    }
+
+    @Test
+    void theIssuedHeaderSnapshotsTheDoctorRegistrationNumberOrNullWhenUnset() {
+        SeededTenant tenant = seedTenant();
+        Visit v = seedVisit(tenant);
+        String unset = (String) createReferral(v, Map.of("referredTo", "ENT")).getBody().get("id");
+        Map<?, ?> noReg = (Map<?, ?>) ((Map<?, ?>) exchange("/v1/clinical/documents/" + unset + "/issue", HttpMethod.POST,
+                authed(v.token()), Map.class).getBody().get("header")).get("doctor");
+        assertThat(noReg.containsKey("registrationNumber")).isTrue();
+        assertThat(noReg.get("registrationNumber")).isNull();
+
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET professional_registration_no = 'KMC 12345' WHERE id = ?", v.doctor().id()));
+        String set = (String) createReferral(v, Map.of("referredTo", "Cardiology")).getBody().get("id");
+        Map<?, ?> withReg = (Map<?, ?>) ((Map<?, ?>) exchange("/v1/clinical/documents/" + set + "/issue", HttpMethod.POST,
+                authed(v.token()), Map.class).getBody().get("header")).get("doctor");
+        assertThat(withReg.get("registrationNumber")).isEqualTo("KMC 12345");
+
+        // later changes never rewrite an already issued header
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET professional_registration_no = 'CHANGED 1' WHERE id = ?", v.doctor().id()));
+        Map<?, ?> reread = (Map<?, ?>) ((Map<?, ?>) exchange("/v1/clinical/documents/" + set, HttpMethod.GET, authed(v.token()), Map.class)
+                .getBody().get("header")).get("doctor");
+        assertThat(reread.get("registrationNumber")).isEqualTo("KMC 12345");
+    }
+
+    @Test
+    void patchingADraftWithNoBodyLeavesTheBodyUnchanged() {
+        Visit v = seedVisit(seedTenant());
+        String id = (String) createReferral(v, Map.of("referredTo", "ENT", "reason", "Keep me")).getBody().get("id");
+
+        for (Map<String, Object> empty : List.<Map<String, Object>>of(Map.of(), java.util.Collections.singletonMap("body", null))) {
+            ResponseEntity<Map> resp = exchange("/v1/clinical/documents/" + id, HttpMethod.PATCH, authedJsonBody(v.token(), empty), Map.class);
+            assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+            assertThat((Map<?, ?>) resp.getBody().get("body")).containsEntry("referredTo", "ENT").containsEntry("reason", "Keep me");
         }
-        assertThat(changed).isNull();
+        // an explicit empty object is still a deliberate replace
+        ResponseEntity<Map> cleared = exchange("/v1/clinical/documents/" + id, HttpMethod.PATCH,
+                authedJsonBody(v.token(), Map.of("body", Map.of())), Map.class);
+        assertThat((Map<?, ?>) cleared.getBody().get("body")).isEmpty();
     }
 
     @Test
