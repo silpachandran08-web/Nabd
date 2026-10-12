@@ -58,6 +58,52 @@ class PregnancyStatusApiTest extends ApiTestBase {
     }
 
     @Test
+    void resendingTheCurrentStatusIsANoOpWithNoNewEventAndTheOriginalAttestation() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff first = seedStaff(tenant, seedFullAccessRole(tenant.id()), "preg4@a.com", "+919800000054", false);
+        SeededStaff second = seedStaff(tenant, seedFullAccessRole(tenant.id()), "preg5@a.com", "+919800000055", false);
+        String token = loginAndGetAccessToken(first);
+        String otherToken = loginAndGetAccessToken(second);
+        String patientId = registerPatient(token, "+919999950004");
+        String url = "/v1/clinical/patients/" + patientId + "/pregnancy-status";
+        Map<String, Object> body = Map.of("status", "pregnant", "expectedDeliveryDate", "2027-03-01");
+
+        ResponseEntity<Map> original = exchange(url, HttpMethod.PUT, authedJsonBody(token, body), Map.class);
+        ResponseEntity<Map> repeat = exchange(url, HttpMethod.PUT, authedJsonBody(otherToken, body), Map.class);
+
+        assertThat(repeat.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(repeat.getBody().get("recordedBy")).isEqualTo(original.getBody().get("recordedBy"));
+        assertThat(repeat.getBody().get("recordedAt")).isEqualTo(original.getBody().get("recordedAt"));
+        assertThat(exchange(url + "/history", HttpMethod.GET, authed(token), List.class).getBody()).hasSize(1);
+        List<Integer> audits = inTenantTx(tenant.id(), () -> jdbc.queryForList(
+                "SELECT 1 FROM audit_log WHERE action = 'patient.pregnancy_status.recorded' AND entity_id = ?::uuid", Integer.class, patientId));
+        assertThat(audits).hasSize(1);
+
+        // a real change still records an event
+        exchange(url, HttpMethod.PUT, authedJsonBody(otherToken, Map.of("status", "pregnant", "expectedDeliveryDate", "2027-04-01")), Map.class);
+        assertThat(exchange(url + "/history", HttpMethod.GET, authed(token), List.class).getBody()).hasSize(2);
+    }
+
+    @Test
+    void theDatabaseRefusesToUpdateDeleteOrTruncateThePregnancyHistory() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "preg6@a.com", "+919800000056", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "+919999950005");
+        exchange("/v1/clinical/patients/" + patientId + "/pregnancy-status", HttpMethod.PUT, authedJsonBody(token, Map.of("status", "pregnant")), Map.class);
+
+        for (String sql : new String[]{
+                "UPDATE patient_pregnancy_events SET actor_id = actor_id",
+                "DELETE FROM patient_pregnancy_events",
+                "TRUNCATE patient_pregnancy_events"}) {
+            Exception e = org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class,
+                    () -> inTenantTx(tenant.id(), () -> jdbc.execute(sql)));
+            assertThat(e.getMessage()).as(sql).contains("patient_pregnancy_events is append-only");
+        }
+        assertThat(exchange("/v1/clinical/patients/" + patientId + "/pregnancy-status/history", HttpMethod.GET, authed(token), List.class).getBody()).hasSize(1);
+    }
+
+    @Test
     void readNeedsClinicalViewAndWriteNeedsClinicalEdit() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedRole(tenant.id(), "FrontDeskOnly", false, fullGrant("queue"), fullGrant("patients"));
