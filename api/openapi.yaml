@@ -1153,6 +1153,16 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden. 403 not-prescriber when an override is sent by someone who is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/print-header:
+    parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: Header data for printing a SIGNED prescription (clinic, prescriber of record, professional registration number). 409 prescription-not-signed for a draft. The registration number is null when none is on file; the printout must then omit it.
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PrescriptionPrintHeader" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Prescription not signed (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
@@ -1558,6 +1568,17 @@ components:
         actorId: { type: [string, "null"], format: uuid }
         actorName: { type: [string, "null"] }
         occurredAt: { type: string, format: date-time }
+    PrescriptionPrintHeader:
+      type: object
+      properties:
+        prescriptionId: { type: string, format: uuid }
+        signedAt: { type: [string, "null"], format: date-time }
+        clinicName: { type: string }
+        clinicRegion: { type: string, enum: [IN, KSA] }
+        clinicPhone: { type: [string, "null"], description: "Clinic WhatsApp number from clinic setup" }
+        prescriberId: { type: [string, "null"], format: uuid, description: "Who signed (the visit's doctor or a clinical:approve holder)" }
+        prescriberName: { type: [string, "null"] }
+        professionalRegistrationNo: { type: [string, "null"], description: "From the staff record; null when not set" }
     Prescription:
       type: object
       properties:
@@ -1670,6 +1691,11 @@ components:
         fieldGrants:
           type: array
           items: { type: string, example: "no_financial_fields" }
+        departmentId: { type: [string, "null"], format: uuid }
+        professionalRegistrationNo:
+          type: [string, "null"]
+          pattern: "^$|^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$"
+          description: "DOC-N1. Omitted/null = unchanged; empty string = clear; otherwise 1-40 characters of letters, digits, space . / -. Audited (the audit row records set/changed/cleared, not the value). Requires staff:edit."
 
     Staff:
       type: object
@@ -1684,6 +1710,7 @@ components:
         emailVerified: { type: boolean }
         mobileVerified: { type: boolean, description: "Patient data is unreachable until both this and emailVerified are true (NB-041)" }
         lastSeenAt: { type: [string, "null"], format: date-time }
+        professionalRegistrationNo: { type: [string, "null"], description: "DOC-N1. Medical council / SCFHS registration number; null when not set" }
 
     RoleWrite:
       type: object
