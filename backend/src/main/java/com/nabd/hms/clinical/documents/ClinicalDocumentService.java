@@ -146,6 +146,8 @@ public class ClinicalDocumentService {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("id", row.doctorId().toString());
         doc.put("name", doctor.name());
+        // Snapshot at issue time like every other header value; null when none is recorded (never a placeholder).
+        doc.put("registrationNumber", repo.findRegistrationNo(tenantId, row.doctorId()).orElse(null));
         Map<String, Object> pat = new LinkedHashMap<>();
         pat.put("name", patient.name());
         pat.put("mrn", patient.mrn());

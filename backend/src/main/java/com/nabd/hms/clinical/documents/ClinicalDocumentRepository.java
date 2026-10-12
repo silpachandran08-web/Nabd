@@ -90,6 +90,13 @@ class ClinicalDocumentRepository {
                 tenantId, staffId).stream().findFirst();
     }
 
+    /** The doctor's printed professional registration number (V55); empty when none is recorded. */
+    Optional<String> findRegistrationNo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT professional_registration_no FROM staff WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> rs.getString("professional_registration_no"),
+                tenantId, staffId).stream().filter(v -> v != null && !v.isBlank()).findFirst();
+    }
+
     // ── visit summary prefill: reads the visit's own signed note / prescription ──
 
     SummarySources findSummarySources(UUID tenantId, UUID queueEntryId) {
