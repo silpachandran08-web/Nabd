@@ -124,7 +124,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
       )}
       <div className={`${r.notice} ${r.noticeInfo}`} role="note">
         <Icon name="info" size={16} />
-        <span>Medicines are printed exactly as the prescriber typed them. Generic and brand names are not stored separately, so none is added or substituted.</span>
+        <span>Medicines are printed exactly as the prescriber typed them. No name is added or substituted.</span>
       </div>
 
       <article className={r.sheet} aria-label="Prescription">
@@ -169,10 +169,14 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
                 <span className={r.medNo}>{i + 1}.</span>
                 <div>
                   <div className={r.medName}>{m.drugName}</div>
+                  {m.brandName && <div className={r.medInstructions}><span className={r.muted}>Brand </span>{m.brandName}</div>}
                   <div className={r.medFields}>
+                    {m.route && <span className={r.medField}><span className={r.muted}>Route</span>{m.route}</span>}
                     {m.dosage && <span className={r.medField}><span className={r.muted}>Dose</span>{m.dosage}</span>}
+                    {m.sigPattern && m.sigPattern !== m.frequency && <span className={r.medField}><span className={r.muted}>Pattern</span>{m.sigPattern}</span>}
                     {m.frequency && <span className={r.medField}><span className={r.muted}>Frequency</span>{m.frequency}</span>}
                     {m.duration && <span className={r.medField}><span className={r.muted}>Duration</span>{m.duration}</span>}
+                    {m.quantity != null && <span className={r.medField}><span className={r.muted}>Quantity</span>{m.quantity}{m.quantityUnit ? ` ${m.quantityUnit}` : ""}</span>}
                   </div>
                   {m.instructions && <div className={r.medInstructions}><span className={r.muted}>Instructions </span>{m.instructions}</div>}
                 </div>
