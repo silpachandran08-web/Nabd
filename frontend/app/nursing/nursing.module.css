@@ -9,7 +9,7 @@
    doctor-queues panel. */
 .layout {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: minmax(0, 1fr) 264px;
   gap: var(--nb-space-16);
   align-items: start;
 }
@@ -20,20 +20,27 @@
   gap: var(--nb-space-16);
 }
 
+/* Segmented control (wireframe): one capsule holding Vitals due / Vaccines / Recorded / All. */
 .filterPills {
-  display: flex;
-  gap: var(--nb-space-8);
-  flex-wrap: wrap;
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--nb-border-subtle);
+  border-radius: 999px;
+  background: var(--nb-surface-2);
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .pillFilter {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: 30px;
   padding: 0 var(--nb-space-12);
-  border: 1px solid var(--nb-border-default);
+  border: 1px solid transparent;
   border-radius: 999px;
+  white-space: nowrap;
   background: transparent;
   color: var(--nb-text-secondary);
   font-family: inherit;
@@ -58,6 +65,9 @@
 }
 
 .sideTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -84,8 +94,39 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  max-width: 260px;
+  max-width: 280px;
 }
+.flagList > span { text-transform: uppercase; letter-spacing: 0.04em; font-size: 10.5px; white-space: normal; }
+
+.sideState { padding: var(--nb-space-8) var(--nb-space-16) var(--nb-space-16); color: var(--nb-text-secondary); font-size: 13px; }
+.sideFooter { padding: 0 var(--nb-space-16) var(--nb-space-16); }
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.visitCell { display: inline-flex; align-items: center; gap: var(--nb-space-8); color: var(--nb-text-secondary); white-space: nowrap; }
+/* If the card is ever narrower than the table, the row action stays pinned at the end edge
+   instead of scrolling out of reach (the wireframe's clipped-button defect). */
+.actionCell { text-align: end; white-space: nowrap; position: sticky; inset-inline-end: 0; background-color: var(--nb-surface-1); }
+.flagCell { min-width: 180px; }
+.patientCell { min-width: 160px; }
+
+.secondaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  height: 34px;
+  padding: 0 var(--nb-space-12);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  background: var(--nb-surface-2);
+  color: var(--nb-text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.secondaryBtnWide { composes: secondaryBtn; width: 100%; justify-content: center; }
 
 .pickerRow {
   display: flex;
@@ -178,6 +219,8 @@
 /* Colour is only a reinforcement: every flagged row also carries an icon + text pill. The marker
    sits on the first cell (borders on <tr> are unreliable in collapsed tables) and is logical so
    it flips in RTL. */
+.rowFlagged td { background-image: linear-gradient(var(--nb-danger-tint), var(--nb-danger-tint)); }
+.rowUrgent td { background-image: linear-gradient(var(--nb-urgent-tint), var(--nb-urgent-tint)); }
 .rowFlagged td:first-child {
   border-inline-start: 3px solid var(--nb-danger-500);
 }
@@ -278,23 +321,25 @@
 
 .table {
   width: 100%;
+  min-width: 700px;
   border-collapse: collapse;
   font-size: 13.5px;
 }
 
 .table th {
+  white-space: nowrap;
   text-align: start;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--nb-text-tertiary);
-  padding: var(--nb-space-12) var(--nb-space-16);
+  padding: var(--nb-space-12);
   border-bottom: 1px solid var(--nb-border-subtle);
 }
 
 .table td {
-  padding: var(--nb-space-12) var(--nb-space-16);
+  padding: var(--nb-space-12);
   border-bottom: 1px solid var(--nb-border-subtle);
   vertical-align: middle;
 }
@@ -320,8 +365,12 @@
 }
 
 .actionBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nb-space-8);
   white-space: nowrap;
-  height: 30px;
+  height: 34px;
   padding: 0 var(--nb-space-12);
   border: none;
   border-radius: var(--nb-radius-md);
@@ -481,7 +530,7 @@
   .layout { grid-template-columns: 1fr; }
   .sidebarStack { flex-direction: row; }
   .sidebarStack > * { flex: 1; }
-  .smallBtn, .actionBtn, .pillFilter, .tab, .cancelBtn, .submitBtn, .input, .select { min-height: 44px; }
+  .smallBtn, .secondaryBtn, .actionBtn, .pillFilter, .tab, .cancelBtn, .submitBtn, .input, .select { min-height: 44px; }
   .textarea { min-height: 88px; }
   .pillCount { font-size: 11px; }
 }
@@ -505,7 +554,23 @@
   .modalActions { flex-wrap: wrap; }
 
   /* Tables become one card per row; each cell is labelled by its data-label. */
+  .table { min-width: 0; }
   .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table td.actionCell { text-align: end; position: static; background-color: transparent; }
+  .flagCell, .patientCell { min-width: 0; }
+  .table td.patientCell { justify-content: flex-start; text-align: start; }
+  .patientCell::before { display: none; }
+  .patientCell > span { text-align: start; }
+  .rowFlagged td:first-child, .rowUrgent td:first-child { border-inline-start: none; }
+  .rowFlagged { border-inline-start: 4px solid var(--nb-danger-500); }
+  .rowUrgent { border-inline-start: 4px solid var(--nb-urgent-500); }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .tab { white-space: nowrap; }
+  .headerRight { width: 100%; }
+  .filterPills { width: 100%; }
+  .filterPills > button { padding-inline: var(--nb-space-8); gap: 4px; }
+  .filterPills > button { flex: 1; justify-content: center; }
+  .headerActions > button { flex: 1 1 auto; min-height: 44px; justify-content: center; }
   .table thead { position: absolute; inset-inline-start: -9999px; }
   .table tr { padding: var(--nb-space-8) 0; border-bottom: 1px solid var(--nb-border-default); }
   .table td { display: flex; justify-content: space-between; align-items: center; gap: var(--nb-space-12); border-bottom: none; padding: var(--nb-space-8) var(--nb-space-16); text-align: end; }

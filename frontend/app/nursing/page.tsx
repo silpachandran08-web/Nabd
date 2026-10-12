@@ -20,23 +20,42 @@ type QueueEntry = {
   id: string; patientId: string; doctorId: string; departmentId: string; tokenNumber: number; status: string; createdAt: string;
   priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
   priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
-  source: string; presentingComplaint: string | null;
+  source: string; presentingComplaint: string | null; appointmentId: string | null;
 };
 type Row = QueueEntry & {
   patientName: string; patientMrn: string; doctorName: string;
-  allergies: string[]; chronicConditions: string[]; dob: string | null;
+  allergies: string[]; chronicConditions: string[];
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
+  dob: string | null; gender: string | null; hasAppointment: boolean;
 };
 // A patient's clinical-flags chips: allergy (danger), chronic condition (warn), presenting
 // complaint (neutral info). "Urgent" is reserved for the queue's priority flag (rendered
 // separately) — a routine complaint such as "cough" must never look urgent.
 type Flag = { kind: "danger" | "warn" | "info"; text: string };
-function flagsFor(r: { allergies: string[]; chronicConditions: string[]; presentingComplaint: string | null }): Flag[] {
+function flagsFor(r: { allergies: string[]; chronicConditions: string[]; presentingComplaint: string | null; priorityReason: string | null }): Flag[] {
   return [
     ...r.allergies.map((a): Flag => ({ kind: "danger", text: `Allergy: ${a}` })),
     ...r.chronicConditions.map((c): Flag => ({ kind: "warn", text: c })),
-    ...(r.presentingComplaint ? [{ kind: "info", text: r.presentingComplaint } as Flag] : []),
+    ...(r.presentingComplaint && r.presentingComplaint.trim().toLowerCase() !== (r.priorityReason ?? "").trim().toLowerCase()
+      ? [{ kind: "info", text: r.presentingComplaint } as Flag] : []),
   ];
+}
+
+// "58 M" from the patient's real dob/gender; either part is simply left out when unknown.
+function ageSex(dob: string | null, gender: string | null): string {
+  const parts: string[] = [];
+  if (dob) {
+    const d = new Date(dob);
+    if (!Number.isNaN(d.getTime())) {
+      const now = new Date();
+      let age = now.getFullYear() - d.getFullYear();
+      if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age -= 1;
+      parts.push(age >= 0 ? String(age) : "");
+    }
+  }
+  const g = (gender ?? "").trim().charAt(0).toUpperCase();
+  if (g) parts.push(g);
+  return parts.filter(Boolean).join(" ");
 }
 const FLAG_ICON = { danger: "alert", warn: "pulse", info: "info" } as const;
 
@@ -214,12 +233,12 @@ function NursingWorklist() {
   useEffect(() => {
     void Promise.resolve().then(() => {
       const now = new Date();
-      const greg = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+      const greg = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
       if (getIdentity()?.tenantRegion === "KSA") {
         const hijri = new Intl.DateTimeFormat("en-SA-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now);
-        setDateLine(`Today · ${hijri} · ${greg}`);
+        setDateLine(`${hijri} · ${greg}`);
       } else {
-        setDateLine(`Today · ${greg}`);
+        setDateLine(greg);
       }
     });
   }, []);
@@ -271,11 +290,12 @@ function NursingWorklist() {
       }
       const withNames = async (list: QueueEntry[]) => Promise.all(list.map(async (e) => {
         const pRes = await authedFetch(`/patients/${e.patientId}`);
-        const p: { name?: string; mrn?: string; dob?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
+        const p: { name?: string; mrn?: string; dob?: string; gender?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
         return {
           ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—",
-          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [], dob: p?.dob ?? null,
+          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
           lastVitalsAt: null, vitalsOutOfRange: false,
+          dob: p?.dob ?? null, gender: p?.gender ?? null, hasAppointment: !!e.appointmentId,
         };
       }));
       // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today —
@@ -587,24 +607,27 @@ function NursingWorklist() {
         <div>
           <h1 className={styles.title}>{tab === "vitals" || isVaccinesView ? "Vitals Worklist" : TABS.find((t) => t.key === tab)?.label}</h1>
           <p className={styles.subtitle}>
-            {loaded && <>{rows.length} awaiting vitals{dateLine ? " · " : ""}</>}{dateLine}
+            {dateLine}{loaded && <>{dateLine ? " · " : ""}{rows.length} awaiting vitals</>}
           </p>
         </div>
         <div className={styles.headerRight}>
           {loaded && tab === "vitals" && (
-            <div className={styles.filterPills}>
-              <button className={vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("due")}>
+            <div className={styles.filterPills} role="group" aria-label="Worklist view">
+              <button className={!isVaccinesView && vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} aria-pressed={!isVaccinesView && vitalsFilter === "due"} onClick={() => changeFilter("due")}>
                 Vitals due <span className={styles.pillCount}>{rows.length}</span>
               </button>
-              <button className={vitalsFilter === "recorded" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("recorded")}>
+              {/* No vaccines backend: the segment opens the honest "not available" view and carries no count. */}
+              <button className={isVaccinesView ? styles.pillFilterActive : styles.pillFilter} aria-pressed={isVaccinesView} onClick={() => router.replace("/nursing?tab=vaccines")}>
+                Vaccines
+              </button>
+              <button className={!isVaccinesView && vitalsFilter === "recorded" ? styles.pillFilterActive : styles.pillFilter} aria-pressed={!isVaccinesView && vitalsFilter === "recorded"} onClick={() => changeFilter("recorded")}>
                 Recorded <span className={styles.pillCount}>{recordedRows.length}</span>
               </button>
-              <button className={vitalsFilter === "all" ? styles.pillFilterActive : styles.pillFilter} onClick={() => changeFilter("all")}>
+              <button className={!isVaccinesView && vitalsFilter === "all" ? styles.pillFilterActive : styles.pillFilter} aria-pressed={!isVaccinesView && vitalsFilter === "all"} onClick={() => changeFilter("all")}>
                 All <span className={styles.pillCount}>{rows.length + recordedRows.length}</span>
               </button>
             </div>
           )}
-          {allow(PERM.packages) && <button className={styles.smallBtn} onClick={() => router.push("/packages")}>Package Sessions →</button>}
         </div>
       </div>
 
@@ -640,8 +663,9 @@ function NursingWorklist() {
       {loaded && tab === "vitals" && (
         <>
           <div className={`${styles.headerActions} ${styles.actionsGap}`}>
-            {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}>Capture vitals</button>}
-            {canFlagPriority && <button className={styles.smallBtn} onClick={() => openUrgentPicker()}>Mark urgent</button>}
+            {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}><Icon name="pulse" size={14} />Capture vitals</button>}
+            {canFlagPriority && <button className={styles.secondaryBtn} onClick={() => openUrgentPicker()}><Icon name="bolt" size={14} />Mark urgent</button>}
+            {allow(PERM.packages) && <button className={styles.secondaryBtn} onClick={() => router.push("/packages")}><Icon name="package" size={14} />Package sessions</button>}
           </div>
 
           <div className={styles.layout}>
@@ -651,7 +675,7 @@ function NursingWorklist() {
               ) : (
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
-                    <thead><tr><th>Patient</th><th>Visit</th><th>Clinical flags</th><th>Last vitals</th><th>Status</th><th></th></tr></thead>
+                    <thead><tr><th>Patient</th><th>Visit</th><th>Clinical flags</th><th>Last vitals</th><th>Status</th><th><span className={styles.srOnly}>Action</span></th></tr></thead>
                     <tbody>
                       {visibleVitalsRows.map((r) => {
                         const flags = flagsFor(r);
@@ -659,9 +683,17 @@ function NursingWorklist() {
                         const rowClass = hasAllergy ? styles.rowFlagged : r.priority ? styles.rowUrgent : undefined;
                         return (
                           <tr key={r.id} className={rowClass}>
-                            <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                            <td data-label="Visit" className={styles.muted}>{VISIT_LABEL[r.source] ?? r.source}</td>
-                            <td data-label="Clinical flags">
+                            <td data-label="Patient" className={styles.patientCell} title={r.patientMrn ? `MRN ${r.patientMrn}` : undefined}>
+                              <div><span className={styles.patientName}>{r.patientName}</span>
+                              <span className={styles.mrn}>{[ageSex(r.dob, r.gender), `T-${r.tokenNumber}`, r.doctorName !== "—" ? r.doctorName : ""].filter(Boolean).join(" · ")}</span></div>
+                            </td>
+                            <td data-label="Visit">
+                              <span className={styles.visitCell}>
+                                <Icon name={r.hasAppointment ? "calendar" : r.source === "walk_in" ? "login" : "users"} size={15} />
+                                {r.hasAppointment ? "Appointment" : VISIT_LABEL[r.source] ?? r.source}
+                              </span>
+                            </td>
+                            <td data-label="Clinical flags" className={styles.flagCell}>
                               {flags.length === 0 && !r.priority ? <span className={styles.muted}>No flags</span> : (
                                 <div className={styles.flagList}>
                                   {r.priority && <StatusPill tone="urgent" label={r.priorityReason ? `Urgent: ${r.priorityReason}` : "Urgent"} icon="alert" />}
@@ -675,7 +707,7 @@ function NursingWorklist() {
                                 ? <StatusPill tone="warn" label="Waiting" icon="clock" />
                                 : <StatusPill tone={r.vitalsOutOfRange ? "danger" : "ok"} label={r.vitalsOutOfRange ? `${statusLabel(r.status)} · out of range` : statusLabel(r.status)} icon={r.vitalsOutOfRange ? "alert" : "check"} />}
                             </td>
-                            <td data-label="">{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}>Capture vitals</button>}</td>
+                            <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}><Icon name="pulse" size={14} />Capture vitals</button>}</td>
                           </tr>
                         );
                       })}
@@ -687,7 +719,7 @@ function NursingWorklist() {
 
             <div className={styles.sidebarStack}>
               <div className={styles.card}>
-                <div className={styles.sideTitle}>Vitals summary</div>
+                <div className={styles.sideTitle}><Icon name="pulse" size={14} />Vitals summary</div>
                 <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedRows.length}</span></div>
                 <div className={styles.summaryRow}>
                   <span>Out of range</span>
@@ -695,13 +727,18 @@ function NursingWorklist() {
                     {outOfRangeCount > 0 && <Icon name="alert" size={14} />} {outOfRangeCount}
                   </span>
                 </div>
+                {/* No real source for capture duration yet — an honest dash, never an invented figure. */}
+                <div className={styles.summaryRow}><span>Avg capture time</span><span className={styles.summaryValue} title="Not measured yet">—</span></div>
               </div>
 
               {/* No backend exists for vaccines/injections yet (filed separately) — shown as an
                   honest "not available" card rather than fabricated due-dates. */}
               <div className={styles.card}>
-                <div className={styles.sideTitle}>Vaccines &amp; injections due</div>
-                <div className={styles.state}>Not available yet.</div>
+                <div className={styles.sideTitle}><Icon name="syringe" size={14} />Vaccines &amp; injections due</div>
+                <div className={styles.sideState}>Not available yet.</div>
+                <div className={styles.sideFooter}>
+                  <button type="button" className={styles.secondaryBtnWide} onClick={() => router.replace("/nursing?tab=vaccines")}>Open vaccine list</button>
+                </div>
               </div>
             </div>
           </div>
