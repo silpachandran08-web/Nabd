@@ -1054,6 +1054,11 @@ export default function ConsultPage() {
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.rxHeader}>
                     <h3 className={styles.rxTitle}>Prescription {rxStatus === "signed" && <StatusPill tone="ok" label="Signed" />}</h3>
+                    {rxStatus === "signed" && can("clinical:view") && (
+                      <div className={styles.rxHeaderActions}>
+                        <Link className={styles.backBtn} style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }} href={`/consult/rx/${activeEntry.id}/print`}>Print prescription</Link>
+                      </div>
+                    )}
                     {rxStatus !== "signed" && (
                       <div className={styles.rxHeaderActions}>
                         <button className={styles.backBtn} onClick={() => void saveRx()} disabled={rxSaving}>{rxSaving ? "Saving…" : "Save"}</button>
