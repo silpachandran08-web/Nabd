@@ -78,12 +78,12 @@ const LANDING_RULES: [permission: string, path: string][] = [
   ["setup:view", "/setup"],
 ];
 
-/** Any nursing:* grant marks a nursing role. Custom nurse roles are assembled per tenant from module
- * grants, so a role can hold nursing:create/edit without nursing:view — checking only nursing:view
- * sent those nurses to /consult. Checked before LANDING_RULES: clinical:edit (and queue:view) are
- * held by nurses and doctors alike, nursing:* is the one signal only nursing roles carry. */
+/** A nursing role: one that can open the nursing worklist. /nursing is gated on nursing:view (AccessGate,
+ * and every GET under /v1/nursing), so nursing:create/edit alone cannot use it: landing or navigating
+ * such a role there is a "no access" dead end. Checked before LANDING_RULES because clinical:edit and
+ * queue:view are held by nurses and doctors alike; nursing:view is the signal only nursing roles carry. */
 export function hasNursingGrant(permissions: string[]): boolean {
-  return permissions.some((p) => p.startsWith("nursing:"));
+  return permissions.includes("nursing:view");
 }
 
 // The clinic owner holds every grant, so the rules below would land them on /nursing. Their home
