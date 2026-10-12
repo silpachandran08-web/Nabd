@@ -1127,6 +1127,16 @@ paths:
       x-required-permission: clinical:edit
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AllergyStatus" } } } }
+  /clinical/drugs/search:
+    get:
+      tags: [Clinical]
+      summary: "DOC-033. Drug name type-ahead for the prescription pad, built only from this tenant's pharmacy item master (active stocked items) and names it has prescribed before. Returns [] for q shorter than 2 characters. Names only, no PII. Not a clinical formulary; free-text entry always remains possible."
+      x-required-permission: clinical:view (or clinical:edit)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 8, minimum: 1, maximum: 20 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DrugSuggestion" } } } } }
   /clinical/prescriptions/{queueEntryId}:
     parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1429,6 +1439,20 @@ components:
         duration: { type: string }
         instructions: { type: string }
         overrides: { type: array, items: { $ref: "#/components/schemas/RxWarningDecision" } }
+        brandName: { type: [string, "null"], maxLength: 200, description: "DOC-033. Brand/product text. The safety checks (allergy, pregnancy, controlled) run on drugName AND brandName." }
+        sigPattern: { type: [string, "null"], maxLength: 40, description: "DOC-033. Morning-noon-night pattern as entered, e.g. 1-0-1. `frequency` stays the free-text sig." }
+        route: { type: [string, "null"], maxLength: 40, description: "DOC-033. Route as entered (oral, topical, ...); not interpreted by the server." }
+        quantity: { type: [number, "null"], exclusiveMinimum: 0, description: "DOC-033. Quantity to dispense, as entered by the doctor; never derived or converted by the server." }
+        quantityUnit: { type: [string, "null"], maxLength: 40, description: "DOC-033. Unit of quantity as entered (tablets, ml, ...); never converted." }
+    DrugSuggestion:
+      type: object
+      description: "DOC-033. A type-ahead suggestion from the tenant's own data. Not a clinical formulary: no dose, strength or class."
+      properties:
+        name: { type: string }
+        source: { type: string, enum: [pharmacy, history], description: "pharmacy = the tenant's pharmacy item master; history = a name this tenant has prescribed before" }
+        code: { type: [string, "null"], description: "Pharmacy item code (pharmacy only)" }
+        inStock: { type: [boolean, "null"] }
+        prescriptionOnly: { type: [boolean, "null"] }
     RxWarning:
       type: object
       properties:
@@ -1466,6 +1490,11 @@ components:
         pregnancyWarning: { type: [string, "null"] }
         controlledSubstanceWarning: { type: [string, "null"] }
         warnings: { type: array, items: { $ref: "#/components/schemas/RxWarning" } }
+        brandName: { type: [string, "null"] }
+        sigPattern: { type: [string, "null"] }
+        route: { type: [string, "null"] }
+        quantity: { type: [number, "null"] }
+        quantityUnit: { type: [string, "null"] }
     PharmacySettings:
       type: object
       properties:

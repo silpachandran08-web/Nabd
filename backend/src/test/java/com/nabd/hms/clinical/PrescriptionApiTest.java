@@ -438,4 +438,61 @@ class PrescriptionApiTest extends ApiTestBase {
                         "WHERE i.tenant_id = ? AND p.status = 'signed'", Integer.class, tenant.id()));
         assertThat(signedItems).isEqualTo(1);
     }
+
+    // DOC-033 (NOT EXECUTED in the authoring environment: no Docker/Testcontainers).
+    @Test
+    void structuredFieldsRoundTripAndABrandCannotHideAnAllergyConflict() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc33@a.com", "+919800033001", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P33", "+919999933001");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        String entry = checkIn(token, patientId, doc.id());
+
+        // generic is innocuous, the brand text carries the allergen: the line must still need a decision
+        ResponseEntity<Map> saved = exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "brandName", "Penicillin-X", "sigPattern", "1-0-1",
+                        "route", "oral", "quantity", 10, "quantityUnit", "tablets")))), Map.class);
+        assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(saved.getBody().get("unresolvedWarnings")).isEqualTo(1);
+        Map<?, ?> line = (Map<?, ?>) ((List<?>) saved.getBody().get("items")).get(0);
+        assertThat(line.get("brandName")).isEqualTo("Penicillin-X");
+        assertThat(line.get("sigPattern")).isEqualTo("1-0-1");
+        assertThat(line.get("route")).isEqualTo("oral");
+        assertThat(line.get("quantityUnit")).isEqualTo("tablets");
+        ResponseEntity<Map> refused = exchange("/v1/clinical/prescriptions/" + entry + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        // an old client that omits the new fields still works
+        ResponseEntity<Map> legacy = exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+        assertThat(legacy.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(legacy.getBody().get("unresolvedWarnings")).isEqualTo(0);
+    }
+
+    @Test
+    void drugSearchIsTenantScopedTrimmedAndMatchesPharmacyItemsAndHistory() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc33b@a.com", "+919800033002", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Amoxicillin 500mg capsule", "isRx", true, "price", 12.50, "stockQty", 5)), Map.class);
+        String entry = checkIn(token, registerPatient(token, "P33b", "+919999933002"), doc.id());
+        exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Amlodipine")))), Map.class);
+
+        ResponseEntity<List> hits = exchange("/v1/clinical/drugs/search?q=am&limit=5", HttpMethod.GET, authed(token), List.class);
+        assertThat(hits.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(hits.getBody().toString()).contains("Amoxicillin 500mg capsule").contains("Amlodipine");
+        assertThat(exchange("/v1/clinical/drugs/search?q=a", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        assertThat(exchange("/v1/clinical/drugs/search?q=%25", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+
+        SeededTenant other = seedTenant();
+        UUID otherRole = seedFullAccessRole(other.id());
+        String otherToken = loginAndGetAccessToken(seedStaff(other, otherRole, "doc33c@b.com", "+919800033003", false));
+        assertThat(exchange("/v1/clinical/drugs/search?q=am", HttpMethod.GET, authed(otherToken), List.class).getBody()).isEmpty();
+    }
 }
