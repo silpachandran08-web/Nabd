@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
-import { getIdentity, getPermissions, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
+import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 // Same "waiting" bucket as the Arrivals page's own tab counts (arrivals/page.tsx bucketOf).
@@ -34,18 +34,18 @@ const NAV_ITEMS: { href: string; label: string; short: string; icon: IconName; p
   { href: "/account", label: "My account", short: "Account", icon: "user", permission: null },
 ];
 
-// DESIGN.md's Nurse sidebar, exactly: Today, Waiting Patients, Vitals, Vaccines & Injections,
-// Administration History (its own "More" is left out — nothing to overflow into here). The real
-// nursing page is a single route with tabs/filters, so each deep-links via query params instead
-// of being a separate page. Vaccines & Injections has no backend at all (filed separately) — it
-// still links through, landing on the page's own honest "not available yet" state rather than
-// being omitted, since the wireframe names it as a destination.
-const NURSING_ITEMS: { label: string; short: string; icon: IconName; tab?: string; filter?: string }[] = [
-  { label: "Today", short: "Today", icon: "home", filter: "due" },
-  { label: "Waiting Patients", short: "Waiting", icon: "clock", filter: "all" },
-  { label: "Vitals", short: "Vitals", icon: "pulse", filter: "recorded" },
-  { label: "Vaccines & Injections", short: "Vaccines", icon: "syringe", tab: "vaccines" },
-  { label: "Administration History", short: "History", icon: "list", tab: "administration" },
+// The Nurse sidebar (wireframe "Nurse / Clinical Assistant"): the nursing worklist's own sections,
+// each deep-linking into the single /nursing route via ?tab=. Package Sessions opens /packages
+// (packages:view). The wireframe's Clinical Inbox and More have no page or data source yet, so
+// they are left out rather than linked to nothing.
+type NursingItem = { label: string; short: string; icon: IconName; tab?: string; href?: string; permission?: string; badgeKey?: "priority" | "admin" };
+const NURSING_ITEMS: NursingItem[] = [
+  { label: "Arrivals & Vitals", short: "Vitals", icon: "pulse" },
+  { label: "Priority Patients", short: "Priority", icon: "alert", tab: "priority", badgeKey: "priority" },
+  { label: "Administration Orders", short: "Orders", icon: "syringe", tab: "administration", badgeKey: "admin" },
+  { label: "Today's Procedures", short: "Procedures", icon: "list", tab: "procedures" },
+  { label: "Package Sessions", short: "Packages", icon: "package", href: "/packages", permission: "packages:view" },
+  { label: "Completed Activity", short: "Activity", icon: "clock", tab: "activity" },
 ];
 
 // DESIGN.md's Owner / Clinic Manager sidebar, in its order. The owner holds every grant (so the
@@ -71,20 +71,15 @@ const OWNER_ITEMS: OwnerItem[] = [
     active: (p, tab) => p === "/setup" && tab === "subscription" },
 ];
 
-function nursingHref(item: { tab?: string; filter?: string }): string {
-  const params = new URLSearchParams();
-  if (item.tab) params.set("tab", item.tab);
-  if (item.filter) params.set("filter", item.filter);
-  const qs = params.toString();
-  return qs ? `/nursing?${qs}` : "/nursing";
+function nursingHref(item: NursingItem): string {
+  if (item.href) return item.href;
+  return item.tab ? `/nursing?tab=${item.tab}` : "/nursing";
 }
 
-function isNursingItemActive(item: { tab?: string; filter?: string }, pathname: string | null, searchParams: URLSearchParams): boolean {
+function isNursingItemActive(item: NursingItem, pathname: string | null, searchParams: URLSearchParams): boolean {
+  if (item.href) return !!pathname && pathname.startsWith(item.href);
   if (pathname !== "/nursing") return false;
-  const currentTab = searchParams.get("tab") ?? "vitals";
-  if ((item.tab ?? "vitals") !== currentTab) return false;
-  if (currentTab === "vitals" && (item.filter ?? "due") !== (searchParams.get("filter") ?? "due")) return false;
-  return true;
+  return (item.tab ?? "vitals") === (searchParams.get("tab") ?? "vitals");
 }
 
 function initials(name: string): string {
@@ -143,7 +138,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // ponytail: no polling — a count can lag until the next page change; poll if reception asks.
   useEffect(() => {
     const perms = getPermissions();
-    if (skip || isOwner() || perms.includes("nursing:view") || !perms.includes("queue:view")) return;
+    if (skip || isOwner() || hasNursingGrant(perms) || !perms.includes("queue:view")) return;
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
     let cancelled = false;
@@ -158,6 +153,32 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         });
       })
       .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pathname, skip]);
+
+  // The Nurse sidebar's count badges, off the same endpoints the nursing page itself reads:
+  // priority-flagged queue entries (GET /queue?priority=true, queue:view) and today's administration
+  // orders not yet given (GET /nursing/administration-orders/today, nursing:view). A section the role
+  // can't read just shows no badge. Refreshed on every navigation, like the reception badges.
+  useEffect(() => {
+    const perms = getPermissions();
+    if (skip || isOwner() || !hasNursingGrant(perms)) return;
+    const token = localStorage.getItem("nabd_access_token");
+    if (!token) return;
+    let cancelled = false;
+    const headers = { Authorization: `Bearer ${token}` };
+    const load = (path: string, key: string, count: (rows: { status?: string }[]) => number) =>
+      fetch(`${API_BASE}${path}`, { headers })
+        .then(async (res) => {
+          if (cancelled || !res.ok) return;
+          const rows: { status?: string }[] = await res.json();
+          if (!cancelled && Array.isArray(rows)) setBadges((b) => ({ ...b, [key]: count(rows) }));
+        })
+        .catch(() => {});
+    if (perms.includes("queue:view")) void load("/queue?priority=true", "nursing:priority", (r) => r.length);
+    if (perms.includes("nursing:view")) {
+      void load("/nursing/administration-orders/today", "nursing:admin", (r) => r.filter((o) => o.status === "not_started").length);
+    }
     return () => { cancelled = true; };
   }, [pathname, skip]);
 
@@ -184,7 +205,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // not leak those in here, or the sidebar mixes two different roles' navigation into one.
   const ownerItems = owner ? OWNER_ITEMS.filter((item) => permissions.includes(item.permission)) : [];
   const showOwner = ownerItems.length > 0;
-  const showNursing = !showOwner && permissions.includes("nursing:view");
+  const showNursing = !showOwner && hasNursingGrant(permissions);
   const items = showOwner || showNursing ? [] : NAV_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission));
   if (items.length === 0 && !showNursing && !showOwner) return null;
   const currentTab = searchParams.get("tab");
@@ -195,9 +216,10 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       key: item.label, href: item.href, label: item.label, short: item.short, icon: item.icon,
       active: !!pathname && item.active(pathname, currentTab),
     })),
-    ...(showNursing ? NURSING_ITEMS.map((item) => ({
+    ...(showNursing ? NURSING_ITEMS.filter((item) => !item.permission || permissions.includes(item.permission)).map((item) => ({
       key: item.label, href: nursingHref(item), label: item.label, short: item.short, icon: item.icon,
       active: isNursingItemActive(item, pathname, searchParams),
+      badge: item.badgeKey ? badges[`nursing:${item.badgeKey}`] : undefined,
     })) : []),
     ...items.map((item) => ({
       key: item.href, href: item.href, label: item.label, short: item.short, icon: item.icon,
