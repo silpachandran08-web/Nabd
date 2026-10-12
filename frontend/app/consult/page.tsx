@@ -18,6 +18,7 @@ import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
+import RxPad from "../components/consult/RxPad";
 import SafetyStrip from "../components/consult/SafetyStrip";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
@@ -526,9 +527,10 @@ export default function ConsultPage() {
 
   // Editing a line drops its warnings from view (they were computed for the old text); the server
   // recomputes them on the next save, and signing is checked again on the server regardless.
-  function updateRxItem(index: number, field: "drugName" | "dosage" | "frequency" | "duration" | "instructions", value: string) {
+  // DOC-033: the structured pad (RxPad) edits several fields at once; the name fields keep that rule.
+  function patchRxItem(index: number, patch: Partial<PrescriptionItem>) {
     setRxDirty(true);
-    setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value, ...(field === "drugName" ? { warnings: undefined } : {}) } : item)));
+    setRxItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch, ...("drugName" in patch || "brandName" in patch ? { warnings: undefined } : {}) } : item)));
   }
   function addRxItem() { setRxDirty(true); setRxItems((prev) => [...prev, { ...BLANK_RX_ITEM }]); }
   function removeRxItem(index: number) { setRxDirty(true); setRxItems((prev) => prev.filter((_, i) => i !== index)); }
@@ -551,6 +553,8 @@ export default function ConsultPage() {
         .filter(({ i }) => i.drugName.trim() !== "")
         .map(({ i, index }) => ({
           drugName: i.drugName, dosage: i.dosage, frequency: i.frequency, duration: i.duration, instructions: i.instructions,
+          brandName: i.brandName?.trim() || undefined, sigPattern: i.sigPattern || undefined, route: i.route || undefined,
+          quantity: i.quantity ?? undefined, quantityUnit: i.quantityUnit?.trim() || undefined,
           overrides: overrides && overrides.index === index ? [{ kind: overrides.kind, reasonCode: overrides.reasonCode, note: overrides.note || undefined }] : undefined,
         }));
       const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}`, { method: "PATCH", body: JSON.stringify({ items }) });
@@ -1075,16 +1079,11 @@ export default function ConsultPage() {
                   )}
                   {rxItems.map((item, i) => (
                     <div key={i}>
-                      <div className={styles.rxRow}>
-                        <input id={`rx-drug-${i}`} className={styles.input} aria-label="Drug name" placeholder="Drug name" value={item.drugName} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "drugName", e.target.value)} />
-                        <input className={styles.input} aria-label="Dosage" placeholder="Dosage" value={item.dosage} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "dosage", e.target.value)} />
-                        <input className={styles.input} aria-label="Frequency" placeholder="Frequency" value={item.frequency} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "frequency", e.target.value)} />
-                        <input className={styles.input} aria-label="Duration" placeholder="Duration" value={item.duration} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "duration", e.target.value)} />
-                        <input className={styles.input} aria-label="Instructions" placeholder="Instructions" value={item.instructions} disabled={rxStatus === "signed"} onChange={(e) => updateRxItem(i, "instructions", e.target.value)} />
+                      <RxPad item={item} index={i} locked={rxStatus === "signed"} authedFetch={authedFetch} onChange={(patch) => patchRxItem(i, patch)}>
                         {rxStatus !== "signed" && rxItems.length > 1 && (
                           <button type="button" className={styles.removeBtn} onClick={() => removeRxItem(i)} aria-label="Remove">×</button>
                         )}
-                      </div>
+                      </RxPad>
                       <RxWarnings
                         item={item}
                         locked={rxStatus === "signed"}

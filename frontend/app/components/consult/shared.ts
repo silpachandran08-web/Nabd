@@ -29,7 +29,10 @@ export type PrescriptionItem = {
   instructions: string; allergyOverrideReason?: string | null; allergyWarning?: string | null;
   pregnancyWarning?: string | null; controlledSubstanceWarning?: string | null;
   warnings?: RxWarning[]; overrides?: RxDecisionInput[];
+  // DOC-033 structured pad fields (null on lines saved before they existed)
+  brandName?: string | null; sigPattern?: string | null; route?: string | null; quantity?: number | null; quantityUnit?: string | null;
 };
+export type DrugSuggestion = { name: string; source: "pharmacy" | "history"; code: string | null; inStock: boolean | null; prescriptionOnly: boolean | null };
 export type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[]; unresolvedWarnings?: number };
 export type Problem = { title: string; detail: string };
 
