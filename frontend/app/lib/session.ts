@@ -71,7 +71,6 @@ export function getIdentity(): Identity | null {
 // billing lookups) without being a clinician. Landing a receptionist with that grant on /consult
 // instead of /arrivals was exactly this mistake.
 const LANDING_RULES: [permission: string, path: string][] = [
-  ["nursing:view", "/nursing"],
   ["clinical:edit", "/consult"],
   ["queue:view", "/arrivals"],
   ["pharmacy:view", "/pharmacy"],
@@ -79,12 +78,21 @@ const LANDING_RULES: [permission: string, path: string][] = [
   ["setup:view", "/setup"],
 ];
 
+/** A nursing role: one that can open the nursing worklist. /nursing is gated on nursing:view (AccessGate,
+ * and every GET under /v1/nursing), so nursing:create/edit alone cannot use it: landing or navigating
+ * such a role there is a "no access" dead end. Checked before LANDING_RULES because clinical:edit and
+ * queue:view are held by nurses and doctors alike; nursing:view is the signal only nursing roles carry. */
+export function hasNursingGrant(permissions: string[]): boolean {
+  return permissions.includes("nursing:view");
+}
+
 // The clinic owner holds every grant, so the rules below would land them on /nursing. Their home
 // is the Overview ("Today at a glance", DESIGN.md's owner home) — the same page the owner portal
 // (owner/workspaces) opens after picking a clinic. "owner" comes from the staff member's own built-in role (AuthService.mintTokenPair);
 // tokens minted before that claim existed simply fall through to the rules.
 export function landingPathFor(permissions: string[], owner = false): string {
   if (owner && permissions.includes("reports:view")) return "/overview";
+  if (!owner && hasNursingGrant(permissions)) return "/nursing";
   for (const [permission, path] of LANDING_RULES) {
     if (permissions.includes(permission)) return path;
   }

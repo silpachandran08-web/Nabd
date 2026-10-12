@@ -27,6 +27,8 @@ const PATHS = {
   plus: "M12 5v14M5 12h14",
   building: "M5 21V4h9v17M14 9h5v12M9 8h1M9 12h1M9 16h1M3 21h18",
   chevron: "M9 6l6 6-6 6",
+  login: "M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 012 2v12a2 2 0 01-2 2h-5",
+  bolt: "M13 3L5 13.5h6L10 21l8-10.5h-6z",
   sync: "M4 12a8 8 0 0113.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 01-13.7 5.6L4 16M4 20v-4h4",
 } as const;
 
