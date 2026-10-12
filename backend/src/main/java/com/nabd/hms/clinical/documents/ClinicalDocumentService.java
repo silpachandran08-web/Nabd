@@ -3,6 +3,7 @@ package com.nabd.hms.clinical.documents;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nabd.hms.clinical.PrescriptionService;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
@@ -105,9 +106,14 @@ public class ClinicalDocumentService {
     }
 
     @Transactional
-    public DocumentResponse issue(UUID tenantId, UUID staffId, String ip, UUID id) {
+    public DocumentResponse issue(UUID tenantId, UUID staffId, boolean callerCanApprove, String ip, UUID id) {
         tenantContext.set(tenantId);
         DocumentRow row = repo.lock(tenantId, id).orElseThrow(this::notFound);
+        // Same gate as signing a prescription (V1-007): the document prints under the visit doctor's name.
+        if (!PrescriptionService.mayActAsVisitDoctor(row.doctorId(), staffId, callerCanApprove)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "not-prescriber", "Prescriber only",
+                    "Only the doctor on this visit, or a clinician with approval rights, can issue this document.");
+        }
         if ("issued".equals(row.status())) {
             throw issued();
         }

@@ -63,7 +63,7 @@ public class PrescriptionService {
 
     /** Role-matrix permission (module `clinical`, action `approve`) that lets someone other than the visit's doctor
      * record a warning decision or sign a prescription. */
-    static final String PERMISSION_CLINICAL_APPROVE = "clinical:approve";
+    public static final String PERMISSION_CLINICAL_APPROVE = "clinical:approve";
 
     private static final String DOSE_RULE_SOURCE = "Weight-based mg/kg calculation v1 (clinician-supplied rate; no coded per-drug formulary)";
 
@@ -285,7 +285,12 @@ public class PrescriptionService {
     /** V1-007: the visit's own doctor, or someone holding the explicit clinical:approve grant. Draft editing stays
      * open to clinical:edit (a nurse may prepare a line); recording a warning decision and signing do not. */
     private static boolean mayDecide(QueueEntryOwner owner, UUID callerStaffId, boolean callerCanApprove) {
-        return callerCanApprove || (owner.doctorId() != null && owner.doctorId().equals(callerStaffId));
+        return mayActAsVisitDoctor(owner.doctorId(), callerStaffId, callerCanApprove);
+    }
+
+    /** The same rule for other legal-weight outputs of a visit (clinical documents): the visit's doctor or clinical:approve. */
+    public static boolean mayActAsVisitDoctor(UUID visitDoctorId, UUID callerStaffId, boolean callerCanApprove) {
+        return callerCanApprove || (visitDoctorId != null && visitDoctorId.equals(callerStaffId));
     }
 
     private ApiException notPrescriber(String what) {

@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical.documents;
 
+import com.nabd.hms.clinical.PrescriptionService;
 import com.nabd.hms.common.RequestMeta;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -23,7 +24,7 @@ import static com.nabd.hms.clinical.documents.ClinicalDocumentModels.DocumentRes
 import static com.nabd.hms.clinical.documents.ClinicalDocumentModels.SummaryPrefillResponse;
 import static com.nabd.hms.clinical.documents.ClinicalDocumentModels.UpdateRequest;
 
-/** DOC-030: visit outputs. Reads need clinical:view; writing and issuing need clinical:edit (as notes and prescriptions do). */
+/** DOC-030: visit outputs. Reads need clinical:view; drafting needs clinical:edit; issuing also needs to be the visit's doctor or hold clinical:approve (as signing a prescription does). */
 @RestController
 @RequestMapping("/v1/clinical")
 public class ClinicalDocumentController {
@@ -69,7 +70,12 @@ public class ClinicalDocumentController {
     @PostMapping("/documents/{id}/issue")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public DocumentResponse issue(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, HttpServletRequest http) {
-        return service.issue(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id);
+        return service.issue(tenantId(jwt), staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), id);
+    }
+
+    private static boolean canApprove(Jwt jwt) {
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        return permissions != null && permissions.contains(PrescriptionService.PERMISSION_CLINICAL_APPROVE);
     }
 
     private UUID tenantId(Jwt jwt) {
