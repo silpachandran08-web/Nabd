@@ -158,6 +158,33 @@ class StaffApiTest extends ApiTestBase {
         assertThat(resp.getBody().get("scope")).isEqualTo("own_patients_only");
     }
 
+    // DOC-N1 (written, not executed here: needs Docker/Testcontainers).
+    @Test
+    void patchSetsChangesAndClearsProfessionalRegistrationNo() {
+        SeededTenant tenant = seedTenant();
+        UUID ownerRole = seedFullAccessRole(tenant.id());
+        SeededStaff owner = seedStaff(tenant, ownerRole, "owner-reg@a.com", "+919100000040", false);
+        SeededStaff target = seedStaff(tenant, ownerRole, "target-reg@a.com", "+919100000041", false);
+        String token = loginAndGetAccessToken(owner);
+        String path = "/v1/staff/" + target.id();
+
+        ResponseEntity<Map> set = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("professionalRegistrationNo", "KMC 78412")), Map.class);
+        assertThat(set.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(set.getBody().get("professionalRegistrationNo")).isEqualTo("KMC 78412");
+
+        // a PATCH that does not mention it leaves it alone
+        ResponseEntity<Map> other = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("scope", "own_patients_only")), Map.class);
+        assertThat(other.getBody().get("professionalRegistrationNo")).isEqualTo("KMC 78412");
+
+        // markup / control characters are refused
+        ResponseEntity<Map> bad = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("professionalRegistrationNo", "<b>1</b>")), Map.class);
+        assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // empty string clears it
+        ResponseEntity<Map> cleared = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of("professionalRegistrationNo", "")), Map.class);
+        assertThat(cleared.getBody().get("professionalRegistrationNo")).isNull();
+    }
+
     @Test
     void acceptInviteActivatesStaffAndLogsIn() {
         SeededTenant tenant = seedTenant();

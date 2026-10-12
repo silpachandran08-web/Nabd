@@ -495,4 +495,30 @@ class PrescriptionApiTest extends ApiTestBase {
         String otherToken = loginAndGetAccessToken(seedStaff(other, otherRole, "doc33c@b.com", "+919800033003", false));
         assertThat(exchange("/v1/clinical/drugs/search?q=am", HttpMethod.GET, authed(otherToken), List.class).getBody()).isEmpty();
     }
+
+    // DOC-N1 (written, not executed here: needs Docker/Testcontainers).
+    @Test
+    void printHeaderIsRefusedForADraftAndCarriesPrescriberAndRegistrationNoOnceSigned() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-print@a.com", "+919800020091", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/staff/" + doc.id(), HttpMethod.PATCH, authedJsonBody(token, Map.of("professionalRegistrationNo", "KMC 78412")), Map.class);
+        String patientId = registerPatient(token, "P-print", "+919999960091");
+        String queueEntryId = checkIn(token, patientId, doc.id());
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg", "frequency", "BD", "duration", "3 days")))), Map.class);
+        String path = "/v1/clinical/prescriptions/" + queueEntryId + "/print-header";
+
+        ResponseEntity<Map> draft = exchange(path, HttpMethod.GET, authed(token), Map.class);
+        assertThat(draft.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(draft.getBody().get("type")).asString().contains("prescription-not-signed");
+
+        exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        ResponseEntity<Map> signed = exchange(path, HttpMethod.GET, authed(token), Map.class);
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(signed.getBody().get("prescriberId")).isEqualTo(doc.id().toString());
+        assertThat(signed.getBody().get("professionalRegistrationNo")).isEqualTo("KMC 78412");
+        assertThat(signed.getBody().get("clinicName")).isNotNull();
+    }
 }

@@ -76,8 +76,8 @@ public class StaffController {
     @PatchMapping("/{id}")
     @PreAuthorize("hasAuthority('staff:edit')")
     public StaffResponse patch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                @RequestBody StaffPatchRequest req) {
-        return staffService.patch(tenantId(jwt), staffId(jwt), id, req);
+                                @Valid @RequestBody StaffPatchRequest req, HttpServletRequest http) {
+        return staffService.patch(tenantId(jwt), staffId(jwt), id, req, RequestMeta.clientIp(http));
     }
 
     @PostMapping("/{id}/suspend")
