@@ -93,6 +93,9 @@ export function hasNursingGrant(permissions: string[]): boolean {
 export function landingPathFor(permissions: string[], owner = false): string {
   if (owner && permissions.includes("reports:view")) return "/overview";
   if (!owner && hasNursingGrant(permissions)) return "/nursing";
+  // DOC-002: a doctor (clinical:edit) lands on My Day, whose reads all demand queue:view; a
+  // clinical:edit role without queue:view keeps the /consult fallback below.
+  if (permissions.includes("clinical:edit") && permissions.includes("queue:view")) return "/my-day";
   for (const [permission, path] of LANDING_RULES) {
     if (permissions.includes(permission)) return path;
   }
