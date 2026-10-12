@@ -1138,7 +1138,7 @@ paths:
         "404": { description: Patient not found }
     put:
       tags: [Clinical]
-      summary: Record an explicit status (who and when are stamped by the server; appended to the history and audited). Never set automatically. A recorded pregnant or lactating status escalates the prescription pregnancy warning (severity severe, a fresh decision is required); other statuses leave the existing rule unchanged.
+      summary: Record an explicit status (who and when are stamped by the server; appended to the history and audited). Never set automatically. A recorded pregnant or lactating status escalates the prescription pregnancy warning (severity severe, a fresh decision is required); other statuses leave the existing rule unchanged. Re-sending the status and date already recorded is a no-op (no history event, no audit row, recorded by / at unchanged; the current state is returned).
       x-required-permission: clinical:edit
       requestBody:
         required: true
@@ -1276,7 +1276,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Clinical]
-      summary: Replace the fields of a DRAFT document. 409 document-issued once issued.
+      summary: Replace the fields of a DRAFT document (a request with no body field leaves the draft unchanged). 409 document-issued once issued.
       x-required-permission: clinical:edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
@@ -1291,12 +1291,13 @@ paths:
   /clinical/documents/{id}/issue:
     post:
       tags: [Clinical]
-      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). Audited (clinical_document.issued; no clinical text in the audit row).
+      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
       x-required-permission: clinical:edit
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Issued, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden. not-prescriber: caller is neither the visit's doctor nor holds clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
