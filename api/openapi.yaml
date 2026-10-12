@@ -1165,6 +1165,73 @@ paths:
         "403": { description: "Forbidden. 403 not-prescriber: caller is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /clinical/visits/{queueEntryId}/documents:
+    get:
+      tags: [Clinical]
+      summary: Clinical documents (visit summary, referral letter, certificate) of a visit, oldest first
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/ClinicalDocument" } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Clinical]
+      summary: Create a DRAFT document for the visit. body holds only the labelled fields of that type, as typed by the doctor (unknown keys are 400); blank values are dropped. The server fills nothing in.
+      x-required-permission: clinical:edit
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocumentCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /clinical/visits/{queueEntryId}/documents/summary-prefill:
+    get:
+      tags: [Clinical]
+      summary: Starting values for a visit summary, read from the visit's SIGNED note (diagnosis, assessment, plan) and SIGNED prescription (one line per medicine). Unsigned sources contribute nothing (noteSigned / prescriptionSigned say which). Nothing is stored; the doctor edits then creates the document.
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocumentSummaryPrefill" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /clinical/documents/{id}:
+    get:
+      tags: [Clinical]
+      summary: One clinical document (header snapshot present once issued)
+      x-required-permission: clinical:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Clinical]
+      summary: Replace the fields of a DRAFT document. 409 document-issued once issued.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocumentUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/documents/{id}/issue:
+    post:
+      tags: [Clinical]
+      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). Audited (clinical_document.issued; no clinical text in the audit row).
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Issued, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /clinical/vitals/{queueEntryId}:
     get:
       tags: [Clinical]
@@ -1357,6 +1424,53 @@ components:
               page: { $ref: "#/components/schemas/PageMeta" }
 
   schemas:
+    ClinicalDocumentCreate:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [visit_summary, referral, certificate] }
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    ClinicalDocumentUpdate:
+      type: object
+      properties:
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    ClinicalDocumentBody:
+      type: object
+      description: >
+        Plain text fields typed by the doctor, max 4000 characters each. Allowed keys per type -
+        visit_summary - diagnosis, assessment, plan, medicines, patientInstructions;
+        referral - referredTo, department, reason, findings, notes;
+        certificate - purpose, findings, restFrom (yyyy-mm-dd), restTo (yyyy-mm-dd), remarks.
+      additionalProperties: { type: string }
+    ClinicalDocumentSummaryPrefill:
+      type: object
+      properties:
+        noteSigned: { type: boolean }
+        prescriptionSigned: { type: boolean }
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    ClinicalDocument:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        queueEntryId: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        type: { type: string, enum: [visit_summary, referral, certificate] }
+        status: { type: string, enum: [draft, issued] }
+        body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+        header:
+          type: [object, "null"]
+          description: Snapshot taken at issue time; null while a draft. Never changes afterwards.
+          properties:
+            clinic: { type: object, properties: { name: { type: [string, "null"] }, region: { type: [string, "null"] } } }
+            doctor: { type: object, properties: { id: { type: string, format: uuid }, name: { type: [string, "null"] } } }
+            patient: { type: object, properties: { name: { type: string }, mrn: { type: string }, dob: { type: string, format: date }, gender: { type: string } } }
+            visit: { type: object, properties: { queueEntryId: { type: string, format: uuid }, date: { type: string, format: date } } }
+            issuedBy: { type: object, properties: { id: { type: string, format: uuid }, name: { type: [string, "null"] } } }
+        issuedBy: { type: [string, "null"], format: uuid }
+        issuedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     Allergy:
       type: object
       properties:
