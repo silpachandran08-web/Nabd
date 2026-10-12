@@ -19,6 +19,7 @@ import MedicinesList from "../components/consult/MedicinesList";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import SafetyStrip from "../components/consult/SafetyStrip";
+import VisitOutputs from "../components/consult/VisitOutputs";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
   age, DONE_STATUSES, initials, minutesSince, rxItemLine, statusLabel, WAITING_STATUSES,
@@ -1165,7 +1166,7 @@ export default function ConsultPage() {
                       <span className={p.muted}>Visible to reception as soon as you close.</span>
                     </li>
                   </ul>
-                  <p className={p.muted}>Referral letters, certificates, visit summaries and diagnostic requests aren&apos;t available yet.</p>
+                  <VisitOutputs authedFetch={authedFetch} queueEntryId={activeEntry.id} patientName={activeEntry.patientName} patient={pat} />
 
                   {closeIssues.length > 0 && !closedOut && (
                     <div className={`${p.notice} ${p.noticeDanger}`} role="alert">
