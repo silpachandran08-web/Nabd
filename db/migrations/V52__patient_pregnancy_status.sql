@@ -41,3 +41,7 @@ CREATE TRIGGER trg_patient_pregnancy_events_no_update BEFORE UPDATE ON patient_p
   FOR EACH ROW EXECUTE FUNCTION patient_pregnancy_events_immutable();
 CREATE TRIGGER trg_patient_pregnancy_events_no_delete BEFORE DELETE ON patient_pregnancy_events
   FOR EACH ROW EXECUTE FUNCTION patient_pregnancy_events_immutable();
+-- Row triggers do not fire on TRUNCATE; refuse it too (same guard V51 added for the allergy history).
+DROP TRIGGER IF EXISTS trg_patient_pregnancy_events_no_truncate ON patient_pregnancy_events;
+CREATE TRIGGER trg_patient_pregnancy_events_no_truncate BEFORE TRUNCATE ON patient_pregnancy_events
+  FOR EACH STATEMENT EXECUTE FUNCTION patient_pregnancy_events_immutable();
