@@ -8,6 +8,8 @@
 
 /* Print only the document: hide the app chrome and the toolbar. Scoped to a page that has the print area. */
 @media print {
+  /* The app is dark; the paper must not inherit it when "background graphics" is on. */
+  :global(html):has(.printArea), :global(body):has(.printArea) { background: Canvas !important; color: CanvasText !important; }
   :global(body):has(.printArea) * { visibility: hidden; }
   :global(body):has(.printArea) .printArea, :global(body):has(.printArea) .printArea * { visibility: visible; }
   .printArea { position: absolute; inset-block-start: 0; inset-inline: 0; }
