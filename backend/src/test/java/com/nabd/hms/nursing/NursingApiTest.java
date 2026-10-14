@@ -364,7 +364,7 @@ class NursingApiTest extends ApiTestBase {
         SeededStaff staff = seedStaff(tenant, roleId, "v2@a.com", "+919800020102", false);
         String token = loginAndGetAccessToken(staff);
         String p1 = registerPatient(token, "V2a", "+919999960102");
-        String p2 = registerPatient(token, "V2b", "+919999960103");
+        String p2 = registerPatient(token, "Second Vaccine Patient", "+919999960103");
         String visitOfP2 = checkIn(token, p2, staff.id());
 
         assertThat(exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(token, Map.of(

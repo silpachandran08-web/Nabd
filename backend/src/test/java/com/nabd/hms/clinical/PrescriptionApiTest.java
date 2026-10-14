@@ -428,10 +428,8 @@ class PrescriptionApiTest extends ApiTestBase {
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
                 inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM prescriptions WHERE tenant_id = ? AND status = 'signed'", tenant.id())));
         // (c) TRUNCATE on either table
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
-                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE prescription_items")));
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
-                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE prescriptions CASCADE")));
+        assertTruncateRefusedByTrigger("TRUNCATE prescription_items", "signed prescriptions are final");
+        assertTruncateRefusedByTrigger("TRUNCATE prescriptions CASCADE", "signed prescriptions are final");
 
         Integer signedItems = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
                 "SELECT count(*) FROM prescription_items i JOIN prescriptions p ON p.id = i.prescription_id " +
@@ -567,37 +565,44 @@ class PrescriptionApiTest extends ApiTestBase {
         assertThat(legacy.getBody().get("unresolvedWarnings")).isEqualTo(0);
     }
 
+    /** TestRestTemplate expands a String URL as a template and re-encodes '%', so "%20" would arrive as a literal "%20".
+     * A pre-built URI is sent as is: {@code encodedQuery} must already be percent-encoded. */
+    private ResponseEntity<List> searchDrugs(String token, String encodedQuery) {
+        return http.exchange(java.net.URI.create(url("/v1/clinical/drugs/search?q=" + encodedQuery)), HttpMethod.GET, authed(token), List.class);
+    }
+
     @Test
     void drugSearchIsTenantScopedTrimmedAndMatchesPharmacyItemsAndHistory() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff doc = seedStaff(tenant, roleId, "doc33b@a.com", "+919800033002", false);
         String token = loginAndGetAccessToken(doc);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
         exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Amoxicillin 500mg capsule", "isRx", true, "price", 12.50, "stockQty", 5)), Map.class);
         String entry = checkIn(token, registerPatient(token, "P33b", "+919999933002"), doc.id());
         exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
                 "items", List.of(Map.of("drugName", "Amlodipine")))), Map.class);
 
-        ResponseEntity<List> hits = exchange("/v1/clinical/drugs/search?q=am&limit=5", HttpMethod.GET, authed(token), List.class);
+        ResponseEntity<List> hits = searchDrugs(token, "am&limit=5");
         assertThat(hits.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(hits.getBody().toString()).contains("Amoxicillin 500mg capsule").contains("Amlodipine");
-        assertThat(exchange("/v1/clinical/drugs/search?q=a", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
-        assertThat(exchange("/v1/clinical/drugs/search?q=%25", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        assertThat(searchDrugs(token, "a").getBody()).isEmpty();
+        assertThat(searchDrugs(token, "%25").getBody()).isEmpty();
         // Surrounding whitespace is trimmed (this reaches the SQL path: "am" after trimming has two characters).
-        assertThat(exchange("/v1/clinical/drugs/search?q=%20am%20", HttpMethod.GET, authed(token), List.class).getBody().toString())
+        assertThat(searchDrugs(token, "%20am%20").getBody().toString())
                 .contains("Amoxicillin 500mg capsule");
         // 2+ characters containing LIKE wildcards must be matched literally (ESCAPE path), never as "match everything".
         // a%  a_  (and a backslash) all start with a seeded-name prefix letter, so a wildcard bug would return both drugs.
         for (String wildcard : new String[]{"a%25", "a_", "%25%25", "_m", "a%5C"}) {
-            assertThat(exchange("/v1/clinical/drugs/search?q=" + wildcard, HttpMethod.GET, authed(token), List.class).getBody())
+            assertThat(searchDrugs(token, wildcard).getBody())
                     .as("q=" + wildcard).isEmpty();
         }
 
         SeededTenant other = seedTenant();
         UUID otherRole = seedFullAccessRole(other.id());
         String otherToken = loginAndGetAccessToken(seedStaff(other, otherRole, "doc33c@b.com", "+919800033003", false));
-        assertThat(exchange("/v1/clinical/drugs/search?q=am", HttpMethod.GET, authed(otherToken), List.class).getBody()).isEmpty();
+        assertThat(searchDrugs(otherToken, "am").getBody()).isEmpty();
     }
 
     // DOC-N1 (written, not executed here: needs Docker/Testcontainers).
