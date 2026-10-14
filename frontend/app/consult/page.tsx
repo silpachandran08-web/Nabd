@@ -19,6 +19,7 @@ import MedicinesList from "../components/consult/MedicinesList";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import RxPad from "../components/consult/RxPad";
+import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
 import VisitOutputs from "../components/consult/VisitOutputs";
 import VitalsCard from "../components/consult/VitalsCard";
@@ -38,7 +39,6 @@ type Note = {
   diagnosis: string | null; status: string; signedAt: string | null; updatedAt: string;
 };
 type NoteDraft = NoteFields;
-type FavouriteRxSet = { id: string; doctorId: string | null; name: string; items: PrescriptionItem[] };
 type DoseResult = { weightKg: number; mgPerKg: number; totalDoseMg: number; ruleSource: string };
 type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis: string | null; createdAt: string };
 type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
@@ -158,8 +158,6 @@ export default function ConsultPage() {
   const [showAllergies, setShowAllergies] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
-  const [favouriteSets, setFavouriteSets] = useState<FavouriteRxSet[]>([]);
-  const [newSetName, setNewSetName] = useState("");
   const [doseMgPerKg, setDoseMgPerKg] = useState("");
   const [doseResult, setDoseResult] = useState<DoseResult | null>(null);
   const [doseError, setDoseError] = useState<string | null>(null);
@@ -437,8 +435,6 @@ export default function ConsultPage() {
     setRxDirty(false);
     setOverride(null);
     setShowAllergies(false);
-    setFavouriteSets([]);
-    setNewSetName("");
     setDoseMgPerKg("");
     setDoseResult(null);
     setDoseError(null);
@@ -450,10 +446,6 @@ export default function ConsultPage() {
     needsServerCheckRef.current = false;
 
     try {
-      const setsRes = await authedFetch("/clinical/rx-sets");
-      if (stale()) return;
-      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
-
       const pRes = await authedFetch(`/patients/${row.patientId}`);
       if (stale()) return;
       if (pRes?.ok) setActivePatient(await pRes.json());
@@ -643,32 +635,6 @@ export default function ConsultPage() {
       return;
     }
     setDoseResult(await res.json());
-  }
-
-  async function saveCurrentAsSet() {
-    if (!newSetName.trim()) return;
-    const items = rxItems.filter((i) => i.drugName.trim() !== "");
-    if (items.length === 0) return;
-    const res = await authedFetch("/clinical/rx-sets", { method: "POST", body: JSON.stringify({ name: newSetName, items }) });
-    if (res?.ok) {
-      setNewSetName("");
-      const setsRes = await authedFetch("/clinical/rx-sets");
-      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
-    }
-  }
-
-  async function applySet(setId: string) {
-    if (!activeEntry) return;
-    const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}/apply-set/${setId}`, { method: "POST" });
-    if (res?.ok) {
-      const rx: Prescription = await res.json();
-      setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
-      setRxDirty(false);
-      setRxError(null);
-    } else {
-      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't apply set." }));
-      setRxError(pr?.detail || "Couldn't apply set.");
-    }
   }
 
   async function submitAmendment() {
@@ -1117,22 +1083,15 @@ export default function ConsultPage() {
 
                   <div className={styles.previousMeds}>
                     <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>
-                    {favouriteSets.length === 0 ? (
-                      <div className={styles.saveStatus}>No saved sets yet.</div>
-                    ) : (
-                      favouriteSets.map((set) => (
-                        <div key={set.id} className={styles.previousMedsRow}>
-                          <span>{set.name} ({set.items.map((i) => i.drugName).join(", ")})</span>{" "}
-                          {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={() => applySet(set.id)}>Apply</button>}
-                        </div>
-                      ))
-                    )}
-                    {rxStatus !== "signed" && (
-                      <div className={styles.rxRow} style={{ marginBlockStart: "8px" }}>
-                        <input className={styles.input} aria-label="New set name" placeholder="Save current items as set…" value={newSetName} onChange={(e) => setNewSetName(e.target.value)} />
-                        <button type="button" className={styles.backBtn} onClick={saveCurrentAsSet} disabled={!newSetName.trim()}>Save set</button>
-                      </div>
-                    )}
+                    <FavouriteRxSetsPanel
+                      authedFetch={authedFetch} entryId={activeEntry?.id ?? null} locked={rxStatus === "signed"} items={rxItems}
+                      onError={setRxError}
+                      onApplied={(rx) => {
+                        setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
+                        setRxDirty(false);
+                        setRxError(null);
+                      }}
+                    />
                   </div>
 
                   <div className={styles.previousMeds}>
