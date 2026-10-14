@@ -109,7 +109,7 @@ type ProcedureOrder = {
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
 type Problem = { title: string; detail: string };
-const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueEdit: "queue:edit" } as const;
+const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueView: "queue:view", queueEdit: "queue:edit" } as const;
 type Tab = "vitals" | "priority" | "administration" | "procedures" | "activity";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -186,7 +186,10 @@ function NursingWorklist() {
   const [error, setError] = useState<string | null>(null);
   const [sectionFailed, setSectionFailed] = useState(false);
   const [dateLine, setDateLine] = useState("");
-  const [forbidden, setForbidden] = useState(false);
+  // The worklist, priority and procedures-pending lists come from GET /queue (queue:view). A nurse role
+  // without it still has the nursing:view sections (orders, procedures, activity), so a 403 there
+  // only closes the queue-backed sections instead of the whole page.
+  const [queueForbidden, setQueueForbidden] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [, setNow] = useState(() => Date.now());
 
@@ -273,16 +276,13 @@ function NursingWorklist() {
         authedFetch("/nursing/activity/today"),
       ]);
       if (!queueRes) return;
-      if (queueRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!queueRes.ok) {
+      const noQueue = queueRes.status === 403;
+      if (!noQueue && !queueRes.ok) {
         setError("Couldn't load the nursing worklist. Try again.");
         return;
       }
-      setForbidden(false);
-      const entries: QueueEntry[] = await queueRes.json();
+      setQueueForbidden(noQueue);
+      const entries: QueueEntry[] = noQueue ? [] : await queueRes.json();
       const staffMap = new Map<string, string>();
       if (staffRes?.ok) {
         const options: StaffOption[] = await staffRes.json();
@@ -577,7 +577,6 @@ function NursingWorklist() {
   }
 
   const allow = (permission: string) => !loading && can(permission);
-  if (forbidden) return <main className={styles.page}><EmptyState icon="shield" title="No access to the nursing worklist" hint="Your role doesn't include the nursing worklist." /></main>;
 
   const visibleVitalsRows = vitalsFilter === "due" ? rows : vitalsFilter === "recorded" ? recordedRows : [...rows, ...recordedRows];
   const urgentCandidates = [...rows, ...recordedRows].filter((r) => !r.priority);
@@ -586,8 +585,11 @@ function NursingWorklist() {
   const canCaptureVitals = allow(PERM.vitalsWrite);
   const canCreateOrders = allow(PERM.create);
   const canEditOrders = allow(PERM.edit);
-  // Flagging and acknowledging priority call POST /queue/{id}/reorder and /priority/acknowledge (queue:edit).
+  // Flagging and acknowledging priority call POST /queue/{id}/reorder and /priority/acknowledge (queue:edit);
+  // "Procedures done, continue" is PATCH /queue/{id}/status (queue:edit) after GET /departments/{id}/flow (queue:view).
   const canFlagPriority = allow(PERM.queueEdit);
+  const canAdvanceQueue = allow(PERM.queueEdit) && allow(PERM.queueView);
+  const noQueueAccess = <EmptyState icon="shield" title="No access to the patient queue" hint="Your role doesn't include the patient queue, so arrivals and priority patients aren't shown here." />;
   const showSkeleton = !loaded && !error;
   const showLoadError = !loaded && !!error;
   const vitalsEmpty = {
@@ -611,11 +613,11 @@ function NursingWorklist() {
         <div>
           <h1 className={styles.title}>{isVaccinesView ? "Vaccines & Injections" : tab === "vitals" ? "Vitals Worklist" : TABS.find((t) => t.key === tab)?.label}</h1>
           <p className={styles.subtitle}>
-            {dateLine}{loaded && !isVaccinesView && <>{dateLine ? " · " : ""}{rows.length} awaiting vitals</>}
+            {dateLine}{loaded && !isVaccinesView && !queueForbidden && <>{dateLine ? " · " : ""}{rows.length} awaiting vitals</>}
           </p>
         </div>
         <div className={styles.headerRight}>
-          {loaded && tab === "vitals" && (
+          {loaded && tab === "vitals" && !queueForbidden && (
             <div className={styles.filterPills} role="group" aria-label="Worklist view">
               <button className={!isVaccinesView && vitalsFilter === "due" ? styles.pillFilterActive : styles.pillFilter} aria-pressed={!isVaccinesView && vitalsFilter === "due"} onClick={() => changeFilter("due")}>
                 Vitals due <span className={styles.pillCount}>{rows.length}</span>
@@ -667,14 +669,14 @@ function NursingWorklist() {
       {loaded && tab === "vitals" && (
         <>
           <div className={`${styles.headerActions} ${styles.actionsGap}`}>
-            {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}><Icon name="pulse" size={14} />Capture vitals</button>}
+            {canCaptureVitals && !queueForbidden && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}><Icon name="pulse" size={14} />Capture vitals</button>}
             {canCreateOrders && <button className={styles.secondaryBtn} onClick={() => setShowVaccineDialog(true)}><Icon name="syringe" size={14} />Record vaccine</button>}
-            {canFlagPriority && <button className={styles.secondaryBtn} onClick={() => openUrgentPicker()}><Icon name="bolt" size={14} />Mark urgent</button>}
+            {canFlagPriority && !queueForbidden && <button className={styles.secondaryBtn} onClick={() => openUrgentPicker()}><Icon name="bolt" size={14} />Mark urgent</button>}
           </div>
 
           <div className={styles.layout}>
             <div className={styles.card}>
-              {visibleVitalsRows.length === 0 ? (
+              {queueForbidden ? noQueueAccess : visibleVitalsRows.length === 0 ? (
                 <EmptyState icon="pulse" title={vitalsEmpty.title} hint={vitalsEmpty.hint} />
               ) : (
                 <div className={styles.tableWrap}>
@@ -723,7 +725,7 @@ function NursingWorklist() {
             </div>
 
             <div className={styles.sidebarStack}>
-              <div className={styles.card}>
+              {!queueForbidden && <div className={styles.card}>
                 <div className={styles.sideTitle}><Icon name="pulse" size={14} />Vitals summary</div>
                 <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedRows.length}</span></div>
                 <div className={styles.summaryRow}>
@@ -734,7 +736,7 @@ function NursingWorklist() {
                 </div>
                 {/* No real source for capture duration yet — an honest dash, never an invented figure. */}
                 <div className={styles.summaryRow}><span>Avg capture time</span><span className={styles.summaryValue} title="Not measured yet">—</span></div>
-              </div>
+              </div>}
 
               {/* No backend exists for vaccines/injections yet (filed separately) — shown as an
                   honest "not available" card rather than fabricated due-dates. */}
@@ -752,7 +754,7 @@ function NursingWorklist() {
 
       {loaded && tab === "priority" && (
         <div className={styles.card}>
-          {priorityRows.length === 0 ? (
+          {queueForbidden ? noQueueAccess : priorityRows.length === 0 ? (
             <EmptyState icon="alert" title="No priority patients flagged" hint="Patients flagged urgent by reception or nursing appear here." />
           ) : (
             <div className={styles.tableWrap}>
@@ -848,7 +850,7 @@ function NursingWorklist() {
                           {r.priority && <StatusPill tone="urgent" label="Urgent" icon="alert" />}
                           <StatusPill tone="warn" label="Procedures pending" icon="clock" />
                         </td>
-                        <td data-label=""><button className={styles.actionBtn} onClick={() => continueAfterProcedures(r)}>Procedures done, continue</button></td>
+                        <td data-label="">{canAdvanceQueue && <button className={styles.actionBtn} onClick={() => continueAfterProcedures(r)}>Procedures done, continue</button>}</td>
                       </tr>
                     ))}
                   </tbody>
