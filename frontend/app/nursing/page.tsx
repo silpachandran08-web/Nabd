@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./nursing.module.css";
 import Icon from "../components/ui/Icon";
 import Dialog from "../components/ui/Dialog";
+import VaccinePanel, { RecordVaccineDialog, type VaccineVisit } from "../components/nursing/VaccinePanel";
 import AccessGate from "../components/ui/AccessGate";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
@@ -201,6 +202,8 @@ function NursingWorklist() {
   // dueRows reusing the existing per-row modal; "Mark urgent" is the missing create-a-flag
   // action (nursing could previously only acknowledge one someone else raised).
   const [showCapturePicker, setShowCapturePicker] = useState(false);
+  const [showVaccineDialog, setShowVaccineDialog] = useState(false);
+  const [vaccineReload, setVaccineReload] = useState(0);
   const [showUrgentPicker, setShowUrgentPicker] = useState(false);
   const [urgentEntryId, setUrgentEntryId] = useState("");
   const [urgentReasonCode, setUrgentReasonCode] = useState<string>(URGENT_REASON_CODES[0]);
@@ -598,14 +601,17 @@ function NursingWorklist() {
   // no backend exists for it — not one of the 5 real tabs, so it's checked from the raw query
   // param (validTab() would just fall it back to "vitals") and shown as its own honest section.
   const isVaccinesView = searchParams.get("tab") === "vaccines";
+  // Today's visits a vaccine can be recorded against (one entry per visit, never a made-up patient).
+  const vaccineVisits: VaccineVisit[] = [...new Map([...rows, ...recordedRows, ...proceduresPendingRows].map((r) => [r.id, r])).values()]
+    .map((r) => ({ patientId: r.patientId, queueEntryId: r.id, patientName: r.patientName, tokenNumber: r.tokenNumber }));
 
   return (
     <main className={styles.page}>
       <div className={styles.headerRow}>
         <div>
-          <h1 className={styles.title}>{tab === "vitals" || isVaccinesView ? "Vitals Worklist" : TABS.find((t) => t.key === tab)?.label}</h1>
+          <h1 className={styles.title}>{isVaccinesView ? "Vaccines & Injections" : tab === "vitals" ? "Vitals Worklist" : TABS.find((t) => t.key === tab)?.label}</h1>
           <p className={styles.subtitle}>
-            {dateLine}{loaded && <>{dateLine ? " · " : ""}{rows.length} awaiting vitals</>}
+            {dateLine}{loaded && !isVaccinesView && <>{dateLine ? " · " : ""}{rows.length} awaiting vitals</>}
           </p>
         </div>
         <div className={styles.headerRight}>
@@ -630,9 +636,14 @@ function NursingWorklist() {
       </div>
 
       {isVaccinesView ? (
-        <div className={styles.card}>
-          <EmptyState icon="syringe" title="Vaccines & injections isn't available yet" />
-        </div>
+        <>
+          {canCreateOrders && (
+            <div className={`${styles.headerActions} ${styles.actionsGap}`}>
+              <button className={styles.actionBtn} onClick={() => setShowVaccineDialog(true)}><Icon name="syringe" size={14} />Record vaccine</button>
+            </div>
+          )}
+          <VaccinePanel authedFetch={authedFetch} reloadKey={vaccineReload} />
+        </>
       ) : (
         <>
 
@@ -657,6 +668,7 @@ function NursingWorklist() {
         <>
           <div className={`${styles.headerActions} ${styles.actionsGap}`}>
             {canCaptureVitals && <button className={styles.actionBtn} onClick={() => setShowCapturePicker(true)}><Icon name="pulse" size={14} />Capture vitals</button>}
+            {canCreateOrders && <button className={styles.secondaryBtn} onClick={() => setShowVaccineDialog(true)}><Icon name="syringe" size={14} />Record vaccine</button>}
             {canFlagPriority && <button className={styles.secondaryBtn} onClick={() => openUrgentPicker()}><Icon name="bolt" size={14} />Mark urgent</button>}
           </div>
 
@@ -677,7 +689,7 @@ function NursingWorklist() {
                           <tr key={r.id} className={rowClass}>
                             <td data-label="Patient" className={styles.patientCell} title={r.patientMrn ? `MRN ${r.patientMrn}` : undefined}>
                               <div><span className={styles.patientName}>{r.patientName}</span>
-                              <span className={styles.mrn}>{[ageSex(r.dob, r.gender), `T-${r.tokenNumber}`, r.doctorName !== "—" ? r.doctorName : ""].filter(Boolean).join(" · ")}</span></div>
+                              <span className={styles.mrn} title={r.doctorName !== "—" ? r.doctorName : undefined}>{[ageSex(r.dob, r.gender), `T-${r.tokenNumber}`, r.doctorName !== "—" ? r.doctorName : ""].filter(Boolean).join(" · ")}</span></div>
                             </td>
                             <td data-label="Visit">
                               <span className={styles.visitCell}>
@@ -728,9 +740,9 @@ function NursingWorklist() {
                   honest "not available" card rather than fabricated due-dates. */}
               <div className={styles.card}>
                 <div className={styles.sideTitle}><Icon name="syringe" size={14} />Vaccines &amp; injections due</div>
-                <div className={styles.sideState}>Not available yet.</div>
+                <div className={styles.sideState}>Not available yet. No immunisation schedule is set up.</div>
                 <div className={styles.sideFooter}>
-                  <button type="button" className={styles.secondaryBtnWide} onClick={() => router.replace("/nursing?tab=vaccines")}>Open vaccine list</button>
+                  <button type="button" className={styles.secondaryBtnWide} onClick={() => router.replace("/nursing?tab=vaccines")}>Open vaccine log</button>
                 </div>
               </div>
             </div>
@@ -1004,10 +1016,15 @@ function NursingWorklist() {
         </div>
       )}
 
+      {showVaccineDialog && canCreateOrders && (
+        <RecordVaccineDialog authedFetch={authedFetch} visits={vaccineVisits}
+          onClose={() => setShowVaccineDialog(false)}
+          onRecorded={() => { setShowVaccineDialog(false); setVaccineReload((n) => n + 1); if (!isVaccinesView) router.replace("/nursing?tab=vaccines"); }} />
+      )}
+
       {showUrgentPicker && canFlagPriority && (
-        <div className={styles.overlay} onClick={() => setShowUrgentPicker(false)}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitMarkUrgent}>
-            <h2 className={styles.modalTitle}>Mark urgent</h2>
+        <Dialog title="Mark urgent" onClose={() => { if (!urgentSubmitting) setShowUrgentPicker(false); }}>
+          <form onSubmit={submitMarkUrgent}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="urgentPatient">Patient</label>
               <select id="urgentPatient" className={styles.select} value={urgentEntryId} onChange={(e) => setUrgentEntryId(e.target.value)}>
@@ -1036,7 +1053,7 @@ function NursingWorklist() {
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {showAdminForm && canCreateOrders && (

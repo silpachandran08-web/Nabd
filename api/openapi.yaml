@@ -28,6 +28,7 @@ tags:
   - name: Audit
   - name: Clinical
   - name: Pharmacy
+  - name: Nursing
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -1636,6 +1637,27 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PharmacyStockMovement" } } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # ------------------------------------------------- Nursing (vaccine record, record-only)
+  /nursing/vaccine-records:
+    post:
+      tags: [Nursing]
+      summary: Record a vaccine given. Record-only and append-only - stores what the nurse entered (free-text vaccine name, dose, route, site, lot). There is no immunisation schedule, so nothing is validated or computed against one. Audited as nursing.vaccine_recorded. 400 queue-entry-mismatch if queueEntryId belongs to another patient.
+      x-required-permission: nursing:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/VaccineRecordWrite" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/VaccineRecord" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /nursing/vaccine-records/today:
+    get:
+      tags: [Nursing]
+      summary: Vaccines recorded today (clinic day), newest first. There is no due list because no vaccine schedule reference data exists.
+      x-required-permission: nursing:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/VaccineRecord" } } } } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1779,6 +1801,35 @@ components:
         issuedAt: { type: [string, "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    VaccineRecordWrite:
+      type: object
+      required: [patientId, vaccineName, dose, route]
+      properties:
+        patientId: { type: string, format: uuid }
+        queueEntryId: { type: [string, "null"], format: uuid }
+        vaccineName: { type: string, maxLength: 200 }
+        dose: { type: string, maxLength: 100 }
+        route: { type: string, enum: [IM, IV, SC, infusion, oral, topical] }
+        site: { type: [string, "null"], maxLength: 100 }
+        lotNumber: { type: [string, "null"], maxLength: 100 }
+        expiryDate: { type: [string, "null"], format: date }
+        notes: { type: [string, "null"], maxLength: 1000 }
+    VaccineRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        queueEntryId: { type: [string, "null"], format: uuid }
+        vaccineName: { type: string }
+        dose: { type: string }
+        route: { type: string }
+        site: { type: [string, "null"] }
+        lotNumber: { type: [string, "null"] }
+        expiryDate: { type: [string, "null"], format: date }
+        notes: { type: [string, "null"] }
+        recordedByName: { type: string }
+        administeredAt: { type: string, format: date-time }
     Allergy:
       type: object
       properties:

@@ -10,6 +10,8 @@ import com.nabd.hms.nursing.dto.ProcedureOrderRequest;
 import com.nabd.hms.nursing.dto.ProcedureOrderResponse;
 import com.nabd.hms.nursing.dto.ProcedureStatusRequest;
 import com.nabd.hms.nursing.dto.RefuseRequest;
+import com.nabd.hms.nursing.dto.VaccineRecordRequest;
+import com.nabd.hms.nursing.dto.VaccineRecordResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,8 +36,11 @@ public class NursingController {
     private final AdministrationService administrationService;
     private final ProcedureService procedureService;
     private final ActivityService activityService;
+    private final VaccineRecordService vaccineRecordService;
 
-    NursingController(AdministrationService administrationService, ProcedureService procedureService, ActivityService activityService) {
+    NursingController(AdministrationService administrationService, ProcedureService procedureService, ActivityService activityService,
+                      VaccineRecordService vaccineRecordService) {
+        this.vaccineRecordService = vaccineRecordService;
         this.administrationService = administrationService;
         this.procedureService = procedureService;
         this.activityService = activityService;
@@ -101,6 +106,19 @@ public class NursingController {
     @PreAuthorize("hasAuthority('nursing:view')")
     public List<ActivityEntryResponse> activityToday(@AuthenticationPrincipal Jwt jwt) {
         return activityService.today(tenantId(jwt), staffId(jwt));
+    }
+
+    @PostMapping("/vaccine-records")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('nursing:create')")
+    public VaccineRecordResponse recordVaccine(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody VaccineRecordRequest req) {
+        return vaccineRecordService.record(tenantId(jwt), staffId(jwt), req);
+    }
+
+    @GetMapping("/vaccine-records/today")
+    @PreAuthorize("hasAuthority('nursing:view')")
+    public List<VaccineRecordResponse> vaccineRecordsToday(@AuthenticationPrincipal Jwt jwt) {
+        return vaccineRecordService.listToday(tenantId(jwt));
     }
 
     private UUID tenantId(Jwt jwt) {

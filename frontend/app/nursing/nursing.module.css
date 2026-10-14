@@ -108,7 +108,7 @@
    instead of scrolling out of reach (the wireframe's clipped-button defect). */
 .actionCell { text-align: end; white-space: nowrap; position: sticky; inset-inline-end: 0; background-color: var(--nb-surface-1); }
 .flagCell { min-width: 180px; }
-.patientCell { min-width: 160px; }
+.patientCell { min-width: 160px; max-width: 200px; }
 
 .secondaryBtn {
   display: inline-flex;
@@ -355,6 +355,9 @@
 
 .mrn {
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--nb-text-tertiary);
   font-size: 12px;
   margin-top: 1px;
@@ -557,7 +560,8 @@
   .table { min-width: 0; }
   .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
   .table td.actionCell { text-align: end; position: static; background-color: transparent; }
-  .flagCell, .patientCell { min-width: 0; }
+  .flagCell, .patientCell { min-width: 0; max-width: none; }
+  .mrn { white-space: normal; }
   .table td.patientCell { justify-content: flex-start; text-align: start; }
   .patientCell::before { display: none; }
   .patientCell > span { text-align: start; }
