@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.queue.QueueModels.ActorInfo;
 import static com.nabd.hms.queue.QueueModels.WaitlistEntryRow;
 
 @Repository
@@ -79,6 +80,35 @@ class WaitlistRepository {
                         "WHERE tenant_id = ? AND id = ? AND status = 'offered' AND offer_expires_at > now()",
                 appointmentId, tenantId, id);
         return rows == 1;
+    }
+
+    /**
+     * REC-028: books an entry into a slot the front desk chose. Any not-yet-closed entry qualifies (waiting,
+     * offered, or an offer that lapsed); booked/cancelled rows are final. Same check-in-the-WHERE shape as
+     * claimOffer, so a concurrent remove or accept makes this return false instead of double-booking.
+     */
+    boolean claimForChosenSlot(UUID tenantId, UUID id, UUID appointmentId) {
+        int rows = jdbc.update(
+                "UPDATE waitlist_entries SET status = 'booked', booked_appointment_id = ? " +
+                        "WHERE tenant_id = ? AND id = ? AND status IN ('waiting','offered','expired')",
+                appointmentId, tenantId, id);
+        return rows == 1;
+    }
+
+    /** True while another entry holds a live (unexpired) offer of exactly this slot with this doctor. */
+    boolean isSlotOnLiveOffer(UUID tenantId, UUID doctorId, Instant slotStart, UUID exceptEntryId) {
+        Boolean held = jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM waitlist_entries WHERE tenant_id = ? AND doctor_id = ? " +
+                        "AND status = 'offered' AND offer_expires_at > now() AND offered_slot_start = ? AND id <> ?)",
+                Boolean.class, tenantId, doctorId, Timestamp.from(slotStart), exceptEntryId);
+        return Boolean.TRUE.equals(held);
+    }
+
+    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
     }
 
     void cancelMembership(UUID tenantId, UUID id) {

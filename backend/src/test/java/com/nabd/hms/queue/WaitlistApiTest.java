@@ -174,4 +174,86 @@ class WaitlistApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(resp.getBody().get("type")).asString().contains("already-waitlisted");
     }
+
+    /** REC-028: the front desk books a waitlisted patient into a slot it chose; conflicts are clear 409s. */
+    @Test
+    void acceptWithAChosenSlotBooksItAndRefusesTakenOrOfferedSlots() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "doc28@a.com", "+919700000028", false);
+        String token = loginAndGetAccessToken(doctor);
+        addWorkingHours(token, doctor.id());
+        Instant base = nearFutureSlot();
+
+        String waiterA = registerPatient(token, "WaiterA", "+919700002801");
+        String waiterB = registerPatient(token, "WaiterB", "+919700002802");
+        String entryA = (String) exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", doctor.id().toString(), "patientId", waiterA)), Map.class).getBody().get("id");
+        String entryB = (String) exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", doctor.id().toString(), "patientId", waiterB)), Map.class).getBody().get("id");
+
+        // a slot already booked by someone else: 409 slot-unavailable, entry stays waiting
+        String other = registerPatient(token, "Taken", "+919700002803");
+        bookAppointment(token, doctor.id(), other, base);
+        ResponseEntity<Map> taken = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,
+                authedJsonBody(token, Map.of("slotStart", base.toString())), Map.class);
+        assertThat(taken.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(taken.getBody().get("type")).asString().contains("slot-unavailable");
+
+        // a slot in the past: 400
+        ResponseEntity<Map> past = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,
+                authedJsonBody(token, Map.of("slotStart", Instant.now().minus(1, ChronoUnit.HOURS).toString())), Map.class);
+        assertThat(past.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // a free chosen slot for a waiting (never offered) entry: booked
+        Instant chosen = base.plus(30, ChronoUnit.MINUTES);
+        ResponseEntity<Map> ok = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,
+                authedJsonBody(token, Map.of("slotStart", chosen.toString())), Map.class);
+        assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(ok.getBody().get("status")).isEqualTo("booked");
+        String apptId = (String) ok.getBody().get("bookedAppointmentId");
+        Map<String, Object> appt = exchange("/v1/appointments/" + apptId, HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(appt).containsEntry("patientId", waiterA).containsEntry("startTime", chosen.toString())
+                .containsEntry("status", "scheduled");
+        Integer audits = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE action = 'waitlist.booked_chosen_slot' AND entity_id = ?::uuid "
+                        + "AND after::text NOT LIKE '%WaiterA%'", Integer.class, entryA));
+        assertThat(audits).isEqualTo(1);
+
+        // the same entry again: already booked -> 409
+        ResponseEntity<Map> again = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,
+                authedJsonBody(token, Map.of("slotStart", base.plus(45, ChronoUnit.MINUTES).toString())), Map.class);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(again.getBody().get("type")).asString().contains("waitlist-entry-closed");
+
+        // a freed slot on live offer to B cannot be grabbed for a third waiter: 409 slot-on-offer
+        String waiterC = registerPatient(token, "WaiterC", "+919700002804");
+        String entryC = (String) exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", doctor.id().toString(), "patientId", waiterC)), Map.class).getBody().get("id");
+        Instant freed = base.plus(60, ChronoUnit.MINUTES);
+        String toCancel = bookAppointment(token, doctor.id(), other, freed);
+        exchange("/v1/appointments/" + toCancel + "/cancel", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "patient cancelled")), Map.class);
+        ResponseEntity<Map> onOffer = exchange("/v1/waitlist/" + entryC + "/accept", HttpMethod.POST,
+                authedJsonBody(token, Map.of("slotStart", freed.toString())), Map.class);
+        assertThat(onOffer.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(onOffer.getBody().get("type")).asString().contains("slot-on-offer");
+
+        // B accepting its own offered slot with slotStart = the offer is the plain accept
+        ResponseEntity<Map> own = exchange("/v1/waitlist/" + entryB + "/accept", HttpMethod.POST,
+                authedJsonBody(token, Map.of("slotStart", freed.toString())), Map.class);
+        assertThat(own.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(own.getBody().get("status")).isEqualTo("booked");
+        assertThat(own.getBody().get("offeredSlotStart")).isEqualTo(freed.toString());
+
+        // tenant isolation: another clinic cannot accept (or even see) this entry
+        SeededTenant otherTenant = seedTenant();
+        SeededStaff otherStaff = seedStaff(otherTenant, seedFullAccessRole(otherTenant.id()), "doc28b@a.com", "+919700000029", false);
+        String otherToken = loginAndGetAccessToken(otherStaff);
+        ResponseEntity<Map> foreign = exchange("/v1/waitlist/" + entryC + "/accept", HttpMethod.POST,
+                authedJsonBody(otherToken, Map.of("slotStart", base.plus(90, ChronoUnit.MINUTES).toString())), Map.class);
+        assertThat(foreign.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        ResponseEntity<List> foreignList = exchange("/v1/waitlist?doctorId=" + doctor.id(), HttpMethod.GET, authed(otherToken), List.class);
+        assertThat(foreignList.getBody()).isEmpty();
+    }
 }

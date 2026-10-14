@@ -1003,6 +1003,69 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "New slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /waitlist:
+    get:
+      tags: [Queue]
+      summary: A doctor's waitlist, oldest join first (waiting, offered and expired entries; NB-099)
+      description: Lapsed offers are closed and re-offered to the next waiting patient on read.
+      x-required-permission: queue:view
+      parameters:
+        - { name: doctorId, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Entries", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WaitlistEntry" } } } } }
+    post:
+      tags: [Queue]
+      summary: Put a patient on a doctor's waitlist
+      x-required-permission: queue:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [doctorId, patientId], properties: { doctorId: { type: string, format: uuid }, patientId: { type: string, format: uuid } } }
+      responses:
+        "201": { description: "Joined", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
+        "409": { description: "already-waitlisted", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /waitlist/{id}/accept:
+    post:
+      tags: [Queue]
+      summary: Accept the offered slot, or book the entry into a slot the front desk chose (REC-028)
+      description: >
+        Without a body (or with slotStart null) this accepts the slot the entry was offered, exactly as
+        before: 409 `offer-expired` if the 15-minute offer lapsed or was used. With `slotStart` set, the
+        entry (status waiting, offered or expired) is booked into that slot after the same checks as
+        POST /appointments: 400 `slot-in-past`, 400 `clinic-holiday`, 409 `session-full`, 409
+        `slot-unavailable` (doctor already booked then). A slot currently offered to another waitlisted
+        patient is refused with 409 `slot-on-offer`; a booked/removed entry is 409 `waitlist-entry-closed`.
+        slotStart equal to the entry's own live offer is the plain accept. If the entry held a live offer of
+        a different slot, that slot is offered to the next waiting patient. Audited as
+        `waitlist.booked_chosen_slot` (ids and slot only).
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                slotStart: { type: [string, "null"], format: date-time, description: "Chosen slot start; omit to accept the offered slot" }
+      responses:
+        "200": { description: "Booked entry (status booked, bookedAppointmentId set)", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
+        "400": { description: "slot-in-past or clinic-holiday", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "offer-expired, slot-unavailable, slot-on-offer, session-full or waitlist-entry-closed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /waitlist/{id}:
+    delete:
+      tags: [Queue]
+      summary: Remove a waiting or offered entry from the waitlist
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Removed" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /queue/check-in:
     post:
       tags: [Queue]
@@ -2480,6 +2543,19 @@ components:
         patientId: { type: string, format: uuid }
         doctorId: { type: string, format: uuid }
         startTime: { type: string, format: date-time }
+
+    WaitlistEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        joinedAt: { type: string, format: date-time }
+        status: { type: string, enum: [waiting, offered, booked, expired, cancelled] }
+        offeredSlotStart: { type: [string, "null"], format: date-time }
+        offerExpiresAt: { type: [string, "null"], format: date-time }
+        bookedAppointmentId: { type: [string, "null"], format: uuid }
 
     Appointment:
       type: object
