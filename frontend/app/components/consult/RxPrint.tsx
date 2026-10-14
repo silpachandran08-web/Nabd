@@ -30,6 +30,16 @@ type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: 
 
 class LoadError extends Error {}
 
+// DOC-R3: a snapshot that is present but not in the expected shape must block printing, never print as "none".
+const SNAPSHOT_STATES = ["recorded", "none_documented", "not_assessed"];
+function validSnapshot(x: unknown): x is PrescriptionAllergySnapshot {
+  if (!x || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  if (typeof o.state !== "string" || !SNAPSHOT_STATES.includes(o.state) || !Array.isArray(o.allergies)) return false;
+  if (o.state === "recorded" && o.allergies.length === 0) return false;
+  return o.allergies.every((a) => !!a && typeof a === "object" && typeof (a as Record<string, unknown>).substance === "string");
+}
+
 export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
   const router = useRouter();
   const mounted = useHasMounted();
@@ -69,7 +79,11 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         }
         // A safe print needs every part: a missing allergy statement must never print as an empty one.
         // DOC-R3: the register is read only for a legacy prescription that has no snapshot from signing.
+        // undefined = the server predates the field; null = legacy signed row; anything else must be a valid snapshot.
         const snapshot = rx.allergySnapshot ?? null;
+        if (snapshot !== null && !validSnapshot(snapshot)) {
+          throw new LoadError("The allergy statement saved at signing couldn't be read, so the prescription can't be printed.");
+        }
         const [hRes, pRes, aRes, sRes] = await Promise.all([
           get(`/clinical/prescriptions/${queueEntryId}/print-header`),
           get(`/patients/${rx.patientId}`),
@@ -164,7 +178,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
 
         <section className={r.allergyBox} aria-label="Allergies">
           {allergy.kind === "atSigning" ? (
-            <h3 className={r.sectionTitle}>Allergies (as recorded in the register at signing, {when(rx.signedAt)})</h3>
+            <h3 className={r.sectionTitle}>Allergies at signing ({when(rx.signedAt)})</h3>
           ) : (
             <>
               <p className={r.muted} role="note">Allergy status at signing not recorded (signed {signedDay}, before it was captured with the prescription).</p>
