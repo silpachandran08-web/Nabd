@@ -134,6 +134,9 @@ function ArrivalsPageInner() {
   // Patient name/MRN lookups are per-row GET /patients/{id}; cache them so the 15s poll only
   // fetches patients it hasn't seen (the N+1 shrinks to the first load).
   const patientCache = useRef(new Map<string, { name: string; mrn: string }>());
+  // Only the newest load may write the board: a slower, older poll must never put a stale status back.
+  const loadSeq = useRef(0);
+  const [sendingIds, setSendingIds] = useState<string[]>([]);
   const [railId, setRailId] = useState<string | null>(null);
   const [railPatient, setRailPatient] = useState<{ state: "loading" | "error" | "ready"; data: PatientDetail | null }>({ state: "loading", data: null });
   const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null);
@@ -224,6 +227,7 @@ function ArrivalsPageInner() {
   );
 
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setError(null);
     try {
       const [queueRes, staffRes] = await Promise.all([authedFetch("/queue"), authedFetch("/staff/roster")]);
@@ -253,6 +257,7 @@ function ArrivalsPageInner() {
         if (p?.name) patientCache.current.set(e.patientId, { name: p.name, mrn: p.mrn ?? "" });
         return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "" };
       }));
+      if (seq !== loadSeq.current) return;
       setRows(withNames);
 
       // NB-101/NB-100: per-doctor wait estimate and any active delay, for the sidebar.
@@ -664,16 +669,35 @@ function ArrivalsPageInner() {
   // it's rendered with the same pill and grouped into the same tab as checked_in. This one button
   // walks both hops (or just the second, if already "waiting") so vitals becomes reachable at all.
   async function sendForVitals(row: Row) {
-    if (row.status === "checked_in") {
-      const toWaiting = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "waiting" }) });
-      if (!toWaiting?.ok) {
-        if (toWaiting) setActionError(await problemMessage(toWaiting, "Couldn't send the patient for vitals."));
+    if (sendingIds.includes(row.id)) return;
+    setSendingIds((ids) => [...ids, row.id]);
+    setActionError(null);
+    // Show each hop as soon as the server accepts it, so the board never waits on the full reload.
+    const showStatus = (status: string) => setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status } : r)));
+    try {
+      if (row.status === "checked_in") {
+        const toWaiting = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "waiting" }) });
+        if (!toWaiting) return;
+        if (!toWaiting.ok) {
+          setActionError(await problemMessage(toWaiting, "Couldn't send the patient for vitals."));
+          return;
+        }
+        showStatus("waiting");
+      }
+      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "vitals_pending" }) });
+      if (!res) return;
+      if (!res.ok) {
+        setActionError(await problemMessage(res, "Couldn't send the patient for vitals."));
         return;
       }
+      showStatus("vitals_pending");
+    } catch {
+      setActionError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setSendingIds((ids) => ids.filter((id) => id !== row.id));
+      // Always re-read the queue, success or not: the first hop may have applied even if the second did not.
+      void load();
     }
-    const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "vitals_pending" }) });
-    if (res?.ok) load();
-    else if (res) setActionError(await problemMessage(res, "Couldn't send the patient for vitals."));
   }
 
   // The URL is the tab's only state: sidebar links and tab clicks both just change ?tab=, so the
@@ -735,7 +759,7 @@ function ArrivalsPageInner() {
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openPriorityModal(r.id))}>Mark priority</button>
         )}
         {grants.queueEdit && (r.status === "checked_in" || r.status === "waiting") && (
-          <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => void sendForVitals(r))}>Send for vitals</button>
+          <button type="button" className={styles.actionBtn} disabled={sendingIds.includes(r.id)} onClick={() => afterClick(() => void sendForVitals(r))}>{sendingIds.includes(r.id) ? "Sending…" : "Send for vitals"}</button>
         )}
         {grants.clinicalEdit && r.status === "vitals_pending" && (
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openVitalsModal(r.id))}>Record vitals</button>
