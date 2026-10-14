@@ -13,6 +13,7 @@ import { useClinicalContext } from "../components/consult/clinical";
 import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
 import DentalDrawer from "../components/consult/DentalDrawer";
+import DoctorOrders from "../components/consult/DoctorOrders";
 import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
@@ -1206,6 +1207,7 @@ export default function ConsultPage() {
               {hasDrugs ? <ul className={p.list}>{rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}</li>)}</ul> : <p className={p.muted}>No drugs added.</p>}
               <button type="button" className={`${p.linkBtn} ${p.linkBtnTouch}`} onClick={() => setStep("plan")}>Open prescription</button>
             </section>
+            <DoctorOrders authedFetch={authedFetch} queueEntryId={activeEntry.id} />
             <FollowUpPanel authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} />
             <section className={p.card} aria-label="Package">
               <h3 className={p.cardTitle}>Package</h3>
