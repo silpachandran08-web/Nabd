@@ -2065,7 +2065,7 @@ components:
         mgPerKg: { type: number }
         totalDoseMg: { type: number }
         ruleSource: { type: string }
-        weightRecordedAt: { type: string, format: date-time, description: When the weight used was recorded (weight_recorded_at; falls back to the vitals row time for rows recorded before V72). }
+        weightRecordedAt: { type: [string, "null"], format: date-time, description: When the weight used was recorded. Null when unknown (weight saved before the date was tracked); never estimated from the visit row time. Clients should treat null as stale. }
     PharmacyItem:
       type: object
       properties:

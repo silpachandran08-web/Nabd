@@ -39,16 +39,18 @@ class VitalsRepository {
     }
 
     /** A patient's most recent recorded weight and when that weight was recorded. */
-    record WeightReading(BigDecimal weightKg, Instant recordedAt) {
+    record WeightReading(BigDecimal weightKg, Instant recordedAt /* null = unknown */) {
     }
 
     /** NB-112 / DOC-036: the paediatric dose calculator sources weight from here: the most recent vitals row carrying a weight, across any visit,
-     * with the time the weight itself was recorded (weight_recorded_at, falling back to the row's recorded_at). */
+     * with the time the weight itself was recorded. Legacy rows (weight saved before V72) have an unknown weight time:
+     * it is returned as null, never estimated from recorded_at. A row with a known time outranks any unknown-time row. */
     Optional<WeightReading> findLatestWeight(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT weight_kg, COALESCE(weight_recorded_at, recorded_at) AS weight_at FROM vitals " +
+        return jdbc.query("SELECT weight_kg, weight_recorded_at AS weight_at FROM vitals " +
                         "WHERE tenant_id = ? AND patient_id = ? AND weight_kg IS NOT NULL " +
-                        "ORDER BY COALESCE(weight_recorded_at, recorded_at) DESC LIMIT 1",
-                (rs, i) -> new WeightReading(rs.getBigDecimal("weight_kg"), rs.getTimestamp("weight_at").toInstant()),
+                        "ORDER BY weight_recorded_at DESC NULLS LAST, recorded_at DESC LIMIT 1",
+                (rs, i) -> new WeightReading(rs.getBigDecimal("weight_kg"),
+                        rs.getTimestamp("weight_at") == null ? null : rs.getTimestamp("weight_at").toInstant()),
                 tenantId, patientId).stream().findFirst();
     }
 
