@@ -80,8 +80,9 @@ public class PrescriptionController {
 
     @PostMapping("/rx-sets")
     @PreAuthorize("hasAuthority('clinical:edit')")
-    public FavouriteRxSetResponse createSet(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FavouriteRxSetRequest req) {
-        return service.createSet(tenantId(jwt), staffId(jwt), canApprove(jwt), req);
+    public FavouriteRxSetResponse createSet(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FavouriteRxSetRequest req,
+                                             HttpServletRequest http) {
+        return service.createSet(tenantId(jwt), staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req);
     }
 
     @GetMapping("/rx-sets")
@@ -110,6 +111,13 @@ public class PrescriptionController {
     public PrescriptionResponse applySet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                           @PathVariable UUID setId, HttpServletRequest http) {
         return service.applySet(tenantId(jwt), queueEntryId, setId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
+    }
+
+    /** DOC-035 / DOC-R2: "Repeat last prescription" (the patient's most recent signed Rx from another visit). */
+    @PostMapping("/prescriptions/{queueEntryId}/repeat-last")
+    @PreAuthorize("hasAuthority('clinical:edit')")
+    public PrescriptionResponse repeatLast(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
+        return service.repeatLast(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
     }
 
     private UUID tenantId(Jwt jwt) {

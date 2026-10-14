@@ -195,7 +195,8 @@ public class PrescriptionService {
     /** NB-114 / DOC-035: a doctor's saved combo of drugs. scope "mine" (default) is private, "shared" is visible to the
      * clinic, "standard" is a clinic standard with no owner and needs clinical:approve. Items keep brand/sig/route/quantity. */
     @Transactional
-    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, boolean callerCanApprove, FavouriteRxSetRequest req) {
+    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, boolean callerCanApprove, String ipAddress,
+                                            FavouriteRxSetRequest req) {
         tenantContext.set(tenantId);
         String scope = req.scope() == null ? "mine" : req.scope();
         if (req.items().isEmpty()) {
@@ -206,6 +207,11 @@ public class PrescriptionService {
         }
         UUID setId = repo.insertSet(tenantId, "standard".equals(scope) ? null : doctorId, req.name().trim(), "shared".equals(scope));
         repo.insertSetItems(tenantId, setId, req.items());
+        // DOC-R2: creation is audited like update and delete (same before/after shape).
+        ActorInfo actor = repo.findActorInfo(tenantId, doctorId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", doctorId, actor.name(), actor.role(), ipAddress, "rx_set.created", "rx_set", setId,
+                null, Map.of("name", req.name().trim(), "shared", "shared".equals(scope), "standard", "standard".equals(scope),
+                        "itemCount", req.items().size()));
         return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), doctorId, callerCanApprove,
                 repo.activePharmacyNames(tenantId));
     }
@@ -289,6 +295,32 @@ public class PrescriptionService {
                 .toList();
         PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
         repo.markSetUsed(tenantId, setId);
+        return result;
+    }
+
+    /** DOC-035 / DOC-R2 "Repeat last prescription": replace the draft with the lines of this patient's most recent SIGNED
+     * prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are NOT carried
+     * over: upsert() re-runs every allergy, pregnancy and controlled-substance check against the current register, so a
+     * line that needs a decision needs a fresh one on this prescription. 404 no-previous-prescription when there is none. */
+    @Transactional
+    public PrescriptionResponse repeatLast(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
+                                            String ipAddress) {
+        tenantContext.set(tenantId);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        PrescriptionRow last = repo.findSignedByPatient(tenantId, owner.patientId()).stream()
+                .filter(p -> !p.queueEntryId().equals(queueEntryId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "no-previous-prescription", "No previous prescription",
+                        "This patient has no signed prescription from an earlier visit to repeat."));
+        List<PrescriptionItemRequest> items = repo.findItems(tenantId, last.id()).stream()
+                .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
+                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
+                .toList();
+        PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "prescription.repeated_last",
+                "prescription", result.id(), null, Map.of("queueEntryId", queueEntryId.toString(),
+                        "sourcePrescriptionId", last.id().toString(), "itemCount", items.size()));
         return result;
     }
 

@@ -915,4 +915,61 @@ class PrescriptionApiTest extends ApiTestBase {
                         "UPDATE prescriptions SET allergy_snapshot = '{\"state\":\"not_assessed\",\"allergies\":[]}'::jsonb " +
                                 "WHERE tenant_id = ? AND status = 'draft'", tenant.id())));
     }
+
+    // DOC-R2 / DOC-035 "Repeat last prescription" (written, NOT executed here). Copies the latest signed Rx from an earlier
+    // visit with its structured fields, never the earlier warning decisions; 404 when there is nothing to repeat.
+    @Test
+    void repeatLastCopiesThePreviousSignedPrescriptionAndRerunsTheSafetyChecks() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-r2a@a.com", "+919800079011", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "R2a", "+919999979011");
+
+        String first = checkIn(token, patientId, doc.id());
+        ResponseEntity<Map> none = exchange("/v1/clinical/prescriptions/" + first + "/repeat-last", HttpMethod.POST, authed(token), Map.class);
+        assertThat(none.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(none.getBody().get("type")).asString().contains("no-previous-prescription");
+
+        exchange("/v1/clinical/prescriptions/" + first, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Ibuprofen", "dosage", "400mg", "frequency", "TDS", "duration", "3 days",
+                        "brandName", "Brufen", "route", "Oral", "quantity", 9, "quantityUnit", "tablets")))), Map.class);
+        exchange("/v1/clinical/prescriptions/" + first + "/sign", HttpMethod.POST, authed(token), Map.class);
+
+        // A severe NSAID allergy recorded since: the repeated line must carry a fresh, unresolved warning.
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "NSAID", "severity", "severe", "reaction", "angioedema")), Map.class);
+        String second = checkIn(token, patientId, doc.id());
+        ResponseEntity<Map> repeated = exchange("/v1/clinical/prescriptions/" + second + "/repeat-last", HttpMethod.POST, authed(token), Map.class);
+        assertThat(repeated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(repeated.getBody().get("status")).isEqualTo("draft");
+        assertThat(repeated.getBody().get("unresolvedWarnings")).isEqualTo(1);
+        List<?> items = (List<?>) repeated.getBody().get("items");
+        assertThat(items).hasSize(1);
+        Map<?, ?> line = (Map<?, ?>) items.get(0);
+        assertThat(line.get("drugName")).isEqualTo("Ibuprofen");
+        assertThat(line.get("brandName")).isEqualTo("Brufen");
+        assertThat(line.get("route")).isEqualTo("Oral");
+        assertThat(line.get("quantityUnit")).isEqualTo("tablets");
+
+        Integer audited = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'prescription.repeated_last'", Integer.class, tenant.id()));
+        assertThat(audited).isEqualTo(1);
+    }
+
+    // DOC-R2: creating a set is audited like update and delete.
+    @Test
+    void creatingAFavouriteSetIsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-r2b@a.com", "+919800079012", false);
+        String token = loginAndGetAccessToken(doc);
+        ResponseEntity<Map> created = exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Audited set", "scope", "shared", "items", List.of(Map.of("drugName", "Cetirizine")))), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String after = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT after::text FROM audit_log WHERE tenant_id = ? AND action = 'rx_set.created' AND entity_id = ?::uuid",
+                String.class, tenant.id(), created.getBody().get("id")));
+        assertThat(after).contains("Audited set").contains("itemCount");
+    }
 }

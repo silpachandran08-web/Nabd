@@ -1276,7 +1276,7 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/FavouriteRxSet" } } } } }
     post:
       tags: [Clinical]
-      summary: "Save a set. scope mine (default) | shared | standard; standard needs clinical:approve (403 rx-set-owner-only). Items keep brand, sig, route and quantity."
+      summary: "Save a set. scope mine (default) | shared | standard; standard needs clinical:approve (403 rx-set-owner-only). Items keep brand, sig, route and quantity. Audited (rx_set.created)."
       x-required-permission: clinical:edit
       requestBody:
         required: true
@@ -1330,6 +1330,16 @@ paths:
       parameters:
         - { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }
         - { name: setId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/repeat-last:
+    post:
+      tags: [Clinical]
+      summary: "DOC-035 / DOC-R2 Repeat last prescription. Replaces the draft with the lines of this patient's most recent SIGNED prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are not carried over; every safety check re-runs against the current register. 404 no-previous-prescription when there is none; 409 prescription-signed when this visit's Rx is already signed. Audited (prescription.repeated_last)."
+      x-required-permission: clinical:edit
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
