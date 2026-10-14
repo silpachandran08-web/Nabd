@@ -1328,6 +1328,21 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /clinical/patients/{patientId}/dose-calculator:
+    get:
+      tags: [Clinical]
+      summary: >
+        Weight-based dose suggestion (decision support, not a prescription). total = latest recorded weight x the
+        clinician-supplied mgPerKg. The rule is a named formula with no per-drug formulary, so no per-dose or daily
+        maximum is returned. 400 no-weight-recorded when the patient has no recorded weight (a weight is never estimated).
+      x-required-permission: clinical:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: mgPerKg, in: query, required: true, schema: { type: number } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DoseCalculation" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
   # ------------------------------------------------------------ Pharmacy (Hybrid mode)
   /pharmacy/settings:
     get:
@@ -1736,6 +1751,14 @@ components:
         recordedBy: { type: string, format: uuid }
         recordedAt: { type: string, format: date-time }
         abnormalFlags: { type: array, items: { type: string } }
+    DoseCalculation:
+      type: object
+      properties:
+        weightKg: { type: number }
+        mgPerKg: { type: number }
+        totalDoseMg: { type: number }
+        ruleSource: { type: string }
+        weightRecordedAt: { type: string, format: date-time, description: When the weight used was recorded (weight_recorded_at; falls back to the vitals row time for rows recorded before V72). }
     PharmacyItem:
       type: object
       properties:
