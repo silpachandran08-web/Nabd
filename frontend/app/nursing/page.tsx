@@ -874,26 +874,38 @@ function NursingWorklist() {
                     {procedureOrders.map((p) => {
                       const consented = !!p.consentSignedName;
                       const open = p.status === "ordered" || p.status === "prepped";
+                      // Wireframe (Today's Procedures): an open order without signed consent reads "Consent missing" /
+                      // "Blocked until consent" / Paused. The backend refuses prepped/completed until consent (ProcedureService).
+                      const blocked = open && !consented;
                       return (
                         <tr key={p.id}>
                           <td data-label="Patient">{p.patientName}</td>
                           <td data-label="Procedure">{p.chargeName}</td>
                           <td data-label="Consent">
                             {consented
-                              ? <StatusPill tone="ok" label={`Signed · ${p.consentSignedName}${p.consentSignedAt ? ` · ${hhmm(p.consentSignedAt)}` : ""}`} />
+                              ? <span title={p.consentRecordedByName ? `Recorded by ${p.consentRecordedByName}` : undefined}>
+                                  <StatusPill tone="ok" icon="check" label={`Signed · ${p.consentSignedName}${p.consentSignedAt ? ` · ${hhmm(p.consentSignedAt)}` : ""}`} />
+                                </span>
                               : <div className={styles.rowActions}>
                                   <StatusPill tone="danger" label="Consent missing" icon="alert" />
-                                  {canEditOrders && <button className={styles.smallBtn} onClick={() => { setConsentError(null); setConsentModal({ orderId: p.id, signedName: "" }); }}>Record consent</button>}
+                                  {canEditOrders && open && <button className={styles.smallBtn} onClick={() => { setConsentError(null); setConsentModal({ orderId: p.id, signedName: "" }); }}>Record consent</button>}
                                 </div>}
+                            {/* No consent-form version field exists in the API yet; the free-text note given at ordering is shown as typed. */}
+                            {p.consentNote && <span className={`${styles.mrn} ${styles.muted}`}>Note: {p.consentNote}</span>}
                           </td>
-                          <td data-label="Preparation" className={styles.muted}>{p.prepNotes ?? "—"}</td>
+                          <td data-label="Preparation">
+                            {blocked
+                              ? <StatusPill tone="warn" label="Blocked until consent" icon="clock" />
+                              : <span className={styles.muted}>{p.prepNotes ?? "—"}</span>}
+                            {blocked && p.prepNotes && <span className={`${styles.mrn} ${styles.muted}`}>{p.prepNotes}</span>}
+                          </td>
                           <td data-label="State">
-                            {p.status === "ordered" && <StatusPill tone="neutral" label="Not started" />}
-                            {p.status === "prepped" && <StatusPill tone="info" label="In progress" icon="sync" />}
+                            {blocked && <StatusPill tone="warn" label="Paused" icon="clock" />}
+                            {p.status === "ordered" && !blocked && <StatusPill tone="neutral" label="Not started" />}
+                            {p.status === "prepped" && !blocked && <StatusPill tone="info" label="In progress" icon="sync" />}
                             {p.status === "completed" && <StatusPill tone="ok" label={`Completed${p.billed ? " · billed" : " · pending bill"}`} />}
                           </td>
                           <td data-label="">
-                            {open && !consented && <StatusPill tone="warn" label="Blocked until consent" icon="clock" />}
                             {open && consented && canEditOrders && (
                               <div className={styles.rowActions}>
                                 {p.status === "ordered" && <button className={styles.smallBtn} onClick={() => setProcedureStatus(p.id, "prepped")}>Mark prepped</button>}
@@ -1165,7 +1177,7 @@ function NursingWorklist() {
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Consent note</label>
-              <input className={styles.input} value={procForm.consentNote} onChange={(e) => setProcForm((p) => ({ ...p, consentNote: e.target.value }))} placeholder="Signed v2.1 / Consent missing" />
+              <input className={styles.input} value={procForm.consentNote} onChange={(e) => setProcForm((p) => ({ ...p, consentNote: e.target.value }))} placeholder="Consent form name and version (optional)" />
             </div>
             {procFormError && <div className={styles.formError} role="alert">{procFormError}</div>}
             <div className={styles.modalActions}>
