@@ -483,6 +483,12 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                     {e.label}
                   </Link>
                 ))}
+                {owner && (
+                  <Link href="/account" role="menuitem" className={`${styles.moreItem} ${pathname === "/account" ? styles.linkActive : ""}`} onClick={() => setShowMore(false)}>
+                    <Icon name="user" />
+                    Account &amp; Security
+                  </Link>
+                )}
                 {owner && (canReturnToWorkspaces ? (
                   <Link href="/owner/workspaces" role="menuitem" className={styles.moreItem} onClick={() => setShowMore(false)}>
                     <Icon name="building" />
