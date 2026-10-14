@@ -838,6 +838,7 @@ export default function ConsultPage() {
           error={previewError}
           onClose={() => { setPreview(null); setPreviewError(null); }}
           onStart={canStartRow(preview) ? () => startConsult(preview) : undefined}
+          canEditAllergies={can("clinical:edit")}
           onOpenVisit={(preview.status === "checkout_pending" || preview.status === "completed") && !dirty
             ? () => { const r = preview; setPreview(null); void openConsult(r); }
             : undefined}
