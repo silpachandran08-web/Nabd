@@ -707,6 +707,13 @@ function PatientsList() {
                 ))}
               </tbody>
             </table>
+            {/* GET /patients/registry has no paging parameters (server returns at most 200 rows per filter);
+                say so instead of implying the list is complete. Counts are pre-search, so only compare without q. */}
+            {!q.trim() && registry.rows.length < (registry.counts[filter] ?? 0) && (
+              <p className={styles.muted} role="status">
+                Showing the first {registry.rows.length} of {registry.counts[filter]}. Search by name, mobile or patient ID to find others.
+              </p>
+            )}
           </div>
         )}
       </div>
