@@ -12,6 +12,9 @@ import { getIdentity } from "../lib/session";
 import { useClinicalContext } from "../components/consult/clinical";
 import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
+import ConsultTimer from "../components/consult/ConsultTimer";
+import DiagnosisField from "../components/consult/DiagnosisField";
+import NoteTemplates from "../components/consult/NoteTemplates";
 import DentalDrawer from "../components/consult/DentalDrawer";
 import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
@@ -875,6 +878,7 @@ export default function ConsultPage() {
             </span>
             <StatusBadge status={activeEntry.status} />
             {saveBadge}
+            {(activeEntry.status === "in_consult" || locked) && <ConsultTimer entryId={activeEntry.id} ended={locked} />}
           </div>
         </div>
 
@@ -1008,6 +1012,7 @@ export default function ConsultPage() {
 
             {step === "examine" && (
               <>
+                {!locked && can("clinical:edit") && <NoteTemplates authedFetch={authedFetch} patientId={activeEntry.patientId} entryId={activeEntry.id} note={note} onSetField={updateField} />}
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.noteGrid}>
                     {(["subjective", "objective"] as const).map((field) => (
@@ -1040,8 +1045,7 @@ export default function ConsultPage() {
                     <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked} onChange={(e) => updateField("assessment", e.target.value)} />
                   </div>
                   <div className={styles.noteField}>
-                    <label className={styles.noteLabel} htmlFor="diagnosis">diagnosis</label>
-                    <input id="diagnosis" className={styles.input} value={note.diagnosis} disabled={locked} onChange={(e) => updateField("diagnosis", e.target.value)} />
+                    <DiagnosisField value={note.diagnosis} disabled={locked} inputClassName={styles.input} onChange={(v) => updateField("diagnosis", v)} />
                   </div>
                 </div>
               </div>
