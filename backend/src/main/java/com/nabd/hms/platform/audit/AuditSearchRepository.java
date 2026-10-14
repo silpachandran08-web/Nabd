@@ -5,14 +5,16 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.audit.AuditSearchModels.AuditEntry;
+import static com.nabd.hms.platform.audit.AuditSearchModels.AuditFilter;
+import static com.nabd.hms.platform.audit.AuditSearchModels.OperatorInfo;
 
-/** Goes through search_audit_log (V16), a SECURITY DEFINER escape hatch from audit_log's normal
- * per-tenant RLS — this is the one place in the app that legitimately reads across tenants. */
+/** Goes through search_audit_log (V16, actor-filter overload V85), a SECURITY DEFINER escape hatch from
+ * audit_log's normal per-tenant RLS — this is the one place in the app that legitimately reads across tenants. */
 @Repository
 class AuditSearchRepository {
 
@@ -22,17 +24,25 @@ class AuditSearchRepository {
         this.jdbc = jdbc;
     }
 
-    List<AuditEntry> search(UUID tenantId, String action, String entityType, Instant createdAfter,
-                             Instant createdBefore, Long afterId, int limit) {
+    List<AuditEntry> search(AuditFilter f, Long afterId, int limit) {
         return jdbc.query("""
                 SELECT * FROM search_audit_log(
-                    ?::uuid, ?::text, ?::text, ?::timestamptz, ?::timestamptz, ?::bigint, ?::int)
+                    ?::uuid, ?::text, ?::text, ?::timestamptz, ?::timestamptz,
+                    ?::uuid, ?::text, ?::text, ?::text, ?::bigint, ?::int)
                 """,
                 mapper(),
-                tenantId, action, entityType,
-                createdAfter == null ? null : Timestamp.from(createdAfter),
-                createdBefore == null ? null : Timestamp.from(createdBefore),
+                f.tenantId(), f.action(), f.entityType(),
+                f.createdAfter() == null ? null : Timestamp.from(f.createdAfter()),
+                f.createdBefore() == null ? null : Timestamp.from(f.createdBefore()),
+                f.actorId(), f.actorType(), f.actorRole(), f.actorName(),
                 afterId, limit);
+    }
+
+    // master.operators carries no RLS (platform-only data) — same lookup SupportAccessRepository does.
+    Optional<OperatorInfo> findOperatorInfo(UUID operatorId) {
+        return jdbc.query("SELECT name, role FROM master.operators WHERE id = ?",
+                (rs, i) -> new OperatorInfo(rs.getString("name"), rs.getString("role")), operatorId)
+                .stream().findFirst();
     }
 
     private RowMapper<AuditEntry> mapper() {

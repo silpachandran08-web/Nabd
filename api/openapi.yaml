@@ -30,6 +30,7 @@ tags:
   - name: Pharmacy
   - name: Nursing
   - name: Reports
+  - name: Platform
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -1782,6 +1783,70 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MoneyReport" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+  # ------------------------------------------------- Platform console: audit (PLT-028)
+  /platform/audit-log:
+    get:
+      tags: [Platform]
+      summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
+      x-required-permission: audit_compliance:view
+      parameters:
+        - $ref: "#/components/parameters/PlatformAuditTenantId"
+        - $ref: "#/components/parameters/PlatformAuditAction"
+        - $ref: "#/components/parameters/PlatformAuditEntityType"
+        - $ref: "#/components/parameters/PlatformAuditCreatedAfter"
+        - $ref: "#/components/parameters/PlatformAuditCreatedBefore"
+        - $ref: "#/components/parameters/PlatformAuditActorId"
+        - $ref: "#/components/parameters/PlatformAuditActorType"
+        - $ref: "#/components/parameters/PlatformAuditActorRole"
+        - $ref: "#/components/parameters/PlatformAuditActorName"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 50 }
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Page of audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/PlatformAuditEntry" } }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no audit_compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /platform/audit-log/export:
+    get:
+      tags: [Platform]
+      summary: >
+        CSV export of the filtered platform audit log (same filters and same columns as GET /platform/audit-log;
+        before/after are the stored JSON text). Bounded at 10,000 rows; above that it is refused with 400
+        export-too-large rather than truncated. Text cells that a spreadsheet would treat as a formula are
+        prefixed with an apostrophe. Audited as audit_log.export (actor = the operator, entityType audit_log),
+        written once into the audit trail of every tenant whose rows the file contains, with filters (the
+        actor-name search text is recorded only as actorNameFilter=true), rowCount, totalRowCount and tenantCount.
+        An export matching no rows writes no audit row (no tenant trail to write to).
+      x-required-permission: audit_compliance:view
+      parameters:
+        - $ref: "#/components/parameters/PlatformAuditTenantId"
+        - $ref: "#/components/parameters/PlatformAuditAction"
+        - $ref: "#/components/parameters/PlatformAuditEntityType"
+        - $ref: "#/components/parameters/PlatformAuditCreatedAfter"
+        - $ref: "#/components/parameters/PlatformAuditCreatedBefore"
+        - $ref: "#/components/parameters/PlatformAuditActorId"
+        - $ref: "#/components/parameters/PlatformAuditActorType"
+        - $ref: "#/components/parameters/PlatformAuditActorRole"
+        - $ref: "#/components/parameters/PlatformAuditActorName"
+      responses:
+        "200":
+          description: >
+            CSV (Content-Disposition attachment, audit-log-YYYY-MM-DD.csv). Header row
+            id,createdAt,tenantId,tenantName,tenantSlug,actorType,actorId,actorName,actorRole,ipAddress,action,entityType,entityId,before,after
+          content:
+            text/csv:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no audit_compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
 components:
   securitySchemes:
@@ -1795,6 +1860,49 @@ components:
         tenant/role headers.
 
   parameters:
+    PlatformAuditTenantId:
+      name: tenantId
+      in: query
+      schema: { type: string, format: uuid }
+    PlatformAuditAction:
+      name: action
+      in: query
+      description: Exact action, e.g. patient.create
+      schema: { type: string }
+    PlatformAuditEntityType:
+      name: entityType
+      in: query
+      schema: { type: string }
+    PlatformAuditCreatedAfter:
+      name: createdAfter
+      in: query
+      description: Inclusive lower bound (ISO-8601 instant, e.g. 2026-10-01T00:00:00Z)
+      schema: { type: string, format: date-time }
+    PlatformAuditCreatedBefore:
+      name: createdBefore
+      in: query
+      description: Inclusive upper bound (ISO-8601 instant)
+      schema: { type: string, format: date-time }
+    PlatformAuditActorId:
+      name: actorId
+      in: query
+      description: Exact actor id (staff id or operator id)
+      schema: { type: string, format: uuid }
+    PlatformAuditActorType:
+      name: actorType
+      in: query
+      description: Any other value is 400 invalid-actor-type
+      schema: { type: string, enum: [staff, operator, system] }
+    PlatformAuditActorRole:
+      name: actorRole
+      in: query
+      description: Case-insensitive exact match on the role label snapshot (e.g. Doctor, super_admin)
+      schema: { type: string }
+    PlatformAuditActorName:
+      name: actorName
+      in: query
+      description: Case-insensitive substring of the actor name snapshot; % and _ match literally. audit_log stores no actor email.
+      schema: { type: string }
     PathId:
       name: id
       in: path
@@ -2293,6 +2401,24 @@ components:
               field: { type: string }
               message: { type: string }
 
+    PlatformAuditEntry:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        tenantId: { type: string, format: uuid }
+        tenantName: { type: string }
+        tenantSlug: { type: string }
+        actorType: { type: string, enum: [staff, operator, system] }
+        actorId: { type: [string, "null"], format: uuid }
+        actorName: { type: string }
+        actorRole: { type: string }
+        ipAddress: { type: [string, "null"] }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: [string, "null"], format: uuid }
+        before: { description: Prior state as stored (JSON), null for a create }
+        after: { description: New state as stored (JSON), null for a delete }
+        createdAt: { type: string, format: date-time }
     PageMeta:
       type: object
       properties:
