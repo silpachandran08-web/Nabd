@@ -389,4 +389,40 @@ class NursingApiTest extends ApiTestBase {
         assertThat(exchange("/v1/nursing/vaccine-records/today", HttpMethod.GET, authed(token), Map.class).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    // M1-fix (written, NOT executed): the audit row carries ids and structured values only. AuditService PHI rule.
+    @Test
+    void vaccineAuditRowHoldsNoNameOrFreeText() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "v4@a.com", "+919800020104", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "Zelda Quimby", "+919999960104");
+
+        ResponseEntity<Map> resp = exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "vaccineName", "SecretVaccineName", "dose", "0.5 mL", "route", "IM",
+                "site", "left deltoid", "lotNumber", "LOT-9", "notes", "patient was anxious")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String recordId = (String) resp.getBody().get("id");
+        String recordedBy = (String) resp.getBody().get("recordedByName");
+
+        List<Map<String, Object>> rows = inTenantTx(tenant.id(), () -> jdbc.queryForList(
+                "SELECT actor_id, entity_type, before::text AS before_json, after::text AS after_json FROM audit_log " +
+                        "WHERE tenant_id = ? AND action = 'nursing.vaccine_recorded' AND entity_id = ?",
+                tenant.id(), UUID.fromString(recordId)));
+        assertThat(rows).hasSize(1);
+        Map<String, Object> row = rows.get(0);
+        assertThat(row.get("entity_type")).isEqualTo("vaccine_record");
+        assertThat(row.get("actor_id")).isEqualTo(staff.id());
+        assertThat(row.get("before_json")).isNull();
+        String after = (String) row.get("after_json");
+        assertThat(after).contains(patientId).contains("IM");
+        assertThat(after).doesNotContain("Zelda").doesNotContain("Quimby")
+                .doesNotContain("SecretVaccineName").doesNotContain("left deltoid")
+                .doesNotContain("LOT-9").doesNotContain("patient was anxious")
+                .doesNotContain("patientName").doesNotContain("recordedByName").doesNotContain("notes");
+        if (recordedBy != null && !recordedBy.isBlank()) {
+            assertThat(after).doesNotContain(recordedBy);
+        }
+    }
 }

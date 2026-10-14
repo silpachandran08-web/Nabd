@@ -707,6 +707,37 @@ class PrescriptionApiTest extends ApiTestBase {
                 .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    // M1-fix/m4 (written, NOT executed): another doctor's PRIVATE set does not exist for anyone else, approvers included.
+    @Test
+    void anotherDoctorsPrivateSetIs404OnPatchDeleteAndApplyEvenForAnApprover() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = plainDoctor(tenant, "own36@a.com", "+919800036002");
+        SeededStaff other = plainDoctor(tenant, "oth36@a.com", "+919800036003");
+        UUID leadRole = seedRole(tenant.id(), "Lead36", false, fullGrant("clinical"), fullGrant("queue"), fullGrant("patients"));
+        SeededStaff lead = seedStaff(tenant, leadRole, "ld36@a.com", "+919800036004", false);
+        String ownerToken = loginAndGetAccessToken(owner);
+        String otherToken = loginAndGetAccessToken(other);
+        String leadToken = loginAndGetAccessToken(lead);
+        String setId = (String) exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
+                "name", "Private", "items", List.of(Map.of("drugName", "Cetirizine")))), Map.class).getBody().get("id");
+        String patientId = registerPatient(leadToken, "P36", "+919999936001");
+        String entry = checkIn(leadToken, patientId, lead.id());
+
+        for (String token : List.of(otherToken, leadToken)) {
+            assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                    authedJsonBody(token, Map.of("name", "Probe")), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(token), Map.class)
+                    .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(exchange("/v1/clinical/prescriptions/" + entry + "/apply-set/" + setId, HttpMethod.POST, authed(token), Map.class)
+                    .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        }
+        // untouched for the owner
+        List<?> mine = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(ownerToken), List.class).getBody();
+        assertThat(mine).hasSize(1);
+        assertThat(((Map<?, ?>) mine.get(0)).get("name")).isEqualTo("Private");
+    }
+
     @Test
     void aClinicStandardNeedsClinicalApproveAndIsNotEditableByOrdinaryDoctors() {
         SeededTenant tenant = seedTenant();
