@@ -1276,7 +1276,7 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/FavouriteRxSet" } } } } }
     post:
       tags: [Clinical]
-      summary: "Save a set. scope mine (default) | shared | standard; standard needs clinical:approve (403 rx-set-owner-only). Items keep brand, sig, route and quantity."
+      summary: "Save a set. scope mine (default) | shared | standard; standard needs clinical:approve (403 rx-set-owner-only). Items keep brand, sig, route and quantity. Audited (rx_set.created)."
       x-required-permission: clinical:edit
       requestBody:
         required: true
@@ -1334,6 +1334,16 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/repeat-last:
+    post:
+      tags: [Clinical]
+      summary: "DOC-035 / DOC-R2 Repeat last prescription. Replaces the draft with the lines of this patient's most recent SIGNED prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are not carried over; every safety check re-runs against the current register. 404 no-previous-prescription when there is none; 409 prescription-signed when this visit's Rx is already signed. Audited (prescription.repeated_last)."
+      x-required-permission: clinical:edit
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/prescriptions/{queueEntryId}:
     parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1373,7 +1383,7 @@ paths:
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
-      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). Audited.
+      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
       x-required-permission: clinical:edit
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
@@ -2121,6 +2131,35 @@ components:
         signedAt: { type: [string, "null"], format: date-time }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
+        allergySnapshot:
+          description: >-
+            DOC-R3: the allergy statement captured when this prescription was signed (what the sign gate checked).
+            Never recomputed, so later allergy-register changes do not alter it. Null for a draft, and null for a
+            prescription signed before this snapshot existed (migration V79); a signed prescription with a null
+            snapshot must be shown as "allergy status at signing not recorded", never filled from the current register.
+          oneOf:
+            - { $ref: "#/components/schemas/PrescriptionAllergySnapshot" }
+            - { type: "null" }
+    PrescriptionAllergySnapshot:
+      type: object
+      required: [state, allergies]
+      properties:
+        state:
+          type: string
+          enum: [recorded, none_documented, not_assessed]
+          description: Same meaning as AllergyStatus.state, at the moment of signing.
+        allergies:
+          type: array
+          description: Active register entries at signing (empty unless state is recorded).
+          items:
+            type: object
+            properties:
+              substance: { type: string }
+              severity: { type: string }
+              reaction: { type: [string, "null"] }
+        documentedBy: { type: [string, "null"], format: uuid, description: "Who documented no known allergies; null unless none_documented" }
+        documentedByName: { type: [string, "null"] }
+        documentedAt: { type: [string, "null"], format: date-time }
     Problem:
       type: object
       description: RFC 7807

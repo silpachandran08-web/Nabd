@@ -3,6 +3,7 @@ package com.nabd.hms.clinical;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
 import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
+import com.nabd.hms.clinical.dto.PrescriptionAllergySnapshotResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetItemResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
@@ -38,6 +39,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
+import static com.nabd.hms.clinical.AllergyModels.AssessmentRow;
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
 import static com.nabd.hms.clinical.PrescriptionModels.ActorInfo;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetItemRow;
@@ -193,7 +195,8 @@ public class PrescriptionService {
     /** NB-114 / DOC-035: a doctor's saved combo of drugs. scope "mine" (default) is private, "shared" is visible to the
      * clinic, "standard" is a clinic standard with no owner and needs clinical:approve. Items keep brand/sig/route/quantity. */
     @Transactional
-    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, boolean callerCanApprove, FavouriteRxSetRequest req) {
+    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, boolean callerCanApprove, String ipAddress,
+                                            FavouriteRxSetRequest req) {
         tenantContext.set(tenantId);
         String scope = req.scope() == null ? "mine" : req.scope();
         if (req.items().isEmpty()) {
@@ -204,6 +207,11 @@ public class PrescriptionService {
         }
         UUID setId = repo.insertSet(tenantId, "standard".equals(scope) ? null : doctorId, req.name().trim(), "shared".equals(scope));
         repo.insertSetItems(tenantId, setId, req.items());
+        // DOC-R2: creation is audited like update and delete (same before/after shape).
+        ActorInfo actor = repo.findActorInfo(tenantId, doctorId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", doctorId, actor.name(), actor.role(), ipAddress, "rx_set.created", "rx_set", setId,
+                null, Map.of("name", req.name().trim(), "shared", "shared".equals(scope), "standard", "standard".equals(scope),
+                        "itemCount", req.items().size()));
         return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), doctorId, callerCanApprove,
                 repo.activePharmacyNames(tenantId));
     }
@@ -290,6 +298,32 @@ public class PrescriptionService {
         return result;
     }
 
+    /** DOC-035 / DOC-R2 "Repeat last prescription": replace the draft with the lines of this patient's most recent SIGNED
+     * prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are NOT carried
+     * over: upsert() re-runs every allergy, pregnancy and controlled-substance check against the current register, so a
+     * line that needs a decision needs a fresh one on this prescription. 404 no-previous-prescription when there is none. */
+    @Transactional
+    public PrescriptionResponse repeatLast(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
+                                            String ipAddress) {
+        tenantContext.set(tenantId);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        PrescriptionRow last = repo.findSignedByPatient(tenantId, owner.patientId()).stream()
+                .filter(p -> !p.queueEntryId().equals(queueEntryId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "no-previous-prescription", "No previous prescription",
+                        "This patient has no signed prescription from an earlier visit to repeat."));
+        List<PrescriptionItemRequest> items = repo.findItems(tenantId, last.id()).stream()
+                .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
+                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
+                .toList();
+        PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "prescription.repeated_last",
+                "prescription", result.id(), null, Map.of("queueEntryId", queueEntryId.toString(),
+                        "sourcePrescriptionId", last.id().toString(), "itemCount", items.size()));
+        return result;
+    }
+
     /** Another doctor's private set does not exist for this caller (404, no existence probe), approvers included:
      * clinical:approve only reaches shared and standard sets. */
     private void requireVisible(FavouriteSetRow set, UUID callerStaffId) {
@@ -366,7 +400,10 @@ public class PrescriptionService {
             throw new ApiException(HttpStatus.CONFLICT, "warning-unresolved", "Resolve the warning first",
                     "These medicines carry a safety warning that needs a recorded decision before signing: " + lines + ".");
         }
-        if (repo.sign(tenantId, row.id()) == 0) {
+        // DOC-R3: capture the allergy statement the gate above just checked (still under the register lock) and store
+        // it with the status flip, so the printout shows what the prescriber signed against, not the register at print time.
+        StoredAllergySnapshot snapshot = captureAllergySnapshot(tenantId, owner.patientId());
+        if (repo.sign(tenantId, row.id(), toJson(snapshot)) == 0) {
             // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
             return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
         }
@@ -388,7 +425,8 @@ public class PrescriptionService {
         }).toList();
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "prescription.signed", "prescription", row.id(), null, Map.of("queueEntryId", queueEntryId.toString(), "items", finalItems,
-                        "signedByVisitDoctor", owner.doctorId().equals(callerStaffId)));
+                        "signedByVisitDoctor", owner.doctorId().equals(callerStaffId),
+                        "allergySnapshotState", snapshot.state(), "allergySnapshotActiveCount", snapshot.allergies().size()));
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 
@@ -446,7 +484,54 @@ public class PrescriptionService {
                 })
                 .toList();
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
-                p.createdAt(), p.signedAt(), items, unresolved[0]);
+                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()));
+    }
+
+    // ── DOC-R3: allergy statement snapshotted at signing ─────────────────
+
+    /** Stored form in prescriptions.allergy_snapshot. Timestamps and ids are strings, like StoredDecision. */
+    record StoredAllergySnapshot(String state, List<StoredSnapshotAllergy> allergies, String documentedBy,
+                                 String documentedByName, String documentedAt) {
+    }
+
+    record StoredSnapshotAllergy(String substance, String severity, String reaction) {
+    }
+
+    /** Same rule as AllergyService.status(): any active entry = "recorded"; otherwise a "no known allergies" statement
+     * = "none_documented"; otherwise "not_assessed". Caller must hold the patient's allergy-register lock. */
+    private StoredAllergySnapshot captureAllergySnapshot(UUID tenantId, UUID patientId) {
+        List<AllergyRow> active = allergyRepo.findActiveByPatient(tenantId, patientId);
+        if (!active.isEmpty()) {
+            List<StoredSnapshotAllergy> list = active.stream()
+                    .map(a -> new StoredSnapshotAllergy(a.substance(), a.severity(), a.reaction())).toList();
+            return new StoredAllergySnapshot("recorded", list, null, null, null);
+        }
+        AssessmentRow a = allergyRepo.findAssessment(tenantId, patientId).orElse(null);
+        if (a == null) {
+            return new StoredAllergySnapshot("not_assessed", List.of(), null, null, null);
+        }
+        String name = allergyRepo.findStaffNames(tenantId, java.util.Set.of(a.documentedBy())).get(a.documentedBy());
+        return new StoredAllergySnapshot("none_documented", List.of(), a.documentedBy().toString(), name,
+                a.documentedAt().toString());
+    }
+
+    /** Null in, null out: a draft or a prescription signed before V79 has no snapshot and must stay distinguishable. */
+    private PrescriptionAllergySnapshotResponse readAllergySnapshot(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        StoredAllergySnapshot s;
+        try {
+            s = objectMapper.readValue(json, StoredAllergySnapshot.class);
+        } catch (JsonProcessingException e) {
+            // Never print a guessed statement: an unreadable snapshot is surfaced as an error, not as "none".
+            throw new IllegalStateException("stored prescription allergy snapshot is unreadable", e);
+        }
+        List<PrescriptionAllergySnapshotResponse.Allergy> allergies = s.allergies() == null ? List.of() : s.allergies().stream()
+                .map(x -> new PrescriptionAllergySnapshotResponse.Allergy(x.substance(), x.severity(), x.reaction())).toList();
+        return new PrescriptionAllergySnapshotResponse(s.state(), allergies,
+                s.documentedBy() == null ? null : UUID.fromString(s.documentedBy()), s.documentedByName(),
+                s.documentedAt() == null ? null : Instant.parse(s.documentedAt()));
     }
 
     // ── warning detection and stored decisions ───────────────────────────
