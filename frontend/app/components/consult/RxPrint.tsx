@@ -36,8 +36,21 @@ function validSnapshot(x: unknown): x is PrescriptionAllergySnapshot {
   if (!x || typeof x !== "object") return false;
   const o = x as Record<string, unknown>;
   if (typeof o.state !== "string" || !SNAPSHOT_STATES.includes(o.state) || !Array.isArray(o.allergies)) return false;
-  if (o.state === "recorded" && o.allergies.length === 0) return false;
-  return o.allergies.every((a) => !!a && typeof a === "object" && typeof (a as Record<string, unknown>).substance === "string");
+  // "recorded" needs at least one entry; "none_documented" and "not_assessed" must list none.
+  if ((o.state === "recorded") !== (o.allergies.length > 0)) return false;
+  const text = (v: unknown) => typeof v === "string" && v.trim() !== "";
+  const entriesOk = o.allergies.every((a) => {
+    if (!a || typeof a !== "object") return false;
+    const e = a as Record<string, unknown>;
+    return text(e.substance) && typeof e.severity === "string" && (e.reaction == null || typeof e.reaction === "string");
+  });
+  if (!entriesOk) return false;
+  // "No known allergies" is a documented statement: who and when must be there (the server always sets both).
+  if (o.state === "none_documented") {
+    if (!text(o.documentedBy) || !text(o.documentedAt) || Number.isNaN(Date.parse(o.documentedAt as string))) return false;
+    if (o.documentedByName != null && typeof o.documentedByName !== "string") return false;
+  }
+  return true;
 }
 
 export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
