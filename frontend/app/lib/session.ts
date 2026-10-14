@@ -5,6 +5,7 @@
 // ClinicNav's clinic-info card and signed-in-as footer, never for authorization.
 type AccessTokenClaims = {
   sub?: string;
+  tenantId?: string;
   permissions?: string[];
   tenantName?: string;
   tenantRegion?: string;
