@@ -15,10 +15,12 @@ import ConflictDialog from "../components/consult/ConflictDialog";
 import ConsultTimer from "../components/consult/ConsultTimer";
 import DiagnosisField from "../components/consult/DiagnosisField";
 import NoteTemplates from "../components/consult/NoteTemplates";
+import DoseCalculator from "../components/consult/DoseCalculator";
 import DentalDrawer from "../components/consult/DentalDrawer";
 import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
+import PackageSessionCard from "../components/consult/PackageSessionCard";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import RxPad from "../components/consult/RxPad";
@@ -42,7 +44,6 @@ type Note = {
   diagnosis: string | null; status: string; signedAt: string | null; updatedAt: string;
 };
 type NoteDraft = NoteFields;
-type DoseResult = { weightKg: number; mgPerKg: number; totalDoseMg: number; ruleSource: string };
 type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis: string | null; createdAt: string };
 type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 type Step = "reason" | "examine" | "assess" | "plan" | "close";
@@ -161,9 +162,6 @@ export default function ConsultPage() {
   const [showAllergies, setShowAllergies] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
-  const [doseMgPerKg, setDoseMgPerKg] = useState("");
-  const [doseResult, setDoseResult] = useState<DoseResult | null>(null);
-  const [doseError, setDoseError] = useState<string | null>(null);
   const [amendments, setAmendments] = useState<NoteAmendment[]>([]);
   const [showAmendForm, setShowAmendForm] = useState(false);
   const [amendReason, setAmendReason] = useState("");
@@ -438,9 +436,6 @@ export default function ConsultPage() {
     setRxDirty(false);
     setOverride(null);
     setShowAllergies(false);
-    setDoseMgPerKg("");
-    setDoseResult(null);
-    setDoseError(null);
     setAmendments([]);
     setShowAmendForm(false);
     setAmendReason("");
@@ -627,18 +622,6 @@ export default function ConsultPage() {
     setNotice("Decision recorded and audited.");
   }
 
-  async function calculateDose() {
-    if (!activePatient || !doseMgPerKg) return;
-    setDoseError(null);
-    const res = await authedFetch(`/clinical/patients/${activePatient.id}/dose-calculator?mgPerKg=${doseMgPerKg}`);
-    if (!res?.ok) {
-      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
-      setDoseError(pr?.detail || "Couldn't calculate dose.");
-      setDoseResult(null);
-      return;
-    }
-    setDoseResult(await res.json());
-  }
 
   async function submitAmendment() {
     if (!activeEntry || !amendReason.trim()) return;
@@ -1072,17 +1055,7 @@ export default function ConsultPage() {
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
 
                   <div className={styles.previousMeds}>
-                    <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Weight-based dose calculator</div>
-                    <div className={styles.rxRow}>
-                      <input className={styles.input} aria-label="mg per kg" placeholder="mg/kg" value={doseMgPerKg} onChange={(e) => setDoseMgPerKg(e.target.value)} />
-                      <button type="button" className={styles.backBtn} onClick={calculateDose} disabled={!doseMgPerKg}>Calculate</button>
-                      {doseResult && (
-                        <span className={styles.saveStatus}>
-                          {doseResult.totalDoseMg} mg total ({doseResult.weightKg} kg × {doseResult.mgPerKg} mg/kg)
-                        </span>
-                      )}
-                    </div>
-                    {doseError && <div className={styles.errorState} role="alert">{doseError}</div>}
+                    <DoseCalculator key={activeEntry.patientId} authedFetch={authedFetch} patientId={activeEntry.patientId} queueEntryId={activeEntry.id} canRecordWeight={can("clinical:edit")} onWeightRecorded={reloadCtx} />
                   </div>
 
                   <div className={styles.previousMeds}>
@@ -1175,6 +1148,7 @@ export default function ConsultPage() {
               {pat && pat.activePackages > 0
                 ? <p className={p.muted}>{pat.activePackages} active package{pat.activePackages === 1 ? "" : "s"}. <Link href="/packages" className={p.linkBtn}>Open packages</Link></p>
                 : <p className={p.muted}>No active package.</p>}
+              {can("packages:view") && <PackageSessionCard authedFetch={authedFetch} patientId={activeEntry.patientId} canRedeem={can("packages:edit")} />}
             </section>
           </aside>
         </div>

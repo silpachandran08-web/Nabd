@@ -93,11 +93,12 @@ public class PrescriptionService {
     @Transactional
     public DoseCalculationResponse calculateDose(UUID tenantId, UUID patientId, BigDecimal mgPerKg) {
         tenantContext.set(tenantId);
-        BigDecimal weightKg = vitalsRepo.findLatestWeightKg(tenantId, patientId)
+        VitalsRepository.WeightReading reading = vitalsRepo.findLatestWeight(tenantId, patientId)
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "no-weight-recorded", "No weight recorded",
                         "Record this patient's weight in vitals before calculating a weight-based dose."));
+        BigDecimal weightKg = reading.weightKg();
         BigDecimal totalDoseMg = weightKg.multiply(mgPerKg).setScale(2, RoundingMode.HALF_UP);
-        return new DoseCalculationResponse(weightKg, mgPerKg, totalDoseMg, DOSE_RULE_SOURCE);
+        return new DoseCalculationResponse(weightKg, mgPerKg, totalDoseMg, DOSE_RULE_SOURCE, reading.recordedAt());
     }
 
     @Transactional
