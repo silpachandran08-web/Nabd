@@ -31,7 +31,7 @@ function addToDate(ymd: string, days: number, months: number): string {
 export default function FollowUpPanel({
   authedFetch, doctorId, patientId, onBooked, canBook,
 }: {
-  authedFetch: AuthedFetch; doctorId: string; patientId: string; onBooked: (label: string | null) => void;
+  authedFetch: AuthedFetch; doctorId: string; patientId: string; onBooked: (label: string | null | undefined) => void;
   /** queue:create — booking controls are absent without it; the existing follow-up still shows. */
   canBook: boolean;
 }) {
@@ -59,7 +59,7 @@ export default function FollowUpPanel({
       try {
         const res = await authedFetch(`/appointments?patientId=${patientId}&doctorId=${doctorId}&limit=100`);
         if (cancelled) return;
-        if (!res?.ok) { setExisting("error"); return; }
+        if (!res?.ok) { setExisting("error"); onBooked(undefined); return; }
         const page: { data: AppointmentLite[] } = await res.json();
         const fu = upcomingFollowUp(page.data ?? [], doctorId, Date.now());
         const label = fu ? fmtFull(fu.startTime) : null;
@@ -67,7 +67,7 @@ export default function FollowUpPanel({
         onBooked(label);
         setExisting("done");
       } catch {
-        if (!cancelled) setExisting("error");
+        if (!cancelled) { setExisting("error"); onBooked(undefined); }
       }
     });
     return () => { cancelled = true; };
@@ -131,10 +131,11 @@ export default function FollowUpPanel({
     <section className={s.card} aria-label="Follow-up">
       <h3 className={s.cardTitle}>
         Follow-up
-        {existing === "loading" ? null : booked ? <StatusPill tone="ok" label={`Set · ${booked}`} /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
+        {existing === "loading" ? null : booked ? <StatusPill tone="ok" label={`Set · ${booked}`} />
+          : existing === "error" ? <StatusPill tone="warn" icon="alert" label="Unknown" /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
       </h3>
       {existing === "loading" && <Skeleton rows={1} label="Checking for a booked follow-up" />}
-      {existing === "error" && <p className={s.muted}>Couldn&apos;t check for an existing follow-up; one may already be booked.</p>}
+      {existing === "error" && <p className={s.muted}>Couldn&apos;t check for an existing follow-up; one may already be booked. Check the schedule before booking.</p>}
       {canBook && (<>
       {booked && <p className={s.muted}>Book another only if a second visit is needed; the existing one is not moved.</p>}
       <div className={s.row} role="group" aria-label="Follow-up interval">
