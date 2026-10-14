@@ -39,13 +39,18 @@ public class PatientController {
         this.service = service;
     }
 
-    /** Patient Registry — filter: all (default), recent, followup, package, balance, duplicate, archived. */
+    /**
+     * Patient Registry — filter: all (default), recent, followup, package, balance, duplicate, archived.
+     * REC-040: optional limit (1-200, default 200) and opaque cursor page the matching rows.
+     */
     @GetMapping("/registry")
     @PreAuthorize("hasAuthority('patients:view')")
     public PatientRegistryResponse registry(@AuthenticationPrincipal Jwt jwt,
                                             @RequestParam(required = false) String q,
-                                            @RequestParam(required = false) String filter) {
-        return service.registry(tenantId(jwt), staffId(jwt), q, filter);
+                                            @RequestParam(required = false) String filter,
+                                            @RequestParam(required = false) Integer limit,
+                                            @RequestParam(required = false) String cursor) {
+        return service.registry(tenantId(jwt), staffId(jwt), q, filter, limit, cursor);
     }
 
     @GetMapping

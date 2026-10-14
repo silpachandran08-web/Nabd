@@ -9,8 +9,13 @@ import java.util.UUID;
 /**
  * Patient Registry (DESIGN.md): rows for the selected filter/search plus a count per filter.
  * "all" excludes archived (merged) records, as in the wireframe.
+ *
+ * <p>REC-040 paging (additive): {@code matchedTotal} is how many rows match the current filter + q before paging,
+ * {@code hasMore} says whether another page exists and {@code page.nextCursor} fetches it. A call without
+ * limit/cursor still returns the first 200 rows, as before.
  */
-public record PatientRegistryResponse(int total, Map<String, Integer> counts, List<Row> rows) {
+public record PatientRegistryResponse(int total, Map<String, Integer> counts, List<Row> rows,
+                                      int matchedTotal, boolean hasMore, PageMeta page) {
 
     /**
      * tags: which filters this patient falls under (recent, followup, package, balance, duplicate,

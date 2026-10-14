@@ -148,7 +148,7 @@ class PatientRepository {
                                    WHERE q.patient_id = patients.id AND q.queue_date = ? AND q.status NOT IN ('completed', 'no_show')
                                    ORDER BY q.created_at DESC LIMIT 1) tq ON true
                 WHERE patients.tenant_id = ?
-                """ + CONSENT_GATE + SCOPE_GATE + "ORDER BY patients.name LIMIT ?",
+                """ + CONSENT_GATE + SCOPE_GATE + "ORDER BY patients.name, patients.id LIMIT ?", // id: stable order for REC-040 paging
                 (rs, i) -> new RegistryRow(rs.getObject("id", UUID.class), rs.getString("mrn"), rs.getString("name"),
                         rs.getString("phone"), rs.getDate("dob").toLocalDate(), rs.getString("gender"), rs.getString("status"),
                         rs.getDate("last_visit") == null ? null : rs.getDate("last_visit").toLocalDate(),

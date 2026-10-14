@@ -96,4 +96,73 @@ class PatientRegistryApiTest extends ApiTestBase {
         assertThat(child).isNotNull();
         assertThat(dupe).isNotNull();
     }
+
+    /** REC-040: limit + opaque cursor page the matching rows; a call without paging params is unchanged. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void registryPagesWithLimitAndCursorAndStaysInTenant() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "reg2@a.com", "+919800067002", false);
+        String token = loginAndGetAccessToken(owner);
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        String[] names = {"Pager Aamir", "Pager Bina", "Pager Chetan", "Pager Divya", "Pager Eshan"};
+        for (int i = 0; i < names.length; i++) {
+            ids.add(register(token, names[i], "+91981117710" + i, (1950 + i * 7) + "-0" + (i + 1) + "-1" + i, null));
+        }
+
+        // no paging params: today's call shape still returns every row, plus the new fields
+        Map<String, Object> unpaged = exchange("/v1/patients/registry", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat((List<?>) unpaged.get("rows")).hasSize(5);
+        assertThat(unpaged).containsEntry("total", 5).containsEntry("matchedTotal", 5).containsEntry("hasMore", false);
+        assertThat((Map<String, Object>) unpaged.get("page")).containsEntry("nextCursor", null).containsEntry("limit", 200);
+
+        // limit=2 walks 2 + 2 + 1, each patient exactly once, in name order
+        java.util.List<String> seen = new java.util.ArrayList<>();
+        java.util.List<String> seenNames = new java.util.ArrayList<>();
+        String cursor = null;
+        int pages = 0;
+        do {
+            String path = "/v1/patients/registry?limit=2" + (cursor == null ? "" : "&cursor=" + cursor);
+            Map<String, Object> page = exchange(path, HttpMethod.GET, authed(token), Map.class).getBody();
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) page.get("rows");
+            assertThat(rows.size()).isLessThanOrEqualTo(2);
+            assertThat(page).containsEntry("matchedTotal", 5);
+            rows.forEach(r -> { seen.add((String) r.get("id")); seenNames.add((String) r.get("name")); });
+            cursor = (String) ((Map<String, Object>) page.get("page")).get("nextCursor");
+            assertThat(page.get("hasMore")).isEqualTo(cursor != null);
+            pages++;
+        } while (cursor != null && pages < 10);
+        assertThat(pages).isEqualTo(3);
+        assertThat(seen).hasSize(5).containsExactlyInAnyOrderElementsOf(ids);
+        assertThat(seenNames).containsExactly(names);
+
+        // paging composes with search: q narrows matchedTotal, then pages over that
+        Map<String, Object> searched = exchange("/v1/patients/registry?q=pager&limit=4", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(searched).containsEntry("matchedTotal", 5).containsEntry("hasMore", true);
+        assertThat((List<?>) searched.get("rows")).hasSize(4);
+        Map<String, Object> one = exchange("/v1/patients/registry?q=Divya&limit=4", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(one).containsEntry("matchedTotal", 1).containsEntry("hasMore", false);
+
+        // limit is clamped like the encounters list (1..200), a foreign/garbled cursor is a 400
+        Map<String, Object> clamped = exchange("/v1/patients/registry?limit=0", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat((List<?>) clamped.get("rows")).hasSize(1);
+        assertThat(exchange("/v1/patients/registry?cursor=not-a-cursor", HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        String encounterStyleCursor = new com.nabd.hms.common.Cursor(java.time.Instant.now(), UUID.randomUUID()).encode();
+        assertThat(exchange("/v1/patients/registry?cursor=" + encounterStyleCursor, HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // tenant isolation: another clinic's registry (and its paging) never contains these patients
+        SeededTenant other = seedTenant();
+        SeededStaff otherOwner = seedStaff(other, seedFullAccessRole(other.id()), "reg3@a.com", "+919800067003", false);
+        String otherToken = loginAndGetAccessToken(otherOwner);
+        String otherPatient = register(otherToken, "Pager Other", "+919811177199", "1999-09-09", null);
+        Map<String, Object> otherPage = exchange("/v1/patients/registry?limit=1", HttpMethod.GET, authed(otherToken), Map.class).getBody();
+        assertThat(otherPage).containsEntry("total", 1).containsEntry("matchedTotal", 1).containsEntry("hasMore", false);
+        assertThat(((List<Map<String, Object>>) otherPage.get("rows")).stream().map(r -> r.get("id")).toList())
+                .containsExactly(otherPatient);
+        Map<String, Object> otherSearch = exchange("/v1/patients/registry?q=Aamir", HttpMethod.GET, authed(otherToken), Map.class).getBody();
+        assertThat(otherSearch).containsEntry("matchedTotal", 0);
+        assertThat((List<?>) otherSearch.get("rows")).isEmpty();
+    }
 }

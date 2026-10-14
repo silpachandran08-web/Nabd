@@ -754,6 +754,41 @@ paths:
           description: Likely-duplicate match found (phone/name/DOB fuzzy match) — client should offer merge instead of blind create
           content: { application/json: { schema: { type: object, properties: { candidates: { type: array, items: { $ref: "#/components/schemas/PatientMatchCandidate" } } } } } }
 
+  /patients/registry:
+    get:
+      tags: [Patients]
+      summary: Patient Registry rows with per-filter counts, search and paging (REC-040)
+      description: >
+        Rows for the selected filter, narrowed by `q` (name, MRN, 3+ mobile digits, or today's token
+        such as `T-12`), ordered by name then id. Consent- and row-scope-gated like every patient read.
+        `total` and `counts` ignore `q` and paging; `matchedTotal` is the number of rows matching filter + q
+        before paging. Paging is additive: a call without `limit`/`cursor` returns the first 200 rows exactly
+        as before. `cursor` is opaque (an offset into the ordered result); pass `page.nextCursor` back
+        unchanged with the same `q`/`filter`. Flags and counts are computed for at most 3000 patients per clinic.
+      x-required-permission: patients:view
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - { name: filter, in: query, required: false, schema: { type: string, enum: [all, recent, followup, package, balance, duplicate, archived], default: all } }
+        - { name: limit, in: query, required: false, description: "Clamped to 1..200", schema: { type: integer, minimum: 1, maximum: 200, default: 200 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Registry page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer, description: "Non-archived patients (same as counts.all)" }
+                  counts: { type: object, additionalProperties: { type: integer }, description: "One count per filter key" }
+                  rows: { type: array, items: { $ref: "#/components/schemas/PatientRegistryRow" } }
+                  matchedTotal: { type: integer, description: "Rows matching filter + q before paging (REC-040)" }
+                  hasMore: { type: boolean, description: "True when page.nextCursor fetches another page (REC-040)" }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400":
+          description: Invalid filter (`invalid-filter`) or malformed cursor (`invalid-cursor`)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
   /patients/{id}:
     get:
       tags: [Patients]
@@ -2349,6 +2384,34 @@ components:
             activePackages: { type: integer }
             outstandingBalance: { type: number }
             lastVisitAt: { type: [string, "null"], format: date-time }
+
+    PatientRegistryRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mrn: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        age: { type: integer }
+        gender: { type: string }
+        minor: { type: boolean }
+        lastVisit: { type: [string, "null"], format: date }
+        nextAppointment: { type: [string, "null"], format: date-time }
+        nextDoctorName: { type: [string, "null"] }
+        nextDoctorId: { type: [string, "null"], format: uuid }
+        nextAppointmentId: { type: [string, "null"], format: uuid }
+        nextAppointmentToday: { type: boolean }
+        packageSessionsUsed: { type: [integer, "null"] }
+        packageSessionsTotal: { type: [integer, "null"] }
+        condition: { type: [string, "null"] }
+        followUpDue: { type: boolean }
+        allergy: { type: [string, "null"] }
+        balanceDue: { type: boolean }
+        duplicate: { type: boolean }
+        archived: { type: boolean }
+        queueToken: { type: [integer, "null"] }
+        queueStatus: { type: [string, "null"] }
+        tags: { type: array, items: { type: string, enum: [recent, followup, package, balance, duplicate, archived] } }
 
     PatientMatchCandidate:
       type: object
