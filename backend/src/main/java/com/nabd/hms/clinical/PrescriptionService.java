@@ -221,6 +221,7 @@ public class PrescriptionService {
                                              FavouriteRxSetUpdateRequest req) {
         tenantContext.set(tenantId);
         FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        requireVisible(set, callerStaffId);
         requireCanManage(set, callerStaffId, callerCanApprove, "change");
         if (req.items() != null && req.items().isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "empty-set", "Nothing to save", "A set needs at least one medicine; delete it instead.");
@@ -238,6 +239,9 @@ public class PrescriptionService {
                     shared = false;
                 }
                 case "shared", "mine" -> {
+                    if ("mine".equals(req.scope()) && owner != null && !owner.equals(callerStaffId)) {
+                        throw setForbidden("make another doctor's shared set private"); // would hide it from its own owner
+                    }
                     owner = owner == null ? callerStaffId : owner;
                     shared = "shared".equals(req.scope());
                 }
@@ -261,6 +265,7 @@ public class PrescriptionService {
     public void deleteSet(UUID tenantId, UUID setId, UUID callerStaffId, boolean callerCanApprove, String ipAddress) {
         tenantContext.set(tenantId);
         FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        requireVisible(set, callerStaffId);
         requireCanManage(set, callerStaffId, callerCanApprove, "delete");
         ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
         repo.deleteSet(tenantId, setId); // items go with it (ON DELETE CASCADE); prescriptions already built from it are unaffected
@@ -273,9 +278,7 @@ public class PrescriptionService {
                                           boolean callerCanApprove, String ipAddress) {
         tenantContext.set(tenantId);
         FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
-        if (set.doctorId() != null && !set.shared() && !set.doctorId().equals(callerStaffId)) {
-            throw notFound(); // someone else's private set is not visible, so it does not exist for this caller
-        }
+        requireVisible(set, callerStaffId);
         // Brand, sig, route and quantity travel with the line: upsert() runs the allergy/pregnancy/controlled checks on
         // drug AND brand exactly as for hand-typed lines, so a brand that carries an allergen is flagged on apply.
         List<PrescriptionItemRequest> items = repo.findSetItems(tenantId, setId).stream()
@@ -285,6 +288,14 @@ public class PrescriptionService {
         PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
         repo.markSetUsed(tenantId, setId);
         return result;
+    }
+
+    /** Another doctor's private set does not exist for this caller (404, no existence probe), approvers included:
+     * clinical:approve only reaches shared and standard sets. */
+    private void requireVisible(FavouriteSetRow set, UUID callerStaffId) {
+        if (set.doctorId() != null && !set.shared() && !set.doctorId().equals(callerStaffId)) {
+            throw notFound();
+        }
     }
 
     private void requireCanManage(FavouriteSetRow set, UUID callerStaffId, boolean callerCanApprove, String verb) {
