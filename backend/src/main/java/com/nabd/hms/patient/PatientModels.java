@@ -2,6 +2,7 @@ package com.nabd.hms.patient;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 final class PatientModels {
@@ -12,7 +13,8 @@ final class PatientModels {
                        String gender, UUID guardianId, String address, String status, Instant createdAt) {
     }
 
-    record MatchCandidateRow(UUID id, String name, String phone, double matchScore) {
+    /** matchedFields (REC-038): which of the fields the matcher compares agreed — phone, dob, name, in that order. */
+    record MatchCandidateRow(UUID id, String name, String phone, double matchScore, List<String> matchedFields) {
     }
 
     /** NB-085/NB-127-style audit snapshot — same small per-module record as Dental/Prescription/Reports. */

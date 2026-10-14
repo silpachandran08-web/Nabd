@@ -44,4 +44,8 @@ final class QueueModels {
             return clearedAt == null;
         }
     }
+
+    /** audit_log actor snapshot — same small per-module record as Patient/Dental/Nursing. */
+    record ActorInfo(String name, String role) {
+    }
 }
