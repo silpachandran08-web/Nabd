@@ -237,13 +237,18 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
   return (
     <div className={styles.card}>
       <h2 className={styles.cardTitle}>Pharmacy</h2>
-      <div className={styles.tabs} role="group" aria-label="Pharmacy mode">
-        {(["external", "hybrid", "in_house"] as const).filter((m) => canEdit || m === mode).map((m) => (
-          <button key={m} type="button" aria-pressed={mode === m} className={mode === m ? styles.tabActive : styles.tab} onClick={() => changeMode(m)}>
-            {MODE_LABEL[m]}
-          </button>
-        ))}
-      </div>
+      {canEdit ? (
+        <div className={styles.tabs} role="group" aria-label="Pharmacy mode">
+          {(["external", "hybrid", "in_house"] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} className={mode === m ? styles.tabActive : styles.tab} onClick={() => changeMode(m)}>
+              {MODE_LABEL[m]}
+            </button>
+          ))}
+        </div>
+      ) : (
+        // pharmacy:view only: the mode is information, not a control (PHA-016).
+        <p className={styles.subtitle}>Pharmacy mode: <strong>{MODE_LABEL[mode]}</strong></p>
+      )}
       <p className={ph.modeDesc}>{MODE_DESC[mode]}</p>
       {notice && (
         <div className={`${ph.notice} ${notice.error ? ph.noticeError : ""}`} role={notice.error ? "alert" : "status"}>
