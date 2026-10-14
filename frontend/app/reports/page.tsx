@@ -7,6 +7,7 @@ import Link from "next/link";
 import { getIdentity } from "../lib/session";
 import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
+import { paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
 
 // E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
@@ -27,7 +28,8 @@ type BillingLeakage = {
 type Money = {
   from: string; to: string; includesToday: boolean; currency: string; taxLabel: string;
   collected: number; billsRaised: number; taxCollected: number; noShows: number; bookings: number; waitingNow: number | null;
-  tender: { method: string; amount: number }[]; topServices: { name: string; revenue: number }[];
+  // count: payments per tender (added with OWN-023); optional so an older backend still renders.
+  tender: { method: string; amount: number; count?: number }[]; topServices: { name: string; revenue: number }[];
 };
 // GET /v1/billing/day-close — only the fields the Day close card reads.
 type DayClose = {
@@ -47,7 +49,6 @@ type Period = "today" | "yesterday" | "week" | "month" | "custom";
 const PERIODS: [Period, string][] = [["today", "Today"], ["yesterday", "Yesterday"], ["week", "This week"], ["month", "This month"], ["custom", "Custom"]];
 type Tab = "money" | "sources" | "staff" | "packages" | "leakage" | "retention" | "punctuality";
 const TABS: [Tab, string][] = [["money", "Today's money"], ["sources", "Sources"], ["staff", "Staff"], ["packages", "Packages"], ["leakage", "Leakage"], ["retention", "Retention"], ["punctuality", "Punctuality"]];
-const TENDER_LABELS: Record<string, string> = { cash: "Cash", upi: "UPI", card: "Card", other: "Other" };
 // Chart series colours (DESIGN §8.22); each column also carries its text label.
 const TENDER_COLORS: Record<string, string> = { cash: "var(--rp-series-1)", upi: "var(--rp-series-2)", card: "var(--rp-series-3)", other: "var(--nb-text-tertiary)" };
 
@@ -97,6 +98,7 @@ export default function ReportsPage() {
   const [moneyReport, setMoneyReport] = useState<Money | null>(null);
   const [dayClose, setDayClose] = useState<DayClose | null>(null);
   const [clinicName, setClinicName] = useState("");
+  const [region, setRegion] = useState<string | undefined>(undefined);
   const [exportError, setExportError] = useState<string | null>(null);
   const range = periodRange(period, custom);
   const qs = `from=${range.from}&to=${range.to}`;
@@ -141,6 +143,7 @@ export default function ReportsPage() {
       }
       setMoneyReport(await moneyRes.json());
       setClinicName(getIdentity()?.tenantName ?? "");
+      setRegion(getIdentity()?.tenantRegion);
       if (sourcesRes?.ok) setSources(await sourcesRes.json());
       if (staffRes?.ok) setStaffPerf(await staffRes.json());
       if (retentionRes?.ok) setRetention(await retentionRes.json());
@@ -280,9 +283,9 @@ export default function ReportsPage() {
                 <div className={styles.cardLabel}>Day close</div>
                 <div className={styles.dayCloseRow}>
                   <div>
-                    {closed ? <StatusPill tone="ok" label="Closed" />
-                      : blocked ? <StatusPill tone="warn" label="Blocked" />
-                      : <StatusPill tone="info" label="Open" icon="clock" />}
+                    {closed ? <StatusPill tone="info" label="Closed & locked" icon="lock" />
+                      : blocked ? <StatusPill tone="danger" label="Close blocked" />
+                      : <StatusPill tone="ok" label="Ready to close" />}
                     <div className={styles.statSub}>
                       {closed ? "Today is closed. Billing is locked until the day is unlocked."
                         : blocked ? `${dayClose.unbilled.length} completed ${dayClose.unbilled.length === 1 ? "consultation has" : "consultations have"} no bill.`
@@ -309,7 +312,10 @@ export default function ReportsPage() {
                       height: `${tenderMax > 0 ? Math.max(2, (Number(t.amount) / tenderMax) * 100) : 2}px`,
                       background: TENDER_COLORS[t.method] ?? TENDER_COLORS.other,
                     }} />
-                    <span className={styles.columnLabel}>{TENDER_LABELS[t.method] ?? t.method}</span>
+                    <span className={styles.columnLabel}>{paymentMethodLabel(t.method, region)}</span>
+                    {typeof t.count === "number" && (
+                      <span className={styles.columnSub}>{t.count} {t.count === 1 ? "transaction" : "transactions"}</span>
+                    )}
                   </div>
                 ))}
               </div>

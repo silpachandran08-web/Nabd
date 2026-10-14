@@ -10,7 +10,7 @@ import Icon from "../components/ui/Icon";
 import AccessGate from "../components/ui/AccessGate";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
-import { getIdentity } from "../lib/session";
+import { getIdentity, regionLabel } from "../lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -106,6 +106,10 @@ function SetupPageInner() {
   const [payrollError, setPayrollError] = useState<string | null>(null);
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [specialtyDraft, setSpecialtyDraft] = useState("");
+  // Profile edits need setup:edit (PATCH /setup/profile); without it the profile is shown read-only.
+  const [canEditProfile, setCanEditProfile] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("nabd_access_token");
@@ -178,6 +182,7 @@ function SetupPageInner() {
     // synchronously (react-hooks/set-state-in-effect) — loadAll does, immediately.
     void Promise.resolve().then(() => {
       setCanPharmacy(can("pharmacy:view"));
+      setCanEditProfile(can("setup:edit"));
       setNotice(null);
       return loadAll();
     });
@@ -211,9 +216,13 @@ function SetupPageInner() {
     }
   };
 
+  // A failed save stays inline (unlike the shared patch(), which swaps the whole tab for an
+  // error view) so the owner's edits are not lost.
   const saveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || profileSaving) return;
+    setNotice(null);
+    setProfileError(null);
     const body = {
       name: profile.name,
       timezone: profile.timezone,
@@ -222,9 +231,21 @@ function SetupPageInner() {
       whatsappNumber: profile.whatsappNumber,
       specialties: profile.specialties,
     };
-    if (await patch("/setup/profile", body)) {
+    setProfileSaving(true);
+    try {
+      const res = await authedFetch("/setup/profile", { method: "PATCH", body: JSON.stringify(body) });
+      if (!res) return;
+      if (!res.ok) {
+        const p: Problem | null = await res.json().catch(() => null);
+        setProfileError(res.status === 403 ? "Your role can't change the clinic profile." : p?.detail || "Couldn't save the profile. Try again.");
+        return;
+      }
+      setProfile(await res.json());
       setNotice("Profile saved.");
-      loadAll();
+    } catch {
+      setProfileError("Couldn't reach the server. Your changes are still here; try again.");
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -380,14 +401,17 @@ function SetupPageInner() {
             {profile && (
               <form onSubmit={saveProfile}>
                 {notice && <div className={styles.notice} role="status"><Icon name="check" size={14} /> {notice}</div>}
+                {profileError && <div className={styles.errorState} role="alert">{profileError}</div>}
+                {!canEditProfile && <p className={styles.regionNote}>View only: your role can&apos;t change the clinic profile.</p>}
+                <fieldset className={styles.plainFieldset} disabled={!canEditProfile || profileSaving}>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="clinic-name">Clinic name</label>
                   <input id="clinic-name" className={styles.input} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
                 </div>
-                <div className={styles.regionLock}>
-                  <Icon name="shield" size={14} />
+                <div className={styles.regionLock} role="group" aria-label="Region">
+                  <Icon name="lock" size={14} />
                   <span className={styles.regionNote}>Region is locked irreversibly since provisioning — SYS-14 / NFR-04.</span>
-                  <strong>{profile.region}</strong>
+                  <strong>{regionLabel(profile.region)}{profile.region && regionLabel(profile.region) !== profile.region ? ` (${profile.region})` : ""}</strong>
                 </div>
                 <div className={styles.row}>
                   <div className={styles.field}>
@@ -395,35 +419,38 @@ function SetupPageInner() {
                     <TimezoneSelect id="clinic-timezone" className={styles.select} value={profile.timezone} onChange={(timezone) => setProfile({ ...profile, timezone })} />
                   </div>
                   <div className={styles.field}>
-                    <label className={styles.label}>WhatsApp number</label>
-                    <input className={styles.input} value={profile.whatsappNumber ?? ""} onChange={(e) => setProfile({ ...profile, whatsappNumber: e.target.value })} />
+                    <label className={styles.label} htmlFor="clinic-whatsapp">WhatsApp number</label>
+                    <input id="clinic-whatsapp" type="tel" className={styles.input} value={profile.whatsappNumber ?? ""} onChange={(e) => setProfile({ ...profile, whatsappNumber: e.target.value })} />
                   </div>
                 </div>
                 <div className={styles.row}>
                   <div className={styles.field}>
-                    <label className={styles.label}>Tax ID type</label>
-                    <select className={styles.select} value={profile.taxIdType ?? ""} onChange={(e) => setProfile({ ...profile, taxIdType: e.target.value || null })}>
+                    <label className={styles.label} htmlFor="clinic-tax-type">Tax ID type</label>
+                    <select id="clinic-tax-type" className={styles.select} value={profile.taxIdType ?? ""} onChange={(e) => setProfile({ ...profile, taxIdType: e.target.value || null })}>
                       <option value="">—</option>
                       <option value="GSTIN">GSTIN (India)</option>
                       <option value="VAT">VAT (KSA)</option>
                     </select>
                   </div>
                   <div className={styles.field}>
-                    <label className={styles.label}>Tax ID</label>
-                    <input className={styles.input} value={profile.taxId ?? ""} onChange={(e) => setProfile({ ...profile, taxId: e.target.value })} />
+                    <label className={styles.label} htmlFor="clinic-tax-id">Tax ID</label>
+                    <input id="clinic-tax-id" className={styles.input} value={profile.taxId ?? ""} onChange={(e) => setProfile({ ...profile, taxId: e.target.value })} />
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.label} htmlFor="clinic-specialty">Specialties</label>
+                  <label className={styles.label} htmlFor={canEditProfile ? "clinic-specialty" : undefined}>Specialties</label>
                   <div className={styles.chips}>
+                    {profile.specialties.length === 0 && <span className={styles.regionNote}>No specialties added yet.</span>}
                     {profile.specialties.map((sp) => (
                       <span key={sp} className={styles.chip}>
                         {sp}
-                        <button type="button" className={styles.chipX} aria-label={`Remove ${sp}`} onClick={() => setProfile({ ...profile, specialties: profile.specialties.filter((x) => x !== sp) })}>×</button>
+                        {canEditProfile && (
+                          <button type="button" className={styles.chipX} aria-label={`Remove ${sp}`} onClick={() => setProfile({ ...profile, specialties: profile.specialties.filter((x) => x !== sp) })}>×</button>
+                        )}
                       </span>
                     ))}
                   </div>
-                  <div className={styles.chipAdd}>
+                  {canEditProfile && <div className={styles.chipAdd}>
                     <input
                       id="clinic-specialty"
                       className={styles.input}
@@ -433,11 +460,14 @@ function SetupPageInner() {
                       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSpecialty(); } }}
                     />
                     <button type="button" className={styles.smallBtn} onClick={addSpecialty}>Add</button>
+                  </div>}
+                </div>
+                </fieldset>
+                {canEditProfile && (
+                  <div className={styles.actions}>
+                    <button className={styles.btnPrimary} type="submit" disabled={profileSaving}>{profileSaving ? "Saving…" : "Save profile"}</button>
                   </div>
-                </div>
-                <div className={styles.actions}>
-                  <button className={styles.btnPrimary} type="submit">Save profile</button>
-                </div>
+                )}
               </form>
             )}
           </div>

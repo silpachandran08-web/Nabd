@@ -19,6 +19,8 @@ export default function OwnerLoginPage() {
   const [pin, setPin] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // 423 from the server (OwnerService lockout): the wireframe's "blocked" step, with Start over.
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -29,25 +31,31 @@ export default function OwnerLoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, pin }),
+        signal: AbortSignal.timeout(15_000),
       });
       if (res.status === 429) {
         setFormError("Too many attempts. Wait a minute before trying again.");
         return;
       }
       if (res.status === 423) {
-        setFormError("Too many failed attempts. Try again later.");
+        const p: Problem | null = await res.json().catch(() => null);
+        setPin("");
+        setBlocked(p?.detail || "Too many failed attempts. Try again later.");
         return;
       }
-      const body = await res.json();
-      if (!res.ok) {
-        setFormError((body as Problem).detail || "Email or PIN is incorrect.");
+      const body = await res.json().catch(() => null);
+      if (!res.ok || !body) {
+        setPin("");
+        setFormError(res.status === 401 ? "Email or PIN is incorrect." : (body as Problem | null)?.detail || "Couldn't sign you in. Try again.");
         return;
       }
       const pair = body as PendingWorkspaceToken;
       sessionStorage.setItem("nabd_owner_pending_token", pair.pendingToken);
       router.replace("/owner/workspaces");
-    } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      setFormError(err instanceof DOMException && err.name === "TimeoutError"
+        ? "The server took too long to answer. Try again."
+        : "Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -58,6 +66,14 @@ export default function OwnerLoginPage() {
       <div className={styles.card}>
         <h1 className={styles.title}>Sign in as owner</h1>
         <p className={styles.subtitle}>One login for every clinic you own — pick a workspace next.</p>
+        {blocked ? (
+          <div>
+            <div className={styles.formError} role="alert">{blocked}</div>
+            <button className={styles.submit} type="button" onClick={() => { setBlocked(null); setFormError(null); }}>
+              Start over
+            </button>
+          </div>
+        ) : (
         <form onSubmit={submit} noValidate>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           <div className={styles.field}>
@@ -89,6 +105,7 @@ export default function OwnerLoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
+        )}
         <p className={styles.hint}>This is your owner account, separate from any one clinic&apos;s staff login.</p>
         <Link className={styles.linkBtn} href="/login">Clinic staff? Sign in to your clinic</Link>
       </div>

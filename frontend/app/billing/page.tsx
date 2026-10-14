@@ -7,7 +7,7 @@ import styles from "./billing.module.css";
 import { getIdentity, getPermissions } from "../lib/session";
 import { can } from "../lib/permissions";
 import Icon, { type IconName } from "../components/ui/Icon";
-import { paymentMethodLabel } from "../components/checkout/paymentMethods";
+import { isKsa, paymentMethodLabel } from "../components/checkout/paymentMethods";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -126,13 +126,14 @@ export default function BillingPage() {
     ["Total billed", money.format(Number(s.totals.billed)), plural(s.totals.bills, "bill", "bills"), "receipt", "info"],
     ["Total collected", money.format(Number(s.totals.collected)),
       Number(s.totals.billed) > 0 ? `${Math.round((Number(s.totals.collected) / Number(s.totals.billed)) * 100)}% of billed` : "nothing billed yet", "check", "ok"],
-    ["Cash", money.format(expectedCash), "expected in drawer", "list", "ok"],
-    ["Card", money.format(Number(m.card.amount)), plural(m.card.transactions, "transaction", "transactions"), "list", "info"],
-    [upiLabel, money.format(Number(m.upi.amount)), plural(m.upi.transactions, "transaction", "transactions"), "sync", "sync"],
+    ["Cash", money.format(expectedCash), "expected in drawer", "banknote", "accent"],
+    ["Card", money.format(Number(m.card.amount)), plural(m.card.transactions, "transaction", "transactions"), "card", "info"],
+    // Wireframe dcKpis: wallet for KSA's "Mada & digital", QR for India's UPI.
+    [upiLabel, money.format(Number(m.upi.amount)), plural(m.upi.transactions, "transaction", "transactions"), isKsa(region) ? "wallet" : "qr", "sync"],
     ["Outstanding balances", money.format(Number(s.outstanding.amount)), plural(s.outstanding.patients, "patient", "patients"), "clock", "warn"],
     ["Refunds recorded", "—", "out of scope this pass", "refresh", "neutral"],
-    [`${s.taxLabel} collected`, money.format(Number(s.totals.tax)), "reconciles to line items", "shield", "info"],
-    ["Pending checkouts", String(s.pendingCheckouts), "on the reception worklist", "users", "warn"],
+    [`${s.taxLabel} collected`, money.format(Number(s.totals.tax)), "reconciles to line items", "percent", "warn"],
+    ["Pending checkouts", String(s.pendingCheckouts), "on the reception worklist", "hourglass", "warn"],
     ["Consultations without a bill", String(s.unbilled.length), s.unbilled.length ? "blocks day close" : "nothing blocking", s.unbilled.length ? "alert" : "check", s.unbilled.length ? "danger" : "ok"],
   ];
 
