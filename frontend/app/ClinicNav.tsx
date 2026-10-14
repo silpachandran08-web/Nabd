@@ -305,7 +305,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
             <div className={styles.clinicText}>
               <div className={styles.clinicName}>{identity.tenantName}</div>
-              {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
             </div>
             <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
           </button>
@@ -329,7 +328,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
           <div className={styles.clinicText}>
             <div className={styles.clinicName}>{identity.tenantName}</div>
-            {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
           </div>
         </div>
       ))}
