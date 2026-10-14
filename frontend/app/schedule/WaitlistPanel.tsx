@@ -259,8 +259,8 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
               const sub = [
                 p && `Priority ${p}`,
                 doctor,
-                `joined ${new Date(w.joinedAt).toLocaleDateString()}`,
-                w.offeredSlotStart && `slot ${new Date(w.offeredSlotStart).toLocaleDateString()} ${clinicTime(w.offeredSlotStart, timezone)}`,
+                `joined ${new Date(w.joinedAt).toLocaleDateString(undefined, { timeZone: timezone })}`,
+                w.offeredSlotStart && `slot ${new Date(w.offeredSlotStart).toLocaleDateString(undefined, { timeZone: timezone })} ${clinicTime(w.offeredSlotStart, timezone)}`,
               ].filter(Boolean).join(" · ");
               return (
                 <li key={w.id} className={styles.waitItem}>
