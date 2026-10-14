@@ -10,6 +10,10 @@ import ConfirmDialog from "./ConfirmDialog";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
+import { decodeAccessToken } from "../lib/session";
+import VitalsCard from "../components/consult/VitalsCard";
+import type { Part } from "../components/consult/clinical";
+import type { Vitals } from "../components/consult/shared";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
@@ -38,6 +42,13 @@ type RegistryRow = {
   queueToken: number | null; queueStatus: string | null; tags: string[];
 };
 type Registry = { total: number; counts: Record<string, number>; rows: RegistryRow[] };
+// Today's queue entry for the drawer patient (GET /v1/queue, QueueEntryResponse subset).
+type TodayVisit = { id: string; patientId: string; doctorId: string; status: string; tokenNumber: number };
+const VISIT_DONE = ["completed", "cancelled", "no_show"];
+const VISIT_LABEL: Record<string, string> = {
+  checked_in: "Waiting", waiting: "Waiting", billing_pending: "Billing", vitals_pending: "Waiting for vitals",
+  vitals_done: "Ready for doctor", in_consult: "In consultation", procedures_pending: "Procedures", checkout_pending: "At checkout",
+};
 const FILTERS: [string, string][] = [["all", "All"], ["recent", "Recently visited"], ["followup", "Follow-up due"],
   ["package", "Active package"], ["balance", "Outstanding balance"], ["duplicate", "Duplicate review"], ["archived", "Archived"]];
 // Financial and duplicate-review filters are absent (not disabled) for roles that don't hold the grant.
@@ -168,7 +179,12 @@ function PatientsList() {
   const [historyToothId, setHistoryToothId] = useState<string | null>(null);
   const [historyEntries, setHistoryEntries] = useState<ToothHistoryEntry[]>([]);
 
-  const queueRow = drawerPatient ? registry?.rows.find((r) => r.id === drawerPatient.id && r.queueToken != null) : undefined;
+  // DOC-052: the drawer's visit context (wireframe Patient 360: latest vitals + "Start consultation").
+  const [visit, setVisit] = useState<TodayVisit | null>(null);
+  const [visitVitals, setVisitVitals] = useState<Part<Vitals>>({ status: "loading", data: null });
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const selfId = () => decodeAccessToken(localStorage.getItem("nabd_access_token") ?? "")?.sub ?? "";
 
   function toothLabel(fdiNumber: number): string {
     return numbering === "universal" ? `#${FDI_TO_UNIVERSAL[fdiNumber]}` : String(fdiNumber);
@@ -273,6 +289,11 @@ function PatientsList() {
     setPhoneShown(false);
     setAllergyLoad("loading");
     setConditionLoad("loading");
+    setVisit(null);
+    setVisitVitals({ status: "loading", data: null });
+    setStartError(null);
+    // Only patients the registry shows in today's queue have a visit to look up.
+    if (registry?.rows.some((r) => r.id === id && r.queueToken != null)) void loadTodayVisit(id, seq);
     let res: Response | null;
     try {
       res = await authedFetch(`/patients/${id}`);
@@ -315,6 +336,53 @@ function PatientsList() {
         const chartRes = await authedFetch(`/specialty/dental/patients/${id}/chart`);
         if (seq === openSeq.current && chartRes?.ok) setChart(await chartRes.json());
       } catch { /* chart stays empty; tooth edits re-fetch nothing */ }
+    }
+  }
+
+  async function loadTodayVisit(patientId: string, seq: number) {
+    if (!can("queue:view")) return;
+    try {
+      const res = await authedFetch("/queue");
+      if (seq !== openSeq.current || !res?.ok) return;
+      const list: TodayVisit[] = await res.json();
+      const open = list.filter((e) => e.patientId === patientId && !VISIT_DONE.includes(e.status));
+      const me = selfId();
+      const entry = open.find((e) => e.doctorId === me) ?? open[0] ?? null;
+      if (seq !== openSeq.current) return;
+      setVisit(entry);
+      if (entry && clinicalView) void loadVisitVitals(entry.id, seq);
+    } catch { /* no visit context; the drawer still shows the record */ }
+  }
+
+  async function loadVisitVitals(entryId: string, seq = openSeq.current) {
+    setVisitVitals({ status: "loading", data: null });
+    try {
+      const res = await authedFetch(`/clinical/vitals/${entryId}`);
+      if (seq !== openSeq.current || !res) return;
+      if (res.ok) setVisitVitals({ status: "ok", data: await res.json() });
+      else setVisitVitals({ status: res.status === 404 ? "none" : "error", data: null });
+    } catch {
+      if (seq === openSeq.current) setVisitVitals({ status: "error", data: null });
+    }
+  }
+
+  /** Same transition the consult workspace's Start uses (PATCH status in_consult); /consult?entry= then opens the visit. */
+  async function startConsultation(entry: TodayVisit) {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
+      if (!res) return;
+      if (!res.ok) {
+        const p: { detail?: string; title?: string } | null = await res.json().catch(() => null);
+        setStartError(p?.detail || p?.title || "Couldn't start the consultation.");
+        return;
+      }
+      router.push(`/consult?entry=${encodeURIComponent(entry.id)}`);
+    } catch {
+      setStartError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -639,6 +707,13 @@ function PatientsList() {
                 ))}
               </tbody>
             </table>
+            {/* GET /patients/registry has no paging parameters (server returns at most 200 rows per filter);
+                say so instead of implying the list is complete. Counts are pre-search, so only compare without q. */}
+            {!q.trim() && registry.rows.length < (registry.counts[filter] ?? 0) && (
+              <p className={styles.muted} role="status">
+                Showing the first {registry.rows.length} of {registry.counts[filter]}. Search by name, mobile or patient ID to find others.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -663,12 +738,29 @@ function PatientsList() {
             <>
               <div className={styles.drawerHeader}>
                 <span className={styles.drawerMeta}>{drawerPatient.mrn} · {age(drawerPatient.dob)} · {drawerPatient.gender}</span>
-                {queueRow && clinicalEdit && (
-                  <button type="button" className={styles.primaryBtn} onClick={() => router.push("/consult")}>
-                    Open consult queue · T-{queueRow.queueToken}
-                  </button>
-                )}
+                {(() => {
+                  if (!visit) return null;
+                  const mine = visit.doctorId === selfId();
+                  // Start/Resume only for the doctor whose queue holds the visit; everyone else sees where the visit is.
+                  if (mine && clinicalEdit && visit.status === "in_consult") return (
+                    <button type="button" className={styles.primaryBtn} onClick={() => router.push(`/consult?entry=${encodeURIComponent(visit.id)}`)}>
+                      Resume consultation · T-{visit.tokenNumber}
+                    </button>
+                  );
+                  if (mine && clinicalEdit && visit.status === "vitals_done" && can("queue:edit")) return (
+                    <button type="button" className={styles.primaryBtn} disabled={starting} onClick={() => void startConsultation(visit)}>
+                      {starting ? "Starting…" : `Start consultation · T-${visit.tokenNumber}`}
+                    </button>
+                  );
+                  return <StatusPill tone="info" icon="users" label={`${mine ? "In your queue" : "In today's queue"} · T-${visit.tokenNumber} · ${VISIT_LABEL[visit.status] ?? visit.status.replace(/_/g, " ")}`} />;
+                })()}
               </div>
+              {startError && <div className={styles.errorInline} role="alert">{startError}</div>}
+              {visit && clinicalView && (
+                <div className={styles.section}>
+                  <VitalsCard vitals={visitVitals} onRetry={() => void loadVisitVitals(visit.id)} />
+                </div>
+              )}
 
               {canDental && (
                 <div className={styles.drawerTabs}>
