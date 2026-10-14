@@ -1009,7 +1009,7 @@ function NursingWorklist() {
         </Dialog>
       )}
 
-      {showCapturePicker && canCaptureVitals && (
+      {showCapturePicker && canCaptureVitals && !queueForbidden && (
         <div className={styles.overlay} onClick={() => setShowCapturePicker(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Capture vitals — pick a patient</h2>
