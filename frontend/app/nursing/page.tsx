@@ -1005,9 +1005,8 @@ function NursingWorklist() {
       )}
 
       {showUrgentPicker && canFlagPriority && (
-        <div className={styles.overlay} onClick={() => setShowUrgentPicker(false)}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={submitMarkUrgent}>
-            <h2 className={styles.modalTitle}>Mark urgent</h2>
+        <Dialog title="Mark urgent" onClose={() => { if (!urgentSubmitting) setShowUrgentPicker(false); }}>
+          <form onSubmit={submitMarkUrgent}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="urgentPatient">Patient</label>
               <select id="urgentPatient" className={styles.select} value={urgentEntryId} onChange={(e) => setUrgentEntryId(e.target.value)}>
@@ -1036,7 +1035,7 @@ function NursingWorklist() {
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
 
       {showAdminForm && canCreateOrders && (
