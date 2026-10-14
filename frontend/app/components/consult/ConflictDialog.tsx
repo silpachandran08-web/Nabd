@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
+import { NOTE_FIELD_LABEL } from "./consultFlow";
 import type { NoteFields } from "./draftStore";
 import s from "./consultParts.module.css";
 
@@ -33,7 +34,7 @@ export default function ConflictDialog({ mine, server, onResolve, onClose }: {
       <div className={s.stack} style={{ marginBlockStart: "var(--nb-space-12)" }}>
         {differing.map((f) => (
           <fieldset key={f} className={s.card} style={{ margin: 0 }}>
-            <legend className={s.cardTitle}>{f}</legend>
+            <legend className={s.cardTitle}>{NOTE_FIELD_LABEL[f]}</legend>
             <p className={s.muted}><strong>Mine (this device):</strong> {mine[f] || "(empty)"}</p>
             <p className={s.muted}><strong>Server:</strong> {server[f] || "(empty)"}</p>
             <div className={s.row}>

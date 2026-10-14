@@ -30,7 +30,7 @@ import SafetyStrip from "../components/consult/SafetyStrip";
 import VisitOutputs from "../components/consult/VisitOutputs";
 import VisitTimeline from "../components/consult/VisitTimeline";
 import {
-  buildTimeline, DEFAULT_START_STATUS, nextPatient, queueStatusLabel, statusBeforeConsult, statusSequence,
+  buildTimeline, DEFAULT_START_STATUS, NOTE_FIELD_LABEL, NOTE_TITLE, nextPatient, queueStatusLabel, statusBeforeConsult, statusSequence,
 } from "../components/consult/consultFlow";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
@@ -928,7 +928,7 @@ export default function ConsultPage() {
             <span>
               This note was signed in another session, so the text on this device was not saved. Copy anything still needed into an amendment.
               <ul style={{ margin: "4px 0 0", paddingInlineStart: "18px" }}>
-                {(Object.keys(orphanText) as (keyof NoteFields)[]).filter((k) => orphanText[k].trim() !== "").map((k) => <li key={k}><strong>{k}:</strong> {orphanText[k]}</li>)}
+                {(Object.keys(orphanText) as (keyof NoteFields)[]).filter((k) => orphanText[k].trim() !== "").map((k) => <li key={k}><strong>{NOTE_FIELD_LABEL[k]}:</strong> {orphanText[k]}</li>)}
               </ul>
               <button type="button" className={p.linkBtn} onClick={() => setOrphanText(null)}>Dismiss</button>
             </span>
@@ -986,7 +986,7 @@ export default function ConsultPage() {
 
             {locked && (
               <div className={styles.signedBanner}>
-                <span>This note is signed and locked.</span>
+                <span>This note is finalised. Changes need a documented amendment with a reason, which is audited.</span>
                 {canEditNote && (
                   <span className={styles.followUpControls}>
                     <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
@@ -1042,10 +1042,11 @@ export default function ConsultPage() {
               <>
                 {!locked && can("clinical:edit") && <NoteTemplates authedFetch={authedFetch} patientId={activeEntry.patientId} entryId={activeEntry.id} note={note} onSetField={updateField} />}
                 <div className={styles.card} style={{ padding: "24px" }}>
+                  <h3 className={p.cardTitle}>{NOTE_TITLE}</h3>
                   <div className={styles.noteGrid}>
                     {(["subjective", "objective"] as const).map((field) => (
                       <div className={styles.noteField} key={field}>
-                        <label className={styles.noteLabel} htmlFor={field}>{field}</label>
+                        <label className={styles.noteLabel} htmlFor={field}>{NOTE_FIELD_LABEL[field]}</label>
                         <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked || !canEditNote} onChange={(e) => updateField(field, e.target.value)} />
                       </div>
                     ))}
@@ -1067,9 +1068,10 @@ export default function ConsultPage() {
 
             {step === "assess" && (
               <div className={styles.card} style={{ padding: "24px" }}>
+                <h3 className={p.cardTitle}>{NOTE_TITLE}</h3>
                 <div className={styles.noteGrid}>
                   <div className={styles.noteField}>
-                    <label className={styles.noteLabel} htmlFor="assessment">assessment</label>
+                    <label className={styles.noteLabel} htmlFor="assessment">{NOTE_FIELD_LABEL.assessment}</label>
                     <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked || !canEditNote} onChange={(e) => updateField("assessment", e.target.value)} />
                   </div>
                   <div className={styles.noteField}>
@@ -1083,7 +1085,7 @@ export default function ConsultPage() {
               <>
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.noteField}>
-                    <label className={styles.noteLabel} htmlFor="plan">plan</label>
+                    <label className={styles.noteLabel} htmlFor="plan">{NOTE_FIELD_LABEL.plan}</label>
                     <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked || !canEditNote} onChange={(e) => updateField("plan", e.target.value)} />
                   </div>
                 </div>
