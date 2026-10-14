@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Dialog from "../components/ui/Dialog";
-import Icon from "../components/ui/Icon";
+import Icon, { type IconName } from "../components/ui/Icon";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
@@ -28,6 +28,8 @@ import RxPad from "../components/consult/RxPad";
 import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
 import VisitOutputs from "../components/consult/VisitOutputs";
+import VisitTimeline from "../components/consult/VisitTimeline";
+import { buildTimeline, nextPatient } from "../components/consult/consultFlow";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
   age, DONE_STATUSES, initials, minutesSince, rxItemLine, statusLabel, WAITING_STATUSES,
@@ -49,12 +51,13 @@ type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis:
 type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 type Step = "reason" | "examine" | "assess" | "plan" | "close";
 
-const STEPS: { id: Step; label: string; hint: string }[] = [
-  { id: "reason", label: "Reason", hint: "Read the complaint and vitals" },
-  { id: "examine", label: "Examine", hint: "Record history and findings" },
-  { id: "assess", label: "Assess", hint: "Assessment and diagnosis" },
-  { id: "plan", label: "Plan", hint: "Treatment and prescription" },
-  { id: "close", label: "Close", hint: "Review and hand off" },
+// Step rail and the one-line note for the current step (wireframe cwSteps / cwStepNote).
+const STEPS: { id: Step; label: string; hint: string; icon: IconName }[] = [
+  { id: "reason", label: "Reason", hint: "Why they came — read, don't type.", icon: "inbox" },
+  { id: "examine", label: "Examine", hint: "Specialty tools live here, inside the consult — no second screen.", icon: "stethoscope" },
+  { id: "assess", label: "Assess", hint: "Two or three lines. Quick phrases cover most of it.", icon: "list" },
+  { id: "plan", label: "Plan", hint: "Prescribe, order, follow up — actions only.", icon: "pulse" },
+  { id: "close", label: "Close", hint: "What stays open after this visit.", icon: "check" },
 ];
 
 const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "" };
@@ -130,6 +133,7 @@ export default function ConsultPage() {
   const [step, setStep] = useState<Step>("reason");
   const [note, setNote] = useState<NoteDraft>(BLANK_DRAFT);
   const [noteStatus, setNoteStatus] = useState<"draft" | "signed">("draft");
+  const [signedAt, setSignedAt] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -375,6 +379,9 @@ export default function ConsultPage() {
 
   // ---- opening visits -----------------------------------------------------------------------
 
+  // Who may start which visit: the visit doctor, from the status just before in_consult.
+  const canStartRow = (r: Row) => r.doctorId === selfId && r.status === "vitals_done";
+
   function openRow(row: Row) {
     setPreviewError(null);
     if (row.status === "in_consult" && row.doctorId === selfId) void openConsult(row);
@@ -422,6 +429,7 @@ export default function ConsultPage() {
     setStep(wantStep ?? "reason");
     setNote(BLANK_DRAFT);
     setNoteStatus("draft");
+    setSignedAt(null);
     setDirty(false);
     setLastSavedAt(null);
     setSaveState("idle");
@@ -457,6 +465,7 @@ export default function ConsultPage() {
         baseUpdatedRef.current = server!.updatedAt;
         setNote(toFields(server!));
         setNoteStatus(server!.status as "draft" | "signed");
+        setSignedAt(server!.signedAt);
         if (server!.status === "signed") {
           const aRes = await authedFetch(`/clinical/notes/${row.id}/amendments`);
           if (stale()) return;
@@ -713,6 +722,8 @@ export default function ConsultPage() {
           return;
         }
         setNoteStatus("signed");
+        const signed: Partial<Note> | null = await signRes.json().catch(() => null);
+        setSignedAt(typeof signed?.signedAt === "string" ? signed.signedAt : new Date().toISOString());
       }
       const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
       if (!statusRes?.ok) {
@@ -721,6 +732,7 @@ export default function ConsultPage() {
         return;
       }
       setActiveEntry((prev) => (prev ? { ...prev, status: "checkout_pending" } : prev));
+      setRows((prev) => prev.map((r) => (r.id === activeEntry.id ? { ...r, status: "checkout_pending" } : r)));
       setNotice("Sent to checkout. Reception can see this visit now.");
       // Stay in the workspace (don't auto-close): follow-up and amendments remain reachable.
     } catch {
@@ -809,6 +821,27 @@ export default function ConsultPage() {
     const advisoryItems = rxItems.filter((i) => (i.warnings ?? []).some((w) => !w.requiresDecision));
     const doctorName = getIdentity()?.staffName ?? "";
     const signedBlocked = closeIssues.length > 0 && !closeAck;
+    const canEditNote = can("clinical:edit");
+    const stepIndex = Math.max(0, STEPS.findIndex((x) => x.id === step));
+    const next = closedOut ? nextPatient(rows, activeEntry.id, selfId, canStartRow) : null;
+    const vd = ctx.vitals.data;
+    const timeline = buildTimeline({
+      checkedInAt: activeEntry.createdAt ?? null,
+      vitals: {
+        status: ctx.vitals.status, recordedAt: vd?.recordedAt ?? null,
+        summary: vd ? [
+          vd.bpSystolic != null && vd.bpDiastolic != null ? `BP ${vd.bpSystolic}/${vd.bpDiastolic}` : null,
+          vd.pulseBpm != null ? `${vd.pulseBpm} bpm` : null,
+          vd.tempCelsius != null ? `${vd.tempCelsius} °C` : null,
+          vd.spo2Percent != null ? `SpO₂ ${vd.spo2Percent}%` : null,
+        ].filter(Boolean).join(" · ") || null : null,
+      },
+      status: activeEntry.status,
+      draft: { savedAt: lastSavedAt ? lastSavedAt.toISOString() : null, pendingOnDevice: dirty && (saveState === "offline" || saveState === "error" || !online) },
+      signedAt,
+      noteSigned: locked,
+      amendments,
+    });
     const primaryLabel = completing ? "Working…" : handoffPending ? "Retry checkout handoff" : closedOut ? "Sent to checkout" : "Sign note and send to checkout";
 
     return (
@@ -862,6 +895,7 @@ export default function ConsultPage() {
                 <li key={r.id}>
                   <button type="button" className={`${styles.todayBtn} ${r.id === activeEntry.id ? styles.todayBtnOn : ""}`} aria-current={r.id === activeEntry.id ? "true" : undefined} onClick={() => switchTo(r)}>
                     <span><strong>#{r.tokenNumber}</strong> {r.patientName}</span>
+                    <span className={styles.todayMeta}>{r.appointmentId ? "Appointment" : (VISIT_LABEL[r.source ?? ""] ?? "Walk-in")}</span>
                     <span className={styles.flags}>
                       {(r.patient?.allergies.length ?? 0) > 0 && <StatusPill tone="danger" label="Allergy" />}
                       {r.priority && <StatusPill tone="urgent" label="Urgent" />}
@@ -876,29 +910,38 @@ export default function ConsultPage() {
           <div className={styles.centerCol}>
             <nav aria-label="Consultation steps">
               <ol className={styles.steps}>
-                {STEPS.map((s, i) => (
-                  <li key={s.id}>
-                    <button type="button" className={`${styles.stepBtn} ${step === s.id ? styles.stepBtnOn : ""}`} aria-current={step === s.id ? "step" : undefined} onClick={() => setStep(s.id)}>
-                      <span className={styles.stepName}>{i + 1}. {s.label}</span>
-                      <span className={styles.stepHint}>{s.hint}</span>
-                    </button>
-                  </li>
-                ))}
+                {STEPS.map((s, i) => {
+                  const done = i < stepIndex;
+                  return (
+                    <li key={s.id}>
+                      <button type="button" className={`${styles.stepBtn} ${step === s.id ? styles.stepBtnOn : done ? styles.stepBtnDone : ""}`} aria-current={step === s.id ? "step" : undefined} onClick={() => setStep(s.id)}>
+                        <Icon name={done ? "check" : s.icon} size={14} />
+                        <span className={styles.stepName}>{i + 1}. {s.label}</span>
+                        {done && <span className={p.srOnly}>(earlier step)</span>}
+                      </button>
+                    </li>
+                  );
+                })}
               </ol>
+              <p className={styles.stepHint}>{STEPS[stepIndex].hint}</p>
             </nav>
+
+            <VisitTimeline events={timeline} />
 
             {locked && (
               <div className={styles.signedBanner}>
                 <span>This note is signed and locked.</span>
-                <span className={styles.followUpControls}>
-                  <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
-                    {showAmendForm ? "Cancel amendment" : "Amend note"}
-                  </button>
-                </span>
+                {canEditNote && (
+                  <span className={styles.followUpControls}>
+                    <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
+                      {showAmendForm ? "Cancel amendment" : "Amend note"}
+                    </button>
+                  </span>
+                )}
               </div>
             )}
 
-            {showAmendForm && (
+            {showAmendForm && canEditNote && (
               <div className={styles.card} style={{ padding: "16px" }}>
                 <div className={styles.noteField}>
                   <label className={styles.noteLabel} htmlFor="amendReason">Reason for amendment</label>
@@ -935,27 +978,6 @@ export default function ConsultPage() {
                     : <p className={p.muted}>No reason was recorded at check-in. Ask the patient.</p>}
                 </section>
                 <VitalsCard vitals={ctx.vitals} onRetry={reloadCtx} />
-                <section className={p.card} aria-label="Visit timeline">
-                  <h3 className={p.cardTitle}>Visit timeline</h3>
-                  <ol className={p.timeline}>
-                    <li>
-                      <span className={p.timelineDot}><Icon name="check" size={14} /></span>
-                      <span>Checked in{activeEntry.createdAt ? ` · ${new Date(activeEntry.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
-                    </li>
-                    <li>
-                      <span className={p.timelineDot}><Icon name={ctx.vitals.status === "ok" ? "check" : "alert"} size={14} /></span>
-                      <span>
-                        {ctx.vitals.status === "ok" ? `Vitals recorded${ctx.vitals.data?.recordedAt ? ` · ${new Date(ctx.vitals.data.recordedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}`
-                          : ctx.vitals.status === "none" ? "Vitals not recorded yet"
-                          : ctx.vitals.status === "error" ? "Vitals status unavailable" : "Checking vitals…"}
-                      </span>
-                    </li>
-                    <li>
-                      <span className={p.timelineDot}><Icon name="stethoscope" size={14} /></span>
-                      <span>{activeEntry.status === "in_consult" ? "In consultation" : `Status: ${statusLabel(activeEntry.status)}`}</span>
-                    </li>
-                  </ol>
-                </section>
                 <div><button type="button" className={p.btn} onClick={() => setStep("examine")}>Continue to Examine</button></div>
               </>
             )}
@@ -968,7 +990,7 @@ export default function ConsultPage() {
                     {(["subjective", "objective"] as const).map((field) => (
                       <div className={styles.noteField} key={field}>
                         <label className={styles.noteLabel} htmlFor={field}>{field}</label>
-                        <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked} onChange={(e) => updateField(field, e.target.value)} />
+                        <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked || !canEditNote} onChange={(e) => updateField(field, e.target.value)} />
                       </div>
                     ))}
                   </div>
@@ -992,10 +1014,10 @@ export default function ConsultPage() {
                 <div className={styles.noteGrid}>
                   <div className={styles.noteField}>
                     <label className={styles.noteLabel} htmlFor="assessment">assessment</label>
-                    <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked} onChange={(e) => updateField("assessment", e.target.value)} />
+                    <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked || !canEditNote} onChange={(e) => updateField("assessment", e.target.value)} />
                   </div>
                   <div className={styles.noteField}>
-                    <DiagnosisField value={note.diagnosis} disabled={locked} inputClassName={styles.input} onChange={(v) => updateField("diagnosis", v)} />
+                    <DiagnosisField value={note.diagnosis} disabled={locked || !canEditNote} inputClassName={styles.input} onChange={(v) => updateField("diagnosis", v)} />
                   </div>
                 </div>
               </div>
@@ -1006,7 +1028,7 @@ export default function ConsultPage() {
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.noteField}>
                     <label className={styles.noteLabel} htmlFor="plan">plan</label>
-                    <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked} onChange={(e) => updateField("plan", e.target.value)} />
+                    <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked || !canEditNote} onChange={(e) => updateField("plan", e.target.value)} />
                   </div>
                 </div>
 
@@ -1158,15 +1180,32 @@ export default function ConsultPage() {
         <div className={styles.actionBar}>
           <div className={styles.stripActions}>{saveBadge ?? <span className={styles.saveStatus}>No changes yet</span>}</div>
           <div className={styles.stripActions}>
-            {activeEntry.status === "in_consult" && (
-              <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>Transfer to another department</button>
-            )}
-            {step !== "close" ? (
-              <button className={styles.completeBtn} onClick={() => setStep("close")}>Close consultation</button>
+            {closedOut ? (
+              <>
+                {canEditNote && <button className={styles.completeBtn} onClick={() => { setShowAmendForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Add amendment</button>}
+                {step !== "close" && <button className={styles.backBtn} onClick={() => setStep("close")}>Visit outputs</button>}
+                {next
+                  ? <button className={styles.backBtn} onClick={() => void switchTo(next)}>Next patient · #{next.tokenNumber}</button>
+                  : <button className={styles.backBtn} onClick={closeShell}>Back to queue</button>}
+              </>
             ) : (
-              <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || closedOut || signedBlocked || !!conflict}>
-                {primaryLabel}
-              </button>
+              <>
+                {!locked && canEditNote && (
+                  <button className={styles.backBtn} onClick={() => void saveNote(activeEntry.id)} disabled={saveState === "saving" || !!conflict || (!dirty && saveState !== "error")}>
+                    {saveState === "saving" ? "Saving…" : "Save draft"}
+                  </button>
+                )}
+                {activeEntry.status === "in_consult" && (
+                  <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>Transfer to another department</button>
+                )}
+                {canEditNote && (step !== "close" ? (
+                  <button className={styles.completeBtn} onClick={() => setStep("close")}>Close consultation</button>
+                ) : (
+                  <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || closedOut || signedBlocked || !!conflict}>
+                    {primaryLabel}
+                  </button>
+                ))}
+              </>
             )}
           </div>
         </div>
