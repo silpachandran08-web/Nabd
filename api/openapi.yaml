@@ -1063,6 +1063,87 @@ paths:
                   page: { $ref: "#/components/schemas/PageMeta" }
 
   # ------------------------------------------------- Clinical (allergies, Rx)
+  /clinical/encounters:
+    get:
+      tags: [Clinical]
+      summary: The calling doctor's own encounters (visits that reached consultation), newest first (DOC-005)
+      description: >
+        Read-only, tenant-scoped, restricted to queue entries where doctor_id is the caller. `state`
+        filters on the clinical note (none = no note yet, draft, signed, unsigned = none or draft).
+        `from`/`to` filter on the clinic calendar day of the visit. Outputs are derived from the note,
+        prescription and clinical documents tables; no clinical free text is returned.
+      x-required-permission: clinical:view
+      parameters:
+        - { name: state, in: query, required: false, schema: { type: string, enum: [none, draft, signed, unsigned] } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        queueEntryId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        patientMrn: { type: string }
+                        queueDate: { type: string, format: date }
+                        occurredAt: { type: string, format: date-time }
+                        visitStatus: { type: string, enum: [in_consult, checkout_pending, completed] }
+                        noteState: { type: string, enum: [none, draft, signed] }
+                        noteSignedAt: { type: [string, "null"], format: date-time }
+                        amendmentCount: { type: integer }
+                        rxStatus: { type: string, enum: [none, draft, signed] }
+                        rxItemCount: { type: integer }
+                        documentsDraft: { type: integer }
+                        documentsIssued: { type: integer }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /appointments/follow-ups:
+    get:
+      tags: [Appointments]
+      summary: The calling doctor's own follow-up appointments (appointments.is_follow_up), soonest first (DOC-006)
+      description: >
+        Read-only, tenant-scoped, caller's own appointments only. No reason or reminder data exists in
+        the schema, so none is returned. `from`/`to` filter on the clinic calendar day of the start time.
+      x-required-permission: queue:view
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [scheduled, cancelled, completed, no_show] } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        appointmentId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        patientMrn: { type: string }
+                        startTime: { type: string, format: date-time }
+                        status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /clinical/patients/{patientId}/allergies:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:

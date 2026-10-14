@@ -86,13 +86,16 @@ const DOCTOR_ITEMS: DoctorItem[] = [
   { label: "Schedule", short: "Schedule", icon: "calendar", href: "/schedule", permission: "queue:view" },
   // DOC-004: the doctor's own hours and leave (reads need queue:view; writes inside need queue:edit).
   { label: "My Schedule", short: "Hours", icon: "clock", href: "/my-schedule", permission: "clinical:edit", alsoPermission: "queue:view" },
+  // DOC-005 / DOC-006: wireframe order is Schedule, Encounters, Follow-ups.
+  { label: "Encounters", short: "Encounters", icon: "list", href: "/encounters", permission: "clinical:view" },
+  { label: "Follow-ups", short: "Follow-ups", icon: "refresh", href: "/follow-ups", permission: "queue:view" },
 ];
 // Wireframe doctor items whose page does not exist yet. Not linked (no dead links) and not shown
 // disabled (restricted/unavailable UI is absent): when a page ships, move its entry into DOCTOR_ITEMS
 // at the wireframe position (after Schedule:
-// Encounters, Follow-ups, External Reports, Clinical Documents, Specialty Workspace, Clinical Settings, More).
+// External Reports, Clinical Documents, Specialty Workspace, Clinical Settings, More).
 export const DOCTOR_PLANNED = [
-  "Encounters", "Follow-ups", "External Reports",
+  "External Reports",
   "Clinical Documents", "Specialty Workspace", "Clinical Settings", "More",
 ] as const;
 function isDoctorNav(perms: string[]): boolean {
