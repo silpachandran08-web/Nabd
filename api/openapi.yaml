@@ -751,7 +751,10 @@ paths:
       responses:
         "201": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
         "409":
-          description: Likely-duplicate match found (phone/name/DOB fuzzy match) — client should offer merge instead of blind create
+          description: >
+            Likely-duplicate match found (same phone digits, or same DOB + similar name) — client should
+            offer merge instead of blind create, or resend with confirmedNotDuplicate=true after review.
+            Each candidate carries matchScore (0..1) and matchedFields.
           content: { application/json: { schema: { type: object, properties: { candidates: { type: array, items: { $ref: "#/components/schemas/PatientMatchCandidate" } } } } } }
 
   /patients/registry:
@@ -2345,6 +2348,9 @@ components:
         nationalId:
           type: [string, "null"]
           description: "Aadhaar/Iqama — column-level encrypted at rest (NB-140), never returned in list responses"
+        confirmedNotDuplicate:
+          type: [boolean, "null"]
+          description: "Set after staff reviewed the 409 duplicate candidates and confirmed this is a different person; skips the duplicate check"
 
     PatientPatch:
       type: object
@@ -2415,11 +2421,27 @@ components:
 
     PatientMatchCandidate:
       type: object
+      description: >
+        A likely duplicate returned with the 409 on registration. Never carries the national ID
+        (it is not compared and not returned).
       properties:
         patientId: { type: string, format: uuid }
         name: { type: string }
         phone: { type: string }
-        matchScore: { type: number }
+        matchScore:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >
+            0..1, not a percentage. 1.0 when the mobile number matches (digits only); otherwise the
+            trigram similarity of the names when the date of birth matches. Candidates are returned
+            highest score first (at most 5).
+        matchedFields:
+          type: array
+          description: >
+            REC-038: which compared fields agreed, in this order: phone (same digits), dob (same date),
+            name (trigram similarity above 0.3). Only these three fields are compared.
+          items: { type: string, enum: [phone, dob, name] }
 
     WorkingHoursWrite:
       type: object

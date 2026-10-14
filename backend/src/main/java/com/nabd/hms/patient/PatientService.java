@@ -208,7 +208,7 @@ public class PatientService {
             log.info("patient registration blocked by {}: {} duplicate candidate(s) (tenant {})",
                     callerStaffId, candidates.size(), tenantId);
             return new DuplicateCandidatesResponse(candidates.stream()
-                    .map(c -> new PatientMatchCandidateResponse(c.id(), c.name(), c.phone(), c.matchScore()))
+                    .map(c -> new PatientMatchCandidateResponse(c.id(), c.name(), c.phone(), c.matchScore(), c.matchedFields()))
                     .toList());
         }
 

@@ -188,18 +188,22 @@ class PatientRepository {
 
     /** Phone-exact is the strong signal; DOB match + trigram name similarity is the fuzzy one (NB-060). */
     // Phones compare as digits (PhoneNumbers), so records saved in any format before normalisation still match.
+    // REC-038: phone_match / dob_match / name_match report which compared fields agreed (same 0.3 name threshold).
     List<MatchCandidateRow> findDuplicateCandidates(UUID tenantId, String phone, String name, LocalDate dob, int limit) {
         String digits = phone.replaceAll("\\D", "");
         return jdbc.query(
                 "SELECT id, name, phone, GREATEST(" +
                         "  CASE WHEN regexp_replace(phone, '\\D', '', 'g') = ? THEN 1.0 ELSE 0.0 END," +
                         "  CASE WHEN dob = ? THEN similarity(name, ?) ELSE 0.0 END" +
-                        ") AS match_score " +
+                        ") AS match_score, " +
+                        "regexp_replace(phone, '\\D', '', 'g') = ? AS phone_match, " +
+                        "dob = ? AS dob_match, " +
+                        "similarity(name, ?) > 0.3 AS name_match " +
                         "FROM patients " +
                         "WHERE tenant_id = ? AND status = 'active' " +
                         "AND (regexp_replace(phone, '\\D', '', 'g') = ? OR (dob = ? AND similarity(name, ?) > 0.3)) " +
                         "ORDER BY match_score DESC LIMIT ?",
-                candidateMapper(), digits, dob, name, tenantId, digits, dob, name, limit);
+                candidateMapper(), digits, dob, name, digits, dob, name, tenantId, digits, dob, name, limit);
     }
 
     UUID insert(UUID tenantId, String name, String phone, LocalDate dob, String gender,
@@ -310,9 +314,15 @@ class PatientRepository {
     }
 
     private RowMapper<MatchCandidateRow> candidateMapper() {
-        return (rs, i) -> new MatchCandidateRow(
-                UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("phone"),
-                rs.getDouble("match_score"));
+        return (rs, i) -> {
+            List<String> matched = new java.util.ArrayList<>(3);
+            if (rs.getBoolean("phone_match")) matched.add("phone");
+            if (rs.getBoolean("dob_match")) matched.add("dob");
+            if (rs.getBoolean("name_match")) matched.add("name");
+            return new MatchCandidateRow(
+                    UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("phone"),
+                    rs.getDouble("match_score"), List.copyOf(matched));
+        };
     }
 
     /** V3-010: whether a national ID is on file (the encrypted value itself is never read back), so the audit row can
