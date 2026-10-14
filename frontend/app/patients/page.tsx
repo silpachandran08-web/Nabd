@@ -14,6 +14,7 @@ import { decodeAccessToken } from "../lib/session";
 import VitalsCard from "../components/consult/VitalsCard";
 import type { Part } from "../components/consult/clinical";
 import type { Vitals } from "../components/consult/shared";
+import { DEFAULT_START_STATUS, statusBeforeConsult, statusSequence } from "../components/consult/consultFlow";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
@@ -43,8 +44,8 @@ type RegistryRow = {
 };
 type Registry = { total: number; counts: Record<string, number>; rows: RegistryRow[] };
 // Today's queue entry for the drawer patient (GET /v1/queue, QueueEntryResponse subset).
-type TodayVisit = { id: string; patientId: string; doctorId: string; status: string; tokenNumber: number };
-const VISIT_DONE = ["completed", "cancelled", "no_show"];
+type TodayVisit = { id: string; patientId: string; doctorId: string; departmentId: string; status: string; tokenNumber: number };
+const VISIT_DONE = ["completed", "cancelled", "no_show", "transferred_out"];
 const VISIT_LABEL: Record<string, string> = {
   checked_in: "Waiting", waiting: "Waiting", billing_pending: "Billing", vitals_pending: "Waiting for vitals",
   vitals_done: "Ready for doctor", in_consult: "In consultation", procedures_pending: "Procedures", checkout_pending: "At checkout",
@@ -183,6 +184,8 @@ function PatientsList() {
   const [visit, setVisit] = useState<TodayVisit | null>(null);
   const [visitVitals, setVisitVitals] = useState<Part<Vitals>>({ status: "loading", data: null });
   const [starting, setStarting] = useState(false);
+  // The status the department's pipeline puts right before in_consult (same rule as /consult, DOC-019).
+  const [visitStartStatus, setVisitStartStatus] = useState<string | null>(DEFAULT_START_STATUS);
   const [startError, setStartError] = useState<string | null>(null);
   const selfId = () => decodeAccessToken(localStorage.getItem("nabd_access_token") ?? "")?.sub ?? "";
 
@@ -290,6 +293,7 @@ function PatientsList() {
     setAllergyLoad("loading");
     setConditionLoad("loading");
     setVisit(null);
+    setVisitStartStatus(DEFAULT_START_STATUS);
     setVisitVitals({ status: "loading", data: null });
     setStartError(null);
     // Only patients the registry shows in today's queue have a visit to look up.
@@ -351,6 +355,18 @@ function PatientsList() {
       if (seq !== openSeq.current) return;
       setVisit(entry);
       if (entry && clinicalView) void loadVisitVitals(entry.id, seq);
+      if (entry) {
+        // An unreadable flow falls back to the default pipeline (vitals first), as /consult does.
+        let start: string | null = DEFAULT_START_STATUS;
+        try {
+          const fRes = await authedFetch(`/departments/${entry.departmentId}/flow`);
+          if (fRes?.ok) {
+            const steps: { stepType: string }[] = await fRes.json();
+            start = statusBeforeConsult(statusSequence(steps.map((x) => x.stepType)));
+          }
+        } catch { /* keep the default */ }
+        if (seq === openSeq.current) setVisitStartStatus(start);
+      }
     } catch { /* no visit context; the drawer still shows the record */ }
   }
 
@@ -747,7 +763,7 @@ function PatientsList() {
                       Resume consultation · T-{visit.tokenNumber}
                     </button>
                   );
-                  if (mine && clinicalEdit && visit.status === "vitals_done" && can("queue:edit")) return (
+                  if (mine && clinicalEdit && visitStartStatus !== null && visit.status === visitStartStatus && can("queue:edit")) return (
                     <button type="button" className={styles.primaryBtn} disabled={starting} onClick={() => void startConsultation(visit)}>
                       {starting ? "Starting…" : `Start consultation · T-${visit.tokenNumber}`}
                     </button>
