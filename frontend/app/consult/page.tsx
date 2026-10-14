@@ -29,10 +29,12 @@ import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
 import VisitOutputs from "../components/consult/VisitOutputs";
 import VisitTimeline from "../components/consult/VisitTimeline";
-import { buildTimeline, nextPatient } from "../components/consult/consultFlow";
+import {
+  buildTimeline, DEFAULT_START_STATUS, nextPatient, queueStatusLabel, statusBeforeConsult, statusSequence,
+} from "../components/consult/consultFlow";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
-  age, DONE_STATUSES, initials, minutesSince, rxItemLine, statusLabel, WAITING_STATUSES,
+  age, DONE_STATUSES, initials, minutesSince, rxItemLine, WAITING_STATUSES,
   type PatientDetail, type Prescription, type PrescriptionItem, type Problem, type QueueEntry, type Row, type RxWarning,
 } from "../components/consult/shared";
 import p from "../components/consult/consultParts.module.css";
@@ -92,7 +94,7 @@ const STATUS_TONE: Record<string, { tone: PillTone; icon?: Parameters<typeof Sta
 };
 function StatusBadge({ status }: { status: string }) {
   const t = STATUS_TONE[status] ?? { tone: "neutral" as PillTone };
-  return <StatusPill tone={t.tone} icon={t.icon} label={statusLabel(status)} />;
+  return <StatusPill tone={t.tone} icon={t.icon} label={queueStatusLabel(status)} />;
 }
 
 function decodeJwt(token: string): Record<string, unknown> {
@@ -124,6 +126,9 @@ export default function ConsultPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selfId, setSelfId] = useState("");
   const [now, setNow] = useState(0);
+  // departmentId -> the status a visit must be in before it can move to in_consult (that
+  // department's configured pipeline; a department without vitals starts from "waiting").
+  const [startStatus, setStartStatus] = useState<Record<string, string | null>>({});
   // The URL mirrors the open visit, but only once a ?entry= deep link has been read; otherwise the
   // mirror effect would strip the params on mount, before the deep link is consumed.
   const [urlReady, setUrlReady] = useState(false);
@@ -247,6 +252,20 @@ export default function ConsultPage() {
         return { ...e, patientName: patient?.name ?? "Unknown patient", patient };
       }));
       setRows(withNames);
+      // One flow lookup per department, so "Start consultation" is offered exactly where the server
+      // will accept the move. An unreadable flow falls back to the default pipeline (vitals first).
+      const depts = [...new Set(entries.map((e) => e.departmentId))];
+      const flows = await Promise.all(depts.map(async (d) => {
+        try {
+          const r = await authedFetch(`/departments/${d}/flow`);
+          if (!r?.ok) return [d, DEFAULT_START_STATUS] as const;
+          const steps: { stepType: string }[] = await r.json();
+          return [d, statusBeforeConsult(statusSequence(steps.map((x) => x.stepType)))] as const;
+        } catch {
+          return [d, DEFAULT_START_STATUS] as const;
+        }
+      }));
+      setStartStatus(Object.fromEntries(flows));
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -395,7 +414,10 @@ export default function ConsultPage() {
   // ---- opening visits -----------------------------------------------------------------------
 
   // Who may start which visit: the visit doctor, from the status just before in_consult.
-  const canStartRow = (r: Row) => r.doctorId === selfId && r.status === "vitals_done";
+  const canStartRow = (r: Row) => {
+    const from = r.departmentId in startStatus ? startStatus[r.departmentId] : DEFAULT_START_STATUS;
+    return r.doctorId === selfId && from !== null && r.status === from;
+  };
 
   function openRow(row: Row) {
     setPreviewError(null);
@@ -815,7 +837,7 @@ export default function ConsultPage() {
           starting={starting}
           error={previewError}
           onClose={() => { setPreview(null); setPreviewError(null); }}
-          onStart={preview.status === "vitals_done" && preview.doctorId === selfId ? () => startConsult(preview) : undefined}
+          onStart={canStartRow(preview) ? () => startConsult(preview) : undefined}
           onOpenVisit={(preview.status === "checkout_pending" || preview.status === "completed") && !dirty
             ? () => { const r = preview; setPreview(null); void openConsult(r); }
             : undefined}
@@ -1415,13 +1437,13 @@ export default function ConsultPage() {
                         </div>
                       </td>
                       <td className={styles.hideNarrow}>
-                        {waiting ? <>{mins !== null ? `${mins} min` : "—"}{r.createdAt ? <span className={styles.subline}>{new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span> : null}</> : "—"}
+                        {waiting && mins !== null ? `${mins} min` : "—"}{r.createdAt ? <span className={styles.subline}>Arrived {new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span> : null}
                       </td>
                       <td><StatusBadge status={r.status} /></td>
                       <td>
                         {r.status === "in_consult" && mine
                           ? <button className={styles.actionBtn} onClick={() => openRow(r)}>Resume</button>
-                          : r.status === "vitals_done" && mine
+                          : canStartRow(r)
                             ? <button className={styles.actionBtn} onClick={() => openRow(r)}>Start consultation</button>
                             : <button className={styles.actionBtnGhost} onClick={() => openRow(r)}>Summary</button>}
                       </td>
