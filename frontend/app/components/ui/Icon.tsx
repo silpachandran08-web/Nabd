@@ -31,6 +31,8 @@ const PATHS = {
   login: "M10 17l5-5-5-5M15 12H3M14 4h5a2 2 0 012 2v12a2 2 0 01-2 2h-5",
   bolt: "M13 3L5 13.5h6L10 21l8-10.5h-6z",
   sync: "M4 12a8 8 0 0113.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 01-13.7 5.6L4 16M4 20v-4h4",
+  lock: "M7 11V8a5 5 0 0110 0v3M5 11h14v10H5zM12 15v2",
+  globe: "M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 2.5 3.8 5.5 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.5-3.8-9S9.5 5.5 12 3z",
 } as const;
 
 export type IconName = keyof typeof PATHS;
