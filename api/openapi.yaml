@@ -2255,6 +2255,22 @@ components:
         mobileVerified: { type: boolean, description: "Patient data is unreachable until both this and emailVerified are true (NB-041)" }
         lastSeenAt: { type: [string, "null"], format: date-time }
         professionalRegistrationNo: { type: [string, "null"], description: "DOC-N1. Medical council / SCFHS registration number; null when not set" }
+        loginMethod:
+          type: string
+          readOnly: true
+          enum: [owner_account, invite_pending, authenticator, authenticator_setup_required, pin_or_whatsapp_otp, pin, whatsapp_otp, none]
+          description: >
+            OWN-034. Derived from stored credentials, first match wins: owner_account (Owner-linked row; signs in
+            through /owners/auth/login with the Owner's email + PIN), invite_pending (invite not accepted), authenticator
+            (MFA enrolled; every sign-in ends with a TOTP code), authenticator_setup_required (role requires MFA, not yet
+            enrolled; next sign-in forces enrolment), then the first factors available: pin_or_whatsapp_otp, pin,
+            whatsapp_otp, none. Which first factor was actually used at a sign-in is not recorded, so it is never guessed.
+            Independent of status (a suspended account keeps its method but cannot sign in).
+        loginFactors:
+          type: array
+          readOnly: true
+          items: { type: string, enum: [pin, whatsapp_otp, authenticator] }
+          description: "OWN-034. Factors this staff row can use: pin (PIN set), whatsapp_otp (mobile on file), authenticator (MFA enrolled). Empty for invite_pending and owner_account."
 
     RoleWrite:
       type: object

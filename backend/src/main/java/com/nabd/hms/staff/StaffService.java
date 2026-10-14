@@ -176,7 +176,54 @@ public class StaffService {
     private StaffResponse toResponse(StaffRow row) {
         return new StaffResponse(row.id(), row.email(), row.name(), row.mobilePhone(), row.roleId(), row.status(),
                 row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants(), row.departmentId(), row.lastSeenAt(),
-                row.professionalRegistrationNo());
+                row.professionalRegistrationNo(), loginMethod(row), loginFactors(row));
+    }
+
+    /**
+     * OWN-034: how this account signs in, derived only from what the schema stores (AuthService's
+     * real login paths). Which first factor a person actually used is NOT recorded anywhere
+     * (sessions/login_attempts hold no method), so when both PIN and WhatsApp OTP are available
+     * this says so rather than picking one. Status (suspended) is reported separately.
+     */
+    static String loginMethod(StaffRow row) {
+        if (row.ownerLinked()) {
+            return "owner_account";              // shadow row: signs in via /owners/auth/login (owner email + PIN)
+        }
+        if ("invited".equals(row.status())) {
+            return "invite_pending";             // no credential until the invite is accepted
+        }
+        if (row.mfaEnabled()) {
+            return "authenticator";              // every sign-in ends with a TOTP code
+        }
+        if (row.roleMfaRequired()) {
+            return "authenticator_setup_required"; // next sign-in forces authenticator enrolment
+        }
+        boolean otp = row.mobilePhone() != null;
+        if (row.hasPin() && otp) {
+            return "pin_or_whatsapp_otp";
+        }
+        if (row.hasPin()) {
+            return "pin";
+        }
+        return otp ? "whatsapp_otp" : "none";
+    }
+
+    /** OWN-034: the factors this staff row can currently use (PIN, WhatsApp OTP to the mobile on file, authenticator). */
+    static List<String> loginFactors(StaffRow row) {
+        if (row.ownerLinked() || "invited".equals(row.status())) {
+            return List.of();
+        }
+        List<String> factors = new java.util.ArrayList<>();
+        if (row.hasPin()) {
+            factors.add("pin");
+        }
+        if (row.mobilePhone() != null) {
+            factors.add("whatsapp_otp");
+        }
+        if (row.mfaEnabled()) {
+            factors.add("authenticator");
+        }
+        return List.copyOf(factors);
     }
 
     private ApiException staffConflict(DataIntegrityViolationException e) {
