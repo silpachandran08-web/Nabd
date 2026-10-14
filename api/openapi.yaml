@@ -29,6 +29,7 @@ tags:
   - name: Clinical
   - name: Pharmacy
   - name: Nursing
+  - name: Reports
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -1658,6 +1659,19 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/VaccineRecord" } } } } }
 
+  # ------------------------------------------------------------- Reports
+  /reports/money:
+    get:
+      tags: [Reports]
+      summary: "Reports - Today's money (OWN-01) for a period of clinic days, inclusive; from/to both default to today. 400 invalid-period when from is after to or the range exceeds a year."
+      x-required-permission: reports:view
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MoneyReport" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2671,3 +2685,33 @@ components:
         id: { type: string, format: uuid }
         name: { type: string }
         roleName: { type: string }
+
+    MoneyReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        includesToday: { type: boolean }
+        currency: { type: string, enum: [INR, SAR] }
+        taxLabel: { type: string, enum: [GST, VAT] }
+        collected: { type: number, description: "Exact decimal sum of payments recorded in the period" }
+        billsRaised: { type: integer }
+        taxCollected: { type: number }
+        noShows: { type: integer }
+        bookings: { type: integer }
+        waitingNow: { type: [integer, "null"], description: "Only set while the period includes today" }
+        tender:
+          type: array
+          items:
+            type: object
+            properties:
+              method: { type: string, enum: [cash, card, upi, other] }
+              amount: { type: number, description: "Exact decimal sum for this method" }
+              count: { type: integer, description: "OWN-023. Number of payments recorded with this method in the period. There is no refund count: payments are never negative or reversed in the data model." }
+        topServices:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              revenue: { type: number }
