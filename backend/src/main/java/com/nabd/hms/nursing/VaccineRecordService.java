@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.nabd.hms.nursing.NursingModels.VaccineRecordRow;
@@ -51,7 +53,7 @@ public class VaccineRecordService {
         VaccineRecordResponse out = toResponse(tenantId, repo.findVaccineRecord(tenantId, id).orElseThrow());
         var actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), null,
-                "nursing.vaccine_recorded", "vaccine_record", id, null, out);
+                "nursing.vaccine_recorded", "vaccine_record", id, null, auditPayload(out));
         return out;
     }
 
@@ -62,6 +64,17 @@ public class VaccineRecordService {
         LocalDate today = clock.today(tenantId);
         return repo.listVaccineRecords(tenantId, ClinicClock.startOf(today, zone), ClinicClock.startOf(today.plusDays(1), zone))
                 .stream().map(r -> toResponse(tenantId, r)).toList();
+    }
+
+    /** PHI rule (AuditService): ids and structured values only. No patient or staff name, no free text (vaccine name, dose,
+     * site, lot, notes); the full row is recoverable from vaccine_records by entityId. */
+    private static Map<String, Object> auditPayload(VaccineRecordResponse out) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("patientId", out.patientId());
+        m.put("queueEntryId", out.queueEntryId());
+        m.put("route", out.route());
+        m.put("expiryDate", out.expiryDate() == null ? null : out.expiryDate().toString());
+        return m;
     }
 
     private VaccineRecordResponse toResponse(UUID tenantId, VaccineRecordRow r) {
