@@ -1297,7 +1297,7 @@ paths:
     parameters: [{ name: setId, in: path, required: true, schema: { type: string, format: uuid } }]
     patch:
       tags: [Clinical]
-      summary: "DOC-035. Rename, switch scope, or replace the items (omitted fields unchanged). Only the owner or a clinical:approve holder (clinic standards: approve only); otherwise 403 rx-set-owner-only. Audited (rx_set.updated)."
+      summary: "DOC-035. Rename, switch scope, or replace the items (omitted fields unchanged). Only the owner or a clinical:approve holder (clinic standards: approve only); otherwise 403 rx-set-owner-only. Another doctor's PRIVATE set is 404 for everyone, clinical:approve holders included (approve reaches shared and standard sets only). Audited (rx_set.updated)."
       x-required-permission: clinical:edit
       requestBody:
         required: true
@@ -1316,7 +1316,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Clinical]
-      summary: "DOC-035. Delete a set (owner or clinical:approve; same 403 rule). Prescriptions already built from it are unaffected. Audited (rx_set.deleted)."
+      summary: "DOC-035. Delete a set (owner or clinical:approve; same 403 rule; another doctor's private set is 404 for everyone). Prescriptions already built from it are unaffected. Audited (rx_set.deleted)."
       x-required-permission: clinical:edit
       responses:
         "204": { description: Deleted }
