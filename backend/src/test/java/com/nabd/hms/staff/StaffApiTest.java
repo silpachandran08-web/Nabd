@@ -251,6 +251,73 @@ class StaffApiTest extends ApiTestBase {
         assertThat(targetToken).isNotBlank(); // sanity: token was actually issued before suspension
     }
 
+    private static Map<String, Object> byId(List<Map<String, Object>> data, UUID id) {
+        return data.stream().filter(s -> id.toString().equals(s.get("id"))).findFirst().orElseThrow();
+    }
+
+    /** OWN-034: loginMethod/loginFactors are derived from stored credentials only; no hash ever leaves the API. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void listReportsEachStaffMembersLoginMethodFromStoredCredentials() {
+        SeededTenant tenant = seedTenant();
+        UUID ownerRole = seedFullAccessRole(tenant.id());
+        SeededStaff owner = seedStaff(tenant, ownerRole, "lm-owner@a.com", "+919100000091", false);
+        SeededStaff withTotp = seedStaff(tenant, ownerRole, "lm-totp@a.com", "+919100000092", true);
+        UUID mfaRole = seedRole(tenant.id(), "MfaRole", false, fullGrant("queue"));
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE roles SET mfa_required = true WHERE id = ?", mfaRole));
+        SeededStaff mustEnrol = seedStaff(tenant, mfaRole, "lm-enrol@a.com", "+919100000093", false);
+        SeededStaff otpOnly = seedStaff(tenant, ownerRole, "lm-otp@a.com", "+919100000094", false);
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET pin_hash = NULL WHERE id = ?", otpOnly.id()));
+        SeededStaff pinOnly = seedStaff(tenant, ownerRole, "lm-pin@a.com", "+919100000095", false);
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET mobile_phone = NULL WHERE id = ?", pinOnly.id()));
+        SeededOwner ownerAccount = seedOwner("lm-owner-account@a.com");
+        SeededStaff ownerShadow = seedStaff(tenant, ownerRole, "lm-shadow@a.com", "+919100000096", false);
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET owner_id = ? WHERE id = ?", ownerAccount.id(), ownerShadow.id()));
+        String token = loginAndGetAccessToken(owner);
+        exchange("/v1/staff", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "email", "lm-invited@a.com", "name", "Lm Invited", "mobilePhone", "+919100000097",
+                "roleId", ownerRole.toString())), Map.class);
+
+        ResponseEntity<Map> resp = exchange("/v1/staff?limit=100", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> data = (List<Map<String, Object>>) resp.getBody().get("data");
+
+        assertThat(byId(data, owner.id())).containsEntry("loginMethod", "pin_or_whatsapp_otp")
+                .containsEntry("loginFactors", List.of("pin", "whatsapp_otp"));
+        assertThat(byId(data, withTotp.id())).containsEntry("loginMethod", "authenticator")
+                .containsEntry("loginFactors", List.of("pin", "whatsapp_otp", "authenticator"));
+        assertThat(byId(data, mustEnrol.id())).containsEntry("loginMethod", "authenticator_setup_required");
+        assertThat(byId(data, otpOnly.id())).containsEntry("loginMethod", "whatsapp_otp")
+                .containsEntry("loginFactors", List.of("whatsapp_otp"));
+        assertThat(byId(data, pinOnly.id())).containsEntry("loginMethod", "pin")
+                .containsEntry("loginFactors", List.of("pin"));
+        assertThat(byId(data, ownerShadow.id())).containsEntry("loginMethod", "owner_account")
+                .containsEntry("loginFactors", List.of());
+        Map<String, Object> invited = data.stream().filter(s -> "lm-invited@a.com".equals(s.get("email"))).findFirst().orElseThrow();
+        assertThat(invited).containsEntry("loginMethod", "invite_pending").containsEntry("loginFactors", List.of());
+        assertThat(data).allSatisfy(s -> assertThat(s.keySet()).doesNotContain("pinHash", "mfaSecretEnc", "hasPin"));
+
+        // single-record GET carries the same derived field
+        ResponseEntity<Map> one = exchange("/v1/staff/" + withTotp.id(), HttpMethod.GET, authed(token), Map.class);
+        assertThat((Map<String, Object>) one.getBody()).containsEntry("loginMethod", "authenticator");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void loginMethodListIsTenantIsolated() { // OWN-034
+        SeededTenant tenantA = seedTenant();
+        SeededTenant tenantB = seedTenant();
+        SeededStaff staffA = seedStaff(tenantA, seedFullAccessRole(tenantA.id()), "lm-a@a.com", "+919100000098", true);
+        SeededStaff staffB = seedStaff(tenantB, seedFullAccessRole(tenantB.id()), "lm-b@b.com", "+919100000099", false);
+        String tokenB = loginAndGetAccessToken(staffB);
+
+        List<Map<String, Object>> data = (List<Map<String, Object>>) exchange("/v1/staff", HttpMethod.GET, authed(tokenB), Map.class)
+                .getBody().get("data");
+        assertThat(data).extracting(s -> s.get("id")).containsExactly(staffB.id().toString());
+        assertThat(exchange("/v1/staff/" + staffA.id(), HttpMethod.GET, authed(tokenB), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
     // ---- helpers ----
 
     private String mfaLogin(SeededTenant tenant, SeededStaff staff) {

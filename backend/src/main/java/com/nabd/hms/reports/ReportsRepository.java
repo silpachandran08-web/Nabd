@@ -200,9 +200,9 @@ class ReportsRepository {
     }
 
     List<MoneyResponse.Tender> tenderBetween(UUID tenantId, Instant start, Instant end) {
-        return jdbc.query("SELECT method, SUM(amount) AS amount FROM invoice_payments WHERE tenant_id = ? " +
+        return jdbc.query("SELECT method, SUM(amount) AS amount, COUNT(*) AS payment_count FROM invoice_payments WHERE tenant_id = ? " +
                         "AND recorded_at >= ? AND recorded_at < ? GROUP BY method ORDER BY SUM(amount) DESC",
-                (rs, i) -> new MoneyResponse.Tender(rs.getString("method"), rs.getBigDecimal("amount")),
+                (rs, i) -> new MoneyResponse.Tender(rs.getString("method"), rs.getBigDecimal("amount"), rs.getInt("payment_count")),
                 tenantId, Timestamp.from(start), Timestamp.from(end));
     }
 

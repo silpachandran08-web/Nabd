@@ -70,7 +70,7 @@ class ReportsApiTest extends ApiTestBase {
         assertThat(m).containsEntry("includesToday", true).containsEntry("currency", "INR").containsEntry("taxLabel", "GST")
                 .containsEntry("billsRaised", 1).containsEntry("bookings", 1).containsEntry("noShows", 1).containsEntry("waitingNow", 1);
         assertThat(((Number) m.get("collected")).doubleValue()).isEqualTo(500.0);
-        assertThat((List<Map<String, Object>>) m.get("tender")).singleElement().satisfies(x -> assertThat(x).containsEntry("method", "cash"));
+        assertThat((List<Map<String, Object>>) m.get("tender")).singleElement().satisfies(x -> assertThat(x).containsEntry("method", "cash").containsEntry("count", 1));
         assertThat((List<Map<String, Object>>) m.get("topServices")).singleElement().satisfies(x -> {
             assertThat(x).containsEntry("name", "X");
             assertThat(((Number) x.get("revenue")).doubleValue()).isEqualTo(500.0);
@@ -85,6 +85,51 @@ class ReportsApiTest extends ApiTestBase {
         String today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString();
         assertThat(exchange("/v1/reports/money?from=" + today + "&to=" + yesterday, HttpMethod.GET, authed(token), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    private void pay(String token, String invoiceId, String method, double amount) {
+        exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
+                authedJsonBody(token, Map.of("method", method, "amount", amount)), Map.class);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void moneyReportCountsPaymentsPerTenderAndDoesNotLeakAcrossTenants() { // OWN-023
+        SeededTenant tenant = seedTenant();
+        SeededTenant other = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "mt1@a.com", "+919800068101", false);
+        SeededStaff otherOwner = seedStaff(other, seedFullAccessRole(other.id()), "mt2@b.com", "+919800068102", false);
+        String token = loginAndGetAccessToken(owner);
+        String otherToken = loginAndGetAccessToken(otherOwner);
+
+        // visit 1: one 500 bill split 200 cash + 300 card; visit 2: 100 cash in full
+        String e1 = checkIn(token, registerPatient(token, "Mt One", "+919999968101"), owner.id(), null);
+        moveTo(token, e1, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        ResponseEntity<Map> inv = exchange("/v1/billing/checkout/" + e1, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 500, "taxRatePercent", 0)))), Map.class);
+        String invoiceId = (String) inv.getBody().get("id");
+        pay(token, invoiceId, "cash", 200);
+        pay(token, invoiceId, "card", 300);
+        String e2 = checkIn(token, registerPatient(token, "Mt Two", "+919999968102"), owner.id(), null);
+        moveTo(token, e2, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        checkoutAndPay(token, e2, 100);
+
+        Map<String, Object> m = exchange("/v1/reports/money", HttpMethod.GET, authed(token), Map.class).getBody();
+        List<Map<String, Object>> tender = (List<Map<String, Object>>) m.get("tender");
+        assertThat(tender).hasSize(2);
+        Map<String, Object> cash = tender.stream().filter(t -> "cash".equals(t.get("method"))).findFirst().orElseThrow();
+        Map<String, Object> card = tender.stream().filter(t -> "card".equals(t.get("method"))).findFirst().orElseThrow();
+        assertThat(cash).containsEntry("count", 2);
+        assertThat(((Number) cash.get("amount")).doubleValue()).isEqualTo(300.0);
+        assertThat(card).containsEntry("count", 1);
+        assertThat(((Number) card.get("amount")).doubleValue()).isEqualTo(300.0);
+        assertThat(((Number) m.get("collected")).doubleValue()).isEqualTo(600.0);
+
+        // the other clinic's report sees none of these payments
+        Map<String, Object> o = exchange("/v1/reports/money", HttpMethod.GET, authed(otherToken), Map.class).getBody();
+        assertThat((List<?>) o.get("tender")).isEmpty();
+        assertThat(((Number) o.get("collected")).doubleValue()).isEqualTo(0.0);
     }
 
     @Test
