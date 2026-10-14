@@ -1,0 +1,40 @@
+.page { min-height: 100%; padding: var(--nb-space-32); max-width: 1280px; margin: 0 auto; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--nb-space-16); margin-block-end: var(--nb-space-16); }
+.title { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.3px; margin: 0 0 var(--nb-space-4); }
+.subtitle { font-size: 13px; color: var(--nb-text-secondary); margin: 0; }
+.btn { display: inline-flex; align-items: center; gap: 6px; min-block-size: 36px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: 999px; background: var(--nb-surface-2); color: var(--nb-text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.btn:hover { color: var(--nb-text-primary); }
+.btn:focus-visible, .row:focus-visible, .field:focus-visible, .chip:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
+.filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--nb-space-12) var(--nb-space-16); margin-block-end: var(--nb-space-16); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.chip { min-block-size: 36px; padding-inline: var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: 999px; background: var(--nb-surface-2); color: var(--nb-text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--nb-surface-3); color: var(--nb-text-primary); border-color: var(--nb-accent-500); font-weight: 600; }
+.label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--nb-text-tertiary); }
+.field { min-block-size: 36px; padding-inline: var(--nb-space-8); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; font-size: 13px; }
+.card { background: var(--nb-surface-1); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-lg); padding: var(--nb-space-16); margin-block-end: var(--nb-space-16); }
+.cardTitle { display: flex; align-items: center; gap: var(--nb-space-8); font-size: 14px; font-weight: 600; margin: 0 0 var(--nb-space-4); }
+.count { font-size: 12px; font-weight: 500; color: var(--nb-text-secondary); background: var(--nb-surface-3); border-radius: 999px; padding: 1px var(--nb-space-8); }
+.hint { margin: 0 0 var(--nb-space-12); font-size: 12px; color: var(--nb-text-tertiary); }
+.list { list-style: none; margin: 0; padding: 0; }
+.head, .row { display: grid; gap: var(--nb-space-12); align-items: center; padding: var(--nb-space-8) var(--nb-space-12); }
+.cols5 { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1.2fr) 16px; }
+.cols4 { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr); }
+.head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--nb-text-tertiary); }
+.row { min-block-size: 54px; border-block-start: 1px solid var(--nb-border-subtle); color: inherit; text-decoration: none; }
+a.row:hover { background: var(--nb-surface-2); }
+.cell { display: flex; flex-direction: column; gap: 2px; min-inline-size: 0; font-size: 13px; overflow-wrap: anywhere; }
+.name { font-size: 14px; font-weight: 500; }
+.meta { font-size: 12px; color: var(--nb-text-secondary); }
+.pills { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.na { font-size: 12px; color: var(--nb-text-tertiary); }
+.mlabel { display: none; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--nb-text-tertiary); }
+.more { display: flex; justify-content: center; padding-block-start: var(--nb-space-12); }
+.inlineErr { font-size: 13px; color: var(--nb-text-secondary); display: flex; align-items: center; gap: var(--nb-space-8); justify-content: center; padding-block-start: var(--nb-space-12); }
+@media (max-width: 1100px) { .page { padding: var(--nb-space-24); } }
+@media (max-width: 720px) {
+  .page { padding: var(--nb-space-16); }
+  .head { display: none; }
+  .cols5, .cols4 { grid-template-columns: minmax(0, 1fr); gap: var(--nb-space-8); padding-block: var(--nb-space-12); }
+  .mlabel { display: block; }
+  .row > svg { display: none; }
+}

@@ -290,8 +290,7 @@ class PharmacyApiTest extends ApiTestBase {
                 inTenantTx(tenant.id(), () -> jdbc.update("UPDATE pharmacy_stock_movements SET reason = 'edited' WHERE tenant_id = ?", tenant.id())));
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
                 inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM pharmacy_stock_movements WHERE tenant_id = ?", tenant.id())));
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
-                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE pharmacy_stock_movements")));
+        assertTruncateRefusedByTrigger("TRUNCATE pharmacy_stock_movements", "pharmacy_stock_movements is append-only");
     }
 
     // V2-004: editing an item no longer writes stock, so a stale edit cannot overwrite a newer count.

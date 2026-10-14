@@ -80,15 +80,22 @@ const DOCTOR_ITEMS: DoctorItem[] = [
   { label: "My Day", short: "My Day", icon: "sun", href: MY_DAY_HREF, permission: "clinical:edit", alsoPermission: "queue:view", badgeKey: MY_DAY_HREF },
   { label: "Patients", short: "Patients", icon: "users", href: "/patients", permission: "patients:view" },
   { label: "Consultation Workspace", short: "Consult", icon: "stethoscope", href: "/consult", permission: "clinical:edit" },
+  // DOC-003: sets are read with clinical:view; the doctor sidebar itself already needs clinical:edit.
+  { label: "Prescriptions & Templates", short: "Rx sets", icon: "syringe", href: "/prescriptions", permission: "clinical:view", alsoPermission: "clinical:edit" },
   { label: "Treatment Packages", short: "Packages", icon: "package", href: "/packages", permission: "packages:view" },
   { label: "Schedule", short: "Schedule", icon: "calendar", href: "/schedule", permission: "queue:view" },
+  // DOC-004: the doctor's own hours and leave (reads need queue:view; writes inside need queue:edit).
+  { label: "My Schedule", short: "Hours", icon: "clock", href: "/my-schedule", permission: "clinical:edit", alsoPermission: "queue:view" },
+  // DOC-005 / DOC-006: wireframe order is Schedule, Encounters, Follow-ups.
+  { label: "Encounters", short: "Encounters", icon: "list", href: "/encounters", permission: "clinical:view" },
+  { label: "Follow-ups", short: "Follow-ups", icon: "refresh", href: "/follow-ups", permission: "queue:view" },
 ];
 // Wireframe doctor items whose page does not exist yet. Not linked (no dead links) and not shown
 // disabled (restricted/unavailable UI is absent): when a page ships, move its entry into DOCTOR_ITEMS
-// at the wireframe position (after Consultation Workspace: Prescriptions & Templates; after Schedule:
-// Encounters, Follow-ups, External Reports, Clinical Documents, Specialty Workspace, Clinical Settings, More).
+// at the wireframe position (after Schedule:
+// External Reports, Clinical Documents, Specialty Workspace, Clinical Settings, More).
 export const DOCTOR_PLANNED = [
-  "Prescriptions & Templates", "Encounters", "Follow-ups", "External Reports",
+  "External Reports",
   "Clinical Documents", "Specialty Workspace", "Clinical Settings", "More",
 ] as const;
 function isDoctorNav(perms: string[]): boolean {
@@ -305,7 +312,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
             <div className={styles.clinicText}>
               <div className={styles.clinicName}>{identity.tenantName}</div>
-              {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
             </div>
             <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
           </button>
@@ -329,7 +335,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
           <div className={styles.clinicText}>
             <div className={styles.clinicName}>{identity.tenantName}</div>
-            {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
           </div>
         </div>
       ))}

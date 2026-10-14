@@ -28,6 +28,7 @@ tags:
   - name: Audit
   - name: Clinical
   - name: Pharmacy
+  - name: Nursing
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -1063,6 +1064,87 @@ paths:
                   page: { $ref: "#/components/schemas/PageMeta" }
 
   # ------------------------------------------------- Clinical (allergies, Rx)
+  /clinical/encounters:
+    get:
+      tags: [Clinical]
+      summary: The calling doctor's own encounters (visits that reached consultation), newest first (DOC-005)
+      description: >
+        Read-only, tenant-scoped, restricted to queue entries where doctor_id is the caller. `state`
+        filters on the clinical note (none = no note yet, draft, signed, unsigned = none or draft).
+        `from`/`to` filter on the clinic calendar day of the visit. Outputs are derived from the note,
+        prescription and clinical documents tables; no clinical free text is returned.
+      x-required-permission: clinical:view
+      parameters:
+        - { name: state, in: query, required: false, schema: { type: string, enum: [none, draft, signed, unsigned] } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        queueEntryId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        patientMrn: { type: string }
+                        queueDate: { type: string, format: date }
+                        occurredAt: { type: string, format: date-time }
+                        visitStatus: { type: string, enum: [in_consult, checkout_pending, completed] }
+                        noteState: { type: string, enum: [none, draft, signed] }
+                        noteSignedAt: { type: [string, "null"], format: date-time }
+                        amendmentCount: { type: integer }
+                        rxStatus: { type: string, enum: [none, draft, signed] }
+                        rxItemCount: { type: integer }
+                        documentsDraft: { type: integer }
+                        documentsIssued: { type: integer }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /appointments/follow-ups:
+    get:
+      tags: [Appointments]
+      summary: The calling doctor's own follow-up appointments (appointments.is_follow_up), soonest first (DOC-006)
+      description: >
+        Read-only, tenant-scoped, caller's own appointments only. No reason or reminder data exists in
+        the schema, so none is returned. `from`/`to` filter on the clinic calendar day of the start time.
+      x-required-permission: queue:view
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [scheduled, cancelled, completed, no_show] } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        appointmentId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        patientMrn: { type: string }
+                        startTime: { type: string, format: date-time }
+                        status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /clinical/patients/{patientId}/allergies:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1185,6 +1267,73 @@ paths:
         - { name: limit, in: query, required: false, schema: { type: integer, default: 8, minimum: 1, maximum: 20 } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DrugSuggestion" } } } } }
+  /clinical/rx-sets:
+    get:
+      tags: [Clinical]
+      summary: "DOC-035. Favourite Rx sets visible to the caller: their own, other doctors' shared sets, and clinic standards. scope is relative to the caller. Each item carries stale (true = the tenant has an active pharmacy item master and neither drug nor brand is in it; null = no master to compare with, nothing guessed)."
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/FavouriteRxSet" } } } } }
+    post:
+      tags: [Clinical]
+      summary: "Save a set. scope mine (default) | shared | standard; standard needs clinical:approve (403 rx-set-owner-only). Items keep brand, sig, route and quantity."
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, items]
+              properties:
+                name: { type: string, maxLength: 120 }
+                scope: { type: string, enum: [mine, shared, standard] }
+                items: { type: array, minItems: 1, items: { $ref: "#/components/schemas/PrescriptionItemWrite" } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/FavouriteRxSet" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: standard without clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/rx-sets/{setId}:
+    parameters: [{ name: setId, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      tags: [Clinical]
+      summary: "DOC-035. Rename, switch scope, or replace the items (omitted fields unchanged). Only the owner or a clinical:approve holder (clinic standards: approve only); otherwise 403 rx-set-owner-only. Another doctor's PRIVATE set is 404 for everyone, clinical:approve holders included (approve reaches shared and standard sets only). Audited (rx_set.updated)."
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                scope: { type: string, enum: [mine, shared, standard] }
+                items: { type: array, minItems: 1, items: { $ref: "#/components/schemas/PrescriptionItemWrite" } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/FavouriteRxSet" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: not the owner and no clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Clinical]
+      summary: "DOC-035. Delete a set (owner or clinical:approve; same 403 rule; another doctor's private set is 404 for everyone). Prescriptions already built from it are unaffected. Audited (rx_set.deleted)."
+      x-required-permission: clinical:edit
+      responses:
+        "204": { description: Deleted }
+        "403": { description: "Forbidden (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /clinical/prescriptions/{queueEntryId}/apply-set/{setId}:
+    post:
+      tags: [Clinical]
+      summary: "Replace the draft with the set's items, keeping brand, sig, route and quantity. The safety checks run on every applied line (drug AND brand) exactly as for typed lines. Stamps the set's lastUsedAt. 404 for another doctor's private set."
+      x-required-permission: clinical:edit
+      parameters:
+        - { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: setId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/prescriptions/{queueEntryId}:
     parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1301,6 +1450,47 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /clinical/note-templates:
+    get:
+      tags: [Clinical]
+      summary: The calling doctor's own note templates (favourites first, then by name). Other doctors' templates are never returned. Nothing is pre-loaded - the list is empty until the doctor saves one.
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/NoteTemplate" } } } } }
+    post:
+      tags: [Clinical]
+      summary: Save a note template owned by the caller. Name 1-80 chars; each section at most 4000 chars (refused, never truncated); up to 10 doctor-defined tags of at most 30 chars (trimmed, case-insensitive duplicates dropped). At most 100 templates per doctor (409 note-template-limit).
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplateCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplate" } } } }
+        "400": { description: "Bad request. 400 invalid-note-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Conflict. 409 note-template-limit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/note-templates/{id}:
+    patch:
+      tags: [Clinical]
+      summary: Change one of the caller's templates. A field that is absent or null is left unchanged (send "" or [] to clear). Used to rename, edit text, edit tags and to mark or unmark a favourite. 404 for another doctor's template.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplateUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplate" } } } }
+        "400": { description: "Bad request. 400 invalid-note-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Clinical]
+      summary: Delete one of the caller's templates (notes already written from it are unaffected). 404 for another doctor's template.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /clinical/vitals/{queueEntryId}:
     get:
       tags: [Clinical]
@@ -1327,6 +1517,21 @@ paths:
         "200": { description: The vitals as stored, content: { application/json: { schema: { $ref: "#/components/schemas/Vitals" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /clinical/patients/{patientId}/dose-calculator:
+    get:
+      tags: [Clinical]
+      summary: >
+        Weight-based dose suggestion (decision support, not a prescription). total = latest recorded weight x the
+        clinician-supplied mgPerKg. The rule is a named formula with no per-drug formulary, so no per-dose or daily
+        maximum is returned. 400 no-weight-recorded when the patient has no recorded weight (a weight is never estimated).
+      x-required-permission: clinical:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: mgPerKg, in: query, required: true, schema: { type: number } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DoseCalculation" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   # ------------------------------------------------------------ Pharmacy (Hybrid mode)
   /pharmacy/settings:
@@ -1432,6 +1637,27 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PharmacyStockMovement" } } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # ------------------------------------------------- Nursing (vaccine record, record-only)
+  /nursing/vaccine-records:
+    post:
+      tags: [Nursing]
+      summary: Record a vaccine given. Record-only and append-only - stores what the nurse entered (free-text vaccine name, dose, route, site, lot). There is no immunisation schedule, so nothing is validated or computed against one. Audited as nursing.vaccine_recorded. 400 queue-entry-mismatch if queueEntryId belongs to another patient.
+      x-required-permission: nursing:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/VaccineRecordWrite" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/VaccineRecord" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /nursing/vaccine-records/today:
+    get:
+      tags: [Nursing]
+      summary: Vaccines recorded today (clinic day), newest first. There is no due list because no vaccine schedule reference data exists.
+      x-required-permission: nursing:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/VaccineRecord" } } } } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1499,6 +1725,41 @@ components:
       properties:
         type: { type: string, enum: [visit_summary, referral, certificate] }
         body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    NoteTemplate:
+      type: object
+      required: [id, name, subjective, objective, assessment, plan, tags, favourite, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        subjective: { type: string }
+        objective: { type: string }
+        assessment: { type: string }
+        plan: { type: string }
+        tags: { type: array, items: { type: string } }
+        favourite: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    NoteTemplateCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 80 }
+        subjective: { type: [string, "null"], maxLength: 4000 }
+        objective: { type: [string, "null"], maxLength: 4000 }
+        assessment: { type: [string, "null"], maxLength: 4000 }
+        plan: { type: [string, "null"], maxLength: 4000 }
+        tags: { type: [array, "null"], maxItems: 10, items: { type: string, maxLength: 30 } }
+        favourite: { type: [boolean, "null"] }
+    NoteTemplateUpdate:
+      type: object
+      properties:
+        name: { type: [string, "null"], maxLength: 80 }
+        subjective: { type: [string, "null"], maxLength: 4000 }
+        objective: { type: [string, "null"], maxLength: 4000 }
+        assessment: { type: [string, "null"], maxLength: 4000 }
+        plan: { type: [string, "null"], maxLength: 4000 }
+        tags: { type: [array, "null"], maxItems: 10, items: { type: string, maxLength: 30 } }
+        favourite: { type: [boolean, "null"] }
     ClinicalDocumentUpdate:
       type: object
       properties:
@@ -1540,6 +1801,35 @@ components:
         issuedAt: { type: [string, "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    VaccineRecordWrite:
+      type: object
+      required: [patientId, vaccineName, dose, route]
+      properties:
+        patientId: { type: string, format: uuid }
+        queueEntryId: { type: [string, "null"], format: uuid }
+        vaccineName: { type: string, maxLength: 200 }
+        dose: { type: string, maxLength: 100 }
+        route: { type: string, enum: [IM, IV, SC, infusion, oral, topical] }
+        site: { type: [string, "null"], maxLength: 100 }
+        lotNumber: { type: [string, "null"], maxLength: 100 }
+        expiryDate: { type: [string, "null"], format: date }
+        notes: { type: [string, "null"], maxLength: 1000 }
+    VaccineRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        queueEntryId: { type: [string, "null"], format: uuid }
+        vaccineName: { type: string }
+        dose: { type: string }
+        route: { type: string }
+        site: { type: [string, "null"] }
+        lotNumber: { type: [string, "null"] }
+        expiryDate: { type: [string, "null"], format: date }
+        notes: { type: [string, "null"] }
+        recordedByName: { type: string }
+        administeredAt: { type: string, format: date-time }
     Allergy:
       type: object
       properties:
@@ -1634,6 +1924,38 @@ components:
         code: { type: [string, "null"], description: "Pharmacy item code (pharmacy only)" }
         inStock: { type: [boolean, "null"] }
         prescriptionOnly: { type: [boolean, "null"] }
+    FavouriteRxSet:
+      type: object
+      description: "DOC-035. scope is relative to the caller. staleCheckAvailable false = the tenant has no active pharmacy items, so staleness is unknown (staleItemCount 0 does not mean up to date)."
+      properties:
+        id: { type: string, format: uuid }
+        doctorId: { type: [string, "null"], format: uuid, description: "null = clinic standard" }
+        ownerName: { type: [string, "null"] }
+        name: { type: string }
+        scope: { type: string, enum: [mine, shared, standard] }
+        shared: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastUsedAt: { type: [string, "null"], format: date-time }
+        staleCheckAvailable: { type: boolean }
+        staleItemCount: { type: integer }
+        canEdit: { type: boolean, description: "caller is the owner or holds clinical:approve" }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              drugName: { type: string }
+              dosage: { type: [string, "null"] }
+              frequency: { type: [string, "null"] }
+              duration: { type: [string, "null"] }
+              instructions: { type: [string, "null"] }
+              brandName: { type: [string, "null"] }
+              sigPattern: { type: [string, "null"] }
+              route: { type: [string, "null"] }
+              quantity: { type: [number, "null"] }
+              quantityUnit: { type: [string, "null"] }
+              stale: { type: [boolean, "null"] }
     RxWarning:
       type: object
       properties:
@@ -1736,6 +2058,14 @@ components:
         recordedBy: { type: string, format: uuid }
         recordedAt: { type: string, format: date-time }
         abnormalFlags: { type: array, items: { type: string } }
+    DoseCalculation:
+      type: object
+      properties:
+        weightKg: { type: number }
+        mgPerKg: { type: number }
+        totalDoseMg: { type: number }
+        ruleSource: { type: string }
+        weightRecordedAt: { type: [string, "null"], format: date-time, description: When the weight used was recorded. Null when unknown (weight saved before the date was tracked); never estimated from the visit row time. Clients should treat null as stale. }
     PharmacyItem:
       type: object
       properties:

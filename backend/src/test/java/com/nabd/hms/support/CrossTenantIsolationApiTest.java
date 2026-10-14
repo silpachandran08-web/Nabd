@@ -110,4 +110,52 @@ class CrossTenantIsolationApiTest extends ApiTestBase {
         ResponseEntity<Map> viaB = exchange("/v1/appointments/" + appointmentId, HttpMethod.GET, authed(tokenB), Map.class);
         assertThat(viaB.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
+
+    // M3 (written, NOT executed: no Docker/Postgres in the authoring environment). Wave 2 tables: both the API
+    // and the RLS policy (queried as the app role under the other tenant's context) must hide the row.
+    @Test
+    void noteTemplatesAndVaccineRecordsAreInvisibleToAnotherTenant() {
+        SeededTenant tenantA = seedTenant();
+        SeededTenant tenantB = seedTenant();
+        UUID roleA = seedFullAccessRole(tenantA.id());
+        UUID roleB = seedFullAccessRole(tenantB.id());
+        SeededStaff staffA = seedStaff(tenantA, roleA, "a5@a.com", "+919700000009", false);
+        SeededStaff staffB = seedStaff(tenantB, roleB, "b5@b.com", "+919700000010", false);
+        String tokenA = loginAndGetAccessToken(staffA);
+        String tokenB = loginAndGetAccessToken(staffB);
+
+        String templateId = (String) exchange("/v1/clinical/note-templates", HttpMethod.POST,
+                authedJsonBody(tokenA, Map.of("name", "A only")), Map.class).getBody().get("id");
+        String patientId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(tokenA, Map.of(
+                "name", "A Vaccinee", "phone", "+919888900005", "dob", "1990-01-01", "gender", "male")), Map.class).getBody().get("id");
+        ResponseEntity<Map> vaccine = exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(tokenA, Map.of(
+                "patientId", patientId, "vaccineName", "A vaccine", "dose", "0.5 mL", "route", "IM")), Map.class);
+        assertThat(vaccine.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String vaccineId = (String) vaccine.getBody().get("id");
+
+        // API: B sees neither and cannot touch the template
+        assertThat(exchange("/v1/clinical/note-templates", HttpMethod.GET, authed(tokenB), List.class).getBody()).isEmpty();
+        assertThat(exchange("/v1/clinical/note-templates/" + templateId, HttpMethod.PATCH,
+                authedJsonBody(tokenB, Map.of("name", "Taken")), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exchange("/v1/clinical/note-templates/" + templateId, HttpMethod.DELETE, authed(tokenB), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exchange("/v1/nursing/vaccine-records/today", HttpMethod.GET, authed(tokenB), List.class).getBody()).isEmpty();
+        assertThat(exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(tokenB, Map.of(
+                "patientId", patientId, "vaccineName", "X", "dose", "1", "route", "IM")), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND); // A's patient does not exist for B
+
+        // RLS: without any tenant_id predicate, B's context still cannot read A's rows; A's context can
+        Integer templatesSeenByB = inTenantTx(tenantB.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM note_templates WHERE id = ?", Integer.class, UUID.fromString(templateId)));
+        Integer vaccinesSeenByB = inTenantTx(tenantB.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM vaccine_records WHERE id = ?", Integer.class, UUID.fromString(vaccineId)));
+        assertThat(templatesSeenByB).isZero();
+        assertThat(vaccinesSeenByB).isZero();
+        Integer templatesSeenByA = inTenantTx(tenantA.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM note_templates WHERE id = ?", Integer.class, UUID.fromString(templateId)));
+        Integer vaccinesSeenByA = inTenantTx(tenantA.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM vaccine_records WHERE id = ?", Integer.class, UUID.fromString(vaccineId)));
+        assertThat(templatesSeenByA).isEqualTo(1);
+        assertThat(vaccinesSeenByA).isEqualTo(1);
+    }
 }

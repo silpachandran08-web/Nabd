@@ -12,13 +12,20 @@ import { getIdentity } from "../lib/session";
 import { useClinicalContext } from "../components/consult/clinical";
 import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
+import ConsultTimer from "../components/consult/ConsultTimer";
+import DiagnosisField from "../components/consult/DiagnosisField";
+import NoteTemplates from "../components/consult/NoteTemplates";
+import DoseCalculator from "../components/consult/DoseCalculator";
 import DentalDrawer from "../components/consult/DentalDrawer";
+import DoctorOrders from "../components/consult/DoctorOrders";
 import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
+import PackageSessionCard from "../components/consult/PackageSessionCard";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import RxPad from "../components/consult/RxPad";
+import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
 import VisitOutputs from "../components/consult/VisitOutputs";
 import VitalsCard from "../components/consult/VitalsCard";
@@ -38,8 +45,6 @@ type Note = {
   diagnosis: string | null; status: string; signedAt: string | null; updatedAt: string;
 };
 type NoteDraft = NoteFields;
-type FavouriteRxSet = { id: string; doctorId: string | null; name: string; items: PrescriptionItem[] };
-type DoseResult = { weightKg: number; mgPerKg: number; totalDoseMg: number; ruleSource: string };
 type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis: string | null; createdAt: string };
 type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 type Step = "reason" | "examine" | "assess" | "plan" | "close";
@@ -158,11 +163,6 @@ export default function ConsultPage() {
   const [showAllergies, setShowAllergies] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
-  const [favouriteSets, setFavouriteSets] = useState<FavouriteRxSet[]>([]);
-  const [newSetName, setNewSetName] = useState("");
-  const [doseMgPerKg, setDoseMgPerKg] = useState("");
-  const [doseResult, setDoseResult] = useState<DoseResult | null>(null);
-  const [doseError, setDoseError] = useState<string | null>(null);
   const [amendments, setAmendments] = useState<NoteAmendment[]>([]);
   const [showAmendForm, setShowAmendForm] = useState(false);
   const [amendReason, setAmendReason] = useState("");
@@ -437,11 +437,6 @@ export default function ConsultPage() {
     setRxDirty(false);
     setOverride(null);
     setShowAllergies(false);
-    setFavouriteSets([]);
-    setNewSetName("");
-    setDoseMgPerKg("");
-    setDoseResult(null);
-    setDoseError(null);
     setAmendments([]);
     setShowAmendForm(false);
     setAmendReason("");
@@ -450,10 +445,6 @@ export default function ConsultPage() {
     needsServerCheckRef.current = false;
 
     try {
-      const setsRes = await authedFetch("/clinical/rx-sets");
-      if (stale()) return;
-      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
-
       const pRes = await authedFetch(`/patients/${row.patientId}`);
       if (stale()) return;
       if (pRes?.ok) setActivePatient(await pRes.json());
@@ -632,44 +623,6 @@ export default function ConsultPage() {
     setNotice("Decision recorded and audited.");
   }
 
-  async function calculateDose() {
-    if (!activePatient || !doseMgPerKg) return;
-    setDoseError(null);
-    const res = await authedFetch(`/clinical/patients/${activePatient.id}/dose-calculator?mgPerKg=${doseMgPerKg}`);
-    if (!res?.ok) {
-      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
-      setDoseError(pr?.detail || "Couldn't calculate dose.");
-      setDoseResult(null);
-      return;
-    }
-    setDoseResult(await res.json());
-  }
-
-  async function saveCurrentAsSet() {
-    if (!newSetName.trim()) return;
-    const items = rxItems.filter((i) => i.drugName.trim() !== "");
-    if (items.length === 0) return;
-    const res = await authedFetch("/clinical/rx-sets", { method: "POST", body: JSON.stringify({ name: newSetName, items }) });
-    if (res?.ok) {
-      setNewSetName("");
-      const setsRes = await authedFetch("/clinical/rx-sets");
-      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
-    }
-  }
-
-  async function applySet(setId: string) {
-    if (!activeEntry) return;
-    const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}/apply-set/${setId}`, { method: "POST" });
-    if (res?.ok) {
-      const rx: Prescription = await res.json();
-      setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
-      setRxDirty(false);
-      setRxError(null);
-    } else {
-      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't apply set." }));
-      setRxError(pr?.detail || "Couldn't apply set.");
-    }
-  }
 
   async function submitAmendment() {
     if (!activeEntry || !amendReason.trim()) return;
@@ -875,6 +828,7 @@ export default function ConsultPage() {
             </span>
             <StatusBadge status={activeEntry.status} />
             {saveBadge}
+            {(activeEntry.status === "in_consult" || locked) && <ConsultTimer entryId={activeEntry.id} ended={locked} />}
           </div>
         </div>
 
@@ -1008,6 +962,7 @@ export default function ConsultPage() {
 
             {step === "examine" && (
               <>
+                {!locked && can("clinical:edit") && <NoteTemplates authedFetch={authedFetch} patientId={activeEntry.patientId} entryId={activeEntry.id} note={note} onSetField={updateField} />}
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.noteGrid}>
                     {(["subjective", "objective"] as const).map((field) => (
@@ -1040,8 +995,7 @@ export default function ConsultPage() {
                     <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked} onChange={(e) => updateField("assessment", e.target.value)} />
                   </div>
                   <div className={styles.noteField}>
-                    <label className={styles.noteLabel} htmlFor="diagnosis">diagnosis</label>
-                    <input id="diagnosis" className={styles.input} value={note.diagnosis} disabled={locked} onChange={(e) => updateField("diagnosis", e.target.value)} />
+                    <DiagnosisField value={note.diagnosis} disabled={locked} inputClassName={styles.input} onChange={(v) => updateField("diagnosis", v)} />
                   </div>
                 </div>
               </div>
@@ -1102,37 +1056,20 @@ export default function ConsultPage() {
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
 
                   <div className={styles.previousMeds}>
-                    <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Weight-based dose calculator</div>
-                    <div className={styles.rxRow}>
-                      <input className={styles.input} aria-label="mg per kg" placeholder="mg/kg" value={doseMgPerKg} onChange={(e) => setDoseMgPerKg(e.target.value)} />
-                      <button type="button" className={styles.backBtn} onClick={calculateDose} disabled={!doseMgPerKg}>Calculate</button>
-                      {doseResult && (
-                        <span className={styles.saveStatus}>
-                          {doseResult.totalDoseMg} mg total ({doseResult.weightKg} kg × {doseResult.mgPerKg} mg/kg)
-                        </span>
-                      )}
-                    </div>
-                    {doseError && <div className={styles.errorState} role="alert">{doseError}</div>}
+                    <DoseCalculator key={activeEntry.patientId} authedFetch={authedFetch} patientId={activeEntry.patientId} queueEntryId={activeEntry.id} canRecordWeight={can("clinical:edit")} onWeightRecorded={reloadCtx} />
                   </div>
 
                   <div className={styles.previousMeds}>
                     <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>
-                    {favouriteSets.length === 0 ? (
-                      <div className={styles.saveStatus}>No saved sets yet.</div>
-                    ) : (
-                      favouriteSets.map((set) => (
-                        <div key={set.id} className={styles.previousMedsRow}>
-                          <span>{set.name} ({set.items.map((i) => i.drugName).join(", ")})</span>{" "}
-                          {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={() => applySet(set.id)}>Apply</button>}
-                        </div>
-                      ))
-                    )}
-                    {rxStatus !== "signed" && (
-                      <div className={styles.rxRow} style={{ marginBlockStart: "8px" }}>
-                        <input className={styles.input} aria-label="New set name" placeholder="Save current items as set…" value={newSetName} onChange={(e) => setNewSetName(e.target.value)} />
-                        <button type="button" className={styles.backBtn} onClick={saveCurrentAsSet} disabled={!newSetName.trim()}>Save set</button>
-                      </div>
-                    )}
+                    <FavouriteRxSetsPanel
+                      authedFetch={authedFetch} entryId={activeEntry?.id ?? null} locked={rxStatus === "signed"} items={rxItems}
+                      onError={setRxError}
+                      onApplied={(rx) => {
+                        setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
+                        setRxDirty(false);
+                        setRxError(null);
+                      }}
+                    />
                   </div>
 
                   <div className={styles.previousMeds}>
@@ -1206,12 +1143,14 @@ export default function ConsultPage() {
               {hasDrugs ? <ul className={p.list}>{rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}</li>)}</ul> : <p className={p.muted}>No drugs added.</p>}
               <button type="button" className={`${p.linkBtn} ${p.linkBtnTouch}`} onClick={() => setStep("plan")}>Open prescription</button>
             </section>
+            <DoctorOrders authedFetch={authedFetch} queueEntryId={activeEntry.id} />
             <FollowUpPanel authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} />
             <section className={p.card} aria-label="Package">
               <h3 className={p.cardTitle}>Package</h3>
               {pat && pat.activePackages > 0
                 ? <p className={p.muted}>{pat.activePackages} active package{pat.activePackages === 1 ? "" : "s"}. <Link href="/packages" className={p.linkBtn}>Open packages</Link></p>
                 : <p className={p.muted}>No active package.</p>}
+              {can("packages:view") && <PackageSessionCard authedFetch={authedFetch} patientId={activeEntry.patientId} canRedeem={can("packages:edit")} />}
             </section>
           </aside>
         </div>

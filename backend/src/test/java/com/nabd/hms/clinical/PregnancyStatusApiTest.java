@@ -60,8 +60,9 @@ class PregnancyStatusApiTest extends ApiTestBase {
     @Test
     void resendingTheCurrentStatusIsANoOpWithNoNewEventAndTheOriginalAttestation() {
         SeededTenant tenant = seedTenant();
-        SeededStaff first = seedStaff(tenant, seedFullAccessRole(tenant.id()), "preg4@a.com", "+919800000054", false);
-        SeededStaff second = seedStaff(tenant, seedFullAccessRole(tenant.id()), "preg5@a.com", "+919800000055", false);
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff first = seedStaff(tenant, roleId, "preg4@a.com", "+919800000054", false);
+        SeededStaff second = seedStaff(tenant, roleId, "preg5@a.com", "+919800000055", false);
         String token = loginAndGetAccessToken(first);
         String otherToken = loginAndGetAccessToken(second);
         String patientId = registerPatient(token, "+919999950004");
@@ -94,12 +95,12 @@ class PregnancyStatusApiTest extends ApiTestBase {
 
         for (String sql : new String[]{
                 "UPDATE patient_pregnancy_events SET actor_id = actor_id",
-                "DELETE FROM patient_pregnancy_events",
-                "TRUNCATE patient_pregnancy_events"}) {
+                "DELETE FROM patient_pregnancy_events"}) {
             Exception e = org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class,
                     () -> inTenantTx(tenant.id(), () -> jdbc.execute(sql)));
             assertThat(e.getMessage()).as(sql).contains("patient_pregnancy_events is append-only");
         }
+        assertTruncateRefusedByTrigger("TRUNCATE patient_pregnancy_events", "patient_pregnancy_events is append-only");
         assertThat(exchange("/v1/clinical/patients/" + patientId + "/pregnancy-status/history", HttpMethod.GET, authed(token), List.class).getBody()).hasSize(1);
     }
 

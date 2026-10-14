@@ -4,6 +4,7 @@ import com.nabd.hms.clinical.dto.DoseCalculationResponse;
 import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
+import com.nabd.hms.clinical.dto.FavouriteRxSetUpdateRequest;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
 import com.nabd.hms.clinical.dto.PrescriptionUpsertRequest;
 import com.nabd.hms.common.RequestMeta;
@@ -12,6 +13,8 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -78,13 +81,28 @@ public class PrescriptionController {
     @PostMapping("/rx-sets")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public FavouriteRxSetResponse createSet(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody FavouriteRxSetRequest req) {
-        return service.createSet(tenantId(jwt), staffId(jwt), req);
+        return service.createSet(tenantId(jwt), staffId(jwt), canApprove(jwt), req);
     }
 
     @GetMapping("/rx-sets")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<FavouriteRxSetResponse> listSets(@AuthenticationPrincipal Jwt jwt) {
-        return service.listSets(tenantId(jwt), staffId(jwt));
+        return service.listSets(tenantId(jwt), staffId(jwt), canApprove(jwt));
+    }
+
+    /** DOC-035: owner of the set, or clinical:approve (clinic standards). */
+    @PatchMapping("/rx-sets/{setId}")
+    @PreAuthorize("hasAuthority('clinical:edit')")
+    public FavouriteRxSetResponse updateSet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID setId,
+                                             @Valid @RequestBody FavouriteRxSetUpdateRequest req, HttpServletRequest http) {
+        return service.updateSet(tenantId(jwt), setId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req);
+    }
+
+    @DeleteMapping("/rx-sets/{setId}")
+    @PreAuthorize("hasAuthority('clinical:edit')")
+    public ResponseEntity<Void> deleteSet(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID setId, HttpServletRequest http) {
+        service.deleteSet(tenantId(jwt), setId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/prescriptions/{queueEntryId}/apply-set/{setId}")

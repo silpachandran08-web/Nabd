@@ -56,6 +56,33 @@ class VitalsApiTest extends ApiTestBase {
     }
 
     @Test
+    void doseCalculatorReportsWhenTheWeightWasRecordedAndNotWhenALaterNonWeightSaveHappened() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "nurse5@a.com", "+919800010005", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V5", "+919999950005");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "vitals_pending");
+
+        // no weight yet: the calculator refuses rather than estimating
+        ResponseEntity<Map> none = exchange("/v1/clinical/patients/" + patientId + "/dose-calculator?mgPerKg=10", HttpMethod.GET, authed(token), Map.class);
+        assertThat(none.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        exchange("/v1/clinical/vitals/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of("weightKg", 13.4)), Map.class);
+        ResponseEntity<Map> first = exchange("/v1/clinical/patients/" + patientId + "/dose-calculator?mgPerKg=10", HttpMethod.GET, authed(token), Map.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Object weightAt = first.getBody().get("weightRecordedAt");
+        assertThat(weightAt).isNotNull();
+
+        // a later pulse-only save must not refresh the weight's timestamp
+        exchange("/v1/clinical/vitals/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of("pulseBpm", 90)), Map.class);
+        ResponseEntity<Map> second = exchange("/v1/clinical/patients/" + patientId + "/dose-calculator?mgPerKg=10", HttpMethod.GET, authed(token), Map.class);
+        assertThat(second.getBody().get("weightRecordedAt")).isEqualTo(weightAt);
+        assertThat(second.getBody().get("ruleSource")).isNotNull();
+    }
+
+    @Test
     void correctingVitalsAfterVitalsDoneDoesNotAttemptAnIllegalTransition() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());

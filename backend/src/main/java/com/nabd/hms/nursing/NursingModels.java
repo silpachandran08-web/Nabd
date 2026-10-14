@@ -23,6 +23,14 @@ final class NursingModels {
                               Instant createdAt, String consentSignedName, UUID consentRecordedBy, Instant consentSignedAt) {
     }
 
+    record VaccineRecordRow(UUID id, UUID patientId, UUID queueEntryId, UUID recordedBy, String vaccineName, String dose,
+                             String route, String site, String lotNumber, java.time.LocalDate expiryDate, String notes,
+                             Instant administeredAt) {
+    }
+
+    record ActorInfo(String name, String role) {
+    }
+
     record ActivityRow(String kind, String activity, UUID patientId, UUID staffId, Instant occurredAt) {
     }
 }

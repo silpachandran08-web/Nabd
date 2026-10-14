@@ -1,0 +1,35 @@
+/* DOC-027 note templates, diagnosis field (DOC-027) and consult timer (DOC-028). Tokens only; logical properties. */
+.panel { display: flex; flex-direction: column; gap: var(--nb-space-12); }
+.head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--nb-space-8); }
+.title { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--nb-text-tertiary); }
+.chips { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.tagChip { display: inline-flex; align-items: center; gap: var(--nb-space-4); min-height: 28px; padding: 0 var(--nb-space-8); border-radius: 999px; border: 1px solid var(--nb-border-default); background: var(--nb-surface-3); color: var(--nb-text-secondary); font: inherit; font-size: 12px; }
+button.tagChip { cursor: pointer; }
+.tagChipOn { background: var(--nb-accent-tint); color: var(--nb-accent-500); border-color: var(--nb-accent-500); }
+.tplList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.tpl { display: flex; flex-direction: column; gap: var(--nb-space-8); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); background: var(--nb-surface-2, var(--nb-surface-1)); min-width: 0; }
+.tplTop { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--nb-space-8); }
+.tplName { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+.tplPreview { margin: 0; font-size: 12px; color: var(--nb-text-secondary); overflow-wrap: anywhere; white-space: pre-wrap; max-block-size: 4.5em; overflow: hidden; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+.form { display: flex; flex-direction: column; gap: var(--nb-space-8); border: 1px dashed var(--nb-border-default); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); }
+.formRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); align-items: flex-end; }
+.grow { flex: 1 1 160px; min-width: 0; }
+.fieldLabel { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: 12px; color: var(--nb-text-secondary); }
+.scope { margin: 0; font-size: 12px; color: var(--nb-text-secondary); }
+
+/* Diagnosis */
+.dx { display: grid; grid-template-columns: 1fr; gap: var(--nb-space-8); }
+.dxCode { min-width: 0; }
+.dxHelp { margin: var(--nb-space-4) 0 0; font-size: 12px; color: var(--nb-text-secondary); }
+.dxError { margin: var(--nb-space-4) 0 0; font-size: 12px; color: var(--nb-warn-500); }
+
+/* Timer */
+.timer { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--nb-space-8); }
+.time { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; color: var(--nb-text-primary); }
+.timeOver { color: var(--nb-warn-500); }
+.timerBtn { min-height: 32px; padding: 0 var(--nb-space-12); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: var(--nb-space-4); }
+.timerNote { flex-basis: 100%; margin: 0; font-size: 11px; color: var(--nb-text-tertiary); }
+@media (pointer: coarse) { .timerBtn, .tagChip { min-height: 44px; } }
+.dxWrap { min-width: 0; }
+.fieldLabel input { inline-size: 100%; min-inline-size: 0; box-sizing: border-box; }

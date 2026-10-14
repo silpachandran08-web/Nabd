@@ -335,4 +335,94 @@ class NursingApiTest extends ApiTestBase {
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
+
+    // ---- NUR-B2: record-only vaccine log (NOT EXECUTED: no Postgres/Docker in the authoring environment) ----
+
+    @Test
+    void recordingAVaccineStoresWhatWasEnteredAndListsItToday() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "v1@a.com", "+919800020101", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V1", "+919999960101");
+
+        ResponseEntity<Map> resp = exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "vaccineName", "  Typed by nurse ", "dose", "0.5 mL", "route", "IM",
+                "site", "left deltoid", "lotNumber", "LOT-1")), Map.class);
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(resp.getBody().get("vaccineName")).isEqualTo("Typed by nurse");
+        assertThat(resp.getBody().get("recordedByName")).isNotNull();
+        ResponseEntity<List> today = exchange("/v1/nursing/vaccine-records/today", HttpMethod.GET, authed(token), List.class);
+        assertThat(today.getBody()).anyMatch(e -> resp.getBody().get("id").equals(((Map<?, ?>) e).get("id")));
+    }
+
+    @Test
+    void vaccineRecordRejectsBlankNameAndBadRouteAndMismatchedVisit() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "v2@a.com", "+919800020102", false);
+        String token = loginAndGetAccessToken(staff);
+        String p1 = registerPatient(token, "V2a", "+919999960102");
+        String p2 = registerPatient(token, "Second Vaccine Patient", "+919999960103");
+        String visitOfP2 = checkIn(token, p2, staff.id());
+
+        assertThat(exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", p1, "vaccineName", " ", "dose", "1", "route", "IM")), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", p1, "vaccineName", "X", "dose", "1", "route", "rectal")), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        ResponseEntity<Map> mismatch = exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", p1, "queueEntryId", visitOfP2, "vaccineName", "X", "dose", "1", "route", "IM")), Map.class);
+        assertThat(mismatch.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(mismatch.getBody().get("type")).asString().contains("queue-entry-mismatch");
+    }
+
+    @Test
+    void vaccineRecordsRequireTheNursingGrant() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedRole(tenant.id(), "QueueOnly2", false, fullGrant("queue"), fullGrant("patients"));
+        SeededStaff staff = seedStaff(tenant, roleId, "v3@a.com", "+919800020103", false);
+        String token = loginAndGetAccessToken(staff);
+
+        assertThat(exchange("/v1/nursing/vaccine-records/today", HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    // M1-fix (written, NOT executed): the audit row carries ids and structured values only. AuditService PHI rule.
+    @Test
+    void vaccineAuditRowHoldsNoNameOrFreeText() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "v4@a.com", "+919800020104", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "Zelda Quimby", "+919999960104");
+
+        ResponseEntity<Map> resp = exchange("/v1/nursing/vaccine-records", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "vaccineName", "SecretVaccineName", "dose", "0.5 mL", "route", "IM",
+                "site", "left deltoid", "lotNumber", "LOT-9", "notes", "patient was anxious")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String recordId = (String) resp.getBody().get("id");
+        String recordedBy = (String) resp.getBody().get("recordedByName");
+
+        List<Map<String, Object>> rows = inTenantTx(tenant.id(), () -> jdbc.queryForList(
+                "SELECT actor_id, entity_type, before::text AS before_json, after::text AS after_json FROM audit_log " +
+                        "WHERE tenant_id = ? AND action = 'nursing.vaccine_recorded' AND entity_id = ?",
+                tenant.id(), UUID.fromString(recordId)));
+        assertThat(rows).hasSize(1);
+        Map<String, Object> row = rows.get(0);
+        assertThat(row.get("entity_type")).isEqualTo("vaccine_record");
+        assertThat(row.get("actor_id")).isEqualTo(staff.id());
+        assertThat(row.get("before_json")).isNull();
+        String after = (String) row.get("after_json");
+        assertThat(after).contains(patientId).contains("IM");
+        assertThat(after).doesNotContain("Zelda").doesNotContain("Quimby")
+                .doesNotContain("SecretVaccineName").doesNotContain("left deltoid")
+                .doesNotContain("LOT-9").doesNotContain("patient was anxious")
+                .doesNotContain("patientName").doesNotContain("recordedByName").doesNotContain("notes");
+        if (recordedBy != null && !recordedBy.isBlank()) {
+            assertThat(after).doesNotContain(recordedBy);
+        }
+    }
 }

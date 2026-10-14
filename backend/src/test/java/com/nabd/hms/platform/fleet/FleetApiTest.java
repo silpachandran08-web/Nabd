@@ -22,10 +22,7 @@ class FleetApiTest extends ApiTestBase {
         SeededTenant tenant = seedClinicInBrand(brand);
         String token = superAdminToken();
 
-        ResponseEntity<Map> resp = exchange("/v1/platform/tenants?limit=100", HttpMethod.GET, authed(token), Map.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        List<Map<String, Object>> rows = (List<Map<String, Object>>) resp.getBody().get("data");
-        Map<String, Object> row = rows.stream().filter(r -> tenant.id().toString().equals(r.get("id"))).findFirst().orElseThrow();
+        Map<String, Object> row = findTenantRow(token, tenant.id());
         assertThat(row.get("slug")).isEqualTo(tenant.slug());
         assertThat(row.get("region")).isEqualTo("IN");
         assertThat(row.get("status")).isEqualTo("active");
@@ -39,9 +36,7 @@ class FleetApiTest extends ApiTestBase {
         SeededTenant tenant = seedTenant(); // no brand_id — matches every pre-provisioning-flow seed path
         String token = superAdminToken();
 
-        ResponseEntity<Map> resp = exchange("/v1/platform/tenants?limit=200", HttpMethod.GET, authed(token), Map.class);
-        List<Map<String, Object>> rows = (List<Map<String, Object>>) resp.getBody().get("data");
-        Map<String, Object> row = rows.stream().filter(r -> tenant.id().toString().equals(r.get("id"))).findFirst().orElseThrow();
+        Map<String, Object> row = findTenantRow(token, tenant.id());
         assertThat(row.get("brandName")).isNull();
         assertThat(row.get("ownerName")).isNull();
     }
@@ -125,6 +120,21 @@ class FleetApiTest extends ApiTestBase {
             ResponseEntity<Map> allowed = exchange("/v1/platform/tenants", HttpMethod.GET, authed(token), Map.class);
             assertThat(allowed.getStatusCode()).as("role " + role).isEqualTo(HttpStatus.OK);
         }
+    }
+
+    /** The suite shares one database and the list is oldest-first, so walk the cursor instead of trusting one page. */
+    private Map<String, Object> findTenantRow(String token, UUID tenantId) {
+        String cursor = null;
+        do {
+            ResponseEntity<Map> resp = exchange("/v1/platform/tenants?limit=200" + (cursor == null ? "" : "&cursor=" + cursor),
+                    HttpMethod.GET, authed(token), Map.class);
+            assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+            for (Map<String, Object> r : (List<Map<String, Object>>) resp.getBody().get("data")) {
+                if (tenantId.toString().equals(r.get("id"))) return r;
+            }
+            cursor = (String) ((Map<?, ?>) resp.getBody().get("page")).get("nextCursor");
+        } while (cursor != null);
+        throw new AssertionError("tenant " + tenantId + " not in the fleet list");
     }
 
     private String superAdminToken() {

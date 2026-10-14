@@ -121,8 +121,8 @@ class DiscountApiTest extends ApiTestBase {
     // V2-005: billing can request and auto-approve within the cap, but cannot approve or reject above-cap requests.
     @Test
     void billingRoleCannotApproveOrRejectAboveCapDiscounts() {
-        String requester = billingToken("billing12@nabd.internal");
-        String otherBilling = billingToken("billing13@nabd.internal");
+        String requester = billingToken("discount-billing12@nabd.internal");
+        String otherBilling = billingToken("discount-billing13@nabd.internal");
         UUID tenantId = subscribedTenant(requester, 100000);
         ResponseEntity<Map> requested = exchange("/v1/platform/billing/discounts", HttpMethod.POST,
                 authedJsonBody(requester, Map.of("tenantId", tenantId.toString(), "percent", 25, "reason", "enterprise")), Map.class);
