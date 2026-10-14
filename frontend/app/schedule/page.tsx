@@ -348,7 +348,8 @@ export default function SchedulePage() {
           : <MoveAppointmentDialog target={target} timezone={day.timezone} initialDate={day.date} authedFetch={authedFetch} onClose={closeDialog} onDone={done} />;
       })()}
       {waitlistOpen && day && (
-        <WaitlistPanel doctors={day.doctors} authedFetch={authedFetch} onClose={closeWaitlist} />
+        <WaitlistPanel doctors={day.doctors} timezone={day.timezone} canJoin={canBook} authedFetch={authedFetch}
+          onClose={closeWaitlist} onBooked={() => void load()} />
       )}
       {dialog?.kind === "slot" && day && (
         <InfoDialog title={CELL_INFO[dialog.cell.kind].label} onClose={closeDialog}

@@ -164,7 +164,7 @@
   display: flex;
   align-items: center;
   gap: var(--nb-space-8);
-  min-height: 36px;
+  min-height: 44px;
   padding: var(--nb-space-8) var(--nb-space-12);
   border-radius: var(--nb-radius-md);
   color: var(--nb-text-secondary);
@@ -205,6 +205,32 @@
   border-top: 1px solid var(--nb-border-subtle);
 }
 
+.navBarAvatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--nb-accent-tint);
+  color: var(--nb-accent-500);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.navBarError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nb-space-8);
+  padding: var(--nb-space-8) var(--nb-space-12);
+  color: var(--nb-danger-500);
+  font-size: 12px;
+  flex: 1;
+  align-content: flex-start;
+}
+
 .navBarUserText {
   display: flex;
   flex-direction: column;
@@ -230,7 +256,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--nb-space-4);
-  height: 32px;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
   padding: 0 var(--nb-space-8);
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);
@@ -265,7 +293,8 @@
   }
   .navBarBrand { align-items: center; padding-inline: 0; }
   .navBarBrandText { font-size: 11px; }
-  .navBarEnv, .navBarSection, .navBarLabel, .navBarUserText, .navBarLogoutText { display: none; }
+  .navBarEnv, .navBarSection, .navBarLabel, .navBarUserText, .navBarLogoutText, .navBarAvatar { display: none; }
+  .navBarError { justify-content: center; padding-inline: 0; }
   .navBarLink {
     flex-direction: column;
     justify-content: center;

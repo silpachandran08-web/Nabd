@@ -9,6 +9,10 @@ import { API_BASE, type OperatorProfile } from "./surfaces";
 // cleared the session on 401. A 401 now tries POST /platform/auth/refresh once (single-flight, so
 // parallel requests share one refresh) and replays the request; only if that fails is the session
 // cleared and the operator sent to login.
+// Location: kept beside the operator console (app/platform/) rather than app/lib/, which holds the
+// clinic session (lib/session.ts). Every consumer lives under app/platform/, the two sessions use
+// different tokens and refresh endpoints, and colocating keeps a clinic page from importing it by mistake.
+// Token storage keys appear only in this file; login, logout and the nav go through the helpers below.
 
 const ACCESS_KEY = "nabd_platform_access_token";
 const REFRESH_KEY = "nabd_platform_refresh_token";
@@ -47,6 +51,23 @@ function refreshSession(): Promise<boolean> {
 export function clearPlatformSession() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
+}
+
+export function hasPlatformSession(): boolean {
+  return !!localStorage.getItem(ACCESS_KEY);
+}
+
+/** Login and MFA verify hand their token pair here, so the storage keys live in this file only. */
+export function storePlatformSession(pair: { accessToken: string; refreshToken: string }) {
+  localStorage.setItem(ACCESS_KEY, pair.accessToken);
+  localStorage.setItem(REFRESH_KEY, pair.refreshToken);
+}
+
+/** Ends the server session (best effort) and clears the local one. The caller routes to login. */
+export async function platformLogout(): Promise<void> {
+  const token = localStorage.getItem(ACCESS_KEY);
+  if (token) await send("/platform/auth/logout", { method: "POST" }, token).catch(() => {});
+  clearPlatformSession();
 }
 
 function send(path: string, init: RequestInit | undefined, token: string) {

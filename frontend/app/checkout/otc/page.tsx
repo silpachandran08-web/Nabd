@@ -7,6 +7,7 @@ import { formatMoney } from "../../lib/money";
 import { can } from "../../lib/permissions";
 import { getIdentity } from "../../lib/session";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
+import AccessGate from "../../components/ui/AccessGate";
 
 // NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
 // /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
@@ -29,7 +30,18 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// A counter sale exists only to create an invoice (POST /billing/otc-checkout needs billing:create),
+// so the whole route is gated on that grant, matching the Arrivals entry button (PHA-016). The gate
+// also keeps can() below out of the server render.
 export default function OtcCheckoutPage() {
+  return (
+    <AccessGate permission="billing:create" surface="Counter sale">
+      <OtcCheckoutInner />
+    </AccessGate>
+  );
+}
+
+function OtcCheckoutInner() {
   const router = useRouter();
   const region = getIdentity()?.tenantRegion;
   const canCheckout = can("billing:create"); // the API requires billing:create; absent otherwise

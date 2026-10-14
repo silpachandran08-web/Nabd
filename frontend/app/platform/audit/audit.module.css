@@ -59,7 +59,7 @@
 
 .select,
 .input {
-  height: 40px;
+  height: 44px;
   background: var(--nb-surface-3);
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);
@@ -72,7 +72,7 @@
 }
 
 .submit {
-  height: 40px;
+  height: 44px;
   padding: 0 var(--nb-space-16);
   border: none;
   border-radius: var(--nb-radius-md);
@@ -172,7 +172,7 @@
 }
 
 .loadMore {
-  height: 36px;
+  height: 44px;
   padding: 0 var(--nb-space-16);
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);
@@ -205,7 +205,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 40px;
+  height: 44px;
   padding: 0 var(--nb-space-16);
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);
@@ -234,7 +234,8 @@
 
 .linkBtn {
   margin-inline-start: var(--nb-space-8);
-  padding: 0;
+  min-height: 44px;
+  padding: 0 var(--nb-space-4);
   border: none;
   background: none;
   color: var(--nb-accent-500);
@@ -248,11 +249,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--nb-space-16);
-}
-
-.drawerMeta {
-  font-size: 12px;
-  color: var(--nb-text-secondary);
 }
 
 .diffTable {
@@ -314,4 +310,22 @@
 @media (max-width: 430px) {
   .filterCard { flex-direction: column; align-items: stretch; }
   .select, .input { min-width: 0; width: 100%; }
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--nb-space-4) var(--nb-space-12);
+  margin: 0;
+  font-size: 13px;
+}
+
+.metaGrid dt {
+  color: var(--nb-text-tertiary);
+}
+
+.metaGrid dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

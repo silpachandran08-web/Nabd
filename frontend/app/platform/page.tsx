@@ -6,8 +6,8 @@ import Link from "next/link";
 import styles from "./platform.module.css";
 import Icon from "../components/ui/Icon";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
-import { usePlatformFetch } from "./platformApi";
-import { API_BASE, groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
+import { platformLogout, usePlatformFetch } from "./platformApi";
+import { groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
 
 export default function PlatformHomePage() {
   const router = useRouter();
@@ -16,11 +16,6 @@ export default function PlatformHomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const clearSessionAndRedirect = useCallback(() => {
-    localStorage.removeItem("nabd_platform_access_token");
-    localStorage.removeItem("nabd_platform_refresh_token");
-    router.replace("/platform/login");
-  }, [router]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -47,14 +42,8 @@ export default function PlatformHomePage() {
   }, [load]);
 
   async function logout() {
-    const token = localStorage.getItem("nabd_platform_access_token");
-    if (token) {
-      await fetch(`${API_BASE}/platform/auth/logout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {});
-    }
-    clearSessionAndRedirect();
+    await platformLogout();
+    router.replace("/platform/login");
   }
 
   if (loading) {
