@@ -8,7 +8,8 @@ export type MatrixGrant = {
 
 // Wireframe order (View, Create, Edit, Approve, Export, Refund, Configure). The API has no
 // "configure" grant, so that column is always "not applicable"; Delete is kept because the API
-// does grant it and hiding a granted action would understate the role's access.
+// does grant it and hiding a granted action would understate the role's access. Delete sits
+// before the always-N/A Configure so a narrow layout can never push a real grant out of view.
 const COLUMNS: { key: keyof Omit<MatrixGrant, "module"> | "configure"; label: string }[] = [
   { key: "view", label: "View" },
   { key: "create", label: "Create" },
@@ -16,8 +17,8 @@ const COLUMNS: { key: keyof Omit<MatrixGrant, "module"> | "configure"; label: st
   { key: "approve", label: "Approve" },
   { key: "export", label: "Export" },
   { key: "refundDiscount", label: "Refund" },
-  { key: "configure", label: "Configure" },
   { key: "delete", label: "Delete" },
+  { key: "configure", label: "Configure" },
 ];
 
 // The wireframe's 10 modules (PERM_MODULES), in its order. Every other module the API grants
