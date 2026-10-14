@@ -60,19 +60,19 @@ class PrescriptionRepository {
     }
 
     Optional<PrescriptionRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
+        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** V1-004: row lock (held to the end of the transaction) that serialises upsert/sign on one prescription. */
     Optional<PrescriptionRow> lockByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
+        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** NB-105: previous medicines, most recent first — signed only, a draft isn't a real prescription yet. */
     List<PrescriptionRow> findSignedByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
+        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
                         "ORDER BY signed_at DESC",
                 prescriptionMapper(), tenantId, patientId);
     }
@@ -107,10 +107,12 @@ class PrescriptionRepository {
         }
     }
 
-    /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed. */
-    int sign(UUID tenantId, UUID prescriptionId) {
-        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
-                "WHERE tenant_id = ? AND id = ? AND status = 'draft'", tenantId, prescriptionId);
+    /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed.
+     * DOC-R3: the allergy snapshot is written in the same UPDATE as the status flip. V51's trigger refuses any later
+     * UPDATE of a signed row, so this is the only moment it can be written. */
+    int sign(UUID tenantId, UUID prescriptionId, String allergySnapshotJson) {
+        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now(), allergy_snapshot = ?::jsonb " +
+                "WHERE tenant_id = ? AND id = ? AND status = 'draft'", allergySnapshotJson, tenantId, prescriptionId);
     }
 
     /** DOC-033: type-ahead source. Pharmacy item master (active stocked items) first, then distinct names this tenant
@@ -226,7 +228,8 @@ class PrescriptionRepository {
                 UUID.fromString(rs.getString("doctor_id")),
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
-                rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant());
+                rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant(),
+                rs.getString("allergy_snapshot_json"));
     }
 
     private RowMapper<PrescriptionItemRow> itemMapper() {

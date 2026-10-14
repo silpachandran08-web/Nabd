@@ -6,12 +6,14 @@ import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
 import { useHasMounted } from "../../lib/useHasMounted";
-import { age, type Allergy, type AllergyStatus, type PatientDetail, type Prescription } from "./shared";
+import { age, type Allergy, type AllergyStatus, type PatientDetail, type Prescription, type PrescriptionAllergySnapshot } from "./shared";
 import r from "./rxPrint.module.css";
 
 // DOC-N1: printable SIGNED prescription. Data comes from GET /clinical/prescriptions/{queueEntryId},
 // GET /clinical/prescriptions/{queueEntryId}/print-header (clinic + prescriber of record + registration number),
-// GET /patients/{id} and the allergy register (/clinical/patients/{id}/allergies[/status]).
+// GET /patients/{id}. DOC-R3: the allergy statement printed is the one captured AT SIGNING (rx.allergySnapshot).
+// Only a prescription signed before that snapshot existed (null snapshot) falls back to the current register
+// (/clinical/patients/{id}/allergies[/status]), and the printout then says the status at signing was not recorded.
 // Nothing is altered: medicine, dose, frequency, duration and instructions are printed exactly as signed.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -20,7 +22,10 @@ type PrintHeader = {
   prescriberId: string | null; prescriberName: string | null; professionalRegistrationNo: string | null;
 };
 type RxFull = Prescription & { patientId: string };
-type Loaded = { rx: RxFull; header: PrintHeader; patient: PatientDetail; allergies: Allergy[]; allergyStatus: AllergyStatus };
+type AllergyView =
+  | { kind: "atSigning"; snapshot: PrescriptionAllergySnapshot }
+  | { kind: "currentRegister"; allergies: Allergy[]; allergyStatus: AllergyStatus };
+type Loaded = { rx: RxFull; header: PrintHeader; patient: PatientDetail; allergy: AllergyView };
 type State = { kind: "loading" } | { kind: "error"; message: string } | { kind: "draft" } | { kind: "ok"; data: Loaded };
 
 class LoadError extends Error {}
@@ -63,11 +68,13 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
           return;
         }
         // A safe print needs every part: a missing allergy statement must never print as an empty one.
+        // DOC-R3: the register is read only for a legacy prescription that has no snapshot from signing.
+        const snapshot = rx.allergySnapshot ?? null;
         const [hRes, pRes, aRes, sRes] = await Promise.all([
           get(`/clinical/prescriptions/${queueEntryId}/print-header`),
           get(`/patients/${rx.patientId}`),
-          get(`/clinical/patients/${rx.patientId}/allergies`),
-          get(`/clinical/patients/${rx.patientId}/allergies/status`),
+          snapshot ? Promise.resolve(null) : get(`/clinical/patients/${rx.patientId}/allergies`),
+          snapshot ? Promise.resolve(null) : get(`/clinical/patients/${rx.patientId}/allergies/status`),
         ]);
         if (hRes.status === 409) {
           if (!cancelled) setState({ kind: "draft" });
@@ -75,8 +82,14 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         }
         if (!hRes.ok) throw new LoadError("Couldn't load the clinic and prescriber details.");
         if (!pRes.ok) throw new LoadError("Couldn't load the patient details.");
-        if (!aRes.ok || !sRes.ok) throw new LoadError("Couldn't confirm the allergy register, so the prescription can't be printed yet.");
-        const data: Loaded = { rx, header: await hRes.json(), patient: await pRes.json(), allergies: await aRes.json(), allergyStatus: await sRes.json() };
+        let allergy: AllergyView;
+        if (snapshot) {
+          allergy = { kind: "atSigning", snapshot };
+        } else {
+          if (!aRes || !sRes || !aRes.ok || !sRes.ok) throw new LoadError("Couldn't confirm the allergy register, so the prescription can't be printed yet.");
+          allergy = { kind: "currentRegister", allergies: await aRes.json(), allergyStatus: await sRes.json() };
+        }
+        const data: Loaded = { rx, header: await hRes.json(), patient: await pRes.json(), allergy };
         if (!cancelled) setState({ kind: "ok", data });
       } catch (e) {
         if (cancelled || (e instanceof LoadError && e.message === "signed out")) return;
@@ -101,8 +114,11 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
     );
   }
 
-  const { rx, header, patient, allergies, allergyStatus } = state.data;
-  const active = allergies.filter((a) => a.active);
+  const { rx, header, patient, allergy } = state.data;
+  // One shape for both sources, so the three statements (recorded / no known allergies / not asked) print identically.
+  const statement = allergy.kind === "atSigning"
+    ? { state: allergy.snapshot.state, entries: allergy.snapshot.allergies, documentedByName: allergy.snapshot.documentedByName, documentedAt: allergy.snapshot.documentedAt }
+    : { state: allergy.allergyStatus.state, entries: allergy.allergies.filter((a) => a.active), documentedByName: allergy.allergyStatus.documentedByName, documentedAt: allergy.allergyStatus.documentedAt };
   const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
   const signedDay = rx.signedAt ? new Date(rx.signedAt).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—";
   const printedOn = new Date().toLocaleDateString(undefined, { dateStyle: "medium" });
@@ -147,15 +163,22 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         </div>
 
         <section className={r.allergyBox} aria-label="Allergies">
-          <h3 className={r.sectionTitle}>Allergies (as recorded in the register, {printedOn})</h3>
-          {active.length > 0 ? (
+          {allergy.kind === "atSigning" ? (
+            <h3 className={r.sectionTitle}>Allergies (as recorded in the register at signing, {when(rx.signedAt)})</h3>
+          ) : (
+            <>
+              <p className={r.muted} role="note">Allergy status at signing not recorded (signed {signedDay}, before it was captured with the prescription).</p>
+              <h3 className={r.sectionTitle}>Allergies (as recorded in the register, {printedOn})</h3>
+            </>
+          )}
+          {statement.entries.length > 0 ? (
             <ul className={r.allergyList}>
-              {active.map((a) => (
-                <li key={a.id}>{a.substance}{a.severity ? ` (${a.severity})` : ""}{a.reaction ? ` · ${a.reaction}` : ""}</li>
+              {statement.entries.map((a, i) => (
+                <li key={`${a.substance}-${i}`}>{a.substance}{a.severity ? ` (${a.severity})` : ""}{a.reaction ? ` · ${a.reaction}` : ""}</li>
               ))}
             </ul>
-          ) : allergyStatus.state === "none_documented" ? (
-            <div>No known allergies, documented{allergyStatus.documentedByName ? ` by ${allergyStatus.documentedByName}` : ""}{allergyStatus.documentedAt ? ` on ${when(allergyStatus.documentedAt)}` : ""}.</div>
+          ) : statement.state === "none_documented" ? (
+            <div>No known allergies, documented{statement.documentedByName ? ` by ${statement.documentedByName}` : ""}{statement.documentedAt ? ` on ${when(statement.documentedAt)}` : ""}.</div>
           ) : (
             <div>No allergy information recorded. Allergies have not been asked or documented.</div>
           )}

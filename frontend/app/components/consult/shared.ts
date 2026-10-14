@@ -33,7 +33,16 @@ export type PrescriptionItem = {
   brandName?: string | null; sigPattern?: string | null; route?: string | null; quantity?: number | null; quantityUnit?: string | null;
 };
 export type DrugSuggestion = { name: string; source: "pharmacy" | "history"; code: string | null; inStock: boolean | null; prescriptionOnly: boolean | null };
-export type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[]; unresolvedWarnings?: number };
+// DOC-R3: allergy statement captured at signing. Null on drafts and on prescriptions signed before it was captured.
+export type PrescriptionAllergySnapshot = {
+  state: "recorded" | "none_documented" | "not_assessed";
+  allergies: { substance: string; severity: string; reaction: string | null }[];
+  documentedBy: string | null; documentedByName: string | null; documentedAt: string | null;
+};
+export type Prescription = {
+  id: string; status: string; signedAt: string | null; items: PrescriptionItem[]; unresolvedWarnings?: number;
+  allergySnapshot?: PrescriptionAllergySnapshot | null;
+};
 export type Problem = { title: string; detail: string };
 
 export type Allergy = {
