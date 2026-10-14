@@ -15,8 +15,10 @@ const SEARCH_INPUT_ID = "nb-global-search";
 // just for this one case. Add more pathnames here if other pages want the same treatment.
 // The Receptionist's Queue & Appointments board carries "Register walk-in", which opens the
 // Arrivals page's own walk-in dialog (?action=walkin) — only for those who can check in.
-const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?: string }> = {
-  "/nursing": { label: "Capture vitals", href: "/nursing?action=capture", permission: "clinical:edit" },
+// permission: every listed grant is required. Capture vitals writes vitals (clinical:edit) for patients
+// picked from the queue (queue:view); without the queue the picker could only claim nobody is waiting.
+const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?: string | string[] }> = {
+  "/nursing": { label: "Capture vitals", href: "/nursing?action=capture", permission: ["clinical:edit", "queue:view"] },
   "/schedule": { label: "Register walk-in", href: "/arrivals?action=walkin", permission: "queue:create" },
 };
 
@@ -82,7 +84,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     : undefined;
   // The owner's day-close action wins over a page-level shortcut (wireframe PRIMARY.owner).
   const action = ownerAction ?? (pathname ? PRIMARY_ACTIONS[pathname] : undefined);
-  const primaryAction = action && (!action.permission || can(action.permission)) ? action : undefined;
+  const primaryAction = action && [action.permission ?? []].flat().every(can) ? action : undefined;
 
   // Patient search lands on /patients, so a role without patients:view gets no search box at all.
   const canSearch = can("patients:view");
