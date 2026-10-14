@@ -1222,7 +1222,7 @@ export default function ConsultPage() {
               <button type="button" className={`${p.linkBtn} ${p.linkBtnTouch}`} onClick={() => setStep("plan")}>Open prescription</button>
             </section>
             <DoctorOrders authedFetch={authedFetch} queueEntryId={activeEntry.id} />
-            <FollowUpPanel authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} />
+            <FollowUpPanel key={activeEntry.id} authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} canBook={can("queue:create")} />
             <section className={p.card} aria-label="Package">
               <h3 className={p.cardTitle}>Package</h3>
               {pat && pat.activePackages > 0
