@@ -530,8 +530,9 @@ export default function ConsultPage() {
       if (draft) {
         const serverFields = server ? toFields(server) : BLANK_DRAFT;
         if (server?.status === "signed") {
+          // Same as the reconnect path: never applied to a signed note, but listed for an amendment.
           void deleteDraft(row.id);
-          setNotice("A local draft was discarded because the note is already signed.");
+          if (!sameFields(draft.note, serverFields)) setOrphanText(draft.note);
         } else if (sameFields(draft.note, serverFields)) {
           void deleteDraft(row.id);
         } else if ((server?.updatedAt ?? null) === draft.baseUpdatedAt) {
