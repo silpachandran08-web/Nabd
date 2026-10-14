@@ -6,8 +6,8 @@ import Link from "next/link";
 import styles from "./platform.module.css";
 import Icon from "../components/ui/Icon";
 import { Skeleton } from "../components/ui/StateViews";
-import { API_BASE, groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
-import { clearPlatformSession, usePlatformFetch } from "./platformApi";
+import { groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
+import { hasPlatformSession, platformLogout, usePlatformFetch } from "./platformApi";
 
 // Every /platform/* page used to be a dead end: only the Command Centre
 // landing page (page.tsx) rendered the surface list, so navigating into any
@@ -24,7 +24,7 @@ export function PlatformNav() {
 
   useEffect(() => {
     if (pathname === "/platform/login") return;
-    if (!localStorage.getItem("nabd_platform_access_token")) return;
+    if (!hasPlatformSession()) return;
     let cancelled = false;
     (async () => {
       const res = await fetchAuthed("/platform/auth/me");
@@ -38,14 +38,7 @@ export function PlatformNav() {
   if (pathname === "/platform/login") return null;
 
   async function logout() {
-    const token = localStorage.getItem("nabd_platform_access_token");
-    if (token) {
-      await fetch(`${API_BASE}/platform/auth/logout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {});
-    }
-    clearPlatformSession();
+    await platformLogout();
     router.replace("/platform/login");
   }
 
