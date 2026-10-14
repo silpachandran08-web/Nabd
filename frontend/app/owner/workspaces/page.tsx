@@ -48,8 +48,11 @@ export default function OwnerWorkspacesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [current, setCurrent] = useState<{ tenantId: string; tenantName: string } | null>(null);
+  const [openSession, setOpenSession] = useState<{ tenantId: string; tenantName: string } | null>(null);
   const [lastOpened, setLastOpened] = useState<LastOpened | null>(null);
+  // Only a session for one of THIS owner's clinics counts as "current"; a leftover session from
+  // another account on a shared browser is ignored (and ended if this owner enters a clinic).
+  const current = openSession && brands.some((b) => b.clinics.some((c) => c.id === openSession.tenantId)) ? openSession : null;
 
   const pendingToken = useCallback(() => sessionStorage.getItem("nabd_owner_pending_token"), []);
 
@@ -85,7 +88,7 @@ export default function OwnerWorkspacesPage() {
 
   useEffect(() => {
     void Promise.resolve().then(() => {
-      setCurrent(currentClinicSession());
+      setOpenSession(currentClinicSession());
       setLastOpened(readLastOpened());
       return load();
     });
