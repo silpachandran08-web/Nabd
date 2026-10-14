@@ -154,7 +154,8 @@ export default function ConsultPage() {
   const [completing, setCompleting] = useState(false);
   const [closeAck, setCloseAck] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
-  const [followUpLabel, setFollowUpLabel] = useState<string | null>(null);
+  // undefined = not known (still checking, or the lookup failed): never shown as "Not set" (T1-BUG-2).
+  const [followUpLabel, setFollowUpLabel] = useState<string | null | undefined>(undefined);
   const [preview, setPreview] = useState<Row | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -482,7 +483,7 @@ export default function ConsultPage() {
     setNotice(null);
     setShellError(null);
     setCloseAck(false);
-    setFollowUpLabel(null);
+    setFollowUpLabel(undefined);
     setShowDental(false);
     setRxItems([]);
     setRxStatus("draft");
@@ -1202,7 +1203,9 @@ export default function ConsultPage() {
                     </li>
                     <li className={p.listRow}>
                       <strong>Follow-up</strong>
-                      {followUpLabel ? <StatusPill tone="ok" label={`Set · ${followUpLabel}`} /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
+                      {followUpLabel ? <StatusPill tone="ok" label={`Set · ${followUpLabel}`} />
+                        : followUpLabel === null ? <StatusPill tone="neutral" icon="calendar" label="Not set" />
+                        : <StatusPill tone="warn" icon="alert" label="Unknown — couldn't check" />}
                     </li>
                     <li className={p.listRow}>
                       <strong>Checkout</strong>
