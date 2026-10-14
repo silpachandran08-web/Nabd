@@ -431,7 +431,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                 {owner && identity.tenantRegion && (
                   <div className={styles.menuRow}>
                     <span>Region</span>
-                    <span className={styles.menuRowValue}>{identity.tenantRegion}</span>
+                    <span className={styles.menuRowValue} title="Fixed at provisioning">{regionLabel(identity.tenantRegion)}</span>
                   </div>
                 )}
                 <div className={styles.menuRow}>

@@ -40,7 +40,7 @@
 .navRail .link { justify-content: center; padding-inline: 0; width: 48px; height: 44px; position: relative; }
 .navRail .badge { position: absolute; top: 2px; inset-inline-end: 0; margin: 0; }
 .navRail .identityFooter { justify-content: center; padding-inline: 0; }
-.navRail .identityMenu { left: 0; }
+.navRail .identityMenu { position: fixed; inset-inline: 96px auto; bottom: 16px; width: 260px; }
 
 .clinicInfo {
   display: flex;
@@ -111,8 +111,8 @@
 .identityMenu {
   position: absolute;
   bottom: calc(100% + var(--nb-space-8));
-  left: 0;
-  width: 260px;
+  /* Within the sidebar's width: the nav scrolls (overflow-y), so anything wider is clipped. */
+  inset-inline: 0;
   z-index: 50;
   padding: var(--nb-space-12);
   border-radius: var(--nb-radius-lg);
@@ -331,6 +331,9 @@
 @media (max-width: 1024px) { .clinicChevron, .planChip { display: none; } }
 /* Rail widths: the nav scrolls (overflow-y), which would clip an absolute popover, so the popover
    is pinned beside the rail instead (wireframe popPos.clinic). */
-@media (max-width: 1024px) { .clinicMenu { position: fixed; top: 56px; inset-inline-start: 96px; } }
+@media (max-width: 1024px) {
+  .clinicMenu { position: fixed; top: 56px; inset-inline-start: 96px; }
+  .identityMenu { position: fixed; inset-inline: 96px auto; bottom: 16px; width: 260px; }
+}
 .navRail .clinicMenu { position: fixed; top: 56px; inset-inline-start: 96px; }
 .navRail .clinicChevron, .navRail .planChip { display: none; }
