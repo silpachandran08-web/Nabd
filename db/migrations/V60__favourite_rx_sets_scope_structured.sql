@@ -16,3 +16,6 @@ ALTER TABLE favourite_rx_set_items ADD COLUMN IF NOT EXISTS quantity numeric(8,2
 ALTER TABLE favourite_rx_set_items ADD COLUMN IF NOT EXISTS quantity_unit text;
 
 CREATE INDEX IF NOT EXISTS idx_favourite_rx_sets_tenant_doctor ON favourite_rx_sets (tenant_id, doctor_id);
+
+-- Encounter list (EncounterListRepository) counts prescription_items per prescription; V21/V53 index only tenant+drug.
+CREATE INDEX IF NOT EXISTS idx_prescription_items_prescription ON prescription_items (prescription_id);
