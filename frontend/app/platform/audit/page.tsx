@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./audit.module.css";
 import Dialog from "../../components/ui/Dialog";
 import Icon from "../../components/ui/Icon";
@@ -119,21 +119,31 @@ export default function AuditLogPage() {
   const [forbidden, setForbidden] = useState(false);
   const [viewing, setViewing] = useState<AuditEntry | null>(null);
   const [filterError, setFilterError] = useState<string | null>(null);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  // Filters of the search on screen. Load more pages through these, never through what has been typed since.
+  const searched = useRef<URLSearchParams>(new URLSearchParams());
 
   const fetchPage = useCallback(
     async (cursor: string | null, append: boolean) => {
       if (append) setLoadingMore(true);
       else setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({ limit: "50" });
-        if (cursor) params.set("cursor", cursor);
-        if (tenantId) params.set("tenantId", tenantId);
-        if (action.trim()) params.set("action", action.trim());
-        if (entityType.trim()) params.set("entityType", entityType.trim());
+      setMoreError(null);
+      if (!append) setError(null);
+      if (!append) {
+        const filters = new URLSearchParams({ limit: "50" });
+        if (tenantId) filters.set("tenantId", tenantId);
+        if (action.trim()) filters.set("action", action.trim());
+        if (entityType.trim()) filters.set("entityType", entityType.trim());
         // Operator-local day boundaries, sent as instants.
-        if (fromDate) params.set("createdAfter", new Date(`${fromDate}T00:00:00`).toISOString());
-        if (toDate) params.set("createdBefore", new Date(`${toDate}T23:59:59.999`).toISOString());
+        if (fromDate) filters.set("createdAfter", new Date(`${fromDate}T00:00:00`).toISOString());
+        if (toDate) filters.set("createdBefore", new Date(`${toDate}T23:59:59.999`).toISOString());
+        searched.current = filters;
+      }
+      // A failed append keeps the loaded rows and offers a retry of that page only.
+      const fail = (msg: string) => (append ? setMoreError(msg) : setError(msg));
+      try {
+        const params = new URLSearchParams(searched.current);
+        if (cursor) params.set("cursor", cursor);
 
         const res = await fetchAuthed(`/platform/audit-log?${params}`);
         if (!res) return; // session gone, already redirecting to login
@@ -142,14 +152,14 @@ export default function AuditLogPage() {
           return;
         }
         if (!res.ok) {
-          setError("Couldn't load the audit log. Try again.");
+          fail(append ? "Couldn't load more entries. Try again." : "Couldn't load the audit log. Try again.");
           return;
         }
         const body: AuditPage = await res.json();
         setRows((prev) => (append ? [...prev, ...body.data] : body.data));
         setNextCursor(body.page.nextCursor);
       } catch {
-        setError("Couldn't reach the server. Check your connection and try again.");
+        fail("Couldn't reach the server. Check your connection and try again.");
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -302,8 +312,9 @@ export default function AuditLogPage() {
                   disabled={loadingMore}
                   onClick={() => fetchPage(nextCursor, true)}
                 >
-                  {loadingMore ? "Loading…" : "Load more"}
+                  {loadingMore ? "Loading…" : moreError ? "Retry load more" : "Load more"}
                 </button>
+                {moreError && <span className={styles.filterError} role="alert">{moreError}</span>}
               </div>
             )}
           </>
