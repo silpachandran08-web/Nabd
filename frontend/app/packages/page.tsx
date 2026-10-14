@@ -64,6 +64,10 @@ const STATUS_PILL: Record<string, string> = {
 };
 // Sell-package wizard (wireframe pksell SELLSTEPS).
 const SELL_STEPS = ["Patient", "Package", "Eligibility", "Review", "Payment", "Invoice & card"];
+// POST /packages/sell refuses (duplicate-active-package) while the stored status is 'active'. The list shows an
+// effective status computed by date (PackageInstanceService.effectiveStatus), so active, grace and expired copies
+// are all still stored as 'active' and all block a new sale; only completed or refunded copies do not.
+const BLOCKING_STATUSES = ["active", "grace", "expired"];
 // Invoice issued by POST /packages/sell, read back from GET /billing/invoices/{id} (billing:view) so the
 // final step shows the server's own net / tax / total and per-line tax, never a client-side estimate.
 type SoldInvoice = {
@@ -319,6 +323,8 @@ export default function PackagesPage() {
         if (invRes?.ok) setSoldInvoice(await invRes.json());
       }
       await loadAll();
+    } catch {
+      setSellError("Couldn't reach the server. The sale may or may not have gone through: check Active patient packages before trying again.");
     } finally {
       setSelling(false);
     }
@@ -627,23 +633,19 @@ export default function PackagesPage() {
           )}
 
           {sellStep === 2 && sellPackage && sellPatient && (() => {
-            const conflict = instances.find((i) => i.patientId === sellPatient.id && i.packageId === sellPackage.id && (i.status === "active" || i.status === "grace"));
-            const blocked = conflict?.status === "active"; // POST /packages/sell refuses this (duplicate-active-package)
+            const conflict = instances.find((i) => i.patientId === sellPatient.id && i.packageId === sellPackage.id && BLOCKING_STATUSES.includes(i.status));
+            const blocked = !!conflict;
             const doctorNames = sellPackage.eligibleDoctorIds.map((id) => staff.find((s) => s.id === id)?.name).filter(Boolean);
             return (
               <>
                 <div className={styles.flagRow}>
                   {blocked
                     ? <StatusPill tone="danger" label="Not eligible" />
-                    : conflict
-                      ? <StatusPill tone="warn" label="Already has this package" />
-                      : <StatusPill tone="ok" label="Eligibility confirmed" />}
+                    : <StatusPill tone="ok" label="Eligibility confirmed" />}
                   <span className={styles.muted}>
-                    {blocked
-                      ? `${sellPatient.name} already has an active ${sellPackage.name}. A second copy can be sold once it is used up, expires or is refunded.`
-                      : conflict
-                        ? `${sellPatient.name} has a ${sellPackage.name} in its grace period. Check this is a deliberate second purchase.`
-                        : `No conflicting active package for ${sellPatient.name}.`}
+                    {conflict
+                      ? `${sellPatient.name} already has a ${sellPackage.name} (${conflict.status}). Another copy can be sold only after it is completed or refunded.`
+                      : `No conflicting package for ${sellPatient.name}.`}
                   </span>
                 </div>
                 {sellPackage.doctorLeaveWarning && <div className={styles.bannerWarn}>{sellPackage.doctorLeaveWarning}</div>}
@@ -713,7 +715,7 @@ export default function PackagesPage() {
                   <div className={styles.statCard}><div className={styles.statLabel}>Invoice</div><div className={styles.statValue}>{sold.invoiceNumber}</div></div>
                 </div>
               )}
-              <h3 className={styles.cardTitle}>Tax allocated by list-price ratio</h3>
+              <h3 className={styles.cardTitle}>{soldInvoice ? "Invoice lines" : "Tax allocated by list-price ratio"}</h3>
               {soldInvoice ? (
                 // One invoice line per package item: the server's ex-tax line total and its tax at the item's rate.
                 soldInvoice.lineItems.map((l, n) => (
@@ -749,7 +751,7 @@ export default function PackagesPage() {
             {sellStep < 4 && (
               <button type="button" className={styles.btnPrimary}
                 disabled={(sellStep === 0 && !sellPatient) || (sellStep >= 1 && !sellPackageId)
-                  || (sellStep === 2 && instances.some((i) => i.patientId === sellPatient?.id && i.packageId === sellPackageId && i.status === "active"))}
+                  || (sellStep === 2 && instances.some((i) => i.patientId === sellPatient?.id && i.packageId === sellPackageId && BLOCKING_STATUSES.includes(i.status)))}
                 onClick={() => setSellStep(sellStep + 1)}>Continue</button>
             )}
             {sellStep === 4 && (
