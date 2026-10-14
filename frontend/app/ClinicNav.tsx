@@ -84,6 +84,8 @@ const DOCTOR_ITEMS: DoctorItem[] = [
   { label: "Prescriptions & Templates", short: "Rx sets", icon: "syringe", href: "/prescriptions", permission: "clinical:view", alsoPermission: "clinical:edit" },
   { label: "Treatment Packages", short: "Packages", icon: "package", href: "/packages", permission: "packages:view" },
   { label: "Schedule", short: "Schedule", icon: "calendar", href: "/schedule", permission: "queue:view" },
+  // DOC-004: the doctor's own hours and leave (reads need queue:view; writes inside need queue:edit).
+  { label: "My Schedule", short: "Hours", icon: "clock", href: "/my-schedule", permission: "clinical:edit", alsoPermission: "queue:view" },
 ];
 // Wireframe doctor items whose page does not exist yet. Not linked (no dead links) and not shown
 // disabled (restricted/unavailable UI is absent): when a page ships, move its entry into DOCTOR_ITEMS
