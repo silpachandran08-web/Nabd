@@ -253,7 +253,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
       <HardRuleCard />
 
       {mode === "external" ? (
-        <p className={styles.subtitle}>Item master and dispensing queue are not shown in External mode. Switch to Hybrid to add items.</p>
+        <p className={styles.subtitle}>Item master and dispensing queue are not shown in External mode.{canEdit ? " Switch to Hybrid to add items." : ""}</p>
       ) : (
         <>
           {!canEdit ? null : mode === "in_house" ? (

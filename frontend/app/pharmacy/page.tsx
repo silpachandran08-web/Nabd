@@ -3,18 +3,25 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
-import { EmptyState } from "../components/ui/StateViews";
-import { can } from "../lib/permissions";
-import { useHasMounted } from "../lib/useHasMounted";
+import AccessGate from "../components/ui/AccessGate";
 import setupStyles from "../setup/setup.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 // The pharmacist's own home (PHA-002): the Pharmacy panel on its own route, fed only by /pharmacy/*,
-// so a pharmacy-only role never needs Setup access to reach the dispensing queue.
+// so a pharmacy-only role never needs Setup access to reach the dispensing queue. The nav entry
+// (ClinicNav, pharmacy:view) and the landing rule (lib/session.ts) point here; the Setup tab
+// renders the same panel for setup:view holders who also hold pharmacy:view.
 export default function PharmacyPage() {
+  return (
+    <AccessGate permission="pharmacy:view" surface="Pharmacy">
+      <PharmacyPageInner />
+    </AccessGate>
+  );
+}
+
+function PharmacyPageInner() {
   const router = useRouter();
-  const mounted = useHasMounted();
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("nabd_access_token");
@@ -34,13 +41,10 @@ export default function PharmacyPage() {
     return res;
   }, [router]);
 
-  if (!mounted) return null;
-  if (!can("pharmacy:view")) {
-    return <EmptyState title="Pharmacy isn't available for your role" hint="Ask your clinic owner if you need access." icon="shield" />;
-  }
   return (
     <main className={setupStyles.page}>
       <h1 className={setupStyles.title}>Pharmacy</h1>
+      <p className={setupStyles.subtitle}>Dispensing queue, item master and stock for this clinic.</p>
       <PharmacyPanel authedFetch={authedFetch} />
     </main>
   );
