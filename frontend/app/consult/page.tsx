@@ -139,6 +139,10 @@ export default function ConsultPage() {
   const [note, setNote] = useState<NoteDraft>(BLANK_DRAFT);
   const [noteStatus, setNoteStatus] = useState<"draft" | "signed">("draft");
   const [signedAt, setSignedAt] = useState<string | null>(null);
+  // Editing and saving wait until the server note is known; a failed load must never let a save
+  // replace the server's draft with blank or partial fields (T1-BUG-3).
+  const [noteLoad, setNoteLoad] = useState<"loading" | "ok" | "error">("loading");
+  const noteLoadRef = useRef<"loading" | "ok" | "error">("loading");
   const [orphanText, setOrphanText] = useState<NoteFields | null>(null); // local text not applied because the note was signed elsewhere
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -330,6 +334,7 @@ export default function ConsultPage() {
 
   async function saveNote(entryId: string) {
     if (conflictRef.current) return null; // never overwrite while a conflict is unresolved
+    if (noteLoadRef.current !== "ok") return null; // the server copy was never read: nothing to save over
     const sent = noteRef.current;
     if (!navigator.onLine) {
       setSaveState("offline");
@@ -468,6 +473,8 @@ export default function ConsultPage() {
     setNoteStatus("draft");
     setSignedAt(null);
     setOrphanText(null);
+    noteLoadRef.current = "loading";
+    setNoteLoad("loading");
     setDirty(false);
     setLastSavedAt(null);
     setSaveState("idle");
@@ -510,11 +517,15 @@ export default function ConsultPage() {
           if (aRes?.ok) setAmendments(await aRes.json());
         }
       } else if (nRes && nRes.status !== 404) {
-        setShellError("Couldn't load the note. Reload before typing so nothing is overwritten.");
+        noteLoadRef.current = "error";
+        setNoteLoad("error");
       }
+      if (!nRes) return;
+      if (noteLoadRef.current === "loading") { noteLoadRef.current = "ok"; setNoteLoad("ok"); }
 
       // A local draft means the last save never reached the server (offline, crash, reload).
-      const draft = await readDraft(row.id);
+      // Not when the note failed to load: the draft is kept untouched for the next successful open.
+      const draft = noteLoadRef.current === "ok" ? await readDraft(row.id) : null;
       if (stale()) return;
       if (draft) {
         const serverFields = server ? toFields(server) : BLANK_DRAFT;
@@ -545,7 +556,10 @@ export default function ConsultPage() {
         setRxItems([{ ...BLANK_RX_ITEM }]);
       }
     } catch {
-      if (!stale()) setShellError("Couldn't reach the server. Check your connection, then reopen the visit.");
+      if (!stale()) {
+        if (noteLoadRef.current === "loading") { noteLoadRef.current = "error"; setNoteLoad("error"); }
+        setShellError("Couldn't reach the server. Check your connection, then reopen the visit.");
+      }
     }
   }
 
@@ -696,6 +710,7 @@ export default function ConsultPage() {
   }
 
   function updateField(field: keyof NoteDraft, value: string) {
+    if (noteLoadRef.current !== "ok") return;
     setNote((prev) => ({ ...prev, [field]: value }));
     setDirty(true);
     if (activeEntry) scheduleLocalDraft(activeEntry.id);
@@ -916,6 +931,12 @@ export default function ConsultPage() {
           </div>
         )}
         {shellError && <div className={styles.errorState} role="alert">{shellError}</div>}
+        {noteLoad === "error" && (
+          <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
+            <Icon name="alert" size={16} />
+            <span>Couldn&apos;t load the note, so editing and saving are locked to protect the saved copy. <button type="button" className={p.linkBtn} onClick={() => void openConsult(activeEntry, step)}>Try again</button></span>
+          </div>
+        )}
         {notice && (
           <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
             <Icon name="info" size={16} />
@@ -1040,14 +1061,14 @@ export default function ConsultPage() {
 
             {step === "examine" && (
               <>
-                {!locked && can("clinical:edit") && <NoteTemplates authedFetch={authedFetch} patientId={activeEntry.patientId} entryId={activeEntry.id} note={note} onSetField={updateField} />}
+                {!locked && can("clinical:edit") && noteLoad === "ok" && <NoteTemplates authedFetch={authedFetch} patientId={activeEntry.patientId} entryId={activeEntry.id} note={note} onSetField={updateField} />}
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <h3 className={p.cardTitle}>{NOTE_TITLE}</h3>
                   <div className={styles.noteGrid}>
                     {(["subjective", "objective"] as const).map((field) => (
                       <div className={styles.noteField} key={field}>
                         <label className={styles.noteLabel} htmlFor={field}>{NOTE_FIELD_LABEL[field]}</label>
-                        <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked || !canEditNote} onChange={(e) => updateField(field, e.target.value)} />
+                        <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked || !canEditNote || noteLoad !== "ok"} onChange={(e) => updateField(field, e.target.value)} />
                       </div>
                     ))}
                   </div>
@@ -1072,10 +1093,10 @@ export default function ConsultPage() {
                 <div className={styles.noteGrid}>
                   <div className={styles.noteField}>
                     <label className={styles.noteLabel} htmlFor="assessment">{NOTE_FIELD_LABEL.assessment}</label>
-                    <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked || !canEditNote} onChange={(e) => updateField("assessment", e.target.value)} />
+                    <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked || !canEditNote || noteLoad !== "ok"} onChange={(e) => updateField("assessment", e.target.value)} />
                   </div>
                   <div className={styles.noteField}>
-                    <DiagnosisField value={note.diagnosis} disabled={locked || !canEditNote} inputClassName={styles.input} onChange={(v) => updateField("diagnosis", v)} />
+                    <DiagnosisField value={note.diagnosis} disabled={locked || !canEditNote || noteLoad !== "ok"} inputClassName={styles.input} onChange={(v) => updateField("diagnosis", v)} />
                   </div>
                 </div>
               </div>
@@ -1086,7 +1107,7 @@ export default function ConsultPage() {
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.noteField}>
                     <label className={styles.noteLabel} htmlFor="plan">{NOTE_FIELD_LABEL.plan}</label>
-                    <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked || !canEditNote} onChange={(e) => updateField("plan", e.target.value)} />
+                    <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked || !canEditNote || noteLoad !== "ok"} onChange={(e) => updateField("plan", e.target.value)} />
                   </div>
                 </div>
 
@@ -1248,7 +1269,7 @@ export default function ConsultPage() {
               </>
             ) : (
               <>
-                {!locked && canEditNote && (
+                {!locked && canEditNote && noteLoad === "ok" && (
                   <button className={styles.backBtn} onClick={() => void saveNote(activeEntry.id)} disabled={saveState === "saving" || !!conflict || (!dirty && saveState !== "error")}>
                     {saveState === "saving" ? "Saving…" : "Save draft"}
                   </button>
