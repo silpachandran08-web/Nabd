@@ -137,6 +137,7 @@ export default function StaffAccessPage() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesFailed, setRolesFailed] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [breakGlass, setBreakGlass] = useState<{ id: string; staffId: string; staffName: string; reason: string; activatedAt: string; expiresAt: string }[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -220,6 +221,7 @@ export default function StaffAccessPage() {
 
       const rolesRes = await authedFetch("/roles");
       if (rolesRes?.ok) setRoles(await rolesRes.json());
+      setRolesFailed(!!rolesRes && !rolesRes.ok);
 
       const departmentsRes = await authedFetch("/departments");
       if (departmentsRes?.ok) setDepartments(await departmentsRes.json());
@@ -260,11 +262,13 @@ export default function StaffAccessPage() {
   function restrictionOf(s: Staff): string {
     if (s.status === "invited") return "Pending first sign-in";
     const role = roles.find((r) => r.id === s.roleId);
-    if (role?.builtIn) return "Full access";
+    // Without the role's grants the restriction is unknown; never summarise it as "None".
+    if (!role) return "—";
+    if (role.builtIn) return "Full access";
     const parts: string[] = [];
     if (s.scope === "own_patients_only") parts.push(SCOPE_LABELS.own_patients_only);
     else if (s.scope !== "all_clinic_patients" && s.scope) parts.push(SCOPE_LABELS[s.scope] ?? s.scope);
-    const billing = role?.grants.find((g) => g.module === "billing");
+    const billing = role.grants.find((g) => g.module === "billing");
     if (billing?.view && !billing.refundDiscount) parts.push("No refund, no discount");
     return parts.length ? parts.join(" · ") : "None";
   }
@@ -497,6 +501,9 @@ export default function StaffAccessPage() {
       </div>
 
       {error && !loading && staff.length > 0 && <div className={styles.formError} role="alert">{error}</div>}
+      {rolesFailed && !loading && staff.length > 0 && (
+        <div className={styles.formError} role="alert">Couldn&apos;t load roles, so Role and Restriction show &ldquo;—&rdquo;. Reload to try again.</div>
+      )}
 
       {lastInvite && (
         <div className={styles.inviteBanner}>
