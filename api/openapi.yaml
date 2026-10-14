@@ -1301,6 +1301,47 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /clinical/note-templates:
+    get:
+      tags: [Clinical]
+      summary: The calling doctor's own note templates (favourites first, then by name). Other doctors' templates are never returned. Nothing is pre-loaded - the list is empty until the doctor saves one.
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/NoteTemplate" } } } } }
+    post:
+      tags: [Clinical]
+      summary: Save a note template owned by the caller. Name 1-80 chars; each section at most 4000 chars (refused, never truncated); up to 10 doctor-defined tags of at most 30 chars (trimmed, case-insensitive duplicates dropped). At most 100 templates per doctor (409 note-template-limit).
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplateCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplate" } } } }
+        "400": { description: "Bad request. 400 invalid-note-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Conflict. 409 note-template-limit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/note-templates/{id}:
+    patch:
+      tags: [Clinical]
+      summary: Change one of the caller's templates. A field that is absent or null is left unchanged (send "" or [] to clear). Used to rename, edit text, edit tags and to mark or unmark a favourite. 404 for another doctor's template.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplateUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplate" } } } }
+        "400": { description: "Bad request. 400 invalid-note-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Clinical]
+      summary: Delete one of the caller's templates (notes already written from it are unaffected). 404 for another doctor's template.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /clinical/vitals/{queueEntryId}:
     get:
       tags: [Clinical]
@@ -1499,6 +1540,41 @@ components:
       properties:
         type: { type: string, enum: [visit_summary, referral, certificate] }
         body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    NoteTemplate:
+      type: object
+      required: [id, name, subjective, objective, assessment, plan, tags, favourite, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        subjective: { type: string }
+        objective: { type: string }
+        assessment: { type: string }
+        plan: { type: string }
+        tags: { type: array, items: { type: string } }
+        favourite: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    NoteTemplateCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 80 }
+        subjective: { type: [string, "null"], maxLength: 4000 }
+        objective: { type: [string, "null"], maxLength: 4000 }
+        assessment: { type: [string, "null"], maxLength: 4000 }
+        plan: { type: [string, "null"], maxLength: 4000 }
+        tags: { type: [array, "null"], maxItems: 10, items: { type: string, maxLength: 30 } }
+        favourite: { type: [boolean, "null"] }
+    NoteTemplateUpdate:
+      type: object
+      properties:
+        name: { type: [string, "null"], maxLength: 80 }
+        subjective: { type: [string, "null"], maxLength: 4000 }
+        objective: { type: [string, "null"], maxLength: 4000 }
+        assessment: { type: [string, "null"], maxLength: 4000 }
+        plan: { type: [string, "null"], maxLength: 4000 }
+        tags: { type: [array, "null"], maxItems: 10, items: { type: string, maxLength: 30 } }
+        favourite: { type: [boolean, "null"] }
     ClinicalDocumentUpdate:
       type: object
       properties:
