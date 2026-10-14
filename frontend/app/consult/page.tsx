@@ -134,6 +134,7 @@ export default function ConsultPage() {
   const [note, setNote] = useState<NoteDraft>(BLANK_DRAFT);
   const [noteStatus, setNoteStatus] = useState<"draft" | "signed">("draft");
   const [signedAt, setSignedAt] = useState<string | null>(null);
+  const [orphanText, setOrphanText] = useState<NoteFields | null>(null); // local text not applied because the note was signed elsewhere
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -323,6 +324,20 @@ export default function ConsultPage() {
         const g = await authedFetch(`/clinical/notes/${entryId}`);
         if (g?.status === 200) {
           const server: Note = await g.json();
+          if (server.status === "signed") {
+            // Signed from another session while this device held unsaved text: never overwrite a
+            // signed note. Lock the view to the server copy and keep the local text visible.
+            needsServerCheckRef.current = false;
+            baseUpdatedRef.current = server.updatedAt;
+            setNote(toFields(server));
+            setNoteStatus("signed");
+            setSignedAt(server.signedAt);
+            setDirty(false);
+            setSaveState("idle");
+            setOrphanText(sameFields(toFields(server), sent) ? null : sent);
+            void deleteDraft(entryId);
+            return null;
+          }
           if (server.updatedAt !== baseUpdatedRef.current && !sameFields(toFields(server), sent)) {
             setConflict({ mine: sent, server: toFields(server), serverUpdatedAt: server.updatedAt });
             setConflictOpen(true);
@@ -430,6 +445,7 @@ export default function ConsultPage() {
     setNote(BLANK_DRAFT);
     setNoteStatus("draft");
     setSignedAt(null);
+    setOrphanText(null);
     setDirty(false);
     setLastSavedAt(null);
     setSaveState("idle");
@@ -546,6 +562,10 @@ export default function ConsultPage() {
   // one is passed in `overrides` (keyed by item index).
   async function saveRx(overrides?: { index: number; kind: string; reasonCode: string; note: string }): Promise<Prescription | null> {
     if (!activeEntry) return null;
+    if (!navigator.onLine) {
+      setRxError("You're offline. The prescription can't be saved, checked or signed until you reconnect; your changes stay on this screen.");
+      return null;
+    }
     setRxSaving(true);
     setRxError(null);
     try {
@@ -712,7 +732,7 @@ export default function ConsultPage() {
         needsServerCheckRef.current = needsServerCheckRef.current || dirtyRef.current;
         const saveRes = await saveNote(activeEntry.id);
         if (!saveRes?.ok) {
-          setShellError(conflictRef.current ? "The note changed on the server. Resolve the differences before closing." : "Couldn't save the note. Try again before completing.");
+          setShellError(conflictRef.current ? "The note changed on the server. Resolve the differences before closing." : (navigator.onLine ? "Couldn't save the note. Try again before completing." : "You're offline. The note is kept on this device; it can be signed once you reconnect."));
           return;
         }
         const signRes = await authedFetch(`/clinical/notes/${activeEntry.id}/sign`, { method: "POST" });
@@ -806,7 +826,8 @@ export default function ConsultPage() {
 
   if (activeEntry) {
     const pat = activePatient;
-    const saveBadge = !online || saveState === "offline"
+    const saveBadge = conflict ? <StatusPill tone="warn" icon="alert" label="Sync conflict — review" />
+      : !online || saveState === "offline"
       ? <StatusPill tone="sync" icon="sync" label="Offline · local draft" />
       : saveState === "saving" ? <StatusPill tone="sync" icon="sync" label="Saving…" />
       : saveState === "error" ? <StatusPill tone="danger" label="Couldn't save — retrying" />
@@ -868,7 +889,7 @@ export default function ConsultPage() {
         {!online && (
           <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
             <Icon name="sync" size={16} />
-            <span>You&apos;re offline. The note is saved on this device and will never silently overwrite server data; it is compared with the server copy when you reconnect.</span>
+            <span>You&apos;re offline. The note is saved on this device and will never silently overwrite server data; it is compared with the server copy when you reconnect. Prescriptions, orders and follow-ups need a connection.</span>
           </div>
         )}
         {shellError && <div className={styles.errorState} role="alert">{shellError}</div>}
@@ -876,6 +897,18 @@ export default function ConsultPage() {
           <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
             <Icon name="info" size={16} />
             <span>{notice} <button type="button" className={p.linkBtn} onClick={() => setNotice(null)}>Dismiss</button></span>
+          </div>
+        )}
+        {orphanText && (
+          <div className={`${p.notice} ${p.noticeWarn}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
+            <Icon name="alert" size={16} />
+            <span>
+              This note was signed in another session, so the text on this device was not saved. Copy anything still needed into an amendment.
+              <ul style={{ margin: "4px 0 0", paddingInlineStart: "18px" }}>
+                {(Object.keys(orphanText) as (keyof NoteFields)[]).filter((k) => orphanText[k].trim() !== "").map((k) => <li key={k}><strong>{k}:</strong> {orphanText[k]}</li>)}
+              </ul>
+              <button type="button" className={p.linkBtn} onClick={() => setOrphanText(null)}>Dismiss</button>
+            </span>
           </div>
         )}
         {conflict && (
