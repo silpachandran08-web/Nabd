@@ -625,4 +625,132 @@ class PrescriptionApiTest extends ApiTestBase {
         assertThat(signed.getBody().get("professionalRegistrationNo")).isEqualTo("KMC 78412");
         assertThat(signed.getBody().get("clinicName")).isNotNull();
     }
+
+    // DOC-035 (written, NOT executed: no Docker/Postgres in the authoring environment).
+    private SeededStaff plainDoctor(SeededTenant tenant, String email, String phone) {
+        UUID role = seedRole(tenant.id(), "Doctor " + email, false, clinicalEditNoApprove(), fullGrant("queue"), fullGrant("patients"));
+        return seedStaff(tenant, role, email, phone, false);
+    }
+
+    @Test
+    void aSetKeepsBrandSigRouteAndQuantityAndApplyingItStillFlagsABrandAllergy() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc35a@a.com", "+919800035001", false);
+        String token = loginAndGetAccessToken(doc);
+        ResponseEntity<Map> created = exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Brand combo", "items", List.of(Map.of("drugName", "Paracetamol", "brandName", "Penicillin-X",
+                        "sigPattern", "1-0-1", "route", "oral", "quantity", 10, "quantityUnit", "tablets")))), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> saved = (Map<?, ?>) ((List<?>) created.getBody().get("items")).get(0);
+        assertThat(saved.get("brandName")).isEqualTo("Penicillin-X");
+        assertThat(saved.get("sigPattern")).isEqualTo("1-0-1");
+        assertThat(saved.get("route")).isEqualTo("oral");
+        assertThat(saved.get("quantityUnit")).isEqualTo("tablets");
+        assertThat(created.getBody().get("scope")).isEqualTo("mine");
+        assertThat(created.getBody().get("lastUsedAt")).isNull();
+
+        String patientId = registerPatient(token, "P35a", "+919999935001");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        String entry = checkIn(token, patientId, doc.id());
+
+        ResponseEntity<Map> applied = exchange("/v1/clinical/prescriptions/" + entry + "/apply-set/" + created.getBody().get("id"),
+                HttpMethod.POST, authed(token), Map.class);
+        assertThat(applied.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> line = (Map<?, ?>) ((List<?>) applied.getBody().get("items")).get(0);
+        assertThat(line.get("brandName")).isEqualTo("Penicillin-X");
+        assertThat(line.get("sigPattern")).isEqualTo("1-0-1");
+        assertThat(line.get("route")).isEqualTo("oral");
+        assertThat(applied.getBody().get("unresolvedWarnings")).isEqualTo(1); // brand allergen flagged on apply, never auto-cleared
+
+        ResponseEntity<List> listed = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class);
+        assertThat(((Map<?, ?>) listed.getBody().get(0)).get("lastUsedAt")).isNotNull();
+    }
+
+    @Test
+    void onlyTheOwnerOrAnApproverMayEditOrDeleteASetAndPrivateSetsAreInvisibleToOthers() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = plainDoctor(tenant, "own35@a.com", "+919800035002");
+        SeededStaff other = plainDoctor(tenant, "oth35@a.com", "+919800035003");
+        UUID approverRole = seedRole(tenant.id(), "Clinical lead", false, fullGrant("clinical"), fullGrant("queue"), fullGrant("patients"));
+        SeededStaff approver = seedStaff(tenant, approverRole, "app35@a.com", "+919800035004", false);
+        String ownerToken = loginAndGetAccessToken(owner);
+        String otherToken = loginAndGetAccessToken(other);
+        String approverToken = loginAndGetAccessToken(approver);
+
+        String setId = (String) exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
+                "name", "Mine", "items", List.of(Map.of("drugName", "Cetirizine")))), Map.class).getBody().get("id");
+
+        // private: invisible to another doctor, and not applicable
+        assertThat(exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(otherToken), List.class).getBody()).isEmpty();
+        // shared: visible with scope shared, but still not editable by a non-owner
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                authedJsonBody(ownerToken, Map.of("scope", "shared")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<?> seen = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(otherToken), List.class).getBody();
+        assertThat(seen).hasSize(1);
+        assertThat(((Map<?, ?>) seen.get(0)).get("scope")).isEqualTo("shared");
+        assertThat(((Map<?, ?>) seen.get(0)).get("canEdit")).isEqualTo(false);
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                authedJsonBody(otherToken, Map.of("name", "Hijack")), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(otherToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        // a clinical:approve holder may edit; the owner may delete; unknown id is 404
+        ResponseEntity<Map> renamed = exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                authedJsonBody(approverToken, Map.of("name", "Renamed", "items", List.of(Map.of("drugName", "Loratadine")))), Map.class);
+        assertThat(renamed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(renamed.getBody().get("name")).isEqualTo("Renamed");
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(ownerToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(ownerToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void aClinicStandardNeedsClinicalApproveAndIsNotEditableByOrdinaryDoctors() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff plain = plainDoctor(tenant, "pl35@a.com", "+919800035005");
+        String plainToken = loginAndGetAccessToken(plain);
+        Map<String, Object> body = Map.of("name", "Std", "scope", "standard", "items", List.of(Map.of("drugName", "Cetirizine")));
+        assertThat(exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(plainToken, body), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        UUID leadRole = seedRole(tenant.id(), "Lead", false, fullGrant("clinical"), fullGrant("queue"), fullGrant("patients"));
+        String leadToken = loginAndGetAccessToken(seedStaff(tenant, leadRole, "ld35@a.com", "+919800035006", false));
+        ResponseEntity<Map> std = exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(leadToken, body), Map.class);
+        assertThat(std.getBody().get("scope")).isEqualTo("standard");
+        assertThat(std.getBody().get("doctorId")).isNull();
+        String id = (String) std.getBody().get("id");
+
+        List<?> seen = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(plainToken), List.class).getBody();
+        assertThat(((Map<?, ?>) seen.get(0)).get("canEdit")).isEqualTo(false);
+        assertThat(exchange("/v1/clinical/rx-sets/" + id, HttpMethod.DELETE, authed(plainToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void anItemMissingFromTheActivePharmacyMasterIsStaleButOnlyWhenThereIsAMasterToCompareWith() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc35s@a.com", "+919800035007", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(token, Map.of("name", "S", "items",
+                List.of(Map.of("drugName", "Cetirizine"), Map.of("drugName", "Withdrawn drug")))), Map.class);
+
+        Map<?, ?> noMaster = (Map<?, ?>) exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class).getBody().get(0);
+        assertThat(noMaster.get("staleCheckAvailable")).isEqualTo(false); // nothing to compare with: unknown, not "fine"
+        assertThat(noMaster.get("staleItemCount")).isEqualTo(0);
+        assertThat(((Map<?, ?>) ((List<?>) noMaster.get("items")).get(0)).get("stale")).isNull();
+
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "INSERT INTO charge_catalogue (tenant_id, code, name, category, base_amount, tax_rate_percent, stock_qty) VALUES (?,?,?,?,?,?,?)",
+                tenant.id(), "PH-CET", "cetirizine", "Pharmacy", 1, 0, 5));
+        Map<?, ?> withMaster = (Map<?, ?>) exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class).getBody().get(0);
+        assertThat(withMaster.get("staleCheckAvailable")).isEqualTo(true);
+        assertThat(withMaster.get("staleItemCount")).isEqualTo(1);
+        List<?> items = (List<?>) withMaster.get("items");
+        assertThat(((Map<?, ?>) items.get(0)).get("stale")).isEqualTo(false);
+        assertThat(((Map<?, ?>) items.get(1)).get("stale")).isEqualTo(true);
+    }
 }

@@ -27,10 +27,12 @@ final class PrescriptionModels {
     }
 
     /** NB-114: a saved prescription set — doctorId null means a clinic default, visible to every doctor. */
-    record FavouriteSetRow(UUID id, UUID doctorId, String name, Instant createdAt) {
+    record FavouriteSetRow(UUID id, UUID doctorId, String name, Instant createdAt, boolean shared, Instant updatedAt,
+                            Instant lastUsedAt, String ownerName) {
     }
 
     record FavouriteSetItemRow(UUID id, String drugName, String dosage, String frequency, String duration,
-                                String instructions, int displayOrder) {
+                                String instructions, int displayOrder, String brandName, String sigPattern, String route,
+                                java.math.BigDecimal quantity, String quantityUnit) {
     }
 }

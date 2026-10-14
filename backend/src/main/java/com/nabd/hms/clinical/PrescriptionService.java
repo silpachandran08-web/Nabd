@@ -6,6 +6,7 @@ import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetItemResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
+import com.nabd.hms.clinical.dto.FavouriteRxSetUpdateRequest;
 import com.nabd.hms.clinical.dto.PrescriptionItemRequest;
 import com.nabd.hms.clinical.dto.PrescriptionItemResponse;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
@@ -188,40 +189,137 @@ public class PrescriptionService {
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 
-    /** NB-114: a doctor's saved combo of drugs — one PATCH from a set drops its items onto the pad,
-     * re-running the exact same allergy/pregnancy/controlled checks as any manually typed item. */
+    /** NB-114 / DOC-035: a doctor's saved combo of drugs. scope "mine" (default) is private, "shared" is visible to the
+     * clinic, "standard" is a clinic standard with no owner and needs clinical:approve. Items keep brand/sig/route/quantity. */
     @Transactional
-    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, FavouriteRxSetRequest req) {
+    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, boolean callerCanApprove, FavouriteRxSetRequest req) {
         tenantContext.set(tenantId);
-        UUID setId = repo.insertSet(tenantId, doctorId, req.name());
+        String scope = req.scope() == null ? "mine" : req.scope();
+        if (req.items().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "empty-set", "Nothing to save", "Add at least one medicine to the set.");
+        }
+        if ("standard".equals(scope) && !callerCanApprove) {
+            throw setForbidden("create a clinic standard");
+        }
+        UUID setId = repo.insertSet(tenantId, "standard".equals(scope) ? null : doctorId, req.name().trim(), "shared".equals(scope));
         repo.insertSetItems(tenantId, setId, req.items());
-        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound));
+        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), doctorId, callerCanApprove,
+                repo.activePharmacyNames(tenantId));
     }
 
     @Transactional
-    public List<FavouriteRxSetResponse> listSets(UUID tenantId, UUID doctorId) {
+    public List<FavouriteRxSetResponse> listSets(UUID tenantId, UUID doctorId, boolean callerCanApprove) {
         tenantContext.set(tenantId);
-        return repo.listSets(tenantId, doctorId).stream().map(s -> toSetResponse(tenantId, s)).toList();
+        java.util.Set<String> master = repo.activePharmacyNames(tenantId);
+        return repo.listSets(tenantId, doctorId).stream().map(s -> toSetResponse(tenantId, s, doctorId, callerCanApprove, master)).toList();
+    }
+
+    /** DOC-035: owner-only edit, or clinical:approve (which is also what a clinic standard needs). */
+    @Transactional
+    public FavouriteRxSetResponse updateSet(UUID tenantId, UUID setId, UUID callerStaffId, boolean callerCanApprove, String ipAddress,
+                                             FavouriteRxSetUpdateRequest req) {
+        tenantContext.set(tenantId);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        requireCanManage(set, callerStaffId, callerCanApprove, "change");
+        if (req.items() != null && req.items().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "empty-set", "Nothing to save", "A set needs at least one medicine; delete it instead.");
+        }
+        String name = req.name() == null || req.name().isBlank() ? set.name() : req.name().trim();
+        UUID owner = set.doctorId();
+        boolean shared = set.shared();
+        if (req.scope() != null) {
+            switch (req.scope()) {
+                case "standard" -> {
+                    if (!callerCanApprove) {
+                        throw setForbidden("make a set a clinic standard");
+                    }
+                    owner = null;
+                    shared = false;
+                }
+                case "shared", "mine" -> {
+                    owner = owner == null ? callerStaffId : owner;
+                    shared = "shared".equals(req.scope());
+                }
+                default -> throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-scope", "Invalid scope", "Scope must be mine, shared or standard.");
+            }
+        }
+        repo.updateSet(tenantId, setId, name, owner, shared);
+        if (req.items() != null) {
+            repo.deleteSetItems(tenantId, setId);
+            repo.insertSetItems(tenantId, setId, req.items());
+        }
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.updated", "rx_set", setId,
+                Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null),
+                Map.of("name", name, "shared", shared, "standard", owner == null, "itemsReplaced", req.items() != null));
+        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), callerStaffId, callerCanApprove,
+                repo.activePharmacyNames(tenantId));
+    }
+
+    @Transactional
+    public void deleteSet(UUID tenantId, UUID setId, UUID callerStaffId, boolean callerCanApprove, String ipAddress) {
+        tenantContext.set(tenantId);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        requireCanManage(set, callerStaffId, callerCanApprove, "delete");
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        repo.deleteSet(tenantId, setId); // items go with it (ON DELETE CASCADE); prescriptions already built from it are unaffected
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.deleted", "rx_set", setId,
+                Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null), null);
     }
 
     @Transactional
     public PrescriptionResponse applySet(UUID tenantId, UUID queueEntryId, UUID setId, UUID callerStaffId,
                                           boolean callerCanApprove, String ipAddress) {
         tenantContext.set(tenantId);
-        repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        if (set.doctorId() != null && !set.shared() && !set.doctorId().equals(callerStaffId)) {
+            throw notFound(); // someone else's private set is not visible, so it does not exist for this caller
+        }
+        // Brand, sig, route and quantity travel with the line: upsert() runs the allergy/pregnancy/controlled checks on
+        // drug AND brand exactly as for hand-typed lines, so a brand that carries an allergen is flagged on apply.
         List<PrescriptionItemRequest> items = repo.findSetItems(tenantId, setId).stream()
                 .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
-                        i.instructions(), null))
+                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
                 .toList();
-        return upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
+        PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
+        repo.markSetUsed(tenantId, setId);
+        return result;
     }
 
-    private FavouriteRxSetResponse toSetResponse(UUID tenantId, FavouriteSetRow s) {
+    private void requireCanManage(FavouriteSetRow set, UUID callerStaffId, boolean callerCanApprove, String verb) {
+        if (!canManage(set, callerStaffId, callerCanApprove)) {
+            throw setForbidden(verb);
+        }
+    }
+
+    private static boolean canManage(FavouriteSetRow set, UUID callerStaffId, boolean callerCanApprove) {
+        return callerCanApprove || (set.doctorId() != null && set.doctorId().equals(callerStaffId));
+    }
+
+    private ApiException setForbidden(String what) {
+        return new ApiException(HttpStatus.FORBIDDEN, "rx-set-owner-only", "Not your set",
+                "Only the doctor who owns this set, or a clinician with prescription approval rights, can " + what + " it.");
+    }
+
+    private FavouriteRxSetResponse toSetResponse(UUID tenantId, FavouriteSetRow s, UUID callerStaffId, boolean callerCanApprove,
+                                                  java.util.Set<String> pharmacyMaster) {
+        boolean checkable = !pharmacyMaster.isEmpty();
         List<FavouriteRxSetItemResponse> items = repo.findSetItems(tenantId, s.id()).stream()
                 .map(i -> new FavouriteRxSetItemResponse(i.drugName(), i.dosage(), i.frequency(), i.duration(),
-                        i.instructions()))
+                        i.instructions(), i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(),
+                        checkable ? isStale(i, pharmacyMaster) : null))
                 .toList();
-        return new FavouriteRxSetResponse(s.id(), s.doctorId(), s.name(), s.createdAt(), items);
+        String scope = s.doctorId() == null ? "standard" : s.doctorId().equals(callerStaffId) ? "mine" : "shared";
+        int stale = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.stale())).count();
+        return new FavouriteRxSetResponse(s.id(), s.doctorId(), s.name(), s.createdAt(), items, scope, s.shared(), s.ownerName(),
+                s.updatedAt(), s.lastUsedAt(), checkable, stale, canManage(s, callerStaffId, callerCanApprove));
+    }
+
+    /** Stale = the tenant has an active pharmacy item master and neither the drug nor the brand text is in it. */
+    static boolean isStale(FavouriteSetItemRow i, java.util.Set<String> master) {
+        String drug = i.drugName() == null ? "" : i.drugName().trim().toLowerCase();
+        String brand = i.brandName() == null ? "" : i.brandName().trim().toLowerCase();
+        return !(master.contains(drug) || (!brand.isEmpty() && master.contains(brand)));
     }
 
     /** Server-side gate: signing re-checks every line against the current allergy register and patient profile and
