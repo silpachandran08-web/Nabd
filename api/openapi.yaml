@@ -2595,7 +2595,10 @@ components:
         edit: { type: boolean, default: false }
         delete: { type: boolean, default: false }
         approve: { type: boolean, default: false }
-        refundDiscount: { type: boolean, default: false }
+        refundDiscount:
+          type: boolean
+          default: false
+          description: On the billing module this also puts the string `billing.discount` in the JWT/session permissions list; POST /v1/billing/checkout/{queueEntryId} and /v1/billing/otc-checkout return 403 (discount-not-permitted) for a non-zero discount without it.
         export: { type: boolean, default: false }
 
     Tenant:
