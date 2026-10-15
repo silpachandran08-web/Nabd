@@ -867,6 +867,26 @@ paths:
         "400": { description: "guardian-required: the patient is still a minor", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /patients/{id}/guardian/review:
+    post:
+      tags: [Patients]
+      summary: Age-18 guardian review outcome "keep proxy" — marks the review done (patient leaves guardian-reviews-due), keeps guardian and consent; audited patient.guardian_review_kept (CGV-002). Revoke is DELETE /patients/{id}/guardian.
+      x-required-permission: patients:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [keep] }
+      responses:
+        "200": { description: "Refreshed patient detail incl. guardianReviewKeptAt", content: { application/json: { schema: { $ref: "#/components/schemas/PatientDetail" } } } }
+        "400": { description: "validation, or guardian-review-not-due (still a minor / no guardian on file)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /patients/{id}/consent/withdraw:
     post:
       tags: [Patients]
@@ -2231,8 +2251,8 @@ components:
       required: [itemIndex, kind, severity, message]
       properties:
         itemIndex: { type: integer, minimum: 0, description: "0-based index into the response's items" }
-        kind: { type: string, enum: [allergy] }
-        severity: { type: string, enum: [mild, moderate, severe] }
+        kind: { type: string, enum: [allergy, pregnancy, controlled], description: "pregnancy also covers lactation. Each kind that requires a decision uses the same items[].overrides[] reason flow and is audited with warningKind (DOC-032)." }
+        severity: { type: string, enum: [mild, moderate, severe, caution], description: "mild|moderate|severe for allergies; caution for pregnancy/controlled (severe when raised by a recorded pregnant/lactating status)" }
         message: { type: string }
     PrescriptionItem:
       type: object
@@ -2381,8 +2401,8 @@ components:
           type: array
           description: >-
             DOC-031. Flat structured allergy matches across all lines (same check as items[].warnings and the legacy
-            allergyWarning strings, which are kept). Recomputed on every read. Pregnancy and controlled-substance
-            warnings are not included here (they have no mild/moderate/severe severity); read them from items[].warnings.
+            allergyWarning strings, which are kept). Recomputed on every read. Pregnancy/lactation and controlled-substance
+            warnings (DOC-032) are included too, with severity "caution"; the decision state (requiresDecision, resolved, reasonOptions, decision) is on items[].warnings.
             A severe match still blocks signing (409 warning-unresolved) until an override reason is recorded.
           items: { $ref: "#/components/schemas/PrescriptionWarning" }
         allergySnapshot:
@@ -2682,6 +2702,7 @@ components:
             activePackages: { type: integer }
             outstandingBalance: { type: number }
             lastVisitAt: { type: [string, "null"], format: date-time }
+            guardianReviewKeptAt: { type: [string, "null"], format: date-time, description: "CGV-002: when staff chose keep-proxy at the age-18 review; cleared if the guardian changes" }
 
     PatientRegistryRow:
       type: object

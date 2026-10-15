@@ -481,9 +481,7 @@ public class PrescriptionService {
                         }
                     }
                     for (RxWarningResponse w : warnings) {
-                        if (RxSafetyChecks.KIND_ALLERGY.equals(w.kind())) {
-                            flat.add(new PrescriptionWarningResponse(itemNo[0], w.kind(), w.severity(), w.message()));
-                        }
+                        flat.add(new PrescriptionWarningResponse(itemNo[0], w.kind(), w.severity(), w.message()));
                     }
                     itemNo[0]++;
                     return new PrescriptionItemResponse(i.id(), i.drugName(), i.dosage(), i.frequency(), i.duration(),
