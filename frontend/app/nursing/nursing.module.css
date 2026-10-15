@@ -426,6 +426,14 @@
   column-gap: var(--nb-space-12);
 }
 
+.vitalsPatient { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--nb-space-8); margin-bottom: var(--nb-space-12); }
+.vitalsLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--nb-space-16); align-items: start; }
+.prevPanel { min-width: 0; border-inline-start: 1px solid var(--nb-border-subtle, currentColor); padding-inline-start: var(--nb-space-16); }
+.prevTitle { margin: 0 0 var(--nb-space-8); font-size: 14px; font-weight: 600; }
+.prevScroll { overflow-x: auto; }
+.prevTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.prevTable th, .prevTable td { text-align: start; padding: var(--nb-space-4) var(--nb-space-8); white-space: nowrap; }
+@media (max-width: 1023px) { .vitalsLayout { grid-template-columns: 1fr; } .prevPanel { border-inline-start: 0; padding-inline-start: 0; } }
 .unitInput { position: relative; }
 .unitInput .input { padding-inline-end: 52px; }
 .unit {
