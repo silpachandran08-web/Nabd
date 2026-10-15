@@ -130,7 +130,7 @@ class PharmacyRepository {
     List<DispensingQueueRow> listDispensingQueue(UUID tenantId) {
         return jdbc.query(
                 "SELECT pr.id AS prescription_id, pr.queue_entry_id, pr.patient_id, p.name AS patient_name, " +
-                        "s.name AS doctor_name, pr.signed_at " +
+                        "s.name AS doctor_name, pr.signed_at, q.token_number " +
                         "FROM prescriptions pr " +
                         "JOIN patients p ON p.id = pr.patient_id " +
                         "JOIN staff s ON s.id = pr.doctor_id " +
@@ -139,16 +139,21 @@ class PharmacyRepository {
                         "ORDER BY pr.signed_at",
                 (rs, i) -> new DispensingQueueRow(UUID.fromString(rs.getString("prescription_id")),
                         UUID.fromString(rs.getString("queue_entry_id")), UUID.fromString(rs.getString("patient_id")),
-                        rs.getString("patient_name"), rs.getString("doctor_name"), rs.getTimestamp("signed_at").toInstant()),
+                        rs.getString("patient_name"), rs.getString("doctor_name"), rs.getTimestamp("signed_at").toInstant(), rs.getInt("token_number")),
                 tenantId);
     }
 
     List<DispensingItemRow> listDispensingItems(UUID tenantId, UUID prescriptionId) {
         return jdbc.query(
-                "SELECT drug_name, dosage, frequency, duration, instructions FROM prescription_items " +
-                        "WHERE tenant_id = ? AND prescription_id = ? ORDER BY display_order",
+                // PHA-003: prescription items carry no catalogue link, so stock is matched on the drug name
+                // (exact, case-insensitive) against a stocked catalogue item; null = not stock-tracked / no match.
+                "SELECT pi.drug_name, pi.dosage, pi.frequency, pi.duration, pi.instructions, " +
+                        "(SELECT c.stock_qty FROM charge_catalogue c WHERE c.tenant_id = pi.tenant_id AND c.stock_qty IS NOT NULL " +
+                        "AND c.active = true AND lower(btrim(c.name)) = lower(btrim(pi.drug_name)) ORDER BY c.code LIMIT 1) AS stock_qty " +
+                        "FROM prescription_items pi WHERE pi.tenant_id = ? AND pi.prescription_id = ? ORDER BY pi.display_order",
                 (rs, i) -> new DispensingItemRow(rs.getString("drug_name"), rs.getString("dosage"),
-                        rs.getString("frequency"), rs.getString("duration"), rs.getString("instructions")),
+                        rs.getString("frequency"), rs.getString("duration"), rs.getString("instructions"),
+                        (Integer) rs.getObject("stock_qty")),
                 tenantId, prescriptionId);
     }
 

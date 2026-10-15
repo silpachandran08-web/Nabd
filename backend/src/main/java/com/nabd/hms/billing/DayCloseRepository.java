@@ -31,11 +31,11 @@ class DayCloseRepository {
 
     DayCloseSummaryResponse.Totals totals(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return jdbc.queryForObject("""
-                SELECT (SELECT COALESCE(SUM(total), 0) FROM invoices WHERE tenant_id = ? AND created_at >= ? AND created_at < ?) AS billed,
-                       (SELECT count(*) FROM invoices WHERE tenant_id = ? AND created_at >= ? AND created_at < ?) AS bills,
+                SELECT (SELECT COALESCE(SUM(total), 0) FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?) AS billed,
+                       (SELECT count(*) FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?) AS bills,
                        (SELECT COALESCE(SUM(amount), 0) FROM invoice_payments WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ?) AS collected,
                        (SELECT count(*) FROM invoice_payments WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ?) AS payments,
-                       (SELECT COALESCE(SUM(tax), 0) FROM invoices WHERE tenant_id = ? AND created_at >= ? AND created_at < ?) AS tax
+                       (SELECT COALESCE(SUM(tax), 0) FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?) AS tax
                 """, (rs, i) -> new DayCloseSummaryResponse.Totals(rs.getBigDecimal("billed"), rs.getInt("bills"),
                         rs.getBigDecimal("collected"), rs.getInt("payments"), rs.getBigDecimal("tax")),
                 tenantId, ts(dayStart), ts(dayEnd), tenantId, ts(dayStart), ts(dayEnd), tenantId, ts(dayStart), ts(dayEnd),

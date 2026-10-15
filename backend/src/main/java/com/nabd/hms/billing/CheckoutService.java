@@ -11,7 +11,9 @@ import com.nabd.hms.billing.dto.OtcChargesResponse;
 import com.nabd.hms.billing.dto.PaymentRequest;
 import com.nabd.hms.billing.dto.PaymentResponse;
 import com.nabd.hms.billing.dto.PrescribedItemResponse;
+import com.nabd.hms.billing.dto.VoidInvoiceRequest;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.department.DepartmentService;
 import com.nabd.hms.queue.QueueService;
@@ -61,9 +63,12 @@ public class CheckoutService {
     private final ClinicClock clock;
 
     private final DayCloseService dayClose;
+    private final AuditService auditService;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
-                     DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose) {
+                     DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose,
+                     AuditService auditService) {
+        this.auditService = auditService;
         this.dayClose = dayClose;
         this.clock = clock;
         this.repo = repo;
@@ -246,6 +251,40 @@ public class CheckoutService {
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }
 
+    /**
+     * PHA-011: voids an invoice that has taken no money and puts its pharmacy stock back, in one transaction
+     * with an immutable 'restock' movement per item and an audit event. An invoice with payments is a refund /
+     * credit-note case (no such flow exists yet), so it is refused rather than silently voided.
+     */
+    @Transactional
+    public InvoiceResponse voidInvoice(UUID tenantId, UUID invoiceId, UUID staffId, String ipAddress, VoidInvoiceRequest req) {
+        tenantContext.set(tenantId);
+        dayClose.requireTodayOpen(tenantId);
+        var inv = repo.lockInvoiceForVoid(tenantId, invoiceId).orElseThrow(this::notFound);
+        if ("void".equals(inv.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "invoice-already-void", "Invoice already void", "This invoice has already been voided.");
+        }
+        if (inv.paid().signum() > 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "invoice-has-payments", "Invoice has payments",
+                    "Payments were taken on this invoice, so it can't be voided. Refund the payments first.");
+        }
+        String reason = req.reason().trim();
+        if (reason.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required", "A reason is required to void an invoice.");
+        }
+        List<Object[]> restored = repo.restockInvoiceLines(tenantId, invoiceId, staffId, "Invoice " + inv.invoiceNumber() + " voided: " + reason);
+        repo.markInvoiceVoid(tenantId, invoiceId, staffId, reason);
+        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        java.util.Map<String, Object> after = new java.util.LinkedHashMap<>();
+        after.put("status", "void");
+        after.put("invoiceNumber", inv.invoiceNumber());
+        after.put("reason", reason);
+        after.put("restocked", restored.stream().map(r -> java.util.Map.of("code", r[0], "quantity", r[1])).toList());
+        auditService.record(tenantId, "staff", staffId, actor[0], actor[1], ipAddress, "billing.invoice_voided", "invoice",
+                invoiceId, java.util.Map.of("status", inv.status()), after);
+        return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
+    }
+
     @Transactional
     public InvoiceResponse getInvoice(UUID tenantId, UUID invoiceId) {
         tenantContext.set(tenantId);
@@ -271,7 +310,7 @@ public class CheckoutService {
     }
 
     private ChargeResponse toChargeResponse(ChargeRow c) {
-        return new ChargeResponse(c.id(), c.code(), c.name(), c.category(), c.baseAmount(), c.followUpAmount(), c.taxRatePercent());
+        return new ChargeResponse(c.id(), c.code(), c.name(), c.category(), c.baseAmount(), c.followUpAmount(), c.taxRatePercent(), c.stockQty());
     }
 
     /**

@@ -28,6 +28,7 @@ tags:
   - name: Audit
   - name: Clinical
   - name: Pharmacy
+  - name: Billing
   - name: Nursing
   - name: Reports
   - name: Platform
@@ -1713,6 +1714,33 @@ paths:
       x-required-permission: pharmacy:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DispensingQueueEntry" } } } } }
+  /billing/otc-charges:
+    get:
+      tags: [Billing]
+      summary: Chargeable catalogue for counter sales. Each charge carries `stockQty` (PHA-011).
+      x-required-permission: billing:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { currency: { type: string }, charges: { type: array, items: { $ref: "#/components/schemas/BillingCharge" } } } } } } }
+  /billing/invoices/{id}/void:
+    post:
+      tags: [Billing]
+      summary: >
+        Void an invoice that has taken no payment and restore its pharmacy stock (PHA-011). One transaction: invoice
+        status becomes `void`, one immutable `restock` stock movement per stocked item, audit event `billing.invoice_voided`.
+        Needs billing:edit and the `billing.discount` (refund/discount) grant, else 403 void-not-permitted.
+        400 reason-required; 409 invoice-already-void; 409 invoice-has-payments (refund flow does not exist yet); 409 day-closed.
+        Over-selling is rejected at checkout / otc-checkout with 400 insufficient-stock (unchanged, covered by tests).
+      x-required-permission: billing:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 1 } } } } }
+      responses:
+        "200": { description: The voided invoice (status `void`), content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Conflict }
   /pharmacy/items/{id}/stock-adjustments:
     post:
       tags: [Pharmacy]
@@ -2268,6 +2296,19 @@ components:
         price: { type: number, minimum: 0 }
         taxRatePercent: { type: [number, "null"], minimum: 0, description: Defaults to 0 }
         stockQty: { type: [integer, "null"], minimum: 0, description: Opening stock on POST; ignored on PATCH }
+    BillingCharge:
+      type: object
+      description: Row of the checkout / OTC charge lists (ChargeResponse).
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        baseAmount: { type: number }
+        followUpAmount: { type: [number, "null"] }
+        taxRatePercent: { type: number }
+        stockQty: { type: [integer, "null"], description: "Units on hand; null when the item is not stock-tracked. PHA-011." }
+
     DispensingQueueEntry:
       type: object
       properties:
@@ -2277,11 +2318,15 @@ components:
         patientName: { type: string }
         doctorName: { type: string }
         signedAt: { type: string, format: date-time }
+        token: { type: integer, description: "The visit's queue token number (same value as QueueEntry.tokenNumber). PHA-003." }
         items:
           type: array
           items:
             type: object
             properties:
+              stockQty:
+                type: [integer, "null"]
+                description: "Current stock of the active pharmacy item whose name equals drugName (case-insensitive); null when no stocked item matches. Prescription items carry no catalogue link, so this is a name match. PHA-003."
               drugName: { type: string }
               dosage: { type: [string, "null"] }
               frequency: { type: [string, "null"] }
@@ -2346,7 +2391,7 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [adjustment, dispense] }
+        kind: { type: string, enum: [adjustment, dispense, restock] }
         delta: { type: integer }
         qtyBefore: { type: integer }
         qtyAfter: { type: integer }
