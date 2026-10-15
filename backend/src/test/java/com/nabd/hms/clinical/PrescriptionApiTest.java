@@ -162,6 +162,60 @@ class PrescriptionApiTest extends ApiTestBase {
     }
 
     @Test
+    void theResponseCarriesAFlatStructuredAllergyWarningsArrayAndSevereStillBlocksUntilOverridden() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc5e@a.com", "+919800020015", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P2e", "+919999960015");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Sulfa", "severity", "moderate", "reaction", "rash")), Map.class);
+        String queueEntryId = checkIn(token, patientId, doc.id());
+        String path = "/v1/clinical/prescriptions/" + queueEntryId;
+
+        ResponseEntity<Map> saved = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol"), Map.of("drugName", "Sulfamethoxazole"),
+                        Map.of("drugName", "Penicillin-VK")))), Map.class);
+        assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<?> warnings = (List<?>) saved.getBody().get("warnings");
+        assertThat(warnings).hasSize(2);
+        Map<?, ?> moderate = (Map<?, ?>) warnings.get(0);
+        assertThat(moderate.get("itemIndex")).isEqualTo(1);
+        assertThat(moderate.get("kind")).isEqualTo("allergy");
+        assertThat(moderate.get("severity")).isEqualTo("moderate");
+        Map<?, ?> severe = (Map<?, ?>) warnings.get(1);
+        assertThat(severe.get("itemIndex")).isEqualTo(2);
+        assertThat(severe.get("severity")).isEqualTo("severe");
+        // legacy string is kept and says the same thing
+        Map<?, ?> line = (Map<?, ?>) ((List<?>) saved.getBody().get("items")).get(2);
+        assertThat(line.get("allergyWarning")).isEqualTo(severe.get("message"));
+
+        // the same array is on a plain GET
+        ResponseEntity<Map> got = exchange(path, HttpMethod.GET, authed(token), Map.class);
+        assertThat((List<?>) got.getBody().get("warnings")).hasSize(2);
+
+        // severe still blocks signing without an override reason
+        ResponseEntity<Map> refused = exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(refused.getBody().get("type")).asString().contains("warning-unresolved");
+
+        // with the override reason: signs, warning stays visible, and the decision is audited
+        exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol"), Map.of("drugName", "Sulfamethoxazole"),
+                        Map.of("drugName", "Penicillin-VK", "overrides",
+                                List.of(Map.of("kind", "allergy", "reasonCode", "direct_supervision")))))), Map.class);
+        ResponseEntity<Map> signed = exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat((List<?>) signed.getBody().get("warnings")).hasSize(2);
+        Long audited = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'prescription.allergy_override'",
+                Long.class, tenant.id()));
+        assertThat(audited).isEqualTo(1L);
+    }
+
+    @Test
     void previousMedicinesOnlyReturnsSignedPrescriptions() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
