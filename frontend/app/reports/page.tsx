@@ -149,10 +149,10 @@ export default function ReportsPage() {
       setClinicName(getIdentity()?.tenantName ?? "");
       setRegion(getIdentity()?.tenantRegion);
       if (sourcesRes?.ok) {
-        // Today a bare array; the contract adds untaggedCount at the root, so accept { rows, untaggedCount } too.
+        // Bare array; untaggedCount is repeated on every row (report-wide), so read the first. { rows, untaggedCount } also accepted.
         const body = await sourcesRes.json();
         setSources(Array.isArray(body) ? body : (body?.rows ?? body?.items ?? []));
-        setUntagged(Array.isArray(body) ? 0 : Number(body?.untaggedCount) || 0);
+        setUntagged(Number((Array.isArray(body) ? body[0] : body)?.untaggedCount) || 0);
       }
       if (staffRes?.ok) setStaffPerf(await staffRes.json());
       if (retentionRes?.ok) setRetention(await retentionRes.json());

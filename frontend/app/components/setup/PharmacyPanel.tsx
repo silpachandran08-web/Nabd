@@ -17,7 +17,7 @@ export type PharmacyMode = "external" | "hybrid" | "in_house";
 type PharmacySettings = { mode: PharmacyMode };
 type PharmacyItem = { id: string; code: string; name: string; isRx: boolean; hsnCode: string | null; price: number; taxRatePercent: number; stockQty: number; active: boolean };
 type DispensingQueueEntry = {
-  prescriptionId: string; queueEntryId: string; token?: string | null; patientName: string; doctorName: string; signedAt: string;
+  prescriptionId: string; queueEntryId: string; token?: string | number | null; patientName: string; doctorName: string; signedAt: string;
   items: { stockQty?: number | null; drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null }[];
 };
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;

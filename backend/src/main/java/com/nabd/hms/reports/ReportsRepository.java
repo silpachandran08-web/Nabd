@@ -35,7 +35,7 @@ class ReportsRepository {
     // Postgres's SESSION timezone, not necessarily UTC, and silently drifted "today" by a day.
     BigDecimal billedOn(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return nz(jdbc.queryForObject("SELECT COALESCE(SUM(total), 0) FROM invoices " +
-                        "WHERE tenant_id = ? AND created_at >= ? AND created_at < ?",
+                        "WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?",
                 BigDecimal.class, tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd)));
     }
 
@@ -141,7 +141,7 @@ class ReportsRepository {
     }
 
     int invoiceCountOn(UUID tenantId, Instant dayStart, Instant dayEnd) {
-        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM invoices WHERE tenant_id = ? AND created_at >= ? AND created_at < ?",
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?",
                 Integer.class, tenantId, Timestamp.from(dayStart), Timestamp.from(dayEnd));
         return n == null ? 0 : n;
     }
@@ -154,7 +154,7 @@ class ReportsRepository {
 
     // NB-230/NB-079: single-axis source, straight off queue_entries.source. OWN-024: revenue = invoice totals.
     List<SourceCount> sourceBreakdown(UUID tenantId, LocalDate from, LocalDate to) {
-        return jdbc.query("SELECT q.source, COUNT(*) AS visit_count, COALESCE(SUM(i.total), 0) AS revenue " +
+        return jdbc.query("SELECT q.source, COUNT(*) AS visit_count, COALESCE(SUM(CASE WHEN i.status <> 'void' THEN i.total END), 0) AS revenue " +
                         "FROM queue_entries q LEFT JOIN invoices i ON i.queue_entry_id = q.id " +
                         "WHERE q.tenant_id = ? AND q.queue_date BETWEEN ? AND ? GROUP BY q.source ORDER BY visit_count DESC",
                 (rs, i) -> new SourceCount(rs.getString("source"), rs.getLong("visit_count"), rs.getBigDecimal("revenue")),
@@ -180,7 +180,7 @@ class ReportsRepository {
                   WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ? GROUP BY recorded_by),
                 disc AS (
                   SELECT created_by AS sid, COUNT(*) AS dc FROM invoices
-                  WHERE tenant_id = ? AND created_at >= ? AND created_at < ? AND discount > 0 GROUP BY created_by),
+                  WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ? AND discount > 0 GROUP BY created_by),
                 ovr AS (
                   SELECT actor_id AS sid, COUNT(*) AS oc FROM audit_log
                   WHERE tenant_id = ? AND actor_type = 'staff' AND created_at >= ? AND created_at < ?
@@ -211,7 +211,7 @@ class ReportsRepository {
     // ── Reports → Today's money, over [start, end) on the clinic's clock ──
 
     BigDecimal taxBilledBetween(UUID tenantId, Instant start, Instant end) {
-        return nz(jdbc.queryForObject("SELECT COALESCE(SUM(tax), 0) FROM invoices WHERE tenant_id = ? AND created_at >= ? AND created_at < ?",
+        return nz(jdbc.queryForObject("SELECT COALESCE(SUM(tax), 0) FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?",
                 BigDecimal.class, tenantId, Timestamp.from(start), Timestamp.from(end)));
     }
 
@@ -245,7 +245,7 @@ class ReportsRepository {
         return jdbc.query("""
                 SELECT li.charge_name, SUM(li.line_total) AS revenue
                 FROM invoice_line_items li JOIN invoices i ON i.id = li.invoice_id
-                WHERE i.tenant_id = ? AND i.created_at >= ? AND i.created_at < ?
+                WHERE i.tenant_id = ? AND i.status <> 'void' AND i.created_at >= ? AND i.created_at < ?
                 GROUP BY li.charge_name ORDER BY SUM(li.line_total) DESC, li.charge_name LIMIT ?
                 """, (rs, i) -> new MoneyResponse.Service(rs.getString("charge_name"), rs.getBigDecimal("revenue")),
                 tenantId, Timestamp.from(start), Timestamp.from(end), limit);
