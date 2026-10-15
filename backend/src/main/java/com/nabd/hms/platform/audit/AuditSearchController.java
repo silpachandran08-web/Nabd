@@ -15,8 +15,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.audit.AuditSearchModels.AuditFilter;
@@ -64,10 +62,12 @@ public class AuditSearchController {
                                          @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
         String csv = service.exportCsv(new AuditFilter(tenantId, action, entityType, createdAfter, createdBefore,
                 actorId, actorType, actorRole, actorName), UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
+        // Cross-tenant export: there is no single clinic zone, so the filename carries the UTC date, labelled as such.
+        String utcDate = Instant.now().toString().substring(0, 10);
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf("text/csv"))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"audit-log-" + LocalDate.now(ZoneOffset.UTC) + ".csv\"")
+                        "attachment; filename=\"audit-log-" + utcDate + "-utc.csv\"")
                 .body(csv);
     }
 }
