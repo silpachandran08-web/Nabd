@@ -270,6 +270,10 @@ public class PatientService {
         if (req.has("dob")) changes.put("dob", java.sql.Date.valueOf(req.dob()));
         if (req.has("gender")) changes.put("gender", req.gender());
         if (req.has("guardianId")) changes.put("guardian_id", req.guardianId());
+        if (!Objects.equals(before.guardianId(), guardianId)) {
+            changes.put("guardian_review_kept_at", null); // CGV-002: a different guardian needs a fresh review
+            changes.put("guardian_review_kept_by", null);
+        }
         if (req.has("address")) changes.put("address", req.address());
         if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(req.nationalId()));
         repo.update(tenantId, id, changes);
@@ -336,6 +340,27 @@ public class PatientService {
         repo.update(tenantId, id, java.util.Collections.singletonMap("guardian_id", null));
         changeGuardian(tenantId, callerStaffId, id, before.guardianId(), null);
         log.info("guardian revoked for patient {} by {} (tenant {})", id, callerStaffId, tenantId);
+    }
+
+    /** CGV-002: staff decide to keep the guardian as proxy after the patient turned 18. Stamps the review done (the
+     * patient leaves the due worklist) and audits it; guardian_id and the guardian_access consent are untouched.
+     * Revoke is the separate DELETE /guardian. Only valid for an adult who still has a guardian on file. */
+    @Transactional
+    public PatientDetailResponse keepGuardian(UUID tenantId, UUID callerStaffId, UUID id) {
+        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        tenantContext.set(tenantId);
+        PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
+                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+        if (before.guardianId() == null || isMinor(before.dob(), clock.today(tenantId))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-review-not-due", "No guardian review due",
+                    "Only an adult patient who still has a guardian on file has a guardian review.");
+        }
+        java.util.Map<String, Object> changes = new java.util.LinkedHashMap<>();
+        changes.put("guardian_review_kept_at", java.sql.Timestamp.from(java.time.Instant.now()));
+        changes.put("guardian_review_kept_by", callerStaffId);
+        repo.update(tenantId, id, changes);
+        audit(tenantId, callerStaffId, "patient.guardian_review_kept", id, null, Map.of("guardianId", before.guardianId().toString()));
+        return get(tenantId, callerStaffId, id);
     }
 
     /** NB-082: patients who've turned 18 but still have a guardian on file — the "automatic" part
@@ -480,7 +505,8 @@ public class PatientService {
                 : repo.findActiveConsentGrantedAt(tenantId, row.id(), GUARDIAN_ACCESS).orElse(null);
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
                 row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt, isMinor(row.dob(), clock.today(row.tenantId())),
-                row.guardianId(), guardianName, guardianConsentGrantedAt);
+                row.guardianId(), guardianName, guardianConsentGrantedAt,
+                row.guardianId() == null ? null : repo.findGuardianReviewKeptAt(tenantId, row.id()).orElse(null));
     }
 
     private ApiException notFound() {

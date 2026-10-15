@@ -282,9 +282,14 @@ class PatientRepository {
      * review task is this computed worklist, not a background job (none exists yet, NB-308). */
     List<PatientRow> findGuardianReviewsDue(UUID tenantId) {
         return jdbc.query("SELECT " + COLUMNS + "FROM patients WHERE tenant_id = ? AND status = 'active' " +
-                        "AND guardian_id IS NOT NULL AND dob <= ?::date - INTERVAL '18 years' " +
+                        "AND guardian_id IS NOT NULL AND guardian_review_kept_at IS NULL AND dob <= ?::date - INTERVAL '18 years' " +
                         "ORDER BY dob",
                 patientMapper(), tenantId, java.sql.Date.valueOf(clock.today(tenantId)));
+    }
+
+    Optional<java.time.Instant> findGuardianReviewKeptAt(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT guardian_review_kept_at FROM patients WHERE tenant_id = ? AND id = ? AND guardian_review_kept_at IS NOT NULL",
+                (rs, i) -> rs.getTimestamp(1).toInstant(), tenantId, id).stream().findFirst();
     }
 
     /** NB-085: audit_log's actor_name/actor_role snapshot — same per-module pattern as Dental. */

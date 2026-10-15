@@ -23,5 +23,6 @@ public record PatientDetailResponse(UUID id, String mrn, String name, String pho
                                      String gender, String status, List<String> allergies,
                                      List<String> chronicConditions, int activePackages,
                                      Double outstandingBalance, Instant lastVisitAt, boolean isMinor,
-                                     UUID guardianId, String guardianName, Instant guardianConsentGrantedAt) {
+                                     UUID guardianId, String guardianName, Instant guardianConsentGrantedAt,
+                                     Instant guardianReviewKeptAt) {
 }

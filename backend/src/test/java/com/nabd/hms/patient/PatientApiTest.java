@@ -1,5 +1,6 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
@@ -602,6 +603,66 @@ class PatientApiTest extends ApiTestBase {
 
         ResponseEntity<Map> resp = exchange("/v1/patients/guardian-reviews-due", HttpMethod.GET, authed(token), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    // CGV-002: keep-proxy outcome removes the patient from the worklist, keeps guardian + consent, and is audited.
+    @Test
+    void keepingTheProxyAtTheAge18ReviewClearsTheWorklistRowAndIsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam-keep@a.com", "+919300000041", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatient(token, "Guardian K", "+919888800041");
+        String dob = java.time.LocalDate.now().minusYears(19).toString();
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Keep Me", "phone", "+919888800042", "dob", dob, "gender", "female", "guardianId", guardianId)), Map.class);
+        String patientId = (String) created.getBody().get("id");
+
+        ResponseEntity<Map> bad = exchange("/v1/patients/" + patientId + "/guardian/review", HttpMethod.POST,
+                authedJsonBody(token, Map.of("decision", "revoke")), Map.class);
+        assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<Map> kept = exchange("/v1/patients/" + patientId + "/guardian/review", HttpMethod.POST,
+                authedJsonBody(token, Map.of("decision", "keep")), Map.class);
+        assertThat(kept.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(kept.getBody().get("guardianId")).isEqualTo(guardianId);
+        assertThat(kept.getBody().get("guardianReviewKeptAt")).isNotNull();
+        assertThat(kept.getBody().get("guardianConsentGrantedAt")).isNotNull();
+
+        ResponseEntity<List> due = exchange("/v1/patients/guardian-reviews-due", HttpMethod.GET, authed(token), List.class);
+        assertThat(due.getBody()).noneMatch(r -> patientId.equals(((Map<?, ?>) r).get("patientId")));
+        Long auditCount = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_id = ? AND action = 'patient.guardian_review_kept'",
+                Long.class, UUID.fromString(patientId)));
+        assertThat(auditCount).isEqualTo(1);
+
+        // a minor has no review due
+        String minorId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Little", "phone", "+919888800043", "dob", java.time.LocalDate.now().minusYears(5).toString(),
+                "gender", "male", "guardianId", guardianId)), Map.class).getBody().get("id");
+        assertThat(exchange("/v1/patients/" + minorId + "/guardian/review", HttpMethod.POST,
+                authedJsonBody(token, Map.of("decision", "keep")), Map.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void keepProxyNeedsPatientsEditAndRevokeAfterKeepStillWorks() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam-keep2@a.com", "+919300000044", false);
+        String token = loginAndGetAccessToken(staff);
+        UUID viewRole = seedRole(tenant.id(), "ViewOnlyPat", false, new ModuleGrant("patients", true, false, false, false, false, false, false));
+        SeededStaff viewer = seedStaff(tenant, viewRole, "fam-view@a.com", "+919300000045", false);
+        String viewToken = loginAndGetAccessToken(viewer);
+        String guardianId = registerPatient(token, "Guardian V", "+919888800044");
+        String patientId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Adult V", "phone", "+919888800045", "dob", java.time.LocalDate.now().minusYears(20).toString(),
+                "gender", "male", "guardianId", guardianId)), Map.class).getBody().get("id");
+
+        assertThat(exchange("/v1/patients/" + patientId + "/guardian/review", HttpMethod.POST,
+                authedJsonBody(viewToken, Map.of("decision", "keep")), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        exchange("/v1/patients/" + patientId + "/guardian/review", HttpMethod.POST, authedJsonBody(token, Map.of("decision", "keep")), Map.class);
+        assertThat(exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Void.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
 
     // ---- helpers ----
