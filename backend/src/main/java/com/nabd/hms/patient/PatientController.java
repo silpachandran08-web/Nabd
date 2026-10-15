@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -87,6 +88,13 @@ public class PatientController {
     public PatientResponse patch(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                   @Valid @RequestBody PatientPatchRequest req) {
         return service.patch(tenantId(jwt), staffId(jwt), id, req);
+    }
+
+    @DeleteMapping("/{id}/guardian")
+    @PreAuthorize("hasAuthority('patients:edit')")
+    public ResponseEntity<Void> revokeGuardian(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        service.revokeGuardian(tenantId(jwt), staffId(jwt), id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/merge")

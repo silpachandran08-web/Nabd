@@ -320,6 +320,24 @@ public class PatientService {
         };
     }
 
+    /** CGV-001: dedicated guardian revoke. Touches ONLY guardian_id and the guardian_access consent, so the
+     * address / national ID can never be wiped by it. Idempotent: no guardian on file is a no-op 204. A minor
+     * still needs a guardian (same rule as PATCH), so revoking one is rejected with guardian-required. */
+    @Transactional
+    public void revokeGuardian(UUID tenantId, UUID callerStaffId, UUID id) {
+        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        tenantContext.set(tenantId);
+        PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
+                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+        if (before.guardianId() == null) {
+            return;
+        }
+        validateGuardian(tenantId, before.dob(), null);
+        repo.update(tenantId, id, java.util.Collections.singletonMap("guardian_id", null));
+        changeGuardian(tenantId, callerStaffId, id, before.guardianId(), null);
+        log.info("guardian revoked for patient {} by {} (tenant {})", id, callerStaffId, tenantId);
+    }
+
     /** NB-082: patients who've turned 18 but still have a guardian on file — the "automatic" part
      * of the age-18 handover is this always-current computed worklist; staff perform the actual
      * handover with a normal patch() clearing guardianId, which changeGuardian() already audits. */

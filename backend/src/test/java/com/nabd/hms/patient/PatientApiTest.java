@@ -459,6 +459,59 @@ class PatientApiTest extends ApiTestBase {
     }
 
     @Test
+    void deleteGuardianRevokesOnlyGuardianAndKeepsAddressAndNationalId() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam6@a.com", "+919300000025", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatientWithDob(token, "Guardian F", "+919888800031", "1975-05-05");
+        String dob = java.time.LocalDate.now().minusYears(19).toString();
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Revoke Me", "phone", "+919888800032", "dob", dob, "gender", "female", "guardianId", guardianId,
+                "address", "34 Test Lane", "nationalId", "555566667777")), Map.class);
+        UUID patientId = UUID.fromString((String) created.getBody().get("id"));
+
+        ResponseEntity<Void> revoked = exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Void.class);
+        assertThat(revoked.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        Map<String, Object> row = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT address, national_id_enc, guardian_id FROM patients WHERE id = ?", patientId));
+        assertThat(row.get("guardian_id")).isNull();
+        assertThat(row.get("address")).isEqualTo("34 Test Lane");
+        assertThat(new String(cipher.decrypt((byte[]) row.get("national_id_enc")), java.nio.charset.StandardCharsets.UTF_8))
+                .isEqualTo("555566667777");
+        // append-only consents: the grant row stays, a later withdrawn row supersedes it; the API view must show no guardian
+        Map<?, ?> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(detail.get("guardianId")).isNull();
+        assertThat(detail.get("guardianConsentGrantedAt")).isNull();
+        Long revokeAudit = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_id = ? AND action = 'patient.guardian_revoke'", Long.class, patientId));
+        assertThat(revokeAudit).isEqualTo(1);
+
+        // idempotent: nothing left to revoke, still 204, no second audit row
+        assertThat(exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Void.class).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    void deleteGuardianOfMinorIsRejected() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam7@a.com", "+919300000026", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatientWithDob(token, "Guardian G", "+919888800033", "1975-06-06");
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Little One", "phone", "+919888800034", "dob", java.time.LocalDate.now().minusYears(5).toString(),
+                "gender", "male", "guardianId", guardianId)), Map.class);
+        String patientId = (String) created.getBody().get("id");
+
+        ResponseEntity<Map> resp = exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().get("type")).asString().contains("guardian-required");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody().get("guardianId")).isEqualTo(guardianId);
+    }
+
+    @Test
     void partialPatchOfNameLeavesGuardianAddressAndNationalIdUntouched() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());

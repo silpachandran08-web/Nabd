@@ -856,6 +856,17 @@ paths:
         "204": { description: Reversed }
         "404": { description: "Merge doesn't exist, already reversed, or past the 30-day window", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /patients/{id}/guardian:
+    delete:
+      tags: [Patients]
+      summary: Revoke the patient's guardian — clears guardian_id and withdraws guardian_access consent only; address and national ID are untouched (CGV-001)
+      x-required-permission: patients:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Revoked (also returned when no guardian was on file)" }
+        "400": { description: "guardian-required: the patient is still a minor", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /patients/{id}/consent/withdraw:
     post:
       tags: [Patients]
