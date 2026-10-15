@@ -518,19 +518,15 @@ function PatientsList() {
     }
   }
 
-  /** NB-085 / CGV-001: revocation is a partial PATCH carrying ONLY guardianId:null. PATCH leaves every
-   * property it doesn't mention untouched (address, national ID...), so nothing else may be echoed
-   * back — the detail response doesn't carry those fields anyway. PatientService audits the change
-   * and withdraws the guardian_access consent in the same write. */
+  /** NB-085 / CGV-001: dedicated DELETE /patients/{id}/guardian (204). It touches only the guardian link,
+   * so address and national ID can never be wiped; the server audits it and withdraws the
+   * guardian_access consent in the same write. */
   async function revokeGuardian() {
     if (!drawerPatient) return;
     setConfirmBusy(true);
     setConfirmError(null);
     try {
-      const res = await authedFetch(`/patients/${drawerPatient.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ guardianId: null }),
-      });
+      const res = await authedFetch(`/patients/${drawerPatient.id}/guardian`, { method: "DELETE" });
       if (res?.ok) {
         setConfirmGuardian(false);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
