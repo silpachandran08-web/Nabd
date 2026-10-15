@@ -42,8 +42,10 @@ class StaffRepository {
                 "SELECT s.id, s.tenant_id, s.role_id, s.email, s.name, s.mobile_phone, s.status, s.scope, " +
                         "s.email_verified, s.mobile_verified, s.mfa_enabled, s.department_id, " +
                         "s.field_grants, null::timestamptz AS last_seen_at, s.created_at, null::text AS professional_registration_no, " +
+                        // No tenant is set on this bootstrap path, so a roles subquery would hit roles' RLS
+                        // policy with an empty app.tenant_id (uuid cast error). Not needed here: constant.
                         "(s.pin_hash IS NOT NULL) AS has_pin, (s.owner_id IS NOT NULL) AS owner_linked, " +
-                        "COALESCE((SELECT r.mfa_required FROM roles r WHERE r.id = s.role_id), false) AS role_mfa_required " +
+                        "false AS role_mfa_required " +
                         "FROM find_staff_by_invite_token_hash(?) s " +
                         "WHERE s.invite_expires_at > now()",
                 staffMapper(), tokenHash
