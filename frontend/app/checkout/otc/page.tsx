@@ -8,10 +8,11 @@ import { can } from "../../lib/permissions";
 import { getIdentity } from "../../lib/session";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import AccessGate from "../../components/ui/AccessGate";
+import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
 
 // NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
 // /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
-type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number };
+type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
 type OtcContext = { currency: string; charges: Charge[] };
 type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
 type Payment = { id: string; method: string; amount: number; recordedAt: string };
@@ -20,7 +21,7 @@ type Invoice = {
   subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
   balanceDue: number; status: string; lineItems: LineItem[]; payments: Payment[];
 };
-type Problem = { title: string; detail: string };
+type Problem = { type?: string; title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -116,6 +117,7 @@ function OtcCheckoutInner() {
     setItems((prev) => {
       const existing = prev.find((i) => i.chargeCode === charge.code);
       if (existing) {
+        if (charge.stockQty != null && existing.quantity >= charge.stockQty) return prev; // PHA-011: cap at stock
         return prev.map((i) => (i.chargeCode === charge.code ? { ...i, quantity: i.quantity + 1 } : i));
       }
       return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice: charge.baseAmount, taxRatePercent: charge.taxRatePercent }];
@@ -123,6 +125,8 @@ function OtcCheckoutInner() {
   }
 
   function setQty(code: string, qty: number) {
+    const stock = context?.charges.find((c) => c.code === code)?.stockQty;
+    if (stock != null && qty > stock) return; // PHA-011: cap at stock
     if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.chargeCode !== code));
       return;
@@ -155,7 +159,7 @@ function OtcCheckoutInner() {
       if (!res) return;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
-        setCreateError(p.detail || "Couldn't generate the invoice.");
+        setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
         return;
       }
       setInvoice(await res.json());
@@ -282,12 +286,18 @@ function OtcCheckoutInner() {
                 <button key={c} className={category === c ? styles.catTabActive : styles.catTab} onClick={() => setCategory(c)}>{c}</button>
               ))}
             </div>
-            {visibleCharges.map((c) => (
-              <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
-                <span className={styles.chargeName}>{c.name}</span>
-                <span className={styles.chargePrice}>{formatMoney(c.baseAmount, context.currency)}</span>
-              </button>
-            ))}
+            {visibleCharges.map((c) => {
+              const body = (
+                <>
+                  <span className={styles.chargeName}>{c.name} <StockPill qty={c.stockQty} /></span>
+                  <span className={styles.chargePrice}>{formatMoney(c.baseAmount, context.currency)}</span>
+                </>
+              );
+              // PHA-011: a 0-stock item is flagged and not offered (no button at all).
+              return c.stockQty === 0
+                ? <div key={c.id} className={styles.chargeItem} style={{ cursor: "default", opacity: 0.7 }}>{body}</div>
+                : <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>{body}</button>;
+            })}
           </div>
 
           <div className={styles.card}>

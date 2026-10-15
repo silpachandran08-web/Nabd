@@ -5,6 +5,8 @@ import styles from "../../setup/setup.module.css";
 import ph from "./pharmacy.module.css";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
+import StockPill, { LOW_STOCK } from "../ui/StockPill";
+import Link from "next/link";
 import Dialog from "../ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
@@ -15,8 +17,8 @@ export type PharmacyMode = "external" | "hybrid" | "in_house";
 type PharmacySettings = { mode: PharmacyMode };
 type PharmacyItem = { id: string; code: string; name: string; isRx: boolean; hsnCode: string | null; price: number; taxRatePercent: number; stockQty: number; active: boolean };
 type DispensingQueueEntry = {
-  prescriptionId: string; queueEntryId: string; patientName: string; doctorName: string; signedAt: string;
-  items: { drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null }[];
+  prescriptionId: string; queueEntryId: string; token?: string | null; patientName: string; doctorName: string; signedAt: string;
+  items: { stockQty?: number | null; drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null }[];
 };
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 
@@ -35,7 +37,6 @@ const RULES: { label: string; hybrid: boolean; inHouse: boolean }[] = [
   { label: "Controlled-drug register (not yet available)", hybrid: false, inHouse: false },
   { label: "Stock alerts (not yet available)", hybrid: false, inHouse: false },
 ];
-const LOW_STOCK = 8;
 
 async function problemText(res: Response): Promise<string> {
   const p = await res.json().catch(() => null);
@@ -349,7 +350,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
           )}
 
           <h2 className={styles.cardTitle} style={{ marginTop: "var(--nb-space-24)" }}>Dispensing queue</h2>
-          <p className={styles.subtitle}>Signed prescriptions still ahead of checkout. This list is read-only; dispensing happens on that patient&apos;s billing screen.</p>
+          <p className={styles.subtitle}>Signed prescriptions still ahead of checkout. Open a row to dispense on that patient&apos;s billing screen.</p>
           {queueError ? (
             <ErrorState message={queueError} onRetry={load} />
           ) : queue.length === 0 ? (
@@ -357,18 +358,19 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Patient</th><th>Doctor</th><th>Drugs</th><th>Signed at</th></tr></thead>
+                <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Drugs</th><th>Signed at</th></tr></thead>
                 <tbody>
                   {queue.map((q) => (
                     <tr key={q.prescriptionId}>
-                      <td>{q.patientName}</td>
+                      <td>{q.token ?? "—"}</td>
+                      <td><Link href={`/checkout/${q.queueEntryId}`}>{q.patientName}</Link></td>
                       <td>{q.doctorName}</td>
                       <td>
                         {q.items.map((d, n) => {
                           const sub = [d.dosage, d.frequency, d.duration].filter(Boolean).join(" · ");
                           return (
                             <div key={n} style={{ marginBottom: n < q.items.length - 1 ? "var(--nb-space-8)" : 0 }}>
-                              <div>{d.drugName}</div>
+                              <div>{d.drugName} <StockPill qty={d.stockQty} /></div>
                               {sub && <div className={ph.sub}>{sub}</div>}
                               {d.instructions && (
                                 <details className={ph.instr}>
