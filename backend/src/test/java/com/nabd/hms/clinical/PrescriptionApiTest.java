@@ -843,6 +843,7 @@ class PrescriptionApiTest extends ApiTestBase {
     }
 
     // DOC-R3: "no known allergies" and "not assessed" are snapshotted as the distinct statements they are.
+    // Patients in one test need dissimilar names: same DOB + similar name trips the duplicate-registration guard.
     @Test
     void noKnownAllergiesAndNotAssessedAreSnapshottedAsDistinctStatements() {
         SeededTenant tenant = seedTenant();
@@ -850,7 +851,7 @@ class PrescriptionApiTest extends ApiTestBase {
         SeededStaff doc = seedStaff(tenant, roleId, "doc-r3b@a.com", "+919800079002", false);
         String token = loginAndGetAccessToken(doc);
 
-        String notAsked = registerPatient(token, "R3b NA", "+919999979002");
+        String notAsked = registerPatient(token, "Farida Qureshi", "+919999979002");
         String naEntry = checkIn(token, notAsked, doc.id());
         exchange("/v1/clinical/prescriptions/" + naEntry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
                 "items", List.of(Map.of("drugName", "Paracetamol")))), Map.class);
@@ -860,7 +861,7 @@ class PrescriptionApiTest extends ApiTestBase {
         assertThat((List<?>) na.get("allergies")).isEmpty();
         assertThat(na.get("documentedAt")).isNull();
 
-        String nka = registerPatient(token, "R3b NKA", "+919999979003");
+        String nka = registerPatient(token, "Bennett Okafor", "+919999979003");
         assertThat(exchange("/v1/clinical/patients/" + nka + "/allergies/status", HttpMethod.PUT, authed(token), Map.class)
                 .getBody().get("state")).isEqualTo("none_documented");
         String nkaEntry = checkIn(token, nka, doc.id());
@@ -890,7 +891,7 @@ class PrescriptionApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff doc = seedStaff(tenant, roleId, "doc-r3c@a.com", "+919800079003", false);
         String token = loginAndGetAccessToken(doc);
-        String patientId = registerPatient(token, "R3c", "+919999979004");
+        String patientId = registerPatient(token, "Lorna Whitfield", "+919999979004");
         exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
                 authedJsonBody(token, Map.of("substance", "Dust", "severity", "mild")), Map.class);
         String legacyEntry = checkIn(token, patientId, doc.id());
@@ -907,7 +908,7 @@ class PrescriptionApiTest extends ApiTestBase {
         assertThat(legacy.getBody().containsKey("allergySnapshot")).isTrue();
         assertThat(legacy.getBody().get("allergySnapshot")).isNull();
 
-        String draftEntry = checkIn(token, registerPatient(token, "R3c Draft", "+919999979005"), doc.id());
+        String draftEntry = checkIn(token, registerPatient(token, "Dmitri Ivanov", "+919999979005"), doc.id());
         exchange("/v1/clinical/prescriptions/" + draftEntry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
                 "items", List.of(Map.of("drugName", "Paracetamol")))), Map.class);
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
