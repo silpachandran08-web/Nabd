@@ -19,9 +19,10 @@ class PharmacyModels {
 
     /** NB-179: a signed prescription whose visit hasn't reached checkout yet. */
     record DispensingQueueRow(UUID prescriptionId, UUID queueEntryId, UUID patientId, String patientName,
-                               String doctorName, Instant signedAt) {
+                               String doctorName, Instant signedAt, int token) {
     }
 
-    record DispensingItemRow(String drugName, String dosage, String frequency, String duration, String instructions) {
+    record DispensingItemRow(String drugName, String dosage, String frequency, String duration, String instructions,
+                              Integer stockQty) {
     }
 }
