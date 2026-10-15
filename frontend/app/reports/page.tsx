@@ -11,8 +11,10 @@ import { paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
 
 // E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
-type SourceRow = { source: string; visitCount: number };
-type StaffRow = { staffId: string; staffName: string; collected: number; paymentCount: number };
+// OWN-024: revenue / untaggedCount are additive (S3 contract); every new field is optional so an older backend still renders.
+type SourceRow = { source: string; visitCount: number; revenue?: number | null };
+// OWN-025: handledCount / discountCount / overrideCount are additive and optional for the same reason.
+type StaffRow = { staffId: string; staffName: string; collected: number; paymentCount: number; handledCount?: number | null; discountCount?: number | null; overrideCount?: number | null };
 type StaffPerformanceReport = { scopeNote: string; rows: StaffRow[] };
 type Retention = { totalPatients: number; repeatPatients: number; repeatRatePercent: number; avgVisitsPerPatient: number };
 type NoShowRisk = { rule: string; entries: { patientId: string; patientName: string; priorNoShowCount: number }[] };
@@ -43,6 +45,7 @@ type DoctorPunctuality = {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const dash = (n: number | null | undefined) => (typeof n === "number" ? n : "—");
 
 // DESIGN.md owner "Reports": period switch, then seven tabs.
 type Period = "today" | "yesterday" | "week" | "month" | "custom";
@@ -80,6 +83,7 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [sources, setSources] = useState<SourceRow[]>([]);
+  const [untagged, setUntagged] = useState(0);
   const [staffPerf, setStaffPerf] = useState<StaffPerformanceReport | null>(null);
   const [retention, setRetention] = useState<Retention | null>(null);
   const [noShowRisk, setNoShowRisk] = useState<NoShowRisk | null>(null);
@@ -144,7 +148,12 @@ export default function ReportsPage() {
       setMoneyReport(await moneyRes.json());
       setClinicName(getIdentity()?.tenantName ?? "");
       setRegion(getIdentity()?.tenantRegion);
-      if (sourcesRes?.ok) setSources(await sourcesRes.json());
+      if (sourcesRes?.ok) {
+        // Today a bare array; the contract adds untaggedCount at the root, so accept { rows, untaggedCount } too.
+        const body = await sourcesRes.json();
+        setSources(Array.isArray(body) ? body : (body?.rows ?? body?.items ?? []));
+        setUntagged(Array.isArray(body) ? 0 : Number(body?.untaggedCount) || 0);
+      }
       if (staffRes?.ok) setStaffPerf(await staffRes.json());
       if (retentionRes?.ok) setRetention(await retentionRes.json());
       if (riskRes?.ok) setNoShowRisk(await riskRes.json());
@@ -348,18 +357,28 @@ export default function ReportsPage() {
           <h3 className={styles.sectionTitle}>Where patients come from (selected period)</h3>
           {canExport && <button className={styles.exportBtn} onClick={() => exportCsv("sources")}>Export CSV</button>}
         </div>
+        {untagged > 0 && (
+          <div className={styles.infoNote} role="status">
+            ⚠ {untagged} {untagged === 1 ? "visit carries" : "visits carry"} no source tag
+          </div>
+        )}
         {sources.length === 0 ? (
           <div className={styles.muted}>No visits recorded yet.</div>
         ) : (
           <table className={styles.table}>
-            <thead><tr><th>Source</th><th>Visits</th></tr></thead>
+            <thead><tr><th>Source</th><th>Visits</th><th>Revenue{m ? ` (${m.currency})` : ""}</th></tr></thead>
             <tbody>
               {sources.map((s) => (
-                <tr key={s.source}><td>{s.source.replace("_", " ")}</td><td>{s.visitCount}</td></tr>
+                <tr key={s.source}><td>{s.source.replace("_", " ")}</td><td>{s.visitCount}</td>
+                  <td>{typeof s.revenue === "number" ? money(s.revenue) : "—"}</td></tr>
               ))}
             </tbody>
           </table>
         )}
+      </div>
+      <div className={styles.card + " " + styles.section}>
+        <div className={styles.cardLabel}>Promo codes</div>
+        <div className={styles.muted}>Phase 2 — issuing promo codes and tracking the issuer isn&apos;t available yet.</div>
       </div>
 
         </>
@@ -378,14 +397,31 @@ export default function ReportsPage() {
             <div className={styles.muted}>No payments recorded yet.</div>
           ) : (
             <table className={styles.table}>
-              <thead><tr><th>Staff</th><th>Collected</th><th>Payments</th></tr></thead>
+              <thead><tr><th>Staff</th><th>Handled</th><th>Collected</th><th>Payments</th><th>Discounts</th><th>Overrides</th></tr></thead>
               <tbody>
                 {staffPerf.rows.map((s) => (
-                  <tr key={s.staffId}><td>{s.staffName}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td></tr>
+                  <tr key={s.staffId}><td>{s.staffName}</td><td>{dash(s.handledCount)}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td><td>{dash(s.discountCount)}</td><td>{dash(s.overrideCount)}</td></tr>
                 ))}
               </tbody>
             </table>
           )}
+          {staffPerf.rows.length > 0 && (() => {
+            const max = Math.max(0, ...staffPerf.rows.map((s) => Number(s.collected)));
+            return (
+              <>
+                <div className={styles.cardLabel}>Collections by staff</div>
+                <div className={styles.columns} role="img" aria-label="Collections by staff">
+                  {staffPerf.rows.map((s) => (
+                    <div key={s.staffId} className={styles.column}>
+                      <span className={styles.columnValue}>{money(s.collected)}</span>
+                      <span className={styles.columnBar} style={{ height: `${max > 0 ? Math.max(2, (Number(s.collected) / max) * 100) : 2}px`, background: "var(--rp-series-1)" }} />
+                      <span className={styles.columnLabel}>{s.staffName}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
