@@ -1252,8 +1252,9 @@ paths:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
       tags: [Clinical]
-      summary: Active allergy register of a patient
+      summary: Allergy register of a patient. Active entries by default; includeInactive=true also returns removed entries (active=false, with deactivatedReason/deactivatedAt/deactivatedByName), active ones first.
       x-required-permission: clinical:view
+      parameters: [{ name: includeInactive, in: query, required: false, schema: { type: boolean, default: false } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Allergy" } } } } }
     post:
@@ -2078,6 +2079,9 @@ components:
         recordedByName: { type: [string, "null"] }
         recordedAt: { type: string, format: date-time }
         updatedAt: { type: [string, "null"], format: date-time }
+        deactivatedReason: { type: [string, "null"], description: "Why the entry was removed; null while active" }
+        deactivatedAt: { type: [string, "null"], format: date-time }
+        deactivatedByName: { type: [string, "null"] }
     AllergyWrite:
       type: object
       required: [substance, severity]

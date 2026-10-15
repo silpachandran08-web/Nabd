@@ -31,6 +31,13 @@ class AllergyRepository {
                 mapper(), tenantId, patientId);
     }
 
+    /** DOC-046: whole register incl. removed entries (active first), for the "show removed" view. */
+    List<AllergyRow> findAllByPatient(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT * FROM patient_allergies WHERE tenant_id = ? AND patient_id = ? " +
+                        "ORDER BY active DESC, recorded_at DESC",
+                mapper(), tenantId, patientId);
+    }
+
     /** V1-004/V1-005: transaction-scoped advisory lock on one patient's allergy register. Prescription save/sign and
      * every register write take it first, so an allergy recorded or downgraded concurrently cannot slip between a
      * sign-time warning check and the status flip. Always acquired before any row lock. */
@@ -144,6 +151,9 @@ class AllergyRepository {
                 rs.getTimestamp("recorded_at").toInstant(),
                 rs.getString("category"),
                 rs.getString("source"),
-                rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant());
+                rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant(),
+                rs.getString("deactivated_by") == null ? null : UUID.fromString(rs.getString("deactivated_by")),
+                rs.getTimestamp("deactivated_at") == null ? null : rs.getTimestamp("deactivated_at").toInstant(),
+                rs.getString("deactivation_reason"));
     }
 }
