@@ -46,6 +46,7 @@ function OtcCheckoutInner() {
   const region = getIdentity()?.tenantRegion;
   const canCheckout = can("billing:create"); // the API requires billing:create; absent otherwise
   const canPay = can("billing:edit"); // POST /billing/invoices/{id}/payments requires billing:edit
+  const canDiscount = can("billing.discount"); // REC-043: input absent, and discount not sent, without it
 
   const [context, setContext] = useState<OtcContext | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -131,7 +132,7 @@ function OtcCheckoutInner() {
 
   const subtotal = round2(items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0));
   const tax = round2(items.reduce((sum, i) => sum + round2((i.unitPrice * i.quantity * i.taxRatePercent) / 100), 0));
-  const discountNum = Math.max(0, Number(discount) || 0);
+  const discountNum = canDiscount ? Math.max(0, Number(discount) || 0) : 0;
   const rawTotal = subtotal - discountNum + tax;
   const previewTotal = Math.round(rawTotal);
   const roundOff = round2(previewTotal - rawTotal);
@@ -148,7 +149,7 @@ function OtcCheckoutInner() {
         method: "POST",
         body: JSON.stringify({
           lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          discount: discountNum,
+          ...(canDiscount ? { discount: discountNum } : {}),
         }),
       });
       if (!res) return;
@@ -321,10 +322,12 @@ function OtcCheckoutInner() {
           <div className={styles.card}>
             <div className={styles.totals}>
               <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(subtotal, context.currency)}</span></div>
-              <div className={styles.totalsRow}>
-                <span>Discount</span>
-                <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-              </div>
+              {canDiscount && (
+                <div className={styles.totalsRow}>
+                  <span>Discount</span>
+                  <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                </div>
+              )}
               <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
               <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
               <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
