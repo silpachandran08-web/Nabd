@@ -21,6 +21,9 @@ type Staff = {
   scope: string;
   lastSeenAt: string | null;
   professionalRegistrationNo?: string | null;
+  // OWN-034 (read-only, derived server-side from stored credentials). Optional: absent on an older backend.
+  loginMethod?: string;
+  loginFactors?: string[];
 };
 type StaffPage = { data: Staff[]; page: { nextCursor: string | null; limit: number } };
 type ModuleGrant = {
@@ -94,6 +97,18 @@ const STATUS_PILL: Record<Staff["status"], { tone: PillTone; label: string }> = 
   suspended: { tone: "danger", label: "Suspended" },
 };
 
+// GET /v1/staff loginMethod codes (StaffService.loginMethod). Unknown codes render as-is.
+const LOGIN_METHOD_LABELS: Record<string, string> = {
+  authenticator: "Authenticator",
+  authenticator_setup_required: "Authenticator (setup pending)",
+  pin_or_whatsapp_otp: "PIN / WhatsApp OTP",
+  pin: "PIN",
+  whatsapp_otp: "WhatsApp OTP",
+  owner_account: "Owner account",
+  invite_pending: "Invite pending",
+  none: "Not set",
+};
+
 // Short relative time for "Last active"; the absolute time stays in the cell's title.
 function relativeTime(iso: string): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -122,6 +137,7 @@ export default function StaffAccessPage() {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesFailed, setRolesFailed] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [breakGlass, setBreakGlass] = useState<{ id: string; staffId: string; staffName: string; reason: string; activatedAt: string; expiresAt: string }[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -205,6 +221,7 @@ export default function StaffAccessPage() {
 
       const rolesRes = await authedFetch("/roles");
       if (rolesRes?.ok) setRoles(await rolesRes.json());
+      setRolesFailed(!!rolesRes && !rolesRes.ok);
 
       const departmentsRes = await authedFetch("/departments");
       if (departmentsRes?.ok) setDepartments(await departmentsRes.json());
@@ -238,6 +255,22 @@ export default function StaffAccessPage() {
 
   function roleName(roleId: string): string {
     return roles.find((r) => r.id === roleId)?.name ?? "—";
+  }
+
+  // Restriction summary (wireframe staff table), derived only from what the API returns:
+  // invite state, patient scope and the role's billing grant. Built-in (owner) role = full access.
+  function restrictionOf(s: Staff): string {
+    if (s.status === "invited") return "Pending first sign-in";
+    const role = roles.find((r) => r.id === s.roleId);
+    // Without the role's grants the restriction is unknown; never summarise it as "None".
+    if (!role) return "—";
+    if (role.builtIn) return "Full access";
+    const parts: string[] = [];
+    if (s.scope === "own_patients_only") parts.push(SCOPE_LABELS.own_patients_only);
+    else if (s.scope !== "all_clinic_patients" && s.scope) parts.push(SCOPE_LABELS[s.scope] ?? s.scope);
+    const billing = role.grants.find((g) => g.module === "billing");
+    if (billing?.view && !billing.refundDiscount) parts.push("No refund, no discount");
+    return parts.length ? parts.join(" · ") : "None";
   }
 
   // Counts come from the staff pages loaded so far (RoleResponse has no user count).
@@ -441,6 +474,8 @@ export default function StaffAccessPage() {
 
   const canInvite = permissions.includes("staff:create");
   const canSuspend = permissions.includes("staff:delete");
+  // Login column only when the backend reports it (BE2 OWN-034); an older backend shows no column.
+  const showLogin = staff.some((s) => typeof s.loginMethod === "string");
   const canEditRoles = permissions.includes("staff:edit");
 
   return (
@@ -466,6 +501,9 @@ export default function StaffAccessPage() {
       </div>
 
       {error && !loading && staff.length > 0 && <div className={styles.formError} role="alert">{error}</div>}
+      {rolesFailed && !loading && staff.length > 0 && (
+        <div className={styles.formError} role="alert">Couldn&apos;t load roles, so Role and Restriction show &ldquo;—&rdquo;. Reload to try again.</div>
+      )}
 
       {lastInvite && (
         <div className={styles.inviteBanner}>
@@ -493,6 +531,7 @@ export default function StaffAccessPage() {
                   <th>Status</th>
                   <th>Restriction</th>
                   <th>Active</th>
+                  {showLogin && <th>Login</th>}
                   <th></th>
                 </tr>
               </thead>
@@ -505,8 +544,11 @@ export default function StaffAccessPage() {
                     </td>
                     <td><span className={`${styles.pill} ${styles.pillRole}`}>{roleName(s.roleId)}</span></td>
                     <td><StatusPill tone={STATUS_PILL[s.status].tone} label={STATUS_PILL[s.status].label} /></td>
-                    <td className={styles.muted}>{s.scope === "all_clinic_patients" ? "None" : (SCOPE_LABELS[s.scope] ?? s.scope)}</td>
+                    <td className={styles.muted}>{restrictionOf(s)}</td>
                     <td className={styles.muted} title={s.lastSeenAt ? new Date(s.lastSeenAt).toLocaleString() : undefined}>{s.lastSeenAt ? relativeTime(s.lastSeenAt) : "—"}</td>
+                    {showLogin && (
+                      <td className={styles.muted}>{s.loginMethod ? (LOGIN_METHOD_LABELS[s.loginMethod] ?? s.loginMethod) : "—"}</td>
+                    )}
                     <td>
                       {canEditRoles && (
                         <button className={styles.actionBtn} onClick={() => setRegEdit(s)}>

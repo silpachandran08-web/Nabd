@@ -60,19 +60,19 @@ class PrescriptionRepository {
     }
 
     Optional<PrescriptionRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
+        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** V1-004: row lock (held to the end of the transaction) that serialises upsert/sign on one prescription. */
     Optional<PrescriptionRow> lockByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
+        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** NB-105: previous medicines, most recent first — signed only, a draft isn't a real prescription yet. */
     List<PrescriptionRow> findSignedByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT * FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
+        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
                         "ORDER BY signed_at DESC",
                 prescriptionMapper(), tenantId, patientId);
     }
@@ -107,10 +107,12 @@ class PrescriptionRepository {
         }
     }
 
-    /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed. */
-    int sign(UUID tenantId, UUID prescriptionId) {
-        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now() " +
-                "WHERE tenant_id = ? AND id = ? AND status = 'draft'", tenantId, prescriptionId);
+    /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed.
+     * DOC-R3: the allergy snapshot is written in the same UPDATE as the status flip. V51's trigger refuses any later
+     * UPDATE of a signed row, so this is the only moment it can be written. */
+    int sign(UUID tenantId, UUID prescriptionId, String allergySnapshotJson) {
+        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now(), allergy_snapshot = ?::jsonb " +
+                "WHERE tenant_id = ? AND id = ? AND status = 'draft'", allergySnapshotJson, tenantId, prescriptionId);
     }
 
     /** DOC-033: type-ahead source. Pharmacy item master (active stocked items) first, then distinct names this tenant
@@ -137,10 +139,10 @@ class PrescriptionRepository {
 
     // ── favourite Rx sets (NB-114) ───────────────────────────────────────
 
-    UUID insertSet(UUID tenantId, UUID doctorId, String name) {
+    UUID insertSet(UUID tenantId, UUID doctorId, String name, boolean shared) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO favourite_rx_sets (id, tenant_id, doctor_id, name) VALUES (?,?,?,?)",
-                id, tenantId, doctorId, name);
+        jdbc.update("INSERT INTO favourite_rx_sets (id, tenant_id, doctor_id, name, shared) VALUES (?,?,?,?,?)",
+                id, tenantId, doctorId, name, shared);
         return id;
     }
 
@@ -148,38 +150,74 @@ class PrescriptionRepository {
         int order = 0;
         for (PrescriptionItemRequest item : items) {
             jdbc.update("INSERT INTO favourite_rx_set_items (tenant_id, set_id, drug_name, dosage, frequency, " +
-                            "instructions, duration, display_order) VALUES (?,?,?,?,?,?,?,?)",
+                            "instructions, duration, display_order, brand_name, sig_pattern, route, quantity, quantity_unit) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, setId, item.drugName(), item.dosage(), item.frequency(), item.instructions(),
-                    item.duration(), order++);
+                    item.duration(), order++, blankToNull(item.brandName()), blankToNull(item.sigPattern()),
+                    blankToNull(item.route()), item.quantity(), blankToNull(item.quantityUnit()));
         }
     }
 
-    /** Sets visible to this doctor: their own plus every clinic default (doctor_id is null). */
+    void deleteSetItems(UUID tenantId, UUID setId) {
+        jdbc.update("DELETE FROM favourite_rx_set_items WHERE tenant_id = ? AND set_id = ?", tenantId, setId);
+    }
+
+    void updateSet(UUID tenantId, UUID setId, String name, UUID doctorId, boolean shared) {
+        jdbc.update("UPDATE favourite_rx_sets SET name = ?, doctor_id = ?, shared = ?, updated_at = now() " +
+                "WHERE tenant_id = ? AND id = ?", name, doctorId, shared, tenantId, setId);
+    }
+
+    void deleteSet(UUID tenantId, UUID setId) {
+        jdbc.update("DELETE FROM favourite_rx_sets WHERE tenant_id = ? AND id = ?", tenantId, setId);
+    }
+
+    void markSetUsed(UUID tenantId, UUID setId) {
+        jdbc.update("UPDATE favourite_rx_sets SET last_used_at = now() WHERE tenant_id = ? AND id = ?", tenantId, setId);
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    private static final String SET_SELECT = "SELECT s.id, s.doctor_id, s.name, s.created_at, s.shared, s.updated_at, " +
+            "s.last_used_at, st.name AS owner_name FROM favourite_rx_sets s LEFT JOIN staff st ON st.id = s.doctor_id ";
+
+    private static FavouriteSetRow mapSet(java.sql.ResultSet rs) throws java.sql.SQLException {
+        String d = rs.getString("doctor_id");
+        java.sql.Timestamp used = rs.getTimestamp("last_used_at");
+        return new FavouriteSetRow(UUID.fromString(rs.getString("id")), d == null ? null : UUID.fromString(d),
+                rs.getString("name"), rs.getTimestamp("created_at").toInstant(), rs.getBoolean("shared"),
+                rs.getTimestamp("updated_at").toInstant(), used == null ? null : used.toInstant(), rs.getString("owner_name"));
+    }
+
+    /** Sets visible to this doctor: their own, other doctors' shared sets, and every clinic standard (doctor_id is null). */
     List<FavouriteSetRow> listSets(UUID tenantId, UUID doctorId) {
-        return jdbc.query("SELECT id, doctor_id, name, created_at FROM favourite_rx_sets " +
-                        "WHERE tenant_id = ? AND (doctor_id = ? OR doctor_id IS NULL) ORDER BY name",
-                (rs, i) -> {
-                    String d = rs.getString("doctor_id");
-                    return new FavouriteSetRow(UUID.fromString(rs.getString("id")), d == null ? null : UUID.fromString(d),
-                            rs.getString("name"), rs.getTimestamp("created_at").toInstant());
-                }, tenantId, doctorId);
+        return jdbc.query(SET_SELECT + "WHERE s.tenant_id = ? AND (s.doctor_id = ? OR s.doctor_id IS NULL OR s.shared) " +
+                        "ORDER BY s.name, s.created_at",
+                (rs, i) -> mapSet(rs), tenantId, doctorId);
     }
 
     Optional<FavouriteSetRow> findSet(UUID tenantId, UUID setId) {
-        return jdbc.query("SELECT id, doctor_id, name, created_at FROM favourite_rx_sets WHERE tenant_id = ? AND id = ?",
-                (rs, i) -> {
-                    String d = rs.getString("doctor_id");
-                    return new FavouriteSetRow(UUID.fromString(rs.getString("id")), d == null ? null : UUID.fromString(d),
-                            rs.getString("name"), rs.getTimestamp("created_at").toInstant());
-                }, tenantId, setId).stream().findFirst();
+        return jdbc.query(SET_SELECT + "WHERE s.tenant_id = ? AND s.id = ?", (rs, i) -> mapSet(rs), tenantId, setId)
+                .stream().findFirst();
     }
 
     List<FavouriteSetItemRow> findSetItems(UUID tenantId, UUID setId) {
         return jdbc.query("SELECT * FROM favourite_rx_set_items WHERE tenant_id = ? AND set_id = ? ORDER BY display_order",
                 (rs, i) -> new FavouriteSetItemRow(UUID.fromString(rs.getString("id")), rs.getString("drug_name"),
                         rs.getString("dosage"), rs.getString("frequency"), rs.getString("duration"),
-                        rs.getString("instructions"), rs.getInt("display_order")),
+                        rs.getString("instructions"), rs.getInt("display_order"), rs.getString("brand_name"),
+                        rs.getString("sig_pattern"), rs.getString("route"), rs.getBigDecimal("quantity"),
+                        rs.getString("quantity_unit")),
                 tenantId, setId);
+    }
+
+    /** DOC-035: lower-cased names of the tenant's active stocked pharmacy items (the item master the type-ahead uses).
+     * Empty means the tenant has no master, in which case staleness cannot be judged. */
+    java.util.Set<String> activePharmacyNames(UUID tenantId) {
+        return new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT lower(btrim(name)) FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL AND active",
+                String.class, tenantId));
     }
 
     private RowMapper<PrescriptionRow> prescriptionMapper() {
@@ -190,7 +228,8 @@ class PrescriptionRepository {
                 UUID.fromString(rs.getString("doctor_id")),
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
-                rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant());
+                rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant(),
+                rs.getString("allergy_snapshot_json"));
     }
 
     private RowMapper<PrescriptionItemRow> itemMapper() {

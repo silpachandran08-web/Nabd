@@ -16,6 +16,7 @@ import static com.nabd.hms.nursing.NursingModels.ActivityRow;
 import static com.nabd.hms.nursing.NursingModels.AdministrationOrderRow;
 import static com.nabd.hms.nursing.NursingModels.AdministrationRecordRow;
 import static com.nabd.hms.nursing.NursingModels.ProcedureOrderRow;
+import static com.nabd.hms.nursing.NursingModels.VaccineRecordRow;
 
 @Repository
 class NursingRepository {
@@ -97,6 +98,59 @@ class NursingRepository {
             throw new ApiException(HttpStatus.CONFLICT, "already-recorded", "Already recorded",
                     "This order already has an administration outcome recorded.");
         }
+    }
+
+    // ── NUR-B2: vaccine records (append-only, no schedule) ───────────────────
+
+    Optional<UUID> findPatientIdIfExists(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT id FROM patients WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> UUID.fromString(rs.getString("id")), tenantId, patientId).stream().findFirst();
+    }
+
+    /** The queue entry must belong to the same patient, otherwise a record could be filed against the wrong visit. */
+    boolean queueEntryBelongsToPatient(UUID tenantId, UUID queueEntryId, UUID patientId) {
+        return jdbc.query("SELECT 1 FROM queue_entries WHERE tenant_id = ? AND id = ? AND patient_id = ?",
+                (rs, i) -> 1, tenantId, queueEntryId, patientId).size() > 0;
+    }
+
+    UUID insertVaccineRecord(UUID tenantId, UUID patientId, UUID queueEntryId, UUID recordedBy, String vaccineName,
+                              String dose, String route, String site, String lotNumber, LocalDate expiryDate, String notes) {
+        return jdbc.queryForObject(
+                "INSERT INTO vaccine_records (tenant_id, patient_id, queue_entry_id, recorded_by, vaccine_name, dose, " +
+                        "route, site, lot_number, expiry_date, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING id",
+                UUID.class, tenantId, patientId, queueEntryId, recordedBy, vaccineName, dose, route, site, lotNumber,
+                expiryDate == null ? null : java.sql.Date.valueOf(expiryDate), notes);
+    }
+
+    private static final String VACCINE_COLS = "id, patient_id, queue_entry_id, recorded_by, vaccine_name, dose, route, site, " +
+            "lot_number, expiry_date, notes, administered_at";
+
+    private static VaccineRecordRow mapVaccine(java.sql.ResultSet rs) throws java.sql.SQLException {
+        String q = rs.getString("queue_entry_id");
+        java.sql.Date exp = rs.getDate("expiry_date");
+        return new VaccineRecordRow(UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("patient_id")),
+                q == null ? null : UUID.fromString(q), UUID.fromString(rs.getString("recorded_by")),
+                rs.getString("vaccine_name"), rs.getString("dose"), rs.getString("route"), rs.getString("site"),
+                rs.getString("lot_number"), exp == null ? null : exp.toLocalDate(), rs.getString("notes"),
+                rs.getTimestamp("administered_at").toInstant());
+    }
+
+    Optional<VaccineRecordRow> findVaccineRecord(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT " + VACCINE_COLS + " FROM vaccine_records WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> mapVaccine(rs), tenantId, id).stream().findFirst();
+    }
+
+    List<VaccineRecordRow> listVaccineRecords(UUID tenantId, Instant from, Instant to) {
+        return jdbc.query("SELECT " + VACCINE_COLS + " FROM vaccine_records WHERE tenant_id = ? " +
+                        "AND administered_at >= ? AND administered_at < ? ORDER BY administered_at DESC",
+                (rs, i) -> mapVaccine(rs), tenantId, java.sql.Timestamp.from(from), java.sql.Timestamp.from(to));
+    }
+
+    Optional<NursingModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new NursingModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
     }
 
     // ── NB-146: procedure orders ─────────────────────────────────────────────

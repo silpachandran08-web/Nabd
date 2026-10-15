@@ -18,6 +18,8 @@ public final class GrantsFlattener {
             if (g.delete()) out.add(g.module() + ":delete");
             if (g.approve()) out.add(g.module() + ":approve");
             if (g.refundDiscount()) out.add(g.module() + ":refundDiscount");
+            // REC-043: the billing module's refund/discount flag also gates discounts at checkout.
+            if (g.refundDiscount() && "billing".equals(g.module())) out.add("billing.discount");
             if (g.export()) out.add(g.module() + ":export");
         }
         return out;

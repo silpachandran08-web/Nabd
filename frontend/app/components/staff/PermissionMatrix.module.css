@@ -9,8 +9,10 @@
 .na { color: var(--nb-text-disabled); border: 1px dashed var(--nb-border-default); }
 .scroll { position: relative; overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table th, .table td { padding: var(--nb-space-8); border-bottom: 1px solid var(--nb-border-subtle); text-align: center; }
+.table th, .table td { padding: var(--nb-space-8) var(--nb-space-4); border-bottom: 1px solid var(--nb-border-subtle); text-align: center; }
 .table thead th { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--nb-text-tertiary); white-space: nowrap; }
 .table th:first-child, .table tbody th { text-align: start; white-space: nowrap; font-weight: 500; color: var(--nb-text-primary); }
 .cell { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 8px; font-size: 11px; font-weight: 600; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.table tbody th.group { padding-block-start: var(--nb-space-12); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--nb-text-tertiary); }
+.via { display: block; font-size: 11px; font-weight: 400; color: var(--nb-text-tertiary); }

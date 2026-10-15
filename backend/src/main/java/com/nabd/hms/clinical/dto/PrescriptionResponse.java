@@ -4,8 +4,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/** unresolvedWarnings: number of warnings that still need a recorded decision before this can be signed. */
+/** unresolvedWarnings: number of warnings that still need a recorded decision before this can be signed.
+ * allergySnapshot (DOC-R3): the allergy statement captured at signing. Null for a draft, and null for a prescription
+ * signed before the snapshot existed (V79); a signed prescription with a null snapshot must be shown as "allergy
+ * status at signing not recorded", never filled in from the current register.
+ * warnings (DOC-031): flat list of the allergy matches across all lines, derived from the same per-line check as
+ * items[].warnings; itemIndex is the 0-based position in items. Recomputed on every read. */
 public record PrescriptionResponse(UUID id, UUID queueEntryId, UUID patientId, UUID doctorId, String status,
                                     Instant createdAt, Instant signedAt, List<PrescriptionItemResponse> items,
-                                    int unresolvedWarnings) {
+                                    int unresolvedWarnings, PrescriptionAllergySnapshotResponse allergySnapshot,
+                                    List<PrescriptionWarningResponse> warnings) {
 }

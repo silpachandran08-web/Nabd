@@ -340,3 +340,6 @@
 @media (max-width: 430px) {
   .row { grid-template-columns: 1fr; }
 }
+
+/* OWN-042: groups the profile inputs so a view-only role sees them read-only. */
+.plainFieldset { margin: 0; padding: 0; border: 0; min-width: 0; }

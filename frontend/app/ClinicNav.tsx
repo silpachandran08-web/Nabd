@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
-import { decodeAccessToken, getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
+import { decodeAccessToken, getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 // Same "waiting" bucket as the Arrivals page's own tab counts (arrivals/page.tsx bucketOf).
@@ -80,15 +80,22 @@ const DOCTOR_ITEMS: DoctorItem[] = [
   { label: "My Day", short: "My Day", icon: "sun", href: MY_DAY_HREF, permission: "clinical:edit", alsoPermission: "queue:view", badgeKey: MY_DAY_HREF },
   { label: "Patients", short: "Patients", icon: "users", href: "/patients", permission: "patients:view" },
   { label: "Consultation Workspace", short: "Consult", icon: "stethoscope", href: "/consult", permission: "clinical:edit" },
+  // DOC-003: sets are read with clinical:view; the doctor sidebar itself already needs clinical:edit.
+  { label: "Prescriptions & Templates", short: "Rx sets", icon: "syringe", href: "/prescriptions", permission: "clinical:view", alsoPermission: "clinical:edit" },
   { label: "Treatment Packages", short: "Packages", icon: "package", href: "/packages", permission: "packages:view" },
   { label: "Schedule", short: "Schedule", icon: "calendar", href: "/schedule", permission: "queue:view" },
+  // DOC-004: the doctor's own hours and leave (reads need queue:view; writes inside need queue:edit).
+  { label: "My Schedule", short: "Hours", icon: "clock", href: "/my-schedule", permission: "clinical:edit", alsoPermission: "queue:view" },
+  // DOC-005 / DOC-006: wireframe order is Schedule, Encounters, Follow-ups.
+  { label: "Encounters", short: "Encounters", icon: "list", href: "/encounters", permission: "clinical:view" },
+  { label: "Follow-ups", short: "Follow-ups", icon: "refresh", href: "/follow-ups", permission: "queue:view" },
 ];
 // Wireframe doctor items whose page does not exist yet. Not linked (no dead links) and not shown
 // disabled (restricted/unavailable UI is absent): when a page ships, move its entry into DOCTOR_ITEMS
-// at the wireframe position (after Consultation Workspace: Prescriptions & Templates; after Schedule:
-// Encounters, Follow-ups, External Reports, Clinical Documents, Specialty Workspace, Clinical Settings, More).
+// at the wireframe position (after Schedule:
+// External Reports, Clinical Documents, Specialty Workspace, Clinical Settings, More).
 export const DOCTOR_PLANNED = [
-  "Prescriptions & Templates", "Encounters", "Follow-ups", "External Reports",
+  "External Reports",
   "Clinical Documents", "Specialty Workspace", "Clinical Settings", "More",
 ] as const;
 function isDoctorNav(perms: string[]): boolean {
@@ -135,7 +142,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [showMore, setShowMore] = useState(false);
   const moreBtnRef = useRef<HTMLButtonElement>(null);
   const [showClinic, setShowClinic] = useState(false);
-  const [plan, setPlan] = useState<{ plan: string; status: string } | null>(null);
+  const [plan, setPlan] = useState<{ plan: string; status: string; branchesUsed: number; branchesLimit: number } | null>(null);
+  const [canReturnToWorkspaces, setCanReturnToWorkspaces] = useState(false);
   const [badges, setBadges] = useState<Record<string, number>>({});
 
   // Escape closes the mobile More menu and hands focus back to its button.
@@ -147,6 +155,16 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [showMore]);
+
+  // Escape closes the clinic & branch popover.
+  useEffect(() => {
+    if (!showClinic) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowClinic(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showClinic]);
 
   // Hydration-safe: render nothing until this mounts and can read localStorage, then reflect
   // it — never read it directly during render.
@@ -235,8 +253,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     void fetch(`${API_BASE}/setup/subscription`, { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
         if (cancelled || !res.ok) return;
-        const body: { plan: string; status: string } = await res.json();
-        if (!cancelled) setPlan({ plan: body.plan, status: body.status });
+        const body: { plan: string; status: string; branchesUsed: number; branchesLimit: number } = await res.json();
+        if (!cancelled) setPlan({ plan: body.plan, status: body.status, branchesUsed: Number(body.branchesUsed), branchesLimit: Number(body.branchesLimit) });
       })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -293,6 +311,19 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     router.replace(owner ? "/owner/login" : "/login");
   }
 
+  function toggleClinicMenu() {
+    // Re-checked on every open: the owner's pending-workspace token only lives ~5 minutes.
+    setCanReturnToWorkspaces(ownerPendingTokenValid());
+    setShowClinic((v) => !v);
+  }
+
+  // OWN-003: with an expired pending token the workspace list needs the owner PIN again, so the
+  // clinic session is ended first (no orphaned session left behind) and the owner signs back in.
+  async function switchClinicViaLogin() {
+    setShowClinic(false);
+    await handleSignOut();
+  }
+
   return (
     <>
     <nav className={`${styles.nav} ${collapsed ? styles.navRail : ""}`} aria-label="Main">
@@ -301,25 +332,47 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       {identity && (owner ? (
         <div className={styles.clinicWrap}>
           <button type="button" className={`${styles.clinicInfo} ${styles.clinicButton}`} aria-haspopup="menu"
-            aria-expanded={showClinic} onClick={() => setShowClinic((v) => !v)}>
+            aria-expanded={showClinic} aria-label={`Clinic: ${identity.tenantName}`} onClick={toggleClinicMenu}>
             <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
             <div className={styles.clinicText}>
               <div className={styles.clinicName}>{identity.tenantName}</div>
-              {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
             </div>
             <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
           </button>
           {showClinic && (
             <>
               <div className={styles.menuBackdrop} onClick={() => setShowClinic(false)} />
-              <div className={styles.clinicMenu} role="menu">
-                <div className={styles.menuHeader}>Clinic</div>
+              <div className={styles.clinicMenu} role="menu" aria-label="Clinic & branch">
+                <div className={styles.menuHeader}>Clinic &amp; branch</div>
                 <div className={styles.clinicCurrent} role="menuitem" aria-current="true">
-                  <Icon name="check" size={14} /> {identity.tenantName}
+                  <Icon name="building" size={14} />
+                  <span className={styles.clinicRowText}>
+                    <span>{identity.tenantName}</span>
+                    {identity.tenantRegion && <span className={styles.clinicRowSub}>{regionLabel(identity.tenantRegion)}</span>}
+                  </span>
+                  <span className={styles.clinicRowTag}>Current</span>
                 </div>
-                <Link href="/owner/workspaces" role="menuitem" className={styles.clinicSwitch} onClick={() => setShowClinic(false)}>
-                  Switch workspace
-                </Link>
+                {/* Branch names have no API yet; the subscription summary does say whether this
+                    brand is at its branch limit, which is the wireframe's locked Multi-branch row. */}
+                {plan && plan.branchesLimit > 0 && plan.branchesUsed >= plan.branchesLimit && (
+                  <Link href="/setup?tab=subscription" role="menuitem" className={styles.clinicLocked} onClick={() => setShowClinic(false)}>
+                    <Icon name="lock" size={14} />
+                    <span className={styles.clinicRowText}>
+                      <span>More branches</span>
+                      <span className={styles.clinicRowSub}>Locked: needs Multi-branch module</span>
+                    </span>
+                  </Link>
+                )}
+                {canReturnToWorkspaces ? (
+                  <Link href="/owner/workspaces" role="menuitem" className={styles.clinicSwitch} onClick={() => setShowClinic(false)}>
+                    Switch clinic
+                  </Link>
+                ) : (
+                  <button type="button" role="menuitem" className={styles.clinicSwitch} onClick={switchClinicViaLogin} disabled={signingOut}>
+                    {signingOut ? "Signing out…" : "Switch clinic"}
+                    <span className={styles.clinicRowSub}>Signs you out here; sign in again to pick a clinic.</span>
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -329,7 +382,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
           <div className={styles.clinicText}>
             <div className={styles.clinicName}>{identity.tenantName}</div>
-            {identity.tenantRegion && <div className={styles.clinicRegion}>{identity.tenantRegion}</div>}
           </div>
         </div>
       ))}
@@ -379,7 +431,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                 {owner && identity.tenantRegion && (
                   <div className={styles.menuRow}>
                     <span>Region</span>
-                    <span className={styles.menuRowValue}>{identity.tenantRegion}</span>
+                    <span className={styles.menuRowValue} title="Fixed at provisioning">{regionLabel(identity.tenantRegion)}</span>
                   </div>
                 )}
                 <div className={styles.menuRow}>
@@ -431,11 +483,29 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                     {e.label}
                   </Link>
                 ))}
+                {owner && (
+                  <Link href="/account" role="menuitem" className={`${styles.moreItem} ${pathname === "/account" ? styles.linkActive : ""}`} onClick={() => setShowMore(false)}>
+                    <Icon name="user" />
+                    Account &amp; Security
+                  </Link>
+                )}
+                {owner && (canReturnToWorkspaces ? (
+                  <Link href="/owner/workspaces" role="menuitem" className={styles.moreItem} onClick={() => setShowMore(false)}>
+                    <Icon name="building" />
+                    Switch clinic
+                  </Link>
+                ) : (
+                  <button type="button" role="menuitem" className={`${styles.moreItem} ${styles.moreButton}`} disabled={signingOut}
+                    onClick={() => { setShowMore(false); void handleSignOut(); }}>
+                    <Icon name="building" />
+                    {signingOut ? "Signing out…" : "Switch clinic (sign in again)"}
+                  </button>
+                ))}
               </div>
             </>
           )}
           <button type="button" ref={moreBtnRef} className={styles.bottomLink} aria-expanded={showMore} aria-haspopup="menu"
-            onClick={() => setShowMore((v) => !v)}>
+            onClick={() => { setCanReturnToWorkspaces(ownerPendingTokenValid()); setShowMore((v) => !v); }}>
             <span className={styles.bottomIcon}><Icon name="more" size={20} /></span>
             More
           </button>

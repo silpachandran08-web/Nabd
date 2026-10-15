@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../../login/login.module.css";
+import { API_BASE } from "../surfaces";
+import { storePlatformSession } from "../platformApi";
 
 // Matches POST /v1/platform/auth/login's oneOf response and RFC 7807 Problem errors.
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
@@ -12,8 +14,6 @@ type Problem = {
   detail: string;
   errors?: { field: string; message: string }[];
 };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function PlatformLoginPage() {
   const router = useRouter();
@@ -26,8 +26,7 @@ export default function PlatformLoginPage() {
   const [loading, setLoading] = useState(false);
 
   function handleTokens(pair: TokenPair) {
-    localStorage.setItem("nabd_platform_access_token", pair.accessToken);
-    localStorage.setItem("nabd_platform_refresh_token", pair.refreshToken);
+    storePlatformSession(pair);
     router.replace("/platform");
   }
 

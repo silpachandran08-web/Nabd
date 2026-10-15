@@ -28,6 +28,9 @@ tags:
   - name: Audit
   - name: Clinical
   - name: Pharmacy
+  - name: Nursing
+  - name: Reports
+  - name: Platform
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -750,8 +753,46 @@ paths:
       responses:
         "201": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
         "409":
-          description: Likely-duplicate match found (phone/name/DOB fuzzy match) — client should offer merge instead of blind create
+          description: >
+            Likely-duplicate match found (same phone digits, or same DOB + similar name) — client should
+            offer merge instead of blind create, or resend with confirmedNotDuplicate=true after review.
+            Each candidate carries matchScore (0..1) and matchedFields.
           content: { application/json: { schema: { type: object, properties: { candidates: { type: array, items: { $ref: "#/components/schemas/PatientMatchCandidate" } } } } } }
+
+  /patients/registry:
+    get:
+      tags: [Patients]
+      summary: Patient Registry rows with per-filter counts, search and paging (REC-040)
+      description: >
+        Rows for the selected filter, narrowed by `q` (name, MRN, 3+ mobile digits, or today's token
+        such as `T-12`), ordered by name then id. Consent- and row-scope-gated like every patient read.
+        `total` and `counts` ignore `q` and paging; `matchedTotal` is the number of rows matching filter + q
+        before paging. Paging is additive: a call without `limit`/`cursor` returns the first 200 rows exactly
+        as before. `cursor` is opaque (an offset into the ordered result); pass `page.nextCursor` back
+        unchanged with the same `q`/`filter`. Flags and counts are computed for at most 3000 patients per clinic.
+      x-required-permission: patients:view
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - { name: filter, in: query, required: false, schema: { type: string, enum: [all, recent, followup, package, balance, duplicate, archived], default: all } }
+        - { name: limit, in: query, required: false, description: "Clamped to 1..200", schema: { type: integer, minimum: 1, maximum: 200, default: 200 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Registry page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer, description: "Non-archived patients (same as counts.all)" }
+                  counts: { type: object, additionalProperties: { type: integer }, description: "One count per filter key" }
+                  rows: { type: array, items: { $ref: "#/components/schemas/PatientRegistryRow" } }
+                  matchedTotal: { type: integer, description: "Rows matching filter + q before paging (REC-040)" }
+                  hasMore: { type: boolean, description: "True when page.nextCursor fetches another page (REC-040)" }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400":
+          description: Invalid filter (`invalid-filter`) or malformed cursor (`invalid-cursor`)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /patients/{id}:
     get:
@@ -814,6 +855,17 @@ paths:
       responses:
         "204": { description: Reversed }
         "404": { description: "Merge doesn't exist, already reversed, or past the 30-day window", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /patients/{id}/guardian:
+    delete:
+      tags: [Patients]
+      summary: Revoke the patient's guardian — clears guardian_id and withdraws guardian_access consent only; address and national ID are untouched (CGV-001)
+      x-required-permission: patients:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Revoked (also returned when no guardian was on file)" }
+        "400": { description: "guardian-required: the patient is still a minor", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /patients/{id}/consent/withdraw:
     post:
@@ -964,6 +1016,69 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "New slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /waitlist:
+    get:
+      tags: [Queue]
+      summary: A doctor's waitlist, oldest join first (waiting, offered and expired entries; NB-099)
+      description: Lapsed offers are closed and re-offered to the next waiting patient on read.
+      x-required-permission: queue:view
+      parameters:
+        - { name: doctorId, in: query, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Entries", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WaitlistEntry" } } } } }
+    post:
+      tags: [Queue]
+      summary: Put a patient on a doctor's waitlist
+      x-required-permission: queue:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [doctorId, patientId], properties: { doctorId: { type: string, format: uuid }, patientId: { type: string, format: uuid } } }
+      responses:
+        "201": { description: "Joined", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
+        "409": { description: "already-waitlisted", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /waitlist/{id}/accept:
+    post:
+      tags: [Queue]
+      summary: Accept the offered slot, or book the entry into a slot the front desk chose (REC-028)
+      description: >
+        Without a body (or with slotStart null) this accepts the slot the entry was offered, exactly as
+        before: 409 `offer-expired` if the 15-minute offer lapsed or was used. With `slotStart` set, the
+        entry (status waiting, offered or expired) is booked into that slot after the same checks as
+        POST /appointments: 400 `slot-in-past`, 400 `clinic-holiday`, 409 `session-full`, 409
+        `slot-unavailable` (doctor already booked then). A slot currently offered to another waitlisted
+        patient is refused with 409 `slot-on-offer`; a booked/removed entry is 409 `waitlist-entry-closed`.
+        slotStart equal to the entry's own live offer is the plain accept. If the entry held a live offer of
+        a different slot, that slot is offered to the next waiting patient. Audited as
+        `waitlist.booked_chosen_slot` (ids and slot only).
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                slotStart: { type: [string, "null"], format: date-time, description: "Chosen slot start; omit to accept the offered slot" }
+      responses:
+        "200": { description: "Booked entry (status booked, bookedAppointmentId set)", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
+        "400": { description: "slot-in-past or clinic-holiday", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "offer-expired, slot-unavailable, slot-on-offer, session-full or waitlist-entry-closed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /waitlist/{id}:
+    delete:
+      tags: [Queue]
+      summary: Remove a waiting or offered entry from the waitlist
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Removed" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /queue/check-in:
     post:
       tags: [Queue]
@@ -1063,12 +1178,94 @@ paths:
                   page: { $ref: "#/components/schemas/PageMeta" }
 
   # ------------------------------------------------- Clinical (allergies, Rx)
+  /clinical/encounters:
+    get:
+      tags: [Clinical]
+      summary: The calling doctor's own encounters (visits that reached consultation), newest first (DOC-005)
+      description: >
+        Read-only, tenant-scoped, restricted to queue entries where doctor_id is the caller. `state`
+        filters on the clinical note (none = no note yet, draft, signed, unsigned = none or draft).
+        `from`/`to` filter on the clinic calendar day of the visit. Outputs are derived from the note,
+        prescription and clinical documents tables; no clinical free text is returned.
+      x-required-permission: clinical:view
+      parameters:
+        - { name: state, in: query, required: false, schema: { type: string, enum: [none, draft, signed, unsigned] } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        queueEntryId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        patientMrn: { type: string }
+                        queueDate: { type: string, format: date }
+                        occurredAt: { type: string, format: date-time }
+                        visitStatus: { type: string, enum: [in_consult, checkout_pending, completed] }
+                        noteState: { type: string, enum: [none, draft, signed] }
+                        noteSignedAt: { type: [string, "null"], format: date-time }
+                        amendmentCount: { type: integer }
+                        rxStatus: { type: string, enum: [none, draft, signed] }
+                        rxItemCount: { type: integer }
+                        documentsDraft: { type: integer }
+                        documentsIssued: { type: integer }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /appointments/follow-ups:
+    get:
+      tags: [Appointments]
+      summary: The calling doctor's own follow-up appointments (appointments.is_follow_up), soonest first (DOC-006)
+      description: >
+        Read-only, tenant-scoped, caller's own appointments only. No reason or reminder data exists in
+        the schema, so none is returned. `from`/`to` filter on the clinic calendar day of the start time.
+      x-required-permission: queue:view
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [scheduled, cancelled, completed, no_show] } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        appointmentId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        patientMrn: { type: string }
+                        startTime: { type: string, format: date-time }
+                        status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /clinical/patients/{patientId}/allergies:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
       tags: [Clinical]
-      summary: Active allergy register of a patient
+      summary: Allergy register of a patient. Active entries by default; includeInactive=true also returns removed entries (active=false, with deactivatedReason/deactivatedAt/deactivatedByName), active ones first.
       x-required-permission: clinical:view
+      parameters: [{ name: includeInactive, in: query, required: false, schema: { type: boolean, default: false } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Allergy" } } } } }
     post:
@@ -1185,6 +1382,83 @@ paths:
         - { name: limit, in: query, required: false, schema: { type: integer, default: 8, minimum: 1, maximum: 20 } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DrugSuggestion" } } } } }
+  /clinical/rx-sets:
+    get:
+      tags: [Clinical]
+      summary: "DOC-035. Favourite Rx sets visible to the caller: their own, other doctors' shared sets, and clinic standards. scope is relative to the caller. Each item carries stale (true = the tenant has an active pharmacy item master and neither drug nor brand is in it; null = no master to compare with, nothing guessed)."
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/FavouriteRxSet" } } } } }
+    post:
+      tags: [Clinical]
+      summary: "Save a set. scope mine (default) | shared | standard; standard needs clinical:approve (403 rx-set-owner-only). Items keep brand, sig, route and quantity. Audited (rx_set.created)."
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, items]
+              properties:
+                name: { type: string, maxLength: 120 }
+                scope: { type: string, enum: [mine, shared, standard] }
+                items: { type: array, minItems: 1, items: { $ref: "#/components/schemas/PrescriptionItemWrite" } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/FavouriteRxSet" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: standard without clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/rx-sets/{setId}:
+    parameters: [{ name: setId, in: path, required: true, schema: { type: string, format: uuid } }]
+    patch:
+      tags: [Clinical]
+      summary: "DOC-035. Rename, switch scope, or replace the items (omitted fields unchanged). Only the owner or a clinical:approve holder (clinic standards: approve only); otherwise 403 rx-set-owner-only. Another doctor's PRIVATE set is 404 for everyone, clinical:approve holders included (approve reaches shared and standard sets only). Audited (rx_set.updated)."
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 120 }
+                scope: { type: string, enum: [mine, shared, standard] }
+                items: { type: array, minItems: 1, items: { $ref: "#/components/schemas/PrescriptionItemWrite" } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/FavouriteRxSet" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: not the owner and no clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Clinical]
+      summary: "DOC-035. Delete a set (owner or clinical:approve; same 403 rule; another doctor's private set is 404 for everyone). Prescriptions already built from it are unaffected. Audited (rx_set.deleted)."
+      x-required-permission: clinical:edit
+      responses:
+        "204": { description: Deleted }
+        "403": { description: "Forbidden (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /clinical/prescriptions/{queueEntryId}/apply-set/{setId}:
+    post:
+      tags: [Clinical]
+      summary: "Replace the draft with the set's items, keeping brand, sig, route and quantity. The safety checks run on every applied line (drug AND brand) exactly as for typed lines. Stamps the set's lastUsedAt. 404 for another doctor's private set."
+      x-required-permission: clinical:edit
+      parameters:
+        - { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: setId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/prescriptions/{queueEntryId}/repeat-last:
+    post:
+      tags: [Clinical]
+      summary: "DOC-035 / DOC-R2 Repeat last prescription. Replaces the draft with the lines of this patient's most recent SIGNED prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are not carried over; every safety check re-runs against the current register. 404 no-previous-prescription when there is none; 409 prescription-signed when this visit's Rx is already signed. Audited (prescription.repeated_last)."
+      x-required-permission: clinical:edit
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/prescriptions/{queueEntryId}:
     parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1224,7 +1498,7 @@ paths:
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
-      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). Audited.
+      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
       x-required-permission: clinical:edit
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
@@ -1301,6 +1575,47 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /clinical/note-templates:
+    get:
+      tags: [Clinical]
+      summary: The calling doctor's own note templates (favourites first, then by name). Other doctors' templates are never returned. Nothing is pre-loaded - the list is empty until the doctor saves one.
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/NoteTemplate" } } } } }
+    post:
+      tags: [Clinical]
+      summary: Save a note template owned by the caller. Name 1-80 chars; each section at most 4000 chars (refused, never truncated); up to 10 doctor-defined tags of at most 30 chars (trimmed, case-insensitive duplicates dropped). At most 100 templates per doctor (409 note-template-limit).
+      x-required-permission: clinical:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplateCreate" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplate" } } } }
+        "400": { description: "Bad request. 400 invalid-note-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Conflict. 409 note-template-limit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/note-templates/{id}:
+    patch:
+      tags: [Clinical]
+      summary: Change one of the caller's templates. A field that is absent or null is left unchanged (send "" or [] to clear). Used to rename, edit text, edit tags and to mark or unmark a favourite. 404 for another doctor's template.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplateUpdate" } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NoteTemplate" } } } }
+        "400": { description: "Bad request. 400 invalid-note-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Clinical]
+      summary: Delete one of the caller's templates (notes already written from it are unaffected). 404 for another doctor's template.
+      x-required-permission: clinical:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /clinical/vitals/{queueEntryId}:
     get:
       tags: [Clinical]
@@ -1327,6 +1642,21 @@ paths:
         "200": { description: The vitals as stored, content: { application/json: { schema: { $ref: "#/components/schemas/Vitals" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /clinical/patients/{patientId}/dose-calculator:
+    get:
+      tags: [Clinical]
+      summary: >
+        Weight-based dose suggestion (decision support, not a prescription). total = latest recorded weight x the
+        clinician-supplied mgPerKg. The rule is a named formula with no per-drug formulary, so no per-dose or daily
+        maximum is returned. 400 no-weight-recorded when the patient has no recorded weight (a weight is never estimated).
+      x-required-permission: clinical:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: mgPerKg, in: query, required: true, schema: { type: number } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DoseCalculation" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
 
   # ------------------------------------------------------------ Pharmacy (Hybrid mode)
   /pharmacy/settings:
@@ -1432,6 +1762,104 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PharmacyStockMovement" } } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # ------------------------------------------------- Nursing (vaccine record, record-only)
+  /nursing/vaccine-records:
+    post:
+      tags: [Nursing]
+      summary: Record a vaccine given. Record-only and append-only - stores what the nurse entered (free-text vaccine name, dose, route, site, lot). There is no immunisation schedule, so nothing is validated or computed against one. Audited as nursing.vaccine_recorded. 400 queue-entry-mismatch if queueEntryId belongs to another patient.
+      x-required-permission: nursing:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/VaccineRecordWrite" } } }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/VaccineRecord" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /nursing/vaccine-records/today:
+    get:
+      tags: [Nursing]
+      summary: Vaccines recorded today (clinic day), newest first. There is no due list because no vaccine schedule reference data exists.
+      x-required-permission: nursing:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/VaccineRecord" } } } } }
+
+  # ------------------------------------------------------------- Reports
+  /reports/money:
+    get:
+      tags: [Reports]
+      summary: "Reports - Today's money (OWN-01) for a period of clinic days, inclusive; from/to both default to today. 400 invalid-period when from is after to or the range exceeds a year."
+      x-required-permission: reports:view
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MoneyReport" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  # ------------------------------------------------- Platform console: audit (PLT-028)
+  /platform/audit-log:
+    get:
+      tags: [Platform]
+      summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
+      x-required-permission: audit_compliance:view
+      parameters:
+        - $ref: "#/components/parameters/PlatformAuditTenantId"
+        - $ref: "#/components/parameters/PlatformAuditAction"
+        - $ref: "#/components/parameters/PlatformAuditEntityType"
+        - $ref: "#/components/parameters/PlatformAuditCreatedAfter"
+        - $ref: "#/components/parameters/PlatformAuditCreatedBefore"
+        - $ref: "#/components/parameters/PlatformAuditActorId"
+        - $ref: "#/components/parameters/PlatformAuditActorType"
+        - $ref: "#/components/parameters/PlatformAuditActorRole"
+        - $ref: "#/components/parameters/PlatformAuditActorName"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, default: 50 }
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Page of audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/PlatformAuditEntry" } }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no audit_compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /platform/audit-log/export:
+    get:
+      tags: [Platform]
+      summary: >
+        CSV export of the filtered platform audit log (same filters and same columns as GET /platform/audit-log;
+        before/after are the stored JSON text). Bounded at 10,000 rows; above that it is refused with 400
+        export-too-large rather than truncated. Text cells that a spreadsheet would treat as a formula are
+        prefixed with an apostrophe. Audited as audit_log.export (actor = the operator, entityType audit_log),
+        written once into the audit trail of every tenant whose rows the file contains, with filters (the
+        actor-name search text is recorded only as actorNameFilter=true), rowCount, totalRowCount and tenantCount.
+        An export matching no rows writes no audit row (no tenant trail to write to).
+      x-required-permission: audit_compliance:view
+      parameters:
+        - $ref: "#/components/parameters/PlatformAuditTenantId"
+        - $ref: "#/components/parameters/PlatformAuditAction"
+        - $ref: "#/components/parameters/PlatformAuditEntityType"
+        - $ref: "#/components/parameters/PlatformAuditCreatedAfter"
+        - $ref: "#/components/parameters/PlatformAuditCreatedBefore"
+        - $ref: "#/components/parameters/PlatformAuditActorId"
+        - $ref: "#/components/parameters/PlatformAuditActorType"
+        - $ref: "#/components/parameters/PlatformAuditActorRole"
+        - $ref: "#/components/parameters/PlatformAuditActorName"
+      responses:
+        "200":
+          description: >
+            CSV (Content-Disposition attachment, audit-log-YYYY-MM-DD-utc.csv, UTC date). Header row
+            id,createdAt,tenantId,tenantName,tenantSlug,actorType,actorId,actorName,actorRole,ipAddress,action,entityType,entityId,before,after
+          content:
+            text/csv:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no audit_compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1444,6 +1872,49 @@ components:
         tenant/role headers.
 
   parameters:
+    PlatformAuditTenantId:
+      name: tenantId
+      in: query
+      schema: { type: string, format: uuid }
+    PlatformAuditAction:
+      name: action
+      in: query
+      description: Exact action, e.g. patient.create
+      schema: { type: string }
+    PlatformAuditEntityType:
+      name: entityType
+      in: query
+      schema: { type: string }
+    PlatformAuditCreatedAfter:
+      name: createdAfter
+      in: query
+      description: Inclusive lower bound (ISO-8601 instant, e.g. 2026-10-01T00:00:00Z)
+      schema: { type: string, format: date-time }
+    PlatformAuditCreatedBefore:
+      name: createdBefore
+      in: query
+      description: Inclusive upper bound (ISO-8601 instant)
+      schema: { type: string, format: date-time }
+    PlatformAuditActorId:
+      name: actorId
+      in: query
+      description: Exact actor id (staff id or operator id)
+      schema: { type: string, format: uuid }
+    PlatformAuditActorType:
+      name: actorType
+      in: query
+      description: Any other value is 400 invalid-actor-type
+      schema: { type: string, enum: [staff, operator, system] }
+    PlatformAuditActorRole:
+      name: actorRole
+      in: query
+      description: Case-insensitive exact match on the role label snapshot (e.g. Doctor, super_admin)
+      schema: { type: string }
+    PlatformAuditActorName:
+      name: actorName
+      in: query
+      description: Case-insensitive substring of the actor name snapshot; % and _ match literally. audit_log stores no actor email.
+      schema: { type: string }
     PathId:
       name: id
       in: path
@@ -1499,6 +1970,41 @@ components:
       properties:
         type: { type: string, enum: [visit_summary, referral, certificate] }
         body: { $ref: "#/components/schemas/ClinicalDocumentBody" }
+    NoteTemplate:
+      type: object
+      required: [id, name, subjective, objective, assessment, plan, tags, favourite, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        subjective: { type: string }
+        objective: { type: string }
+        assessment: { type: string }
+        plan: { type: string }
+        tags: { type: array, items: { type: string } }
+        favourite: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    NoteTemplateCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 80 }
+        subjective: { type: [string, "null"], maxLength: 4000 }
+        objective: { type: [string, "null"], maxLength: 4000 }
+        assessment: { type: [string, "null"], maxLength: 4000 }
+        plan: { type: [string, "null"], maxLength: 4000 }
+        tags: { type: [array, "null"], maxItems: 10, items: { type: string, maxLength: 30 } }
+        favourite: { type: [boolean, "null"] }
+    NoteTemplateUpdate:
+      type: object
+      properties:
+        name: { type: [string, "null"], maxLength: 80 }
+        subjective: { type: [string, "null"], maxLength: 4000 }
+        objective: { type: [string, "null"], maxLength: 4000 }
+        assessment: { type: [string, "null"], maxLength: 4000 }
+        plan: { type: [string, "null"], maxLength: 4000 }
+        tags: { type: [array, "null"], maxItems: 10, items: { type: string, maxLength: 30 } }
+        favourite: { type: [boolean, "null"] }
     ClinicalDocumentUpdate:
       type: object
       properties:
@@ -1540,6 +2046,35 @@ components:
         issuedAt: { type: [string, "null"], format: date-time }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    VaccineRecordWrite:
+      type: object
+      required: [patientId, vaccineName, dose, route]
+      properties:
+        patientId: { type: string, format: uuid }
+        queueEntryId: { type: [string, "null"], format: uuid }
+        vaccineName: { type: string, maxLength: 200 }
+        dose: { type: string, maxLength: 100 }
+        route: { type: string, enum: [IM, IV, SC, infusion, oral, topical] }
+        site: { type: [string, "null"], maxLength: 100 }
+        lotNumber: { type: [string, "null"], maxLength: 100 }
+        expiryDate: { type: [string, "null"], format: date }
+        notes: { type: [string, "null"], maxLength: 1000 }
+    VaccineRecord:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        queueEntryId: { type: [string, "null"], format: uuid }
+        vaccineName: { type: string }
+        dose: { type: string }
+        route: { type: string }
+        site: { type: [string, "null"] }
+        lotNumber: { type: [string, "null"] }
+        expiryDate: { type: [string, "null"], format: date }
+        notes: { type: [string, "null"] }
+        recordedByName: { type: string }
+        administeredAt: { type: string, format: date-time }
     Allergy:
       type: object
       properties:
@@ -1555,6 +2090,9 @@ components:
         recordedByName: { type: [string, "null"] }
         recordedAt: { type: string, format: date-time }
         updatedAt: { type: [string, "null"], format: date-time }
+        deactivatedReason: { type: [string, "null"], description: "Why the entry was removed; null while active" }
+        deactivatedAt: { type: [string, "null"], format: date-time }
+        deactivatedByName: { type: [string, "null"] }
     AllergyWrite:
       type: object
       required: [substance, severity]
@@ -1634,6 +2172,38 @@ components:
         code: { type: [string, "null"], description: "Pharmacy item code (pharmacy only)" }
         inStock: { type: [boolean, "null"] }
         prescriptionOnly: { type: [boolean, "null"] }
+    FavouriteRxSet:
+      type: object
+      description: "DOC-035. scope is relative to the caller. staleCheckAvailable false = the tenant has no active pharmacy items, so staleness is unknown (staleItemCount 0 does not mean up to date)."
+      properties:
+        id: { type: string, format: uuid }
+        doctorId: { type: [string, "null"], format: uuid, description: "null = clinic standard" }
+        ownerName: { type: [string, "null"] }
+        name: { type: string }
+        scope: { type: string, enum: [mine, shared, standard] }
+        shared: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastUsedAt: { type: [string, "null"], format: date-time }
+        staleCheckAvailable: { type: boolean }
+        staleItemCount: { type: integer }
+        canEdit: { type: boolean, description: "caller is the owner or holds clinical:approve" }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              drugName: { type: string }
+              dosage: { type: [string, "null"] }
+              frequency: { type: [string, "null"] }
+              duration: { type: [string, "null"] }
+              instructions: { type: [string, "null"] }
+              brandName: { type: [string, "null"] }
+              sigPattern: { type: [string, "null"] }
+              route: { type: [string, "null"] }
+              quantity: { type: [number, "null"] }
+              quantityUnit: { type: [string, "null"] }
+              stale: { type: [boolean, "null"] }
     RxWarning:
       type: object
       properties:
@@ -1656,6 +2226,14 @@ components:
             by: { type: string, format: uuid }
             byName: { type: [string, "null"] }
             at: { type: string, format: date-time }
+    PrescriptionWarning:
+      type: object
+      required: [itemIndex, kind, severity, message]
+      properties:
+        itemIndex: { type: integer, minimum: 0, description: "0-based index into the response's items" }
+        kind: { type: string, enum: [allergy] }
+        severity: { type: string, enum: [mild, moderate, severe] }
+        message: { type: string }
     PrescriptionItem:
       type: object
       properties:
@@ -1736,6 +2314,14 @@ components:
         recordedBy: { type: string, format: uuid }
         recordedAt: { type: string, format: date-time }
         abnormalFlags: { type: array, items: { type: string } }
+    DoseCalculation:
+      type: object
+      properties:
+        weightKg: { type: number }
+        mgPerKg: { type: number }
+        totalDoseMg: { type: number }
+        ruleSource: { type: string }
+        weightRecordedAt: { type: [string, "null"], format: date-time, description: When the weight used was recorded. Null when unknown (weight saved before the date was tracked); never estimated from the visit row time. Clients should treat null as stale. }
     PharmacyItem:
       type: object
       properties:
@@ -1791,6 +2377,43 @@ components:
         signedAt: { type: [string, "null"], format: date-time }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
+        warnings:
+          type: array
+          description: >-
+            DOC-031. Flat structured allergy matches across all lines (same check as items[].warnings and the legacy
+            allergyWarning strings, which are kept). Recomputed on every read. Pregnancy and controlled-substance
+            warnings are not included here (they have no mild/moderate/severe severity); read them from items[].warnings.
+            A severe match still blocks signing (409 warning-unresolved) until an override reason is recorded.
+          items: { $ref: "#/components/schemas/PrescriptionWarning" }
+        allergySnapshot:
+          description: >-
+            DOC-R3: the allergy statement captured when this prescription was signed (what the sign gate checked).
+            Never recomputed, so later allergy-register changes do not alter it. Null for a draft, and null for a
+            prescription signed before this snapshot existed (migration V79); a signed prescription with a null
+            snapshot must be shown as "allergy status at signing not recorded", never filled from the current register.
+          oneOf:
+            - { $ref: "#/components/schemas/PrescriptionAllergySnapshot" }
+            - { type: "null" }
+    PrescriptionAllergySnapshot:
+      type: object
+      required: [state, allergies]
+      properties:
+        state:
+          type: string
+          enum: [recorded, none_documented, not_assessed]
+          description: Same meaning as AllergyStatus.state, at the moment of signing.
+        allergies:
+          type: array
+          description: Active register entries at signing (empty unless state is recorded).
+          items:
+            type: object
+            properties:
+              substance: { type: string }
+              severity: { type: string }
+              reaction: { type: [string, "null"] }
+        documentedBy: { type: [string, "null"], format: uuid, description: "Who documented no known allergies; null unless none_documented" }
+        documentedByName: { type: [string, "null"] }
+        documentedAt: { type: [string, "null"], format: date-time }
     Problem:
       type: object
       description: RFC 7807
@@ -1809,6 +2432,24 @@ components:
               field: { type: string }
               message: { type: string }
 
+    PlatformAuditEntry:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        tenantId: { type: string, format: uuid }
+        tenantName: { type: string }
+        tenantSlug: { type: string }
+        actorType: { type: string, enum: [staff, operator, system] }
+        actorId: { type: [string, "null"], format: uuid }
+        actorName: { type: string }
+        actorRole: { type: string }
+        ipAddress: { type: [string, "null"] }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: [string, "null"], format: uuid }
+        before: { description: Prior state as stored (JSON), null for a create }
+        after: { description: New state as stored (JSON), null for a delete }
+        createdAt: { type: string, format: date-time }
     PageMeta:
       type: object
       properties:
@@ -1911,6 +2552,22 @@ components:
         mobileVerified: { type: boolean, description: "Patient data is unreachable until both this and emailVerified are true (NB-041)" }
         lastSeenAt: { type: [string, "null"], format: date-time }
         professionalRegistrationNo: { type: [string, "null"], description: "DOC-N1. Medical council / SCFHS registration number; null when not set" }
+        loginMethod:
+          type: string
+          readOnly: true
+          enum: [owner_account, invite_pending, authenticator, authenticator_setup_required, pin_or_whatsapp_otp, pin, whatsapp_otp, none]
+          description: >
+            OWN-034. Derived from stored credentials, first match wins: owner_account (Owner-linked row; signs in
+            through /owners/auth/login with the Owner's email + PIN), invite_pending (invite not accepted), authenticator
+            (MFA enrolled; every sign-in ends with a TOTP code), authenticator_setup_required (role requires MFA, not yet
+            enrolled; next sign-in forces enrolment), then the first factors available: pin_or_whatsapp_otp, pin,
+            whatsapp_otp, none. Which first factor was actually used at a sign-in is not recorded, so it is never guessed.
+            Independent of status (a suspended account keeps its method but cannot sign in).
+        loginFactors:
+          type: array
+          readOnly: true
+          items: { type: string, enum: [pin, whatsapp_otp, authenticator] }
+          description: "OWN-034. Factors this staff row can use: pin (PIN set), whatsapp_otp (mobile on file), authenticator (MFA enrolled). Empty for invite_pending and owner_account."
 
     RoleWrite:
       type: object
@@ -1942,7 +2599,10 @@ components:
         edit: { type: boolean, default: false }
         delete: { type: boolean, default: false }
         approve: { type: boolean, default: false }
-        refundDiscount: { type: boolean, default: false }
+        refundDiscount:
+          type: boolean
+          default: false
+          description: On the billing module this also puts the string `billing.discount` in the JWT/session permissions list; POST /v1/billing/checkout/{queueEntryId} and /v1/billing/otc-checkout return 403 (discount-not-permitted) for a non-zero discount without it.
         export: { type: boolean, default: false }
 
     Tenant:
@@ -1980,6 +2640,9 @@ components:
         nationalId:
           type: [string, "null"]
           description: "Aadhaar/Iqama — column-level encrypted at rest (NB-140), never returned in list responses"
+        confirmedNotDuplicate:
+          type: [boolean, "null"]
+          description: "Set after staff reviewed the 409 duplicate candidates and confirmed this is a different person; skips the duplicate check"
 
     PatientPatch:
       type: object
@@ -2020,13 +2683,57 @@ components:
             outstandingBalance: { type: number }
             lastVisitAt: { type: [string, "null"], format: date-time }
 
+    PatientRegistryRow:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        mrn: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        age: { type: integer }
+        gender: { type: string }
+        minor: { type: boolean }
+        lastVisit: { type: [string, "null"], format: date }
+        nextAppointment: { type: [string, "null"], format: date-time }
+        nextDoctorName: { type: [string, "null"] }
+        nextDoctorId: { type: [string, "null"], format: uuid }
+        nextAppointmentId: { type: [string, "null"], format: uuid }
+        nextAppointmentToday: { type: boolean }
+        packageSessionsUsed: { type: [integer, "null"] }
+        packageSessionsTotal: { type: [integer, "null"] }
+        condition: { type: [string, "null"] }
+        followUpDue: { type: boolean }
+        allergy: { type: [string, "null"] }
+        balanceDue: { type: boolean }
+        duplicate: { type: boolean }
+        archived: { type: boolean }
+        queueToken: { type: [integer, "null"] }
+        queueStatus: { type: [string, "null"] }
+        tags: { type: array, items: { type: string, enum: [recent, followup, package, balance, duplicate, archived] } }
+
     PatientMatchCandidate:
       type: object
+      description: >
+        A likely duplicate returned with the 409 on registration. Never carries the national ID
+        (it is not compared and not returned).
       properties:
         patientId: { type: string, format: uuid }
         name: { type: string }
         phone: { type: string }
-        matchScore: { type: number }
+        matchScore:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >
+            0..1, not a percentage. 1.0 when the mobile number matches (digits only); otherwise the
+            trigram similarity of the names when the date of birth matches. Candidates are returned
+            highest score first (at most 5).
+        matchedFields:
+          type: array
+          description: >
+            REC-038: which compared fields agreed, in this order: phone (same digits), dob (same date),
+            name (trigram similarity above 0.3). Only these three fields are compared.
+          items: { type: string, enum: [phone, dob, name] }
 
     WorkingHoursWrite:
       type: object
@@ -2065,6 +2772,19 @@ components:
         patientId: { type: string, format: uuid }
         doctorId: { type: string, format: uuid }
         startTime: { type: string, format: date-time }
+
+    WaitlistEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        patientName: { type: string }
+        joinedAt: { type: string, format: date-time }
+        status: { type: string, enum: [waiting, offered, booked, expired, cancelled] }
+        offeredSlotStart: { type: [string, "null"], format: date-time }
+        offerExpiresAt: { type: [string, "null"], format: date-time }
+        bookedAppointmentId: { type: [string, "null"], format: uuid }
 
     Appointment:
       type: object
@@ -2341,3 +3061,33 @@ components:
         id: { type: string, format: uuid }
         name: { type: string }
         roleName: { type: string }
+
+    MoneyReport:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        includesToday: { type: boolean }
+        currency: { type: string, enum: [INR, SAR] }
+        taxLabel: { type: string, enum: [GST, VAT] }
+        collected: { type: number, description: "Exact decimal sum of payments recorded in the period" }
+        billsRaised: { type: integer }
+        taxCollected: { type: number }
+        noShows: { type: integer }
+        bookings: { type: integer }
+        waitingNow: { type: [integer, "null"], description: "Only set while the period includes today" }
+        tender:
+          type: array
+          items:
+            type: object
+            properties:
+              method: { type: string, enum: [cash, card, upi, other] }
+              amount: { type: number, description: "Exact decimal sum for this method" }
+              count: { type: integer, description: "OWN-023. Number of payments recorded with this method in the period. There is no refund count: payments are never negative or reversed in the data model." }
+        topServices:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              revenue: { type: number }

@@ -98,6 +98,65 @@ class PatientApiTest extends ApiTestBase {
         assertThat(resp.getBody()).containsKey("candidates");
     }
 
+    /** REC-038: each candidate says which compared fields matched; the score is 0..1; no national ID is ever echoed. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void duplicateCandidatesReportMatchedFieldsAndNeverTheNationalId() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "dupfields@a.com", "+919300000038", false);
+        String token = loginAndGetAccessToken(staff);
+        String nationalId = "1098765432";
+        ResponseEntity<Map> first = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Mohammed Alharbi", "phone", "+919888803801", "dob", "1985-03-15", "gender", "male",
+                "nationalId", nationalId)), Map.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String firstId = (String) first.getBody().get("id");
+
+        // same phone (typed another way), same DOB, near-identical name, same national ID
+        ResponseEntity<String> all = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Mohammed Al-Harbi", "phone", "98888 03801", "dob", "1985-03-15", "gender", "male",
+                "nationalId", nationalId)), String.class);
+        assertThat(all.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(all.getBody()).doesNotContain(nationalId).doesNotContain("nationalId");
+        Map<String, Object> allCandidate = onlyCandidate(all.getBody());
+        assertThat(allCandidate).containsEntry("patientId", firstId);
+        assertThat((List<String>) allCandidate.get("matchedFields")).containsExactly("phone", "dob", "name");
+        assertThat(((Number) allCandidate.get("matchScore")).doubleValue()).isEqualTo(1.0);
+
+        // phone only: different person on the same number
+        ResponseEntity<String> phoneOnly = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Zainab Qureshi", "phone", "+919888803801", "dob", "2001-11-30", "gender", "female")), String.class);
+        assertThat(phoneOnly.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat((List<String>) onlyCandidate(phoneOnly.getBody()).get("matchedFields")).containsExactly("phone");
+
+        // DOB + similar name on a different phone: the fuzzy rule, score is the 0..1 name similarity
+        ResponseEntity<String> fuzzy = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Mohamed Alharbi", "phone", "+919888803899", "dob", "1985-03-15", "gender", "male")), String.class);
+        assertThat(fuzzy.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        Map<String, Object> fuzzyCandidate = onlyCandidate(fuzzy.getBody());
+        assertThat((List<String>) fuzzyCandidate.get("matchedFields")).containsExactly("dob", "name");
+        assertThat(((Number) fuzzyCandidate.get("matchScore")).doubleValue()).isGreaterThan(0.3).isLessThan(1.0);
+
+        // tenant isolation: the same phone in another clinic matches nothing there
+        SeededTenant other = seedTenant();
+        SeededStaff otherStaff = seedStaff(other, seedFullAccessRole(other.id()), "dupfields2@a.com", "+919300000039", false);
+        ResponseEntity<Map> elsewhere = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(loginAndGetAccessToken(otherStaff), Map.of(
+                "name", "Mohammed Alharbi", "phone", "+919888803801", "dob", "1985-03-15", "gender", "male")), Map.class);
+        assertThat(elsewhere.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> onlyCandidate(String body) {
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(body, Map.class);
+            List<Map<String, Object>> candidates = (List<Map<String, Object>>) parsed.get("candidates");
+            assertThat(candidates).hasSize(1);
+            return candidates.get(0);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @Test
     void listRequiresFullyVerifiedCaller() {
         SeededTenant tenant = seedTenant();
@@ -397,6 +456,59 @@ class PatientApiTest extends ApiTestBase {
         assertThat(nationalIdEnc).isNotNull();
         assertThat(new String(cipher.decrypt(nationalIdEnc), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("123456789012");
         assertThat(exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody().get("guardianId")).isNull();
+    }
+
+    @Test
+    void deleteGuardianRevokesOnlyGuardianAndKeepsAddressAndNationalId() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam6@a.com", "+919300000025", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatientWithDob(token, "Guardian F", "+919888800031", "1975-05-05");
+        String dob = java.time.LocalDate.now().minusYears(19).toString();
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Revoke Me", "phone", "+919888800032", "dob", dob, "gender", "female", "guardianId", guardianId,
+                "address", "34 Test Lane", "nationalId", "555566667777")), Map.class);
+        UUID patientId = UUID.fromString((String) created.getBody().get("id"));
+
+        ResponseEntity<Void> revoked = exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Void.class);
+        assertThat(revoked.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        Map<String, Object> row = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT address, national_id_enc, guardian_id FROM patients WHERE id = ?", patientId));
+        assertThat(row.get("guardian_id")).isNull();
+        assertThat(row.get("address")).isEqualTo("34 Test Lane");
+        assertThat(new String(cipher.decrypt((byte[]) row.get("national_id_enc")), java.nio.charset.StandardCharsets.UTF_8))
+                .isEqualTo("555566667777");
+        // append-only consents: the grant row stays, a later withdrawn row supersedes it; the API view must show no guardian
+        Map<?, ?> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(detail.get("guardianId")).isNull();
+        assertThat(detail.get("guardianConsentGrantedAt")).isNull();
+        Long revokeAudit = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE entity_id = ? AND action = 'patient.guardian_revoke'", Long.class, patientId));
+        assertThat(revokeAudit).isEqualTo(1);
+
+        // idempotent: nothing left to revoke, still 204, no second audit row
+        assertThat(exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Void.class).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    void deleteGuardianOfMinorIsRejected() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "fam7@a.com", "+919300000026", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatientWithDob(token, "Guardian G", "+919888800033", "1975-06-06");
+        ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Little One", "phone", "+919888800034", "dob", java.time.LocalDate.now().minusYears(5).toString(),
+                "gender", "male", "guardianId", guardianId)), Map.class);
+        String patientId = (String) created.getBody().get("id");
+
+        ResponseEntity<Map> resp = exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().get("type")).asString().contains("guardian-required");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody().get("guardianId")).isEqualTo(guardianId);
     }
 
     @Test

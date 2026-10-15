@@ -72,9 +72,16 @@ public class PatientService {
     private static final int REGISTRY_CAP = 3000;
     private static final int REGISTRY_ROWS = 200;
 
-    /** Patient Registry: per-patient visit/appointment/package/balance/clinical flags, one count per filter. */
+    /**
+     * Patient Registry: per-patient visit/appointment/package/balance/clinical flags, one count per filter.
+     * REC-040: rows are paged with limit (clamped to 1..REGISTRY_ROWS, default REGISTRY_ROWS, so a call without
+     * paging params behaves exactly as before) and an opaque offset cursor over the name-then-id ordered result.
+     * Offset, not keyset: the rows are filtered and searched in memory (see REGISTRY_CAP), and the order is
+     * stable (name, id), so a page boundary only shifts if patients are added or removed between requests.
+     */
     @Transactional(readOnly = true)
-    public PatientRegistryResponse registry(UUID tenantId, UUID callerStaffId, String q, String filter) {
+    public PatientRegistryResponse registry(UUID tenantId, UUID callerStaffId, String q, String filter,
+                                            Integer limit, String cursor) {
         UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         String f = filter == null || filter.isBlank() ? "all" : filter;
@@ -108,11 +115,42 @@ public class PatientService {
             counts.put(key, (int) all.stream().filter(r -> inFilter(r, key)).count());
         }
         String needle = q == null ? "" : q.strip().toLowerCase();
-        List<PatientRegistryResponse.Row> rows = all.stream()
+        List<PatientRegistryResponse.Row> matched = all.stream()
                 .filter(r -> inFilter(r, f))
                 .filter(r -> needle.isEmpty() || matches(r, needle))
-                .limit(REGISTRY_ROWS).toList();
-        return new PatientRegistryResponse(counts.get("all"), counts, rows);
+                .toList();
+        int size = limit == null ? REGISTRY_ROWS : Math.max(1, Math.min(limit, REGISTRY_ROWS));
+        int offset = cursor == null ? 0 : decodeRegistryCursor(cursor);
+        int from = Math.min(offset, matched.size());
+        int to = Math.min(from + size, matched.size());
+        boolean hasMore = to < matched.size();
+        String nextCursor = hasMore ? encodeRegistryCursor(to) : null;
+        return new PatientRegistryResponse(counts.get("all"), counts, matched.subList(from, to),
+                matched.size(), hasMore, new PageMeta(nextCursor, size));
+    }
+
+    private static final String REGISTRY_CURSOR_PREFIX = "reg:";
+
+    private static String encodeRegistryCursor(int offset) {
+        return java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString((REGISTRY_CURSOR_PREFIX + offset).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** Same 400 invalid-cursor problem as common.Cursor for anything that isn't a cursor this endpoint issued. */
+    private static int decodeRegistryCursor(String value) {
+        try {
+            String raw = new String(java.util.Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+            if (raw.startsWith(REGISTRY_CURSOR_PREFIX)) {
+                int offset = Integer.parseInt(raw.substring(REGISTRY_CURSOR_PREFIX.length()));
+                if (offset >= 0) {
+                    return offset;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // fall through to the 400 below
+        }
+        throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-cursor", "Invalid cursor",
+                "The pagination cursor is malformed.");
     }
 
     private static boolean inFilter(PatientRegistryResponse.Row r, String filter) {
@@ -170,7 +208,7 @@ public class PatientService {
             log.info("patient registration blocked by {}: {} duplicate candidate(s) (tenant {})",
                     callerStaffId, candidates.size(), tenantId);
             return new DuplicateCandidatesResponse(candidates.stream()
-                    .map(c -> new PatientMatchCandidateResponse(c.id(), c.name(), c.phone(), c.matchScore()))
+                    .map(c -> new PatientMatchCandidateResponse(c.id(), c.name(), c.phone(), c.matchScore(), c.matchedFields()))
                     .toList());
         }
 
@@ -280,6 +318,24 @@ public class PatientService {
             case "dob" -> req.dob();
             default -> req.gender();
         };
+    }
+
+    /** CGV-001: dedicated guardian revoke. Touches ONLY guardian_id and the guardian_access consent, so the
+     * address / national ID can never be wiped by it. Idempotent: no guardian on file is a no-op 204. A minor
+     * still needs a guardian (same rule as PATCH), so revoking one is rejected with guardian-required. */
+    @Transactional
+    public void revokeGuardian(UUID tenantId, UUID callerStaffId, UUID id) {
+        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        tenantContext.set(tenantId);
+        PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
+                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+        if (before.guardianId() == null) {
+            return;
+        }
+        validateGuardian(tenantId, before.dob(), null);
+        repo.update(tenantId, id, java.util.Collections.singletonMap("guardian_id", null));
+        changeGuardian(tenantId, callerStaffId, id, before.guardianId(), null);
+        log.info("guardian revoked for patient {} by {} (tenant {})", id, callerStaffId, tenantId);
     }
 
     /** NB-082: patients who've turned 18 but still have a guardian on file — the "automatic" part

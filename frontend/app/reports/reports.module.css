@@ -297,6 +297,12 @@
   color: var(--nb-text-secondary);
 }
 
+.columnSub {
+  color: var(--nb-text-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
 .hbarRow {
   display: grid;
   grid-template-columns: 140px 1fr;

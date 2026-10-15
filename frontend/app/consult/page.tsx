@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Dialog from "../components/ui/Dialog";
-import Icon from "../components/ui/Icon";
+import Icon, { type IconName } from "../components/ui/Icon";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
@@ -12,18 +12,29 @@ import { getIdentity } from "../lib/session";
 import { useClinicalContext } from "../components/consult/clinical";
 import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
+import ConsultTimer from "../components/consult/ConsultTimer";
+import DiagnosisField from "../components/consult/DiagnosisField";
+import NoteTemplates from "../components/consult/NoteTemplates";
+import DoseCalculator from "../components/consult/DoseCalculator";
 import DentalDrawer from "../components/consult/DentalDrawer";
+import DoctorOrders from "../components/consult/DoctorOrders";
 import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
+import PackageSessionCard from "../components/consult/PackageSessionCard";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import RxPad from "../components/consult/RxPad";
+import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
 import VisitOutputs from "../components/consult/VisitOutputs";
+import VisitTimeline from "../components/consult/VisitTimeline";
+import {
+  buildTimeline, DEFAULT_START_STATUS, NOTE_FIELD_LABEL, NOTE_TITLE, nextPatient, queueStatusLabel, statusBeforeConsult, statusSequence,
+} from "../components/consult/consultFlow";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
-  age, DONE_STATUSES, initials, minutesSince, rxItemLine, statusLabel, WAITING_STATUSES,
+  age, DONE_STATUSES, initials, minutesSince, rxItemLine, WAITING_STATUSES,
   type PatientDetail, type Prescription, type PrescriptionItem, type Problem, type QueueEntry, type Row, type RxWarning,
 } from "../components/consult/shared";
 import p from "../components/consult/consultParts.module.css";
@@ -38,18 +49,17 @@ type Note = {
   diagnosis: string | null; status: string; signedAt: string | null; updatedAt: string;
 };
 type NoteDraft = NoteFields;
-type FavouriteRxSet = { id: string; doctorId: string | null; name: string; items: PrescriptionItem[] };
-type DoseResult = { weightKg: number; mgPerKg: number; totalDoseMg: number; ruleSource: string };
 type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis: string | null; createdAt: string };
 type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 type Step = "reason" | "examine" | "assess" | "plan" | "close";
 
-const STEPS: { id: Step; label: string; hint: string }[] = [
-  { id: "reason", label: "Reason", hint: "Read the complaint and vitals" },
-  { id: "examine", label: "Examine", hint: "Record history and findings" },
-  { id: "assess", label: "Assess", hint: "Assessment and diagnosis" },
-  { id: "plan", label: "Plan", hint: "Treatment and prescription" },
-  { id: "close", label: "Close", hint: "Review and hand off" },
+// Step rail and the one-line note for the current step (wireframe cwSteps / cwStepNote).
+const STEPS: { id: Step; label: string; hint: string; icon: IconName }[] = [
+  { id: "reason", label: "Reason", hint: "Why they came — read, don't type.", icon: "inbox" },
+  { id: "examine", label: "Examine", hint: "Specialty tools live here, inside the consult — no second screen.", icon: "stethoscope" },
+  { id: "assess", label: "Assess", hint: "Two or three lines. Quick phrases cover most of it.", icon: "list" },
+  { id: "plan", label: "Plan", hint: "Prescribe, order, follow up — actions only.", icon: "pulse" },
+  { id: "close", label: "Close", hint: "What stays open after this visit.", icon: "check" },
 ];
 
 const BLANK_RX_ITEM: PrescriptionItem = { drugName: "", dosage: "", frequency: "", duration: "", instructions: "" };
@@ -84,7 +94,7 @@ const STATUS_TONE: Record<string, { tone: PillTone; icon?: Parameters<typeof Sta
 };
 function StatusBadge({ status }: { status: string }) {
   const t = STATUS_TONE[status] ?? { tone: "neutral" as PillTone };
-  return <StatusPill tone={t.tone} icon={t.icon} label={statusLabel(status)} />;
+  return <StatusPill tone={t.tone} icon={t.icon} label={queueStatusLabel(status)} />;
 }
 
 function decodeJwt(token: string): Record<string, unknown> {
@@ -116,6 +126,9 @@ export default function ConsultPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [selfId, setSelfId] = useState("");
   const [now, setNow] = useState(0);
+  // departmentId -> the status a visit must be in before it can move to in_consult (that
+  // department's configured pipeline; a department without vitals starts from "waiting").
+  const [startStatus, setStartStatus] = useState<Record<string, string | null>>({});
   // The URL mirrors the open visit, but only once a ?entry= deep link has been read; otherwise the
   // mirror effect would strip the params on mount, before the deep link is consumed.
   const [urlReady, setUrlReady] = useState(false);
@@ -125,6 +138,12 @@ export default function ConsultPage() {
   const [step, setStep] = useState<Step>("reason");
   const [note, setNote] = useState<NoteDraft>(BLANK_DRAFT);
   const [noteStatus, setNoteStatus] = useState<"draft" | "signed">("draft");
+  const [signedAt, setSignedAt] = useState<string | null>(null);
+  // Editing and saving wait until the server note is known; a failed load must never let a save
+  // replace the server's draft with blank or partial fields (T1-BUG-3).
+  const [noteLoad, setNoteLoad] = useState<"loading" | "ok" | "error">("loading");
+  const noteLoadRef = useRef<"loading" | "ok" | "error">("loading");
+  const [orphanText, setOrphanText] = useState<NoteFields | null>(null); // local text not applied because the note was signed elsewhere
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -135,7 +154,8 @@ export default function ConsultPage() {
   const [completing, setCompleting] = useState(false);
   const [closeAck, setCloseAck] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
-  const [followUpLabel, setFollowUpLabel] = useState<string | null>(null);
+  // undefined = not known (still checking, or the lookup failed): never shown as "Not set" (T1-BUG-2).
+  const [followUpLabel, setFollowUpLabel] = useState<string | null | undefined>(undefined);
   const [preview, setPreview] = useState<Row | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -158,11 +178,6 @@ export default function ConsultPage() {
   const [showAllergies, setShowAllergies] = useState(false);
   const [signing, setSigning] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
-  const [favouriteSets, setFavouriteSets] = useState<FavouriteRxSet[]>([]);
-  const [newSetName, setNewSetName] = useState("");
-  const [doseMgPerKg, setDoseMgPerKg] = useState("");
-  const [doseResult, setDoseResult] = useState<DoseResult | null>(null);
-  const [doseError, setDoseError] = useState<string | null>(null);
   const [amendments, setAmendments] = useState<NoteAmendment[]>([]);
   const [showAmendForm, setShowAmendForm] = useState(false);
   const [amendReason, setAmendReason] = useState("");
@@ -242,6 +257,20 @@ export default function ConsultPage() {
         return { ...e, patientName: patient?.name ?? "Unknown patient", patient };
       }));
       setRows(withNames);
+      // One flow lookup per department, so "Start consultation" is offered exactly where the server
+      // will accept the move. An unreadable flow falls back to the default pipeline (vitals first).
+      const depts = [...new Set(entries.map((e) => e.departmentId))];
+      const flows = await Promise.all(depts.map(async (d) => {
+        try {
+          const r = await authedFetch(`/departments/${d}/flow`);
+          if (!r?.ok) return [d, DEFAULT_START_STATUS] as const;
+          const steps: { stepType: string }[] = await r.json();
+          return [d, statusBeforeConsult(statusSequence(steps.map((x) => x.stepType)))] as const;
+        } catch {
+          return [d, DEFAULT_START_STATUS] as const;
+        }
+      }));
+      setStartStatus(Object.fromEntries(flows));
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -306,6 +335,7 @@ export default function ConsultPage() {
 
   async function saveNote(entryId: string) {
     if (conflictRef.current) return null; // never overwrite while a conflict is unresolved
+    if (noteLoadRef.current !== "ok") return null; // the server copy was never read: nothing to save over
     const sent = noteRef.current;
     if (!navigator.onLine) {
       setSaveState("offline");
@@ -319,6 +349,20 @@ export default function ConsultPage() {
         const g = await authedFetch(`/clinical/notes/${entryId}`);
         if (g?.status === 200) {
           const server: Note = await g.json();
+          if (server.status === "signed") {
+            // Signed from another session while this device held unsaved text: never overwrite a
+            // signed note. Lock the view to the server copy and keep the local text visible.
+            needsServerCheckRef.current = false;
+            baseUpdatedRef.current = server.updatedAt;
+            setNote(toFields(server));
+            setNoteStatus("signed");
+            setSignedAt(server.signedAt);
+            setDirty(false);
+            setSaveState("idle");
+            setOrphanText(sameFields(toFields(server), sent) ? null : sent);
+            void deleteDraft(entryId);
+            return null;
+          }
           if (server.updatedAt !== baseUpdatedRef.current && !sameFields(toFields(server), sent)) {
             setConflict({ mine: sent, server: toFields(server), serverUpdatedAt: server.updatedAt });
             setConflictOpen(true);
@@ -375,6 +419,12 @@ export default function ConsultPage() {
 
   // ---- opening visits -----------------------------------------------------------------------
 
+  // Who may start which visit: the visit doctor, from the status just before in_consult.
+  const canStartRow = (r: Row) => {
+    const from = r.departmentId in startStatus ? startStatus[r.departmentId] : DEFAULT_START_STATUS;
+    return r.doctorId === selfId && from !== null && r.status === from;
+  };
+
   function openRow(row: Row) {
     setPreviewError(null);
     if (row.status === "in_consult" && row.doctorId === selfId) void openConsult(row);
@@ -422,6 +472,10 @@ export default function ConsultPage() {
     setStep(wantStep ?? "reason");
     setNote(BLANK_DRAFT);
     setNoteStatus("draft");
+    setSignedAt(null);
+    setOrphanText(null);
+    noteLoadRef.current = "loading";
+    setNoteLoad("loading");
     setDirty(false);
     setLastSavedAt(null);
     setSaveState("idle");
@@ -429,7 +483,7 @@ export default function ConsultPage() {
     setNotice(null);
     setShellError(null);
     setCloseAck(false);
-    setFollowUpLabel(null);
+    setFollowUpLabel(undefined);
     setShowDental(false);
     setRxItems([]);
     setRxStatus("draft");
@@ -437,11 +491,6 @@ export default function ConsultPage() {
     setRxDirty(false);
     setOverride(null);
     setShowAllergies(false);
-    setFavouriteSets([]);
-    setNewSetName("");
-    setDoseMgPerKg("");
-    setDoseResult(null);
-    setDoseError(null);
     setAmendments([]);
     setShowAmendForm(false);
     setAmendReason("");
@@ -450,10 +499,6 @@ export default function ConsultPage() {
     needsServerCheckRef.current = false;
 
     try {
-      const setsRes = await authedFetch("/clinical/rx-sets");
-      if (stale()) return;
-      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
-
       const pRes = await authedFetch(`/patients/${row.patientId}`);
       if (stale()) return;
       if (pRes?.ok) setActivePatient(await pRes.json());
@@ -466,23 +511,29 @@ export default function ConsultPage() {
         baseUpdatedRef.current = server!.updatedAt;
         setNote(toFields(server!));
         setNoteStatus(server!.status as "draft" | "signed");
+        setSignedAt(server!.signedAt);
         if (server!.status === "signed") {
           const aRes = await authedFetch(`/clinical/notes/${row.id}/amendments`);
           if (stale()) return;
           if (aRes?.ok) setAmendments(await aRes.json());
         }
       } else if (nRes && nRes.status !== 404) {
-        setShellError("Couldn't load the note. Reload before typing so nothing is overwritten.");
+        noteLoadRef.current = "error";
+        setNoteLoad("error");
       }
+      if (!nRes) return;
+      if (noteLoadRef.current === "loading") { noteLoadRef.current = "ok"; setNoteLoad("ok"); }
 
       // A local draft means the last save never reached the server (offline, crash, reload).
-      const draft = await readDraft(row.id);
+      // Not when the note failed to load: the draft is kept untouched for the next successful open.
+      const draft = noteLoadRef.current === "ok" ? await readDraft(row.id) : null;
       if (stale()) return;
       if (draft) {
         const serverFields = server ? toFields(server) : BLANK_DRAFT;
         if (server?.status === "signed") {
+          // Same as the reconnect path: never applied to a signed note, but listed for an amendment.
           void deleteDraft(row.id);
-          setNotice("A local draft was discarded because the note is already signed.");
+          if (!sameFields(draft.note, serverFields)) setOrphanText(draft.note);
         } else if (sameFields(draft.note, serverFields)) {
           void deleteDraft(row.id);
         } else if ((server?.updatedAt ?? null) === draft.baseUpdatedAt) {
@@ -507,7 +558,10 @@ export default function ConsultPage() {
         setRxItems([{ ...BLANK_RX_ITEM }]);
       }
     } catch {
-      if (!stale()) setShellError("Couldn't reach the server. Check your connection, then reopen the visit.");
+      if (!stale()) {
+        if (noteLoadRef.current === "loading") { noteLoadRef.current = "error"; setNoteLoad("error"); }
+        setShellError("Couldn't reach the server. Check your connection, then reopen the visit.");
+      }
     }
   }
 
@@ -546,6 +600,10 @@ export default function ConsultPage() {
   // one is passed in `overrides` (keyed by item index).
   async function saveRx(overrides?: { index: number; kind: string; reasonCode: string; note: string }): Promise<Prescription | null> {
     if (!activeEntry) return null;
+    if (!navigator.onLine) {
+      setRxError("You're offline. The prescription can't be saved, checked or signed until you reconnect; your changes stay on this screen.");
+      return null;
+    }
     setRxSaving(true);
     setRxError(null);
     try {
@@ -632,44 +690,6 @@ export default function ConsultPage() {
     setNotice("Decision recorded and audited.");
   }
 
-  async function calculateDose() {
-    if (!activePatient || !doseMgPerKg) return;
-    setDoseError(null);
-    const res = await authedFetch(`/clinical/patients/${activePatient.id}/dose-calculator?mgPerKg=${doseMgPerKg}`);
-    if (!res?.ok) {
-      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
-      setDoseError(pr?.detail || "Couldn't calculate dose.");
-      setDoseResult(null);
-      return;
-    }
-    setDoseResult(await res.json());
-  }
-
-  async function saveCurrentAsSet() {
-    if (!newSetName.trim()) return;
-    const items = rxItems.filter((i) => i.drugName.trim() !== "");
-    if (items.length === 0) return;
-    const res = await authedFetch("/clinical/rx-sets", { method: "POST", body: JSON.stringify({ name: newSetName, items }) });
-    if (res?.ok) {
-      setNewSetName("");
-      const setsRes = await authedFetch("/clinical/rx-sets");
-      if (setsRes?.ok) setFavouriteSets(await setsRes.json());
-    }
-  }
-
-  async function applySet(setId: string) {
-    if (!activeEntry) return;
-    const res = await authedFetch(`/clinical/prescriptions/${activeEntry.id}/apply-set/${setId}`, { method: "POST" });
-    if (res?.ok) {
-      const rx: Prescription = await res.json();
-      setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
-      setRxDirty(false);
-      setRxError(null);
-    } else {
-      const pr: Problem = await res?.json().catch(() => ({ title: "Error", detail: "Couldn't apply set." }));
-      setRxError(pr?.detail || "Couldn't apply set.");
-    }
-  }
 
   async function submitAmendment() {
     if (!activeEntry || !amendReason.trim()) return;
@@ -692,6 +712,7 @@ export default function ConsultPage() {
   }
 
   function updateField(field: keyof NoteDraft, value: string) {
+    if (noteLoadRef.current !== "ok") return;
     setNote((prev) => ({ ...prev, [field]: value }));
     setDirty(true);
     if (activeEntry) scheduleLocalDraft(activeEntry.id);
@@ -750,7 +771,7 @@ export default function ConsultPage() {
         needsServerCheckRef.current = needsServerCheckRef.current || dirtyRef.current;
         const saveRes = await saveNote(activeEntry.id);
         if (!saveRes?.ok) {
-          setShellError(conflictRef.current ? "The note changed on the server. Resolve the differences before closing." : "Couldn't save the note. Try again before completing.");
+          setShellError(conflictRef.current ? "The note changed on the server. Resolve the differences before closing." : (navigator.onLine ? "Couldn't save the note. Try again before completing." : "You're offline. The note is kept on this device; it can be signed once you reconnect."));
           return;
         }
         const signRes = await authedFetch(`/clinical/notes/${activeEntry.id}/sign`, { method: "POST" });
@@ -760,6 +781,8 @@ export default function ConsultPage() {
           return;
         }
         setNoteStatus("signed");
+        const signed: Partial<Note> | null = await signRes.json().catch(() => null);
+        setSignedAt(typeof signed?.signedAt === "string" ? signed.signedAt : new Date().toISOString());
       }
       const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
       if (!statusRes?.ok) {
@@ -768,6 +791,7 @@ export default function ConsultPage() {
         return;
       }
       setActiveEntry((prev) => (prev ? { ...prev, status: "checkout_pending" } : prev));
+      setRows((prev) => prev.map((r) => (r.id === activeEntry.id ? { ...r, status: "checkout_pending" } : r)));
       setNotice("Sent to checkout. Reception can see this visit now.");
       // Stay in the workspace (don't auto-close): follow-up and amendments remain reachable.
     } catch {
@@ -830,7 +854,8 @@ export default function ConsultPage() {
           starting={starting}
           error={previewError}
           onClose={() => { setPreview(null); setPreviewError(null); }}
-          onStart={preview.status === "vitals_done" && preview.doctorId === selfId ? () => startConsult(preview) : undefined}
+          onStart={canStartRow(preview) ? () => startConsult(preview) : undefined}
+          canEditAllergies={can("clinical:edit")}
           onOpenVisit={(preview.status === "checkout_pending" || preview.status === "completed") && !dirty
             ? () => { const r = preview; setPreview(null); void openConsult(r); }
             : undefined}
@@ -841,7 +866,8 @@ export default function ConsultPage() {
 
   if (activeEntry) {
     const pat = activePatient;
-    const saveBadge = !online || saveState === "offline"
+    const saveBadge = conflict ? <StatusPill tone="warn" icon="alert" label="Sync conflict — review" />
+      : !online || saveState === "offline"
       ? <StatusPill tone="sync" icon="sync" label="Offline · local draft" />
       : saveState === "saving" ? <StatusPill tone="sync" icon="sync" label="Saving…" />
       : saveState === "error" ? <StatusPill tone="danger" label="Couldn't save — retrying" />
@@ -856,6 +882,27 @@ export default function ConsultPage() {
     const advisoryItems = rxItems.filter((i) => (i.warnings ?? []).some((w) => !w.requiresDecision));
     const doctorName = getIdentity()?.staffName ?? "";
     const signedBlocked = closeIssues.length > 0 && !closeAck;
+    const canEditNote = can("clinical:edit");
+    const stepIndex = Math.max(0, STEPS.findIndex((x) => x.id === step));
+    const next = closedOut ? nextPatient(rows, activeEntry.id, selfId, canStartRow) : null;
+    const vd = ctx.vitals.data;
+    const timeline = buildTimeline({
+      checkedInAt: activeEntry.createdAt ?? null,
+      vitals: {
+        status: ctx.vitals.status, recordedAt: vd?.recordedAt ?? null,
+        summary: vd ? [
+          vd.bpSystolic != null && vd.bpDiastolic != null ? `BP ${vd.bpSystolic}/${vd.bpDiastolic}` : null,
+          vd.pulseBpm != null ? `${vd.pulseBpm} bpm` : null,
+          vd.tempCelsius != null ? `${vd.tempCelsius} °C` : null,
+          vd.spo2Percent != null ? `SpO₂ ${vd.spo2Percent}%` : null,
+        ].filter(Boolean).join(" · ") || null : null,
+      },
+      status: activeEntry.status,
+      draft: { savedAt: lastSavedAt ? lastSavedAt.toISOString() : null, pendingOnDevice: dirty && (saveState === "offline" || saveState === "error" || !online) },
+      signedAt,
+      noteSigned: locked,
+      amendments,
+    });
     const primaryLabel = completing ? "Working…" : handoffPending ? "Retry checkout handoff" : closedOut ? "Sent to checkout" : "Sign note and send to checkout";
 
     return (
@@ -875,20 +922,39 @@ export default function ConsultPage() {
             </span>
             <StatusBadge status={activeEntry.status} />
             {saveBadge}
+            {(activeEntry.status === "in_consult" || locked) && <ConsultTimer entryId={activeEntry.id} ended={locked} />}
           </div>
         </div>
 
         {!online && (
           <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
             <Icon name="sync" size={16} />
-            <span>You&apos;re offline. The note is saved on this device and will never silently overwrite server data; it is compared with the server copy when you reconnect.</span>
+            <span>You&apos;re offline. The note is saved on this device and will never silently overwrite server data; it is compared with the server copy when you reconnect. Prescriptions, orders and follow-ups need a connection.</span>
           </div>
         )}
         {shellError && <div className={styles.errorState} role="alert">{shellError}</div>}
+        {noteLoad === "error" && (
+          <div className={`${p.notice} ${p.noticeDanger}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
+            <Icon name="alert" size={16} />
+            <span>Couldn&apos;t load the note, so editing and saving are locked to protect the saved copy. <button type="button" className={p.linkBtn} onClick={() => void openConsult(activeEntry, step)}>Try again</button></span>
+          </div>
+        )}
         {notice && (
           <div className={`${p.notice} ${p.noticeInfo}`} role="status" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
             <Icon name="info" size={16} />
             <span>{notice} <button type="button" className={p.linkBtn} onClick={() => setNotice(null)}>Dismiss</button></span>
+          </div>
+        )}
+        {orphanText && (
+          <div className={`${p.notice} ${p.noticeWarn}`} role="alert" style={{ marginBlockEnd: "var(--nb-space-16)" }}>
+            <Icon name="alert" size={16} />
+            <span>
+              This note was signed in another session, so the text on this device was not saved. Copy anything still needed into an amendment.
+              <ul style={{ margin: "4px 0 0", paddingInlineStart: "18px" }}>
+                {(Object.keys(orphanText) as (keyof NoteFields)[]).filter((k) => orphanText[k].trim() !== "").map((k) => <li key={k}><strong>{NOTE_FIELD_LABEL[k]}:</strong> {orphanText[k]}</li>)}
+              </ul>
+              <button type="button" className={p.linkBtn} onClick={() => setOrphanText(null)}>Dismiss</button>
+            </span>
           </div>
         )}
         {conflict && (
@@ -908,6 +974,7 @@ export default function ConsultPage() {
                 <li key={r.id}>
                   <button type="button" className={`${styles.todayBtn} ${r.id === activeEntry.id ? styles.todayBtnOn : ""}`} aria-current={r.id === activeEntry.id ? "true" : undefined} onClick={() => switchTo(r)}>
                     <span><strong>#{r.tokenNumber}</strong> {r.patientName}</span>
+                    <span className={styles.todayMeta}>{r.appointmentId ? "Appointment" : (VISIT_LABEL[r.source ?? ""] ?? "Walk-in")}</span>
                     <span className={styles.flags}>
                       {(r.patient?.allergies.length ?? 0) > 0 && <StatusPill tone="danger" label="Allergy" />}
                       {r.priority && <StatusPill tone="urgent" label="Urgent" />}
@@ -922,29 +989,38 @@ export default function ConsultPage() {
           <div className={styles.centerCol}>
             <nav aria-label="Consultation steps">
               <ol className={styles.steps}>
-                {STEPS.map((s, i) => (
-                  <li key={s.id}>
-                    <button type="button" className={`${styles.stepBtn} ${step === s.id ? styles.stepBtnOn : ""}`} aria-current={step === s.id ? "step" : undefined} onClick={() => setStep(s.id)}>
-                      <span className={styles.stepName}>{i + 1}. {s.label}</span>
-                      <span className={styles.stepHint}>{s.hint}</span>
-                    </button>
-                  </li>
-                ))}
+                {STEPS.map((s, i) => {
+                  const done = i < stepIndex;
+                  return (
+                    <li key={s.id}>
+                      <button type="button" className={`${styles.stepBtn} ${step === s.id ? styles.stepBtnOn : done ? styles.stepBtnDone : ""}`} aria-current={step === s.id ? "step" : undefined} onClick={() => setStep(s.id)}>
+                        <Icon name={done ? "check" : s.icon} size={14} />
+                        <span className={styles.stepName}>{i + 1}. {s.label}</span>
+                        {done && <span className={p.srOnly}>(earlier step)</span>}
+                      </button>
+                    </li>
+                  );
+                })}
               </ol>
+              <p className={styles.stepHint}>{STEPS[stepIndex].hint}</p>
             </nav>
+
+            <VisitTimeline events={timeline} />
 
             {locked && (
               <div className={styles.signedBanner}>
-                <span>This note is signed and locked.</span>
-                <span className={styles.followUpControls}>
-                  <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
-                    {showAmendForm ? "Cancel amendment" : "Amend note"}
-                  </button>
-                </span>
+                <span>This note is finalised. Changes need a documented amendment with a reason, which is audited.</span>
+                {canEditNote && (
+                  <span className={styles.followUpControls}>
+                    <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
+                      {showAmendForm ? "Cancel amendment" : "Amend note"}
+                    </button>
+                  </span>
+                )}
               </div>
             )}
 
-            {showAmendForm && (
+            {showAmendForm && canEditNote && (
               <div className={styles.card} style={{ padding: "16px" }}>
                 <div className={styles.noteField}>
                   <label className={styles.noteLabel} htmlFor="amendReason">Reason for amendment</label>
@@ -981,39 +1057,20 @@ export default function ConsultPage() {
                     : <p className={p.muted}>No reason was recorded at check-in. Ask the patient.</p>}
                 </section>
                 <VitalsCard vitals={ctx.vitals} onRetry={reloadCtx} />
-                <section className={p.card} aria-label="Visit timeline">
-                  <h3 className={p.cardTitle}>Visit timeline</h3>
-                  <ol className={p.timeline}>
-                    <li>
-                      <span className={p.timelineDot}><Icon name="check" size={14} /></span>
-                      <span>Checked in{activeEntry.createdAt ? ` · ${new Date(activeEntry.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}</span>
-                    </li>
-                    <li>
-                      <span className={p.timelineDot}><Icon name={ctx.vitals.status === "ok" ? "check" : "alert"} size={14} /></span>
-                      <span>
-                        {ctx.vitals.status === "ok" ? `Vitals recorded${ctx.vitals.data?.recordedAt ? ` · ${new Date(ctx.vitals.data.recordedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}`
-                          : ctx.vitals.status === "none" ? "Vitals not recorded yet"
-                          : ctx.vitals.status === "error" ? "Vitals status unavailable" : "Checking vitals…"}
-                      </span>
-                    </li>
-                    <li>
-                      <span className={p.timelineDot}><Icon name="stethoscope" size={14} /></span>
-                      <span>{activeEntry.status === "in_consult" ? "In consultation" : `Status: ${statusLabel(activeEntry.status)}`}</span>
-                    </li>
-                  </ol>
-                </section>
                 <div><button type="button" className={p.btn} onClick={() => setStep("examine")}>Continue to Examine</button></div>
               </>
             )}
 
             {step === "examine" && (
               <>
+                {!locked && can("clinical:edit") && noteLoad === "ok" && <NoteTemplates authedFetch={authedFetch} patientId={activeEntry.patientId} entryId={activeEntry.id} note={note} onSetField={updateField} />}
                 <div className={styles.card} style={{ padding: "24px" }}>
+                  <h3 className={p.cardTitle}>{NOTE_TITLE}</h3>
                   <div className={styles.noteGrid}>
                     {(["subjective", "objective"] as const).map((field) => (
                       <div className={styles.noteField} key={field}>
-                        <label className={styles.noteLabel} htmlFor={field}>{field}</label>
-                        <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked} onChange={(e) => updateField(field, e.target.value)} />
+                        <label className={styles.noteLabel} htmlFor={field}>{NOTE_FIELD_LABEL[field]}</label>
+                        <textarea id={field} className={styles.textarea} value={note[field]} disabled={locked || !canEditNote || noteLoad !== "ok"} onChange={(e) => updateField(field, e.target.value)} />
                       </div>
                     ))}
                   </div>
@@ -1034,14 +1091,14 @@ export default function ConsultPage() {
 
             {step === "assess" && (
               <div className={styles.card} style={{ padding: "24px" }}>
+                <h3 className={p.cardTitle}>{NOTE_TITLE}</h3>
                 <div className={styles.noteGrid}>
                   <div className={styles.noteField}>
-                    <label className={styles.noteLabel} htmlFor="assessment">assessment</label>
-                    <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked} onChange={(e) => updateField("assessment", e.target.value)} />
+                    <label className={styles.noteLabel} htmlFor="assessment">{NOTE_FIELD_LABEL.assessment}</label>
+                    <textarea id="assessment" className={styles.textarea} value={note.assessment} disabled={locked || !canEditNote || noteLoad !== "ok"} onChange={(e) => updateField("assessment", e.target.value)} />
                   </div>
                   <div className={styles.noteField}>
-                    <label className={styles.noteLabel} htmlFor="diagnosis">diagnosis</label>
-                    <input id="diagnosis" className={styles.input} value={note.diagnosis} disabled={locked} onChange={(e) => updateField("diagnosis", e.target.value)} />
+                    <DiagnosisField value={note.diagnosis} disabled={locked || !canEditNote || noteLoad !== "ok"} inputClassName={styles.input} onChange={(v) => updateField("diagnosis", v)} />
                   </div>
                 </div>
               </div>
@@ -1051,8 +1108,8 @@ export default function ConsultPage() {
               <>
                 <div className={styles.card} style={{ padding: "24px" }}>
                   <div className={styles.noteField}>
-                    <label className={styles.noteLabel} htmlFor="plan">plan</label>
-                    <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked} onChange={(e) => updateField("plan", e.target.value)} />
+                    <label className={styles.noteLabel} htmlFor="plan">{NOTE_FIELD_LABEL.plan}</label>
+                    <textarea id="plan" className={styles.textarea} value={note.plan} disabled={locked || !canEditNote || noteLoad !== "ok"} onChange={(e) => updateField("plan", e.target.value)} />
                   </div>
                 </div>
 
@@ -1102,37 +1159,20 @@ export default function ConsultPage() {
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
 
                   <div className={styles.previousMeds}>
-                    <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Weight-based dose calculator</div>
-                    <div className={styles.rxRow}>
-                      <input className={styles.input} aria-label="mg per kg" placeholder="mg/kg" value={doseMgPerKg} onChange={(e) => setDoseMgPerKg(e.target.value)} />
-                      <button type="button" className={styles.backBtn} onClick={calculateDose} disabled={!doseMgPerKg}>Calculate</button>
-                      {doseResult && (
-                        <span className={styles.saveStatus}>
-                          {doseResult.totalDoseMg} mg total ({doseResult.weightKg} kg × {doseResult.mgPerKg} mg/kg)
-                        </span>
-                      )}
-                    </div>
-                    {doseError && <div className={styles.errorState} role="alert">{doseError}</div>}
+                    <DoseCalculator key={activeEntry.patientId} authedFetch={authedFetch} patientId={activeEntry.patientId} queueEntryId={activeEntry.id} canRecordWeight={can("clinical:edit")} onWeightRecorded={reloadCtx} />
                   </div>
 
                   <div className={styles.previousMeds}>
                     <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>
-                    {favouriteSets.length === 0 ? (
-                      <div className={styles.saveStatus}>No saved sets yet.</div>
-                    ) : (
-                      favouriteSets.map((set) => (
-                        <div key={set.id} className={styles.previousMedsRow}>
-                          <span>{set.name} ({set.items.map((i) => i.drugName).join(", ")})</span>{" "}
-                          {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={() => applySet(set.id)}>Apply</button>}
-                        </div>
-                      ))
-                    )}
-                    {rxStatus !== "signed" && (
-                      <div className={styles.rxRow} style={{ marginBlockStart: "8px" }}>
-                        <input className={styles.input} aria-label="New set name" placeholder="Save current items as set…" value={newSetName} onChange={(e) => setNewSetName(e.target.value)} />
-                        <button type="button" className={styles.backBtn} onClick={saveCurrentAsSet} disabled={!newSetName.trim()}>Save set</button>
-                      </div>
-                    )}
+                    <FavouriteRxSetsPanel
+                      authedFetch={authedFetch} entryId={activeEntry?.id ?? null} locked={rxStatus === "signed"} items={rxItems}
+                      onError={setRxError}
+                      onApplied={(rx) => {
+                        setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
+                        setRxDirty(false);
+                        setRxError(null);
+                      }}
+                    />
                   </div>
 
                   <div className={styles.previousMeds}>
@@ -1163,7 +1203,9 @@ export default function ConsultPage() {
                     </li>
                     <li className={p.listRow}>
                       <strong>Follow-up</strong>
-                      {followUpLabel ? <StatusPill tone="ok" label={`Set · ${followUpLabel}`} /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
+                      {followUpLabel ? <StatusPill tone="ok" label={`Set · ${followUpLabel}`} />
+                        : followUpLabel === null ? <StatusPill tone="neutral" icon="calendar" label="Not set" />
+                        : <StatusPill tone="warn" icon="alert" label="Unknown — couldn't check" />}
                     </li>
                     <li className={p.listRow}>
                       <strong>Checkout</strong>
@@ -1206,12 +1248,14 @@ export default function ConsultPage() {
               {hasDrugs ? <ul className={p.list}>{rxItems.filter((i) => i.drugName.trim()).map((i, n) => <li key={n}>{rxItemLine(i)}</li>)}</ul> : <p className={p.muted}>No drugs added.</p>}
               <button type="button" className={`${p.linkBtn} ${p.linkBtnTouch}`} onClick={() => setStep("plan")}>Open prescription</button>
             </section>
-            <FollowUpPanel authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} />
+            <DoctorOrders authedFetch={authedFetch} queueEntryId={activeEntry.id} />
+            <FollowUpPanel key={activeEntry.id} authedFetch={authedFetch} doctorId={activeEntry.doctorId} patientId={activeEntry.patientId} onBooked={setFollowUpLabel} canBook={can("queue:create")} />
             <section className={p.card} aria-label="Package">
               <h3 className={p.cardTitle}>Package</h3>
               {pat && pat.activePackages > 0
                 ? <p className={p.muted}>{pat.activePackages} active package{pat.activePackages === 1 ? "" : "s"}. <Link href="/packages" className={p.linkBtn}>Open packages</Link></p>
                 : <p className={p.muted}>No active package.</p>}
+              {can("packages:view") && <PackageSessionCard authedFetch={authedFetch} patientId={activeEntry.patientId} canRedeem={can("packages:edit")} />}
             </section>
           </aside>
         </div>
@@ -1219,15 +1263,32 @@ export default function ConsultPage() {
         <div className={styles.actionBar}>
           <div className={styles.stripActions}>{saveBadge ?? <span className={styles.saveStatus}>No changes yet</span>}</div>
           <div className={styles.stripActions}>
-            {activeEntry.status === "in_consult" && (
-              <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>Transfer to another department</button>
-            )}
-            {step !== "close" ? (
-              <button className={styles.completeBtn} onClick={() => setStep("close")}>Close consultation</button>
+            {closedOut ? (
+              <>
+                {canEditNote && <button className={styles.completeBtn} onClick={() => { setShowAmendForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Add amendment</button>}
+                {step !== "close" && <button className={styles.backBtn} onClick={() => setStep("close")}>Visit outputs</button>}
+                {next
+                  ? <button className={styles.backBtn} onClick={() => void switchTo(next)}>Next patient · #{next.tokenNumber}</button>
+                  : <button className={styles.backBtn} onClick={closeShell}>Back to queue</button>}
+              </>
             ) : (
-              <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || closedOut || signedBlocked || !!conflict}>
-                {primaryLabel}
-              </button>
+              <>
+                {!locked && canEditNote && noteLoad === "ok" && (
+                  <button className={styles.backBtn} onClick={() => void saveNote(activeEntry.id)} disabled={saveState === "saving" || !!conflict || (!dirty && saveState !== "error")}>
+                    {saveState === "saving" ? "Saving…" : "Save draft"}
+                  </button>
+                )}
+                {activeEntry.status === "in_consult" && (
+                  <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>Transfer to another department</button>
+                )}
+                {canEditNote && (step !== "close" ? (
+                  <button className={styles.completeBtn} onClick={() => setStep("close")}>Close consultation</button>
+                ) : (
+                  <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || closedOut || signedBlocked || !!conflict}>
+                    {primaryLabel}
+                  </button>
+                ))}
+              </>
             )}
           </div>
         </div>
@@ -1404,13 +1465,13 @@ export default function ConsultPage() {
                         </div>
                       </td>
                       <td className={styles.hideNarrow}>
-                        {waiting ? <>{mins !== null ? `${mins} min` : "—"}{r.createdAt ? <span className={styles.subline}>{new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span> : null}</> : "—"}
+                        {waiting && mins !== null ? `${mins} min` : "—"}{r.createdAt ? <span className={styles.subline}>Arrived {new Date(r.createdAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span> : null}
                       </td>
                       <td><StatusBadge status={r.status} /></td>
                       <td>
                         {r.status === "in_consult" && mine
                           ? <button className={styles.actionBtn} onClick={() => openRow(r)}>Resume</button>
-                          : r.status === "vitals_done" && mine
+                          : canStartRow(r)
                             ? <button className={styles.actionBtn} onClick={() => openRow(r)}>Start consultation</button>
                             : <button className={styles.actionBtnGhost} onClick={() => openRow(r)}>Summary</button>}
                       </td>

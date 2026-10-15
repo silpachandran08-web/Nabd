@@ -30,15 +30,15 @@ export type Surface = {
 // Order and grouping follow the wireframe's NAV.platform (Today / Customers / Money / Service /
 // Governance); Growth and the unbuilt Service surfaces join when their pages exist.
 export const SURFACES: Surface[] = [
-  { permission: "", label: "Command Centre", short: "Home", href: "/platform", icon: "home", section: "Today" },
+  { permission: "", label: "Command Centre", short: "Today", href: "/platform", icon: "chart", section: "Today" },
   { permission: "clinics_fleet:view", label: "Clinics", short: "Clinics", href: "/platform/fleet", icon: "building", section: "Customers" },
-  { permission: "onboarding_provisioning:view", label: "Onboarding", short: "Onboard", href: "/platform/provisioning", icon: "plus", section: "Customers" },
-  { permission: "territories:view", label: "Territories", short: "Areas", href: "/platform/territories", icon: "chart", section: "Customers" },
-  { permission: "billing_revenue:view", label: "Billing & Revenue", short: "Billing", href: "/platform/billing", icon: "receipt", section: "Money" },
-  { permission: "pricing_packaging:view", label: "Pricing & Packaging", short: "Pricing", href: "/platform/plans", icon: "package", section: "Money" },
-  { permission: "support_tickets:view", label: "Support Tickets", short: "Tickets", href: "/platform/support", icon: "inbox", section: "Service" },
-  { permission: "support_access:view", label: "Support Access", short: "Access", href: "/platform/access", icon: "user", section: "Service" },
-  { permission: "audit_compliance:view", label: "Audit & Compliance", short: "Audit", href: "/platform/audit", icon: "shield", section: "Governance" },
+  { permission: "onboarding_provisioning:view", label: "Onboarding", short: "Onboard", href: "/platform/provisioning", icon: "plusSquare", section: "Customers" },
+  { permission: "territories:view", label: "Territories", short: "Territories", href: "/platform/territories", icon: "globe", section: "Customers" },
+  { permission: "billing_revenue:view", label: "Billing & Revenue", short: "Billing", href: "/platform/billing", icon: "wallet", section: "Money" },
+  { permission: "pricing_packaging:view", label: "Pricing & Packaging", short: "Pricing", href: "/platform/plans", icon: "sparkle", section: "Money" },
+  { permission: "support_tickets:view", label: "Support Tickets", short: "Tickets", href: "/platform/support", icon: "lifebuoy", section: "Service" },
+  { permission: "support_access:view", label: "Support Access", short: "Access", href: "/platform/access", icon: "shieldUser", section: "Service" },
+  { permission: "audit_compliance:view", label: "Audit & Compliance", short: "Audit", href: "/platform/audit", icon: "scroll", section: "Governance" },
 ];
 
 export function visibleSurfaces(permissions: string[]): Surface[] {

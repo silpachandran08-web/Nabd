@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getIdentity } from "../../lib/session";
 import StatusPill from "../ui/StatusPill";
 import { Skeleton } from "../ui/StateViews";
+import { upcomingFollowUp, type AppointmentLite } from "./consultFlow";
 import type { AuthedFetch, Problem } from "./shared";
 import s from "./consultParts.module.css";
 
@@ -28,8 +29,12 @@ function addToDate(ymd: string, days: number, months: number): string {
 }
 
 export default function FollowUpPanel({
-  authedFetch, doctorId, patientId, onBooked,
-}: { authedFetch: AuthedFetch; doctorId: string; patientId: string; onBooked: (label: string) => void }) {
+  authedFetch, doctorId, patientId, onBooked, canBook,
+}: {
+  authedFetch: AuthedFetch; doctorId: string; patientId: string; onBooked: (label: string | null | undefined) => void;
+  /** queue:create — booking controls are absent without it; the existing follow-up still shows. */
+  canBook: boolean;
+}) {
   const [tz] = useState<string | undefined>(() => REGION_TZ[getIdentity()?.tenantRegion ?? ""]);
   const [interval, setIntervalId] = useState<string | null>(null);
   const [date, setDate] = useState("");
@@ -39,9 +44,35 @@ export default function FollowUpPanel({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [booked, setBooked] = useState<string | null>(null);
+  const [existing, setExisting] = useState<"loading" | "error" | "done">("loading");
 
   const fmtSlot = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: tz });
   const fmtFull = (iso: string) => `${new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: tz })} ${fmtSlot(iso)}`;
+
+  // A follow-up booked earlier (another session, or before a reload) is the current state: the
+  // soonest scheduled follow-up appointment with this doctor (GET /appointments, is_follow_up).
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.resolve().then(async () => {
+      if (cancelled) return;
+      setExisting("loading");
+      try {
+        const res = await authedFetch(`/appointments?patientId=${patientId}&doctorId=${doctorId}&limit=100`);
+        if (cancelled) return;
+        if (!res?.ok) { setExisting("error"); onBooked(undefined); return; }
+        const page: { data: AppointmentLite[] } = await res.json();
+        const fu = upcomingFollowUp(page.data ?? [], doctorId, Date.now());
+        const label = fu ? fmtFull(fu.startTime) : null;
+        setBooked(label);
+        onBooked(label);
+        setExisting("done");
+      } catch {
+        if (!cancelled) { setExisting("error"); onBooked(undefined); }
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per patient/doctor; fmtFull/onBooked are render-local
+  }, [authedFetch, patientId, doctorId]);
 
   useEffect(() => {
     if (!date) return;
@@ -100,8 +131,13 @@ export default function FollowUpPanel({
     <section className={s.card} aria-label="Follow-up">
       <h3 className={s.cardTitle}>
         Follow-up
-        {booked ? <StatusPill tone="ok" label={`Set · ${booked}`} /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
+        {existing === "loading" ? null : booked ? <StatusPill tone="ok" label={`Set · ${booked}`} />
+          : existing === "error" ? <StatusPill tone="warn" icon="alert" label="Unknown" /> : <StatusPill tone="neutral" icon="calendar" label="Not set" />}
       </h3>
+      {existing === "loading" && <Skeleton rows={1} label="Checking for a booked follow-up" />}
+      {existing === "error" && <p className={s.muted}>Couldn&apos;t check for an existing follow-up; one may already be booked. Check the schedule before booking.</p>}
+      {canBook && (<>
+      {booked && <p className={s.muted}>Book another only if a second visit is needed; the existing one is not moved.</p>}
       <div className={s.row} role="group" aria-label="Follow-up interval">
         {INTERVALS.map((i) => (
           <button key={i.id} type="button" className={`${s.chip} ${interval === i.id ? s.chipOn : ""}`} aria-pressed={interval === i.id} onClick={() => pick(i.id)}>
@@ -135,8 +171,9 @@ export default function FollowUpPanel({
         </div>
       )}
       {message && <div className={`${s.notice} ${s.noticeDanger}`} role="alert" style={{ marginBlockStart: "var(--nb-space-8)" }}>{message}</div>}
+      </>)}
       <p className={s.muted} style={{ marginBlockStart: "var(--nb-space-8)" }}>
-        A reminder message is not sent automatically yet; the follow-up appears on the schedule.
+        Reminder: not available yet. No WhatsApp reminder or booking link is sent; the follow-up appears on the schedule and in Follow-ups.
       </p>
     </section>
   );

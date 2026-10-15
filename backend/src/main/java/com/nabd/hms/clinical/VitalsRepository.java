@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,11 +38,20 @@ class VitalsRepository {
                 (rs, i) -> rs.getDate("dob").toLocalDate(), tenantId, patientId).stream().findFirst();
     }
 
-    /** NB-112: the paediatric dose calculator sources weight from here — the most recent vitals row for the patient, across any visit. */
-    Optional<BigDecimal> findLatestWeightKg(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT weight_kg FROM vitals WHERE tenant_id = ? AND patient_id = ? AND weight_kg IS NOT NULL " +
-                        "ORDER BY recorded_at DESC LIMIT 1",
-                (rs, i) -> rs.getBigDecimal("weight_kg"), tenantId, patientId).stream().findFirst();
+    /** A patient's most recent recorded weight and when that weight was recorded. */
+    record WeightReading(BigDecimal weightKg, Instant recordedAt /* null = unknown */) {
+    }
+
+    /** NB-112 / DOC-036: the paediatric dose calculator sources weight from here: the most recent vitals row carrying a weight, across any visit,
+     * with the time the weight itself was recorded. Legacy rows (weight saved before V72) have an unknown weight time:
+     * it is returned as null, never estimated from recorded_at. A row with a known time outranks any unknown-time row. */
+    Optional<WeightReading> findLatestWeight(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT weight_kg, weight_recorded_at AS weight_at FROM vitals " +
+                        "WHERE tenant_id = ? AND patient_id = ? AND weight_kg IS NOT NULL " +
+                        "ORDER BY weight_recorded_at DESC NULLS LAST, recorded_at DESC LIMIT 1",
+                (rs, i) -> new WeightReading(rs.getBigDecimal("weight_kg"),
+                        rs.getTimestamp("weight_at") == null ? null : rs.getTimestamp("weight_at").toInstant()),
+                tenantId, patientId).stream().findFirst();
     }
 
     /** Freely correctable — no signed/locked concept for vitals. A null argument keeps the stored value (V2-008),
@@ -51,11 +61,12 @@ class VitalsRepository {
                 Integer spo2Percent, UUID recordedBy) {
         jdbc.update(
                 "INSERT INTO vitals (tenant_id, queue_entry_id, patient_id, height_cm, weight_kg, bp_systolic, " +
-                        "  bp_diastolic, pulse_bpm, temp_celsius, spo2_percent, recorded_by) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?,?,?) " +
+                        "  bp_diastolic, pulse_bpm, temp_celsius, spo2_percent, recorded_by, weight_recorded_at) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?, CASE WHEN ?::numeric IS NOT NULL THEN now() END) " +
                         "ON CONFLICT (queue_entry_id) DO UPDATE SET " +
                         "  height_cm = COALESCE(EXCLUDED.height_cm, vitals.height_cm), " +
                         "  weight_kg = COALESCE(EXCLUDED.weight_kg, vitals.weight_kg), " +
+                        "  weight_recorded_at = CASE WHEN EXCLUDED.weight_kg IS NOT NULL THEN now() ELSE vitals.weight_recorded_at END, " +
                         "  bp_systolic = COALESCE(EXCLUDED.bp_systolic, vitals.bp_systolic), " +
                         "  bp_diastolic = COALESCE(EXCLUDED.bp_diastolic, vitals.bp_diastolic), " +
                         "  pulse_bpm = COALESCE(EXCLUDED.pulse_bpm, vitals.pulse_bpm), " +
@@ -63,7 +74,7 @@ class VitalsRepository {
                         "  spo2_percent = COALESCE(EXCLUDED.spo2_percent, vitals.spo2_percent), " +
                         "  recorded_by = EXCLUDED.recorded_by, recorded_at = now()",
                 tenantId, queueEntryId, patientId, heightCm, weightKg, bpSystolic, bpDiastolic, pulseBpm,
-                tempCelsius, spo2Percent, recordedBy);
+                tempCelsius, spo2Percent, recordedBy, weightKg);
     }
 
     Optional<VitalsModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {

@@ -72,6 +72,24 @@ public abstract class ApiTestBase {
         return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
     }
 
+    /** nabd_app holds no TRUNCATE grant, so a TRUNCATE as nabd_app fails on the privilege check before any
+     * BEFORE TRUNCATE trigger fires. Run it as superuser (always rolled back) so only the trigger can refuse it. */
+    protected static void assertTruncateRefusedByTrigger(String sql, String expectedMessage) {
+        try (Connection su = superuserConnection()) {
+            su.setAutoCommit(false);
+            try (Statement st = su.createStatement()) {
+                st.execute(sql);
+                throw new AssertionError(sql + " succeeded; the TRUNCATE trigger is missing");
+            } catch (SQLException e) {
+                org.assertj.core.api.Assertions.assertThat(e.getMessage()).as(sql).contains(expectedMessage);
+            } finally {
+                su.rollback();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private static void bootstrapAppRole() {
         try (Connection c = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              Statement st = c.createStatement()) {
@@ -82,6 +100,8 @@ public abstract class ApiTestBase {
             st.execute("GRANT EXECUTE ON FUNCTION find_session_by_token_hash(text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION find_staff_by_invite_token_hash(text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,bigint,int) TO " + APP_ROLE);
+            // V85 (PLT-028): actor-filter overload, the one AuditSearchRepository calls now
+            st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,uuid,text,text,text,bigint,int) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION claim_outbox_events(int,int) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION apply_whatsapp_status(text,text,text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION apply_whatsapp_template_update(text,text,text,text) TO " + APP_ROLE);
@@ -101,6 +121,8 @@ public abstract class ApiTestBase {
         registry.add("spring.datasource.password", () -> APP_ROLE_PW);
         registry.add("spring.flyway.enabled", () -> "false"); // migrated as superuser above, before grants existed
         registry.add("app.crypto.key", () -> CRYPTO_KEY_B64);
+        // tests call OutboxDispatcher.poll() themselves; the background poll would race them for the same rows
+        registry.add("app.outbox.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE));
         // default 20/min is realistic for one browser, not for a suite of HTTP calls from one loopback IP
         registry.add("app.auth.rate-limit-per-ip-per-minute", () -> "100000");
     }

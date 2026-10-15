@@ -24,7 +24,12 @@ public record MoneyResponse(
         List<Tender> tender,
         List<Service> topServices
 ) {
-    public record Tender(String method, BigDecimal amount) {
+    /**
+     * OWN-023: count = number of payment rows recorded with this method in the period (the wireframe's
+     * "9 transactions"). Exact decimals for amount are unchanged. There is no refund/reversal row in
+     * invoice_payments (amount &gt; 0, no negative or void rows), so there is no per-tender refund count.
+     */
+    public record Tender(String method, BigDecimal amount, int count) {
     }
 
     /** Revenue before tax and bill-level discount — the line items as charged. */

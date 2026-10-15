@@ -162,6 +162,60 @@ class PrescriptionApiTest extends ApiTestBase {
     }
 
     @Test
+    void theResponseCarriesAFlatStructuredAllergyWarningsArrayAndSevereStillBlocksUntilOverridden() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc5e@a.com", "+919800020015", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "P2e", "+919999960015");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Sulfa", "severity", "moderate", "reaction", "rash")), Map.class);
+        String queueEntryId = checkIn(token, patientId, doc.id());
+        String path = "/v1/clinical/prescriptions/" + queueEntryId;
+
+        ResponseEntity<Map> saved = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol"), Map.of("drugName", "Sulfamethoxazole"),
+                        Map.of("drugName", "Penicillin-VK")))), Map.class);
+        assertThat(saved.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<?> warnings = (List<?>) saved.getBody().get("warnings");
+        assertThat(warnings).hasSize(2);
+        Map<?, ?> moderate = (Map<?, ?>) warnings.get(0);
+        assertThat(moderate.get("itemIndex")).isEqualTo(1);
+        assertThat(moderate.get("kind")).isEqualTo("allergy");
+        assertThat(moderate.get("severity")).isEqualTo("moderate");
+        Map<?, ?> severe = (Map<?, ?>) warnings.get(1);
+        assertThat(severe.get("itemIndex")).isEqualTo(2);
+        assertThat(severe.get("severity")).isEqualTo("severe");
+        // legacy string is kept and says the same thing
+        Map<?, ?> line = (Map<?, ?>) ((List<?>) saved.getBody().get("items")).get(2);
+        assertThat(line.get("allergyWarning")).isEqualTo(severe.get("message"));
+
+        // the same array is on a plain GET
+        ResponseEntity<Map> got = exchange(path, HttpMethod.GET, authed(token), Map.class);
+        assertThat((List<?>) got.getBody().get("warnings")).hasSize(2);
+
+        // severe still blocks signing without an override reason
+        ResponseEntity<Map> refused = exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(refused.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(refused.getBody().get("type")).asString().contains("warning-unresolved");
+
+        // with the override reason: signs, warning stays visible, and the decision is audited
+        exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol"), Map.of("drugName", "Sulfamethoxazole"),
+                        Map.of("drugName", "Penicillin-VK", "overrides",
+                                List.of(Map.of("kind", "allergy", "reasonCode", "direct_supervision")))))), Map.class);
+        ResponseEntity<Map> signed = exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat((List<?>) signed.getBody().get("warnings")).hasSize(2);
+        Long audited = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'prescription.allergy_override'",
+                Long.class, tenant.id()));
+        assertThat(audited).isEqualTo(1L);
+    }
+
+    @Test
     void previousMedicinesOnlyReturnsSignedPrescriptions() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
@@ -428,10 +482,8 @@ class PrescriptionApiTest extends ApiTestBase {
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
                 inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM prescriptions WHERE tenant_id = ? AND status = 'signed'", tenant.id())));
         // (c) TRUNCATE on either table
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
-                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE prescription_items")));
-        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
-                inTenantTx(tenant.id(), () -> jdbc.execute("TRUNCATE prescriptions CASCADE")));
+        assertTruncateRefusedByTrigger("TRUNCATE prescription_items", "signed prescriptions are final");
+        assertTruncateRefusedByTrigger("TRUNCATE prescriptions CASCADE", "signed prescriptions are final");
 
         Integer signedItems = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
                 "SELECT count(*) FROM prescription_items i JOIN prescriptions p ON p.id = i.prescription_id " +
@@ -567,37 +619,44 @@ class PrescriptionApiTest extends ApiTestBase {
         assertThat(legacy.getBody().get("unresolvedWarnings")).isEqualTo(0);
     }
 
+    /** TestRestTemplate expands a String URL as a template and re-encodes '%', so "%20" would arrive as a literal "%20".
+     * A pre-built URI is sent as is: {@code encodedQuery} must already be percent-encoded. */
+    private ResponseEntity<List> searchDrugs(String token, String encodedQuery) {
+        return http.exchange(java.net.URI.create(url("/v1/clinical/drugs/search?q=" + encodedQuery)), HttpMethod.GET, authed(token), List.class);
+    }
+
     @Test
     void drugSearchIsTenantScopedTrimmedAndMatchesPharmacyItemsAndHistory() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff doc = seedStaff(tenant, roleId, "doc33b@a.com", "+919800033002", false);
         String token = loginAndGetAccessToken(doc);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
         exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Amoxicillin 500mg capsule", "isRx", true, "price", 12.50, "stockQty", 5)), Map.class);
         String entry = checkIn(token, registerPatient(token, "P33b", "+919999933002"), doc.id());
         exchange("/v1/clinical/prescriptions/" + entry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
                 "items", List.of(Map.of("drugName", "Amlodipine")))), Map.class);
 
-        ResponseEntity<List> hits = exchange("/v1/clinical/drugs/search?q=am&limit=5", HttpMethod.GET, authed(token), List.class);
+        ResponseEntity<List> hits = searchDrugs(token, "am&limit=5");
         assertThat(hits.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(hits.getBody().toString()).contains("Amoxicillin 500mg capsule").contains("Amlodipine");
-        assertThat(exchange("/v1/clinical/drugs/search?q=a", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
-        assertThat(exchange("/v1/clinical/drugs/search?q=%25", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        assertThat(searchDrugs(token, "a").getBody()).isEmpty();
+        assertThat(searchDrugs(token, "%25").getBody()).isEmpty();
         // Surrounding whitespace is trimmed (this reaches the SQL path: "am" after trimming has two characters).
-        assertThat(exchange("/v1/clinical/drugs/search?q=%20am%20", HttpMethod.GET, authed(token), List.class).getBody().toString())
+        assertThat(searchDrugs(token, "%20am%20").getBody().toString())
                 .contains("Amoxicillin 500mg capsule");
         // 2+ characters containing LIKE wildcards must be matched literally (ESCAPE path), never as "match everything".
         // a%  a_  (and a backslash) all start with a seeded-name prefix letter, so a wildcard bug would return both drugs.
         for (String wildcard : new String[]{"a%25", "a_", "%25%25", "_m", "a%5C"}) {
-            assertThat(exchange("/v1/clinical/drugs/search?q=" + wildcard, HttpMethod.GET, authed(token), List.class).getBody())
+            assertThat(searchDrugs(token, wildcard).getBody())
                     .as("q=" + wildcard).isEmpty();
         }
 
         SeededTenant other = seedTenant();
         UUID otherRole = seedFullAccessRole(other.id());
         String otherToken = loginAndGetAccessToken(seedStaff(other, otherRole, "doc33c@b.com", "+919800033003", false));
-        assertThat(exchange("/v1/clinical/drugs/search?q=am", HttpMethod.GET, authed(otherToken), List.class).getBody()).isEmpty();
+        assertThat(searchDrugs(otherToken, "am").getBody()).isEmpty();
     }
 
     // DOC-N1 (written, not executed here: needs Docker/Testcontainers).
@@ -624,5 +683,348 @@ class PrescriptionApiTest extends ApiTestBase {
         assertThat(signed.getBody().get("prescriberId")).isEqualTo(doc.id().toString());
         assertThat(signed.getBody().get("professionalRegistrationNo")).isEqualTo("KMC 78412");
         assertThat(signed.getBody().get("clinicName")).isNotNull();
+    }
+
+    // DOC-035 (written, NOT executed: no Docker/Postgres in the authoring environment).
+    private SeededStaff plainDoctor(SeededTenant tenant, String email, String phone) {
+        UUID role = seedRole(tenant.id(), "Doctor " + email, false, clinicalEditNoApprove(), fullGrant("queue"), fullGrant("patients"));
+        return seedStaff(tenant, role, email, phone, false);
+    }
+
+    @Test
+    void aSetKeepsBrandSigRouteAndQuantityAndApplyingItStillFlagsABrandAllergy() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc35a@a.com", "+919800035001", false);
+        String token = loginAndGetAccessToken(doc);
+        ResponseEntity<Map> created = exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Brand combo", "items", List.of(Map.of("drugName", "Paracetamol", "brandName", "Penicillin-X",
+                        "sigPattern", "1-0-1", "route", "oral", "quantity", 10, "quantityUnit", "tablets")))), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> saved = (Map<?, ?>) ((List<?>) created.getBody().get("items")).get(0);
+        assertThat(saved.get("brandName")).isEqualTo("Penicillin-X");
+        assertThat(saved.get("sigPattern")).isEqualTo("1-0-1");
+        assertThat(saved.get("route")).isEqualTo("oral");
+        assertThat(saved.get("quantityUnit")).isEqualTo("tablets");
+        assertThat(created.getBody().get("scope")).isEqualTo("mine");
+        assertThat(created.getBody().get("lastUsedAt")).isNull();
+
+        String patientId = registerPatient(token, "P35a", "+919999935001");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Penicillin", "severity", "severe", "reaction", "anaphylaxis")), Map.class);
+        String entry = checkIn(token, patientId, doc.id());
+
+        ResponseEntity<Map> applied = exchange("/v1/clinical/prescriptions/" + entry + "/apply-set/" + created.getBody().get("id"),
+                HttpMethod.POST, authed(token), Map.class);
+        assertThat(applied.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> line = (Map<?, ?>) ((List<?>) applied.getBody().get("items")).get(0);
+        assertThat(line.get("brandName")).isEqualTo("Penicillin-X");
+        assertThat(line.get("sigPattern")).isEqualTo("1-0-1");
+        assertThat(line.get("route")).isEqualTo("oral");
+        assertThat(applied.getBody().get("unresolvedWarnings")).isEqualTo(1); // brand allergen flagged on apply, never auto-cleared
+
+        ResponseEntity<List> listed = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class);
+        assertThat(((Map<?, ?>) listed.getBody().get(0)).get("lastUsedAt")).isNotNull();
+    }
+
+    @Test
+    void onlyTheOwnerOrAnApproverMayEditOrDeleteASetAndPrivateSetsAreInvisibleToOthers() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = plainDoctor(tenant, "own35@a.com", "+919800035002");
+        SeededStaff other = plainDoctor(tenant, "oth35@a.com", "+919800035003");
+        UUID approverRole = seedRole(tenant.id(), "Clinical lead", false, fullGrant("clinical"), fullGrant("queue"), fullGrant("patients"));
+        SeededStaff approver = seedStaff(tenant, approverRole, "app35@a.com", "+919800035004", false);
+        String ownerToken = loginAndGetAccessToken(owner);
+        String otherToken = loginAndGetAccessToken(other);
+        String approverToken = loginAndGetAccessToken(approver);
+
+        String setId = (String) exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
+                "name", "Mine", "items", List.of(Map.of("drugName", "Cetirizine")))), Map.class).getBody().get("id");
+
+        // private: invisible to another doctor, and not applicable
+        assertThat(exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(otherToken), List.class).getBody()).isEmpty();
+        // shared: visible with scope shared, but still not editable by a non-owner
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                authedJsonBody(ownerToken, Map.of("scope", "shared")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<?> seen = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(otherToken), List.class).getBody();
+        assertThat(seen).hasSize(1);
+        assertThat(((Map<?, ?>) seen.get(0)).get("scope")).isEqualTo("shared");
+        assertThat(((Map<?, ?>) seen.get(0)).get("canEdit")).isEqualTo(false);
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                authedJsonBody(otherToken, Map.of("name", "Hijack")), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(otherToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        // a clinical:approve holder may edit; the owner may delete; unknown id is 404
+        ResponseEntity<Map> renamed = exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                authedJsonBody(approverToken, Map.of("name", "Renamed", "items", List.of(Map.of("drugName", "Loratadine")))), Map.class);
+        assertThat(renamed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(renamed.getBody().get("name")).isEqualTo("Renamed");
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(ownerToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(ownerToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    // M1-fix/m4 (written, NOT executed): another doctor's PRIVATE set does not exist for anyone else, approvers included.
+    @Test
+    void anotherDoctorsPrivateSetIs404OnPatchDeleteAndApplyEvenForAnApprover() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = plainDoctor(tenant, "own36@a.com", "+919800036002");
+        SeededStaff other = plainDoctor(tenant, "oth36@a.com", "+919800036003");
+        UUID leadRole = seedRole(tenant.id(), "Lead36", false, fullGrant("clinical"), fullGrant("queue"), fullGrant("patients"));
+        SeededStaff lead = seedStaff(tenant, leadRole, "ld36@a.com", "+919800036004", false);
+        String ownerToken = loginAndGetAccessToken(owner);
+        String otherToken = loginAndGetAccessToken(other);
+        String leadToken = loginAndGetAccessToken(lead);
+        String setId = (String) exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
+                "name", "Private", "items", List.of(Map.of("drugName", "Cetirizine")))), Map.class).getBody().get("id");
+        String patientId = registerPatient(leadToken, "P36", "+919999936001");
+        String entry = checkIn(leadToken, patientId, lead.id());
+
+        for (String token : List.of(otherToken, leadToken)) {
+            assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.PATCH,
+                    authedJsonBody(token, Map.of("name", "Probe")), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(exchange("/v1/clinical/rx-sets/" + setId, HttpMethod.DELETE, authed(token), Map.class)
+                    .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(exchange("/v1/clinical/prescriptions/" + entry + "/apply-set/" + setId, HttpMethod.POST, authed(token), Map.class)
+                    .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+            assertThat(exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        }
+        // untouched for the owner
+        List<?> mine = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(ownerToken), List.class).getBody();
+        assertThat(mine).hasSize(1);
+        assertThat(((Map<?, ?>) mine.get(0)).get("name")).isEqualTo("Private");
+    }
+
+    @Test
+    void aClinicStandardNeedsClinicalApproveAndIsNotEditableByOrdinaryDoctors() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff plain = plainDoctor(tenant, "pl35@a.com", "+919800035005");
+        String plainToken = loginAndGetAccessToken(plain);
+        Map<String, Object> body = Map.of("name", "Std", "scope", "standard", "items", List.of(Map.of("drugName", "Cetirizine")));
+        assertThat(exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(plainToken, body), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+
+        UUID leadRole = seedRole(tenant.id(), "Lead", false, fullGrant("clinical"), fullGrant("queue"), fullGrant("patients"));
+        String leadToken = loginAndGetAccessToken(seedStaff(tenant, leadRole, "ld35@a.com", "+919800035006", false));
+        ResponseEntity<Map> std = exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(leadToken, body), Map.class);
+        assertThat(std.getBody().get("scope")).isEqualTo("standard");
+        assertThat(std.getBody().get("doctorId")).isNull();
+        String id = (String) std.getBody().get("id");
+
+        List<?> seen = exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(plainToken), List.class).getBody();
+        assertThat(((Map<?, ?>) seen.get(0)).get("canEdit")).isEqualTo(false);
+        assertThat(exchange("/v1/clinical/rx-sets/" + id, HttpMethod.DELETE, authed(plainToken), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void anItemMissingFromTheActivePharmacyMasterIsStaleButOnlyWhenThereIsAMasterToCompareWith() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc35s@a.com", "+919800035007", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(token, Map.of("name", "S", "items",
+                List.of(Map.of("drugName", "Cetirizine"), Map.of("drugName", "Withdrawn drug")))), Map.class);
+
+        Map<?, ?> noMaster = (Map<?, ?>) exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class).getBody().get(0);
+        assertThat(noMaster.get("staleCheckAvailable")).isEqualTo(false); // nothing to compare with: unknown, not "fine"
+        assertThat(noMaster.get("staleItemCount")).isEqualTo(0);
+        assertThat(((Map<?, ?>) ((List<?>) noMaster.get("items")).get(0)).get("stale")).isNull();
+
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "INSERT INTO charge_catalogue (tenant_id, code, name, category, base_amount, tax_rate_percent, stock_qty) VALUES (?,?,?,?,?,?,?)",
+                tenant.id(), "PH-CET", "cetirizine", "Pharmacy", 1, 0, 5));
+        Map<?, ?> withMaster = (Map<?, ?>) exchange("/v1/clinical/rx-sets", HttpMethod.GET, authed(token), List.class).getBody().get(0);
+        assertThat(withMaster.get("staleCheckAvailable")).isEqualTo(true);
+        assertThat(withMaster.get("staleItemCount")).isEqualTo(1);
+        List<?> items = (List<?>) withMaster.get("items");
+        assertThat(((Map<?, ?>) items.get(0)).get("stale")).isEqualTo(false);
+        assertThat(((Map<?, ?>) items.get(1)).get("stale")).isEqualTo(true);
+    }
+
+    // DOC-R3 (written, NOT executed in the authoring environment: Maven cannot resolve dependencies there).
+    // Signing stores the allergy statement the sign gate checked; later register changes never alter it.
+    @Test
+    void signingSnapshotsTheAllergyStatementAndLaterRegisterChangesDoNotAlterIt() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-r3a@a.com", "+919800079001", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "R3a", "+919999979001");
+        ResponseEntity<Map> dust = exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Dust", "severity", "mild", "reaction", "sneezing")), Map.class);
+        String dustId = (String) dust.getBody().get("id");
+        String queueEntryId = checkIn(token, patientId, doc.id());
+        ResponseEntity<Map> draft = exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol", "dosage", "500mg")))), Map.class);
+        assertThat(draft.getBody().containsKey("allergySnapshot")).isTrue();
+        assertThat(draft.getBody().get("allergySnapshot")).isNull(); // a draft never carries one
+
+        ResponseEntity<Map> signed = exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Map<?, ?> atSign = (Map<?, ?>) signed.getBody().get("allergySnapshot");
+        assertThat(atSign.get("state")).isEqualTo("recorded");
+        List<?> atSignAllergies = (List<?>) atSign.get("allergies");
+        assertThat(atSignAllergies).hasSize(1);
+        assertThat(((Map<?, ?>) atSignAllergies.get(0)).get("substance")).isEqualTo("Dust");
+        assertThat(((Map<?, ?>) atSignAllergies.get(0)).get("severity")).isEqualTo("mild");
+        assertThat(((Map<?, ?>) atSignAllergies.get(0)).get("reaction")).isEqualTo("sneezing");
+
+        // The register changes after signing: a new allergy, and the old one removed.
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Latex", "severity", "severe", "reaction", "urticaria")), Map.class);
+        assertThat(exchange("/v1/clinical/allergies/" + dustId + "/deactivate", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("reason", "Entered on the wrong patient")), Void.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Map<?, ?> later = (Map<?, ?>) exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.GET, authed(token), Map.class)
+                .getBody().get("allergySnapshot");
+        assertThat(later).isEqualTo(atSign);
+        Map<?, ?> previous = (Map<?, ?>) exchange("/v1/clinical/patients/" + patientId + "/prescriptions", HttpMethod.GET, authed(token), List.class)
+                .getBody().get(0);
+        assertThat(previous.get("allergySnapshot")).isEqualTo(atSign);
+
+        // Database backstop: the snapshot of a signed prescription cannot be rewritten (V51 trigger).
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.update(
+                        "UPDATE prescriptions SET allergy_snapshot = '{\"state\":\"not_assessed\",\"allergies\":[]}'::jsonb WHERE tenant_id = ?",
+                        tenant.id())));
+        String audited = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT after::text FROM audit_log WHERE tenant_id = ? AND action = 'prescription.signed' ORDER BY created_at DESC LIMIT 1",
+                String.class, tenant.id()));
+        assertThat(audited).contains("allergySnapshotState").contains("recorded");
+    }
+
+    // DOC-R3: "no known allergies" and "not assessed" are snapshotted as the distinct statements they are.
+    // Patients in one test need dissimilar names: same DOB + similar name trips the duplicate-registration guard.
+    @Test
+    void noKnownAllergiesAndNotAssessedAreSnapshottedAsDistinctStatements() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-r3b@a.com", "+919800079002", false);
+        String token = loginAndGetAccessToken(doc);
+
+        String notAsked = registerPatient(token, "Farida Qureshi", "+919999979002");
+        String naEntry = checkIn(token, notAsked, doc.id());
+        exchange("/v1/clinical/prescriptions/" + naEntry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol")))), Map.class);
+        Map<?, ?> na = (Map<?, ?>) exchange("/v1/clinical/prescriptions/" + naEntry + "/sign", HttpMethod.POST, authed(token), Map.class)
+                .getBody().get("allergySnapshot");
+        assertThat(na.get("state")).isEqualTo("not_assessed");
+        assertThat((List<?>) na.get("allergies")).isEmpty();
+        assertThat(na.get("documentedAt")).isNull();
+
+        String nka = registerPatient(token, "Bennett Okafor", "+919999979003");
+        assertThat(exchange("/v1/clinical/patients/" + nka + "/allergies/status", HttpMethod.PUT, authed(token), Map.class)
+                .getBody().get("state")).isEqualTo("none_documented");
+        String nkaEntry = checkIn(token, nka, doc.id());
+        exchange("/v1/clinical/prescriptions/" + nkaEntry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol")))), Map.class);
+        Map<?, ?> none = (Map<?, ?>) exchange("/v1/clinical/prescriptions/" + nkaEntry + "/sign", HttpMethod.POST, authed(token), Map.class)
+                .getBody().get("allergySnapshot");
+        assertThat(none.get("state")).isEqualTo("none_documented");
+        assertThat((List<?>) none.get("allergies")).isEmpty();
+        assertThat(none.get("documentedBy")).isEqualTo(doc.id().toString());
+        assertThat(none.get("documentedByName")).isEqualTo("Test Staff");
+        assertThat(none.get("documentedAt")).isNotNull();
+
+        // An allergy recorded after signing does not turn the signed "no known allergies" into "recorded".
+        exchange("/v1/clinical/patients/" + nka + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Latex", "severity", "mild")), Map.class);
+        Map<?, ?> after = (Map<?, ?>) exchange("/v1/clinical/prescriptions/" + nkaEntry, HttpMethod.GET, authed(token), Map.class)
+                .getBody().get("allergySnapshot");
+        assertThat(after).isEqualTo(none);
+    }
+
+    // DOC-R3: a prescription signed before V79 has no snapshot. It stays null (never filled from the current register),
+    // and a draft can never carry a snapshot (CHECK constraint).
+    @Test
+    void aLegacySignedPrescriptionHasANullSnapshotAndADraftCannotCarryOne() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-r3c@a.com", "+919800079003", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "Lorna Whitfield", "+919999979004");
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "Dust", "severity", "mild")), Map.class);
+        String legacyEntry = checkIn(token, patientId, doc.id());
+        UUID legacyId = UUID.randomUUID();
+        // What a pre-V79 sign left behind: status signed, signed_at set, no allergy_snapshot.
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "INSERT INTO prescriptions (id, tenant_id, queue_entry_id, patient_id, doctor_id, status, signed_at) " +
+                        "VALUES (?,?,?::uuid,?::uuid,?,'signed', now() - interval '30 days')",
+                legacyId, tenant.id(), legacyEntry, patientId, doc.id()));
+
+        ResponseEntity<Map> legacy = exchange("/v1/clinical/prescriptions/" + legacyEntry, HttpMethod.GET, authed(token), Map.class);
+        assertThat(legacy.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(legacy.getBody().get("status")).isEqualTo("signed");
+        assertThat(legacy.getBody().containsKey("allergySnapshot")).isTrue();
+        assertThat(legacy.getBody().get("allergySnapshot")).isNull();
+
+        String draftEntry = checkIn(token, registerPatient(token, "Dmitri Ivanov", "+919999979005"), doc.id());
+        exchange("/v1/clinical/prescriptions/" + draftEntry, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Paracetamol")))), Map.class);
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                inTenantTx(tenant.id(), () -> jdbc.update(
+                        "UPDATE prescriptions SET allergy_snapshot = '{\"state\":\"not_assessed\",\"allergies\":[]}'::jsonb " +
+                                "WHERE tenant_id = ? AND status = 'draft'", tenant.id())));
+    }
+
+    // DOC-R2 / DOC-035 "Repeat last prescription" (written, NOT executed here). Copies the latest signed Rx from an earlier
+    // visit with its structured fields, never the earlier warning decisions; 404 when there is nothing to repeat.
+    @Test
+    void repeatLastCopiesThePreviousSignedPrescriptionAndRerunsTheSafetyChecks() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-r2a@a.com", "+919800079011", false);
+        String token = loginAndGetAccessToken(doc);
+        String patientId = registerPatient(token, "R2a", "+919999979011");
+
+        String first = checkIn(token, patientId, doc.id());
+        ResponseEntity<Map> none = exchange("/v1/clinical/prescriptions/" + first + "/repeat-last", HttpMethod.POST, authed(token), Map.class);
+        assertThat(none.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(none.getBody().get("type")).asString().contains("no-previous-prescription");
+
+        exchange("/v1/clinical/prescriptions/" + first, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Ibuprofen", "dosage", "400mg", "frequency", "TDS", "duration", "3 days",
+                        "brandName", "Brufen", "route", "Oral", "quantity", 9, "quantityUnit", "tablets")))), Map.class);
+        exchange("/v1/clinical/prescriptions/" + first + "/sign", HttpMethod.POST, authed(token), Map.class);
+
+        // A severe NSAID allergy recorded since: the repeated line must carry a fresh, unresolved warning.
+        exchange("/v1/clinical/patients/" + patientId + "/allergies", HttpMethod.POST,
+                authedJsonBody(token, Map.of("substance", "NSAID", "severity", "severe", "reaction", "angioedema")), Map.class);
+        String second = checkIn(token, patientId, doc.id());
+        ResponseEntity<Map> repeated = exchange("/v1/clinical/prescriptions/" + second + "/repeat-last", HttpMethod.POST, authed(token), Map.class);
+        assertThat(repeated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(repeated.getBody().get("status")).isEqualTo("draft");
+        assertThat(repeated.getBody().get("unresolvedWarnings")).isEqualTo(1);
+        List<?> items = (List<?>) repeated.getBody().get("items");
+        assertThat(items).hasSize(1);
+        Map<?, ?> line = (Map<?, ?>) items.get(0);
+        assertThat(line.get("drugName")).isEqualTo("Ibuprofen");
+        assertThat(line.get("brandName")).isEqualTo("Brufen");
+        assertThat(line.get("route")).isEqualTo("Oral");
+        assertThat(line.get("quantityUnit")).isEqualTo("tablets");
+
+        Integer audited = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'prescription.repeated_last'", Integer.class, tenant.id()));
+        assertThat(audited).isEqualTo(1);
+    }
+
+    // DOC-R2: creating a set is audited like update and delete.
+    @Test
+    void creatingAFavouriteSetIsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-r2b@a.com", "+919800079012", false);
+        String token = loginAndGetAccessToken(doc);
+        ResponseEntity<Map> created = exchange("/v1/clinical/rx-sets", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Audited set", "scope", "shared", "items", List.of(Map.of("drugName", "Cetirizine")))), Map.class);
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String after = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT after::text FROM audit_log WHERE tenant_id = ? AND action = 'rx_set.created' AND entity_id = ?::uuid",
+                String.class, tenant.id(), created.getBody().get("id")));
+        assertThat(after).contains("Audited set").contains("itemCount");
     }
 }

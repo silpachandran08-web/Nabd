@@ -2,6 +2,8 @@
 // Shapes match GET /v1/queue, /patients/{id}, /clinical/* as already consumed by consult,
 // nursing and patients pages.
 
+import { queueStatusLabel } from "./consultFlow";
+
 export type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 
 export type QueueEntry = {
@@ -33,7 +35,16 @@ export type PrescriptionItem = {
   brandName?: string | null; sigPattern?: string | null; route?: string | null; quantity?: number | null; quantityUnit?: string | null;
 };
 export type DrugSuggestion = { name: string; source: "pharmacy" | "history"; code: string | null; inStock: boolean | null; prescriptionOnly: boolean | null };
-export type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[]; unresolvedWarnings?: number };
+// DOC-R3: allergy statement captured at signing. Null on drafts and on prescriptions signed before it was captured.
+export type PrescriptionAllergySnapshot = {
+  state: "recorded" | "none_documented" | "not_assessed";
+  allergies: { substance: string; severity: string; reaction: string | null }[];
+  documentedBy: string | null; documentedByName: string | null; documentedAt: string | null;
+};
+export type Prescription = {
+  id: string; status: string; signedAt: string | null; items: PrescriptionItem[]; unresolvedWarnings?: number;
+  allergySnapshot?: PrescriptionAllergySnapshot | null;
+};
 export type Problem = { title: string; detail: string };
 
 export type Allergy = {
@@ -54,8 +65,9 @@ export type Vitals = {
 export const WAITING_STATUSES = ["checked_in", "waiting", "vitals_pending", "vitals_done"];
 export const DONE_STATUSES = ["checkout_pending", "completed", "no_show"];
 
+// DOC-044: one label map for queue statuses (consultFlow.QUEUE_STATUS_LABEL).
 export function statusLabel(status: string): string {
-  return status.replace(/_/g, " ");
+  return queueStatusLabel(status);
 }
 
 export function age(dob: string): number {

@@ -11,7 +11,7 @@ final class StaffRoleModels {
     record StaffRow(UUID id, UUID tenantId, UUID roleId, String email, String name, String mobilePhone,
                      String status, String scope, boolean emailVerified, boolean mobileVerified,
                      boolean mfaEnabled, List<String> fieldGrants, UUID departmentId, Instant lastSeenAt, Instant createdAt,
-                     String professionalRegistrationNo) {
+                     String professionalRegistrationNo, boolean hasPin, boolean ownerLinked, boolean roleMfaRequired) {
     }
 
     record RoleRow(UUID id, UUID tenantId, String name, boolean builtIn, String grantsJson, boolean mfaRequired) {

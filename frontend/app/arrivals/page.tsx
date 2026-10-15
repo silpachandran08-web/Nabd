@@ -11,8 +11,7 @@ import type { IconName } from "../components/ui/Icon";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
 import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
-import { PAYMENT_METHODS, paymentMethodLabel } from "../components/checkout/paymentMethods";
-import { CheckInDialog, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
+import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
@@ -1057,18 +1056,8 @@ function ArrivalsPageInner() {
               </select>
             </div>
 
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="paymentMode">Payment mode</label>
-              <select id="paymentMode" className={styles.select} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
-                {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{paymentMethodLabel(m, region)}</option>)}
-              </select>
-            </div>
-
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="presentingComplaint">Presenting complaint</label>
-              <textarea id="presentingComplaint" className={styles.textarea} value={presentingComplaint}
-                onChange={(e) => setPresentingComplaint(e.target.value)} placeholder="Fever, 3 days" />
-            </div>
+            <CheckInIntakeFields complaint={presentingComplaint} onComplaint={setPresentingComplaint}
+              paymentMode={paymentMode} onPaymentMode={setPaymentMode} region={region} />
 
             {modalError && <div className={styles.formError} role="alert">{modalError}</div>}
 

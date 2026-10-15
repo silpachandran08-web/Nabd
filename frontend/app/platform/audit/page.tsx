@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./audit.module.css";
 import Dialog from "../../components/ui/Dialog";
 import Icon from "../../components/ui/Icon";
@@ -8,8 +8,10 @@ import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews
 import RoleDenied from "../../components/platform/RoleDenied";
 import { usePlatformFetch } from "../platformApi";
 
-// Matches GET /v1/platform/audit-log (AuditSearchController) — cross-tenant by
-// default, narrowed by the tenantId/action filters below.
+// Matches GET /v1/platform/audit-log (AuditSearchController) — cross-tenant by default. Filters
+// the controller accepts and search_audit_log (V16) applies: tenantId, action and entityType (exact
+// match), createdAfter / createdBefore (ISO instants, both inclusive), limit, cursor. There is no
+// actor filter on this endpoint yet, so none is offered.
 type AuditEntry = {
   id: number;
   tenantId: string;
@@ -17,6 +19,7 @@ type AuditEntry = {
   tenantSlug: string;
   actorType: string;
   actorName: string;
+  ipAddress?: string | null;
   actorRole: string;
   action: string;
   entityType: string;
@@ -107,6 +110,7 @@ export default function AuditLogPage() {
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [tenantId, setTenantId] = useState("");
   const [action, setAction] = useState("");
+  const [entityType, setEntityType] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(true);
@@ -115,20 +119,31 @@ export default function AuditLogPage() {
   const [forbidden, setForbidden] = useState(false);
   const [viewing, setViewing] = useState<AuditEntry | null>(null);
   const [filterError, setFilterError] = useState<string | null>(null);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  // Filters of the search on screen. Load more pages through these, never through what has been typed since.
+  const searched = useRef<URLSearchParams>(new URLSearchParams());
 
   const fetchPage = useCallback(
     async (cursor: string | null, append: boolean) => {
       if (append) setLoadingMore(true);
       else setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({ limit: "50" });
-        if (cursor) params.set("cursor", cursor);
-        if (tenantId) params.set("tenantId", tenantId);
-        if (action) params.set("action", action);
+      setMoreError(null);
+      if (!append) setError(null);
+      if (!append) {
+        const filters = new URLSearchParams({ limit: "50" });
+        if (tenantId) filters.set("tenantId", tenantId);
+        if (action.trim()) filters.set("action", action.trim());
+        if (entityType.trim()) filters.set("entityType", entityType.trim());
         // Operator-local day boundaries, sent as instants.
-        if (fromDate) params.set("createdAfter", new Date(`${fromDate}T00:00:00`).toISOString());
-        if (toDate) params.set("createdBefore", new Date(`${toDate}T23:59:59.999`).toISOString());
+        if (fromDate) filters.set("createdAfter", new Date(`${fromDate}T00:00:00`).toISOString());
+        if (toDate) filters.set("createdBefore", new Date(`${toDate}T23:59:59.999`).toISOString());
+        searched.current = filters;
+      }
+      // A failed append keeps the loaded rows and offers a retry of that page only.
+      const fail = (msg: string) => (append ? setMoreError(msg) : setError(msg));
+      try {
+        const params = new URLSearchParams(searched.current);
+        if (cursor) params.set("cursor", cursor);
 
         const res = await fetchAuthed(`/platform/audit-log?${params}`);
         if (!res) return; // session gone, already redirecting to login
@@ -137,20 +152,20 @@ export default function AuditLogPage() {
           return;
         }
         if (!res.ok) {
-          setError("Couldn't load the audit log. Try again.");
+          fail(append ? "Couldn't load more entries. Try again." : "Couldn't load the audit log. Try again.");
           return;
         }
         const body: AuditPage = await res.json();
         setRows((prev) => (append ? [...prev, ...body.data] : body.data));
         setNextCursor(body.page.nextCursor);
       } catch {
-        setError("Couldn't reach the server. Check your connection and try again.");
+        fail("Couldn't reach the server. Check your connection and try again.");
       } finally {
         setLoading(false);
         setLoadingMore(false);
       }
     },
-    [fetchAuthed, tenantId, action, fromDate, toDate]
+    [fetchAuthed, tenantId, action, entityType, fromDate, toDate]
   );
 
   useEffect(() => {
@@ -206,7 +221,17 @@ export default function AuditLogPage() {
               className={styles.input}
               value={action}
               onChange={(e) => setAction(e.target.value)}
-              placeholder="e.g. patient.update"
+              placeholder="Exact code, e.g. patient.update"
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="entityType">Entity type</label>
+            <input
+              id="entityType"
+              className={styles.input}
+              value={entityType}
+              onChange={(e) => setEntityType(e.target.value)}
+              placeholder="Exact type, e.g. patient"
             />
           </div>
           <div className={styles.field}>
@@ -220,7 +245,7 @@ export default function AuditLogPage() {
           <button className={styles.submit} type="submit">Search</button>
           {rows.length > 0 && !loading && (
             <button type="button" className={styles.secondaryBtn} onClick={() => exportCsv(rows)}>
-              <Icon name="receipt" size={14} /> Export CSV ({rows.length})
+              <Icon name="list" size={14} /> Export CSV ({rows.length})
             </button>
           )}
           {filterError && <div className={styles.filterError} role="alert">{filterError}</div>}
@@ -228,7 +253,7 @@ export default function AuditLogPage() {
       )}
       {!forbidden && rows.length > 0 && !loading && (
         <p className={styles.exportHint}>
-          Export covers the rows loaded on this page only. Exports are not yet recorded as their own audit event — handle the file as confidential.
+          Export is built in your browser from the {rows.length} rows loaded here (use Load more to include more). It is not yet recorded as its own audit event, so handle the file as confidential.
         </p>
       )}
 
@@ -240,7 +265,7 @@ export default function AuditLogPage() {
         ) : error ? (
           <ErrorState message={error} onRetry={() => fetchPage(null, false)} />
         ) : rows.length === 0 ? (
-          <EmptyState icon="shield" title="No matching audit entries" hint="Widen the date range or clear the clinic and action filters." />
+          <EmptyState icon="shield" title="No matching audit entries" hint="Widen the date range or clear the clinic, action and entity filters." />
         ) : (
           <>
             <div className={styles.tableWrap}>
@@ -287,8 +312,9 @@ export default function AuditLogPage() {
                   disabled={loadingMore}
                   onClick={() => fetchPage(nextCursor, true)}
                 >
-                  {loadingMore ? "Loading…" : "Load more"}
+                  {loadingMore ? "Loading…" : moreError ? "Retry load more" : "Load more"}
                 </button>
+                {moreError && <span className={styles.filterError} role="alert">{moreError}</span>}
               </div>
             )}
           </>
@@ -298,9 +324,13 @@ export default function AuditLogPage() {
       {viewing && (
         <Dialog title={`${viewing.action} — before and after`} size="drawer" onClose={() => setViewing(null)}>
           <div className={styles.drawer}>
-            <div className={styles.drawerMeta}>
-              {new Date(viewing.createdAt).toLocaleString()} · {viewing.actorName} ({viewing.actorRole}) · {viewing.tenantName}
-            </div>
+            <dl className={styles.metaGrid}>
+              <dt>When</dt><dd>{new Date(viewing.createdAt).toLocaleString()}</dd>
+              <dt>Clinic</dt><dd>{viewing.tenantName} ({viewing.tenantSlug})</dd>
+              <dt>Actor</dt><dd>{viewing.actorName} ({viewing.actorRole}{viewing.actorType ? `, ${viewing.actorType}` : ""})</dd>
+              {viewing.ipAddress && <><dt>IP address</dt><dd>{viewing.ipAddress}</dd></>}
+              <dt>Entity</dt><dd>{viewing.entityType}{viewing.entityId ? ` · ${viewing.entityId}` : ""}</dd>
+            </dl>
             {changes.length === 0 ? (
               <p className={styles.muted}>No field changes recorded for this entry.</p>
             ) : (

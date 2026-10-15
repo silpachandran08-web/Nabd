@@ -7,6 +7,7 @@ import { formatMoney } from "../../lib/money";
 import { can } from "../../lib/permissions";
 import { getIdentity } from "../../lib/session";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
+import AccessGate from "../../components/ui/AccessGate";
 
 // NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
 // /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
@@ -29,11 +30,23 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// A counter sale exists only to create an invoice (POST /billing/otc-checkout needs billing:create),
+// so the whole route is gated on that grant, matching the Arrivals entry button (PHA-016). The gate
+// also keeps can() below out of the server render.
 export default function OtcCheckoutPage() {
+  return (
+    <AccessGate permission="billing:create" surface="Counter sale">
+      <OtcCheckoutInner />
+    </AccessGate>
+  );
+}
+
+function OtcCheckoutInner() {
   const router = useRouter();
   const region = getIdentity()?.tenantRegion;
   const canCheckout = can("billing:create"); // the API requires billing:create; absent otherwise
   const canPay = can("billing:edit"); // POST /billing/invoices/{id}/payments requires billing:edit
+  const canDiscount = can("billing.discount"); // REC-043: input absent, and discount not sent, without it
 
   const [context, setContext] = useState<OtcContext | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
@@ -119,7 +132,7 @@ export default function OtcCheckoutPage() {
 
   const subtotal = round2(items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0));
   const tax = round2(items.reduce((sum, i) => sum + round2((i.unitPrice * i.quantity * i.taxRatePercent) / 100), 0));
-  const discountNum = Math.max(0, Number(discount) || 0);
+  const discountNum = canDiscount ? Math.max(0, Number(discount) || 0) : 0;
   const rawTotal = subtotal - discountNum + tax;
   const previewTotal = Math.round(rawTotal);
   const roundOff = round2(previewTotal - rawTotal);
@@ -136,7 +149,7 @@ export default function OtcCheckoutPage() {
         method: "POST",
         body: JSON.stringify({
           lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          discount: discountNum,
+          ...(canDiscount ? { discount: discountNum } : {}),
         }),
       });
       if (!res) return;
@@ -309,10 +322,12 @@ export default function OtcCheckoutPage() {
           <div className={styles.card}>
             <div className={styles.totals}>
               <div className={styles.totalsRow}><span>Subtotal</span><span>{formatMoney(subtotal, context.currency)}</span></div>
-              <div className={styles.totalsRow}>
-                <span>Discount</span>
-                <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-              </div>
+              {canDiscount && (
+                <div className={styles.totalsRow}>
+                  <span>Discount</span>
+                  <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+                </div>
+              )}
               <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
               <div className={styles.totalsRow}><span>Round-off</span><span>{roundOff >= 0 ? "+" : "−"}{formatMoney(Math.abs(roundOff), context.currency)}</span></div>
               <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>

@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.queue.dto.WaitlistAcceptRequest;
 import com.nabd.hms.queue.dto.WaitlistEntryResponse;
 import com.nabd.hms.queue.dto.WaitlistJoinRequest;
 import jakarta.validation.Valid;
@@ -44,10 +45,12 @@ public class WaitlistController {
         return service.list(tenantId(jwt), doctorId);
     }
 
+    /** Body optional (REC-028): without slotStart this accepts the offered slot; with it, books that chosen slot. */
     @PostMapping("/{id}/accept")
     @PreAuthorize("hasAuthority('queue:edit')")
-    public WaitlistEntryResponse accept(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.accept(tenantId(jwt), staffId(jwt), id);
+    public WaitlistEntryResponse accept(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                        @RequestBody(required = false) WaitlistAcceptRequest req) {
+        return service.accept(tenantId(jwt), staffId(jwt), id, req == null ? null : req.slotStart());
     }
 
     @DeleteMapping("/{id}")

@@ -1,0 +1,17 @@
+/* DOC-036 dose calculator + DOC-041 package session. Tokens only; logical properties. */
+.wrap { display: flex; flex-direction: column; gap: var(--nb-space-8); margin-block-start: var(--nb-space-16); padding-block-start: var(--nb-space-12); border-block-start: 1px solid var(--nb-border-subtle); }
+.head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--nb-space-8); }
+.title { font-size: 12px; font-weight: 600; color: var(--nb-text-primary); }
+.note { margin: 0; font-size: 12px; color: var(--nb-text-secondary); }
+.result { display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--nb-space-8); }
+.facts > div { background: var(--nb-surface-3); border-radius: var(--nb-radius-md); padding: var(--nb-space-8) var(--nb-space-12); min-width: 0; }
+.facts dt { font-size: 11px; color: var(--nb-text-tertiary); }
+.facts dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.big { font-size: 16px !important; font-weight: 600; }
+.hint { font-size: 12px; color: var(--nb-text-secondary); }
+.record { display: flex; flex-direction: column; gap: var(--nb-space-8); max-inline-size: 360px; }
+.label { display: flex; flex-direction: column; gap: var(--nb-space-4); font-size: 12px; color: var(--nb-text-secondary); }
+.pkgItem { display: flex; flex-direction: column; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); background: var(--nb-surface-3); border-radius: var(--nb-radius-md); font-size: 13px; }
+.pkgRow { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--nb-space-8); }
+.pkgName { overflow-wrap: anywhere; min-width: 0; }

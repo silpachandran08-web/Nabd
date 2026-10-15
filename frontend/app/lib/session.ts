@@ -5,6 +5,7 @@
 // ClinicNav's clinic-info card and signed-in-as footer, never for authorization.
 type AccessTokenClaims = {
   sub?: string;
+  tenantId?: string;
   permissions?: string[];
   tenantName?: string;
   tenantRegion?: string;
@@ -40,6 +41,23 @@ export function isOwner(): boolean {
   const token = localStorage.getItem("nabd_access_token");
   if (!token) return false;
   return decodeAccessToken(token)?.owner === true;
+}
+
+/** Display name for the tenant region (fixed at provisioning: IN or KSA). Unknown codes pass through. */
+export function regionLabel(region: string | null | undefined): string {
+  if (region === "IN") return "India";
+  if (region === "KSA") return "Saudi Arabia";
+  return region ?? "";
+}
+
+/** The owner portal's pending-workspace token (sessionStorage, ~5 min, OwnerService) while it is
+ * still unexpired. Lets an owner inside a clinic go back to the workspace list without a new PIN
+ * only while it lasts; display/routing only, the server re-checks it. */
+export function ownerPendingTokenValid(): boolean {
+  if (typeof window === "undefined") return false;
+  const token = sessionStorage.getItem("nabd_owner_pending_token");
+  const exp = token ? decodeAccessToken(token)?.exp : undefined;
+  return !!exp && exp * 1000 > Date.now() + 10_000;
 }
 
 export function getIdentity(): Identity | null {

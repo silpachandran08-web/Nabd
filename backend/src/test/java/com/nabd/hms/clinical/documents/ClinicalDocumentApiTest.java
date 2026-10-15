@@ -143,14 +143,14 @@ class ClinicalDocumentApiTest extends ApiTestBase {
     void theIssuedHeaderSnapshotsTheDoctorRegistrationNumberOrNullWhenUnset() {
         SeededTenant tenant = seedTenant();
         Visit v = seedVisit(tenant);
-        String unset = (String) createReferral(v, Map.of("referredTo", "ENT")).getBody().get("id");
+        String unset = (String) createReferral(v, Map.of("referredTo", "ENT", "reason", "Hearing loss")).getBody().get("id");
         Map<?, ?> noReg = (Map<?, ?>) ((Map<?, ?>) exchange("/v1/clinical/documents/" + unset + "/issue", HttpMethod.POST,
                 authed(v.token()), Map.class).getBody().get("header")).get("doctor");
         assertThat(noReg.containsKey("registrationNumber")).isTrue();
         assertThat(noReg.get("registrationNumber")).isNull();
 
         inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET professional_registration_no = 'KMC 12345' WHERE id = ?", v.doctor().id()));
-        String set = (String) createReferral(v, Map.of("referredTo", "Cardiology")).getBody().get("id");
+        String set = (String) createReferral(v, Map.of("referredTo", "Cardiology", "reason", "Murmur")).getBody().get("id");
         Map<?, ?> withReg = (Map<?, ?>) ((Map<?, ?>) exchange("/v1/clinical/documents/" + set + "/issue", HttpMethod.POST,
                 authed(v.token()), Map.class).getBody().get("header")).get("doctor");
         assertThat(withReg.get("registrationNumber")).isEqualTo("KMC 12345");

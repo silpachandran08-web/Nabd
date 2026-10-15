@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Dialog from "../ui/Dialog";
 import { Skeleton } from "../ui/StateViews";
+import { PAYMENT_METHODS, paymentMethodLabel } from "../checkout/paymentMethods";
+import { getIdentity } from "../../lib/session";
 import styles from "./checkin.module.css";
 
 // One check-in overlay shared by Arrivals and Patients (REC-041, REC-017): confirm -> POST
@@ -84,6 +86,28 @@ export function CheckInResultDialog({ result, authedFetch, onClose }: { result: 
   );
 }
 
+/** Visit intake captured at every check-in (CheckInRequest.presentingComplaint / paymentMode), shared by
+ * this dialog and the Arrivals walk-in drawer so both send the same fields. */
+export function CheckInIntakeFields({ complaint, onComplaint, paymentMode, onPaymentMode, region }: {
+  complaint: string; onComplaint: (v: string) => void; paymentMode: string; onPaymentMode: (v: string) => void; region?: string | null;
+}) {
+  return (
+    <>
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="checkin-payment">Payment mode</label>
+        <select id="checkin-payment" className={styles.select} value={paymentMode} onChange={(e) => onPaymentMode(e.target.value)}>
+          {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{paymentMethodLabel(m, region)}</option>)}
+        </select>
+      </div>
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="checkin-complaint">Presenting complaint</label>
+        <textarea id="checkin-complaint" className={styles.textarea} value={complaint}
+          onChange={(e) => onComplaint(e.target.value)} placeholder="Fever, 3 days" />
+      </div>
+    </>
+  );
+}
+
 export type CheckInPatient = {
   id: string; name: string; nextAppointmentToday: boolean; nextAppointmentId: string | null;
   nextDoctorId: string | null; nextDoctorName: string | null; nextAppointment: string | null;
@@ -104,6 +128,9 @@ export function CheckInDialog({ patient, authedFetch, onClose, onDone, onChecked
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<CheckInResult | null>(null);
+  const [complaint, setComplaint] = useState("");
+  const [paymentMode, setPaymentMode] = useState("cash");
+  const [region] = useState(() => getIdentity()?.tenantRegion);
 
   useEffect(() => {
     if (booked) return;
@@ -124,9 +151,10 @@ export function CheckInDialog({ patient, authedFetch, onClose, onDone, onChecked
     setSaving(true);
     setError(null);
     try {
+      const intake = { presentingComplaint: complaint.trim() || null, paymentMode };
       const body = booked
-        ? { patientId: patient.id, doctorId: patient.nextDoctorId, appointmentId: patient.nextAppointmentId }
-        : { patientId: patient.id, doctorId };
+        ? { patientId: patient.id, doctorId: patient.nextDoctorId, appointmentId: patient.nextAppointmentId, ...intake }
+        : { patientId: patient.id, doctorId, ...intake };
       const res = await authedFetch("/queue/check-in", { method: "POST", body: JSON.stringify(body) });
       if (!res) return;
       if (!res.ok) {
@@ -157,13 +185,16 @@ export function CheckInDialog({ patient, authedFetch, onClose, onDone, onChecked
         ) : (
           <>
             <p className={styles.sub}>No booking today — this checks them in as a walk-in.</p>
-            <label className={styles.label} htmlFor="checkin-doctor">Doctor</label>
-            <select id="checkin-doctor" className={styles.select} value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
-              <option value="">{doctors === null ? "Loading…" : "Choose a doctor"}</option>
-              {(doctors ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="checkin-doctor">Doctor</label>
+              <select id="checkin-doctor" className={styles.select} value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
+                <option value="">{doctors === null ? "Loading…" : "Choose a doctor"}</option>
+                {(doctors ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
           </>
         )}
+        <CheckInIntakeFields complaint={complaint} onComplaint={setComplaint} paymentMode={paymentMode} onPaymentMode={setPaymentMode} region={region} />
         {error && <div className={styles.error} role="alert">{error}</div>}
         <div className={styles.actions}>
           <button type="button" className={styles.secondaryBtn} onClick={onClose}>Cancel</button>

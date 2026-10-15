@@ -3,9 +3,12 @@ package com.nabd.hms.clinical;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
 import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
+import com.nabd.hms.clinical.dto.PrescriptionAllergySnapshotResponse;
+import com.nabd.hms.clinical.dto.PrescriptionWarningResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetItemResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
+import com.nabd.hms.clinical.dto.FavouriteRxSetUpdateRequest;
 import com.nabd.hms.clinical.dto.PrescriptionItemRequest;
 import com.nabd.hms.clinical.dto.PrescriptionItemResponse;
 import com.nabd.hms.clinical.dto.PrescriptionResponse;
@@ -37,6 +40,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
+import static com.nabd.hms.clinical.AllergyModels.AssessmentRow;
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
 import static com.nabd.hms.clinical.PrescriptionModels.ActorInfo;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetItemRow;
@@ -92,11 +96,12 @@ public class PrescriptionService {
     @Transactional
     public DoseCalculationResponse calculateDose(UUID tenantId, UUID patientId, BigDecimal mgPerKg) {
         tenantContext.set(tenantId);
-        BigDecimal weightKg = vitalsRepo.findLatestWeightKg(tenantId, patientId)
+        VitalsRepository.WeightReading reading = vitalsRepo.findLatestWeight(tenantId, patientId)
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "no-weight-recorded", "No weight recorded",
                         "Record this patient's weight in vitals before calculating a weight-based dose."));
+        BigDecimal weightKg = reading.weightKg();
         BigDecimal totalDoseMg = weightKg.multiply(mgPerKg).setScale(2, RoundingMode.HALF_UP);
-        return new DoseCalculationResponse(weightKg, mgPerKg, totalDoseMg, DOSE_RULE_SOURCE);
+        return new DoseCalculationResponse(weightKg, mgPerKg, totalDoseMg, DOSE_RULE_SOURCE, reading.recordedAt());
     }
 
     @Transactional
@@ -188,40 +193,180 @@ public class PrescriptionService {
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 
-    /** NB-114: a doctor's saved combo of drugs — one PATCH from a set drops its items onto the pad,
-     * re-running the exact same allergy/pregnancy/controlled checks as any manually typed item. */
+    /** NB-114 / DOC-035: a doctor's saved combo of drugs. scope "mine" (default) is private, "shared" is visible to the
+     * clinic, "standard" is a clinic standard with no owner and needs clinical:approve. Items keep brand/sig/route/quantity. */
     @Transactional
-    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, FavouriteRxSetRequest req) {
+    public FavouriteRxSetResponse createSet(UUID tenantId, UUID doctorId, boolean callerCanApprove, String ipAddress,
+                                            FavouriteRxSetRequest req) {
         tenantContext.set(tenantId);
-        UUID setId = repo.insertSet(tenantId, doctorId, req.name());
+        String scope = req.scope() == null ? "mine" : req.scope();
+        if (req.items().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "empty-set", "Nothing to save", "Add at least one medicine to the set.");
+        }
+        if ("standard".equals(scope) && !callerCanApprove) {
+            throw setForbidden("create a clinic standard");
+        }
+        UUID setId = repo.insertSet(tenantId, "standard".equals(scope) ? null : doctorId, req.name().trim(), "shared".equals(scope));
         repo.insertSetItems(tenantId, setId, req.items());
-        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound));
+        // DOC-R2: creation is audited like update and delete (same before/after shape).
+        ActorInfo actor = repo.findActorInfo(tenantId, doctorId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", doctorId, actor.name(), actor.role(), ipAddress, "rx_set.created", "rx_set", setId,
+                null, Map.of("name", req.name().trim(), "shared", "shared".equals(scope), "standard", "standard".equals(scope),
+                        "itemCount", req.items().size()));
+        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), doctorId, callerCanApprove,
+                repo.activePharmacyNames(tenantId));
     }
 
     @Transactional
-    public List<FavouriteRxSetResponse> listSets(UUID tenantId, UUID doctorId) {
+    public List<FavouriteRxSetResponse> listSets(UUID tenantId, UUID doctorId, boolean callerCanApprove) {
         tenantContext.set(tenantId);
-        return repo.listSets(tenantId, doctorId).stream().map(s -> toSetResponse(tenantId, s)).toList();
+        java.util.Set<String> master = repo.activePharmacyNames(tenantId);
+        return repo.listSets(tenantId, doctorId).stream().map(s -> toSetResponse(tenantId, s, doctorId, callerCanApprove, master)).toList();
+    }
+
+    /** DOC-035: owner-only edit, or clinical:approve (which is also what a clinic standard needs). */
+    @Transactional
+    public FavouriteRxSetResponse updateSet(UUID tenantId, UUID setId, UUID callerStaffId, boolean callerCanApprove, String ipAddress,
+                                             FavouriteRxSetUpdateRequest req) {
+        tenantContext.set(tenantId);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        requireVisible(set, callerStaffId);
+        requireCanManage(set, callerStaffId, callerCanApprove, "change");
+        if (req.items() != null && req.items().isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "empty-set", "Nothing to save", "A set needs at least one medicine; delete it instead.");
+        }
+        String name = req.name() == null || req.name().isBlank() ? set.name() : req.name().trim();
+        UUID owner = set.doctorId();
+        boolean shared = set.shared();
+        if (req.scope() != null) {
+            switch (req.scope()) {
+                case "standard" -> {
+                    if (!callerCanApprove) {
+                        throw setForbidden("make a set a clinic standard");
+                    }
+                    owner = null;
+                    shared = false;
+                }
+                case "shared", "mine" -> {
+                    if ("mine".equals(req.scope()) && owner != null && !owner.equals(callerStaffId)) {
+                        throw setForbidden("make another doctor's shared set private"); // would hide it from its own owner
+                    }
+                    owner = owner == null ? callerStaffId : owner;
+                    shared = "shared".equals(req.scope());
+                }
+                default -> throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-scope", "Invalid scope", "Scope must be mine, shared or standard.");
+            }
+        }
+        repo.updateSet(tenantId, setId, name, owner, shared);
+        if (req.items() != null) {
+            repo.deleteSetItems(tenantId, setId);
+            repo.insertSetItems(tenantId, setId, req.items());
+        }
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.updated", "rx_set", setId,
+                Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null),
+                Map.of("name", name, "shared", shared, "standard", owner == null, "itemsReplaced", req.items() != null));
+        return toSetResponse(tenantId, repo.findSet(tenantId, setId).orElseThrow(this::notFound), callerStaffId, callerCanApprove,
+                repo.activePharmacyNames(tenantId));
+    }
+
+    @Transactional
+    public void deleteSet(UUID tenantId, UUID setId, UUID callerStaffId, boolean callerCanApprove, String ipAddress) {
+        tenantContext.set(tenantId);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        requireVisible(set, callerStaffId);
+        requireCanManage(set, callerStaffId, callerCanApprove, "delete");
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        repo.deleteSet(tenantId, setId); // items go with it (ON DELETE CASCADE); prescriptions already built from it are unaffected
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.deleted", "rx_set", setId,
+                Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null), null);
     }
 
     @Transactional
     public PrescriptionResponse applySet(UUID tenantId, UUID queueEntryId, UUID setId, UUID callerStaffId,
                                           boolean callerCanApprove, String ipAddress) {
         tenantContext.set(tenantId);
-        repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
+        requireVisible(set, callerStaffId);
+        // Brand, sig, route and quantity travel with the line: upsert() runs the allergy/pregnancy/controlled checks on
+        // drug AND brand exactly as for hand-typed lines, so a brand that carries an allergen is flagged on apply.
         List<PrescriptionItemRequest> items = repo.findSetItems(tenantId, setId).stream()
                 .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
-                        i.instructions(), null))
+                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
                 .toList();
-        return upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
+        PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
+        repo.markSetUsed(tenantId, setId);
+        return result;
     }
 
-    private FavouriteRxSetResponse toSetResponse(UUID tenantId, FavouriteSetRow s) {
+    /** DOC-035 / DOC-R2 "Repeat last prescription": replace the draft with the lines of this patient's most recent SIGNED
+     * prescription from another visit, keeping brand, sig, route and quantity. Earlier warning decisions are NOT carried
+     * over: upsert() re-runs every allergy, pregnancy and controlled-substance check against the current register, so a
+     * line that needs a decision needs a fresh one on this prescription. 404 no-previous-prescription when there is none. */
+    @Transactional
+    public PrescriptionResponse repeatLast(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove,
+                                            String ipAddress) {
+        tenantContext.set(tenantId);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        PrescriptionRow last = repo.findSignedByPatient(tenantId, owner.patientId()).stream()
+                .filter(p -> !p.queueEntryId().equals(queueEntryId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "no-previous-prescription", "No previous prescription",
+                        "This patient has no signed prescription from an earlier visit to repeat."));
+        List<PrescriptionItemRequest> items = repo.findItems(tenantId, last.id()).stream()
+                .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
+                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
+                .toList();
+        PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "prescription.repeated_last",
+                "prescription", result.id(), null, Map.of("queueEntryId", queueEntryId.toString(),
+                        "sourcePrescriptionId", last.id().toString(), "itemCount", items.size()));
+        return result;
+    }
+
+    /** Another doctor's private set does not exist for this caller (404, no existence probe), approvers included:
+     * clinical:approve only reaches shared and standard sets. */
+    private void requireVisible(FavouriteSetRow set, UUID callerStaffId) {
+        if (set.doctorId() != null && !set.shared() && !set.doctorId().equals(callerStaffId)) {
+            throw notFound();
+        }
+    }
+
+    private void requireCanManage(FavouriteSetRow set, UUID callerStaffId, boolean callerCanApprove, String verb) {
+        if (!canManage(set, callerStaffId, callerCanApprove)) {
+            throw setForbidden(verb);
+        }
+    }
+
+    private static boolean canManage(FavouriteSetRow set, UUID callerStaffId, boolean callerCanApprove) {
+        return callerCanApprove || (set.doctorId() != null && set.doctorId().equals(callerStaffId));
+    }
+
+    private ApiException setForbidden(String what) {
+        return new ApiException(HttpStatus.FORBIDDEN, "rx-set-owner-only", "Not your set",
+                "Only the doctor who owns this set, or a clinician with prescription approval rights, can " + what + " it.");
+    }
+
+    private FavouriteRxSetResponse toSetResponse(UUID tenantId, FavouriteSetRow s, UUID callerStaffId, boolean callerCanApprove,
+                                                  java.util.Set<String> pharmacyMaster) {
+        boolean checkable = !pharmacyMaster.isEmpty();
         List<FavouriteRxSetItemResponse> items = repo.findSetItems(tenantId, s.id()).stream()
                 .map(i -> new FavouriteRxSetItemResponse(i.drugName(), i.dosage(), i.frequency(), i.duration(),
-                        i.instructions()))
+                        i.instructions(), i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(),
+                        checkable ? isStale(i, pharmacyMaster) : null))
                 .toList();
-        return new FavouriteRxSetResponse(s.id(), s.doctorId(), s.name(), s.createdAt(), items);
+        String scope = s.doctorId() == null ? "standard" : s.doctorId().equals(callerStaffId) ? "mine" : "shared";
+        int stale = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.stale())).count();
+        return new FavouriteRxSetResponse(s.id(), s.doctorId(), s.name(), s.createdAt(), items, scope, s.shared(), s.ownerName(),
+                s.updatedAt(), s.lastUsedAt(), checkable, stale, canManage(s, callerStaffId, callerCanApprove));
+    }
+
+    /** Stale = the tenant has an active pharmacy item master and neither the drug nor the brand text is in it. */
+    static boolean isStale(FavouriteSetItemRow i, java.util.Set<String> master) {
+        String drug = i.drugName() == null ? "" : i.drugName().trim().toLowerCase();
+        String brand = i.brandName() == null ? "" : i.brandName().trim().toLowerCase();
+        return !(master.contains(drug) || (!brand.isEmpty() && master.contains(brand)));
     }
 
     /** Server-side gate: signing re-checks every line against the current allergy register and patient profile and
@@ -256,7 +401,10 @@ public class PrescriptionService {
             throw new ApiException(HttpStatus.CONFLICT, "warning-unresolved", "Resolve the warning first",
                     "These medicines carry a safety warning that needs a recorded decision before signing: " + lines + ".");
         }
-        if (repo.sign(tenantId, row.id()) == 0) {
+        // DOC-R3: capture the allergy statement the gate above just checked (still under the register lock) and store
+        // it with the status flip, so the printout shows what the prescriber signed against, not the register at print time.
+        StoredAllergySnapshot snapshot = captureAllergySnapshot(tenantId, owner.patientId());
+        if (repo.sign(tenantId, row.id(), toJson(snapshot)) == 0) {
             // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
             return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
         }
@@ -278,7 +426,8 @@ public class PrescriptionService {
         }).toList();
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "prescription.signed", "prescription", row.id(), null, Map.of("queueEntryId", queueEntryId.toString(), "items", finalItems,
-                        "signedByVisitDoctor", owner.doctorId().equals(callerStaffId)));
+                        "signedByVisitDoctor", owner.doctorId().equals(callerStaffId),
+                        "allergySnapshotState", snapshot.state(), "allergySnapshotActiveCount", snapshot.allergies().size()));
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 
@@ -305,6 +454,8 @@ public class PrescriptionService {
         String region = repo.findTenantRegion(tenantId).orElse("IN");
         LocalDate today = clock.today(tenantId);
         int[] unresolved = {0};
+        int[] itemNo = {0};
+        List<PrescriptionWarningResponse> flat = new ArrayList<>();
         List<PrescriptionItemResponse> items = repo.findItems(tenantId, p.id()).stream()
                 .map(i -> {
                     List<StoredDecision> stored = parseDecisions(i.overridesJson());
@@ -329,6 +480,12 @@ public class PrescriptionService {
                             default -> controlledWarning = d.message();
                         }
                     }
+                    for (RxWarningResponse w : warnings) {
+                        if (RxSafetyChecks.KIND_ALLERGY.equals(w.kind())) {
+                            flat.add(new PrescriptionWarningResponse(itemNo[0], w.kind(), w.severity(), w.message()));
+                        }
+                    }
+                    itemNo[0]++;
                     return new PrescriptionItemResponse(i.id(), i.drugName(), i.dosage(), i.frequency(), i.duration(),
                             i.instructions(), i.allergyOverrideReason(), i.displayOrder(), allergyWarning,
                             pregnancyWarning, controlledWarning, warnings, i.brandName(), i.sigPattern(), i.route(),
@@ -336,7 +493,54 @@ public class PrescriptionService {
                 })
                 .toList();
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
-                p.createdAt(), p.signedAt(), items, unresolved[0]);
+                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat);
+    }
+
+    // ── DOC-R3: allergy statement snapshotted at signing ─────────────────
+
+    /** Stored form in prescriptions.allergy_snapshot. Timestamps and ids are strings, like StoredDecision. */
+    record StoredAllergySnapshot(String state, List<StoredSnapshotAllergy> allergies, String documentedBy,
+                                 String documentedByName, String documentedAt) {
+    }
+
+    record StoredSnapshotAllergy(String substance, String severity, String reaction) {
+    }
+
+    /** Same rule as AllergyService.status(): any active entry = "recorded"; otherwise a "no known allergies" statement
+     * = "none_documented"; otherwise "not_assessed". Caller must hold the patient's allergy-register lock. */
+    private StoredAllergySnapshot captureAllergySnapshot(UUID tenantId, UUID patientId) {
+        List<AllergyRow> active = allergyRepo.findActiveByPatient(tenantId, patientId);
+        if (!active.isEmpty()) {
+            List<StoredSnapshotAllergy> list = active.stream()
+                    .map(a -> new StoredSnapshotAllergy(a.substance(), a.severity(), a.reaction())).toList();
+            return new StoredAllergySnapshot("recorded", list, null, null, null);
+        }
+        AssessmentRow a = allergyRepo.findAssessment(tenantId, patientId).orElse(null);
+        if (a == null) {
+            return new StoredAllergySnapshot("not_assessed", List.of(), null, null, null);
+        }
+        String name = allergyRepo.findStaffNames(tenantId, java.util.Set.of(a.documentedBy())).get(a.documentedBy());
+        return new StoredAllergySnapshot("none_documented", List.of(), a.documentedBy().toString(), name,
+                a.documentedAt().toString());
+    }
+
+    /** Null in, null out: a draft or a prescription signed before V79 has no snapshot and must stay distinguishable. */
+    private PrescriptionAllergySnapshotResponse readAllergySnapshot(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        StoredAllergySnapshot s;
+        try {
+            s = objectMapper.readValue(json, StoredAllergySnapshot.class);
+        } catch (JsonProcessingException e) {
+            // Never print a guessed statement: an unreadable snapshot is surfaced as an error, not as "none".
+            throw new IllegalStateException("stored prescription allergy snapshot is unreadable", e);
+        }
+        List<PrescriptionAllergySnapshotResponse.Allergy> allergies = s.allergies() == null ? List.of() : s.allergies().stream()
+                .map(x -> new PrescriptionAllergySnapshotResponse.Allergy(x.substance(), x.severity(), x.reaction())).toList();
+        return new PrescriptionAllergySnapshotResponse(s.state(), allergies,
+                s.documentedBy() == null ? null : UUID.fromString(s.documentedBy()), s.documentedByName(),
+                s.documentedAt() == null ? null : Instant.parse(s.documentedAt()));
     }
 
     // ── warning detection and stored decisions ───────────────────────────

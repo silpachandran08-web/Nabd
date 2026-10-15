@@ -19,6 +19,8 @@ const WARNING_BODY: Record<RxWarning["kind"], (w: RxWarning) => string> = {
   controlled: (w) => w.message,
 };
 
+const SEVERITY_LABEL: Record<string, string> = { mild: "Mild", moderate: "Moderate", severe: "Severe" };
+
 const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "");
 
 /** Decision card for the warnings of one prescription line (DOC-031/032). An unresolved warning that
@@ -42,7 +44,7 @@ export default function RxWarnings({
           <div key={w.kind} className={`${s.notice} ${open ? s.noticeDanger : w.requiresDecision ? s.noticeInfo : s.noticeWarn} ${s.warnCard}`} role={open ? "alert" : "status"}>
             <Icon name="alert" size={16} />
             <div className={s.warnBody}>
-              <strong>{WARNING_TITLE[w.kind]}{w.requiresDecision ? "" : " (advisory)"}</strong>
+              <strong>{WARNING_TITLE[w.kind]}{w.kind === "allergy" && SEVERITY_LABEL[w.severity] ? ` · ${SEVERITY_LABEL[w.severity]}` : ""}{w.requiresDecision ? "" : " (advisory)"}</strong>
               <span>{WARNING_BODY[w.kind](w)}</span>
               {w.decision && (
                 <span>
@@ -51,6 +53,7 @@ export default function RxWarnings({
                   {w.decision.byName ? ` · ${w.decision.byName}` : ""}{w.decision.at ? ` · ${fmt(w.decision.at)}` : ""}
                 </span>
               )}
+              {open && !locked && onOverride && <span className={s.muted}>An override logs the warning, your name, the time, your reason and the final item.</span>}
               {open && !locked && (
                 <span className={s.row}>
                   <button type="button" className={s.btn} onClick={onChangeMedicine}>Change medicine</button>
