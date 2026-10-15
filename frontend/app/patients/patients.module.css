@@ -273,6 +273,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--nb-space-8);
   font-size: 13px;
   padding: 6px 0;
   border-bottom: 1px solid var(--nb-border-subtle);
@@ -280,7 +281,7 @@
 
 .allergyForm {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1.3fr auto;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin-top: var(--nb-space-12);
 }

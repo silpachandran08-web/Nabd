@@ -31,7 +31,16 @@ type PatientDetail = Patient & {
 };
 // GET /clinical/patients/{id}/allergies/status. "not_assessed" (nobody asked) is NOT "none_documented".
 type AllergyStatus = { state: "recorded" | "none_documented" | "not_assessed"; activeCount: number; documentedByName: string | null; documentedAt: string | null };
-type Allergy = { id: string; substance: string; severity: string; reaction: string | null; active: boolean };
+type Allergy = {
+  id: string; substance: string; severity: string; reaction: string | null; active: boolean;
+  category?: string | null; recordedByName?: string | null; recordedAt?: string;
+  deactivatedReason?: string | null; deactivatedAt?: string | null; deactivatedByName?: string | null;
+};
+const ALLERGY_CATEGORIES = [
+  { id: "drug", label: "Drug / medicine" }, { id: "food", label: "Food" },
+  { id: "environmental", label: "Environmental" }, { id: "other", label: "Other" },
+];
+const categoryLabel = (id?: string | null) => ALLERGY_CATEGORIES.find((c) => c.id === id)?.label;
 type Condition = { id: string; condition: string; status: string; reviewDueDate: string | null };
 // GET /v1/patients/registry (PatientController.registry → PatientRegistryResponse)
 type RegistryRow = {
@@ -147,8 +156,11 @@ function PatientsList() {
 
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   // Severity starts unset: an unknown severity must never be guessed, so Add stays unavailable until a clinician picks one.
-  const [newAllergy, setNewAllergy] = useState({ substance: "", severity: "", reaction: "" });
+  const [newAllergy, setNewAllergy] = useState({ substance: "", category: "", severity: "", reaction: "" });
   const [allergyStatus, setAllergyStatus] = useState<AllergyStatus | null>(null);
+  const [showRemoved, setShowRemoved] = useState(false);
+  const [removedAllergies, setRemovedAllergies] = useState<Allergy[] | null>(null);
+  const [removedError, setRemovedError] = useState(false);
   const [removeAllergy, setRemoveAllergy] = useState<Allergy | null>(null);
   const [confirmGuardian, setConfirmGuardian] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -284,8 +296,10 @@ function PatientsList() {
     setHistoryToothId(null);
     setHistoryEntries([]);
     setNewSupernumerary({ nearToothNumber: 11, status: "healthy", note: "" });
-    setNewAllergy({ substance: "", severity: "", reaction: "" });
+    setNewAllergy({ substance: "", category: "", severity: "", reaction: "" });
     setAllergyStatus(null);
+    setShowRemoved(false);
+    setRemovedAllergies(null);
     setRemoveAllergy(null);
     setConfirmGuardian(false);
     setConfirmError(null);
@@ -436,6 +450,17 @@ function PatientsList() {
     }
   }
 
+  async function loadRemoved(patientId: string) {
+    setRemovedError(false);
+    try {
+      const res = await authedFetch(`/clinical/patients/${patientId}/allergies?includeInactive=true`);
+      if (res?.ok) setRemovedAllergies(((await res.json()) as Allergy[]).filter((x) => !x.active));
+      else if (res) setRemovedError(true);
+    } catch {
+      setRemovedError(true);
+    }
+  }
+
   async function addAllergy() {
     if (!drawerPatient || !newAllergy.substance.trim() || !newAllergy.severity) return;
     setAllergyBusy(true);
@@ -443,11 +468,12 @@ function PatientsList() {
     try {
       const res = await authedFetch(`/clinical/patients/${drawerPatient.id}/allergies`, {
         method: "POST",
-        body: JSON.stringify(newAllergy),
+        body: JSON.stringify({ ...newAllergy, category: newAllergy.category || undefined }),
       });
       if (res?.ok) {
-        setNewAllergy({ substance: "", severity: "", reaction: "" });
+        setNewAllergy({ substance: "", category: "", severity: "", reaction: "" });
         refreshAllergies(drawerPatient.id);
+        if (showRemoved) void loadRemoved(drawerPatient.id);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
       } else if (res) setActionError("Couldn't save the allergy. It has NOT been recorded.");
@@ -475,6 +501,7 @@ function PatientsList() {
         setDrawerPatient((p) => (p ? { ...p, allergies: p.allergies.filter((n) => n !== gone.substance) } : p));
         setRemoveAllergy(null);
         refreshAllergies(drawerPatient.id);
+        if (showRemoved) void loadRemoved(drawerPatient.id);
         const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
         if (pRes?.ok) setDrawerPatient(await pRes.json());
       } else if (res) setConfirmError("Couldn't remove the allergy. It is still on record.");
@@ -990,13 +1017,22 @@ function PatientsList() {
                         ) : (
                           allergies.map((a) => (
                             <div key={a.id} className={styles.allergyRow}>
-                              <span>{a.substance} · {a.severity}{a.reaction ? ` · ${a.reaction}` : ""}</span>
+                              <span>
+                                {a.substance} · {a.severity}{a.reaction ? ` · ${a.reaction}` : ""}
+                                {categoryLabel(a.category) ? ` · ${categoryLabel(a.category)}` : ""}
+                                {a.recordedAt ? <span className={styles.muted}> · recorded {new Date(a.recordedAt).toLocaleDateString()}{a.recordedByName ? ` by ${a.recordedByName}` : ""}</span> : null}
+                              </span>
                               {clinicalEdit && <button className={styles.linkBtn} onClick={() => { setConfirmError(null); setRemoveAllergy(a); }}>Remove</button>}
                             </div>
                           ))
                         )}
                         {clinicalEdit && (
                           <div className={styles.allergyForm}>
+                            <select className={styles.smallInput} aria-label="Category" value={newAllergy.category}
+                              onChange={(e) => setNewAllergy((p) => ({ ...p, category: e.target.value }))}>
+                              <option value="">Category (optional)</option>
+                              {ALLERGY_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                            </select>
                             <input className={styles.smallInput} aria-label="Substance" placeholder="Substance" value={newAllergy.substance}
                               onChange={(e) => setNewAllergy((p) => ({ ...p, substance: e.target.value }))} />
                             <select className={styles.smallInput} aria-label="Severity" value={newAllergy.severity}
@@ -1010,6 +1046,31 @@ function PatientsList() {
                               onChange={(e) => setNewAllergy((p) => ({ ...p, reaction: e.target.value }))} />
                             <button className={styles.linkBtn} disabled={allergyBusy || !newAllergy.substance.trim() || !newAllergy.severity} onClick={addAllergy}>Add</button>
                           </div>
+                        )}
+                        {allergyLoad === "ok" && (
+                          <>
+                            <button type="button" className={styles.linkBtn} aria-expanded={showRemoved}
+                              onClick={() => { const next = !showRemoved; setShowRemoved(next); if (next && drawerPatient) void loadRemoved(drawerPatient.id); }}>
+                              {showRemoved ? "Hide removed allergies" : "Show removed allergies"}
+                            </button>
+                            {showRemoved && (removedError ? (
+                              <div className={styles.errorInline} role="alert">Couldn&apos;t load removed allergies.</div>
+                            ) : removedAllergies === null ? (
+                              <Skeleton rows={1} label="Loading removed allergies" />
+                            ) : removedAllergies.length === 0 ? (
+                              <div className={styles.muted}>No removed allergies</div>
+                            ) : removedAllergies.map((a) => (
+                              <div key={a.id} className={styles.allergyRow}>
+                                <span>
+                                  <s>{a.substance}</s> · {a.severity}{categoryLabel(a.category) ? ` · ${categoryLabel(a.category)}` : ""}
+                                  <span className={styles.muted}>
+                                    {" "}· removed{a.deactivatedAt ? ` ${new Date(a.deactivatedAt).toLocaleDateString()}` : ""}{a.deactivatedByName ? ` by ${a.deactivatedByName}` : ""}
+                                    {a.deactivatedReason ? ` · Reason: ${a.deactivatedReason}` : ""}
+                                  </span>
+                                </span>
+                              </div>
+                            )))}
+                          </>
                         )}
                       </div>
 
