@@ -69,6 +69,37 @@ class AllergyApiTest extends ApiTestBase {
     }
 
     @Test
+    void includeInactiveReturnsRemovedEntriesWithCategoryAndRemovalAudit() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "nurse9@a.com", "+919800000009", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "A9", "+919999940009");
+        String base = "/v1/clinical/patients/" + patientId + "/allergies";
+        String removedId = (String) exchange(base, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "substance", "Peanut", "category", "food", "severity", "mild")), Map.class).getBody().get("id");
+        exchange(base, HttpMethod.POST, authedJsonBody(token, Map.of("substance", "Dust", "category", "environmental", "severity", "mild")), Map.class);
+        ResponseEntity<Map> badCategory = exchange(base, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "substance", "X", "category", "bogus", "severity", "mild")), Map.class);
+        assertThat(badCategory.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        exchange("/v1/clinical/allergies/" + removedId + "/deactivate", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("reason", "Entered in error")), Void.class);
+
+        assertThat(exchange(base, HttpMethod.GET, authed(token), List.class).getBody()).hasSize(1);
+        List<Map<String, Object>> all = exchange(base + "?includeInactive=true", HttpMethod.GET, authed(token), List.class).getBody();
+        assertThat(all).hasSize(2);
+        assertThat(all.get(0).get("substance")).isEqualTo("Dust");
+        Map<String, Object> removed = all.get(1);
+        assertThat(removed.get("active")).isEqualTo(false);
+        assertThat(removed.get("category")).isEqualTo("food");
+        assertThat(removed.get("deactivatedReason")).isEqualTo("Entered in error");
+        assertThat(removed.get("deactivatedAt")).isNotNull();
+        assertThat(removed.get("deactivatedByName")).isNotNull();
+        assertThat(removed.get("recordedByName")).isNotNull();
+        assertThat(all.get(0).get("deactivatedReason")).isNull();
+    }
+
+    @Test
     void roleWithoutClinicalGrantIsForbidden() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedRole(tenant.id(), "FrontDeskOnly", false, fullGrant("queue"), fullGrant("patients"));

@@ -55,11 +55,18 @@ public class AllergyService {
     }
 
     @Transactional
-    public List<AllergyResponse> list(UUID tenantId, UUID patientId) {
+    public List<AllergyResponse> list(UUID tenantId, UUID patientId, boolean includeInactive) {
         tenantContext.set(tenantId);
-        List<AllergyRow> rows = repo.findActiveByPatient(tenantId, patientId);
-        Map<UUID, String> names = repo.findStaffNames(tenantId, rows.stream().map(AllergyRow::recordedBy).collect(java.util.stream.Collectors.toSet()));
-        return rows.stream().map(a -> toResponse(a, names.get(a.recordedBy()))).toList();
+        List<AllergyRow> rows = includeInactive ? repo.findAllByPatient(tenantId, patientId) : repo.findActiveByPatient(tenantId, patientId);
+        Set<UUID> staff = new HashSet<>();
+        rows.forEach(r -> {
+            staff.add(r.recordedBy());
+            if (r.deactivatedBy() != null) {
+                staff.add(r.deactivatedBy());
+            }
+        });
+        Map<UUID, String> names = repo.findStaffNames(tenantId, staff);
+        return rows.stream().map(a -> toResponse(a, names.get(a.recordedBy()), a.deactivatedBy() == null ? null : names.get(a.deactivatedBy()))).toList();
     }
 
     @Transactional
@@ -89,7 +96,7 @@ public class AllergyService {
         Map<String, Object> after = snapshot(row);
         repo.insertEvent(tenantId, patientId, id, "recorded", null, json(after), null, callerStaffId);
         audit(tenantId, callerStaffId, ipAddress, "allergy.recorded", id, null, after);
-        return toResponse(row, repo.findStaffNames(tenantId, Set.of(callerStaffId)).get(callerStaffId));
+        return toResponse(row, repo.findStaffNames(tenantId, Set.of(callerStaffId)).get(callerStaffId), null);
     }
 
     @Transactional
@@ -130,7 +137,7 @@ public class AllergyService {
         Map<String, Object> auditAfter = new LinkedHashMap<>(after);
         auditAfter.put("reason", reason);
         audit(tenantId, callerStaffId, ipAddress, "allergy.corrected", id, before, auditAfter);
-        return toResponse(updated, repo.findStaffNames(tenantId, Set.of(updated.recordedBy())).get(updated.recordedBy()));
+        return toResponse(updated, repo.findStaffNames(tenantId, Set.of(updated.recordedBy())).get(updated.recordedBy()), null);
     }
 
     @Transactional
@@ -245,9 +252,10 @@ public class AllergyService {
         return s == null || s.isBlank() ? null : s.trim();
     }
 
-    private AllergyResponse toResponse(AllergyRow a, String recordedByName) {
+    private AllergyResponse toResponse(AllergyRow a, String recordedByName, String deactivatedByName) {
         return new AllergyResponse(a.id(), a.patientId(), a.substance(), a.severity(), a.reaction(), a.active(),
-                a.recordedBy(), a.recordedAt(), a.category(), a.source(), recordedByName, a.updatedAt());
+                a.recordedBy(), a.recordedAt(), a.category(), a.source(), recordedByName, a.updatedAt(),
+                a.deactivationReason(), a.deactivatedAt(), deactivatedByName);
     }
 
     private ApiException reasonRequired() {

@@ -10,7 +10,8 @@ final class AllergyModels {
 
     record AllergyRow(UUID id, UUID patientId, String substance, String severity, String reaction,
                        boolean active, UUID recordedBy, Instant recordedAt,
-                       String category, String source, Instant updatedAt) {
+                       String category, String source, Instant updatedAt,
+                       UUID deactivatedBy, Instant deactivatedAt, String deactivationReason) {
     }
 
     /** One append-only history row; before/after are already-serialized JSON (nullable). */
