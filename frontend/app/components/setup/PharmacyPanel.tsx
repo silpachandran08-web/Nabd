@@ -362,7 +362,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
                 <tbody>
                   {queue.map((q) => (
                     <tr key={q.prescriptionId}>
-                      <td>{q.token ?? "—"}</td>
+                      <td>{q.token != null ? `T-${q.token}` : "—"}</td>
                       <td><Link href={`/checkout/${q.queueEntryId}`}>{q.patientName}</Link></td>
                       <td>{q.doctorName}</td>
                       <td>

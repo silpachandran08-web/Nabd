@@ -508,6 +508,11 @@ class PharmacyApiTest extends ApiTestBase {
                 authedJsonBody(token, Map.of("reason", "again")), Map.class);
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(itemStock(token, code)).isEqualTo(10);
+
+        ResponseEntity<Map> pay = exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
+                authedJsonBody(token, Map.of("method", "cash", "amount", 10)), Map.class);
+        assertThat(pay.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(pay.getBody().get("type")).asString().contains("invoice-void");
     }
 
     @Test

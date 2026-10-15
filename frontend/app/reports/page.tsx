@@ -85,6 +85,7 @@ export default function ReportsPage() {
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [untagged, setUntagged] = useState(0);
   const [staffPerf, setStaffPerf] = useState<StaffPerformanceReport | null>(null);
+  const [tabErr, setTabErr] = useState<{ sources?: boolean; staff?: boolean }>({});
   const [retention, setRetention] = useState<Retention | null>(null);
   const [noShowRisk, setNoShowRisk] = useState<NoShowRisk | null>(null);
   const [liability, setLiability] = useState<Liability | null>(null);
@@ -155,6 +156,7 @@ export default function ReportsPage() {
         setUntagged(Number((Array.isArray(body) ? body[0] : body)?.untaggedCount) || 0);
       }
       if (staffRes?.ok) setStaffPerf(await staffRes.json());
+      setTabErr({ sources: !!sourcesRes && !sourcesRes.ok, staff: !!staffRes && !staffRes.ok });
       if (retentionRes?.ok) setRetention(await retentionRes.json());
       if (riskRes?.ok) setNoShowRisk(await riskRes.json());
       if (liabilityRes?.ok) setLiability(await liabilityRes.json());
@@ -362,10 +364,12 @@ export default function ReportsPage() {
             ⚠ {untagged} {untagged === 1 ? "visit carries" : "visits carry"} no source tag
           </div>
         )}
-        {sources.length === 0 ? (
+        {tabErr.sources ? (
+          <div className={styles.errorState} role="alert">Couldn&apos;t load sources. Try again.</div>
+        ) : sources.length === 0 ? (
           <div className={styles.muted}>No visits recorded yet.</div>
         ) : (
-          <table className={styles.table}>
+          <div style={{ overflowX: "auto" }}><table className={styles.table}>
             <thead><tr><th>Source</th><th>Visits</th><th>Revenue{m ? ` (${m.currency})` : ""}</th></tr></thead>
             <tbody>
               {sources.map((s) => (
@@ -373,7 +377,7 @@ export default function ReportsPage() {
                   <td>{typeof s.revenue === "number" ? money(s.revenue) : "—"}</td></tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
       <div className={styles.card + " " + styles.section}>
@@ -386,6 +390,7 @@ export default function ReportsPage() {
 
       {tab === "staff" && (
         <>
+      {tabErr.staff && <div className={styles.errorState} role="alert">Couldn&apos;t load staff performance. Try again.</div>}
       {staffPerf && (
         <div className={styles.card + " " + styles.section}>
           <div className={styles.sectionHeader}>
@@ -396,14 +401,14 @@ export default function ReportsPage() {
           {staffPerf.rows.length === 0 ? (
             <div className={styles.muted}>No payments recorded yet.</div>
           ) : (
-            <table className={styles.table}>
+            <div style={{ overflowX: "auto" }}><table className={styles.table}>
               <thead><tr><th>Staff</th><th>Handled</th><th>Collected</th><th>Payments</th><th>Discounts</th><th>Overrides</th></tr></thead>
               <tbody>
                 {staffPerf.rows.map((s) => (
                   <tr key={s.staffId}><td>{s.staffName}</td><td>{dash(s.handledCount)}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td><td>{dash(s.discountCount)}</td><td>{dash(s.overrideCount)}</td></tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
           {staffPerf.rows.length > 0 && (() => {
             const max = Math.max(0, ...staffPerf.rows.map((s) => Number(s.collected)));

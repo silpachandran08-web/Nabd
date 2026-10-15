@@ -294,7 +294,7 @@ function OtcCheckoutInner() {
                 </>
               );
               // PHA-011: a 0-stock item is flagged and not offered (no button at all).
-              return c.stockQty === 0
+              return c.stockQty != null && c.stockQty <= 0
                 ? <div key={c.id} className={styles.chargeItem} style={{ cursor: "default", opacity: 0.7 }}>{body}</div>
                 : <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>{body}</button>;
             })}

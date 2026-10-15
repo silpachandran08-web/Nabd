@@ -127,6 +127,7 @@ public class CheckoutService {
 
         List<LineItemRequest> lineItems = resolvePharmacyLines(tenantId, req.lineItems());
         Optional<InvoiceRow> existing = repo.findInvoiceByQueueEntry(tenantId, queueEntryId);
+        existing.ifPresent(CheckoutService::rejectVoid);
         UUID invoiceId;
         if (existing.isEmpty()) {
             if (lineItems.isEmpty()) {
@@ -234,11 +235,19 @@ public class CheckoutService {
         return new Totals(subtotal, discount, tax, roundOff, total);
     }
 
+    private static void rejectVoid(InvoiceRow invoice) {
+        if ("void".equals(invoice.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "invoice-void", "Invoice is void",
+                    "This invoice was voided; it can't take payments or more charges.");
+        }
+    }
+
     @Transactional
     public InvoiceResponse recordPayment(UUID tenantId, UUID invoiceId, UUID staffId, PaymentRequest req) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
         InvoiceRow invoice = repo.findInvoice(tenantId, invoiceId).orElseThrow(this::notFound);
+        rejectVoid(invoice);
         if ("paid".equals(invoice.status())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invoice-already-paid", "Invoice already paid",
                     "This invoice has no outstanding balance.");

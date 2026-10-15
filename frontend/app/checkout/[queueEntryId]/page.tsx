@@ -299,7 +299,7 @@ export default function CheckoutPage() {
             </>
           );
           // PHA-011: a 0-stock item is flagged and not offered (no button at all).
-          return c.stockQty === 0
+          return c.stockQty != null && c.stockQty <= 0
             ? <div key={c.id} className={styles.chargeItem} style={{ cursor: "default", opacity: 0.7 }}>{body}</div>
             : <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>{body}</button>;
         })}
@@ -410,7 +410,7 @@ export default function CheckoutPage() {
                 ))}
               </>
             )}
-            {!showAddMore && canBill && (
+            {!showAddMore && canBill && invoice.status !== "void" && (
               <button type="button" className={styles.backBtn} style={{ marginTop: "16px" }} onClick={() => setShowAddMore(true)}>
                 + Add more charges
               </button>
@@ -440,7 +440,7 @@ export default function CheckoutPage() {
               </>
             )}
 
-            {context.queueStatus === "checkout_pending" && canBill && (
+            {context.queueStatus === "checkout_pending" && canBill && invoice.status !== "void" && (
               <>
                 <p className={styles.muted} style={{ marginTop: "12px" }}>
                   {invoice.balanceDue > 0 ? "Record the remaining payment, then complete checkout." : "Nothing further to charge for this visit."}
@@ -452,7 +452,7 @@ export default function CheckoutPage() {
               </>
             )}
 
-            {invoice.status !== "paid" && canPay && (
+            {invoice.status !== "paid" && invoice.status !== "void" && canPay && (
               <form onSubmit={submitPayment}>
                 <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Record payment</h2>
                 <div className={styles.paymentMethods}>
