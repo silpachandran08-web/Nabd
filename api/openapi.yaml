@@ -2211,6 +2211,14 @@ components:
             by: { type: string, format: uuid }
             byName: { type: [string, "null"] }
             at: { type: string, format: date-time }
+    PrescriptionWarning:
+      type: object
+      required: [itemIndex, kind, severity, message]
+      properties:
+        itemIndex: { type: integer, minimum: 0, description: "0-based index into the response's items" }
+        kind: { type: string, enum: [allergy] }
+        severity: { type: string, enum: [mild, moderate, severe] }
+        message: { type: string }
     PrescriptionItem:
       type: object
       properties:
@@ -2354,6 +2362,14 @@ components:
         signedAt: { type: [string, "null"], format: date-time }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
+        warnings:
+          type: array
+          description: >-
+            DOC-031. Flat structured allergy matches across all lines (same check as items[].warnings and the legacy
+            allergyWarning strings, which are kept). Recomputed on every read. Pregnancy and controlled-substance
+            warnings are not included here (they have no mild/moderate/severe severity); read them from items[].warnings.
+            A severe match still blocks signing (409 warning-unresolved) until an override reason is recorded.
+          items: { $ref: "#/components/schemas/PrescriptionWarning" }
         allergySnapshot:
           description: >-
             DOC-R3: the allergy statement captured when this prescription was signed (what the sign gate checked).

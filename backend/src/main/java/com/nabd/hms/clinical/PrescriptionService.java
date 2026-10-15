@@ -4,6 +4,7 @@ import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
 import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
 import com.nabd.hms.clinical.dto.PrescriptionAllergySnapshotResponse;
+import com.nabd.hms.clinical.dto.PrescriptionWarningResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetItemResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetRequest;
 import com.nabd.hms.clinical.dto.FavouriteRxSetResponse;
@@ -453,6 +454,8 @@ public class PrescriptionService {
         String region = repo.findTenantRegion(tenantId).orElse("IN");
         LocalDate today = clock.today(tenantId);
         int[] unresolved = {0};
+        int[] itemNo = {0};
+        List<PrescriptionWarningResponse> flat = new ArrayList<>();
         List<PrescriptionItemResponse> items = repo.findItems(tenantId, p.id()).stream()
                 .map(i -> {
                     List<StoredDecision> stored = parseDecisions(i.overridesJson());
@@ -477,6 +480,12 @@ public class PrescriptionService {
                             default -> controlledWarning = d.message();
                         }
                     }
+                    for (RxWarningResponse w : warnings) {
+                        if (RxSafetyChecks.KIND_ALLERGY.equals(w.kind())) {
+                            flat.add(new PrescriptionWarningResponse(itemNo[0], w.kind(), w.severity(), w.message()));
+                        }
+                    }
+                    itemNo[0]++;
                     return new PrescriptionItemResponse(i.id(), i.drugName(), i.dosage(), i.frequency(), i.duration(),
                             i.instructions(), i.allergyOverrideReason(), i.displayOrder(), allergyWarning,
                             pregnancyWarning, controlledWarning, warnings, i.brandName(), i.sigPattern(), i.route(),
@@ -484,7 +493,7 @@ public class PrescriptionService {
                 })
                 .toList();
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
-                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()));
+                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat);
     }
 
     // ── DOC-R3: allergy statement snapshotted at signing ─────────────────
