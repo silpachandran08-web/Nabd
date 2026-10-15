@@ -1840,7 +1840,7 @@ paths:
       responses:
         "200":
           description: >
-            CSV (Content-Disposition attachment, audit-log-YYYY-MM-DD.csv). Header row
+            CSV (Content-Disposition attachment, audit-log-YYYY-MM-DD-utc.csv, UTC date). Header row
             id,createdAt,tenantId,tenantName,tenantSlug,actorType,actorId,actorName,actorRole,ipAddress,action,entityType,entityId,before,after
           content:
             text/csv:

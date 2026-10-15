@@ -250,7 +250,7 @@ class AuditSearchApiTest extends ApiTestBase {
         auditService.record(tenant.id(), "system", null, "Nabd System", "System", null,
                 "patient.create", "patient", UUID.randomUUID(), null, Map.of("x", 1));
         for (String role : List.of("billing", "support_engineer", "commercial")) {
-            SeededOperator op = seedOperator("audit-export-" + role + "-" + UUID.randomUUID() + "@nabd.health", role, false);
+            SeededOperator op = seedOperator("ax-" + UUID.randomUUID() + "@nabd.health", role, false);
             ResponseEntity<String> resp = exchange("/v1/platform/audit-log/export?tenantId=" + tenant.id(),
                     HttpMethod.GET, authed(platformLoginAndGetAccessToken(op)), String.class);
             assertThat(resp.getStatusCode()).as(role).isEqualTo(HttpStatus.FORBIDDEN);
@@ -267,7 +267,7 @@ class AuditSearchApiTest extends ApiTestBase {
         auditService.record(tenant.id(), "system", null, "Nabd System", "System", null,
                 "patient.create", "patient", UUID.randomUUID(), null, Map.of("x", 1));
         for (String role : List.of("sre", "super_admin")) {
-            SeededOperator op = seedOperator("audit-export-" + role + "-" + UUID.randomUUID() + "@nabd.health", role, false);
+            SeededOperator op = seedOperator("ax-" + UUID.randomUUID() + "@nabd.health", role, false);
             ResponseEntity<String> resp = exchange("/v1/platform/audit-log/export?tenantId=" + tenant.id(),
                     HttpMethod.GET, authed(platformLoginAndGetAccessToken(op)), String.class);
             assertThat(resp.getStatusCode()).as(role).isEqualTo(HttpStatus.OK);
