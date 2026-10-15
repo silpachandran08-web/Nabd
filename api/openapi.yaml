@@ -1643,6 +1643,18 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /clinical/vitals/patient/{patientId}/previous:
+    get:
+      tags: [Clinical]
+      summary: A patient's vitals across visits, newest first (NUR-022). The caller drops the current visit. 404 for an unknown patient.
+      x-required-permission: clinical:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 20 }, description: Values above 20 are capped at 20. }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/VitalsHistory" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /clinical/patients/{patientId}/dose-calculator:
     get:
       tags: [Clinical]
@@ -2298,6 +2310,8 @@ components:
         pulseBpm: { type: [integer, "null"], minimum: 20, maximum: 300 }
         tempCelsius: { type: [number, "null"], minimum: 20, maximum: 45 }
         spo2Percent: { type: [integer, "null"], minimum: 1, maximum: 100 }
+        bloodSugar: { type: [number, "null"], exclusiveMinimum: 0, maximum: 9999.99, description: "Display unit mg/dL is a UI constant, not stored (needs clinical sign-off). No clinical range is enforced." }
+        painScore: { type: [integer, "null"], minimum: 0, maximum: 10, description: "0-10 numeric rating scale; outside 0-10 is 400." }
     Vitals:
       type: object
       properties:
@@ -2311,9 +2325,15 @@ components:
         pulseBpm: { type: [integer, "null"] }
         tempCelsius: { type: [number, "null"] }
         spo2Percent: { type: [integer, "null"] }
+        bloodSugar: { type: [number, "null"] }
+        painScore: { type: [integer, "null"], minimum: 0, maximum: 10 }
         recordedBy: { type: string, format: uuid }
         recordedAt: { type: string, format: date-time }
         abnormalFlags: { type: array, items: { type: string } }
+    VitalsHistory:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Vitals" } }
     DoseCalculation:
       type: object
       properties:

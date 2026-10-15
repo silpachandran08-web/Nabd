@@ -22,5 +22,9 @@ public record VitalsWriteRequest(
         @Min(10) @Max(200) Integer bpDiastolic,
         @Min(20) @Max(300) Integer pulseBpm,
         @DecimalMin("20") @DecimalMax("45") BigDecimal tempCelsius,
-        @Min(1) @Max(100) Integer spo2Percent) {
+        @Min(1) @Max(100) Integer spo2Percent,
+        // NUR-021: bloodSugar is only bounded to positive / the column width (no clinical range, unit mg/dL is a UI constant,
+        // needs clinical sign-off); painScore is the 0-10 numeric rating scale.
+        @DecimalMin(value = "0", inclusive = false) @DecimalMax("9999.99") BigDecimal bloodSugar,
+        @Min(0) @Max(10) Integer painScore) {
 }
