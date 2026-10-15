@@ -46,3 +46,50 @@ export const vitalsPayload = (f: VitalsForm) =>
   Object.fromEntries(VITAL_FIELDS.map((d) => [d.key, f[d.key].trim() === "" ? null : Number(f[d.key])]));
 
 export const VITALS_BLANK_HINT = "Leave a box blank to keep its saved value. A saved value can't be cleared here, only replaced by the correct one.";
+
+// ---- NUR-021/022: nurse capture form extras (blood sugar, pain score, one combined BP box). ----
+// Blood-sugar unit is a display constant, not stored: NEEDS CLINICAL SIGN-OFF (mg/dL vs mmol/L).
+export const BLOOD_SUGAR_UNIT = "mg/dL";
+export const PAIN_SCORE_MAX = 10;
+export type VitalsExtras = { bloodSugar: string; painScore: string };
+export const EMPTY_EXTRAS: VitalsExtras = { bloodSugar: "", painScore: "" };
+
+/** "120/80" or "120 / 80" -> strings for the two BP fields. Blank is fine (both ""); junk sets error. */
+export function parseBp(text: string): { sys: string; dia: string; error?: string } {
+  const t = text.trim();
+  if (t === "") return { sys: "", dia: "" };
+  const m = /^(\d{1,3})\s*\/\s*(\d{1,3})$/.exec(t);
+  return m ? { sys: m[1], dia: m[2] } : { sys: "", dia: "", error: "Enter blood pressure as systolic/diastolic, e.g. 120/80." };
+}
+
+/** Errors for the nurse form, keyed by input: bp (combined), the other vitals, bloodSugar, painScore, form. */
+export function nurseVitalsErrors(f: VitalsForm, bpText: string, x: VitalsExtras): Partial<Record<VitalKey | "bp" | "bloodSugar" | "painScore" | "form", string>> {
+  const bp = parseBp(bpText);
+  const { bpSystolic, bpDiastolic, form, ...rest } = vitalsErrors({ ...f, bpSystolic: bp.sys, bpDiastolic: bp.dia });
+  const errs: ReturnType<typeof nurseVitalsErrors> = { ...rest };
+  const bpErr = bp.error ?? bpSystolic ?? bpDiastolic;
+  if (bpErr) errs.bp = bpErr;
+  const sugar = x.bloodSugar.trim(), pain = x.painScore.trim();
+  if (sugar !== "" && !(Number.isFinite(Number(sugar)) && Number(sugar) > 0)) errs.bloodSugar = "Enter a number above 0.";
+  if (pain !== "" && !(Number.isInteger(Number(pain)) && Number(pain) >= 0 && Number(pain) <= PAIN_SCORE_MAX)) errs.painScore = `Enter a whole number 0–${PAIN_SCORE_MAX}.`;
+  // vitalsErrors only sees the 7 base fields; blood sugar / pain / a typed BP also count as "something entered".
+  if (form && sugar === "" && pain === "" && bpText.trim() === "") errs.form = form;
+  return errs;
+}
+
+export const nurseVitalsPayload = (f: VitalsForm, bpText: string, x: VitalsExtras) => {
+  const bp = parseBp(bpText);
+  return {
+    ...vitalsPayload({ ...f, bpSystolic: bp.sys, bpDiastolic: bp.dia }),
+    bloodSugar: x.bloodSugar.trim() === "" ? null : Number(x.bloodSugar),
+    painScore: x.painScore.trim() === "" ? null : Number(x.painScore),
+  };
+};
+
+/** One previous-visit row from GET /clinical/vitals/patient/{id}/previous; every vitals field may be absent. */
+export type PreviousVitals = {
+  queueEntryId: string; recordedAt?: string | null;
+  bpSystolic?: number | null; bpDiastolic?: number | null; pulseBpm?: number | null; tempCelsius?: number | null;
+  spo2Percent?: number | null; weightKg?: number | null; heightCm?: number | null; bloodSugar?: number | null; painScore?: number | null;
+};
+export const formatBp = (v: PreviousVitals) => (v.bpSystolic != null && v.bpDiastolic != null ? `${v.bpSystolic}/${v.bpDiastolic}` : "—");

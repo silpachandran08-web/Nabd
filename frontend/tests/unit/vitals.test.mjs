@@ -62,3 +62,36 @@ test("payload sends blanks as null (server keeps the stored value) and numbers a
   assert.equal(p.bpSystolic, null);
   assert.equal(Object.keys(p).length, VITAL_FIELDS.length);
 });
+
+// NUR-021: combined BP box, blood sugar, pain score.
+import { parseBp, nurseVitalsErrors, nurseVitalsPayload, EMPTY_EXTRAS } from "../../app/lib/vitals.ts";
+
+test("parseBp accepts 120/80 and 120 / 80, blank, and rejects junk", () => {
+  assert.deepEqual(parseBp("120/80"), { sys: "120", dia: "80" });
+  assert.deepEqual(parseBp(" 120 / 80 "), { sys: "120", dia: "80" });
+  assert.deepEqual(parseBp(""), { sys: "", dia: "" });
+  assert.ok(parseBp("120").error);
+  assert.ok(parseBp("a/b").error);
+});
+
+test("nurse form: BP errors land on the combined bp key; systolic must exceed diastolic", () => {
+  assert.ok(nurseVitalsErrors(EMPTY_VITALS, "120", EMPTY_EXTRAS).bp);
+  assert.ok(nurseVitalsErrors(EMPTY_VITALS, "80/120", EMPTY_EXTRAS).bp);
+  assert.deepEqual(nurseVitalsErrors(EMPTY_VITALS, "120/80", EMPTY_EXTRAS), {});
+});
+
+test("nurse form: pain 0-10 whole numbers; a lone blood sugar or pain value is enough to save; blank is refused", () => {
+  const x = (o) => ({ ...EMPTY_EXTRAS, ...o });
+  assert.ok(nurseVitalsErrors(EMPTY_VITALS, "", x({ painScore: "11" })).painScore);
+  assert.ok(nurseVitalsErrors(EMPTY_VITALS, "", x({ painScore: "2.5" })).painScore);
+  assert.deepEqual(nurseVitalsErrors(EMPTY_VITALS, "", x({ painScore: "0" })), {});
+  assert.ok(nurseVitalsErrors(EMPTY_VITALS, "", x({ bloodSugar: "0" })).bloodSugar);
+  assert.deepEqual(nurseVitalsErrors(EMPTY_VITALS, "", x({ bloodSugar: "5.4" })), {});
+  assert.ok(nurseVitalsErrors(EMPTY_VITALS, "", EMPTY_EXTRAS).form);
+});
+
+test("nurse payload splits BP and sends nulls for blanks", () => {
+  const p = nurseVitalsPayload(EMPTY_VITALS, "120/80", { bloodSugar: "", painScore: "3" });
+  assert.equal(p.bpSystolic, 120); assert.equal(p.bpDiastolic, 80);
+  assert.equal(p.bloodSugar, null); assert.equal(p.painScore, 3); assert.equal(p.pulseBpm, null);
+});
