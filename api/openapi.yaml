@@ -1795,6 +1795,59 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MoneyReport" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /reports/sources:
+    get:
+      tags: [Reports]
+      summary: "Visits by source tag (OWN-024). Bare array; each row carries revenue (invoice totals of that source's visits) and the report-wide untaggedCount (visits with no source tag; 0 today as source is NOT NULL)."
+      x-required-permission: reports:view
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, default: 30 } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    source: { type: string }
+                    visitCount: { type: integer, format: int64 }
+                    revenue: { type: number, description: "Sum of invoice totals for the visits in this source" }
+                    untaggedCount: { type: integer, format: int64, description: "Report-wide count of untagged visits, repeated on every row" }
+  /reports/staff-performance:
+    get:
+      tags: [Reports]
+      summary: "Per-staff performance (OWN-025). own_patients_only staff get only their own row (see scopeNote)."
+      x-required-permission: reports:view
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, default: 30 } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scopeNote: { type: string }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        staffId: { type: string, format: uuid }
+                        staffName: { type: string }
+                        collected: { type: number }
+                        paymentCount: { type: integer, format: int64 }
+                        handledCount: { type: integer, format: int64, description: "Distinct visits: completed as doctor plus billed by this staff member" }
+                        discountCount: { type: integer, format: int64, description: "Invoices raised with a discount" }
+                        overrideCount: { type: integer, format: int64, description: "Prescription safety overrides/acknowledgements from audit_log" }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:

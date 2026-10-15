@@ -152,25 +152,60 @@ class ReportsRepository {
         return n == null ? 0 : n;
     }
 
-    // NB-230/NB-079: single-axis source, straight off queue_entries.source.
+    // NB-230/NB-079: single-axis source, straight off queue_entries.source. OWN-024: revenue = invoice totals.
     List<SourceCount> sourceBreakdown(UUID tenantId, LocalDate from, LocalDate to) {
-        return jdbc.query("SELECT source, COUNT(*) AS visit_count FROM queue_entries " +
-                        "WHERE tenant_id = ? AND queue_date BETWEEN ? AND ? GROUP BY source ORDER BY visit_count DESC",
-                (rs, i) -> new SourceCount(rs.getString("source"), rs.getLong("visit_count")),
+        return jdbc.query("SELECT q.source, COUNT(*) AS visit_count, COALESCE(SUM(i.total), 0) AS revenue " +
+                        "FROM queue_entries q LEFT JOIN invoices i ON i.queue_entry_id = q.id " +
+                        "WHERE q.tenant_id = ? AND q.queue_date BETWEEN ? AND ? GROUP BY q.source ORDER BY visit_count DESC",
+                (rs, i) -> new SourceCount(rs.getString("source"), rs.getLong("visit_count"), rs.getBigDecimal("revenue")),
                 tenantId, Date.valueOf(from), Date.valueOf(to));
+    }
+
+    // OWN-024: queue_entries.source is NOT NULL DEFAULT 'walk_in' (V24), so this is 0 until a nullable/unknown tag exists.
+    long untaggedVisits(UUID tenantId, LocalDate from, LocalDate to) {
+        Long n = jdbc.queryForObject("SELECT COUNT(*) FROM queue_entries WHERE tenant_id = ? AND queue_date BETWEEN ? AND ? " +
+                "AND (source IS NULL OR btrim(source) = '')", Long.class, tenantId, Date.valueOf(from), Date.valueOf(to));
+        return n == null ? 0 : n;
     }
 
     // NB-231: scopedToStaffId null = every staff member (Owner/manager view); non-null = that
     // staff member's own row only (NB-051's exact row-scoping convention, reused here).
-    List<StaffCollectionRow> staffCollection(UUID tenantId, Instant since, Instant until, UUID scopedToStaffId) {
-        return jdbc.query("SELECT ip.recorded_by, s.name, SUM(ip.amount) AS collected, COUNT(*) AS payment_count " +
-                        "FROM invoice_payments ip JOIN staff s ON s.id = ip.recorded_by " +
-                        "WHERE ip.tenant_id = ? AND ip.recorded_at >= ? AND ip.recorded_at < ? " +
-                        "AND (?::uuid IS NULL OR ip.recorded_by = ?::uuid) " +
-                        "GROUP BY ip.recorded_by, s.name ORDER BY collected DESC",
-                (rs, i) -> new StaffCollectionRow(UUID.fromString(rs.getString("recorded_by")), rs.getString("name"),
-                        rs.getBigDecimal("collected"), rs.getLong("payment_count")),
-                tenantId, Timestamp.from(since), Timestamp.from(until), scopedToStaffId, scopedToStaffId);
+    // OWN-025: a row exists for any staff member with payments, discounted invoices, overrides or handled visits.
+    List<StaffCollectionRow> staffCollection(UUID tenantId, LocalDate fromDay, LocalDate toDay, Instant since, Instant until,
+                                             UUID scopedToStaffId) {
+        Timestamp s = Timestamp.from(since), u = Timestamp.from(until);
+        return jdbc.query("""
+                WITH pay AS (
+                  SELECT recorded_by AS sid, SUM(amount) AS collected, COUNT(*) AS pc FROM invoice_payments
+                  WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ? GROUP BY recorded_by),
+                disc AS (
+                  SELECT created_by AS sid, COUNT(*) AS dc FROM invoices
+                  WHERE tenant_id = ? AND created_at >= ? AND created_at < ? AND discount > 0 GROUP BY created_by),
+                ovr AS (
+                  SELECT actor_id AS sid, COUNT(*) AS oc FROM audit_log
+                  WHERE tenant_id = ? AND actor_type = 'staff' AND created_at >= ? AND created_at < ?
+                    AND (action LIKE 'prescription.%override' OR action = 'prescription.controlled_acknowledged')
+                  GROUP BY actor_id),
+                hnd AS (
+                  SELECT sid, COUNT(DISTINCT qid) AS hc FROM (
+                    SELECT doctor_id AS sid, id AS qid FROM queue_entries
+                      WHERE tenant_id = ? AND queue_date BETWEEN ? AND ? AND status = 'completed'
+                    UNION ALL
+                    SELECT created_by, queue_entry_id FROM invoices
+                      WHERE tenant_id = ? AND created_at >= ? AND created_at < ?) x GROUP BY sid)
+                SELECT st.id, st.name, COALESCE(pay.collected, 0) AS collected, COALESCE(pay.pc, 0) AS pc,
+                       COALESCE(hnd.hc, 0) AS hc, COALESCE(disc.dc, 0) AS dc, COALESCE(ovr.oc, 0) AS oc
+                FROM staff st LEFT JOIN pay ON pay.sid = st.id LEFT JOIN disc ON disc.sid = st.id
+                LEFT JOIN ovr ON ovr.sid = st.id LEFT JOIN hnd ON hnd.sid = st.id
+                WHERE st.tenant_id = ? AND (?::uuid IS NULL OR st.id = ?::uuid)
+                  AND (pay.sid IS NOT NULL OR disc.sid IS NOT NULL OR ovr.sid IS NOT NULL OR hnd.sid IS NOT NULL)
+                ORDER BY collected DESC, st.name
+                """,
+                (rs, i) -> new StaffCollectionRow(UUID.fromString(rs.getString("id")), rs.getString("name"),
+                        rs.getBigDecimal("collected"), rs.getLong("pc"), rs.getLong("hc"), rs.getLong("dc"), rs.getLong("oc")),
+                tenantId, s, u, tenantId, s, u, tenantId, s, u,
+                tenantId, Date.valueOf(fromDay), Date.valueOf(toDay), tenantId, s, u,
+                tenantId, scopedToStaffId, scopedToStaffId);
     }
 
     // ── Reports → Today's money, over [start, end) on the clinic's clock ──
