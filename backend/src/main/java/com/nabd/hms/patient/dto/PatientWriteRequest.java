@@ -18,6 +18,10 @@ public record PatientWriteRequest(
         String nationalId,
         // Set after staff reviewed the duplicate candidates a first attempt returned and confirmed
         // this is a different person (e.g. a child on a parent's number). Absent = old behaviour.
-        Boolean confirmedNotDuplicate
+        Boolean confirmedNotDuplicate,
+        // CGV-005: evidence that the guardian agreed; required whenever guardianId is supplied.
+        GuardianConsent guardianConsent
 ) {
+    public record GuardianConsent(Boolean confirmed, String channel) {
+    }
 }

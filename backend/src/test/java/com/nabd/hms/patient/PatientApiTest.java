@@ -60,9 +60,51 @@ class PatientApiTest extends ApiTestBase {
 
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Child", "phone", "+919888800004", "dob",
-                java.time.LocalDate.now().minusYears(5).toString(), "gender", "male", "guardianId", guardianId)), Map.class);
+                java.time.LocalDate.now().minusYears(5).toString(), "gender", "male", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    @Test
+    void guardianRegistrationWithoutValidConsentIsRejected() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "cgv5a@a.com", "+919300000051", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatient(token, "Guardian CGV5", "+919888800061");
+        String dob = java.time.LocalDate.now().minusYears(5).toString();
+        java.util.List<Object> bad = java.util.Arrays.asList(null, Map.of("confirmed", false, "channel", "phone"),
+                Map.of("confirmed", true, "channel", "email"), Map.of("confirmed", true));
+        int n = 0;
+        for (Object consent : bad) {
+            Map<String, Object> body = new java.util.HashMap<>(Map.of("name", "Child CGV5", "phone", "+91988880007" + n++,
+                    "dob", dob, "gender", "male", "guardianId", guardianId));
+            if (consent != null) body.put("guardianConsent", consent);
+            ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, body), Map.class);
+            assertThat(resp.getStatusCode()).as("consent %s", consent).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(resp.getBody().get("type")).asString().contains("guardian-consent-required");
+        }
+    }
+
+    @Test
+    void guardianConsentEvidenceIsStoredAndAudited() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "cgv5b@a.com", "+919300000052", false);
+        String token = loginAndGetAccessToken(staff);
+        String guardianId = registerPatient(token, "Guardian CGV5b", "+919888800062");
+        ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Child CGV5b", "phone", "+919888800063", "dob", java.time.LocalDate.now().minusYears(5).toString(),
+                "gender", "male", "guardianId", guardianId,
+                "guardianConsent", Map.of("confirmed", true, "channel", "written"))), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID childId = UUID.fromString((String) resp.getBody().get("id"));
+        Map<String, Object> row = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT captured_by, capture_channel, granted_at FROM consents WHERE patient_id = ? AND consent_type = 'guardian_access'", childId));
+        assertThat(row.get("captured_by")).isEqualTo(staff.id());
+        assertThat(row.get("capture_channel")).isEqualTo("written");
+        assertThat(row.get("granted_at")).isNotNull();
+        String after = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT after::text FROM audit_log WHERE entity_id = ? AND action = 'patient.guardian_grant'", String.class, childId));
+        assertThat(after).contains("written");
     }
 
     @Test
@@ -75,7 +117,7 @@ class PatientApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Child2", "phone", "+919888800005", "dob",
                 java.time.LocalDate.now().minusYears(5).toString(), "gender", "male",
-                "guardianId", UUID.randomUUID().toString())), Map.class);
+                "guardianId", UUID.randomUUID().toString(), "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(resp.getBody().get("type")).asString().contains("guardian-not-found");
@@ -345,7 +387,7 @@ class PatientApiTest extends ApiTestBase {
 
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Minor One", "phone", "+919888800021", "dob", java.time.LocalDate.now().minusYears(10).toString(),
-                "gender", "female", "guardianId", guardianId)), Map.class);
+                "gender", "female", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String minorId = (String) resp.getBody().get("id");
 
@@ -372,7 +414,7 @@ class PatientApiTest extends ApiTestBase {
         String guardian2 = registerPatientWithDob(token, "Guardian B", "+919888800023", "1978-06-15");
         String dob = java.time.LocalDate.now().minusYears(8).toString();
         ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Minor Two", "phone", "+919888800024", "dob", dob, "gender", "male", "guardianId", guardian1)), Map.class);
+                "name", "Minor Two", "phone", "+919888800024", "dob", dob, "gender", "male", "guardianId", guardian1, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class);
         String minorId = (String) created.getBody().get("id");
 
         ResponseEntity<Map> patched = exchange("/v1/patients/" + minorId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
@@ -406,7 +448,7 @@ class PatientApiTest extends ApiTestBase {
         // 19 years old: an adult, but still carrying a guardian on file (nothing stops that at registration)
         String dob = java.time.LocalDate.now().minusYears(19).toString();
         ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Newly Adult", "phone", "+919888800026", "dob", dob, "gender", "female", "guardianId", guardianId)), Map.class);
+                "name", "Newly Adult", "phone", "+919888800026", "dob", dob, "gender", "female", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class);
         String patientId = (String) created.getBody().get("id");
 
         ResponseEntity<List> due = exchange("/v1/patients/guardian-reviews-due", HttpMethod.GET, authed(token), List.class);
@@ -440,7 +482,7 @@ class PatientApiTest extends ApiTestBase {
         String guardianId = registerPatientWithDob(token, "Guardian D", "+919888800027", "1975-03-03");
         String dob = java.time.LocalDate.now().minusYears(19).toString();
         ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Has Address", "phone", "+919888800028", "dob", dob, "gender", "female", "guardianId", guardianId,
+                "name", "Has Address", "phone", "+919888800028", "dob", dob, "gender", "female", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"),
                 "address", "12 Test Street", "nationalId", "123456789012")), Map.class);
         UUID patientId = UUID.fromString((String) created.getBody().get("id"));
 
@@ -468,7 +510,7 @@ class PatientApiTest extends ApiTestBase {
         String guardianId = registerPatientWithDob(token, "Guardian F", "+919888800031", "1975-05-05");
         String dob = java.time.LocalDate.now().minusYears(19).toString();
         ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Revoke Me", "phone", "+919888800032", "dob", dob, "gender", "female", "guardianId", guardianId,
+                "name", "Revoke Me", "phone", "+919888800032", "dob", dob, "gender", "female", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"),
                 "address", "34 Test Lane", "nationalId", "555566667777")), Map.class);
         UUID patientId = UUID.fromString((String) created.getBody().get("id"));
 
@@ -503,7 +545,7 @@ class PatientApiTest extends ApiTestBase {
         String guardianId = registerPatientWithDob(token, "Guardian G", "+919888800033", "1975-06-06");
         ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Little One", "phone", "+919888800034", "dob", java.time.LocalDate.now().minusYears(5).toString(),
-                "gender", "male", "guardianId", guardianId)), Map.class);
+                "gender", "male", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class);
         String patientId = (String) created.getBody().get("id");
 
         ResponseEntity<Map> resp = exchange("/v1/patients/" + patientId + "/guardian", HttpMethod.DELETE, authed(token), Map.class);
@@ -521,7 +563,7 @@ class PatientApiTest extends ApiTestBase {
         String guardianId = registerPatientWithDob(token, "Guardian E", "+919888800029", "1976-04-04");
         String dob = java.time.LocalDate.now().minusYears(7).toString();
         ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Small Child", "phone", "+919888800030", "dob", dob, "gender", "male", "guardianId", guardianId,
+                "name", "Small Child", "phone", "+919888800030", "dob", dob, "gender", "male", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"),
                 "address", "Addr 1", "nationalId", "987654321098")), Map.class);
         UUID patientId = UUID.fromString((String) created.getBody().get("id"));
 
@@ -615,7 +657,7 @@ class PatientApiTest extends ApiTestBase {
         String guardianId = registerPatient(token, "Guardian K", "+919888800041");
         String dob = java.time.LocalDate.now().minusYears(19).toString();
         ResponseEntity<Map> created = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Keep Me", "phone", "+919888800042", "dob", dob, "gender", "female", "guardianId", guardianId)), Map.class);
+                "name", "Keep Me", "phone", "+919888800042", "dob", dob, "gender", "female", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class);
         String patientId = (String) created.getBody().get("id");
 
         ResponseEntity<Map> bad = exchange("/v1/patients/" + patientId + "/guardian/review", HttpMethod.POST,
@@ -639,7 +681,7 @@ class PatientApiTest extends ApiTestBase {
         // a minor has no review due
         String minorId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Little", "phone", "+919888800043", "dob", java.time.LocalDate.now().minusYears(5).toString(),
-                "gender", "male", "guardianId", guardianId)), Map.class).getBody().get("id");
+                "gender", "male", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class).getBody().get("id");
         assertThat(exchange("/v1/patients/" + minorId + "/guardian/review", HttpMethod.POST,
                 authedJsonBody(token, Map.of("decision", "keep")), Map.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -656,7 +698,7 @@ class PatientApiTest extends ApiTestBase {
         String guardianId = registerPatient(token, "Guardian V", "+919888800044");
         String patientId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Adult V", "phone", "+919888800045", "dob", java.time.LocalDate.now().minusYears(20).toString(),
-                "gender", "male", "guardianId", guardianId)), Map.class).getBody().get("id");
+                "gender", "male", "guardianId", guardianId, "guardianConsent", Map.of("confirmed", true, "channel", "in_person"))), Map.class).getBody().get("id");
 
         assertThat(exchange("/v1/patients/" + patientId + "/guardian/review", HttpMethod.POST,
                 authedJsonBody(viewToken, Map.of("decision", "keep")), Map.class).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);

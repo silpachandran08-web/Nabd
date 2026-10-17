@@ -753,6 +753,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PatientWrite" } } }
       responses:
         "201": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
+        "400": { description: "validation-failed, guardian-required, guardian-not-found, or guardian-consent-required (guardianId without a valid guardianConsent)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409":
           description: >
             Likely-duplicate match found (same phone digits, or same DOB + similar name) — client should
@@ -995,6 +996,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentWrite" } } }
       responses:
         "201": { description: "Booked", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "404": { description: "patient-not-found or doctor-not-found (unknown id or another clinic's)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "Slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/{id}:
@@ -1058,6 +1060,7 @@ paths:
             schema: { type: object, required: [doctorId, patientId], properties: { doctorId: { type: string, format: uuid }, patientId: { type: string, format: uuid } } }
       responses:
         "201": { description: "Joined", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
+        "404": { description: "patient-not-found or doctor-not-found (unknown id or another clinic's)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "already-waitlisted", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /waitlist/{id}/accept:
@@ -2781,6 +2784,17 @@ components:
         confirmedNotDuplicate:
           type: [boolean, "null"]
           description: "Set after staff reviewed the 409 duplicate candidates and confirmed this is a different person; skips the duplicate check"
+        guardianConsent:
+          type: object
+          description: >
+            CGV-005. Required whenever guardianId is supplied, else 400 `guardian-consent-required`
+            (also when confirmed is not true or channel is not one of the listed values). Stored with the
+            guardian_access consent (captured_by = calling staff, capture_channel, granted_at) and audited
+            in `patient.guardian_grant` (consentChannel). PATCH guardian changes are unchanged.
+          required: [confirmed, channel]
+          properties:
+            confirmed: { type: boolean, description: "Must be true" }
+            channel: { type: string, enum: [in_person, phone, written] }
 
     PatientPatch:
       type: object

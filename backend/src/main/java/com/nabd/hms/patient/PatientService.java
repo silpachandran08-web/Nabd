@@ -198,6 +198,9 @@ public class PatientService {
         requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         validateGuardian(tenantId, req);
+        if (req.guardianId() != null) {
+            requireGuardianConsent(req.guardianConsent());
+        }
 
         String phone = PhoneNumbers.e164(req.phone(), repo.region(tenantId)); // one stored format, whatever was typed
         List<MatchCandidateRow> candidates = Boolean.TRUE.equals(req.confirmedNotDuplicate())
@@ -216,7 +219,7 @@ public class PatientService {
         UUID id = repo.insert(tenantId, req.name(), phone, req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
         if (req.guardianId() != null) {
-            grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId());
+            grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId(), req.guardianConsent().channel());
         }
         log.info("patient {} registered by {} (tenant {})", id, callerStaffId, tenantId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
@@ -376,9 +379,20 @@ public class PatientService {
                 .toList();
     }
 
-    private void grantGuardianConsent(UUID tenantId, UUID callerStaffId, UUID patientId, UUID guardianId) {
-        repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS);
-        audit(tenantId, callerStaffId, "patient.guardian_grant", patientId, null, Map.of("guardianId", guardianId));
+    private static final List<String> CONSENT_CHANNELS = List.of("in_person", "phone", "written");
+
+    /** CGV-005: no guardian link without an explicit confirmation and a known channel. */
+    private static void requireGuardianConsent(PatientWriteRequest.GuardianConsent c) {
+        if (c == null || !Boolean.TRUE.equals(c.confirmed()) || c.channel() == null || !CONSENT_CHANNELS.contains(c.channel())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-consent-required", "Guardian consent required",
+                    "guardianConsent.confirmed must be true and guardianConsent.channel one of in_person, phone, written.");
+        }
+    }
+
+    private void grantGuardianConsent(UUID tenantId, UUID callerStaffId, UUID patientId, UUID guardianId, String channel) {
+        repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS, callerStaffId, channel);
+        audit(tenantId, callerStaffId, "patient.guardian_grant", patientId, null,
+                Map.of("guardianId", guardianId, "consentChannel", channel));
     }
 
     private void changeGuardian(UUID tenantId, UUID callerStaffId, UUID patientId, UUID oldGuardianId, UUID newGuardianId) {

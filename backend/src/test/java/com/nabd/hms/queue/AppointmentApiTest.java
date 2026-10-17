@@ -85,6 +85,44 @@ class AppointmentApiTest extends ApiTestBase {
     }
 
     @Test
+    void bookingWithUnknownPatientOrDoctorIsNotFoundNotConflict() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "qa03a@a.com", "+919500000031", false);
+        String token = loginAndGetAccessToken(staff);
+        addWorkingHours(token, staff.id(), null);
+        String patient = registerPatient(token, "P-QA03", "+919999900031");
+        String slot = nearFutureSlot().toString();
+
+        ResponseEntity<Map> badPatient = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", staff.id().toString(), "patientId", UUID.randomUUID().toString(), "startTime", slot)), Map.class);
+        assertThat(badPatient.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(badPatient.getBody().get("type")).asString().contains("patient-not-found");
+
+        ResponseEntity<Map> badDoctor = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", UUID.randomUUID().toString(), "patientId", patient, "startTime", slot)), Map.class);
+        assertThat(badDoctor.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(badDoctor.getBody().get("type")).asString().contains("doctor-not-found");
+    }
+
+    @Test
+    void waitlistJoinWithUnknownPatientOrDoctorIsNotFound() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "qa03b@a.com", "+919500000032", false);
+        String token = loginAndGetAccessToken(staff);
+        String patient = registerPatient(token, "P-QA03b", "+919999900032");
+
+        ResponseEntity<Map> badPatient = exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", staff.id().toString(), "patientId", UUID.randomUUID().toString())), Map.class);
+        assertThat(badPatient.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(badPatient.getBody().get("type")).asString().contains("patient-not-found");
+
+        ResponseEntity<Map> badDoctor = exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", UUID.randomUUID().toString(), "patientId", patient)), Map.class);
+        assertThat(badDoctor.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(badDoctor.getBody().get("type")).asString().contains("doctor-not-found");
+    }
+
+    @Test
     void bookingBeyondSessionCapacityIsRejected() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());

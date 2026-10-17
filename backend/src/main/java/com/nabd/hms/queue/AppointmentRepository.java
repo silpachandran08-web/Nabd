@@ -107,4 +107,15 @@ class AppointmentRepository {
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getBoolean("is_follow_up"));
     }
+
+    /** QA-03: existence checked up front so an unknown id is a 404, not an FK violation mis-reported as a slot conflict. */
+    boolean patientExists(UUID tenantId, UUID patientId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, patientId));
+    }
+
+    boolean doctorExists(UUID tenantId, UUID doctorId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM staff WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, doctorId));
+    }
 }
