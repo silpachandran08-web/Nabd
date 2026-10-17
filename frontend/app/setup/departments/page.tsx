@@ -13,6 +13,10 @@ type Problem = { title: string; detail: string };
 // templates (NB-357) replaced the free-reorder flow editor (NB-355).
 type WorkflowTemplate = { code: string; name: string; steps: string[]; toggleKeys: string[] };
 type DepartmentWorkflow = { templateCode: string | null; toggles: Record<string, boolean>; resolvedSteps: string[]; availableTemplates: WorkflowTemplate[] };
+// GET /v1/departments/{id}/flow (queue:view): a bare FlowStep array today; QA-08 may wrap it as
+// { steps, isDefault } — both shapes are read, and the "Default flow" label needs isDefault === true.
+type FlowStep = { stepType: string };
+type ResolvedFlow = { steps: string[]; isDefault: boolean } | null; // null = couldn't load
 type Builder = {
   mode: "create" | "edit"; sourceId?: string; name: string; active: boolean;
   availableTemplates: WorkflowTemplate[]; workflowLoading: boolean;
@@ -46,6 +50,7 @@ export default function DepartmentsPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  const [flows, setFlows] = useState<Record<string, ResolvedFlow>>({});
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -68,6 +73,19 @@ export default function DepartmentsPage() {
     [router]
   );
 
+  const loadFlow = useCallback(async (id: string) => {
+    let flow: ResolvedFlow = null;
+    try {
+      const res = await authedFetch(`/departments/${id}/flow`);
+      if (res?.ok) {
+        const body: FlowStep[] | { steps?: FlowStep[]; isDefault?: boolean } = await res.json();
+        const steps = Array.isArray(body) ? body : body.steps ?? [];
+        flow = { steps: steps.map((s) => s.stepType), isDefault: !Array.isArray(body) && body.isDefault === true };
+      }
+    } catch { /* shown as "—" */ }
+    setFlows((prev) => ({ ...prev, [id]: flow }));
+  }, [authedFetch]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -82,7 +100,9 @@ export default function DepartmentsPage() {
         setError("Couldn't load departments. Try again.");
         return;
       }
-      setDepartments(await depRes.json());
+      const deps: Department[] = await depRes.json();
+      setDepartments(deps);
+      deps.forEach((d) => void loadFlow(d.id));
       setEdges(await edgeRes.json());
       setMatrixDirty(false);
     } catch {
@@ -90,7 +110,7 @@ export default function DepartmentsPage() {
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, [authedFetch, loadFlow]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -209,6 +229,7 @@ export default function DepartmentsPage() {
           return;
         }
       }
+      void loadFlow(saved.id);
 
       setDepartments((prev) => (isEdit ? prev.map((d) => (d.id === saved.id ? saved : d)) : [...prev, saved]));
       setBuilder(null);
@@ -265,12 +286,16 @@ export default function DepartmentsPage() {
         {toggleError && <div className={styles.errorState} role="alert">{toggleError}</div>}
         <table className={styles.table}>
           <thead>
-            <tr><th>Name</th><th>Status</th><th></th></tr>
+            <tr><th>Name</th><th>Flow</th><th>Status</th><th></th></tr>
           </thead>
           <tbody>
             {departments.map((d) => (
               <tr key={d.id}>
                 <td>{d.name}{d.isDefault && <span className={styles.defaultTag}>Default</span>}</td>
+                <td>
+                  {!(d.id in flows) ? "Loading…" : flows[d.id]?.steps.map((t) => STEP_LABELS[t] ?? t).join(" → ") || "—"}
+                  {flows[d.id]?.isDefault && <span className={styles.defaultTag}>Default flow</span>}
+                </td>
                 <td>{d.active ? "Active" : "Inactive"}</td>
                 <td className={styles.rowActions}>
                   <button className={styles.smallBtn} onClick={() => openEdit(d)}>Edit</button>
