@@ -219,6 +219,68 @@ class OwnerApiTest extends ApiTestBase {
         assertThat(shadowStaffCount).isEqualTo(1);
     }
 
+    /** LIVE-05/QA-05: provisioning (verify_invite_owner) already invites the owner as clinic staff under their
+     * real email; entering the workspace must reuse that row, not add a second "Owner" to /staff. */
+    @Test
+    void enteringWorkspaceAdoptsTheOwnersProvisionedStaffRowInsteadOfAddingASecond() {
+        SeededOwner owner = seedOwner("owner-dup@a.com");
+        SeededTenant clinic = seedClinicInBrand(seedBrand(owner, "Brand"));
+        UUID ownerRoleId = inTenantTx(clinic.id(), () -> jdbc.queryForObject(
+                "SELECT id FROM roles WHERE tenant_id = ? AND built_in = true", UUID.class, clinic.id()));
+        // accepted clinic invite: PIN set, email verified, mobile never verified (the QA-05 PIN-login row)
+        SeededStaff pinRow = seedStaff(clinic, ownerRoleId, owner.email(), "+919900000077", false, true, false);
+
+        ResponseEntity<Map> select = exchange("/v1/owners/workspaces/select", HttpMethod.POST,
+                authedJsonBody(ownerLoginPendingToken(owner), Map.of("clinicId", clinic.id().toString())), Map.class);
+        assertThat(select.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String accessToken = (String) select.getBody().get("accessToken");
+
+        ResponseEntity<Map> staffList = exchange("/v1/staff", HttpMethod.GET, authed(accessToken), Map.class);
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) staffList.getBody().get("data");
+        assertThat(rows).extracting(r -> r.get("id")).containsExactly(pinRow.id().toString());
+
+        // the workspace path keeps the patient access the old shadow row had, and the PIN login still works
+        assertThat(exchange("/v1/patients/registry", HttpMethod.GET, authed(accessToken), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(loginAndGetAccessToken(pinRow)).isNotBlank();
+    }
+
+    @Test
+    void enteringWorkspaceBeforeAcceptingTheClinicInviteAdoptsAndActivatesTheInvitedRow() {
+        SeededOwner owner = seedOwner("owner-inv@a.com");
+        SeededTenant clinic = seedClinicInBrand(seedBrand(owner, "Brand"));
+        UUID invitedId = inTenantTx(clinic.id(), () -> {
+            UUID roleId = jdbc.queryForObject("SELECT id FROM roles WHERE tenant_id = ? AND built_in = true", UUID.class, clinic.id());
+            UUID id = UUID.randomUUID();
+            jdbc.update("INSERT INTO staff (id, tenant_id, role_id, email, name, status, invite_token_hash, invite_expires_at) " +
+                    "VALUES (?,?,?,?,'Owner','invited','h-owner-inv', now() + interval '1 day')", id, clinic.id(), roleId, owner.email());
+            return id;
+        });
+
+        exchange("/v1/owners/workspaces/select", HttpMethod.POST,
+                authedJsonBody(ownerLoginPendingToken(owner), Map.of("clinicId", clinic.id().toString())), Map.class);
+
+        Map<String, Object> row = inTenantTx(clinic.id(), () -> jdbc.queryForMap(
+                "SELECT count(*) OVER () AS n, id, status, owner_id, invite_token_hash FROM staff WHERE tenant_id = ?", clinic.id()));
+        assertThat(row).containsEntry("n", 1L).containsEntry("id", invitedId).containsEntry("status", "active")
+                .containsEntry("owner_id", owner.id()).containsEntry("invite_token_hash", null);
+    }
+
+    @Test
+    void enteringWorkspaceDoesNotAdoptARowWithANonOwnerRole() {
+        SeededOwner owner = seedOwner("owner-susp@a.com");
+        SeededTenant clinic = seedClinicInBrand(seedBrand(owner, "Brand"));
+        UUID doctorRoleId = seedRole(clinic.id(), "Doctor", false, fullGrant("queue"));
+        SeededStaff doctorRow = seedStaff(clinic, doctorRoleId, owner.email(), "+919900000078", false);
+
+        exchange("/v1/owners/workspaces/select", HttpMethod.POST,
+                authedJsonBody(ownerLoginPendingToken(owner), Map.of("clinicId", clinic.id().toString())), Map.class);
+
+        UUID linkedOwner = inTenantTx(clinic.id(), () -> jdbc.queryForObject(
+                "SELECT owner_id FROM staff WHERE id = ?", UUID.class, doctorRow.id()));
+        assertThat(linkedOwner).isNull();
+    }
+
     // ---- account invite (NB-354) ----
 
     @Test
