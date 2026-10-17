@@ -1,5 +1,7 @@
 .modeDesc { font-size: 13px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-16); }
 .notice { display: flex; align-items: center; gap: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); background: var(--nb-ok-tint); color: var(--nb-ok-500); font-size: 13px; font-weight: 500; margin-bottom: var(--nb-space-16); }
+.warn { padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); background: var(--nb-warn-tint); color: var(--nb-text-primary); border-inline-start: 3px solid var(--nb-warn-500); font-size: 13px; margin-bottom: var(--nb-space-16); }
+.na { display: inline-flex; align-items: center; min-height: 34px; padding: 0 var(--nb-space-12); font-size: 13px; color: var(--nb-text-tertiary); }
 .noticeError { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
 .rule { border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); margin-bottom: var(--nb-space-16); overflow-x: auto; }
 .ruleHead { padding: var(--nb-space-12) var(--nb-space-16) 0; font-size: 13px; font-weight: 600; }

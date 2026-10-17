@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./overview.module.css";
 import { getIdentity, getPermissions, isOwner } from "../lib/session";
+import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 
@@ -310,7 +311,8 @@ export default function OverviewPage() {
                   ? `${plural(data.dayClose.unbilledConsultations, "completed consultation has", "completed consultations have")} no bill. Day close is blocked until each is billed.`
                   : `Nothing blocks the close.${data.dayClose.pendingCheckouts > 0 ? ` ${plural(data.dayClose.pendingCheckouts, "checkout", "checkouts")} still pending.` : ""}`}
             </p>
-            <Link className={styles.primaryLink} href="/billing">{data.dayClose.closed ? "View day close" : "Go to day close"}</Link>
+            {/* LIVE-06: /billing needs billing:view; without it the link is absent, not a dead end. */}
+            {can("billing:view") && <Link className={styles.primaryLink} href="/billing">{data.dayClose.closed ? "View day close" : "Go to day close"}</Link>}
           </section>
 
           <section className={styles.card} aria-label="Staff currently active">

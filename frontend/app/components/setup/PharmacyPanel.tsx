@@ -49,6 +49,58 @@ function Mark({ on }: { on: boolean }) {
     : <span className={ph.no}><Icon name="x" size={14} label="Not included" /></span>;
 }
 
+// PHA-006: a mode change needs a reason (3-200 chars, server-enforced too: 400 reason-required) and is audited.
+// In-house is Phase 3 and not selectable (the server answers 400 mode-not-available).
+export const MODE_REASON_MIN = 3;
+export const MODE_REASON_MAX = 200;
+export function ModeChangeDialog({ from, to, authedFetch, onClose, onSaved }: {
+  from: PharmacyMode | null; to: PharmacyMode; authedFetch: AuthedFetch; onClose: () => void; onSaved: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const r = reason.trim();
+    if (r.length < MODE_REASON_MIN || r.length > MODE_REASON_MAX) { setError(`A reason is required (${MODE_REASON_MIN}-${MODE_REASON_MAX} characters).`); return; }
+    setBusy(true);
+    try {
+      const res = await authedFetch("/pharmacy/settings", { method: "PATCH", body: JSON.stringify({ mode: to, reason: r }) });
+      if (!res) return;
+      if (!res.ok) { setError(await problemText(res)); return; }
+      onSaved();
+    } catch {
+      setError("Couldn't reach the server. Nothing was changed; try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Dialog title={`Switch pharmacy to ${MODE_LABEL[to]}`} onClose={onClose}>
+      <form onSubmit={submit}>
+        <p className={ph.modeDesc}>{from ? `Current mode: ${MODE_LABEL[from]}. ` : ""}{MODE_DESC[to]}</p>
+        {from === "hybrid" && (
+          <div className={ph.warn} role="note">
+            <strong>Downgrade from Hybrid.</strong> Pharmacy items stop appearing at checkout, counter sales stop, and the item
+            master and dispensing queue are hidden. Items and stock history are kept, not deleted, and come back if you switch to Hybrid again.
+          </div>
+        )}
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="pm-reason">Reason (required)</label>
+          <input id="pm-reason" className={styles.input} autoFocus minLength={MODE_REASON_MIN} maxLength={MODE_REASON_MAX} required
+            value={reason} onChange={(e) => { setReason(e.target.value); setError(null); }} aria-describedby="pm-reason-hint" />
+          <div id="pm-reason-hint" className={ph.sub}>{MODE_REASON_MIN}-{MODE_REASON_MAX} characters. Recorded in the audit log with the old and new mode.</div>
+        </div>
+        {error && <div className={`${ph.notice} ${ph.noticeError}`} role="alert"><Icon name="alert" size={14} /> {error}</div>}
+        <div className={styles.actions}>
+          <button type="button" className={styles.btn} onClick={onClose}>Cancel</button>
+          <button type="submit" className={styles.btnPrimary} disabled={busy}>{busy ? "Saving…" : from === "hybrid" ? "Confirm downgrade" : "Confirm switch"}</button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 export function HardRuleCard() {
   return (
     <div className={ph.rule}>
@@ -93,6 +145,8 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
   const closeEdit = useCallback(() => setEditing(null), [setEditing]);
   const closeAdjust = useCallback(() => setAdjusting(null), [setAdjusting]);
   const closeDeactivate = useCallback(() => setDeactivating(null), [setDeactivating]);
+  const [switchTo, setSwitchTo] = useState<PharmacyMode | null>(null);
+  const closeSwitch = useCallback(() => setSwitchTo(null), [setSwitchTo]);
   const reasonRef = useRef<HTMLInputElement>(null);
   const [newItem, setNewItem] = useState<Partial<PharmacyItem>>({ isRx: false, stockQty: 0, taxRatePercent: 0 });
 
@@ -138,13 +192,10 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
     }
   };
 
-  const changeMode = async (mode: PharmacyMode) => {
-    if (mode === settings?.mode) return;
-    setNotice(null);
-    if (await send("PATCH", "/pharmacy/settings", { mode })) {
-      setNotice({ text: `Pharmacy mode saved: ${MODE_LABEL[mode]}.` });
-      await load();
-    }
+  const modeSaved = async () => {
+    if (switchTo) setNotice({ text: `Pharmacy mode saved: ${MODE_LABEL[switchTo]}.` });
+    setSwitchTo(null);
+    await load();
   };
 
   // PATCH edits name, price, tax, Rx flag and HSN only. Stock is never sent here: it changes through the stock
@@ -240,11 +291,13 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
       <h2 className={styles.cardTitle}>Pharmacy</h2>
       {canEdit ? (
         <div className={styles.tabs} role="group" aria-label="Pharmacy mode">
-          {(["external", "hybrid", "in_house"] as const).map((m) => (
-            <button key={m} type="button" aria-pressed={mode === m} className={mode === m ? styles.tabActive : styles.tab} onClick={() => changeMode(m)}>
+          {(["external", "hybrid"] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} className={mode === m ? styles.tabActive : styles.tab}
+              onClick={() => { if (m !== mode) { setNotice(null); setSwitchTo(m); } }}>
               {MODE_LABEL[m]}
             </button>
           ))}
+          <span className={mode === "in_house" ? styles.tabActive : ph.na}>{MODE_LABEL.in_house} · {mode === "in_house" ? "current" : "Not available yet"}</span>
         </div>
       ) : (
         // pharmacy:view only: the mode is information, not a control (PHA-016).
@@ -391,6 +444,8 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
           )}
         </>
       )}
+
+      {switchTo && <ModeChangeDialog from={mode} to={switchTo} authedFetch={authedFetch} onClose={closeSwitch} onSaved={() => void modeSaved()} />}
 
       {editing && (
         <Dialog title={`Edit ${editing.name}`} size="drawer" onClose={closeEdit}>
