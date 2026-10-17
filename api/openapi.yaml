@@ -1798,11 +1798,15 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
     patch:
       tags: [Pharmacy]
-      summary: Set the pharmacy mode (external, hybrid or in_house). Items and stock are only managed in hybrid mode.
+      summary: Set the pharmacy mode (external or hybrid). Items and stock are only managed in hybrid mode.
+      description: >-
+        PHA-006. Changing the mode requires `reason` (3-200 chars, trimmed) else 400 reason-required, and is audited as
+        `pharmacy.mode_changed` (before {mode}, after {mode, reason}). Sending the current mode is a no-op (no reason needed).
+        Switching to `in_house` returns 400 mode-not-available (Phase 3, not built) unless the tenant is already in_house.
       x-required-permission: pharmacy:edit
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettingsWrite" } } }
       responses:
         "200": { description: The settings, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -2500,6 +2504,11 @@ components:
       type: object
       properties:
         mode: { type: string, enum: [external, hybrid, in_house] }
+    PharmacySettingsWrite:
+      type: object
+      properties:
+        mode: { type: string, enum: [external, hybrid, in_house] }
+        reason: { type: string, minLength: 3, maxLength: 200, description: Required when mode changes. }
     PharmacyItemWrite:
       type: object
       required: [name, price]

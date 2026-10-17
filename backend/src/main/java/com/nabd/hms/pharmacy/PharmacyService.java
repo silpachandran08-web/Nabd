@@ -49,10 +49,32 @@ public class PharmacyService {
         return new PharmacySettingsResponse(repo.findMode(tenantId).orElse("external"));
     }
 
+    /** PHA-006: a real mode change needs a reason and is audited; re-sending the current mode is a no-op.
+     * In-house is Phase 3 (not built), so it can't be switched to — a tenant already on it keeps it. */
     @Transactional
-    public PharmacySettingsResponse updateSettings(UUID tenantId, PharmacySettingsWriteRequest req) {
+    public PharmacySettingsResponse updateSettings(UUID tenantId, UUID callerStaffId, String ipAddress,
+                                                   PharmacySettingsWriteRequest req) {
         tenantContext.set(tenantId);
+        String current = repo.findMode(tenantId).orElse("external");
+        if (req.mode() == null || req.mode().equals(current)) {
+            return new PharmacySettingsResponse(current);
+        }
+        if ("in_house".equals(req.mode())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "mode-not-available", "Mode not available",
+                    "In-house pharmacy (batch & expiry tracking) isn't available yet. Choose Hybrid or External.");
+        }
+        String reason = req.reason() == null ? "" : req.reason().trim();
+        if (reason.length() < 3 || reason.length() > 200) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
+                    "Give a reason (3-200 characters) for changing the pharmacy mode.");
+        }
         repo.upsertMode(tenantId, req.mode());
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("mode", req.mode());
+        after.put("reason", reason);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
+                "pharmacy.mode_changed", "pharmacy_settings", tenantId, Map.of("mode", current), after);
         return new PharmacySettingsResponse(req.mode());
     }
 

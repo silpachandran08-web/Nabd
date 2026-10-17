@@ -668,7 +668,7 @@ class PrescriptionApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff doc = seedStaff(tenant, roleId, "doc33b@a.com", "+919800033002", false);
         String token = loginAndGetAccessToken(doc);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Amoxicillin 500mg capsule", "isRx", true, "price", 12.50, "stockQty", 5)), Map.class);
         String entry = checkIn(token, registerPatient(token, "P33b", "+919999933002"), doc.id());
