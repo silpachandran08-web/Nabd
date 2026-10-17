@@ -622,11 +622,10 @@
   }
 }
 
-@media (max-width: 430px) {
-  .page {
-    padding: var(--nb-space-16) var(--nb-space-12);
-  }
-
+/* LIVE-02: from 543px down (phones and the narrow tablet rail) the header stacks, and the filter
+   pills and quick actions each keep to one row that scrolls sideways, so the two rows never collide
+   and every control stays a 44px target. Layout only; which buttons render is decided in page.tsx. */
+@media (max-width: 543px) {
   .header {
     flex-direction: column;
     align-items: stretch;
@@ -637,25 +636,42 @@
   }
 
   .segmented {
-    width: 100%;
+    inline-size: 100%;
   }
 
   .segment,
   .segmentActive {
     flex: 1;
+    min-block-size: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     text-align: center;
   }
 
-  /* Tabs and quick actions scroll sideways instead of wrapping into a wall of buttons. */
   .tabs,
   .quickActions {
     flex-wrap: nowrap;
     overflow-x: auto;
-    padding-bottom: var(--nb-space-4);
+    overscroll-behavior-inline: contain;
+    padding-block-end: var(--nb-space-4);
   }
 
   .tab,
   .tabActive,
+  .quickActions > button {
+    flex: none;
+    block-size: auto;
+    min-block-size: 44px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 430px) {
+  .page {
+    padding: var(--nb-space-16) var(--nb-space-12);
+  }
+
   .actionBtn,
   .primaryAction {
     flex: none;
