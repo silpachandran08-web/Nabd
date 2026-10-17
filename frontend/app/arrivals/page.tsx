@@ -27,7 +27,7 @@ type GuardianOption = { id: string; name: string; phone: string };
 // GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
 type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
 type Grants = { queueCreate: boolean; queueEdit: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
-type StaffOption = { id: string; name: string };
+type StaffOption = { id: string; name: string; departmentName?: string | null };
 // Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
 type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
 // NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
@@ -250,8 +250,8 @@ function ArrivalsPageInner() {
       const staffMap = new Map<string, string>();
       let doctorIds: string[] = [];
       if (staffRes?.ok) {
-        const roster: { id: string; name: string }[] = await staffRes.json();
-        setStaff(roster.map((s) => ({ id: s.id, name: s.name })));
+        const roster: StaffOption[] = await staffRes.json();
+        setStaff(roster.map((s) => ({ id: s.id, name: s.name, departmentName: s.departmentName ?? null })));
         roster.forEach((s) => staffMap.set(s.id, s.name));
         doctorIds = roster.map((s) => s.id);
       }
@@ -738,7 +738,7 @@ function ArrivalsPageInner() {
       estimatedMinutes: waitEstimates[s.id],
       delay: delays[s.id] ?? null,
     }))
-    .filter((s) => s.waiting > 0 || s.delay)
+    // REC-023: every active doctor stays on the rail; idle ones sink to the bottom, muted.
     .sort((a, b) => b.waiting - a.waiting);
 
   // Stable close handlers: Dialog re-focuses its first control whenever onClose changes identity.
@@ -897,14 +897,17 @@ function ArrivalsPageInner() {
           <div className={styles.card}>
             <div className={styles.sideTitle}>Doctor queues</div>
             {doctorQueues.length === 0 ? (
-              <EmptyState icon="stethoscope" title="No one waiting" />
+              <EmptyState icon="stethoscope" title="No doctors on the roster" />
             ) : (
               doctorQueues.map((d) => (
-                <div key={d.id} className={`${styles.doctorRow} ${styles.doctorRowStack}`}>
+                <div key={d.id} className={`${styles.doctorRow} ${styles.doctorRowStack}${d.waiting === 0 ? ` ${styles.doctorIdle}` : ""}`}>
                   <div className={styles.doctorLine}>
-                    <span className={styles.doctorName}>{d.name}</span>
+                    <span>
+                      <span className={styles.doctorName}>{d.name}</span>
+                      {d.departmentName && <span className={styles.doctorDept}>{d.departmentName}</span>}
+                    </span>
                     <span className={styles.doctorCount}>
-                      {d.waiting} waiting{d.estimatedMinutes !== undefined ? ` · ~${d.estimatedMinutes}m wait` : ""}
+                      {d.waiting === 0 ? "No patients waiting" : `${d.waiting} waiting${d.estimatedMinutes !== undefined ? ` · ~${d.estimatedMinutes}m wait` : ""}`}
                     </span>
                   </div>
                   {d.delay ? (

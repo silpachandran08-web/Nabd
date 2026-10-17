@@ -12,6 +12,7 @@ import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { decodeAccessToken } from "../lib/session";
+import { formatLastVisit } from "../lib/lastVisit";
 import VitalsCard from "../components/consult/VitalsCard";
 import type { Part } from "../components/consult/clinical";
 import type { Vitals } from "../components/consult/shared";
@@ -79,11 +80,6 @@ function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
-
-const fmtDate = (iso: string) => {
-  const [y, m, d] = iso.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
-};
 
 function nextLabel(r: RegistryRow): string {
   if (!r.nextAppointment) return "—";
@@ -722,7 +718,7 @@ function PatientsList() {
                     </td>
                     <td className={styles.nowrap}>{maskPhone(p.phone)}</td>
                     <td className={styles.nowrap}>{p.age} {p.gender === "female" ? "F" : p.gender === "male" ? "M" : "O"}</td>
-                    <td className={styles.nowrap}>{p.lastVisit ? fmtDate(p.lastVisit) : "—"}</td>
+                    <td className={styles.nowrap}>{formatLastVisit(p.lastVisit)}</td>
                     <td>{nextLabel(p)}</td>
                     <td>
                       <span className={styles.flags}>
@@ -932,7 +928,8 @@ function PatientsList() {
                   <div className={styles.statGrid}>
                     <div className={styles.section}>
                       <div className={styles.sectionLabel}>Last visit</div>
-                      <div className={styles.sectionValue}>{drawerPatient.lastVisitAt ? new Date(drawerPatient.lastVisitAt).toLocaleDateString() : "No visits yet"}</div>
+                      <div className={styles.sectionValue}>{/* LIVE-03: the list row's value first so list and drawer agree; detail when the row is not on this page */}
+                      {formatLastVisit(registry?.rows.find((r) => r.id === drawerPatient.id)?.lastVisit ?? drawerPatient.lastVisitAt)}</div>
                     </div>
                     <div className={styles.section}>
                       <div className={styles.sectionLabel}>Active packages</div>
