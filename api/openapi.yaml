@@ -353,6 +353,26 @@ paths:
         "201": { $ref: "#/components/responses/StaffCreated" }
         "409": { description: Email already on this tenant, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /staff/roster:
+    get:
+      tags: [Staff]
+      summary: Active doctors (role named "Doctor") for queue/consult pickers — id, name and department name only
+      x-required-permission: queue:view
+      responses:
+        "200":
+          description: Active doctors ordered by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, name, departmentName]
+                  properties:
+                    id: { type: string, format: uuid }
+                    name: { type: string }
+                    departmentName: { type: [string, "null"], description: "REC-023: name of the doctor's department (staff.department_id); null when none is assigned" }
+
   /staff/{id}:
     get:
       tags: [Staff]
@@ -2984,7 +3004,8 @@ components:
             chronicConditions: { type: array, items: { type: string } }
             activePackages: { type: integer }
             outstandingBalance: { type: number }
-            lastVisitAt: { type: [string, "null"], format: date-time }
+            lastVisit: { type: [string, "null"], format: date, description: "LIVE-03: last visit, SAME definition as PatientRegistryRow.lastVisit — the latest queue_date (tenant-local day) of any queue entry for this patient whose status is not no_show (a visit in progress today counts). Omitted when the patient has no such entry. Use this for display." }
+            lastVisitAt: { type: [string, "null"], format: date-time, deprecated: true, description: "NB-074, deprecated by LIVE-03: updated_at of the latest COMPLETED queue entry — a different definition from lastVisit / the registry; do not display alongside the registry value." }
             guardianReviewKeptAt: { type: [string, "null"], format: date-time, description: "CGV-002: when staff chose keep-proxy at the age-18 review; cleared if the guardian changes" }
 
     PatientRegistryRow:
@@ -2997,7 +3018,7 @@ components:
         age: { type: integer }
         gender: { type: string }
         minor: { type: boolean }
-        lastVisit: { type: [string, "null"], format: date }
+        lastVisit: { type: [string, "null"], format: date, description: "LIVE-03: latest queue_date (tenant-local day) of any queue entry for this patient whose status is not no_show; same definition as PatientDetail.lastVisit" }
         nextAppointment: { type: [string, "null"], format: date-time }
         nextDoctorName: { type: [string, "null"] }
         nextDoctorId: { type: [string, "null"], format: uuid }

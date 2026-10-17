@@ -520,7 +520,8 @@ public class PatientService {
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
                 row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt, isMinor(row.dob(), clock.today(row.tenantId())),
                 row.guardianId(), guardianName, guardianConsentGrantedAt,
-                row.guardianId() == null ? null : repo.findGuardianReviewKeptAt(tenantId, row.id()).orElse(null));
+                row.guardianId() == null ? null : repo.findGuardianReviewKeptAt(tenantId, row.id()).orElse(null),
+                repo.findLastVisit(tenantId, row.id()).orElse(null));
     }
 
     private ApiException notFound() {
