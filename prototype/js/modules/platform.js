@@ -24,8 +24,8 @@
     ".pf-sn.ok{background:var(--ok-t);color:var(--ok)}.pf-sn.run{background:var(--acc-tint2);color:var(--acc)}.pf-sn.bad{background:var(--crit-t);color:var(--crit)}.pf-sn.wait{background:var(--warn-t);color:var(--warn)}",
     ".pf-job{cursor:pointer;border-radius:var(--r-md);padding:12px;border:1px solid transparent;display:flex;flex-direction:column;gap:8px}",
     ".pf-job:hover{background:var(--s2)}.pf-job.on{background:var(--acc-tint);border-color:var(--acc-line)}",
-    ".pf-slo{display:grid;grid-template-columns:minmax(0,1.6fr) 90px 90px minmax(120px,1fr) auto;gap:10px 16px;align-items:center;font-size:13px;padding:12px 0;border-bottom:1px solid var(--div)}",
-    ".pf-slo:last-child{border-bottom:0}",
+    ".pf-slo{display:grid;grid-template-columns:minmax(0,1.6fr) 90px 90px minmax(120px,1fr) 130px;gap:10px 16px;align-items:center;font-size:13px;padding:12px 0;border-bottom:1px solid var(--div)}",
+    ".pf-slo:last-child{border-bottom:0}.pf-slo>:last-child{justify-self:end}",
     ".pf-slo.h{font:600 10.5px/14px var(--font);letter-spacing:.6px;text-transform:uppercase;color:var(--tx3);padding-top:0}",
     ".frame.mobile .pf-slo,.frame.tablet .pf-slo{grid-template-columns:minmax(0,1fr) auto}.frame.mobile .pf-slo .pf-hide,.frame.tablet .pf-slo .pf-hide{display:none}",
     ".pf-rec{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--crit)}",
@@ -42,7 +42,7 @@
   function num(x) { return '<span class="num ltr" style="white-space:nowrap">' + x + "</span>"; }
   function usd(v) { return num("$" + (v >= 1e6 ? (v / 1e6).toFixed(2) + "M" : v >= 1e3 ? (v / 1e3).toFixed(1) + "K" : v)); }
   var RG = { india: ["IN", "India"], uae: ["AE", "UAE"], ksa: ["SA", "Saudi Arabia"], qatar: ["QA", "Qatar"] };
-  function regPill(r) { return '<span class="pill mute" style="text-transform:none;letter-spacing:0">' + ui.icon("globe") + RG[r][0] + " · " + ui.esc(NB.MARKETS[r].residency.replace(/ region/, "")) + "</span>"; }
+  function regPill(r) { return '<span class="pill mute" style="text-transform:none;letter-spacing:0">' + ui.icon("globe") + RG[r][0] + " · " + ({ india: "Mumbai", uae: "UAE", ksa: "Riyadh", qatar: "Doha" })[r] + "</span>"; }
   function healthPill(h) { return h >= 85 ? ui.pill("ok", "Healthy " + h) : h >= 70 ? ui.pill("warn", "Watch " + h) : ui.pill("crit", "At risk " + h); }
   var TST = { active: ["ok", "Active"], trial: ["info", "Trial"], onboarding: ["sync", "Onboarding"], readonly: ["warn", "Read-only · payment due"] };
   function kv(rows) { return C.kv ? C.kv(rows) : ""; }
@@ -119,20 +119,20 @@
       ui.btn(L("Provision a tenant", "إنشاء مستأجر", "टेनेंट बनाएँ"), { cls: "pri", icon: "plus", ov: "provision" }));
     h += '<div class="pf-lock">' + ui.icon("lock", "sm") + "<span>Platform staff never open patient records. Usage, health and configuration only; support access to a clinic needs the owner's approval, is time-boxed and recorded.</span></div>";
     h += '<div class="ad-tiles">' + C.tile("Active tenants", "428", "", { delta: "+19 this month", dk: "ok", spark: C.wig(428, 60, 2, 1.2) }) +
-      C.tile("Visits yesterday", "38,210", "", { delta: "+4.1% week on week", dk: "ok", spark: C.wig(38, 3, 1.4, 0.8) }) +
-      C.tile("WhatsApp messages / day", "412K", "", { delta: "98.7% delivered", dk: "warn", spark: C.wig(412, 40, 12, 1.6) }) +
-      C.tile("Tenants at risk", "3", "", { delta: "Health score under 75", dk: "crit" }) +
-      C.tile("Trials", "27", "", { delta: "Median 9 days to first booking", dk: "info" }) + "</div>";
+      C.tile("Visits yesterday", "38,210", "", { delta: "+4.1% wk/wk", dk: "ok", spark: C.wig(38, 3, 1.4, 0.8) }) +
+      C.tile("WhatsApp msgs / day", "412K", "", { delta: "98.7% delivered", dk: "warn", spark: C.wig(412, 40, 12, 1.6) }) +
+      C.tile("Tenants at risk", "3", "", { delta: "Health under 75", dk: "crit" }) +
+      C.tile("Trials", "27", "", { delta: "9 days to 1st booking", dk: "info" }) + "</div>";
     h += '<div class="row sb">' + ui.seg("pfReg", [["all", "All regions", P.tenants.length], ["india", "India", cnt("india")], ["uae", "UAE", cnt("uae")], ["ksa", "Saudi Arabia", cnt("ksa")], ["qatar", "Qatar", cnt("qatar")]]) +
       ui.seg("pfHealth", [["all", "Any status"], ["risk", "Needs attention"], ["trial", "Trial"], ["onboarding", "Onboarding"]]) + "</div>";
-    h += ui.table([{ h: "Tenant" }, { h: "Plan" }, { h: "Region" }, { h: "Facilities", cls: "r" }, { h: "Users", cls: "r" }, { h: "Visits · 30 d", cls: "r" }, { h: "Health" }, { h: "MFA" }, { h: "Status" }],
+    h += ui.table([{ h: "Tenant" }, { h: "Plan" }, { h: "Region" }, { h: "Facilities · users", cls: "r" }, { h: "Visits · 30 d", cls: "r" }, { h: "Health" }, { h: "MFA" }, { h: "Status" }],
       rows.map(function (t) {
         var s = TST[t.st];
         return { ov: "tenant", arg: t.id, cls: t.h < 70 ? "crit" : t.h < 85 || t.st === "readonly" ? "urg" : "", cells: [ui.cellp(ui.esc(t.n), ui.esc(t.id + " · " + t.type + " · " + t.city)),
-          ui.esc(t.plan), regPill(t.r), num(t.fac), num(t.users), num(t.v30 ? t.v30.toLocaleString("en-IN") : "—"),
+          ui.esc(t.plan), regPill(t.r), num(t.fac + " · " + t.users), num(t.v30 ? t.v30.toLocaleString("en-IN") : "—"),
           healthPill(t.h) + (t.issue ? '<div class="tiny faint" style="margin-top:4px;white-space:nowrap">' + ui.esc(t.issue) + "</div>" : ""),
           t.mfa < 90 ? ui.pill("warn", t.mfa + "%") : num(t.mfa + "%"), ui.pill(s[0], s[1])] };
-      }), { min: 1100, empty: "No tenants match these filters." });
+      }), { min: 1020, empty: "No tenants match these filters." });
     return h;
   });
   NB.overlay("tenant", function (id) {
@@ -162,7 +162,7 @@
     var list = ui.card(L("Jobs", "المهام", "जॉब"), '<div class="stack s4">' + P.jobs.map(function (j) {
       var st = jobState(j), done = j.st.filter(function (x) { return x === 2; }).length;
       return '<div class="pf-job' + (j.id === job.id ? " on" : "") + '" data-set="pfJob" data-val="' + j.id + '" role="button" tabindex="0"><div class="row sb nw"><b class="small" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ui.esc(j.n) + "</b>" + ui.pill(SS[st][2], SS[st][1]) + "</div>" +
-        '<span class="tiny faint">' + j.id + " · " + RG[j.r][1] + " · started " + j.started + " · " + done + "/10 steps</span>" + C.hbars ? "" : "") +
+        '<span class="tiny faint">' + j.id + " · " + RG[j.r][1] + " · started " + j.started + " · " + done + "/10 steps</span>" +
         '<div class="bar' + (st === 3 ? " crit" : st === 2 ? " ok" : "") + '"><i style="width:' + done * 10 + '%"></i></div></div>';
     }).join("") + "</div>", { icon: "list" });
     var m = NB.MARKETS[job.r];
@@ -201,7 +201,7 @@
       return '<div class="card pf-reg' + (cur ? " hl" : "") + '"><div class="pf-rh"><span class="pf-flag">' + RG[r.r][0] + '</span><div class="fl"><h3 class="h">' + ui.esc(RG[r.r][1]) + (cur ? ' <span class="small faint">· selected market</span>' : "") +
         '</h3><span class="small faint">' + ui.esc(r.cloud) + "</span></div>" + (r.st === "ok" ? ui.pill("ok", "Healthy") : ui.pill("warn", "Degraded")) + "</div>" +
         '<div class="pf-stats"><div><b>' + r.t + "</b><span>Tenants</span></div><div><b>" + r.f + "</b><span>Facilities</span></div><div><b>" + r.up + "%</b><span>Uptime · 30 d</span></div></div>" +
-        '<div class="stack s4"><div class="row sb"><span class="small faint">API p95 · last 14 days</span><b class="small num">' + r.p95 + " ms</b></div>" + C.spark(r.lat, { thr: 300 }) + "</div>" +
+        '<div class="stack s4"><div class="row sb"><span class="small faint">API p95 · last 14 days</span><b class="small num">' + r.p95 + " ms</b></div>" + C.spark(r.lat) + '<span class="tiny faint">Target p95 under 300 ms</span>' + "</div>" +
         kv([["Residency", ui.esc(m.residency)], ["Law", ui.esc(m.privacyLaw)], ["Last backup", ui.esc(r.bk) + " · restore-tested weekly"], ["KMS key rotation", ui.esc(r.kms)], ["Recovery target", "RPO 5 min · RTO 1 h"]]) +
         '<p class="small ' + (r.st === "ok" ? "faint" : "warnc") + '" style="margin:0">' + ui.icon(r.st === "ok" ? "info" : "alertcircle", "xs") + " " + ui.esc(r.note) + "</p></div>";
     }).join("") + "</div>";
@@ -239,7 +239,7 @@
   });
 
   /* ================= platform.support ================= */
-  function supPill(x) { return { pending: ui.pill("warn", "Waiting for owner"), active: '<span class="pf-rec"><i></i>Recording · ' + ui.esc(x.left || "") + "</span>", denied: ui.pill("perm", "Declined"), done: ui.pill("ok", "Completed"), expired: ui.pill("mute", "Expired") }[x.st]; }
+  function supPill(x) { return { pending: ui.pill("warn", "Waiting for owner"), active: '<span class="pill crit"><span class="pulse"></span>Recording · ' + ui.esc(x.left || "") + "</span>", denied: ui.pill("perm", "Declined"), done: ui.pill("ok", "Completed"), expired: ui.pill("mute", "Expired") }[x.st]; }
   NB.screen("platform.support", function (c) {
     var tab = NB.v("pfSupTab", "access");
     var h = ui.header(L("Support access", "وصول الدعم", "सपोर्ट एक्सेस"), "Access to a clinic needs its owner's approval, lasts at most 60 minutes, is recorded and shows up in the clinic's own audit log",

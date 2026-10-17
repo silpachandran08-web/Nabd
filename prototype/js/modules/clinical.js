@@ -92,9 +92,9 @@
     { tok: "T-10", name: "Mary Thomas", as: "52 F", type: "Appointment", reason: "Thyroid review", fac: 0, st: "completed", t: "09:25", dur: 7 },
     { tok: "T-11", name: "Kiran Hegde", as: "29 M", type: "Walk-in", reason: "Sore throat", fac: 0, st: "completed", t: "09:33", dur: 6 },
     { tok: "T-12", name: "Ramya S.", as: "33 F", type: "Teleconsult", reason: "Lab review", fac: 0, st: "completed", t: "09:40", dur: 9 },
-    { tok: "T-18", p: "p6", type: "Appointment", reason: "Thyroid panel review", fac: 0, st: "checkout", t: "09:50", dur: 8 },
+    { tok: "T-18", p: "p6", src: "WhatsApp", type: "Appointment", reason: "Thyroid panel review", fac: 0, st: "checkout", t: "09:50", dur: 8 },
     { tok: "T-15", p: "p3", type: "Walk-in", reason: "Fever 3 days, cough", fac: 0, st: "next", min: 60, flag: "urg" },
-    { tok: "T-20", p: "p8", type: "Appointment", reason: "BP review, knee pain", fac: 0, st: "waiting", min: 70 },
+    { tok: "T-20", p: "p8", src: "Caregiver app", type: "Appointment", reason: "BP review, knee pain", fac: 0, st: "waiting", min: 70 },
     { tok: "T-24", name: "Rahul Verma", as: "49 M", type: "Follow-up", reason: "BP follow-up", fac: 0, st: "booked", min: 80, src: "Nabd Connect" },
     { tok: "T-26", name: "Geeta Rao", as: "57 F", type: "Appointment", reason: "Joint pains", fac: 0, st: "booked", min: 95, src: "WhatsApp" },
     { tok: "T-27", name: "Asif Khan", as: "36 M", type: "Walk-in", reason: "Cough 1 week", fac: 0, st: "arrived", min: 105, src: "Self check-in" },
@@ -250,7 +250,7 @@
       ".cl-col{display:flex;flex-direction:column;gap:16px;min-width:0}",
       ".cl-al .btn{white-space:normal;height:auto;min-height:32px;padding:6px 12px;line-height:16px;text-align:start;justify-content:flex-start}",
       ".cl-left .cl-kv{grid-template-columns:minmax(0,1fr);gap:2px}.cl-left .cl-kv dd{margin-bottom:6px}",
-      ".cl-left .li .t b,.cl-left .li .t small{white-space:normal}",
+      ".cl-left .li .t b,.cl-left .li .t small,.cl-lw .li .t b,.cl-lw .li .t small{white-space:normal}",
       ".frame.tablet .cl-cx,.cl-cx.cmp{grid-template-columns:minmax(0,1fr) 320px}",
       ".frame.tablet .cl-cx .cl-left,.cl-cx.cmp .cl-left{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}",
       ".cl-ph{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}",
@@ -763,15 +763,15 @@
       banners(p, sc) + '<div class="cl-grid2" style="margin-top:14px"><div class="stack s8"><span class="eyebrow">' + L("Pre-consult (WhatsApp)", "ما قبل الاستشارة", "परामर्श-पूर्व") + '</span><dl class="cl-kv">' + sc.pre.slice(0, 3).map(function (r) { return "<dt>" + esc(r[0]) + "</dt><dd>" + esc(r[1]) + "</dd>"; }).join("") + "</dl></div>" +
       '<div class="stack s8"><span class="eyebrow">' + L("Vitals from nurse · 09:38", "العلامات من الممرضة", "नर्स से वाइटल्स") + "</span>" + vtiles(sc, ["bp", "hr", "t", "spo2", "rr", "rbs"]) +
       '<span class="eyebrow" style="margin-top:4px">' + L("Pending / new results", "نتائج معلقة", "लंबित रिपोर्ट") + '</span><div class="chips">' + ui.pill("crit", "K+ 6.1 · not acknowledged") + ui.pill("warn", "HbA1c 8.4") + ui.pill("perm", "CRP ordered", "hourglass") + "</div></div></div></div>";
-    var table = ui.table([{ h: L("Time", "الوقت", "समय") }, { h: L("Token", "الرقم", "टोकन") }, { h: L("Patient", "المريض", "मरीज़") }, { h: L("Visit", "الزيارة", "विज़िट") }, { h: L("Facility", "المنشأة", "सुविधा") }, { h: L("Status", "الحالة", "स्थिति") }, { h: "" }],
+    var table = ui.table([{ h: L("Time", "الوقت", "समय") }, { h: L("Token", "الرقم", "टोकन") }, { h: L("Patient", "المريض", "मरीज़") }, { h: L("Visit", "الزيارة", "विज़िट") }, { h: L("Status", "الحالة", "स्थिति") }, { h: "" }],
       rows.map(function (r) {
         var pp = r.p ? NB.pat(r.p) : null, s = DST[r.st], done = r.st === "completed" || r.st === "checkout";
         var time = done ? '<span class="num ltr">' + r.t + '</span><small class="faint" style="display:block">' + r.dur + " min</small>"
-          : '<span class="num ltr">' + hm(r.min + delay) + "</span>" + (r.fac === 0 && shift ? '<small class="warnc" style="display:block">' + (shift > 0 ? "+" : "") + shift + " min</small>" : '<small class="faint" style="display:block">ETA</small>');
+          : '<span class="num ltr">' + hm(r.min + (r.fac === 0 ? delay : 0)) + "</span>" + (r.fac === 0 && shift ? '<small class="warnc" style="display:block">' + (shift > 0 ? "+" : "") + shift + " min</small>" : '<small class="faint" style="display:block">ETA</small>');
         var act = r.p && !done ? ui.btn(L("Open", "فتح", "खोलें"), { cls: "sm", act: "cl-open", arg: r.p, icon: "steth" }) : r.st === "rounds" ? ui.btn(L("Rounds", "الجولات", "राउंड"), { cls: "sm", go: "doctor.inpatients", icon: "bed" }) : "";
         return { cls: r.flag || "", cells: [time, '<span class="tok">' + r.tok + "</span>", ui.cellp(pp ? pn(pp) : esc(r.name), pp ? pp.age + " " + pp.sex + " · " + esc(r.reason) : esc(r.as + " · " + r.reason)),
-          ui.cellp(esc(r.type), esc(r.src || (r.p === "p3" ? "Desk" : r.p ? "WhatsApp" : "Desk"))), '<span class="small">' + esc(facShort(r.fac)) + "</span>", ui.pill(s[0], s[1]) + (r.flag === "urg" ? " " + ui.pill("urg", "Urgent") : ""), act] };
-      }), { min: 760 });
+          ui.cellp(esc(r.type) + " · " + esc(r.src || "Desk"), ui.icon("building", "xs") + " " + esc(facShort(r.fac))), ui.pill(s[0], s[1]) + (r.flag === "urg" ? " " + ui.pill("urg", "Urgent") : ""), act] };
+      }), { min: 620 });
     var rail = ui.card(L("Running late?", "متأخر؟", "देर हो रही है?"), '<p class="small muted" style="margin:0 0 10px">One tap shifts every waiting and booked patient\'s ETA and sends a WhatsApp update with “wait / reschedule / see another doctor”.</p><div class="chips">' +
         [0, 15, 30, 45, 60].map(function (n) { return '<button class="cl-ch' + (delay === n ? " on" : "") + '" data-ov="cldelay" data-arg="' + n + '">' + (n ? "+" + n + " min" : L("On time", "في الوقت", "समय पर")) + "</button>"; }).join("") + "</div>" +
         '<p class="tiny faint" style="margin:10px 0 0">Last broadcast 09:46 · 6 patients notified · 1 chose another doctor</p>', { icon: "clockh" }) +
@@ -779,7 +779,7 @@
         ui.li('<span class="pill crit" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("flask", "sm") + "</span>", "Results inbox · 5 new", "1 critical: K+ 6.1 (Rakesh Menon) · 14 min to acknowledge", ui.icon("chevright", "sm faint flip"), { go: "doctor.results" }) +
         ui.li('<span class="pill info" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("share", "sm") + "</span>", "Record requests · 2", "Patients approved on WhatsApp · waiting for you", ui.icon("chevright", "sm faint flip"), { go: "doctor.records" }) +
         ui.li('<span class="pill sync" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("bed", "sm") + "</span>", "Ward round 13:30 · 4 patients", "Highest NEWS2 5 (ICU-2) · 1 discharge-ready", ui.icon("chevright", "sm faint flip"), { go: "doctor.inpatients" }) +
-        ui.li('<span class="pill mute" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("calendar", "sm") + "</span>", "Leave 24 Oct (conference)", "11 bookings: 8 moved to Dr. Anil Kumar, 2 rescheduled, 1 pending", ui.icon("chevright", "sm faint flip"), { go: "doctor.schedule" }) + "</div>", { icon: "bell" }) +
+        ui.li('<span class="pill mute" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("calendar", "sm") + "</span>", "Leave 24 Oct (conference)", "11 bookings: 8 moved to Dr. Anil Kumar, 2 rescheduled, 1 pending", ui.icon("chevright", "sm faint flip"), { go: "doctor.schedule" }) + "</div>", { icon: "bell" , cls: "cl-lw" }) +
       ui.card(L("Signed in at", "مسجل الدخول في", "लॉग-इन सुविधा"), '<p class="small muted" style="margin:0 0 10px">One login across ' + fs.length + " facilities. Each facility sees only its own patients; the others see you as “busy”.</p>" +
         '<div class="lst">' + fs.slice(0, 2).map(function (x, i) { return ui.li('<span class="av">' + ui.icon("building", "sm") + "</span>", esc(x.name), esc(x.area), i === NB.state.facility ? ui.pill("acc", "Current") : ""); }).join("") + "</div>", { icon: "building", right: ui.btn("Switch", { cls: "sm ghost", ov: "facswitch" }) });
     return h + '<div class="split wide"><div class="stack s16">' + next + table + '</div><div class="stack s16">' + rail + "</div></div>";
@@ -876,10 +876,10 @@
 
   /* ================= Doctor: Ward rounds ================= */
   CD.round = {
-    "ICU-2": { vit: "T 38.2 · HR 112 · RR 22 · SpO₂ 95% (4 L) · BP 104/62", plan: "Day 6 meropenem; blood culture: E. coli (sensitive). Lactate 1.8 ↓. De-escalate to ceftriaxone?", todo: ["Repeat lactate", "Review central line day 6"], np: [["Resp. rate", "22", 2], ["SpO₂ (scale 1)", "95% on O₂", 1 + 2], ["Systolic BP", "104", 1], ["Pulse", "112", 1], ["Temp", "38.2", 1], ["Consciousness", "Alert", 0]] },
-    "A-01": { vit: "T 37.9 · HR 96 · RR 20 · SpO₂ 94% (2 L) · BP 128/80", plan: "Day 3 IV ceftriaxone + azithromycin; afebrile 18 h. Switch to oral if afebrile 24 h.", todo: ["Wean O₂ to air", "Repeat CRP"], np: [["Resp. rate", "20", 0], ["SpO₂ (scale 1)", "94% on O₂", 1 + 2], ["Systolic BP", "128", 0], ["Pulse", "96", 1], ["Temp", "37.9", 0], ["Consciousness", "Alert", 0]] },
-    "A-06": { vit: "T 37.1 · HR 88 · RR 18 · SpO₂ 98% · BP 122/76 · CBG 168", plan: "DKA resolved (pH 7.36, ketones 0.4). On basal-bolus insulin. Diabetes education today.", todo: ["Dietitian", "Insulin pen teaching"], np: [["Resp. rate", "18", 0], ["SpO₂", "98%", 0], ["Systolic BP", "122", 0], ["Pulse", "88", 0], ["Temp", "37.1", 0], ["Consciousness", "Alert", 0]] },
-    "A-05": { vit: "T 36.8 · HR 78 · RR 16 · SpO₂ 98% · BP 130/82", plan: "Cellulitis improving, margin receding. Oral cephalexin to complete 7 days. Discharge today.", todo: ["Discharge summary", "Follow-up OPD in 5 days"], np: [["Resp. rate", "16", 0], ["SpO₂", "98%", 0], ["Systolic BP", "130", 0], ["Pulse", "78", 0], ["Temp", "36.8", 0], ["Consciousness", "Alert", 0]] }
+    "ICU-2": { vit: "T 37.8 · HR 98 · RR 21 · SpO₂ 96% (2 L) · BP 112/70", plan: "Day 6 meropenem; blood culture: E. coli (sensitive). Lactate 1.8 ↓. De-escalate to ceftriaxone?", todo: ["Repeat lactate", "Review central line day 6"], np: [["Resp. rate", "21", 2], ["SpO₂ (scale 1)", "96% on O₂", 2], ["Systolic BP", "112", 0], ["Pulse", "98", 1], ["Temp", "37.8", 0], ["Consciousness", "Alert", 0]] },
+    "A-01": { vit: "T 37.9 · HR 96 · RR 20 · SpO₂ 94% (2 L) · BP 128/80", plan: "Day 3 IV ceftriaxone + azithromycin; afebrile 18 h. Switch to oral if afebrile 24 h.", todo: ["Wean O₂ to air", "Repeat CRP"], np: [["Resp. rate", "20", 0], ["SpO₂ (scale 1)", "94% on O₂", 3], ["Systolic BP", "128", 0], ["Pulse", "96", 1], ["Temp", "37.9", 0], ["Consciousness", "Alert", 0]] },
+    "A-06": { vit: "T 37.1 · HR 92 · RR 21 · SpO₂ 98% · BP 122/76 · CBG 168", plan: "DKA resolved (pH 7.36, ketones 0.4). On basal-bolus insulin. Diabetes education today.", todo: ["Dietitian", "Insulin pen teaching"], np: [["Resp. rate", "21", 2], ["SpO₂", "98%", 0], ["Systolic BP", "122", 0], ["Pulse", "92", 1], ["Temp", "37.1", 0], ["Consciousness", "Alert", 0]] },
+    "A-05": { vit: "T 36.8 · HR 92 · RR 16 · SpO₂ 98% · BP 108/70", plan: "Cellulitis improving, margin receding. Oral cephalexin to complete 7 days. Discharge today.", todo: ["Discharge summary", "Follow-up OPD in 5 days"], np: [["Resp. rate", "16", 0], ["SpO₂", "98%", 0], ["Systolic BP", "108", 1], ["Pulse", "92", 1], ["Temp", "36.8", 0], ["Consciousness", "Alert", 0]] }
   };
   function myBeds(all) {
     var out = [];
@@ -892,7 +892,7 @@
     var h = ui.header(L("Ward rounds", "جولات الأجنحة", "वार्ड राउंड"), esc(facShort(1)) + " · sorted sickest first (NEWS2) · " + nSeen + " of " + mine.length + " seen",
       ui.seg("clRndAll", [["mine", L("My patients", "مرضاي", "मेरे मरीज़"), mine.length], ["all", L("All wards", "كل الأجنحة", "सभी वार्ड"), myBeds(true).length]], "mine"));
     h += '<div class="card"><div class="row sb"><span class="small muted">' + L("Round progress", "تقدم الجولة", "राउंड प्रगति") + '</span><span class="small num">' + nSeen + "/" + mine.length + '</span></div><div style="margin-top:8px">' + ui.bar(mine.length ? nSeen / mine.length * 100 : 0, "ok") + "</div>" +
-      '<div class="chips" style="margin-top:10px">' + ui.pill("ok", "NEWS2 0–4 · low") + ui.pill("urg", "5–6 · urgent review") + ui.pill("crit", "≥ 7 · emergency") + "</div></div>";
+      '<div class="chips" style="margin-top:10px">' + ui.pill("ok", "NEWS2 0–2") + ui.pill("warn", "3–4 · ward review") + ui.pill("urg", "5–6 · urgent review") + ui.pill("crit", "≥ 7 · emergency") + "</div></div>";
     var cards = beds.map(function (b) {
       var r = CD.round[b.no], k = newsKind(b.news), mineB = b.doc === "Dr. Vikram Shah";
       return '<div class="card ' + (b.news >= 5 ? "crit" : "") + '"><div class="row nw" style="align-items:flex-start"><span class="cl-news ' + k + '">' + b.news + "<small>NEWS2</small></span>" +
@@ -966,7 +966,7 @@
         '<div class="row" style="margin-top:14px"><span class="small faint">Default slot length</span>' + ui.seg("clSlot", [["6", "6 min"], ["8", "8 min"], ["10", "10 min"], ["12", "12 min"], ["15", "15 min"]], "8") + '<span class="small faint">→ ' + Math.floor(240 / +slot) + " slots in a 4-hour session</span></div>", { icon: "sliders" }) + "</div>" +
       '<div class="stack s16">' + ui.card(L("Leave & cover", "الإجازات والتغطية", "छुट्टी और कवर"), '<div class="lst">' +
         ui.li('<span class="pill warn" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("calendar", "sm") + "</span>", "Sat 24 Oct · Conference (RSSDI)", "Cover: Dr. Anil Kumar · 11 bookings: 8 moved, 2 rescheduled, 1 pending", ui.pill("ok", "Approved")) +
-        ui.li('<span class="pill mute" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("calendar", "sm") + "</span>", "23–27 Dec · Annual leave", "Bookings closed for these dates · no patients affected", ui.pill("warn", "Pending owner")) + "</div>", { icon: "logout" }) +
+        ui.li('<span class="pill mute" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("calendar", "sm") + "</span>", "23–27 Dec · Annual leave", "Bookings closed for these dates · no patients affected", ui.pill("warn", "Pending owner")) + "</div>", { icon: "logout" , cls: "cl-lw" }) +
         ui.card(L("Rules", "القواعد", "नियम"), ui.toggle("clR1", "Stop online booking when I am > 30 min late", "Reopens when back on time", true) + ui.toggle("clR2", "Hold 2 emergency slots per session", "Released to walk-ins 30 min before the end", true) +
           ui.toggle("clR3", "Other facilities see only “busy”", "Never which hospital or patient", true) + ui.toggle("clR4", "Approval-record requests can be delegated during leave", "To Dr. Anil Kumar, per facility delegation rules", true), { icon: "shieldcheck" }) + "</div></div>";
   });
@@ -994,14 +994,15 @@
         '<div class="cl-steps" style="margin-top:12px"><span class="cl-step ok"><i>✓</i>Requested</span><span class="cl-step ok"><i>✓</i>Patient approved</span><span class="cl-step ' + (d ? "ok" : "now") + '"><i>' + (d ? "✓" : "3") + "</i>" + (d ? "You decided" : "You") + '</span><span class="cl-step ' + (d && d.s === "ok" ? "ok" : "") + '"><i>4</i>Active</span><span class="cl-step"><i>5</i>Auto-revoke</span></div>' +
         (d ? "" : '<p class="tiny faint" style="margin:8px 0 0">' + ui.icon("clockh", "xs") + " " + esc(x.sla) + "</p>" + '<div class="btns" style="margin-top:12px">' + ui.btn(L("Review & approve", "مراجعة وموافقة", "देखें और स्वीकृत करें"), { cls: "pri", ov: "consentdecide", arg: x.id, icon: "shieldcheck" }) + ui.btn(L("Decline", "رفض", "अस्वीकार"), { cls: "dng", ov: "consentdecide", arg: x.id + "|deny" }) + "</div>") + "</div>";
     }).join("") + "</div>";
-    h += '<h2 class="h">' + L("Your outgoing requests", "طلباتك الصادرة", "आपके भेजे अनुरोध") + "</h2>";
-    h += ui.table([{ h: "Consent" }, { h: "Patient" }, { h: "Records held by" }, { h: "Purpose & data" }, { h: "Status" }, { h: "Approval trail" }, { h: "" }], NB.D.consents.map(function (x) {
-      var p = NB.pat(x.p), s = CST[x.st] || ["mute", x.st], from = x.st === "pending-doctor" || x.st === "active" ? x.from : x.to;
-      return [esc(x.id), ui.cellp(pn(p), p.age + " " + p.sex), esc(from), ui.cellp(esc(x.purpose), esc(x.data.join(", ") + " · " + x.range)),
-        ui.pill(s[0], s[1]) + (x.st === "active" ? '<small class="faint" style="display:block;margin-top:4px">until ' + esc(x.until) + " · " + x.reads + "/5 views</small>" : ""),
-        '<span class="small cl-wrap" style="display:block;max-width:260px">' + esc(x.pt) + (x.dr !== "—" ? " · " + esc(x.dr) : "") + "</span>",
-        x.st === "active" ? ui.btn("View records", { cls: "sm", act: "toast", arg: "Read-only bundle opened · view " + (x.reads + 1) + "/5 logged", icon: "eye" }) : x.st === "pending-doctor" ? ui.btn("Nudge", { cls: "sm ghost", act: "toast", arg: "Reminder sent to the source doctor", icon: "bell" }) : ui.btn("Request again", { cls: "sm ghost", act: "toast", arg: "New request drafted", icon: "refresh" })];
-    }), { min: 1040 });
+    var row = function (x) {
+      var p = NB.pat(x.p), s = CST[x.st] || ["mute", x.st], mine = x.by === "Dr. Vikram Shah";
+      return [esc(x.id), ui.cellp(pn(p), p.age + " " + p.sex + " · " + (mine ? "held by " + esc(x.from) : "to " + esc(x.to))), ui.cellp(esc(x.purpose), esc(x.data.join(", ") + " · " + x.range)),
+        ui.pill(s[0], s[1]) + '<small class="faint cl-wrap" style="display:block;margin-top:4px;max-width:280px">' + (x.st === "active" ? "until " + esc(x.until) + " · " + x.reads + "/5 views · " : "") + esc(x.pt) + (x.dr !== "—" ? " · " + esc(x.dr) : "") + "</small>",
+        x.st === "active" ? ui.btn("View records", { cls: "sm", act: "toast", arg: "Read-only bundle opened · view " + (x.reads + 1) + "/5 logged", icon: "eye" }) : x.st === "pending-doctor" ? ui.btn("Nudge", { cls: "sm ghost", act: "toast", arg: "Reminder sent to the source doctor", icon: "bell" }) : ""];
+    };
+    var cols = [{ h: "Consent" }, { h: "Patient" }, { h: "Purpose & data" }, { h: "Status & approval trail" }, { h: "" }];
+    h += '<h2 class="h">' + L("Your outgoing requests", "طلباتك الصادرة", "आपके भेजे अनुरोध") + "</h2>" + ui.table(cols, NB.D.consents.filter(function (x) { return x.by === "Dr. Vikram Shah"; }).map(row), { min: 820 });
+    h += '<h2 class="h">' + L("Other sharing involving your patients", "مشاركات أخرى لمرضاك", "आपके मरीज़ों से जुड़ी अन्य साझेदारी") + "</h2>" + ui.table(cols, NB.D.consents.filter(function (x) { return x.by !== "Dr. Vikram Shah"; }).map(row), { min: 820 });
     return h;
   });
   NB.overlay("consentdecide", function (arg) {
@@ -1126,7 +1127,7 @@
   /* ================= Nurse ================= */
   NB.screen("nurse.triage", function (c) {
     var sel = NB.v("clTri", "T-23"), t = CD.triage.find(function (x) { return x.tok === sel; }) || CD.triage[0], urg = NB.v("clUrg", {});
-    var need = CD.triage.filter(function (x) { return x.st !== "done"; }).length;
+    var need = CD.triage.filter(function (x) { return x.st === "new"; }).length;
     var who = function (x) { var p = x.p ? NB.pat(x.p) : null; return { name: p ? NB.pname(p) : x.name, as: p ? p.age + " " + p.sex : x.as, age: p ? p.age : parseInt(x.as, 10), al: p ? p.allergies : [] }; };
     var h = ui.header(L("Triage & vitals", "الفرز والعلامات الحيوية", "ट्राइएज और वाइटल्स"), need + " arrivals need vitals · median vitals 0:52 · red flags escalated in under 5 min",
       ui.btn(L("Scan token", "مسح الرقم", "टोकन स्कैन"), { icon: "qr", act: "toast", arg: "Scan the patient's token QR or wristband" }));
@@ -1263,7 +1264,7 @@
       ui.li('<span class="pill ok" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("chat", "sm") + "</span>", "12 bookings auto-accepted", "WhatsApp 9 · Nabd Connect 3 · 1 over cap → waitlist") +
       ui.li('<span class="pill info" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("qr", "sm") + "</span>", "4 self check-ins", "Door QR + geofence · no desk needed") +
       ui.li('<span class="pill acc" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("hourglass", "sm") + "</span>", "ETA shown as a range", "“Leave home now” sent to 3 patients") +
-      ui.li('<span class="pill warn" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("wallet", "sm") + "</span>", NB.money(11500) + " collected", NB.money(2700) + " due · 3 patients", ui.icon("chevright", "sm faint flip"), { go: "solo.money" }) + "</div>", { icon: "sparkle" });
+      ui.li('<span class="pill warn" style="width:32px;height:32px;padding:0;justify-content:center">' + ui.icon("wallet", "sm") + "</span>", NB.money(11500) + " collected", NB.money(2700) + " due · 3 patients", ui.icon("chevright", "sm faint flip"), { go: "solo.money" }) + "</div>", { icon: "sparkle", cls: "cl-lw" });
     if (c.mobile) return h + hero + quick + '<h2 class="h">' + L("Queue", "الطابور", "क़तार") + "</h2>" + list + side;
     return h + '<div class="split wide"><div class="stack s16">' + hero + '<h2 class="h">' + L("Queue", "الطابور", "क़तार") + "</h2>" + list + '</div><div class="stack s16">' + quick + side + "</div></div>";
   });
@@ -1287,7 +1288,7 @@
     var by = gcc ? [["Card / tap", 6200, 7], ["Pay link", 3100, 4], ["Cash", 2200, 2]] : [["UPI", 7200, 9], ["Card", 2500, 1], ["Cash", 1800, 3]];
     var takings = ui.card(L("Today's takings", "إيرادات اليوم", "आज की कमाई"), '<div class="stack s8">' + by.map(function (b) { return '<div><div class="row sb small"><span>' + b[0] + " · " + b[2] + "</span>" + NB.money(b[1]) + '</div><div style="margin-top:4px">' + ui.bar(b[1] / 11500 * 100) + "</div></div>"; }).join("") +
       '<div class="row sb" style="margin-top:6px"><b>Total</b><b>' + NB.money(11500 + (paid ? tot : 0)) + "</b></div><span class=\"small faint\">+ 2 package sessions redeemed (no charge today)</span></div>" + '<div class="btns" style="margin-top:12px">' + ui.btn("Day close", { cls: "sm", act: "toast", arg: "Day closed · summary sent to you on WhatsApp", icon: "wallet" }) + ui.btn("Export", { cls: "sm ghost", act: "toast", arg: "Exported for your accountant", icon: "download" }) + "</div>", { icon: "chart" });
-    var dues = ui.card(L("Dues", "المستحقات", "बकाया"), '<div class="lst">' + CD.dues.map(function (d) { return ui.li(ui.av(d[0]), esc(d[0]), esc(d[1] + " · " + d[3]), '<div class="stack s4" style="align-items:flex-end">' + NB.money(d[2]) + ui.btn("Remind", { cls: "sm ghost", act: "toast", arg: "Polite reminder with pay link sent to " + d[0] }) + "</div>"); }).join("") + "</div>", { icon: "receipt" });
+    var dues = ui.card(L("Dues", "المستحقات", "बकाया"), '<div class="lst">' + CD.dues.map(function (d) { return ui.li(ui.av(d[0]), esc(d[0]), esc(d[1] + " · " + d[3]), '<div class="stack s4" style="align-items:flex-end">' + NB.money(d[2]) + ui.btn("Remind", { cls: "sm ghost", act: "toast", arg: "Polite reminder with pay link sent to " + d[0] }) + "</div>"); }).join("") + "</div>", { icon: "receipt", cls: "cl-lw" });
     if (c.mobile) return h + collect + takings + dues;
     return h + '<div class="split wide">' + collect + '<div class="stack s16">' + takings + dues + "</div></div>";
   });
