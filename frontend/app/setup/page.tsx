@@ -24,7 +24,7 @@ type ConsentContact = { name: string; email: string; phone: string | null };
 type Holiday = { id: string; holidayDate: string; name: string; recurring: boolean };
 type Shift = { id: string; staffId: string; staffName: string | null; patternJson: string; effectiveFrom: string; effectiveTo: string | null };
 type PayrollRow = { staffId: string; staffName: string; role: string; days: number; hours: number; salary: number; notes: string };
-type Subscription = { plan: string; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number };
+type Subscription = { plan: string | null; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number };
 type ImportJob = { id: string; importType: string; fileName: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type ExportJob = { id: string; exportType: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type Licence = { id: string; licenceType: string; holderId: string | null; holderName: string | null; number: string; issuingBody: string | null; expiryDate: string; region: string; status: string };
@@ -711,7 +711,7 @@ function SetupPageInner() {
         return subscription && (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Plan & billing</h2>
-            <p><strong>Plan:</strong> {subscription.plan}</p>
+            <p><strong>Plan:</strong> {subscription.plan ?? "No plan assigned yet"}</p>
             <p><strong>Status:</strong> <span className={`${styles.pill} ${styles.pillActive}`}>{subscription.status}</span></p>
             <div className={styles.tableWrap}>
               <table className={styles.table}>

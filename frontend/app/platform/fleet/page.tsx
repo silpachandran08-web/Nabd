@@ -120,9 +120,10 @@ export default function FleetPage() {
         <div className={styles.kpiGrid}>
           <div className={styles.kpiTile}>
             <div className={styles.kpiLabel}>Tenants live</div>
-            <div className={styles.kpiValue}>{summary ? summary.total : "—"}</div>
+            {/* LIVE-07: live = serving clinics (active, plus overdue which keeps working in its grace period); trialing is not live. */}
+            <div className={styles.kpiValue}>{summary ? (summary.byStatus.active ?? 0) + (summary.byStatus.overdue ?? 0) : "—"}</div>
             <div className={styles.kpiSub}>
-              {summary ? `${summary.byStatus.provisioning ?? 0} provisioning · ${summary.byStatus.suspended ?? 0} suspended` : ""}
+              {summary ? `${summary.byStatus.trialing ?? 0} trialing · ${summary.byStatus.provisioning ?? 0} provisioning · ${summary.byStatus.suspended ?? 0} suspended` : ""}
             </div>
           </div>
           <div className={styles.kpiTile}>
