@@ -4,7 +4,9 @@
 window.NB = window.NB || {};
 NB.D = {};
 
-/* Markets decide currency, tax, national ID and integrations. Language only decides the script. */
+/* Markets decide currency, tax, national ID and integrations. Language only decides the script.
+   fx is a local price-level factor applied to the INR-scale sample prices (not an exchange rate),
+   so a ₹700 consult shows as about 154 SAR/AED, close to real GCC clinic fees. */
 NB.MARKETS = {
   india: { id: "india", name: "India", flag: "IN", cur: "₹", curCode: "INR", tax: "GST", taxRate: 18, taxNote: "Healthcare services exempt; pharmacy 5–12%, devices 12–18%",
     natId: "ABHA number", natId2: "Aadhaar (masked)", phone: "+91", tz: "Asia/Kolkata", city: "Bengaluru",
@@ -13,15 +15,15 @@ NB.MARKETS = {
   uae: { id: "uae", name: "UAE", flag: "AE", cur: "AED", curCode: "AED", tax: "VAT", taxRate: 5, taxNote: "Healthcare zero-rated for qualifying services",
     natId: "Emirates ID", natId2: "Passport", phone: "+971", tz: "Asia/Dubai", city: "Dubai",
     hie: "NABIDH (Dubai) / Malaffi (Abu Dhabi)", claims: "DHA eClaimLink / Shafafiya", einv: "UAE e-invoicing (2027)", eRx: "DHA e-Prescription", regulator: "DHA / DoH / MOHAP",
-    residency: "UAE region (in-country)", privacyLaw: "PDPL + Federal Law 2/2019", fx: 0.044 },
+    residency: "UAE region (in-country)", privacyLaw: "PDPL + Federal Law 2/2019", fx: 0.22 },
   ksa: { id: "ksa", name: "Saudi Arabia", flag: "SA", cur: "SAR", curCode: "SAR", tax: "VAT", taxRate: 15, taxNote: "ZATCA Fatoora phase 2 QR on every invoice",
     natId: "National ID / Iqama", natId2: "Passport", phone: "+966", tz: "Asia/Riyadh", city: "Riyadh",
     hie: "NPHIES / Seha", claims: "NPHIES", einv: "ZATCA Fatoora phase 2", eRx: "Wasfaty", regulator: "MOH / SCFHS",
-    residency: "KSA region (in-Kingdom)", privacyLaw: "PDPL (SDAIA)", fx: 0.045 },
+    residency: "KSA region (in-Kingdom)", privacyLaw: "PDPL (SDAIA)", fx: 0.22 },
   qatar: { id: "qatar", name: "Qatar", flag: "QA", cur: "QAR", curCode: "QAR", tax: "No VAT", taxRate: 0, taxNote: "No VAT in Qatar today",
     natId: "QID", natId2: "Passport", phone: "+974", tz: "Asia/Qatar", city: "Doha",
     hie: "MOPH HIE", claims: "Insurer portals", einv: "—", eRx: "MOPH e-Rx", regulator: "MOPH / QCHP",
-    residency: "Qatar region", privacyLaw: "Law No. 13 of 2016", fx: 0.044 }
+    residency: "Qatar region", privacyLaw: "Law No. 13 of 2016", fx: 0.22 }
 };
 
 /* Facility models. The same product scales from one doctor to a hospital chain. */

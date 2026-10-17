@@ -15,7 +15,7 @@
     ".ip-ews.crit{color:var(--crit);background:var(--crit-t);border-color:rgba(255,77,79,.45)}",
     ".bed.ip-urg{border-color:rgba(255,138,61,.5);box-shadow:inset 3px 0 0 var(--urg)}",
     ".bed.ip-res{border-color:rgba(88,178,245,.45);border-style:dashed}",
-    ".bed .ip-no{font:600 14px/18px var(--font);font-variant-numeric:tabular-nums}",
+    ".bed .ip-no{font:600 14px/18px var(--font);font-variant-numeric:tabular-nums;white-space:nowrap}",
     ".bed .ip-pn{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
     ".bed small{display:block;color:var(--tx3);font-size:11.5px;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
     ".bed .ip-fl{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}",
