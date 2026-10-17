@@ -22,7 +22,12 @@ type Overview = {
   activeStaff: { staffId: string; name: string; roleName: string; departmentName: string | null; signedInAt: string; inConsult: boolean }[];
   staff: { active: number; suspended: number; invited: number; roles: number };
 };
-type Licence = { id: string; licenceType: string; holderName: string | null; number: string; issuingBody: string | null; expiryDate: string };
+// GET /v1/compliance/health (S4 contract OWN-011); every field tolerated absent.
+type HealthItem = { kind?: string; label?: string; status?: string; detail?: string | null; link?: string | null };
+type Health = { licences?: { total?: number; expiringSoon?: number; expired?: number }; items?: HealthItem[] };
+const HEALTH_TONE: Record<string, string> = { ok: "alertOk", attention: "alertWarn", expired: "alertDanger" };
+// Only same-app paths become links; anything else falls back to the licences tab.
+const safeLink = (l?: string | null) => (l && l.startsWith("/") && !l.startsWith("//") ? l : "/setup?tab=licences");
 type Subscription = { plan: string; status: string };
 // GET /v1/setup/checklist (same rows the Setup > Checklist tab reads).
 type ChecklistItem = { step: string; status: "pending" | "skipped" | "done"; skippedAt: string | null; doneAt: string | null };
@@ -51,8 +56,6 @@ const stepLabel = (step: string) => {
   return t.charAt(0).toUpperCase() + t.slice(1);
 };
 const hideKey = (tenant: string) => `nabd_setup_card_hidden:${tenant}`;
-const LICENCE_TYPE_LABELS: Record<string, string> = { facility: "Facility", clinician: "Clinician" }; // LicenceWriteRequest's two types
-const LICENCE_WARNING_DAYS = 30; // same window SetupRepository.computeLicenceStatus uses
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -65,10 +68,6 @@ function localDate(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function daysBetween(from: Date, to: Date): number {
-  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
-}
-
 function signedInLabel(signedInAt: string, now: number): string {
   const minutes = Math.max(0, Math.floor((now - new Date(signedInAt).getTime()) / 60000));
   if (minutes < 5) return "Now";
@@ -79,9 +78,9 @@ function signedInLabel(signedInAt: string, now: number): string {
 export default function OverviewPage() {
   const router = useRouter();
   const [data, setData] = useState<Overview | null>(null);
-  const [licences, setLicences] = useState<Licence[] | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[] | null>(null);
+  const [health, setHealth] = useState<Health | "loading" | "error" | null>(null);
   const [setupHidden, setSetupHidden] = useState(false);
   const [canSwitchClinic, setCanSwitchClinic] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,9 +112,8 @@ export default function OverviewPage() {
     try {
       // Licences and plan live under Setup; only asked for when this role can read them.
       const canSetup = getPermissions().includes("setup:view");
-      const [ovRes, licRes, subRes, clRes] = await Promise.all([
+      const [ovRes, subRes, clRes] = await Promise.all([
         authedFetch("/reports/overview"),
-        canSetup ? authedFetch("/setup/licences") : Promise.resolve(null),
         canSetup ? authedFetch("/setup/subscription") : Promise.resolve(null),
         canSetup ? authedFetch("/setup/checklist") : Promise.resolve(null),
       ]);
@@ -129,7 +127,12 @@ export default function OverviewPage() {
         return;
       }
       setData(await ovRes.json());
-      if (licRes?.ok) setLicences(await licRes.json());
+      if (canSetup) {
+        setHealth("loading");
+        authedFetch("/compliance/health")
+          .then(async (r) => setHealth(r?.ok ? await r.json() : r ? "error" : null))
+          .catch(() => setHealth("error"));
+      }
       if (subRes?.ok) setSubscription(await subRes.json());
       if (clRes?.ok) setChecklist(await clRes.json());
       try {
@@ -172,10 +175,6 @@ export default function OverviewPage() {
 
   const today = localDate(data.date);
   const splitTotal = data.paymentSplit.reduce((sum, p) => sum + Number(p.amount), 0);
-  const licenceAlerts = (licences ?? [])
-    .map((l) => ({ ...l, daysLeft: daysBetween(today, localDate(l.expiryDate)) }))
-    .filter((l) => l.daysLeft <= LICENCE_WARNING_DAYS)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
   // Same rule as Billing & Day Close: only consultations with no bill block the close.
   const blocked = !data.dayClose.closed && data.dayClose.unbilledConsultations > 0;
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -271,37 +270,30 @@ export default function OverviewPage() {
             )}
           </section>
 
-          {licences !== null && (
-            <section className={styles.card} aria-label="Compliance and licences">
+          {health !== null && (
+            <section className={styles.card} aria-label="Compliance and licences" aria-busy={health === "loading"}>
               <div className={styles.cardLabel}>Compliance &amp; licences</div>
-              <div className={styles.alerts}>
-                {licences.length === 0 && (
-                  <div className={`${styles.alert} ${styles.alertInfo}`}>
-                    <div className={styles.alertTitle}>No licences recorded yet</div>
-                    <div className={styles.alertSub}>
-                      Add your clinic&apos;s licences under <Link className={styles.inlineLink} href="/setup?tab=licences">Compliance &amp; Audit</Link> to get renewal reminders here.
-                    </div>
+              {health === "loading" ? (
+                <Skeleton rows={2} label="Loading compliance status" />
+              ) : health === "error" ? (
+                <ErrorState message="Couldn't load compliance status." onRetry={() => void load()} />
+              ) : !health.items?.length ? (
+                <div className={`${styles.alert} ${styles.alertInfo}`}>
+                  <div className={styles.alertTitle}>Nothing to show yet</div>
+                  <div className={styles.alertSub}>
+                    Add your clinic&apos;s licences under <Link className={styles.inlineLink} href="/setup?tab=licences">Compliance &amp; Audit</Link> to get renewal reminders here.
                   </div>
-                )}
-                {licences.length > 0 && licenceAlerts.length === 0 && (
-                  <div className={`${styles.alert} ${styles.alertOk}`}>
-                    <div className={styles.alertTitle}>All {plural(licences.length, "licence", "licences")} current</div>
-                    <div className={styles.alertSub}>Nothing expires in the next {LICENCE_WARNING_DAYS} days.</div>
-                  </div>
-                )}
-                {licenceAlerts.map((l) => (
-                  <div key={l.id} className={`${styles.alert} ${l.daysLeft < 0 ? styles.alertDanger : styles.alertWarn}`}>
-                    <div className={styles.alertTitle}>
-                      {LICENCE_TYPE_LABELS[l.licenceType] ?? l.licenceType} licence{" "}
-                      {l.daysLeft < 0 ? `expired ${plural(-l.daysLeft, "day", "days")} ago`
-                        : l.daysLeft === 0 ? "expires today" : `renews in ${plural(l.daysLeft, "day", "days")}`}
-                    </div>
-                    <div className={styles.alertSub}>
-                      {[l.number, l.holderName, l.issuingBody].filter(Boolean).join(" · ")}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className={styles.alerts}>
+                  {health.items.map((it, i) => (
+                    <Link key={`${it.kind}-${i}`} href={safeLink(it.link)} className={`${styles.alert} ${styles[HEALTH_TONE[it.status ?? ""] ?? "alertInfo"]} ${styles.alertLink}`}>
+                      <div className={styles.alertTitle}>{it.label ?? "Compliance item"}</div>
+                      {it.detail && <div className={styles.alertSub}>{it.detail}</div>}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </section>
           )}
         </div>
