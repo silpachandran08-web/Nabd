@@ -125,7 +125,9 @@ public class CheckoutService {
                     "This visit isn't at a billing stop yet — its status is " + ctx.queueStatus() + ".");
         }
 
-        List<LineItemRequest> lineItems = resolvePharmacyLines(tenantId, req.lineItems());
+        boolean followUp = repo.hasRecentCompletedVisit(tenantId, ctx.patientId(), ctx.doctorId(),
+                clock.today(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
+        List<LineItemRequest> lineItems = resolveCatalogueLines(tenantId, req.lineItems(), followUp);
         Optional<InvoiceRow> existing = repo.findInvoiceByQueueEntry(tenantId, queueEntryId);
         existing.ifPresent(CheckoutService::rejectVoid);
         UUID invoiceId;
@@ -169,12 +171,15 @@ public class CheckoutService {
     @Transactional
     public OtcChargesResponse getOtcCharges(UUID tenantId) {
         tenantContext.set(tenantId);
+        requireOtcAvailable(tenantId);
         List<ChargeResponse> charges = repo.listActiveCharges(tenantId).stream().map(this::toChargeResponse).toList();
         return new OtcChargesResponse(currencyFor(tenantId), charges);
     }
 
     @Transactional
     public InvoiceResponse otcCheckout(UUID tenantId, UUID staffId, CheckoutRequest req) {
+        tenantContext.set(tenantId);
+        requireOtcAvailable(tenantId);
         return standaloneInvoice(tenantId, staffId, null, req, "OTC");
     }
 
@@ -192,7 +197,7 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
                     "Add at least one charge before checking out.");
         }
-        List<LineItemRequest> lineItems = resolvePharmacyLines(tenantId, req.lineItems());
+        List<LineItemRequest> lineItems = resolveCatalogueLines(tenantId, req.lineItems(), false);
         Totals t = computeTotals(lineItems, List.of(), req.discountOrZero());
         List<LineItemInput> items = lineItems.stream().map(this::toLineItemInput).toList();
 
@@ -323,28 +328,43 @@ public class CheckoutService {
     }
 
     /**
-     * V3-004: a stocked pharmacy line is sold at the catalogue's price, name, category and tax, never the client's
-     * (the request fields stay for API compatibility and are ignored for these lines), and an inactive item is
-     * refused with a 409. Non-pharmacy lines keep the client's values: follow-up and doctor-override pricing
-     * legitimately differ from base_amount, and only pharmacy stock is physical.
+     * V3-004 / QA-OI-2: a line whose chargeCode is in the tenant's catalogue is priced SERVER-side: name, category, tax
+     * and unit price come from the catalogue and the client's values are silently ignored (not a 400: the UI sends the
+     * price it displayed, so a stale price just gets corrected; the invoice response shows what was charged). The price
+     * is base_amount, or follow_up_amount for a Consultation when the visit is follow-up eligible. A catalogue entry
+     * flagged doctor_override keeps the client's price (that is what the flag means). An inactive stocked item is a 409.
+     * Lines with no catalogue entry (procedures, packages, free text) keep the client's values; bean validation already
+     * guarantees a name and unitPrice/tax >= 0.
      */
-    private List<LineItemRequest> resolvePharmacyLines(UUID tenantId, List<LineItemRequest> lines) {
+    private List<LineItemRequest> resolveCatalogueLines(UUID tenantId, List<LineItemRequest> lines, boolean followUpEligible) {
         List<LineItemRequest> resolved = new java.util.ArrayList<>(lines.size());
         for (LineItemRequest li : lines) {
-            var pharmacy = repo.findPharmacyCharge(tenantId, li.chargeCode());
-            if (pharmacy.isEmpty()) {
+            var found = repo.findCatalogueCharge(tenantId, li.chargeCode());
+            if (found.isEmpty()) {
                 resolved.add(li);
                 continue;
             }
-            PharmacyChargeRow item = pharmacy.get();
-            if (!item.active()) {
+            PharmacyChargeRow item = found.get();
+            if (item.stocked() && !item.active()) {
                 throw new ApiException(HttpStatus.CONFLICT, "item-inactive", "Item no longer sold",
                         item.name() + " has been deactivated and can't be billed. Remove it from the bill.");
             }
+            BigDecimal price = followUpEligible && "Consultation".equals(item.category()) && item.followUpAmount() != null
+                    ? item.followUpAmount() : item.baseAmount();
+            if (item.doctorOverride()) {
+                price = li.unitPrice();
+            }
             resolved.add(new LineItemRequest(li.chargeCode(), item.name(), item.category(), li.quantity(),
-                    item.baseAmount(), item.taxRatePercent()));
+                    price, item.taxRatePercent()));
         }
         return resolved;
+    }
+
+    private void requireOtcAvailable(UUID tenantId) {
+        if ("external".equals(repo.findPharmacyMode(tenantId).orElse("external"))) {
+            throw new ApiException(HttpStatus.CONFLICT, "otc-not-available", "Counter sales not available",
+                    "Counter sales aren't available while the pharmacy is external. Switch the pharmacy mode to Hybrid or In-house in Clinic Setup.");
+        }
     }
 
     private LineItemInput toLineItemInput(LineItemRequest li) {

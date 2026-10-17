@@ -301,6 +301,8 @@ class CheckoutApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "recep9@a.com", "+919700000009", false);
         String token = loginAndGetAccessToken(staff);
+        // PHA-010: counter sales need a non-external pharmacy mode (default is external)
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
 
         ResponseEntity<Map> charges = exchange("/v1/billing/otc-charges", HttpMethod.GET, authed(token), Map.class);
         assertThat(charges.getStatusCode()).isEqualTo(HttpStatus.OK);

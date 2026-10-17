@@ -28,6 +28,8 @@ class CheckoutDiscountPermissionApiTest extends ApiTestBase {
         SeededTenant tenant = seedTenant();
         UUID role = seedRole(tenant.id(), "Billing", false,
                 new ModuleGrant("billing", true, true, true, false, false, refundDiscount, false));
+        // PHA-010: counter sales need a non-external pharmacy mode
+        inTenantTx(tenant.id(), () -> jdbc.update("INSERT INTO pharmacy_settings (tenant_id, mode) VALUES (?, 'hybrid')", tenant.id()));
         return loginAndGetAccessToken(seedStaff(tenant, role, email, phone, false));
     }
 
