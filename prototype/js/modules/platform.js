@@ -27,11 +27,12 @@
     ".pf-slo{display:grid;grid-template-columns:minmax(0,1.6fr) 90px 90px minmax(120px,1fr) 130px;gap:10px 16px;align-items:center;font-size:13px;padding:12px 0;border-bottom:1px solid var(--div)}",
     ".pf-slo:last-child{border-bottom:0}.pf-slo>:last-child{justify-self:end}",
     ".pf-slo.h{font:600 10.5px/14px var(--font);letter-spacing:.6px;text-transform:uppercase;color:var(--tx3);padding-top:0}",
+    ".pf-mob{display:none}.frame.mobile .pf-mob,.frame.tablet .pf-mob{display:block}",
     ".frame.mobile .pf-slo,.frame.tablet .pf-slo{grid-template-columns:minmax(0,1fr) auto}.frame.mobile .pf-slo .pf-hide,.frame.tablet .pf-slo .pf-hide{display:none}",
     ".pf-rec{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--crit)}",
     ".pf-rec i{width:8px;height:8px;border-radius:99px;background:var(--crit);animation:nbPulse 1.6s infinite}",
     ".pf-lock{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:var(--r-md);border:1px dashed var(--b-str);background:var(--perm-t);font-size:12.5px;color:var(--tx2)}",
-    "@media (max-width:760px){.pf-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-slo{grid-template-columns:minmax(0,1fr) auto}.pf-slo .pf-hide{display:none}}"
+    "@media (max-width:760px){.pf-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-slo{grid-template-columns:minmax(0,1fr) auto}.pf-slo .pf-hide{display:none}.pf-mob{display:block}}"
   ].join("\n");
   (function () {
     if (document.getElementById("pf-css")) return;
@@ -218,7 +219,7 @@
     var h = ui.header(L("Platform health", "صحة المنصة", "प्लेटफ़ॉर्म स्वास्थ्य"), "Service levels over the last 30 days · error budgets · live queues · " + num("10:02") + " AST/IST",
       ui.pill("warn", "1 incident open") + ui.btn("Status page", { icon: "globe", act: "toast", arg: "Public status page: 1 incident (KSA claims gateway) · monitoring" }));
     var slo = '<div class="pf-slo h"><span>Objective</span><span class="pf-hide">Target</span><span class="pf-hide">Actual</span><span class="pf-hide">Error budget left</span><span>Status</span></div>' + P.slo.map(function (s) {
-      return '<div class="pf-slo"><b style="font-weight:500">' + ui.esc(s[0]) + '</b><span class="pf-hide muted num">' + ui.esc(s[1]) + '</span><b class="pf-hide num">' + ui.esc(s[2]) + "</b>" +
+      return '<div class="pf-slo"><div class="stack s4"><b style="font-weight:500">' + ui.esc(s[0]) + '</b><span class="tiny faint pf-mob">' + ui.esc(s[2] + " · target " + s[1] + " · " + s[3] + "% budget left") + '</span></div><span class="pf-hide muted num">' + ui.esc(s[1]) + '</span><b class="pf-hide num">' + ui.esc(s[2]) + "</b>" +
         '<div class="pf-hide stack s4">' + ui.bar(s[3], s[4] === "ok" ? "" : s[4]) + '<span class="tiny faint">' + s[3] + "% left</span></div>" +
         ui.pill(s[4], s[4] === "ok" ? "Meeting" : s[4] === "warn" ? "Burning fast" : "Breached") + "</div>";
     }).join("");

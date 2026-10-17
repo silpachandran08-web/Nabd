@@ -22,10 +22,10 @@
     ".bl-sum .r.sub{font-size:12px}.bl-sum .r.sub>span:first-child{color:var(--tx3);padding-inline-start:12px}",
     ".bl-sum .r.tot{font-size:18px;font-weight:600;padding-top:10px;border-top:1px solid var(--div)}.bl-sum .r.tot>span:first-child{color:var(--tx)}",
     ".bl-sum .r.ins>span:last-child{color:var(--info)}.bl-sum .r.neg>span:last-child{color:var(--ok)}",
-    ".bl-ct .cellp b,.bl-ct .cellp small{white-space:normal}.bl-ct td:first-child{min-width:200px}",
+    ".bl-ct .cellp b,.bl-ct .cellp small{white-space:normal}.bl-ct td:first-child{min-width:200px}.bl-ct td:not(:first-child){white-space:nowrap}",
     ".bl-strike{text-decoration:line-through;color:var(--tx3)}",
     ".bl-pay{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}",
-    ".bl-qr{background:var(--tx);color:var(--bg-root);padding:8px;border-radius:var(--r-sm);display:inline-block;line-height:0}",
+    ".bl-qr{background:var(--tx);color:var(--bg-root);padding:8px;border-radius:var(--r-sm);display:inline-block;line-height:0;justify-self:start;width:max-content}",
     ".bl-qr svg{display:block}",
     ".bl-paper{background:var(--tx);color:var(--bg-root);border-radius:var(--r-md);padding:22px;font-size:12px;line-height:17px;min-width:0}",
     ".bl-paper h2{margin:0;font:700 17px/22px var(--font);color:var(--bg-root)}",
@@ -312,7 +312,7 @@
       var l = r.l, sub = (m.id === "india" ? "HSN/SAC " + l.hsn : l.code ? "Code " + l.code : "") + (r.pk ? " · " + L("Redeemed from ", "مستردة من ", "से रिडीम ") + l.pkg : "");
       var taxCell = r.pk ? '<span class="faint">' + L("Prepaid", "مدفوعة مسبقاً", "प्रीपेड") + "</span>" : r.tr.rate ? fm(r.tax, 2) + '<div class="tiny faint num">' + r.tr.rate + "%</div>" : '<span class="faint">' + ui.esc(r.tr.lbl || "0%") + "</span>";
       var payer = r.pk ? '<span class="subc">' + ui.icon("layers", "xs") + " " + L("Package", "باقة", "पैकेज") + "</span>" : r.cov ? '<span class="infoc">' + ui.icon("shielduser", "xs") + " " + L("Insurer ", "التأمين ", "बीमा ") + (100 - pay.copay) + "%</span>" : '<span>' + ui.icon("user", "xs") + " " + L("Patient", "المريض", "मरीज़") + "</span>";
-      return { cells: [ui.cellp(ui.esc(l.d), ui.esc(sub) + " · " + payer), '<span class="num ltr" style="white-space:nowrap">' + (l.q > 1 ? l.q + " × " : "") + "</span>" + fm(r.rate, 2),
+      return { cells: [ui.cellp(ui.esc(l.d), ui.esc(sub) + " · " + payer), '<span class="num ltr" style="white-space:nowrap">' + (l.q > 1 ? l.q + " × " : "") + fm(r.rate, 2) + "</span>",
         r.disc ? '<span class="okc">−' + fm(r.disc, 2) + "</span>" : r.cov ? '<span class="faint small">' + L("Tariff", "تعرفة", "टैरिफ़") + "</span>" : '<span class="faint">—</span>',
         r.pk ? '<span class="bl-strike">' + fm(r.gross, 2) + "</span>" : fm(r.taxable, 2), taxCell, fm(r.total, 2)] };
     });

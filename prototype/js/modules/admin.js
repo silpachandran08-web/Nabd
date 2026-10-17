@@ -21,6 +21,7 @@
     ".ad-tt{font-size:11px;color:var(--tx3);line-height:14px}",
     ".ad-tile .pill{align-self:flex-start;max-width:100%;height:auto;min-height:22px;white-space:normal;padding:3px 8px;line-height:14px}",
     ".ad-kv{margin:0}.ad-nw{white-space:nowrap}",
+    "[dir=rtl] .ad-tile .pill,[dir=rtl] .ad-tl,[dir=rtl] .ad-tt,[dir=rtl] .ad-tv{unicode-bidi:plaintext}",
     ".ad-spark{display:block;width:100%;height:30px;overflow:visible}",
     ".ad-sl{fill:none;stroke:var(--acc);stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}",
     ".ad-sa{fill:var(--acc-tint);stroke:none}",
@@ -1008,12 +1009,12 @@
             '<div class="stack s4">' + d[2].map(function (a) { return "<div>" + (a[4] === "active" ? ui.pill("ok", "Active") : ui.pill("perm", "Ended")) + "</div>"; }).join("") + "</div>"];
         }), { min: 900 });
     } else {
-      h += '<div class="grid g2">' + ui.card("Invites", '<div class="lst">' + A.invites.map(function (v) {
+      h += '<div class="stack s16">' + ui.card("Invites", '<div class="lst">' + A.invites.map(function (v) {
         return ui.li('<span class="av">' + ui.icon(v.st === "done" ? "check" : "send", "sm") + "</span>", ui.esc(v.to), ui.esc(v.role + " · " + short(facs()[v.f]) + " · sent " + v.sent + " · " + v.exp),
           v.st === "pending" ? ui.pill("warn", "Pending") : v.st === "expired" ? ui.btn("Resend", { cls: "sm", act: "toast", arg: "New single-use invite sent (72 h)", icon: "refresh" }) : ui.pill("ok", "Joined"));
       }).join("") + "</div>" + '<p class="small faint" style="margin:12px 0 0">Invite links are single-use and expire in 72 hours. The person must set up MFA before first use if their role requires it.</p>', { icon: "userplus", right: ui.btn("Invite", { cls: "sm", ov: "invite" }) }) +
         ui.card("Delegations", '<div class="lst">' + A.deleg.map(function (d) {
-          return ui.li('<span class="av">' + ui.icon("key", "sm") + "</span>", ui.esc(d.from) + " → " + ui.esc(d.to), ui.esc(d.what + " · " + d.win + " · " + d.why), d.st === "active" ? ui.pill("info", "Active") : ui.pill("mute", "Ended"));
+          return ui.li('<span class="av">' + ui.icon("key", "sm") + "</span>", ui.esc(d.from) + " → " + ui.esc(d.to), ui.esc(d.what.replace("₹5,000", NB.money(5000).replace(/<[^>]+>/g, "")) + " · " + d.win + " · " + d.why), d.st === "active" ? ui.pill("info", "Active") : ui.pill("mute", "Ended"));
         }).join("") + "</div>" + '<p class="small faint" style="margin:12px 0 0">Delegations hand over specific authority for leave cover, never more than the giver holds, and end on their own (maximum 30 days).</p>', { icon: "key", right: ui.btn("New", { cls: "sm", ov: "delegate" }) }) + "</div>";
     }
     return h;
@@ -1086,7 +1087,7 @@
   }
   NB.screen("owner.integrations", function (c) {
     var I = integrations(), bad = I.filter(function (x) { return x.st === "crit" || x.st === "warn"; }).length;
-    var h = ui.header(L("Integrations", "التكاملات", "इंटीग्रेशन"), ui.esc(c.m.name) + " · " + I.length + " connections · " + ui.esc(c.m.hie) + " · " + ui.esc(c.m.claims),
+    var h = ui.header(L("Integrations", "التكاملات", "इंटीग्रेशन"), ui.esc(c.m.name) + " · " + I.length + " connections · " + ui.esc(c.m.hie) + (c.m.hie.indexOf(c.m.claims) >= 0 ? "" : " · " + ui.esc(c.m.claims)),
       ui.btn("Browse more", { icon: "plus", act: "toast", arg: "Integration catalogue: PACS, HRMS, CCTV-free kiosks and more" }));
     if (bad) h += ui.note("warn", bad + " connection" + (bad > 1 ? "s need" : " needs") + " attention. Lab analyser messages are buffered on the bridge and will replay when it reconnects.");
     h += '<div class="grid g3">' + I.map(function (x) {
@@ -1163,7 +1164,7 @@
         '<div class="tl">' + steps.map(function (s, i) { return '<div class="ev"><span class="dotc ' + (s[2] === "ok" ? "ok" : "warn") + '"><b class="small">' + (i + 1) + '</b></span><div class="bd"><b>' + ui.esc(s[0]) + "</b><small>" + ui.esc(s[1]) + "</small></div>" + (s[2] === "ok" ? ui.pill("ok", "Ready") : ui.pill("warn", "Template pending")) + "</div>"; }).join("") + "</div></div>" +
         '<div class="stack s16">' + ui.card("Last drill", kv([["Date", "12 Sep 2026 (tabletop)"], ["Time to contain", num("42 min")], ["Regulator draft ready", num("3 h 10 min")], ["Next drill", "12 Dec 2026"]]), { icon: "history" }) +
         ui.card("Who is on call", '<div class="lst">' + ui.li(ui.av(privacyOfficer().n), ui.esc(privacyOfficer().n), "Privacy officer · incident lead", ui.pill("ok", "On call")) + ui.li(ui.av("Nabd Security"), "Nabd security team", "Platform side · 24×7", ui.pill("ok", "On call")) + "</div>", { icon: "phone" }) +
-        ui.card("Open incidents", ui.li('<span class="pill crit" style="height:32px;width:32px;padding:0;justify-content:center">' + ui.icon("alertfill", "sm") + "</span>", "INC-031 · unjustified break-glass", "1 patient · internal misuse · patient informed · not reportable", ui.pill("warn", "Closing")), { icon: "alert" }) + "</div></div>";
+        ui.card("Open incidents", '<div class="stack s8"><div class="row sb"><b class="small">INC-031 · unjustified break-glass</b>' + ui.pill("warn", "Closing") + '</div><span class="small faint">1 patient · internal misuse · patient informed · assessed as not reportable to the regulator</span></div>', { icon: "alert" }) + "</div></div>";
     }
     return h;
   });
