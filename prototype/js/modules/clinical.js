@@ -252,7 +252,7 @@
       ".cl-left .cl-kv{grid-template-columns:minmax(0,1fr);gap:2px}.cl-left .cl-kv dd{margin-bottom:6px}",
       ".cl-left .li .t b,.cl-left .li .t small,.cl-lw .li .t b,.cl-lw .li .t small{white-space:normal}",
       ".frame.tablet .cl-cx,.cl-cx.cmp{grid-template-columns:minmax(0,1fr) 320px}",
-      ".frame.tablet .cl-cx .cl-left,.cl-cx.cmp .cl-left{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}",
+      ".frame.tablet .cl-cx .cl-left,.cl-cx.cmp .cl-left{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}",
       ".cl-ph{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}",
       ".cl-ph .who{flex:1;min-width:220px}",
       ".cl-ph h2{margin:0;font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.2px}",
@@ -343,7 +343,7 @@
       ".cl-amt{font-size:34px;line-height:42px;font-weight:700;font-variant-numeric:tabular-nums}",
       ".cl-mic{display:inline-flex;align-items:center;gap:8px}",
       ".cl-mic.on{color:var(--crit);border-color:var(--crit);background:var(--crit-t)}",
-      ".cl-ta{width:100%;background:var(--s3);border:1px solid var(--b-def);border-radius:var(--r-md);padding:8px 12px;font-family:inherit;font-size:13px;line-height:19px;color:var(--tx);resize:vertical;min-height:58px}",
+      ".cl-ta{width:100%;background:var(--s3);border:1px solid var(--b-def);border-radius:var(--r-md);padding:8px 12px;font-family:inherit;font-size:13px;line-height:19px;color:var(--tx);resize:vertical;min-height:58px}.cl-card-g .cl-ta{min-height:96px}",
       ".cl-ta:focus{outline:0;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-tint)}",
       ".cl-soap{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px 10px;align-items:start}",
       ".cl-soap>span{width:28px;height:28px;border-radius:8px;background:var(--acc-tint2);color:var(--acc-300);display:grid;place-items:center;font-weight:700;font-size:13px;margin-top:4px}",
@@ -377,12 +377,13 @@
       ".cl-grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}",
       ".frame.mobile .cl-grid2{grid-template-columns:minmax(0,1fr)}",
       ".frame.mobile .cl-hide-m{display:none}",
+      ".cl-quick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.cl-quick .btn{padding:0 10px}",
       ".cl-q{display:flex;flex-direction:column;gap:8px}",
       ".cl-qi{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:var(--r-md);background:var(--s2);border:1px solid var(--b-sub);min-width:0}",
       ".cl-qi .tok{font-size:15px;min-width:44px}",
       ".cl-qi .t{flex:1;min-width:0}.cl-qi .t b{display:block;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cl-qi .t small{display:block;font-size:12px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
       ".cl-qi.now{border-color:var(--acc-line);background:var(--acc-tint)}",
-      "@media (max-width:1180px){.frame.desktop .cl-cx:not(.cmp){grid-template-columns:minmax(0,1fr) 320px}.frame.desktop .cl-cx:not(.cmp) .cl-left{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}}",
+      "@media (max-width:1180px){.frame.desktop .cl-cx{grid-template-columns:minmax(0,1fr) 290px}.frame.desktop .cl-cx .cl-left{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}}",
       "@media (max-width:760px){.cl-cx,.cl-cx.cmp{grid-template-columns:minmax(0,1fr)}.cl-cx .cl-left,.cl-cx.cmp .cl-left{grid-template-columns:minmax(0,1fr)}.cl-grid2{grid-template-columns:minmax(0,1fr)}}"
     ].join("\n");
     var stEl = document.createElement("style"); stEl.id = "cl-style"; stEl.textContent = css; document.head.appendChild(stEl);
@@ -588,7 +589,7 @@
     var head = '<div class="cl-cr" style="margin-bottom:12px"><span class="cl-lb">' + L("Template", "قالب", "टेम्पलेट") + "</span>" + tpls.map(function (t) { return chip(esc(t), tpl === t, 'data-act="cl-tpl" data-arg="' + t + '"'); }).join("") + "</div>";
     var rows = [["S", "Subjective", sc.soap.s], ["O", "Objective", sc.soap.o], ["A", "Assessment", sc.soap.a], ["P", "Plan", sc.soap.p]];
     var body = head + (dict ? ui.note("crit", '<span class="row nw" style="gap:8px"><span class="pulse" style="color:var(--crit)"></span><b>Listening…</b></span> English–Hindi code-mix · in-region speech model · audio not stored. Tap the mic again to insert text into Subjective.') : "") +
-      '<div class="cl-soap">' + rows.map(function (r) { return "<span title=\"" + r[1] + "\">" + r[0] + '</span><textarea class="cl-ta" aria-label="' + r[1] + '" placeholder="' + r[1] + ' — type, dictate or use .smart phrases">' + esc(r[2]) + "</textarea>"; }).join("") + "</div>" +
+      '<div class="cl-soap">' + rows.map(function (r) { return "<span title=\"" + r[1] + "\">" + r[0] + '</span><textarea class="cl-ta" dir="auto" aria-label="' + r[1] + '" placeholder="' + r[1] + ' — type, dictate or use .smart phrases">' + esc(r[2]) + "</textarea>"; }).join("") + "</div>" +
       '<p class="tiny faint" style="margin:10px 0 0">Smart phrases: <span class="ltr">.fev .cough .dm .htn .nad</span> · Notes autosave every 5 s and lock when you sign.</p>';
     return ui.card(L("Clinical note (SOAP)", "الملاحظة السريرية", "क्लिनिकल नोट (SOAP)"), body, { icon: "edit",
       right: '<button class="btn sm cl-mic' + (dict ? " on" : "") + '" data-act="cl-dict">' + ui.icon("mic", "sm") + (dict ? L("Stop", "إيقاف", "रोकें") : L("Dictate", "إملاء", "बोलकर लिखें")) + "</button>" });
@@ -627,7 +628,7 @@
       '<span class="cl-lb">' + L("When", "متى", "कब") + "</span>" + fs.map(function (f) { return chip('<span class="ltr">' + f + "</span>", l.f === f, arg("f", f)); }).join("") + "</div>" +
       '<div class="cl-cr"><span class="cl-lb">' + L("For", "المدة", "अवधि") + "</span>" + ns.map(function (n) { return chip(n.replace(" days", " d"), l.n === n, arg("n", n)); }).join("") +
       (u === "top" ? "" : (compact ? "</div><div class=\"cl-cr\">" : "") + '<span class="cl-lb">' + L("Food", "الطعام", "भोजन") + "</span>" + ["After food", "Before food", "Any time"].map(function (f) { return chip(f.replace(" food", ""), (l.food || "Any time") === f, arg("food", f)); }).join("")) + "</div>" +
-      '<div class="cl-sig"><span class="pl">' + esc(sig(l, "en")) + ' <span class="faint">· dispense ' + esc(dispenseQty(l)) + "</span></span>" + (lang !== "en" ? '<span dir="' + (lang === "ar" ? "rtl" : "ltr") + '" lang="' + lang + '">' + esc(sig(l, lang)) + "</span>" : "") + "</div></div>";
+      '<div class="cl-sig"><span class="pl" dir="ltr">' + esc(sig(l, "en")) + ' <span class="faint">· dispense ' + esc(dispenseQty(l)) + "</span></span>" + (lang !== "en" ? '<span dir="' + (lang === "ar" ? "rtl" : "ltr") + '" lang="' + lang + '">' + esc(sig(l, lang)) + "</span>" : "") + "</div></div>";
   }
   function rxCard(pid, ctx, compact) {
     var rx = ctx.rx, lang = sigLang(pid), spec = ctx.solo ? "Dermatology" : "General Medicine", log = NB.v("clLog_" + pid, []);
@@ -1068,7 +1069,7 @@
       '<div class="small"><b>' + pn(p) + "</b> · " + p.age + " " + p.sex + " · MRN " + esc(p.mrn) + ' · <span class="ltr">' + esc(natNo(p)) + "</span>" + (isPreg(p) ? " · " + ui.pill("urg", "Pregnant 14 wk", "baby") : "") + "</div>" +
       '<div class="small">' + ui.icon("alertfill", "xs critc") + " " + L("Allergies", "الحساسية", "एलर्जी") + ": " + ((p.allergies || []).map(function (a) { return a.a + " (" + a.rx + ")"; }).join(", ") || "None known") + "</div>" +
       '<div class="small faint">Dx: ' + dx.map(function (c) { return '<span class="ltr">' + c + "</span> " + esc(icdName(c)); }).join(" · ") + "</div>" +
-      "<ol>" + rx.map(function (l) { var dd = drug(l.d); return "<li><b>" + esc(dd.name) + '</b> <span class="faint">(' + esc(dd.gen) + ")</span><small>" + esc(sig(l, "en")) + " · " + esc(dispenseQty(l)) + "</small>" + (lang !== "en" ? '<small dir="' + (lang === "ar" ? "rtl" : "ltr") + '" lang="' + lang + '">' + esc(sig(l, lang)) + "</small>" : "") + "</li>"; }).join("") + "</ol>" +
+      "<ol>" + rx.map(function (l) { var dd = drug(l.d); return "<li><b>" + esc(dd.name) + '</b> <span class="faint">(' + esc(dd.gen) + ")</span><small dir=\"ltr\">" + esc(sig(l, "en")) + " · " + esc(dispenseQty(l)) + "</small>" + (lang !== "en" ? '<small dir="' + (lang === "ar" ? "rtl" : "ltr") + '" lang="' + lang + '">' + esc(sig(l, lang)) + "</small>" : "") + "</li>"; }).join("") + "</ol>" +
       '<div class="small">' + L("Follow-up", "المتابعة", "फ़ॉलो-अप") + ": " + esc(fu) + (pid === "p3" ? " · return today if breathless, confused or vomiting" : "") + '</div><div class="small faint">' + ui.icon("pen", "xs") + " Digitally signed by " + esc(d.name) + " (PIN + device key) on signing</div></div>";
     var body = (crit ? ui.note("crit", crit + " critical alert" + (crit > 1 ? "s are" : " is") + " still open. Go back and accept the safer option or override with a reason.") : ui.note("ok", "All safety checks addressed" + (ovr.length ? " · " + ovr.length + " override" + (ovr.length > 1 ? "s" : "") + " recorded with reasons" : "") + ".")) + doc +
       '<p class="small muted" style="margin:0">' + esc(eRxNote()) + "</p>" +
@@ -1245,7 +1246,7 @@
   function soloQ() { var now = NB.v("clSoloNow", 1); return CD.solo.map(function (x, i) { var s = i < now ? "completed" : i === now ? "inconsult" : x.st === "inconsult" ? "waiting" : x.st; return Object.assign({}, x, { st: s, i: i }); }); }
   NB.screen("solo.today", function (c) {
     var q = soloQ(), now = q.find(function (x) { return x.st === "inconsult"; }), next = q.find(function (x) { return x.st === "waiting" || x.st === "arrived"; }), paused = NB.v("clPause", false);
-    var nm = function (x) { var p = x.p ? NB.pat(x.p) : null; return { n: p ? NB.pname(p) : x.name, as: p ? p.age + " " + p.sex : x.as, r: p ? (scen(x.p).reason || (NB.D.queue.find(function (y) { return y.p === x.p; }) || {}).reason) : x.reason }; };
+    var nm = function (x) { var p = x.p ? NB.pat(x.p) : null; return { n: p ? NB.pname(p) : x.name, as: p ? p.age + " " + p.sex : x.as, r: p ? ((NB.D.queue.find(function (y) { return y.p === x.p; }) || {}).reason || scen(x.p).reason) : x.reason }; };
     var waiting = q.filter(function (x) { return /waiting|arrived|booked/.test(x.st); }).length;
     var h = ui.header(L("Today", "اليوم", "आज"), "Sat 17 Oct · " + waiting + " to see · auto-accept on (28 of 40 booked) · self check-in on");
     if (paused) h += ui.note("crit", "<b>Queue paused.</b> Waiting patients got a neutral “doctor attending an emergency” message with updated ETAs. " + '<a data-toggle="clPause" style="cursor:pointer">Resume queue</a>');
@@ -1253,7 +1254,7 @@
       '<div class="cl-grid2">' + ui.btn(L("Open consult", "فتح الاستشارة", "परामर्श खोलें"), { cls: "lg blk", act: "cl-soloopen", arg: now.p || "p2", icon: "steth" }) + ui.btn(L("Collect payment", "تحصيل الدفع", "भुगतान लें"), { cls: "lg blk", go: "solo.money", icon: "wallet" }) + "</div>" : "") +
       '<div class="hr" style="margin:16px 0"></div>' + (next ? '<div class="row"><div class="fl"><span class="eyebrow">' + L("Next", "التالي", "अगला") + '</span><div class="row" style="margin-top:4px"><span class="cl-tok">' + next.tok + '</span><div><b>' + esc(nm(next).n) + '</b><div class="small muted">' + esc(nm(next).as + " · " + nm(next).r) + "</div></div></div></div></div>" +
       '<button class="btn pri blk cl-big" style="margin-top:14px" data-act="cl-callnext">' + ui.icon("play") + L("Call next", "استدعاء التالي", "अगला बुलाएँ") + " · " + next.tok + "</button>" : ui.note("ok", "Queue clear. Enjoy your coffee.")) + "</div>";
-    var quick = '<div class="cl-grid2">' + ui.btn(paused ? L("Resume queue", "استئناف", "क़तार फिर शुरू") : L("Pause queue", "إيقاف مؤقت", "क़तार रोकें"), { cls: "lg blk" + (paused ? " okb" : " dng"), act: "cl-pause", icon: paused ? "play" : "pause" }) +
+    var quick = '<div class="cl-quick">' + ui.btn(paused ? L("Resume queue", "استئناف", "क़तार फिर शुरू") : L("Pause queue", "إيقاف مؤقت", "क़तार रोकें"), { cls: "lg blk" + (paused ? " okb" : " dng"), act: "cl-pause", icon: paused ? "play" : "pause" }) +
       ui.btn(L("Running late", "متأخر", "देर हो रही है"), { cls: "lg blk", ov: "cldelay", arg: "15", icon: "clockh" }) + ui.btn(L("Add walk-in", "إضافة مراجع", "वॉक-इन जोड़ें"), { cls: "lg blk", ov: "walkin", icon: "userplus" }) + ui.btn(L("Settings", "الإعدادات", "सेटिंग्स"), { cls: "lg blk ghost", go: "solo.setup", icon: "sliders" }) + "</div>";
     var list = '<div class="cl-q">' + q.map(function (x) {
       var s = SQ[x.st] || ["mute", x.st], w = nm(x);
@@ -1309,7 +1310,7 @@
       ui.card("4 · " + L("ETA shown to patients", "الوقت المتوقع للمرضى", "मरीज़ों को ETA"), '<div class="stack s8">' + [["exact", "Exact time", "Best when you are very predictable"], ["range", "Range (recommended)", "Honest when consults vary"], ["position", "Position only", "“You are 3rd”"], ["delay", "Delay only", "Only tell patients when I'm late"], ["hidden", "Hidden", "For bad days; a message near their turn"]].map(function (r) { return ui.radio("clEta", r[0], r[1], r[2], "range"); }).join("") + "</div>" +
         '<div class="cl-thread" style="margin-top:12px"><div class="cl-msg out">' + esc(etaTxt) + "<small>WhatsApp preview</small></div></div>", { icon: "hourglass" }),
       ui.card("5 · " + L("WhatsApp greeting", "تحية واتساب", "व्हाट्सऐप स्वागत"), '<div class="row" style="margin-bottom:10px">' + ui.seg("clGrL", [["en", "English"], ["hi", "हिंदी"], ["ar", "العربية"]], NB.gcc() ? "ar" : "en") + "</div>" +
-        '<textarea class="cl-ta" dir="' + (lang === "ar" ? "rtl" : "ltr") + '">' + esc(greet) + "</textarea>" + '<p class="tiny faint" style="margin:8px 0 0">Sent from ' + (NB.gcc() ? "your verified business number" : "the shared Nabd number with your clinic name") + ". Health details are never put in a message preview.</p>", { icon: "chat" }),
+        '<textarea class="cl-ta" dir="' + (lang === "ar" ? "rtl" : "ltr") + '">' + esc(greet) + "</textarea>" + '<p class="tiny faint" style="margin:8px 0 0">Sent from ' + (NB.gcc() ? "your verified business number" : "the shared Nabd number with your clinic name") + ". Health details are never put in a message preview.</p>", { icon: "chat", cls: "cl-card-g" }),
       ui.card("6 · " + L("Fees", "الرسوم", "फ़ीस"), '<dl class="cl-kv"><dt>New consultation</dt><dd style="text-align:end">' + NB.money(800) + "</dd><dt>Follow-up (within 7 days)</dt><dd style=\"text-align:end\">" + L("Free", "مجاني", "मुफ़्त") + "</dd><dt>Follow-up (after 7 days)</dt><dd style=\"text-align:end\">" + NB.money(500) + "</dd><dt>Teleconsult</dt><dd style=\"text-align:end\">" + NB.money(600) + "</dd><dt>" + esc(m.tax) + '</dt><dd style="text-align:end" class="small">' + esc(m.taxNote) + "</dd></dl>" +
         ui.toggle("clPre", "Ask new patients to prepay online", "Only for Nabd Connect bookings", false), { icon: "banknote" })
     ];
