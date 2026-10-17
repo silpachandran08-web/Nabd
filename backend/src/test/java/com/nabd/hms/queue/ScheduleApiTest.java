@@ -257,6 +257,13 @@ class ScheduleApiTest extends ApiTestBase {
         assertThat(exchange(hoursPath, HttpMethod.DELETE, authed(recToken), Map.class).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
 
+        // The reception staff's own path cannot reach the doctor's block: hours are scoped to the path doctor.
+        String viaOwnPath = "/v1/doctors/" + reception.id() + "/working-hours/" + own.getBody().get("id");
+        assertThat(writeHours(recToken, HttpMethod.PUT, viaOwnPath, "09:00:00", "10:00:00").getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exchange(viaOwnPath, HttpMethod.DELETE, authed(recToken), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
         ResponseEntity<Map> ownUpdate = writeHours(docToken, HttpMethod.PUT, hoursPath, "09:00:00", "11:00:00");
         assertThat(ownUpdate.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(ownUpdate.getBody().get("endTime")).isEqualTo("11:00:00");
