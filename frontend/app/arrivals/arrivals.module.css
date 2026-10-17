@@ -227,6 +227,16 @@
   color: var(--nb-text-tertiary);
 }
 
+.complaint {
+  display: block;
+  max-inline-size: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nb-text-secondary);
+  font-size: 12px;
+}
+
 .actionBtn {
   height: 28px;
   padding: 0 var(--nb-space-12);
@@ -298,6 +308,18 @@
 .doctorCount {
   color: var(--nb-text-tertiary);
   font-size: 12px;
+}
+
+/* REC-023: department under the doctor's name; idle doctors (no one waiting) are muted. */
+.doctorDept {
+  display: block;
+  color: var(--nb-text-tertiary);
+  font-size: 12px;
+}
+
+.doctorIdle .doctorName {
+  color: var(--nb-text-secondary);
+  font-weight: 400;
 }
 
 .field {

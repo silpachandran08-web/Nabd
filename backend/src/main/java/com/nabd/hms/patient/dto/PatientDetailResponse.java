@@ -8,8 +8,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * ponytail: activePackages is still stubbed (zero) — Packages doesn't exist yet. lastVisitAt is
- * real (queue_entries.updated_at where status='completed', NB-074); allergies is real
+ * ponytail: activePackages is still stubbed (zero) — Packages doesn't exist yet. lastVisit (LIVE-03) is
+ * the registry's definition — latest queue_date of a non-no-show queue entry — so the drawer and the
+ * registry list agree; lastVisitAt (deprecated) is the older completed-entry timestamp (NB-074); allergies is real
  * (patient_allergies, NB-107/108); chronicConditions is real (chronic_conditions, NB-077).
  *
  * outstandingBalance is null (omitted from the JSON entirely — NB-052 requires the field be
@@ -24,5 +25,5 @@ public record PatientDetailResponse(UUID id, String mrn, String name, String pho
                                      List<String> chronicConditions, int activePackages,
                                      Double outstandingBalance, Instant lastVisitAt, boolean isMinor,
                                      UUID guardianId, String guardianName, Instant guardianConsentGrantedAt,
-                                     Instant guardianReviewKeptAt) {
+                                     Instant guardianReviewKeptAt, LocalDate lastVisit) {
 }

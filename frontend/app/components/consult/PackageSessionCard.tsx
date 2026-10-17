@@ -9,7 +9,7 @@ import type { AuthedFetch, Problem } from "./shared";
 import s from "./consultParts.module.css";
 import d from "./dose.module.css";
 
-// GET /packages/instances (InstanceResponse) and POST /packages/instances/items/{id}/redeem.
+// GET /packages/instances?patientId= (InstanceResponse) and POST /packages/instances/items/{id}/redeem.
 type Item = { id: string; name: string; quantityTotal: number; quantityConsumed: number };
 type Instance = { id: string; packageName: string; patientId: string; status: string; validityEnd: string | null; items: Item[] };
 
@@ -31,11 +31,11 @@ export default function PackageSessionCard({ authedFetch, patientId, canRedeem }
 
   const load = useCallback(async () => {
     try {
-      const res = await authedFetch("/packages/instances");
+      // DOC-R6: the server filters by patient; no client-side filter over the whole tenant list.
+      const res = await authedFetch(`/packages/instances?patientId=${encodeURIComponent(patientId)}`);
       if (!res) return;
       if (!res.ok) { setState("error"); return; }
-      const all: Instance[] = await res.json();
-      setInstances(all.filter((i) => i.patientId === patientId));
+      setInstances(await res.json());
       setState("ok");
     } catch {
       setState("error");

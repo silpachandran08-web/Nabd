@@ -200,8 +200,25 @@ class SetupApiTest extends ApiTestBase {
 
         ResponseEntity<Map> resp = exchange("/v1/setup/subscription", HttpMethod.GET, authed(token), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody().get("plan")).isNotEqualTo(tenant.slug()).isEqualTo("Standard");
+        // LIVE-07: no platform subscription yet -> no plan name (never a hard-coded label)
+        assertThat(resp.getBody().get("plan")).isNull();
         assertThat(resp.getBody().get("branchesUsed")).isEqualTo(1);
+    }
+
+    @Test
+    void subscriptionPlanIsThePlatformPlanRecordsName() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner@a.com", "+919400000001", false);
+        String token = loginAndGetAccessToken(staff);
+        UUID planId = seedPlan("mid-" + tenant.slug(), 300000, "INR", 10);
+        jdbc.update("UPDATE master.plans SET name = ? WHERE id = ?", "Mid " + tenant.slug(), planId);
+        jdbc.update("INSERT INTO master.subscriptions (tenant_id, plan_id, mrr_cents, currency, renewal_date) " +
+                "VALUES (?, ?, 300000, 'INR', current_date + 30)", tenant.id(), planId);
+
+        ResponseEntity<Map> resp = exchange("/v1/setup/subscription", HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getBody().get("plan")).isEqualTo("Mid " + tenant.slug());
     }
 
     @Test

@@ -73,6 +73,11 @@ class QueueRepository {
                 "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, patientId));
     }
 
+    boolean appointmentCheckedIn(UUID tenantId, UUID appointmentId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM queue_entries WHERE tenant_id = ? AND appointment_id = ?)", Boolean.class, tenantId, appointmentId));
+    }
+
     boolean staffExists(UUID tenantId, UUID staffId) {
         return Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM staff WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, staffId));

@@ -50,7 +50,27 @@ class StaffApiTest extends ApiTestBase {
         Map<String, Object> entry = (Map<String, Object>) resp.getBody().get(0);
         assertThat(entry.get("id")).isEqualTo(doctor.id().toString());
         assertThat(entry.get("name")).isEqualTo("Test Staff");
-        assertThat(entry.keySet()).containsExactlyInAnyOrder("id", "name"); // no email/mobile/status leaking through
+        assertThat(entry.keySet()).containsExactlyInAnyOrder("id", "name", "departmentName"); // no email/mobile/status leaking through
+        assertThat(entry.get("departmentName")).isNull(); // seeded doctor has no department
+    }
+
+    /** REC-023: the arrivals doctor rail shows each doctor's department under the name. */
+    @Test
+    void rosterCarriesEachDoctorsDepartmentName() {
+        SeededTenant tenant = seedTenant();
+        UUID ownerRole = seedFullAccessRole(tenant.id());
+        SeededStaff owner = seedStaff(tenant, ownerRole, "owner-dept@a.com", "+919100000025", false);
+        String token = loginAndGetAccessToken(owner);
+        UUID doctorRole = seedRole(tenant.id(), "Doctor", false, fullGrant("queue"));
+        SeededStaff doctor = seedStaff(tenant, doctorRole, "doctor-dept@a.com", "+919100000026", false);
+        String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Dental", "active", true)), Map.class).getBody().get("id");
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ?::uuid WHERE id = ?", dentalId, doctor.id()));
+
+        ResponseEntity<List> resp = exchange("/v1/staff/roster", HttpMethod.GET, authed(token), List.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat((List<Map<String, Object>>) resp.getBody()).singleElement()
+                .satisfies(e -> assertThat(e).containsEntry("id", doctor.id().toString()).containsEntry("departmentName", "Dental"));
     }
 
     @Test

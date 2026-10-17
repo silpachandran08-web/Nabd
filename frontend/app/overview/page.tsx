@@ -29,7 +29,7 @@ type Health = { licences?: { total?: number; expiringSoon?: number; expired?: nu
 const HEALTH_TONE: Record<string, string> = { ok: "alertOk", attention: "alertWarn", expired: "alertDanger" };
 // Only same-app paths become links; anything else falls back to the licences tab.
 const safeLink = (l?: string | null) => (l && l.startsWith("/") && !l.startsWith("//") ? l : "/setup?tab=licences");
-type Subscription = { plan: string; status: string };
+type Subscription = { plan: string | null; status: string };
 // GET /v1/setup/checklist (same rows the Setup > Checklist tab reads).
 type ChecklistItem = { step: string; status: "pending" | "skipped" | "done"; skippedAt: string | null; doneAt: string | null };
 
@@ -358,7 +358,7 @@ export default function OverviewPage() {
           <Link className={styles.quickLink} href="/setup?tab=subscription">
             <div>
               <div className={styles.quickTitle}>Plan &amp; Modules</div>
-              <div className={styles.quickSub}>{subscription ? `${subscription.plan} plan · ${subscription.status}` : "Your plan and usage"}</div>
+              <div className={styles.quickSub}>{subscription ? `${subscription.plan ? `${subscription.plan} plan` : "No plan assigned"} · ${subscription.status}` : "Your plan and usage"}</div>
             </div>
             <span className={styles.chevron} aria-hidden="true">›</span>
           </Link>

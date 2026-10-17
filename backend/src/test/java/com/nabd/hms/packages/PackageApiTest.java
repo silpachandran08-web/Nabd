@@ -356,6 +356,39 @@ class PackageApiTest extends ApiTestBase {
     }
 
     @Test
+    void instancesCanBeFilteredByPatientServerSide() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "pkg14@a.com", "+919500000014", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientA = registerPatient(token, "Filter Patient A");
+        String patientB = registerPatient(token, "Filter Patient B");
+        String packageId = createPackage(token, 2400.00, 90, "purchase_date");
+        activate(token, packageId);
+        String instanceA = (String) sell(token, patientA, packageId).get("id");
+        sell(token, patientB, packageId);
+
+        ResponseEntity<List> all = exchange("/v1/packages/instances", HttpMethod.GET, authed(token), List.class);
+        assertThat(all.getBody()).hasSize(2);
+
+        ResponseEntity<List> onlyA = exchange("/v1/packages/instances?patientId=" + patientA, HttpMethod.GET, authed(token), List.class);
+        assertThat(onlyA.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(onlyA.getBody()).hasSize(1);
+        assertThat(((Map) onlyA.getBody().get(0)).get("id")).isEqualTo(instanceA);
+        assertThat(((Map) onlyA.getBody().get(0)).get("patientId")).isEqualTo(patientA);
+
+        ResponseEntity<List> none = exchange("/v1/packages/instances?patientId=" + UUID.randomUUID(), HttpMethod.GET, authed(token), List.class);
+        assertThat(none.getBody()).isEmpty();
+
+        // Another tenant's patient id never leaks this tenant's instances.
+        SeededTenant other = seedTenant();
+        SeededStaff otherStaff = seedStaff(other, seedFullAccessRole(other.id()), "pkg15@a.com", "+919500000015", false);
+        ResponseEntity<List> cross = exchange("/v1/packages/instances?patientId=" + patientA, HttpMethod.GET,
+                authed(loginAndGetAccessToken(otherStaff)), List.class);
+        assertThat(cross.getBody()).isEmpty();
+    }
+
+    @Test
     void roleWithoutPackagesGrantIsForbidden() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedRole(tenant.id(), "QueueOnly", false, fullGrant("queue"), fullGrant("patients"));

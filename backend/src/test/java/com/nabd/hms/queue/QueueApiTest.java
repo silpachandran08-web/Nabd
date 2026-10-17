@@ -139,6 +139,106 @@ class QueueApiTest extends ApiTestBase {
         assertThat(second.getBody().get("type")).asString().contains("session-full");
     }
 
+    private ResponseEntity<Map> walkIn(String token, String patientId, UUID doctorId) {
+        return exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", doctorId.toString())), Map.class);
+    }
+
+    /** QA-04: the cap itself is accepted, one over it is not. */
+    @Test
+    void walkInsUpToExactlyTheCapAreAcceptedAndTheNextIsRejected() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "cap1@a.com", "+919600000101", false);
+        String token = loginAndGetAccessToken(staff);
+        addWorkingHours(token, staff.id(), 3);
+
+        for (int i = 0; i < 3; i++) {
+            assertThat(walkIn(token, registerPatientWithDob(token, "Cap" + i, "+91999991010" + i), staff.id())
+                    .getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        }
+        ResponseEntity<Map> over = walkIn(token, registerPatientWithDob(token, "Cap3", "+919999910103"), staff.id());
+        assertThat(over.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(over.getBody().get("type")).asString().contains("session-full");
+    }
+
+    /** QA-04 root cause: a booked patient who was seen (appointment completed) used to stop counting,
+     * freeing a slot for one more walk-in per completed booking. Completed walk-ins always counted. */
+    @Test
+    void aCompletedBookingStillCountsTowardTheWalkInCap() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "cap2@a.com", "+919600000102", false);
+        String token = loginAndGetAccessToken(staff);
+        addWorkingHours(token, staff.id(), 2);
+        String booked = registerPatientWithDob(token, "CapB", "+919999910110");
+        java.time.Instant slot = java.time.Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES)
+                .truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        ResponseEntity<Map> appt = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", staff.id().toString(), "patientId", booked, "startTime", slot.toString())), Map.class);
+        assertThat(appt.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID apptId = UUID.fromString((String) appt.getBody().get("id"));
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE appointments SET status = 'completed' WHERE id = ?", apptId));
+
+        assertThat(walkIn(token, registerPatientWithDob(token, "CapW1", "+919999910111"), staff.id())
+                .getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        ResponseEntity<Map> over = walkIn(token, registerPatientWithDob(token, "CapW2", "+919999910112"), staff.id());
+        assertThat(over.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(over.getBody().get("type")).asString().contains("session-full");
+    }
+
+    /** QA-04: re-checking-in the same appointment used to issue a second, uncounted token. */
+    @Test
+    void anAppointmentCannotBeCheckedInTwice() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "cap3@a.com", "+919600000103", false);
+        String token = loginAndGetAccessToken(staff);
+        addWorkingHours(token, staff.id(), 1);
+        String patient = registerPatientWithDob(token, "CapA", "+919999910120");
+        java.time.Instant slot = java.time.Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES)
+                .truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        ResponseEntity<Map> appt = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "doctorId", staff.id().toString(), "patientId", patient, "startTime", slot.toString())), Map.class);
+        Map<String, Object> body = Map.of("appointmentId", appt.getBody().get("id"), "patientId", patient,
+                "doctorId", staff.id().toString());
+
+        assertThat(exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, body), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, body), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    /** QA-04: two front desks racing for the last slot — the per-doctor-day advisory lock lets exactly one in. */
+    @Test
+    void concurrentWalkInsForTheLastSlotAdmitExactlyOne() throws Exception {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "cap4@a.com", "+919600000104", false);
+        String token = loginAndGetAccessToken(staff);
+        addWorkingHours(token, staff.id(), 1);
+        List<String> patients = List.of(
+                registerPatientWithDob(token, "CapC1", "+919999910130"),
+                registerPatientWithDob(token, "CapC2", "+919999910131"),
+                registerPatientWithDob(token, "CapC3", "+919999910132"));
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(patients.size());
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            List<java.util.concurrent.Future<HttpStatus>> results = new java.util.ArrayList<>();
+            for (String p : patients) {
+                results.add(pool.submit(() -> {
+                    start.await();
+                    return (HttpStatus) walkIn(token, p, staff.id()).getStatusCode();
+                }));
+            }
+            start.countDown();
+            List<HttpStatus> statuses = new java.util.ArrayList<>();
+            for (var f : results) {
+                statuses.add(f.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            }
+            assertThat(statuses).containsExactlyInAnyOrder(HttpStatus.CREATED, HttpStatus.CONFLICT, HttpStatus.CONFLICT);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     @Test
     void checkInWithMismatchedAppointmentFails() {
         SeededTenant tenant = seedTenant();

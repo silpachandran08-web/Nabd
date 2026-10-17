@@ -32,6 +32,7 @@ tags:
   - name: Nursing
   - name: Reports
   - name: Platform
+  - name: Packages
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -352,6 +353,26 @@ paths:
       responses:
         "201": { $ref: "#/components/responses/StaffCreated" }
         "409": { description: Email already on this tenant, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /staff/roster:
+    get:
+      tags: [Staff]
+      summary: Active doctors (role named "Doctor") for queue/consult pickers — id, name and department name only
+      x-required-permission: queue:view
+      responses:
+        "200":
+          description: Active doctors ordered by name
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [id, name, departmentName]
+                  properties:
+                    id: { type: string, format: uuid }
+                    name: { type: string }
+                    departmentName: { type: [string, "null"], description: "REC-023: name of the doctor's department (staff.department_id); null when none is assigned" }
 
   /staff/{id}:
     get:
@@ -1189,7 +1210,8 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/CheckInRequest" } } }
       responses:
         "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
-        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch)" }
+        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch, resolved, or already checked in)" }
+        "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue:
     get:
@@ -1992,6 +2014,15 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/VaccineRecord" } } } } }
 
+  /nursing/worklist:
+    get:
+      tags: [Nursing]
+      summary: "NUR-019 - the nurse worklist in one call: exactly the entries GET /queue returns with no parameters (today's clinic day, all doctors/departments, priority=false), in the same order, each with its patient and vitals. Rows are never dropped. patient is the GET /patients/{id} body, or null when the caller lacks patients:view, is not fully verified (verification-required on that endpoint) or the patient is not visible to them (consent / own-patients scope). vitals is the GET /clinical/vitals/{queueEntryId} body, or null when none are recorded or the caller lacks clinical:view. Patients and vitals are batch-loaded (IN lists); guardian fields are still read per patient that has a guardian."
+      x-required-permission: queue:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NursingWorklist" } } } }
+        "403": { description: Caller lacks queue:view }
+
   # ------------------------------------------------------------- Reports
   /reports/money:
     get:
@@ -2057,6 +2088,37 @@ paths:
                         handledCount: { type: integer, format: int64, description: "Distinct visits: completed as doctor plus billed by this staff member" }
                         discountCount: { type: integer, format: int64, description: "Invoices raised with a discount" }
                         overrideCount: { type: integer, format: int64, description: "Prescription safety overrides/acknowledgements from audit_log" }
+  # ------------------------------------------------- Packages: instances (DOC-R6; rest of E14 documented in code)
+  /packages/instances:
+    get:
+      tags: [Packages]
+      summary: Sold package instances for the caller's tenant, newest first. Optional patientId filters server-side (tenant-scoped; another tenant's patient id returns []). Absent = every instance in the tenant.
+      x-required-permission: packages:view
+      parameters:
+        - { name: patientId, in: query, required: false, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Package instances (InstanceResponse, without per-item lines)", content: { application/json: { schema: { type: array, items: { type: object } } } } }
+        "403": { description: "Forbidden: no packages:view" }
+  # ------------------------------------------------- Platform console: fleet summary (LIVE-07)
+  /platform/tenants/summary:
+    get:
+      tags: [Platform]
+      summary: Fleet KPI counts. live = tenants with status 'active' (trialing excluded); trialing counted separately; byStatus has every status.
+      x-required-permission: clinics_fleet:view
+      responses:
+        "200":
+          description: Fleet summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer, description: "Every tenant, any status" }
+                  live: { type: integer, description: "Tenants whose status is 'active'" }
+                  trialing: { type: integer, description: "Tenants whose status is 'trialing'" }
+                  byStatus: { type: object, additionalProperties: { type: integer } }
+                  regions: { type: array, items: { type: string } }
+        "403": { description: "Forbidden: no clinics_fleet:view (sre)" }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:
@@ -2584,6 +2646,19 @@ components:
         spo2Percent: { type: [integer, "null"], minimum: 1, maximum: 100 }
         bloodSugar: { type: [number, "null"], exclusiveMinimum: 0, maximum: 9999.99, description: "Display unit mg/dL is a UI constant, not stored (needs clinical sign-off). No clinical range is enforced." }
         painScore: { type: [integer, "null"], minimum: 0, maximum: 10, description: "0-10 numeric rating scale; outside 0-10 is 400." }
+    NursingWorklist:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [entry, patient, vitals]
+            properties:
+              entry: { $ref: "#/components/schemas/QueueEntry" }
+              patient: { oneOf: [{ $ref: "#/components/schemas/PatientDetail" }, { type: "null" }] }
+              vitals: { oneOf: [{ $ref: "#/components/schemas/Vitals" }, { type: "null" }] }
     Vitals:
       type: object
       properties:
@@ -2984,7 +3059,8 @@ components:
             chronicConditions: { type: array, items: { type: string } }
             activePackages: { type: integer }
             outstandingBalance: { type: number }
-            lastVisitAt: { type: [string, "null"], format: date-time }
+            lastVisit: { type: [string, "null"], format: date, description: "LIVE-03: last visit, SAME definition as PatientRegistryRow.lastVisit — the latest queue_date (tenant-local day) of any queue entry for this patient whose status is not no_show (a visit in progress today counts). Omitted when the patient has no such entry. Use this for display." }
+            lastVisitAt: { type: [string, "null"], format: date-time, deprecated: true, description: "NB-074, deprecated by LIVE-03: updated_at of the latest COMPLETED queue entry — a different definition from lastVisit / the registry; do not display alongside the registry value." }
             guardianReviewKeptAt: { type: [string, "null"], format: date-time, description: "CGV-002: when staff chose keep-proxy at the age-18 review; cleared if the guardian changes" }
 
     PatientRegistryRow:
@@ -2997,7 +3073,7 @@ components:
         age: { type: integer }
         gender: { type: string }
         minor: { type: boolean }
-        lastVisit: { type: [string, "null"], format: date }
+        lastVisit: { type: [string, "null"], format: date, description: "LIVE-03: latest queue_date (tenant-local day) of any queue entry for this patient whose status is not no_show; same definition as PatientDetail.lastVisit" }
         nextAppointment: { type: [string, "null"], format: date-time }
         nextDoctorName: { type: [string, "null"] }
         nextDoctorId: { type: [string, "null"], format: uuid }
@@ -3300,7 +3376,7 @@ components:
     SubscriptionSummary:
       type: object
       properties:
-        plan: { type: string }
+        plan: { type: [string, "null"], description: "Name of the platform plan record (master.plans.name) of this tenant's subscription — the same name the platform console shows. null when no subscription has been started yet." }
         status: { type: string }
         activePatientsUsed: { type: integer }
         activePatientsLimit: { type: integer }

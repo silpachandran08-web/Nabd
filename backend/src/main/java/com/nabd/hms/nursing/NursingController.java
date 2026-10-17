@@ -12,6 +12,7 @@ import com.nabd.hms.nursing.dto.ProcedureStatusRequest;
 import com.nabd.hms.nursing.dto.RefuseRequest;
 import com.nabd.hms.nursing.dto.VaccineRecordRequest;
 import com.nabd.hms.nursing.dto.VaccineRecordResponse;
+import com.nabd.hms.nursing.dto.WorklistResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,9 +38,11 @@ public class NursingController {
     private final ProcedureService procedureService;
     private final ActivityService activityService;
     private final VaccineRecordService vaccineRecordService;
+    private final WorklistService worklistService;
 
     NursingController(AdministrationService administrationService, ProcedureService procedureService, ActivityService activityService,
-                      VaccineRecordService vaccineRecordService) {
+                      VaccineRecordService vaccineRecordService, WorklistService worklistService) {
+        this.worklistService = worklistService;
         this.vaccineRecordService = vaccineRecordService;
         this.administrationService = administrationService;
         this.procedureService = procedureService;
@@ -119,6 +122,16 @@ public class NursingController {
     @PreAuthorize("hasAuthority('nursing:view')")
     public List<VaccineRecordResponse> vaccineRecordsToday(@AuthenticationPrincipal Jwt jwt) {
         return vaccineRecordService.listToday(tenantId(jwt));
+    }
+
+    /** NUR-019: same permission as GET /queue; patient/vitals sub-objects follow patients:view / clinical:view. */
+    @GetMapping("/worklist")
+    @PreAuthorize("hasAuthority('queue:view')")
+    public WorklistResponse worklist(@AuthenticationPrincipal Jwt jwt) {
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        return worklistService.worklist(tenantId(jwt), staffId(jwt),
+                permissions != null && permissions.contains("patients:view"),
+                permissions != null && permissions.contains("clinical:view"));
     }
 
     private UUID tenantId(Jwt jwt) {

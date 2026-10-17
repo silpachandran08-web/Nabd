@@ -22,7 +22,7 @@ type QueueEntry = {
   priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
   priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
   source: string; presentingComplaint: string | null; appointmentId: string | null;
-  // NUR-012 (S4 contract): optional until the backend ships them; the UI falls back to patient/staff lookups.
+  // NUR-012 (S4 contract): optional until the backend ships them; the UI falls back to the worklist's patient / roster.
   ageYears?: number | null; gender?: string | null; doctorName?: string | null; waitMinutes?: number | null; visitType?: string | null;
 };
 type Row = QueueEntry & {
@@ -282,59 +282,54 @@ function NursingWorklist() {
 
   const load = useCallback(async () => {
     try {
-      const [queueRes, priorityRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
-        authedFetch("/queue"), authedFetch("/queue?priority=true"), authedFetch("/staff/roster"),
+      // NUR-019: one worklist call (queue entry + patient + vitals per row) replaces GET /queue,
+      // GET /queue?priority=true and the per-row /patients/{id} + /clinical/vitals/{id} fan-out.
+      const [queueRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
+        can(PERM.queueView) ? authedFetch("/nursing/worklist") : null, can(PERM.queueView) ? authedFetch("/staff/roster") : null,
         authedFetch("/nursing/administration-orders/today"), authedFetch("/nursing/procedure-orders/today"),
         authedFetch("/nursing/activity/today"),
       ]);
-      if (!queueRes) return;
-      const noQueue = queueRes.status === 403;
+      // LIVE-09: without queue:view the worklist is never requested; treat it like the server's 403.
+      if (!queueRes && can(PERM.queueView)) return; // authedFetch returned null: session redirect
+      const noQueue = !queueRes || queueRes.status === 403;
       if (!noQueue && !queueRes.ok) {
         setError("Couldn't load the nursing worklist. Try again.");
         return;
       }
       setQueueForbidden(noQueue);
-      const entries: QueueEntry[] = noQueue ? [] : await queueRes.json();
+      type WorklistItem = {
+        entry: QueueEntry;
+        patient: { name?: string; mrn?: string; dob?: string; gender?: string; allergies?: string[]; chronicConditions?: string[] } | null;
+        // null = none recorded yet, or the caller lacks clinical:view.
+        vitals: { recordedAt: string; abnormalFlags?: string[] } | null;
+      };
+      const items: WorklistItem[] = noQueue || !queueRes ? [] : ((await queueRes.json())?.items ?? []);
       const staffMap = new Map<string, string>();
       if (staffRes?.ok) {
         const options: StaffOption[] = await staffRes.json();
         setStaff(options);
         options.forEach((s) => staffMap.set(s.id, s.name));
       }
-      const withNames = async (list: QueueEntry[]) => Promise.all(list.map(async (e) => {
-        const pRes = await authedFetch(`/patients/${e.patientId}`);
-        const p: { name?: string; mrn?: string; dob?: string; gender?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
-        return {
-          ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
-          allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
-          lastVitalsAt: null, vitalsOutOfRange: false,
-          dob: p?.dob ?? null, gender: e.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
-          ageYears: e.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
-        };
+      const all: Row[] = items.map(({ entry: e, patient: p, vitals: v }) => ({
+        ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
+        allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
+        lastVitalsAt: v?.recordedAt ?? null, vitalsOutOfRange: (v?.abnormalFlags?.length ?? 0) > 0,
+        dob: p?.dob ?? null, gender: e.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
+        ageYears: e.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
       }));
-      // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today —
-      // fetched vitals confirm it actually happened (a tenant's flow can skip the vitals step type
-      // entirely) rather than assuming from status alone.
+      // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today. Rows
+      // without vitals (flow skips the vitals step, or no clinical:view) stay, shown as not recorded.
       const RECORDED_STATUSES = ["vitals_done", "in_consult", "procedures_pending", "checkout_pending", "completed"];
-      const withVitals = async (list: Row[]) => (await Promise.all(list.map(async (r): Promise<Row | null> => {
-        // Reading recorded vitals needs clinical:view; without it the Recorded view simply stays empty.
-        if (!can(PERM.vitalsRead)) return null;
-        const vRes = await authedFetch(`/clinical/vitals/${r.id}`);
-        if (!vRes?.ok) return null;
-        const v: { recordedAt: string; abnormalFlags: string[] } = await vRes.json();
-        return { ...r, lastVitalsAt: v.recordedAt, vitalsOutOfRange: v.abnormalFlags.length > 0 };
-      }))).filter((r): r is Row => r !== null);
-
-      setRows(await withNames(entries.filter((e) => e.status === "vitals_pending")));
-      setRecordedRows(await withVitals(await withNames(entries.filter((e) => RECORDED_STATUSES.includes(e.status)))));
-      setProceduresPendingRows(await withNames(entries.filter((e) => e.status === "procedures_pending")));
-      if (priorityRes?.ok) setPriorityRows(await withNames(await priorityRes.json()));
+      setRows(all.filter((r) => r.status === "vitals_pending"));
+      setRecordedRows(all.filter((r) => RECORDED_STATUSES.includes(r.status)));
+      setProceduresPendingRows(all.filter((r) => r.status === "procedures_pending"));
+      setPriorityRows(all.filter((r) => r.priority));
       if (adminRes?.ok) setAdministrationOrders(await adminRes.json());
       if (procRes?.ok) setProcedureOrders(await procRes.json());
       if (activityRes?.ok) setActivity(await activityRes.json());
       // A 403 on a secondary list just means that section isn't theirs; anything else is a failure
       // the nurse should hear about rather than see as a silently empty tab.
-      setSectionFailed([priorityRes, adminRes, procRes, activityRes, staffRes].some((r) => r && !r.ok && r.status !== 403));
+      setSectionFailed([adminRes, procRes, activityRes, staffRes].some((r) => r && !r.ok && r.status !== 403));
       setError(null);
       setLoaded(true);
     } catch {
@@ -400,8 +395,8 @@ function NursingWorklist() {
   }
   const canViewVitals = can(PERM.vitalsRead);
   // Row click / Enter / Space: capture for a waiting visit, read-only view for a recorded one.
-  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureVitals) openVitalsModal(r.id); } else if (canViewVitals) void openViewVitals(r); };
-  const rowActionable = (r: Row) => (r.status === "vitals_pending" ? canCaptureVitals : canViewVitals);
+  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureVitals) openVitalsModal(r.id); } else if (canViewVitals && r.lastVitalsAt) void openViewVitals(r); };
+  const rowActionable = (r: Row) => (r.status === "vitals_pending" ? canCaptureVitals : canViewVitals && !!r.lastVitalsAt);
 
   function closeVitalsModal() {
     setVitalsEntryId(null);
@@ -620,6 +615,7 @@ function NursingWorklist() {
 
   const visibleVitalsRows = vitalsFilter === "due" ? rows : vitalsFilter === "recorded" ? recordedRows : [...rows, ...recordedRows];
   const urgentCandidates = [...rows, ...recordedRows].filter((r) => !r.priority);
+  const recordedCount = recordedRows.filter((r) => r.lastVitalsAt).length;
   const outOfRangeCount = recordedRows.filter((r) => r.vitalsOutOfRange).length;
   const staffName = (id: string | null) => (id ? staff.find((s) => s.id === id)?.name ?? null : null);
   const canCaptureVitals = allow(PERM.vitalsWrite);
@@ -756,14 +752,14 @@ function NursingWorklist() {
                                 </div>
                               )}
                             </td>
-                            <td data-label="Last vitals" className={styles.muted}>{r.lastVitalsAt ? hhmm(r.lastVitalsAt) : "—"}</td>
+                            <td data-label="Last vitals" className={styles.muted}>{r.lastVitalsAt ? hhmm(r.lastVitalsAt) : r.status !== "vitals_pending" && canViewVitals ? "Not recorded" : "—"}</td>
                             <td data-label="Status">
                               {r.status === "vitals_pending"
                                 ? <StatusPill tone="warn" label="Waiting" icon="clock" />
                                 : <StatusPill tone={r.vitalsOutOfRange ? "danger" : "ok"} label={r.vitalsOutOfRange ? `${statusLabel(r.status)} · out of range` : statusLabel(r.status)} icon={r.vitalsOutOfRange ? "alert" : "check"} />}
                             </td>
                             <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); openVitalsModal(r.id); }}><Icon name="pulse" size={14} />Capture vitals</button>}
-                              {r.status !== "vitals_pending" && canViewVitals && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); void openViewVitals(r); }}><Icon name="pulse" size={14} />View vitals</button>}</td>
+                              {r.status !== "vitals_pending" && canViewVitals && r.lastVitalsAt && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); void openViewVitals(r); }}><Icon name="pulse" size={14} />View vitals</button>}</td>
                           </tr>
                         );
                       })}
@@ -776,7 +772,7 @@ function NursingWorklist() {
             <div className={styles.sidebarStack}>
               {!queueForbidden && <div className={styles.card}>
                 <div className={styles.sideTitle}><Icon name="pulse" size={14} />Vitals summary</div>
-                <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedRows.length}</span></div>
+                <div className={styles.summaryRow}><span>Recorded today</span><span className={styles.summaryValue}>{recordedCount}</span></div>
                 <div className={styles.summaryRow}>
                   <span>Out of range</span>
                   <span className={outOfRangeCount > 0 ? styles.summaryDanger : styles.summaryValue}>

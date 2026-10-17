@@ -57,6 +57,28 @@ public class VitalsService {
         return toResponse(tenantId, row);
     }
 
+    /** NUR-019: get() for many visits in two queries, keyed by queue entry id; visits with no vitals are absent. */
+    @Transactional
+    public java.util.Map<UUID, VitalsResponse> getMany(UUID tenantId, java.util.Collection<UUID> queueEntryIds) {
+        if (queueEntryIds.isEmpty()) {
+            return java.util.Map.of();
+        }
+        tenantContext.set(tenantId);
+        List<VitalsRow> rows = repo.findByQueueEntries(tenantId, List.copyOf(new java.util.LinkedHashSet<>(queueEntryIds)));
+        if (rows.isEmpty()) {
+            return java.util.Map.of();
+        }
+        java.util.Map<UUID, LocalDate> dobs = repo.findPatientDobs(tenantId,
+                rows.stream().map(VitalsRow::patientId).distinct().toList());
+        LocalDate today = clock.today(tenantId);
+        java.util.Map<UUID, VitalsResponse> out = new java.util.HashMap<>();
+        for (VitalsRow v : rows) {
+            LocalDate dob = dobs.get(v.patientId());
+            out.put(v.queueEntryId(), toResponse(v, dob == null ? 30 : ageInYears(dob, today))); // 30 = get()'s fallback
+        }
+        return out;
+    }
+
     /** NUR-022: previous vitals of a patient across visits, newest first (the caller drops the current visit). */
     @Transactional
     public VitalsHistoryResponse previous(UUID tenantId, UUID patientId, int limit) {

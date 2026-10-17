@@ -20,6 +20,8 @@ type QueueEntry = {
   id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
   queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
   createdAt: string; source: string;
+  // REC-011: already on GET /v1/queue rows; optional so an older backend just shows less.
+  visitType?: string | null; presentingComplaint?: string | null; ageYears?: number | null; gender?: string | null;
 };
 type Row = QueueEntry & { patientName: string; patientMrn: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
@@ -27,7 +29,7 @@ type GuardianOption = { id: string; name: string; phone: string };
 // GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
 type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
 type Grants = { queueCreate: boolean; queueEdit: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
-type StaffOption = { id: string; name: string };
+type StaffOption = { id: string; name: string; departmentName?: string | null };
 // Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
 type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
 // NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
@@ -43,6 +45,11 @@ type TransferTarget = { departmentId: string; departmentName: string; doctors: {
 const VISIT_LABEL: Record<string, string> = {
   walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
   returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
+};
+
+// REC-011: the table's Visit column (QueueRepository's visit_type), same labels as /schedule.
+const VISIT_TYPE_LABEL: Record<string, string> = {
+  appointment: "Appointment", follow_up: "Follow-up", walk_in: "Walk-in", transfer: "Transfer",
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -125,6 +132,7 @@ function ArrivalsPageInner() {
   const tabParam = searchParams.get("tab");
   const [rows, setRows] = useState<Row[]>([]);
   const [staff, setStaff] = useState<StaffOption[]>([]);
+  const [rosterFailed, setRosterFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -236,6 +244,7 @@ function ArrivalsPageInner() {
     const seq = ++loadSeq.current;
     setError(null);
     try {
+      if (!can("queue:view")) { setForbidden(true); return; } // LIVE-09: no requests that can only 403
       const [queueRes, staffRes] = await Promise.all([authedFetch("/queue"), authedFetch("/staff/roster")]);
       if (!queueRes) return;
       if (queueRes.status === 403) {
@@ -249,16 +258,17 @@ function ArrivalsPageInner() {
       const entries: QueueEntry[] = await queueRes.json();
       const staffMap = new Map<string, string>();
       let doctorIds: string[] = [];
+      setRosterFailed(!staffRes?.ok);
       if (staffRes?.ok) {
-        const roster: { id: string; name: string }[] = await staffRes.json();
-        setStaff(roster.map((s) => ({ id: s.id, name: s.name })));
+        const roster: StaffOption[] = await staffRes.json();
+        setStaff(roster.map((s) => ({ id: s.id, name: s.name, departmentName: s.departmentName ?? null })));
         roster.forEach((s) => staffMap.set(s.id, s.name));
         doctorIds = roster.map((s) => s.id);
       }
       const withNames = await Promise.all(entries.map(async (e) => {
         const cached = patientCache.current.get(e.patientId);
         if (cached) return { ...e, patientName: cached.name, patientMrn: cached.mrn };
-        const pRes = await authedFetch(`/patients/${e.patientId}`);
+        const pRes = can("patients:view") ? await authedFetch(`/patients/${e.patientId}`) : null;
         const p = pRes?.ok ? await pRes.json() : null;
         if (p?.name) patientCache.current.set(e.patientId, { name: p.name, mrn: p.mrn ?? "" });
         return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "" };
@@ -338,6 +348,7 @@ function ArrivalsPageInner() {
   }, [authedFetch]);
   useEffect(() => {
     void Promise.resolve().then(async () => {
+      if (!can("queue:view")) return;
       const res = await authedFetch("/appointments/callback-list");
       if (res?.ok) setCallbackList(await res.json());
     });
@@ -617,7 +628,7 @@ function ArrivalsPageInner() {
     const alreadyArrived = new Set(rows.map((r) => r.appointmentId).filter(Boolean));
     const pending = list.filter((a) => a.status === "scheduled" && !alreadyArrived.has(a.id));
     const withNames = await Promise.all(pending.map(async (a) => {
-      const pRes = await authedFetch(`/patients/${a.patientId}`);
+      const pRes = can("patients:view") ? await authedFetch(`/patients/${a.patientId}`) : null;
       const p = pRes?.ok ? await pRes.json() : null;
       return {
         id: a.id, patientId: a.patientId, doctorId: a.doctorId,
@@ -738,7 +749,7 @@ function ArrivalsPageInner() {
       estimatedMinutes: waitEstimates[s.id],
       delay: delays[s.id] ?? null,
     }))
-    .filter((s) => s.waiting > 0 || s.delay)
+    // REC-023: every active doctor stays on the rail; idle ones sink to the bottom, muted.
     .sort((a, b) => b.waiting - a.waiting);
 
   // Stable close handlers: Dialog re-focuses its first control whenever onClose changes identity.
@@ -876,8 +887,10 @@ function ArrivalsPageInner() {
                             #{r.tokenNumber}
                             {r.priority && <span className={styles.priorityTag}><StatusPill tone="urgent" label="Priority" /></span>}
                           </td>
-                          <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                          <td className={`${styles.muted} ${styles.colVisit}`} data-label="Visit">{VISIT_LABEL[r.source] ?? r.source}</td>
+                          <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span>
+                            <span className={styles.mrn}>{[r.patientMrn, [r.ageYears, (r.gender ?? "").trim().charAt(0).toUpperCase()].filter((x) => x != null && x !== "").join(" ")].filter(Boolean).join(" · ")}</span>
+                            {r.presentingComplaint && <span className={styles.complaint} title={r.presentingComplaint}>{r.presentingComplaint}</span>}</td>
+                          <td className={`${styles.muted} ${styles.colVisit}`} data-label="Visit">{(r.visitType && VISIT_TYPE_LABEL[r.visitType]) || (VISIT_LABEL[r.source] ?? r.source)}</td>
                           <td className={styles.colDoctor} data-label="Doctor">{staff.find((s) => s.id === r.doctorId)?.name ?? "—"}</td>
                           <td className={styles.muted} data-label="Wait">{b === "waiting" || b === "in_consult" ? `${waitMinutes(r.createdAt)}m` : "—"}</td>
                           <td data-label="Status"><StatusBadge status={r.status} /></td>
@@ -896,15 +909,20 @@ function ArrivalsPageInner() {
           <div className={styles.sideCol}>
           <div className={styles.card}>
             <div className={styles.sideTitle}>Doctor queues</div>
-            {doctorQueues.length === 0 ? (
-              <EmptyState icon="stethoscope" title="No one waiting" />
+            {rosterFailed ? (
+              <ErrorState message="Couldn't load the doctor roster." onRetry={() => void load()} />
+            ) : doctorQueues.length === 0 ? (
+              <EmptyState icon="stethoscope" title="No doctors on the roster" />
             ) : (
               doctorQueues.map((d) => (
-                <div key={d.id} className={`${styles.doctorRow} ${styles.doctorRowStack}`}>
+                <div key={d.id} className={`${styles.doctorRow} ${styles.doctorRowStack}${d.waiting === 0 ? ` ${styles.doctorIdle}` : ""}`}>
                   <div className={styles.doctorLine}>
-                    <span className={styles.doctorName}>{d.name}</span>
+                    <span>
+                      <span className={styles.doctorName}>{d.name}</span>
+                      {d.departmentName && <span className={styles.doctorDept}>{d.departmentName}</span>}
+                    </span>
                     <span className={styles.doctorCount}>
-                      {d.waiting} waiting{d.estimatedMinutes !== undefined ? ` · ~${d.estimatedMinutes}m wait` : ""}
+                      {d.waiting === 0 ? "No patients waiting" : `${d.waiting} waiting${d.estimatedMinutes !== undefined ? ` · ~${d.estimatedMinutes}m wait` : ""}`}
                     </span>
                   </div>
                   {d.delay ? (
@@ -953,7 +971,7 @@ function ArrivalsPageInner() {
           {railRow.priority && railRow.priorityReason && <p className={styles.railNote}>Priority reason: {railRow.priorityReason}</p>}
           <dl className={styles.railList}>
             <div><dt>MRN</dt><dd>{railRow.patientMrn || "—"}</dd></div>
-            <div><dt>Visit</dt><dd>{VISIT_LABEL[railRow.source] ?? railRow.source}</dd></div>
+            <div><dt>Visit</dt><dd>{(railRow.visitType && VISIT_TYPE_LABEL[railRow.visitType]) || (VISIT_LABEL[railRow.source] ?? railRow.source)}</dd></div>
             <div><dt>Doctor</dt><dd>{staff.find((s) => s.id === railRow.doctorId)?.name ?? "—"}</dd></div>
             <div><dt>Waiting</dt><dd>{bucketOf(railRow.status) === "waiting" || bucketOf(railRow.status) === "in_consult" ? `${waitMinutes(railRow.createdAt)} min` : "—"}</dd></div>
             <div><dt>Arrived</dt><dd>{new Date(railRow.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</dd></div>

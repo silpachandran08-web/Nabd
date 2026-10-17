@@ -42,6 +42,30 @@ class BillingApiTest extends ApiTestBase {
                 .contains(tenant.id().toString());
     }
 
+    /** LIVE-07 root cause: provisioning/go-live never creates a subscription; only an operator's upsert does.
+     * A tenant without one is genuinely absent from the list (not filtered out); after an upsert it shows. */
+    @Test
+    void aTenantAppearsInBillingOnlyOnceASubscriptionIsStarted() {
+        SeededTenant tenant = seedTenant();
+        jdbc.update("UPDATE tenants SET status = 'trialing' WHERE id = ?", tenant.id());
+        UUID planId = seedPlan("base-" + tenant.slug(), 100000, "INR", 3);
+        String token = platformLoginAndGetAccessToken(seedOperator("billing-live07@nabd.internal", "billing", false));
+
+        ResponseEntity<Map> before = exchange("/v1/platform/billing/subscriptions?limit=100", HttpMethod.GET, authed(token), Map.class);
+        assertThat((List) before.getBody().get("data")).extracting(o -> ((Map) o).get("tenantId"))
+                .doesNotContain(tenant.id().toString());
+
+        exchange("/v1/platform/billing/subscriptions/" + tenant.id(), HttpMethod.POST,
+                authedJsonBody(token, Map.of("planId", planId.toString(), "mrrCents", 100000,
+                        "renewalDate", LocalDate.now().plusDays(30).toString())), Map.class);
+
+        ResponseEntity<Map> after = exchange("/v1/platform/billing/subscriptions?limit=100", HttpMethod.GET, authed(token), Map.class);
+        Map row = (Map) ((List) after.getBody().get("data")).stream()
+                .filter(o -> tenant.id().toString().equals(((Map) o).get("tenantId"))).findFirst().orElseThrow();
+        assertThat(row.get("tenantStatus")).isEqualTo("trialing"); // trialing tenants are not filtered out
+        assertThat(row.get("planName")).isEqualTo("base-" + tenant.slug());
+    }
+
     @Test
     void billingCanMoveATenantToOverdueButNotToOffboarding() {
         SeededTenant tenant = seedTenant();

@@ -34,6 +34,30 @@ class VitalsRepository {
                 mapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
+    /** NUR-019: findByQueueEntry for many visits in one query. */
+    List<VitalsRow> findByQueueEntries(UUID tenantId, List<UUID> queueEntryIds) {
+        return jdbc.query("SELECT * FROM vitals WHERE tenant_id = ? AND queue_entry_id IN (" + marks(queueEntryIds) + ")",
+                mapper(), withTenant(tenantId, queueEntryIds));
+    }
+
+    /** NUR-019: findPatientDob for many patients in one query. */
+    java.util.Map<UUID, LocalDate> findPatientDobs(UUID tenantId, List<UUID> patientIds) {
+        java.util.Map<UUID, LocalDate> out = new java.util.HashMap<>();
+        jdbc.query("SELECT id, dob FROM patients WHERE tenant_id = ? AND id IN (" + marks(patientIds) + ")",
+                rs -> { out.put(UUID.fromString(rs.getString("id")), rs.getDate("dob").toLocalDate()); }, withTenant(tenantId, patientIds));
+        return out;
+    }
+
+    private static String marks(List<UUID> ids) {
+        return String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    }
+
+    private static Object[] withTenant(UUID tenantId, List<UUID> ids) {
+        List<Object> args = new java.util.ArrayList<>(List.of(tenantId));
+        args.addAll(ids);
+        return args.toArray();
+    }
+
     /** NUR-022: a patient's vitals across visits, newest first. */
     List<VitalsRow> findByPatient(UUID tenantId, UUID patientId, int limit) {
         return jdbc.query("SELECT * FROM vitals WHERE tenant_id = ? AND patient_id = ? ORDER BY recorded_at DESC LIMIT ?",

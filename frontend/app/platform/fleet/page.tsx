@@ -22,7 +22,7 @@ type TenantSummary = {
 };
 type FleetPage = { data: TenantSummary[]; page: { nextCursor: string | null; limit: number } };
 // Matches GET /v1/platform/tenants/summary (FleetController) — the header's KPI grid.
-type FleetSummary = { total: number; byStatus: Record<string, number>; regions: string[] };
+type FleetSummary = { total: number; live?: number; trialing?: number; byStatus: Record<string, number>; regions: string[] };
 // Matches GET /v1/platform/auth/me (PlatformAuthController) — just enough to gate the
 // Support access column/tile, same shape platform/page.tsx already reads in full.
 type OperatorProfile = { permissions: string[] };
@@ -120,9 +120,10 @@ export default function FleetPage() {
         <div className={styles.kpiGrid}>
           <div className={styles.kpiTile}>
             <div className={styles.kpiLabel}>Tenants live</div>
-            <div className={styles.kpiValue}>{summary ? summary.total : "—"}</div>
+            {/* LIVE-07: live = the server's count (status active); trialing is not live. Overdue counting is a pending decision. */}
+            <div className={styles.kpiValue}>{summary ? (summary.live ?? summary.byStatus.active ?? 0) : "—"}</div>
             <div className={styles.kpiSub}>
-              {summary ? `${summary.byStatus.provisioning ?? 0} provisioning · ${summary.byStatus.suspended ?? 0} suspended` : ""}
+              {summary ? `${summary.byStatus.overdue ?? 0} overdue · ${summary.byStatus.trialing ?? 0} trialing · ${summary.byStatus.provisioning ?? 0} provisioning · ${summary.byStatus.suspended ?? 0} suspended` : ""}
             </div>
           </div>
           <div className={styles.kpiTile}>

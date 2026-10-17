@@ -234,6 +234,8 @@ export default function ConsultPage() {
     }
     const self = String(decodeJwt(token).sub ?? "");
     setSelfId(self);
+    // LIVE-09: no queue:view, no request; same "no access" state the 403 used to produce.
+    if (!can("queue:view")) { setForbidden(true); setLoading(false); return; }
     try {
       const res = await authedFetch(which === "mine" ? `/queue?doctorId=${self}` : "/queue");
       if (!res) return;
@@ -250,7 +252,7 @@ export default function ConsultPage() {
       // chronic-condition and package flags shown in the list. There is no batch endpoint yet.
       const byPatient = new Map<string, Promise<PatientDetail | null>>();
       for (const e of entries) {
-        if (!byPatient.has(e.patientId)) {
+        if (can("patients:view") && !byPatient.has(e.patientId)) {
           byPatient.set(e.patientId, authedFetch(`/patients/${e.patientId}`).then(async (r) => (r?.ok ? ((await r.json()) as PatientDetail) : null)).catch(() => null));
         }
       }
@@ -424,7 +426,7 @@ export default function ConsultPage() {
   // Who may start which visit: the visit doctor, from the status just before in_consult.
   const canStartRow = (r: Row) => {
     const from = r.departmentId in startStatus ? startStatus[r.departmentId] : DEFAULT_START_STATUS;
-    return r.doctorId === selfId && from !== null && r.status === from;
+    return r.doctorId === selfId && from !== null && r.status === from && can("queue:edit");
   };
 
   function openRow(row: Row) {
@@ -501,7 +503,7 @@ export default function ConsultPage() {
     needsServerCheckRef.current = false;
 
     try {
-      const pRes = await authedFetch(`/patients/${row.patientId}`);
+      const pRes = can("patients:view") ? await authedFetch(`/patients/${row.patientId}`) : null;
       if (stale()) return;
       if (pRes?.ok) setActivePatient(await pRes.json());
 
@@ -1282,7 +1284,7 @@ export default function ConsultPage() {
                     {saveState === "saving" ? "Saving…" : "Save draft"}
                   </button>
                 )}
-                {activeEntry.status === "in_consult" && (
+                {activeEntry.status === "in_consult" && can("queue:edit") && (
                   <button className={styles.backBtn} onClick={openTransfer} disabled={completing}>Transfer to another department</button>
                 )}
                 {canEditNote && (step !== "close" ? (

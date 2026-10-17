@@ -65,8 +65,20 @@ class PatientRepository {
         ).stream().findFirst();
     }
 
-    /** NB-074: real signal now that queue_entries exists — the rest of the drawer (allergies,
-     * chronic conditions, packages, balance) stays stubbed until their own epics land. */
+    /** LIVE-03: the ONE definition of "last visit" — the latest queue_date (tenant-local visit day) of
+     * any queue entry for the patient that is not a no-show (so a visit in progress today counts).
+     * Shared verbatim by the registry list and the patient detail (drawer) so they cannot disagree. */
+    private static final String LAST_VISIT_SQL =
+            "(SELECT max(q.queue_date) FROM queue_entries q WHERE q.patient_id = patients.id AND q.status <> 'no_show')";
+
+    Optional<LocalDate> findLastVisit(UUID tenantId, UUID patientId) {
+        return jdbc.query("SELECT " + LAST_VISIT_SQL + " AS last_visit FROM patients WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> rs.getDate("last_visit"), tenantId, patientId)
+                .stream().filter(java.util.Objects::nonNull).map(java.sql.Date::toLocalDate).findFirst();
+    }
+
+    /** NB-074. Deprecated for display (LIVE-03): timestamp of the latest *completed* entry — a different
+     * definition from findLastVisit(); kept only because the consult SafetyStrip still reads lastVisitAt. */
     Optional<Instant> findLastVisitAt(UUID tenantId, UUID patientId) {
         return jdbc.query("SELECT max(updated_at) AS last_visit FROM queue_entries " +
                         "WHERE tenant_id = ? AND patient_id = ? AND status = 'completed'",
@@ -91,6 +103,52 @@ class PatientRepository {
                 "SELECT condition FROM chronic_conditions WHERE tenant_id = ? AND patient_id = ? AND status = 'active' " +
                         "ORDER BY recorded_at DESC",
                 String.class, tenantId, patientId);
+    }
+
+    // NUR-019: batched (IN-list) forms of the four GET /patients/{id} reads above, same SQL and gates.
+    List<PatientRow> findVisibleByIds(UUID tenantId, List<UUID> ids, UUID scopedToDoctorId) {
+        List<Object> args = new java.util.ArrayList<>(List.of(tenantId));
+        args.addAll(ids);
+        args.add(scopedToDoctorId);
+        args.add(scopedToDoctorId);
+        return jdbc.query("SELECT " + COLUMNS + "FROM patients WHERE tenant_id = ? AND id IN (" + marks(ids) + ") " + CONSENT_GATE + SCOPE_GATE,
+                patientMapper(), args.toArray());
+    }
+
+    java.util.Map<UUID, Instant> findLastVisitAts(UUID tenantId, List<UUID> patientIds) {
+        java.util.Map<UUID, Instant> out = new java.util.HashMap<>();
+        jdbc.query("SELECT patient_id, max(updated_at) AS last_visit FROM queue_entries " +
+                        "WHERE tenant_id = ? AND patient_id IN (" + marks(patientIds) + ") AND status = 'completed' GROUP BY patient_id",
+                rs -> { out.put(UUID.fromString(rs.getString("patient_id")), rs.getTimestamp("last_visit").toInstant()); },
+                withTenant(tenantId, patientIds));
+        return out;
+    }
+
+    java.util.Map<UUID, List<String>> findActiveAllergySubstances(UUID tenantId, List<UUID> patientIds) {
+        return groupStrings("SELECT patient_id, substance AS v FROM patient_allergies WHERE tenant_id = ? AND patient_id IN (" + marks(patientIds) + ") " +
+                "AND active ORDER BY recorded_at DESC", tenantId, patientIds);
+    }
+
+    java.util.Map<UUID, List<String>> findActiveConditionNames(UUID tenantId, List<UUID> patientIds) {
+        return groupStrings("SELECT patient_id, condition AS v FROM chronic_conditions WHERE tenant_id = ? AND patient_id IN (" + marks(patientIds) + ") " +
+                "AND status = 'active' ORDER BY recorded_at DESC", tenantId, patientIds);
+    }
+
+    private java.util.Map<UUID, List<String>> groupStrings(String sql, UUID tenantId, List<UUID> patientIds) {
+        java.util.Map<UUID, List<String>> out = new java.util.HashMap<>();
+        jdbc.query(sql, rs -> { out.computeIfAbsent(UUID.fromString(rs.getString("patient_id")), k -> new java.util.ArrayList<>()).add(rs.getString("v")); },
+                withTenant(tenantId, patientIds));
+        return out;
+    }
+
+    private static String marks(List<UUID> ids) {
+        return String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    }
+
+    private static Object[] withTenant(UUID tenantId, List<UUID> ids) {
+        List<Object> args = new java.util.ArrayList<>(List.of(tenantId));
+        args.addAll(ids);
+        return args.toArray();
     }
 
     String region(UUID tenantId) {
@@ -119,7 +177,8 @@ class PatientRepository {
     List<RegistryRow> registry(UUID tenantId, UUID scopedToDoctorId, LocalDate today, Instant todayStart, int cap) {
         return jdbc.query("""
                 SELECT patients.id, patients.mrn, patients.name, patients.phone, patients.dob, patients.gender, patients.status,
-                       (SELECT max(q.queue_date) FROM queue_entries q WHERE q.patient_id = patients.id AND q.status <> 'no_show') AS last_visit,
+                       """ + LAST_VISIT_SQL + """
+                        AS last_visit,
                        na.start_time AS next_start, na.doctor_name AS next_doctor, na.doctor_id AS next_doctor_id, na.id AS next_appt_id,
                        pk.used AS pkg_used, pk.total AS pkg_total,
                        (SELECT c.condition FROM chronic_conditions c WHERE c.patient_id = patients.id AND c.status = 'active'

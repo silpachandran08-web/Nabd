@@ -171,7 +171,8 @@ class ScheduleRepository {
         Instant rangeEnd = date.atTime(blockEnd).atZone(zone).toInstant();
         Integer count = jdbc.queryForObject(
                 "SELECT " +
-                        "(SELECT count(*) FROM appointments a WHERE a.doctor_id = ? AND a.status = 'scheduled' " +
+                        // QA-04: a seen booking (completed) still used its place, as a completed walk-in does
+                        "(SELECT count(*) FROM appointments a WHERE a.doctor_id = ? AND a.status IN ('scheduled','completed') " +
                         "  AND a.start_time >= ? AND a.start_time < ?) " +
                         "+ " +
                         "(SELECT count(*) FROM queue_entries q WHERE q.doctor_id = ? AND q.queue_date = ? " +
