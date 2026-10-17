@@ -97,6 +97,12 @@ function OtcCheckoutInner() {
         setForbidden(true);
         return;
       }
+      if (res.status === 409) {
+        // PHA-010: 409 otc-not-available (pharmacy mode is external) - show the server detail.
+        const p: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
+        setError(p.detail || "Counter sales aren't available for this pharmacy mode.");
+        return;
+      }
       if (!res.ok) {
         setError("Couldn't load charges. Try again.");
         return;

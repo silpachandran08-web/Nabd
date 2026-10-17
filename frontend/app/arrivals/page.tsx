@@ -26,7 +26,7 @@ type PatientOption = { id: string; name: string; phone: string; mrn: string };
 type GuardianOption = { id: string; name: string; phone: string };
 // GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
 type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
-type Grants = { queueCreate: boolean; queueEdit: boolean; billingCreate: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
+type Grants = { queueCreate: boolean; queueEdit: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
 type StaffOption = { id: string; name: string };
 // Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
 type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
@@ -129,7 +129,7 @@ function ArrivalsPageInner() {
   const [, setNow] = useState(() => Date.now());
   // Per-action visibility (REC-014/052/062). Read after mount: the token lives in localStorage, so
   // evaluating can() during SSR/first render would mismatch. Absent until known, never disabled.
-  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, billingCreate: false, billingView: false, clinicalEdit: false, patientsView: false });
+  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, billingView: false, clinicalEdit: false, patientsView: false });
   // Patient name/MRN lookups are per-row GET /patients/{id}; cache them so the 15s poll only
   // fetches patients it hasn't seen (the N+1 shrinks to the first load).
   const patientCache = useRef(new Map<string, { name: string; mrn: string }>());
@@ -296,7 +296,7 @@ function ArrivalsPageInner() {
   useEffect(() => {
     void Promise.resolve().then(() => setGrants({
       queueCreate: can("queue:create"), queueEdit: can("queue:edit"),
-      billingCreate: can("billing:create"), billingView: can("billing:view"), clinicalEdit: can("clinical:edit"), patientsView: can("patients:view"),
+      billingView: can("billing:view"), clinicalEdit: can("clinical:edit"), patientsView: can("patients:view"),
     }));
   }, []);
 
@@ -784,11 +784,6 @@ function ArrivalsPageInner() {
               <Link className={styles.segment} href="/schedule">Schedule</Link>
               <span className={styles.segmentActive} aria-current="page">Live Queue</span>
             </nav>
-            {grants.billingCreate && grants.billingView && (
-              <button type="button" className={styles.secondaryBtn} onClick={() => router.push("/checkout/otc")}>
-                Counter sale
-              </button>
-            )}
           </div>
         )}
       </div>
