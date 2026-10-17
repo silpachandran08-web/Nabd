@@ -90,7 +90,7 @@ function Appointments() {
   return (
     <section className={styles.card} aria-label="Follow-up appointments">
       <h2 className={styles.cardTitle}>Follow-up appointments {!loading && !error && <span className={styles.count}>{rows.length}{next ? "+" : ""}</span>}</h2>
-      <p className={styles.hint}>Your appointments booked as a follow-up. The booking records no reason, so none is shown.</p>
+      <p className={styles.hint}>Your appointments booked as a follow-up. A cancelled booking shows its cancellation reason.</p>
       <div className={styles.filters}>
         <div className={styles.chips} role="group" aria-label="Follow-up view">
           {VIEWS.map((v) => <button key={v.key} type="button" className={styles.chip} aria-pressed={view === v.key} onClick={() => setView(v.key)}>{v.label}</button>)}

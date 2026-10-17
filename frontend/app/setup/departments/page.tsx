@@ -284,6 +284,7 @@ export default function DepartmentsPage() {
           <button className={styles.btn} onClick={openCreate}>+ Add department</button>
         </div>
         {toggleError && <div className={styles.errorState} role="alert">{toggleError}</div>}
+        <div style={{ overflowX: "auto" }}>
         <table className={styles.table}>
           <thead>
             <tr><th>Name</th><th>Flow</th><th>Status</th><th></th></tr>
@@ -317,6 +318,7 @@ export default function DepartmentsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className={styles.card}>

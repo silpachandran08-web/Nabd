@@ -20,7 +20,7 @@ class FollowUpListRepository {
         this.jdbc = jdbc;
     }
 
-    /** DOC-006: appointments flagged is_follow_up for this doctor, soonest first. No reason or reminder data exists to return. */
+    /** DOC-006: appointments flagged is_follow_up for this doctor, soonest first. No booking reason or reminder data exists; cancelReason is returned for cancelled rows (QA-06). */
     List<FollowUpItem> find(UUID tenantId, UUID doctorId, String status, Instant from, Instant toExclusive,
                             int limit, Instant afterStart, UUID afterId) {
         StringBuilder sql = new StringBuilder("""

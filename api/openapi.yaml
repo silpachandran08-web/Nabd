@@ -1362,8 +1362,8 @@ paths:
       tags: [Appointments]
       summary: The calling doctor's own follow-up appointments (appointments.is_follow_up), soonest first (DOC-006)
       description: >
-        Read-only, tenant-scoped, caller's own appointments only. No reason or reminder data exists in
-        the schema, so none is returned. `from`/`to` filter on the clinic calendar day of the start time.
+        Read-only, tenant-scoped, caller's own appointments only. No booking reason or reminder data exists in
+        the schema; `cancelReason` is set on cancelled rows (QA-06). `from`/`to` filter on the clinic calendar day of the start time.
       x-required-permission: queue:view
       parameters:
         - { name: status, in: query, required: false, schema: { type: string, enum: [scheduled, cancelled, completed, no_show] } }
