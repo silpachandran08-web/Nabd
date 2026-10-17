@@ -56,6 +56,8 @@ const MODULES: { key: string; label: string }[] = [
   { key: "specialty_dental", label: "Specialty (Dental)" },
   { key: "nursing", label: "Nursing" },
   { key: "departments", label: "Departments" },
+  // Break-glass (MF-02): Create = may activate emergency access, Approve = reviews every use afterwards.
+  { key: "emergency", label: "Emergency access" },
 ];
 const ACTIONS: { key: ActionKey; label: string }[] = [
   { key: "view", label: "View" },
@@ -140,6 +142,10 @@ export default function StaffAccessPage() {
   const [rolesFailed, setRolesFailed] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [breakGlass, setBreakGlass] = useState<{ id: string; staffId: string; staffName: string; reason: string; activatedAt: string; expiresAt: string }[]>([]);
+  const [bgUnreviewed, setBgUnreviewed] = useState<{ id: string; staffName: string; reason: string; activatedAt: string; deactivatedAt: string | null }[]>([]);
+  const [bgReviewFor, setBgReviewFor] = useState<{ id: string; staffName: string } | null>(null);
+  const [bgReviewNotes, setBgReviewNotes] = useState("");
+  const [bgReviewError, setBgReviewError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -203,7 +209,8 @@ export default function StaffAccessPage() {
         router.replace("/login");
         return;
       }
-      setPermissions(decodePermissions(token));
+      const perms = decodePermissions(token);
+      setPermissions(perms);
 
       const staffRes = await authedFetch("/staff?limit=50");
       if (!staffRes) return;
@@ -228,6 +235,10 @@ export default function StaffAccessPage() {
 
       const bgRes = await authedFetch("/auth/break-glass/active");
       if (bgRes?.ok) setBreakGlass(await bgRes.json());
+      if (perms.includes("emergency:approve")) {
+        const reviewRes = await authedFetch("/auth/break-glass/unreviewed");
+        if (reviewRes?.ok) setBgUnreviewed(await reviewRes.json());
+      }
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -452,6 +463,25 @@ export default function StaffAccessPage() {
     }
   }
 
+  async function submitBgReview(e: React.FormEvent) {
+    e.preventDefault();
+    if (!bgReviewFor) return;
+    setBgReviewError(null);
+    const res = await authedFetch(`/auth/break-glass/${bgReviewFor.id}/review`, {
+      method: "POST",
+      body: JSON.stringify({ notes: bgReviewNotes.trim() }),
+    });
+    if (!res) return;
+    if (!res.ok) {
+      const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't save the review." }));
+      setBgReviewError(body.detail || "Couldn't save the review.");
+      return;
+    }
+    setBgUnreviewed((prev) => prev.filter((g) => g.id !== bgReviewFor.id));
+    setBgReviewFor(null);
+    setBgReviewNotes("");
+  }
+
   async function saveRegistrationNo(target: Staff, value: string): Promise<string | null> {
     try {
       // "" clears it (null/absent would leave it unchanged).
@@ -638,6 +668,50 @@ export default function StaffAccessPage() {
             </>
           )}
         </>
+      )}
+
+      {bgUnreviewed.length > 0 && (
+        <>
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Emergency access — awaiting review</h2>
+          </div>
+          <div className={styles.card}>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead><tr><th>Staff</th><th>Reason</th><th>Activated</th><th>Ended</th><th></th></tr></thead>
+                <tbody>
+                  {bgUnreviewed.map((g) => (
+                    <tr key={g.id}>
+                      <td className={styles.staffName}>{g.staffName}</td>
+                      <td>{g.reason}</td>
+                      <td className={styles.muted}>{new Date(g.activatedAt).toLocaleString()}</td>
+                      <td className={styles.muted}>{g.deactivatedAt ? new Date(g.deactivatedAt).toLocaleString() : "Still active"}</td>
+                      <td>
+                        <button className={styles.actionBtn} onClick={() => { setBgReviewFor({ id: g.id, staffName: g.staffName }); setBgReviewError(null); }}>
+                          Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {bgReviewFor && (
+        <Dialog title={`Review emergency access by ${bgReviewFor.staffName}`} onClose={() => setBgReviewFor(null)}>
+          <form className={styles.dialogForm} onSubmit={submitBgReview}>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="bgReviewNotes">Review notes</label>
+              <input id="bgReviewNotes" className={styles.input} value={bgReviewNotes}
+                onChange={(e) => setBgReviewNotes(e.target.value)} placeholder="Was the access justified? What was looked at?" required />
+            </div>
+            <button className={styles.submit} type="submit" disabled={!bgReviewNotes.trim()}>Mark reviewed</button>
+            {bgReviewError && <div className={styles.formError} role="alert">{bgReviewError}</div>}
+          </form>
+        </Dialog>
       )}
 
       {regEdit && canEditRoles && (

@@ -3,7 +3,9 @@ package com.nabd.hms.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authentication.AuthenticationManagerResolver;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -66,7 +68,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-            Converter<org.springframework.security.oauth2.jwt.Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
+            AuthenticationManagerResolver<HttpServletRequest> tokenPurposeAuthenticationManagerResolver,
             CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
                 .csrf(csrf -> csrf.disable()) // stateless bearer-token API, no cookies to forge
@@ -91,7 +93,9 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+                // Only full session tokens are bearer credentials, except where an endpoint exists to
+                // consume one specific intermediate token — see TokenPurposeAuthenticationManagerResolver.
+                .oauth2ResourceServer(oauth2 -> oauth2.authenticationManagerResolver(tokenPurposeAuthenticationManagerResolver));
         return http.build();
     }
 }

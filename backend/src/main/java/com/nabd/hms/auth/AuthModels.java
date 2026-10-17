@@ -28,7 +28,9 @@ final class AuthModels {
         }
     }
 
-    /** NB-048: an active break-glass grant, for the Owner-visible "who's elevated right now" panel. */
-    record BreakGlassRow(UUID id, UUID staffId, String staffName, String reason, Instant activatedAt, Instant expiresAt) {
+    /** NB-048: one break-glass grant, active or ended, with its post-hoc review once someone has done it. */
+    record BreakGlassGrant(UUID id, UUID staffId, String staffName, String reason, Instant activatedAt, Instant expiresAt,
+                           UUID sessionFamilyId, Instant deactivatedAt, String deactivatedReason,
+                           Instant reviewedAt, UUID reviewedBy, String reviewNotes) {
     }
 }

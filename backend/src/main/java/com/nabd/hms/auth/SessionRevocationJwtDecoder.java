@@ -16,7 +16,9 @@ import java.util.UUID;
  * carry BOTH "sid" and "tenantId" — i.e. staff access tokens minted by AuthService.mintTokenPair.
  * Every other token this app issues (MFA challenge, step-up, mfa_setup_required, platform-operator
  * tokens) is missing one or the other claim and passes through unchanged; see mintTokenPair's
- * neighbors for why none of them share this exact claim pair.
+ * neighbors for why none of them share this exact claim pair. Passing through here is NOT acceptance
+ * as a bearer credential: TokenPurposeAuthenticationManagerResolver rejects every intermediate token
+ * except on the one endpoint meant to consume it.
  */
 @Component
 @Primary

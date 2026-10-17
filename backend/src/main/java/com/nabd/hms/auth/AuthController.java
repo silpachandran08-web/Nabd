@@ -1,7 +1,9 @@
 package com.nabd.hms.auth;
 
 import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
+import com.nabd.hms.auth.dto.BreakGlassGrantResponse;
 import com.nabd.hms.auth.dto.BreakGlassResponse;
+import com.nabd.hms.auth.dto.BreakGlassReviewRequest;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
 import com.nabd.hms.auth.dto.MfaConfirmResponse;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -95,9 +98,11 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
+    /** Re-enrolling an account that already has MFA needs X-Step-Up-Token (QA-04); first enrollment doesn't. */
     @PostMapping("/mfa/enroll")
-    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt) {
-        return authService.enrollMfa(jwt);
+    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt,
+                                       @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
+        return authService.enrollMfa(jwt, stepUpToken);
     }
 
     @PostMapping("/mfa/confirm")
@@ -124,11 +129,14 @@ public class AuthController {
     }
 
     @PostMapping("/break-glass/activate")
+    @PreAuthorize("hasAuthority('emergency:create')")
     public TokenPairResponse activateBreakGlass(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody BreakGlassActivateRequest req,
+                                                 @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken,
                                                  HttpServletRequest http) {
-        return authService.activateBreakGlass(jwt, req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
+        return authService.activateBreakGlass(jwt, stepUpToken, req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
     }
 
+    /** Own grant, or anyone's with emergency:approve — checked in AuthService.deactivateBreakGlass. */
     @PostMapping("/break-glass/{id}/deactivate")
     public ResponseEntity<Void> deactivateBreakGlass(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         authService.deactivateBreakGlass(jwt, id);
@@ -139,6 +147,20 @@ public class AuthController {
     @PreAuthorize("hasAuthority('staff:view')")
     public List<BreakGlassResponse> activeBreakGlass(@AuthenticationPrincipal Jwt jwt) {
         return authService.listActiveBreakGlass(tenantId(jwt));
+    }
+
+    @GetMapping("/break-glass/unreviewed")
+    @PreAuthorize("hasAuthority('emergency:approve')")
+    public List<BreakGlassGrantResponse> unreviewedBreakGlass(@AuthenticationPrincipal Jwt jwt) {
+        return authService.listUnreviewedBreakGlass(tenantId(jwt));
+    }
+
+    @PostMapping("/break-glass/{id}/review")
+    @PreAuthorize("hasAuthority('emergency:approve')")
+    public ResponseEntity<Void> reviewBreakGlass(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                 @Valid @RequestBody BreakGlassReviewRequest req) {
+        authService.reviewBreakGlass(jwt, id, req);
+        return ResponseEntity.noContent().build();
     }
 
     private UUID tenantId(Jwt jwt) {

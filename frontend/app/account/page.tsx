@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import styles from "./account.module.css";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
-// self-activated emergency access (NB-048). All work against a normal logged-in access token.
+// emergency access (NB-048). All work against a normal logged-in access token; replacing an existing
+// MFA setup and activating emergency access also need a fresh authenticator code (step-up).
 type Session = { id: string; device: string | null; ip: string | null; lastSeenAt: string; current: boolean };
 type Problem = { title: string; detail: string };
 
@@ -23,8 +24,12 @@ export default function AccountPage() {
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [mfaError, setMfaError] = useState<string | null>(null);
   const [mfaBusy, setMfaBusy] = useState(false);
+  // Set when the server says this account already has MFA: re-enrolling needs the current code first.
+  const [reenrollNeedsCode, setReenrollNeedsCode] = useState(false);
+  const [currentCode, setCurrentCode] = useState("");
 
   const [bgReason, setBgReason] = useState("");
+  const [bgCode, setBgCode] = useState("");
   const [bgBusy, setBgBusy] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const [bgActive, setBgActive] = useState(false);
@@ -82,11 +87,46 @@ export default function AccountPage() {
     setSessions((prev) => prev.filter((s) => s.id !== id));
   }
 
-  async function startEnroll() {
+  // Deliberately not authedFetch: a wrong code also comes back as 401 ("mfa-failed"), which
+  // authedFetch would misread as an expired session and log the user out instead of letting them retry.
+  async function getStepUpToken(authCode: string): Promise<{ token: string } | { error: string }> {
+    const token = localStorage.getItem("nabd_access_token");
+    if (!token) {
+      router.replace("/login");
+      return { error: "Signed out." };
+    }
+    const res = await fetch(`${API_BASE}/auth/mfa/verify`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ challengeId: "", code: authCode }),
+    });
+    if (!res.ok) {
+      const body: Problem = await res.json().catch(() => ({ title: "", detail: "That code didn't match." }));
+      return { error: body.detail || "That code didn't match." };
+    }
+    const { stepUpToken }: { stepUpToken: string } = await res.json();
+    return { token: stepUpToken };
+  }
+
+  async function startEnroll(e?: React.FormEvent) {
+    e?.preventDefault();
     setMfaError(null);
     setRecoveryCodes(null);
-    const res = await authedFetch("/auth/mfa/enroll", { method: "POST" });
+    const headers: Record<string, string> = {};
+    if (reenrollNeedsCode) {
+      const stepUp = await getStepUpToken(currentCode);
+      if ("error" in stepUp) {
+        setMfaError(stepUp.error);
+        return;
+      }
+      headers["X-Step-Up-Token"] = stepUp.token;
+    }
+    const res = await authedFetch("/auth/mfa/enroll", { method: "POST", headers });
     if (!res) return;
+    if (res.status === 403 && !reenrollNeedsCode) {
+      setReenrollNeedsCode(true); // already enrolled: ask for the current code, then try again
+      return;
+    }
     if (!res.ok) {
       setMfaError("Couldn't start setup.");
       return;
@@ -94,6 +134,8 @@ export default function AccountPage() {
     const body = await res.json();
     setSecretBase32(body.secretBase32);
     setEnrolling(true);
+    setReenrollNeedsCode(false);
+    setCurrentCode("");
     setCode("");
   }
 
@@ -126,7 +168,16 @@ export default function AccountPage() {
     }
     setBgBusy(true);
     try {
-      const res = await authedFetch("/auth/break-glass/activate", { method: "POST", body: JSON.stringify({ reason: bgReason.trim() }) });
+      const stepUp = await getStepUpToken(bgCode);
+      if ("error" in stepUp) {
+        setBgError(stepUp.error);
+        return;
+      }
+      const res = await authedFetch("/auth/break-glass/activate", {
+        method: "POST",
+        headers: { "X-Step-Up-Token": stepUp.token },
+        body: JSON.stringify({ reason: bgReason.trim() }),
+      });
       if (!res) return;
       if (!res.ok) {
         const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't activate emergency access." }));
@@ -138,6 +189,7 @@ export default function AccountPage() {
       localStorage.setItem("nabd_refresh_token", body.refreshToken);
       setBgActive(true);
       setBgReason("");
+      setBgCode("");
     } finally {
       setBgBusy(false);
     }
@@ -171,8 +223,21 @@ export default function AccountPage() {
               {mfaBusy ? "Confirming…" : "Confirm & enable"}
             </button>
           </form>
+        ) : reenrollNeedsCode ? (
+          <form onSubmit={startEnroll}>
+            <p className={styles.muted} style={{ marginBottom: "8px" }}>
+              Two-factor authentication is already on. Enter a code from your current authenticator to replace it.
+              Your old recovery codes stop working once the new setup is confirmed.
+            </p>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="currentMfaCode">Current authentication code</label>
+              <input id="currentMfaCode" className={styles.input} inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
+                value={currentCode} onChange={(e) => setCurrentCode(e.target.value.replace(/\D/g, ""))} required />
+            </div>
+            <button className={styles.btnPrimary} type="submit" disabled={currentCode.length !== 6}>Continue</button>
+          </form>
         ) : (
-          <button className={styles.btnPrimary} onClick={startEnroll}>Set up two-factor authentication</button>
+          <button className={styles.btnPrimary} onClick={() => startEnroll()}>Set up two-factor authentication</button>
         )}
       </div>
 
@@ -200,18 +265,27 @@ export default function AccountPage() {
       <h2 className={styles.sectionTitle}>Emergency access</h2>
       <div className={styles.card}>
         {bgActive ? (
-          <p className={styles.muted}>Emergency access activated. It expires automatically in 30 minutes and the owner has been notified.</p>
+          <p className={styles.muted}>
+            Emergency access activated: clinical records for 30 minutes, then it expires automatically. It is
+            audited and will be reviewed afterwards.
+          </p>
         ) : (
           <form onSubmit={activateBreakGlass}>
             <p className={styles.muted} style={{ marginBottom: "8px" }}>
-              Temporarily elevates your access for 30 minutes. Requires a reason and is always audited.
+              Gives you clinical record access for 30 minutes in an emergency. Needs the emergency-access permission,
+              a reason and a fresh authenticator code. Every use is audited and reviewed afterwards.
             </p>
             {bgError && <div className={styles.formError} role="alert">{bgError}</div>}
             <div className={styles.field}>
               <label className={styles.label} htmlFor="bgReason">Reason</label>
               <textarea id="bgReason" className={styles.textarea} value={bgReason} onChange={(e) => setBgReason(e.target.value)} required />
             </div>
-            <button className={styles.btnDanger} type="submit" disabled={bgBusy}>{bgBusy ? "Activating…" : "Activate emergency access"}</button>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="bgCode">Authentication code</label>
+              <input id="bgCode" className={styles.input} inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
+                value={bgCode} onChange={(e) => setBgCode(e.target.value.replace(/\D/g, ""))} required />
+            </div>
+            <button className={styles.btnDanger} type="submit" disabled={bgBusy || bgCode.length !== 6}>{bgBusy ? "Activating…" : "Activate emergency access"}</button>
           </form>
         )}
       </div>

@@ -4,7 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
+import com.nabd.hms.auth.dto.BreakGlassGrantResponse;
 import com.nabd.hms.auth.dto.BreakGlassResponse;
+import com.nabd.hms.auth.dto.BreakGlassReviewRequest;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
@@ -27,6 +29,7 @@ import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.OpaqueTokens;
+import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WhatsAppOtpSender;
 import com.nabd.hms.config.AuthProperties;
@@ -50,6 +53,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import static com.nabd.hms.auth.AuthModels.BreakGlassGrant;
 import static com.nabd.hms.auth.AuthModels.Role;
 import static com.nabd.hms.auth.AuthModels.SessionRow;
 import static com.nabd.hms.auth.AuthModels.Staff;
@@ -60,6 +64,16 @@ public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final String ISSUER = "https://api.nabd.health";
+
+    /**
+     * MF-02 / QA-02: what an active break-glass grant adds to its session — clinical access to treat
+     * the patient in front of you, and nothing administrative. It used to fold in the whole built-in
+     * Owner role (staff:edit, roles, billing approve...), which a role delegation could then stretch
+     * from 30 minutes into 30 days. Fixed here rather than read from a role so no role edit can widen it.
+     */
+    static final List<String> BREAK_GLASS_PERMISSIONS = List.of(
+            "patients:view", "queue:view", "clinical:view", "clinical:create", "clinical:edit",
+            "nursing:view", "pharmacy:view");
 
     private final AuthRepository repo;
     private final TenantContext tenantContext;
@@ -72,11 +86,13 @@ public class AuthService {
     private final ObjectMapper objectMapper;
     private final WhatsAppOtpSender otpSender;
     private final AuditService auditService;
+    private final StepUpVerifier stepUpVerifier;
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, JwtDecoder jwtDecoder,
-                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService) {
+                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
+                StepUpVerifier stepUpVerifier) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -88,6 +104,7 @@ public class AuthService {
         this.objectMapper = objectMapper;
         this.otpSender = otpSender;
         this.auditService = auditService;
+        this.stepUpVerifier = stepUpVerifier;
     }
 
     // noRollbackFor: recordLoginAttempt() below is the lockout counter's only durable state, and
@@ -149,7 +166,7 @@ public class AuthService {
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staff.id().toString())
-                .claim("purpose", "mfa_setup_required")
+                .claim("purpose", TokenPurposeAuthenticationManagerResolver.MFA_SETUP_REQUIRED)
                 .claim("tenantId", staff.tenantId().toString())
                 .build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
@@ -263,6 +280,7 @@ public class AuthService {
      */
     @Transactional
     public StepUpTokenResponse issueStepUpToken(Jwt callerJwt, String code) {
+        requireSessionToken(callerJwt);
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::mfaFailed);
@@ -291,19 +309,26 @@ public class AuthService {
     }
 
     // ── MFA enrollment (NB-042) ──────────────────────────────────────────
-    // Works from either a normal access token (self-service, already logged in) or the
+    // Works from either a normal session token (self-service, already logged in) or the
     // mfa_setup_required token issued above (policy forced this staff member to enroll before
-    // getting a real session) — both carry sub+tenantId, which is all enroll/confirm need.
+    // getting a real session). QA-04: once MFA is on, replacing it is a re-enrollment, which needs a
+    // full session plus a step-up token proving the CURRENT factor — a session (or setup) token alone
+    // must never be enough to swap someone's second factor. The new secret stays pending until
+    // confirm proves a code from it, so an abandoned enrollment changes nothing.
 
     @Transactional
-    public MfaEnrollResponse enrollMfa(Jwt callerJwt) {
+    public MfaEnrollResponse enrollMfa(Jwt callerJwt, String stepUpToken) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+        requireEnrollmentToken(callerJwt, staff);
+        if (staff.mfaEnabled()) {
+            stepUpVerifier.require(stepUpToken, staffId);
+        }
 
         byte[] secret = totpService.generateSecret();
         repo.setPendingMfaSecret(staffId, cipher.encrypt(secret));
-        log.info("staff {} started MFA enrollment", staffId);
+        log.info("staff {} started MFA {}", staffId, staff.mfaEnabled() ? "re-enrollment" : "enrollment");
         return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd", staff.email()));
     }
 
@@ -313,19 +338,31 @@ public class AuthService {
         UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
         tenantContext.set(tenantId);
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+        requireEnrollmentToken(callerJwt, staff);
 
-        if (staff.mfaSecretEnc() == null || !totpService.verify(cipher.decrypt(staff.mfaSecretEnc()), req.code(), Instant.now())) {
+        byte[] pending = repo.findPendingMfaSecret(staffId).orElseThrow(this::mfaFailed);
+        if (!totpService.verify(cipher.decrypt(pending), req.code(), Instant.now()) || !repo.activatePendingMfaSecret(staffId, pending)) {
             throw mfaFailed();
         }
-        repo.enableMfa(staffId);
+        repo.revokeRecoveryCodes(staffId);
         List<String> codes = new java.util.ArrayList<>();
         for (int i = 0; i < 8; i++) {
             String code = OpaqueTokens.generate().substring(0, 10).toUpperCase(java.util.Locale.ROOT);
             repo.insertRecoveryCode(tenantId, staffId, OpaqueTokens.sha256Hex(code));
             codes.add(code);
         }
-        log.info("staff {} completed MFA enrollment, {} recovery codes issued", staffId, codes.size());
+        auditService.record(tenantId, "staff", staffId, staff.name(), callerRole(callerJwt), null,
+                staff.mfaEnabled() ? "auth.mfa_reenrolled" : "auth.mfa_enrolled", "staff", staffId, null, null);
+        log.info("staff {} completed MFA enrollment, {} recovery codes issued, earlier codes revoked", staffId, codes.size());
         return new MfaConfirmResponse(codes);
+    }
+
+    /** A setup token only ever covers first enrollment; replacing an active factor needs a full session. */
+    private void requireEnrollmentToken(Jwt callerJwt, Staff staff) {
+        boolean setupToken = TokenPurposeAuthenticationManagerResolver.MFA_SETUP_REQUIRED.equals(callerJwt.getClaimAsString("purpose"));
+        if (setupToken ? staff.mfaEnabled() : !TokenPurposeAuthenticationManagerResolver.isSessionToken(callerJwt)) {
+            throw sessionRequired();
+        }
     }
 
     // ── PIN reset (NB-046) ───────────────────────────────────────────────
@@ -371,28 +408,53 @@ public class AuthService {
     }
 
     // ── break-glass (NB-048) ─────────────────────────────────────────────
+    // MF-02 / F-02: activation needs a full session, the dedicated emergency:create permission
+    // (checked in AuthController) and a step-up token, and it grants only BREAK_GLASS_PERMISSIONS,
+    // and only to the new session family it mints. Every grant then waits for a post-hoc review by
+    // someone else holding emergency:approve.
 
     @Transactional
-    public TokenPairResponse activateBreakGlass(Jwt callerJwt, BreakGlassActivateRequest req, String ip, String device, String userAgent) {
+    public TokenPairResponse activateBreakGlass(Jwt callerJwt, String stepUpToken, BreakGlassActivateRequest req,
+                                                String ip, String device, String userAgent) {
+        requireSessionToken(callerJwt);
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
         tenantContext.set(tenantId);
+        stepUpVerifier.require(stepUpToken, staffId);
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
 
         Instant expiresAt = Instant.now().plus(30, ChronoUnit.MINUTES);
-        UUID grantId = repo.insertBreakGlass(tenantId, staffId, req.reason(), expiresAt);
-        auditService.record(tenantId, "staff", staffId, staff.name(), "break-glass", ip,
-                "auth.break_glass_activated", "break_glass_grant", grantId, null, java.util.Map.of("reason", req.reason(), "expiresAt", expiresAt.toString()));
+        UUID familyId = UUID.randomUUID();
+        UUID grantId = repo.insertBreakGlass(tenantId, staffId, req.reason(), expiresAt, familyId);
+        auditService.record(tenantId, "staff", staffId, staff.name(), callerRole(callerJwt), ip,
+                "auth.break_glass_activated", "break_glass_grant", grantId, null,
+                java.util.Map.of("reason", req.reason(), "expiresAt", expiresAt.toString(), "permissions", BREAK_GLASS_PERMISSIONS));
         log.warn("BREAK-GLASS activated by staff {} (tenant {}): {}", staffId, tenantId, req.reason());
-        return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+        return mintTokenPair(staff, familyId, ip, device, userAgent);
     }
 
+    /**
+     * The grant holder may end their own grant; ending anyone else's needs emergency:approve. Either
+     * way the elevated session family is revoked, so the elevated access token stops working on its
+     * next request instead of living out its 15 minutes (QA-26).
+     */
     @Transactional
     public void deactivateBreakGlass(Jwt callerJwt, UUID grantId) {
+        requireSessionToken(callerJwt);
         UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
+        UUID callerId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(tenantId);
-        repo.deactivateBreakGlass(tenantId, grantId);
-        auditService.record(tenantId, "staff", UUID.fromString(callerJwt.getSubject()), "", "", null,
+        BreakGlassGrant grant = repo.findBreakGlass(tenantId, grantId).orElseThrow(this::notFound);
+        if (!grant.staffId().equals(callerId) && !hasPermission(callerJwt, "emergency:approve")) {
+            throw notFound(); // same "don't confirm existence" rule as other scoped lookups
+        }
+        if (!repo.deactivateBreakGlass(tenantId, grantId, callerId)) {
+            return; // already ended — nothing to do, and nothing worth an audit row
+        }
+        if (grant.sessionFamilyId() != null) {
+            repo.revokeFamily(grant.sessionFamilyId(), "break_glass_ended");
+        }
+        auditService.record(tenantId, "staff", callerId, callerJwt.getClaimAsString("staffName"), callerRole(callerJwt), null,
                 "auth.break_glass_deactivated", "break_glass_grant", grantId, null, null);
     }
 
@@ -406,12 +468,42 @@ public class AuthService {
                 .toList();
     }
 
+    /** The post-hoc review queue: every grant, active or ended, that nobody has reviewed yet. */
+    @Transactional
+    public List<BreakGlassGrantResponse> listUnreviewedBreakGlass(UUID tenantId) {
+        tenantContext.set(tenantId);
+        return repo.listUnreviewedBreakGlass(tenantId).stream()
+                .map(r -> new BreakGlassGrantResponse(r.id(), r.staffId(), r.staffName(), r.reason(), r.activatedAt(),
+                        r.expiresAt(), r.deactivatedAt(), r.deactivatedReason()))
+                .toList();
+    }
+
+    @Transactional
+    public void reviewBreakGlass(Jwt callerJwt, UUID grantId, BreakGlassReviewRequest req) {
+        requireSessionToken(callerJwt);
+        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
+        UUID reviewerId = UUID.fromString(callerJwt.getSubject());
+        tenantContext.set(tenantId);
+        BreakGlassGrant grant = repo.findBreakGlass(tenantId, grantId).orElseThrow(this::notFound);
+        if (grant.staffId().equals(reviewerId)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "self-review", "Cannot review your own emergency access",
+                    "Someone other than the person who used emergency access has to review it.");
+        }
+        if (!repo.reviewBreakGlass(tenantId, grantId, reviewerId, req.notes())) {
+            throw new ApiException(HttpStatus.CONFLICT, "already-reviewed", "Already reviewed",
+                    "This emergency access grant has already been reviewed.");
+        }
+        auditService.record(tenantId, "staff", reviewerId, callerJwt.getClaimAsString("staffName"), callerRole(callerJwt), null,
+                "auth.break_glass_reviewed", "break_glass_grant", grantId, null, java.util.Map.of("notes", req.notes()));
+    }
+
     // ── idle-timeout unlock (NB-044) ─────────────────────────────────────
     // Client-side lock only — the underlying session/access token is untouched, so draft state in
     // the page (or already-autosaved backend rows) survives the lock exactly as if nothing happened.
 
     @Transactional
     public void unlock(Jwt callerJwt, UnlockRequest req) {
+        requireSessionToken(callerJwt);
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
@@ -556,24 +648,28 @@ public class AuthService {
             }
         }
 
-        // NB-048: same lazy expire-and-audit shape as delegation above.
+        // NB-048: same lazy expire-and-audit shape as delegation above. Elevation is bound to the
+        // session family minted at activation, and its access tokens never outlive the grant — a
+        // refresh at minute 29 must not buy another 15 minutes of emergency access (QA-26).
         for (UUID expiredId : repo.expireStaleBreakGlass(staff.id())) {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
                     "auth.break_glass_expired", "break_glass_grant", expiredId, null, null);
         }
-        if (repo.hasActiveBreakGlass(staff.id())) {
-            repo.findBuiltInOwnerRole(staff.tenantId()).ifPresent(ownerRole -> {
-                for (String p : flattenGrants(ownerRole.grantsJson())) {
-                    if (!permissions.contains(p)) {
-                        permissions.add(p);
-                    }
+        Instant now = Instant.now();
+        Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
+        java.util.Optional<Instant> breakGlassExpiry = repo.findActiveBreakGlassExpiry(staff.id(), familyId);
+        if (breakGlassExpiry.isPresent()) {
+            for (String p : BREAK_GLASS_PERMISSIONS) {
+                if (!permissions.contains(p)) {
+                    permissions.add(p);
                 }
-            });
+            }
+            if (breakGlassExpiry.get().isBefore(accessExp)) {
+                accessExp = breakGlassExpiry.get();
+            }
         }
 
         UUID sessionId = UUID.randomUUID();
-        Instant now = Instant.now();
-        Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -615,6 +711,28 @@ public class AuthService {
         }
     }
 
+
+    /** Endpoints that act on the caller's own account need a full session, never an intermediate token. */
+    private void requireSessionToken(Jwt jwt) {
+        if (!TokenPurposeAuthenticationManagerResolver.isSessionToken(jwt)) {
+            throw sessionRequired();
+        }
+    }
+
+    private static boolean hasPermission(Jwt jwt, String permission) {
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        return permissions != null && permissions.contains(permission);
+    }
+
+    private static String callerRole(Jwt jwt) {
+        String role = jwt.getClaimAsString("roleName");
+        return role == null ? "" : role;
+    }
+
+    private ApiException sessionRequired() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "session-required", "Full sign-in required",
+                "This action needs a fully signed-in session, not a sign-in challenge token.");
+    }
 
     private ApiException invalidCredentials() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "invalid-credentials", "Invalid credentials",

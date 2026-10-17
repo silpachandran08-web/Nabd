@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.auth.AuthModels.BreakGlassGrant;
 import static com.nabd.hms.auth.AuthModels.Role;
 import static com.nabd.hms.auth.AuthModels.SessionRow;
 import static com.nabd.hms.auth.AuthModels.Staff;
@@ -110,13 +111,29 @@ class AuthRepository {
 
     // ── MFA enrollment (NB-042) ──────────────────────────────────────────
 
-    /** Stores the secret but does NOT flip mfa_enabled — that only happens once confirm() verifies a real code. */
+    /**
+     * Stores the new secret beside (never over) the active one and does NOT flip mfa_enabled — that
+     * only happens in activatePendingMfaSecret once confirm verifies a real code (QA-04).
+     */
     void setPendingMfaSecret(UUID staffId, byte[] encryptedSecret) {
-        jdbc.update("UPDATE staff SET mfa_secret_enc = ? WHERE id = ?", encryptedSecret, staffId);
+        jdbc.update("UPDATE staff SET mfa_pending_secret_enc = ? WHERE id = ?", encryptedSecret, staffId);
     }
 
-    void enableMfa(UUID staffId) {
-        jdbc.update("UPDATE staff SET mfa_enabled = true WHERE id = ?", staffId);
+    Optional<byte[]> findPendingMfaSecret(UUID staffId) {
+        return jdbc.query("SELECT mfa_pending_secret_enc FROM staff WHERE id = ? AND mfa_pending_secret_enc IS NOT NULL",
+                (rs, i) -> rs.getBytes(1), staffId).stream().findFirst();
+    }
+
+    /**
+     * The verified pending secret becomes the active one in a single statement — only if it is still
+     * the one pending, so a second enroll racing this confirm can't slip an unverified secret in.
+     */
+    boolean activatePendingMfaSecret(UUID staffId, byte[] verifiedPendingSecret) {
+        int rows = jdbc.update(
+                "UPDATE staff SET mfa_secret_enc = mfa_pending_secret_enc, mfa_pending_secret_enc = NULL, mfa_enabled = true " +
+                        "WHERE id = ? AND mfa_pending_secret_enc = ?",
+                staffId, verifiedPendingSecret);
+        return rows == 1;
     }
 
     void insertRecoveryCode(UUID tenantId, UUID staffId, String codeHash) {
@@ -124,10 +141,17 @@ class AuthRepository {
                 tenantId, staffId, codeHash);
     }
 
+    /** QA-04: a new enrollment supersedes every recovery code from an earlier one. */
+    void revokeRecoveryCodes(UUID staffId) {
+        jdbc.update("UPDATE mfa_recovery_codes SET revoked_at = now() WHERE staff_id = ? AND used_at IS NULL AND revoked_at IS NULL",
+                staffId);
+    }
+
     /** Atomic check-and-consume — same shape as consumeWhatsAppOtp, so a code can never be used twice. */
     boolean consumeRecoveryCode(UUID staffId, String codeHash) {
         int rows = jdbc.update(
-                "UPDATE mfa_recovery_codes SET used_at = now() WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL",
+                "UPDATE mfa_recovery_codes SET used_at = now() " +
+                        "WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL AND revoked_at IS NULL",
                 staffId, codeHash);
         return rows == 1;
     }
@@ -150,17 +174,22 @@ class AuthRepository {
 
     // ── break-glass (NB-048) ─────────────────────────────────────────────
 
-    UUID insertBreakGlass(UUID tenantId, UUID staffId, String reason, Instant expiresAt) {
+    UUID insertBreakGlass(UUID tenantId, UUID staffId, String reason, Instant expiresAt, UUID sessionFamilyId) {
         return jdbc.queryForObject(
-                "INSERT INTO break_glass_grants (tenant_id, staff_id, reason, expires_at) VALUES (?,?,?,?) RETURNING id",
-                UUID.class, tenantId, staffId, reason, Timestamp.from(expiresAt));
+                "INSERT INTO break_glass_grants (tenant_id, staff_id, reason, expires_at, session_family_id) VALUES (?,?,?,?,?) RETURNING id",
+                UUID.class, tenantId, staffId, reason, Timestamp.from(expiresAt), sessionFamilyId);
     }
 
-    boolean hasActiveBreakGlass(UUID staffId) {
-        Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM break_glass_grants WHERE staff_id = ? AND deactivated_at IS NULL AND expires_at > now()",
-                Integer.class, staffId);
-        return count != null && count > 0;
+    /**
+     * Elevation applies only to the session family minted at activation, never to the staff member's
+     * other sessions — so ending the grant (revoking that family) ends the elevation everywhere.
+     */
+    Optional<Instant> findActiveBreakGlassExpiry(UUID staffId, UUID sessionFamilyId) {
+        return jdbc.query(
+                "SELECT max(expires_at) AS expires_at FROM break_glass_grants " +
+                        "WHERE staff_id = ? AND session_family_id = ? AND deactivated_at IS NULL AND expires_at > now() HAVING count(*) > 0",
+                (rs, i) -> rs.getTimestamp("expires_at").toInstant(), staffId, sessionFamilyId
+        ).stream().findFirst();
     }
 
     /** Same "detect and close on next read" shape as delegation expiry — see AuthService.mintTokenPair. */
@@ -171,36 +200,59 @@ class AuthRepository {
                 (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
     }
 
-    void deactivateBreakGlass(UUID tenantId, UUID id) {
-        jdbc.update("UPDATE break_glass_grants SET deactivated_at = now(), deactivated_reason = 'manual' " +
-                "WHERE tenant_id = ? AND id = ? AND deactivated_at IS NULL", tenantId, id);
+    Optional<BreakGlassGrant> findBreakGlass(UUID tenantId, UUID id) {
+        return jdbc.query(BREAK_GLASS_SELECT + "WHERE g.tenant_id = ? AND g.id = ?", breakGlassMapper(), tenantId, id)
+                .stream().findFirst();
     }
 
-    List<com.nabd.hms.auth.AuthModels.BreakGlassRow> listActiveBreakGlass(UUID tenantId) {
-        return jdbc.query(
-                "SELECT g.id, g.staff_id, s.name AS staff_name, g.reason, g.activated_at, g.expires_at " +
-                        "FROM break_glass_grants g JOIN staff s ON s.id = g.staff_id " +
-                        "WHERE g.tenant_id = ? AND g.deactivated_at IS NULL AND g.expires_at > now() " +
-                        "ORDER BY g.activated_at DESC",
-                (rs, i) -> new com.nabd.hms.auth.AuthModels.BreakGlassRow(
-                        UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("staff_id")),
-                        rs.getString("staff_name"), rs.getString("reason"),
-                        rs.getTimestamp("activated_at").toInstant(), rs.getTimestamp("expires_at").toInstant()),
-                tenantId);
+    boolean deactivateBreakGlass(UUID tenantId, UUID id, UUID deactivatedBy) {
+        int rows = jdbc.update("UPDATE break_glass_grants SET deactivated_at = now(), deactivated_reason = 'manual', deactivated_by = ? " +
+                "WHERE tenant_id = ? AND id = ? AND deactivated_at IS NULL", deactivatedBy, tenantId, id);
+        return rows == 1;
+    }
+
+    List<BreakGlassGrant> listActiveBreakGlass(UUID tenantId) {
+        return jdbc.query(BREAK_GLASS_SELECT +
+                        "WHERE g.tenant_id = ? AND g.deactivated_at IS NULL AND g.expires_at > now() ORDER BY g.activated_at DESC",
+                breakGlassMapper(), tenantId);
+    }
+
+    List<BreakGlassGrant> listUnreviewedBreakGlass(UUID tenantId) {
+        return jdbc.query(BREAK_GLASS_SELECT + "WHERE g.tenant_id = ? AND g.reviewed_at IS NULL ORDER BY g.activated_at DESC",
+                breakGlassMapper(), tenantId);
+    }
+
+    /** Single review per grant: false if it was already reviewed (or doesn't exist). */
+    boolean reviewBreakGlass(UUID tenantId, UUID id, UUID reviewerId, String notes) {
+        int rows = jdbc.update("UPDATE break_glass_grants SET reviewed_at = now(), reviewed_by = ?, review_notes = ? " +
+                "WHERE tenant_id = ? AND id = ? AND reviewed_at IS NULL", reviewerId, notes, tenantId, id);
+        return rows == 1;
+    }
+
+    private static final String BREAK_GLASS_SELECT =
+            "SELECT g.id, g.staff_id, s.name AS staff_name, g.reason, g.activated_at, g.expires_at, g.session_family_id, " +
+                    "g.deactivated_at, g.deactivated_reason, g.reviewed_at, g.reviewed_by, g.review_notes " +
+                    "FROM break_glass_grants g JOIN staff s ON s.id = g.staff_id ";
+
+    private RowMapper<BreakGlassGrant> breakGlassMapper() {
+        return (rs, i) -> new BreakGlassGrant(
+                UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("staff_id")),
+                rs.getString("staff_name"), rs.getString("reason"),
+                rs.getTimestamp("activated_at").toInstant(), rs.getTimestamp("expires_at").toInstant(),
+                rs.getObject("session_family_id", UUID.class),
+                instantOrNull(rs.getTimestamp("deactivated_at")), rs.getString("deactivated_reason"),
+                instantOrNull(rs.getTimestamp("reviewed_at")), rs.getObject("reviewed_by", UUID.class),
+                rs.getString("review_notes"));
+    }
+
+    private static Instant instantOrNull(Timestamp ts) {
+        return ts == null ? null : ts.toInstant();
     }
 
     Optional<Role> findRole(UUID roleId) {
         return jdbc.query(
                 "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required, built_in FROM roles WHERE id = ?",
                 roleMapper(), roleId
-        ).stream().findFirst();
-    }
-
-    /** NB-048: break-glass elevates to whatever the tenant's built-in Owner role currently grants. */
-    Optional<Role> findBuiltInOwnerRole(UUID tenantId) {
-        return jdbc.query(
-                "SELECT id, tenant_id, name, grants::text AS grants_json, mfa_required, built_in FROM roles WHERE tenant_id = ? AND built_in = true",
-                roleMapper(), tenantId
         ).stream().findFirst();
     }
 

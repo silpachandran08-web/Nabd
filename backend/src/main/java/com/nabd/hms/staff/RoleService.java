@@ -101,6 +101,12 @@ public class RoleService {
     @Transactional
     public DelegationResponse createDelegation(UUID tenantId, UUID callerStaffId, DelegationRequest req, List<String> callerPermissions) {
         tenantContext.set(tenantId);
+        // QA-03: granting yourself a role turned a 30-minute elevation into 30 days of it — cover is
+        // always for someone else.
+        if (req.staffId().equals(callerStaffId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "self-delegation", "Cannot delegate to yourself",
+                    "A role can only be delegated to another staff member.");
+        }
         RoleRow delegatedRole = repo.findById(tenantId, req.delegatedRoleId()).orElseThrow(this::notFound);
         if (req.expiresAt().isAfter(Instant.now().plus(MAX_DELEGATION_WINDOW))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "delegation-window-too-long", "Window too long",

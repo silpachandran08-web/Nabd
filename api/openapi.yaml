@@ -206,6 +206,94 @@ paths:
         "204": { description: "Revoked; denied within 60s per NB-032" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # MF-01: only full session tokens (sid, no "purpose") are bearer credentials. Intermediate tokens
+  # (mfa_pending, step_up, ...) are refused with 401 invalid_token everywhere except the one endpoint
+  # each exists for — the mfa_setup_required token on /auth/mfa/enroll and /auth/mfa/confirm.
+  /auth/mfa/enroll:
+    post:
+      tags: [Auth]
+      summary: Start (re-)enrollment of an authenticator app; the new secret is pending until /auth/mfa/confirm
+      description: >
+        Accepts a session token or the mfa_setup_required token. If MFA is already on, needs a session token
+        plus X-Step-Up-Token proving the current factor (403 step-up-required otherwise); the active secret
+        keeps working until confirm.
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "Pending secret (base32) and otpauth URI" }
+        "401": { description: "Intermediate token used where a session is required (session-required)" }
+        "403": { description: "Re-enrollment without a valid step-up token (step-up-required)" }
+
+  /auth/mfa/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm the pending secret with a code from it; activates it and replaces all recovery codes
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "Eight new single-use recovery codes; every earlier code is revoked" }
+        "401": { description: "Wrong code, or nothing pending" }
+
+  /auth/break-glass/activate:
+    post:
+      tags: [Auth]
+      summary: Emergency clinical access for 30 minutes, on a new session
+      description: >
+        Grants patients:view, queue:view, clinical:view/create/edit, nursing:view and pharmacy:view to the
+        session family this call mints (never the caller's other sessions), with access tokens capped at
+        the grant's expiry. Audited, and queued for review.
+      x-required-permission: emergency:create
+      x-step-up: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties: { reason: { type: string } }
+      responses:
+        "200":
+          description: Token pair for the elevated session
+          content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
+        "403": { description: "Missing emergency:create, or step-up-required" }
+
+  /auth/break-glass/{id}/deactivate:
+    post:
+      tags: [Auth]
+      summary: End a grant early and revoke its elevated session
+      description: The grant holder may end their own; ending anyone else's needs emergency:approve (404 otherwise).
+      x-required-permission: authenticated
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: Ended (or already ended) }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /auth/break-glass/unreviewed:
+    get:
+      tags: [Auth]
+      summary: Post-hoc review queue — every grant, active or ended, not yet reviewed
+      x-required-permission: emergency:approve
+      responses:
+        "200": { description: Grants awaiting review }
+
+  /auth/break-glass/{id}/review:
+    post:
+      tags: [Auth]
+      summary: Record the post-hoc review of a grant (once; never by the person who used it)
+      x-required-permission: emergency:approve
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [notes]
+              properties: { notes: { type: string } }
+      responses:
+        "204": { description: Reviewed and audited }
+        "403": { description: "self-review" }
+        "409": { description: "already-reviewed" }
+
   # NB-046 (PIN reset & account recovery): specced, not yet implemented in the backend.
   /auth/pin-reset/request:
     post:
@@ -2593,7 +2681,8 @@ components:
       properties:
         module:
           type: string
-          enum: [patients, queue, clinical, billing, packages, pharmacy, reports, staff, setup, compliance]
+          enum: [patients, queue, clinical, billing, packages, pharmacy, reports, staff, setup, compliance, emergency]
+          description: "emergency — create: may activate break-glass; approve: reviews every break-glass use and may end anyone's grant."
         view: { type: boolean, default: false }
         create: { type: boolean, default: false }
         edit: { type: boolean, default: false }

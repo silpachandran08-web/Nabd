@@ -1,6 +1,7 @@
 package com.nabd.hms.owner;
 
 import com.nabd.hms.auth.AuthService;
+import com.nabd.hms.auth.TokenPurposeAuthenticationManagerResolver;
 import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.OpaqueTokens;
@@ -46,7 +47,7 @@ public class OwnerService {
 
     private static final Logger log = LoggerFactory.getLogger(OwnerService.class);
     private static final String ISSUER = "https://api.nabd.health"; // must match AuthService.ISSUER — same signing key/issuer
-    private static final String PENDING_WORKSPACE_PURPOSE = "owner_pending_workspace";
+    private static final String PENDING_WORKSPACE_PURPOSE = TokenPurposeAuthenticationManagerResolver.OWNER_PENDING_WORKSPACE;
 
     private final OwnerRepository repo;
     private final TenantContext tenantContext;

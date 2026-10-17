@@ -193,7 +193,7 @@ class ProvisioningStepRunner {
                 fullGrant("staff"), fullGrant("patients"), fullGrant("queue"), fullGrant("setup"),
                 fullGrant("clinical"), fullGrant("billing"), fullGrant("specialty_dental"),
                 fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing"),
-                fullGrant("departments")));
+                fullGrant("departments"), fullGrant("emergency")));
         repo.insertBuiltInOwnerRole(tenantId, grantsJson);
         repo.seedDefaultDepartment(tenantId);
     }
