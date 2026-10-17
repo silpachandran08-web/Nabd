@@ -46,8 +46,8 @@ public class PharmacyController {
     @PatchMapping("/settings")
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacySettingsResponse updateSettings(@AuthenticationPrincipal Jwt jwt,
-                                                     @Valid @RequestBody PharmacySettingsWriteRequest req) {
-        return service.updateSettings(tenantId(jwt), req);
+                                                     @Valid @RequestBody PharmacySettingsWriteRequest req, HttpServletRequest http) {
+        return service.updateSettings(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
     @GetMapping("/items")

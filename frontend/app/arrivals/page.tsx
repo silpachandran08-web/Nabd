@@ -109,7 +109,7 @@ function waitMinutes(createdAt: string): number {
 type ArrivalsTab = "all" | Bucket;
 const isArrivalsTab = (t: string | null): t is ArrivalsTab => TABS.some((x) => x.key === t);
 
-// ?tab= deep links (the owner sidebar's Billing & Day Close opens ?tab=checkout_pending) read
+// ?tab= deep links (e.g. /arrivals?tab=checkout_pending; the sidebar's Billing & Day Close opens /billing) read
 // useSearchParams, which needs a Suspense boundary or the page's static prerender breaks.
 export default function ArrivalsPage() {
   return (

@@ -373,7 +373,9 @@ export default function StaffAccessPage() {
         return;
       }
       const body: { staff: Staff; inviteToken: string } = await res.json();
-      setStaff((prev) => [body.staff, ...prev]);
+      // GET /v1/staff orders by created_at ascending, so the newest row belongs at the end; while
+      // more pages remain, Load more will return it, and inserting it now would render it twice.
+      if (!nextCursor) setStaff((prev) => [...prev, body.staff]);
       setLastInvite({ name: body.staff.name, link: `${window.location.origin}/accept-invite/${body.inviteToken}` });
       setInviteEmail("");
       setInviteName("");
@@ -483,7 +485,7 @@ export default function StaffAccessPage() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Staff & Access</h1>
-          <p className={styles.subtitle}>{staff.length} team member{staff.length === 1 ? "" : "s"}</p>
+          <p className={styles.subtitle}>{staff.length}{nextCursor ? "+" : ""} team member{staff.length === 1 && !nextCursor ? "" : "s"}</p>
         </div>
         <div className={styles.headerActions}>
           {canInvite && (

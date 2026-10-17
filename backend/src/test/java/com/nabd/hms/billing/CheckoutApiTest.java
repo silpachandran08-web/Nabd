@@ -302,7 +302,7 @@ class CheckoutApiTest extends ApiTestBase {
         SeededStaff staff = seedStaff(tenant, roleId, "recep9@a.com", "+919700000009", false);
         String token = loginAndGetAccessToken(staff);
         // PHA-010: counter sales need a non-external pharmacy mode (default is external)
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
 
         ResponseEntity<Map> charges = exchange("/v1/billing/otc-charges", HttpMethod.GET, authed(token), Map.class);
         assertThat(charges.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -333,7 +333,7 @@ class CheckoutApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "recep10@a.com", "+919700000010", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         ResponseEntity<Map> item = exchange("/v1/pharmacy/items", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Paracetamol 500mg", "isRx", false, "hsnCode", "3004", "price", 20.00,
                 "taxRatePercent", 12.00, "stockQty", 10)), Map.class);

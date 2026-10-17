@@ -949,13 +949,43 @@ paths:
         "200": { description: "Working hours", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WorkingHours" } } } } }
     post:
       tags: [Queue]
-      x-required-permission: queue:edit
+      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHoursWrite" } } }
       responses:
         "201": { description: "Working hours block created", content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHours" } } } }
+        "400": { description: "Validation error; type ends in hours-overlap when the block overlaps another block of this doctor on the same weekday (blocks are half-open, so 09:00-12:00 and 12:00-14:00 do not overlap), or invalid-time-range when endTime is not after startTime", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
+
+  /doctors/{id}/working-hours/{hoursId}:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+      - { name: hoursId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Queue]
+      summary: Replace one working-hours block of this doctor
+      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHoursWrite" } } }
+      responses:
+        "200": { description: "Updated block", content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHours" } } } }
+        "400": { description: "Validation error; type ends in hours-overlap when the block overlaps another block of this doctor on the same weekday (blocks are half-open, so 09:00-12:00 and 12:00-14:00 do not overlap), or invalid-time-range when endTime is not after startTime", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Queue]
+      summary: Delete one working-hours block of this doctor (existing appointments are not touched)
+      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
+      responses:
+        "204": { description: Deleted }
+        "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /doctors/{id}/leave:
     get:
@@ -1069,6 +1099,21 @@ paths:
         "200": { description: "New appointment", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "New slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /departments/{id}/flow:
+    get:
+      tags: [Queue]
+      summary: "Resolved ordered step types; the default flow (vitals, consultation) when no workflow is picked (QA-08)"
+      description: "Bare array, so there is no isDefault flag; GET /departments/{id}/workflow has templateCode null when the default applies."
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200":
+          description: "Flow steps in order"
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, properties: { stepType: { type: string } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /waitlist:
     get:
@@ -1317,8 +1362,8 @@ paths:
       tags: [Appointments]
       summary: The calling doctor's own follow-up appointments (appointments.is_follow_up), soonest first (DOC-006)
       description: >
-        Read-only, tenant-scoped, caller's own appointments only. No reason or reminder data exists in
-        the schema, so none is returned. `from`/`to` filter on the clinic calendar day of the start time.
+        Read-only, tenant-scoped, caller's own appointments only. No booking reason or reminder data exists in
+        the schema; `cancelReason` is set on cancelled rows (QA-06). `from`/`to` filter on the clinic calendar day of the start time.
       x-required-permission: queue:view
       parameters:
         - { name: status, in: query, required: false, schema: { type: string, enum: [scheduled, cancelled, completed, no_show] } }
@@ -1345,6 +1390,7 @@ paths:
                         patientMrn: { type: string }
                         startTime: { type: string, format: date-time }
                         status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+                        cancelReason: { type: string, nullable: true, description: "QA-06: set only when cancelled" }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
   /clinical/patients/{patientId}/allergies:
@@ -1768,11 +1814,15 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
     patch:
       tags: [Pharmacy]
-      summary: Set the pharmacy mode (external, hybrid or in_house). Items and stock are only managed in hybrid mode.
+      summary: Set the pharmacy mode (external or hybrid). Items and stock are only managed in hybrid mode.
+      description: >-
+        PHA-006. Changing the mode requires `reason` (3-200 chars, trimmed) else 400 reason-required, and is audited as
+        `pharmacy.mode_changed` (before {mode}, after {mode, reason}). Sending the current mode is a no-op (no reason needed).
+        Switching to `in_house` returns 400 mode-not-available (Phase 3, not built) unless the tenant is already in_house.
       x-required-permission: pharmacy:edit
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } }
+        content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettingsWrite" } } }
       responses:
         "200": { description: The settings, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacySettings" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -2470,6 +2520,11 @@ components:
       type: object
       properties:
         mode: { type: string, enum: [external, hybrid, in_house] }
+    PharmacySettingsWrite:
+      type: object
+      properties:
+        mode: { type: string, enum: [external, hybrid, in_house] }
+        reason: { type: string, minLength: 3, maxLength: 200, description: Required when mode changes. }
     PharmacyItemWrite:
       type: object
       required: [name, price]
@@ -3044,6 +3099,8 @@ components:
         startTime: { type: string, format: date-time }
         endTime: { type: string, format: date-time }
         status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+        isFollowUp: { type: boolean }
+        cancelReason: { type: [string, "null"], description: "QA-06: the reason given on cancel (\"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
 
     CheckInRequest:
       type: object

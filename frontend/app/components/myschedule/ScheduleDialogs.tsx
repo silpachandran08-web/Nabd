@@ -8,16 +8,17 @@ import { WEEKDAYS, hhmm, isoDate, type LeaveInput, type WorkingHours, type Worki
 
 const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
-export function WorkingHoursDialog({ existing, onClose, onSave }: {
+export function WorkingHoursDialog({ existing, editing, onClose, onSave }: {
   existing: WorkingHours[];
+  editing?: WorkingHours;
   onClose: () => void;
   onSave: (i: WorkingHoursInput) => Promise<string | null>;
 }) {
-  const [day, setDay] = useState(1);
-  const [start, setStart] = useState("09:00");
-  const [end, setEnd] = useState("13:00");
-  const [slot, setSlot] = useState("15");
-  const [cap, setCap] = useState("");
+  const [day, setDay] = useState(editing?.dayOfWeek ?? 1);
+  const [start, setStart] = useState(editing ? hhmm(editing.startTime) : "09:00");
+  const [end, setEnd] = useState(editing ? hhmm(editing.endTime) : "13:00");
+  const [slot, setSlot] = useState(String(editing?.slotMinutes ?? 15));
+  const [cap, setCap] = useState(editing?.maxPatients != null ? String(editing.maxPatients) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +31,7 @@ export function WorkingHoursDialog({ existing, onClose, onSave }: {
     if (!Number.isInteger(slotN) || slotN < 5 || slotN > 240) return setError("Slot length must be a whole number between 5 and 240 minutes.");
     if (toMin(end) - toMin(start) < slotN) return setError("The block is shorter than one slot.");
     if (capN !== null && (!Number.isInteger(capN) || capN < 1)) return setError("Maximum patients must be 1 or more, or left empty for no cap.");
-    const clash = existing.find((h) => h.dayOfWeek === day && toMin(start) < toMin(h.endTime) && toMin(h.startTime) < toMin(end));
+    const clash = existing.find((h) => h.id !== editing?.id && h.dayOfWeek === day && toMin(start) < toMin(h.endTime) && toMin(h.startTime) < toMin(end));
     if (clash) return setError(`This overlaps your existing ${WEEKDAYS[day]} block ${hhmm(clash.startTime)}–${hhmm(clash.endTime)}.`);
     setBusy(true);
     const err = await onSave({ dayOfWeek: day, startTime: start, endTime: end, slotMinutes: slotN, maxPatients: capN });
@@ -39,7 +40,7 @@ export function WorkingHoursDialog({ existing, onClose, onSave }: {
   }
 
   return (
-    <Dialog title="Add working hours" onClose={onClose}>
+    <Dialog title={editing ? "Edit working hours" : "Add working hours"} onClose={onClose}>
       <form className={styles.form} onSubmit={submit} noValidate>
         <label className={styles.field}>Weekday
           <select className={styles.input} value={day} onChange={(e) => setDay(Number(e.target.value))}>
@@ -54,7 +55,7 @@ export function WorkingHoursDialog({ existing, onClose, onSave }: {
           <label className={styles.field}>Slot length (minutes)<input className={styles.input} inputMode="numeric" value={slot} onChange={(e) => setSlot(e.target.value)} /></label>
           <label className={styles.field}>Max patients (optional)<input className={styles.input} inputMode="numeric" value={cap} onChange={(e) => setCap(e.target.value)} placeholder="No cap" /></label>
         </div>
-        <p className={styles.note}><Icon name="info" size={12} /> This adds a block to your weekly pattern. Blocks cannot be edited or removed from here yet.</p>
+        <p className={styles.note}><Icon name="info" size={12} /> {editing ? "This changes the block for every week." : "This adds a block to your weekly pattern."}</p>
         {error && <p className={styles.error} role="alert"><Icon name="alert" size={14} /> {error}</p>}
         <div className={styles.formActions}>
           <button type="button" className={styles.btn} onClick={onClose}>Cancel</button>

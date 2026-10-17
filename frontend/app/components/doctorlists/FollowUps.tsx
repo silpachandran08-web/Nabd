@@ -9,7 +9,7 @@ import { can } from "../../lib/permissions";
 import { addDays, fmtDate, fmtTime, getJson, isoDate, type PageMeta } from "./api";
 
 // DTOs mirror queue/FollowUpListModels.FollowUpItem and clinical/dto/DueConditionResponse exactly.
-type FollowUp = { appointmentId: string; patientId: string; patientName: string; patientMrn: string; startTime: string; status: "scheduled" | "cancelled" | "completed" | "no_show" };
+type FollowUp = { appointmentId: string; patientId: string; patientName: string; patientMrn: string; startTime: string; status: "scheduled" | "cancelled" | "completed" | "no_show"; cancelReason?: string | null };
 type FollowUpPage = { data: FollowUp[]; page: PageMeta };
 type DueCondition = { id: string; patientId: string; patientName: string; condition: string; reviewDueDate: string };
 
@@ -90,7 +90,7 @@ function Appointments() {
   return (
     <section className={styles.card} aria-label="Follow-up appointments">
       <h2 className={styles.cardTitle}>Follow-up appointments {!loading && !error && <span className={styles.count}>{rows.length}{next ? "+" : ""}</span>}</h2>
-      <p className={styles.hint}>Your appointments booked as a follow-up. The booking records no reason, so none is shown.</p>
+      <p className={styles.hint}>Your appointments booked as a follow-up. A cancelled booking shows its cancellation reason.</p>
       <div className={styles.filters}>
         <div className={styles.chips} role="group" aria-label="Follow-up view">
           {VIEWS.map((v) => <button key={v.key} type="button" className={styles.chip} aria-pressed={view === v.key} onClick={() => setView(v.key)}>{v.label}</button>)}
@@ -109,7 +109,7 @@ function Appointments() {
                   <span className={styles.cell}><span className={styles.mlabel}>Due</span>{fmtDate(r.startTime)}<span className={styles.meta}>{fmtTime(r.startTime)}</span></span>
                   <span className={styles.cell}><span className={styles.mlabel}>Reason</span>Follow-up visit</span>
                   <span className={styles.cell}><span className={styles.mlabel}>Reminder</span><Reminder /></span>
-                  <span className={styles.cell}><span className={styles.mlabel}>State</span><span className={styles.pills}><StatusPill tone={STATUS[r.status].tone} label={STATUS[r.status].label} /></span></span>
+                  <span className={styles.cell}><span className={styles.mlabel}>State</span><span className={styles.pills}><StatusPill tone={STATUS[r.status].tone} label={STATUS[r.status].label} /></span>{r.status === "cancelled" && <span className={styles.meta}>{r.cancelReason || "—"}</span>}</span>
                 </li>
               ))}
             </ul>

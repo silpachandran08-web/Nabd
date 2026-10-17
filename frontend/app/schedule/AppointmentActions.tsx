@@ -32,6 +32,8 @@ export function CancelAppointmentDialog({ target, authedFetch, onClose, onDone }
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // undefined = not cancelled yet; otherwise the server's recorded cancelReason (QA-06), null when absent.
+  const [recorded, setRecorded] = useState<string | null | undefined>(undefined);
 
   async function confirm(e: React.FormEvent) {
     e.preventDefault();
@@ -48,13 +50,24 @@ export function CancelAppointmentDialog({ target, authedFetch, onClose, onDone }
         setError(await problemText(res, "Couldn't cancel the appointment."));
         return;
       }
-      onDone();
+      const body: { cancelReason?: string | null } = await res.json().catch(() => ({}));
+      setRecorded(body.cancelReason ?? null);
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
   }
+
+  if (recorded !== undefined) return (
+    <Dialog title="Appointment cancelled" onClose={onDone}>
+      <p className={styles.dialogSub}>{target.patientName} · {target.time} with {target.doctorName} · {target.dateLabel}</p>
+      <p className={styles.note}>Cancellation reason: {recorded || "—"}</p>
+      <div className={styles.actions}>
+        <button type="button" className={styles.btn} onClick={onDone}>Close</button>
+      </div>
+    </Dialog>
+  );
 
   return (
     <Dialog title="Cancel appointment" onClose={onClose}>

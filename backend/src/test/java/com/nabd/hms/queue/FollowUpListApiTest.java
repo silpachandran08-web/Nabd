@@ -90,5 +90,13 @@ class FollowUpListApiTest extends ApiTestBase {
         // the other doctor sees only their own
         var theirs = exchange("/v1/appointments/follow-ups", HttpMethod.GET, authed(loginAndGetAccessToken(other)), Map.class);
         assertThat((List<?>) theirs.getBody().get("data")).hasSize(1);
+
+        // QA-06: a cancelled follow-up carries its reason; scheduled ones carry null
+        assertThat(row.containsKey("cancelReason")).isTrue();
+        assertThat(row.get("cancelReason")).isNull();
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "UPDATE appointments SET status = 'cancelled', cancel_reason = 'Patient travelling' WHERE id = ?", second));
+        var nowCancelled = exchange("/v1/appointments/follow-ups?status=cancelled", HttpMethod.GET, authed(token), Map.class);
+        assertThat(((Map<?, ?>) ((List<?>) nowCancelled.getBody().get("data")).get(0)).get("cancelReason")).isEqualTo("Patient travelling");
     }
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./login.module.css";
 import { decodeAccessToken, landingPathFor } from "../lib/session";
+import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../lib/loginFetch";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
@@ -36,6 +37,8 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
 
   const [mobilePhone, setMobilePhone] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -48,17 +51,18 @@ export default function LoginPage() {
     router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
   }
 
-  async function submitLogin(e: FormEvent) {
-    e.preventDefault();
+  async function submitLogin(e?: FormEvent) {
+    e?.preventDefault();
     setFormError(null);
     setFieldErrors({});
+    setTimedOut(false);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await loginFetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenantSlug, email, pin }),
-      });
+      }, () => setSlow(true));
       const body = await res.json();
       if (res.ok) {
         if ("setupToken" in body) {
@@ -74,9 +78,11 @@ export default function LoginPage() {
         return;
       }
       applyProblem(res.status, body as Problem);
-    } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
+      else setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
+      setSlow(false);
       setLoading(false);
     }
   }
@@ -445,6 +451,8 @@ export default function LoginPage() {
         <p className={styles.subtitle}>Enter your clinic, email and PIN.</p>
         <form onSubmit={submitLogin} noValidate>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
+          {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
+          {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="tenantSlug">Clinic code</label>
