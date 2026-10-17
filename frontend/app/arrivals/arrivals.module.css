@@ -227,6 +227,16 @@
   color: var(--nb-text-tertiary);
 }
 
+.complaint {
+  display: block;
+  max-inline-size: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nb-text-secondary);
+  font-size: 12px;
+}
+
 .actionBtn {
   height: 28px;
   padding: 0 var(--nb-space-12);
