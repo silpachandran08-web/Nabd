@@ -1232,7 +1232,8 @@
       (t.handed ? ui.pill("info", L("Handed over by assistant", "حوّلها المساعد", "सहायक ने सौंपा"), "users") : "") + "</div>";
     if (!t.optout) conv += '<div class="fd-botbar">' + ui.toggle("fdBot_" + t.id, botOn ? L("Assistant is replying in this chat", "المساعد يرد في هذه المحادثة", "सहायक इस चैट में जवाब दे रहा है") : L("You're handling this chat · assistant paused", "أنت تتولى المحادثة", "आप यह चैट संभाल रहे हैं"),
       botOn ? L("It stops the moment you type. Hand-overs are logged.", "يتوقف فور كتابتك.", "आपके टाइप करते ही रुक जाता है।") : L("Turn on to hand the chat back to the assistant.", "فعّل لإعادتها للمساعد.", "सहायक को लौटाने के लिए चालू करें।"), t.mode === "bot") + "</div>";
-    conv += '<div class="wa"><div class="wa-b">' + '<div class="wa-day">' + L("Today", "اليوم", "आज") + "</div>" + t.msgs.map(bubble).join("") + "</div></div>";
+    var earlier = !/^\d/.test(t.msgs[0].time || "");
+    conv += '<div class="wa"><div class="wa-b">' + '<div class="wa-day">' + (earlier ? L("Earlier", "سابقًا", "पहले") : L("Today", "اليوم", "आज")) + "</div>" + t.msgs.map(bubble).join("") + "</div></div>";
     var comp = '<div class="fd-comp">';
     if (t.optout) comp += ui.note("info", L("This patient sent STOP. Only SMS reminders for booked visits go out; WhatsApp is blocked until they write again.", "أرسل المريض STOP.", "मरीज़ ने STOP भेजा।"), "lock");
     else if (!ss.open) comp += '<div class="note warn">' + ui.icon("lock") + '<div class="fl">' + L("The 24-hour window closed. WhatsApp only allows an approved template until the patient replies.", "أُغلقت نافذة 24 ساعة. يُسمح بقالب معتمد فقط.", "24 घंटे की विंडो बंद। केवल स्वीकृत टेम्पलेट।") + "</div>" +
@@ -1273,11 +1274,14 @@
     pushMsg(p[0], { w: "me", t: txt, time: "10:05", st: "sent" }); NB.toast("Quick reply sent");
   });
 
+  function tplVals(tp, o) {
+    return { appt_confirm: [first(o), "Dr. Meera Iyer", "Sat 17 Oct, 11:40", "nabd.link/q/T28"], reopen_chat: [first(o), NB.fac().name], running_late: ["Dr. Vikram Shah", "15", "10:35–10:45"],
+      document_ready: [first(o), NB.fac().name, "nabd.link/d/7QX2"], dues_reminder: [first(o), NB.money(350).replace(/<[^>]+>/g, ""), NB.fac().name, "nabd.link/pay/8F2K"], festive_offer: [first(o)] }[tp.id] || [];
+  }
   NB.overlay("fd-tpl", function (tid) {
     var t = FD.threads.find(function (x) { return x.id === tid; }) || FD.threads[0], o = who(t.who), sel = NB.v("fdTpl", session(t).open ? "appt_confirm" : "reopen_chat");
     var tp = FD.templates.find(function (x) { return x.id === sel; }) || FD.templates[0];
-    var vals = { appt_confirm: [first(o), "Dr. Meera Iyer", "Sat 17 Oct, 11:40", "nabd.link/q/T28"], reopen_chat: [first(o), NB.fac().name], running_late: ["Dr. Vikram Shah", "15", "10:35–10:45"],
-      document_ready: [first(o), NB.fac().name, "nabd.link/d/7QX2"], dues_reminder: [first(o), NB.money(350).replace(/<[^>]+>/g, ""), NB.fac().name, "nabd.link/pay/8F2K"], festive_offer: [first(o)] }[tp.id];
+    var vals = tplVals(tp, o);
     var body = esc(tp.body).replace(/\{\{(\d)\}\}/g, function (m0, n) { return '<span class="fd-var">' + esc(vals[n - 1] || "{{" + n + "}}") + "</span>"; });
     var h = '<p class="small muted" style="margin:0">' + L("To", "إلى", "को") + " " + esc(nm(o)) + " · " + phone(t.phone, t.intl) + " · " + L("Only Meta-approved templates can start or re-open a conversation.", "القوالب المعتمدة فقط.", "केवल स्वीकृत टेम्पलेट।") + "</p>";
     h += '<div class="stack s8">' + FD.templates.map(function (x) {
@@ -1293,7 +1297,7 @@
   });
   NB.act("fd-tpl-send", function (a) {
     var p = a.split("|"), tp = FD.templates.find(function (x) { return x.id === p[1]; }), t = FD.threads.find(function (x) { return x.id === p[0]; }), o = who(t.who);
-    var txt = tp.body.replace("{{1}}", first(o)).replace(/\{\{\d\}\}/g, "…");
+    var vals = tplVals(tp, o), txt = tp.body.replace(/\{\{(\d)\}\}/g, function (m0, n) { return vals[n - 1] || "…"; });
     pushMsg(p[0], { w: "tpl", tpl: tp.id, t: txt, time: "10:05", st: "sent", btns: tp.btns });
     closeToast("Template " + tp.id + " sent · the chat re-opens when " + first(o) + " replies");
   });
