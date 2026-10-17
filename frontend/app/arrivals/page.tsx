@@ -145,6 +145,9 @@ function ArrivalsPageInner() {
   const [guardianQuery, setGuardianQuery] = useState("");
   const [guardianResults, setGuardianResults] = useState<GuardianOption[]>([]);
   const [guardian, setGuardian] = useState<GuardianOption | null>(null);
+  // CGV-005: staff-confirmed guardian consent (wording constant needs legal review, same as the registry dialog).
+  const [guardianConsent, setGuardianConsent] = useState(false);
+  const [guardianChannel, setGuardianChannel] = useState("");
   // Computed client-side only — server and browser locale defaults for toLocaleDateString can
   // differ, and doing this during the initial render causes a hydration mismatch.
   const [dateLabel, setDateLabel] = useState("");
@@ -406,6 +409,8 @@ function ArrivalsPageInner() {
     setGuardianQuery("");
     setGuardianResults([]);
     setGuardian(null);
+    setGuardianConsent(false);
+    setGuardianChannel("");
   }
 
   const minor = (() => {
@@ -443,11 +448,16 @@ function ArrivalsPageInner() {
           setModalError("A guardian is required for patients under 18. Search for the guardian's record below.");
           return;
         }
+        if (minor && (!guardianConsent || !guardianChannel)) {
+          setModalError("Confirm the guardian's consent and how it was given.");
+          return;
+        }
         const res = await authedFetch("/patients", {
           method: "POST",
           body: JSON.stringify({
             name: newName, phone: newPhone, dob: newDob, gender: newGender,
             guardianId: minor ? guardian?.id ?? null : null,
+            ...(minor ? { guardianConsent: { confirmed: true, channel: guardianChannel } } : {}),
             ...(confirmedNotDuplicate ? { confirmedNotDuplicate: true } : {}),
           }),
         });
@@ -1047,6 +1057,19 @@ function ArrivalsPageInner() {
                             ))}
                           </div>
                         )}
+                      </>
+                    )}
+                    {guardian && (
+                      <>
+                        <label className={styles.label}>
+                          <input type="checkbox" checked={guardianConsent} onChange={(e) => setGuardianConsent(e.target.checked)} /> Guardian has agreed to access on this patient&apos;s behalf
+                        </label>
+                        <select aria-label="How consent was given" className={styles.select} value={guardianChannel} onChange={(e) => setGuardianChannel(e.target.value)}>
+                          <option value="">How was consent given…</option>
+                          <option value="in_person">In person</option>
+                          <option value="phone">Phone</option>
+                          <option value="written">Written</option>
+                        </select>
                       </>
                     )}
                   </div>
