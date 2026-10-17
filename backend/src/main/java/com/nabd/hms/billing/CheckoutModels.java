@@ -10,11 +10,15 @@ final class CheckoutModels {
     }
 
     record ChargeRow(UUID id, String code, String name, String category, BigDecimal baseAmount,
-                      BigDecimal followUpAmount, BigDecimal taxRatePercent) {
+                      BigDecimal followUpAmount, BigDecimal taxRatePercent, Integer stockQty) {
     }
 
-    /** V3-004: the authoritative catalogue row behind a pharmacy (stocked) charge code. */
-    record PharmacyChargeRow(String name, String category, BigDecimal baseAmount, BigDecimal taxRatePercent, boolean active) {
+    /** V3-004 / QA-OI-2: the authoritative catalogue row behind a charge code (stocked = pharmacy item). */
+    record PharmacyChargeRow(String name, String category, BigDecimal baseAmount, BigDecimal followUpAmount, BigDecimal taxRatePercent,
+                              boolean active, boolean doctorOverride, boolean stocked) {
+    }
+
+    record VoidableInvoice(String invoiceNumber, String status, java.math.BigDecimal paid) {
     }
 
     record QueueEntryContext(UUID patientId, UUID doctorId, UUID departmentId, String queueStatus, boolean hasAppointment) {

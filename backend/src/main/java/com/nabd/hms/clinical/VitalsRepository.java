@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,6 +32,16 @@ class VitalsRepository {
     Optional<VitalsRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
         return jdbc.query("SELECT * FROM vitals WHERE tenant_id = ? AND queue_entry_id = ?",
                 mapper(), tenantId, queueEntryId).stream().findFirst();
+    }
+
+    /** NUR-022: a patient's vitals across visits, newest first. */
+    List<VitalsRow> findByPatient(UUID tenantId, UUID patientId, int limit) {
+        return jdbc.query("SELECT * FROM vitals WHERE tenant_id = ? AND patient_id = ? ORDER BY recorded_at DESC LIMIT ?",
+                mapper(), tenantId, patientId, limit);
+    }
+
+    boolean patientExists(UUID tenantId, UUID patientId) {
+        return !jdbc.queryForList("SELECT 1 FROM patients WHERE tenant_id = ? AND id = ?", tenantId, patientId).isEmpty();
     }
 
     Optional<LocalDate> findPatientDob(UUID tenantId, UUID patientId) {
@@ -58,11 +69,11 @@ class VitalsRepository {
      * so a second save carrying only a pulse can no longer wipe the height, weight, BP, temperature and SpO2. */
     void upsert(UUID tenantId, UUID queueEntryId, UUID patientId, BigDecimal heightCm, BigDecimal weightKg,
                 Integer bpSystolic, Integer bpDiastolic, Integer pulseBpm, BigDecimal tempCelsius,
-                Integer spo2Percent, UUID recordedBy) {
+                Integer spo2Percent, BigDecimal bloodSugar, Integer painScore, UUID recordedBy) {
         jdbc.update(
                 "INSERT INTO vitals (tenant_id, queue_entry_id, patient_id, height_cm, weight_kg, bp_systolic, " +
-                        "  bp_diastolic, pulse_bpm, temp_celsius, spo2_percent, recorded_by, weight_recorded_at) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?,?,?, CASE WHEN ?::numeric IS NOT NULL THEN now() END) " +
+                        "  bp_diastolic, pulse_bpm, temp_celsius, spo2_percent, blood_sugar, pain_score, recorded_by, weight_recorded_at) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, CASE WHEN ?::numeric IS NOT NULL THEN now() END) " +
                         "ON CONFLICT (queue_entry_id) DO UPDATE SET " +
                         "  height_cm = COALESCE(EXCLUDED.height_cm, vitals.height_cm), " +
                         "  weight_kg = COALESCE(EXCLUDED.weight_kg, vitals.weight_kg), " +
@@ -72,9 +83,11 @@ class VitalsRepository {
                         "  pulse_bpm = COALESCE(EXCLUDED.pulse_bpm, vitals.pulse_bpm), " +
                         "  temp_celsius = COALESCE(EXCLUDED.temp_celsius, vitals.temp_celsius), " +
                         "  spo2_percent = COALESCE(EXCLUDED.spo2_percent, vitals.spo2_percent), " +
+                        "  blood_sugar = COALESCE(EXCLUDED.blood_sugar, vitals.blood_sugar), " +
+                        "  pain_score = COALESCE(EXCLUDED.pain_score, vitals.pain_score), " +
                         "  recorded_by = EXCLUDED.recorded_by, recorded_at = now()",
                 tenantId, queueEntryId, patientId, heightCm, weightKg, bpSystolic, bpDiastolic, pulseBpm,
-                tempCelsius, spo2Percent, recordedBy, weightKg);
+                tempCelsius, spo2Percent, bloodSugar, painScore, recordedBy, weightKg);
     }
 
     Optional<VitalsModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
@@ -96,6 +109,8 @@ class VitalsRepository {
                 (Integer) rs.getObject("pulse_bpm"),
                 rs.getBigDecimal("temp_celsius"),
                 (Integer) rs.getObject("spo2_percent"),
+                rs.getBigDecimal("blood_sugar"),
+                rs.getObject("pain_score") == null ? null : rs.getInt("pain_score"),
                 UUID.fromString(rs.getString("recorded_by")),
                 rs.getTimestamp("recorded_at").toInstant());
     }

@@ -26,7 +26,7 @@ type PatientOption = { id: string; name: string; phone: string; mrn: string };
 type GuardianOption = { id: string; name: string; phone: string };
 // GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
 type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
-type Grants = { queueCreate: boolean; queueEdit: boolean; billingCreate: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
+type Grants = { queueCreate: boolean; queueEdit: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
 type StaffOption = { id: string; name: string };
 // Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
 type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
@@ -36,6 +36,8 @@ type CallbackEntry = { appointmentId: string; patientId: string; patientName: st
 type AppointmentOption = { id: string; patientId: string; patientName: string; doctorId: string; doctorName: string; startTime: string };
 // Matches GET /departments/{id}/transfer-targets (DepartmentController) — same shape consult's
 // own transfer picker already uses.
+// REC-021 transfer reasons (S4 contract values); `other` takes a free-text note (<=200 chars).
+const MOVE_REASONS: [string, string][] = [["wrong_department", "Wrong department"], ["doctor_unavailable", "Doctor unavailable"], ["patient_request", "Patient request"], ["other", "Other"]];
 type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
 
 const VISIT_LABEL: Record<string, string> = {
@@ -129,7 +131,7 @@ function ArrivalsPageInner() {
   const [, setNow] = useState(() => Date.now());
   // Per-action visibility (REC-014/052/062). Read after mount: the token lives in localStorage, so
   // evaluating can() during SSR/first render would mismatch. Absent until known, never disabled.
-  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, billingCreate: false, billingView: false, clinicalEdit: false, patientsView: false });
+  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, billingView: false, clinicalEdit: false, patientsView: false });
   // Patient name/MRN lookups are per-row GET /patients/{id}; cache them so the 15s poll only
   // fetches patients it hasn't seen (the N+1 shrinks to the first load).
   const patientCache = useRef(new Map<string, { name: string; mrn: string }>());
@@ -143,6 +145,9 @@ function ArrivalsPageInner() {
   const [guardianQuery, setGuardianQuery] = useState("");
   const [guardianResults, setGuardianResults] = useState<GuardianOption[]>([]);
   const [guardian, setGuardian] = useState<GuardianOption | null>(null);
+  // CGV-005: staff-confirmed guardian consent (wording constant needs legal review, same as the registry dialog).
+  const [guardianConsent, setGuardianConsent] = useState(false);
+  const [guardianChannel, setGuardianChannel] = useState("");
   // Computed client-side only — server and browser locale defaults for toLocaleDateString can
   // differ, and doing this during the initial render causes a hydration mismatch.
   const [dateLabel, setDateLabel] = useState("");
@@ -198,6 +203,8 @@ function ArrivalsPageInner() {
   const [moveTargets, setMoveTargets] = useState<TransferTarget[] | null>(null);
   const [moveDepartmentId, setMoveDepartmentId] = useState("");
   const [moveDoctorId, setMoveDoctorId] = useState("");
+  const [moveReason, setMoveReason] = useState("");
+  const [moveReasonNote, setMoveReasonNote] = useState("");
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moveSubmitting, setMoveSubmitting] = useState(false);
 
@@ -296,7 +303,7 @@ function ArrivalsPageInner() {
   useEffect(() => {
     void Promise.resolve().then(() => setGrants({
       queueCreate: can("queue:create"), queueEdit: can("queue:edit"),
-      billingCreate: can("billing:create"), billingView: can("billing:view"), clinicalEdit: can("clinical:edit"), patientsView: can("patients:view"),
+      billingView: can("billing:view"), clinicalEdit: can("clinical:edit"), patientsView: can("patients:view"),
     }));
   }, []);
 
@@ -402,6 +409,8 @@ function ArrivalsPageInner() {
     setGuardianQuery("");
     setGuardianResults([]);
     setGuardian(null);
+    setGuardianConsent(false);
+    setGuardianChannel("");
   }
 
   const minor = (() => {
@@ -439,11 +448,16 @@ function ArrivalsPageInner() {
           setModalError("A guardian is required for patients under 18. Search for the guardian's record below.");
           return;
         }
+        if (minor && (!guardianConsent || !guardianChannel)) {
+          setModalError("Confirm the guardian's consent and how it was given.");
+          return;
+        }
         const res = await authedFetch("/patients", {
           method: "POST",
           body: JSON.stringify({
             name: newName, phone: newPhone, dob: newDob, gender: newGender,
             guardianId: minor ? guardian?.id ?? null : null,
+            ...(minor ? { guardianConsent: { confirmed: true, channel: guardianChannel } } : {}),
             ...(confirmedNotDuplicate ? { confirmedNotDuplicate: true } : {}),
           }),
         });
@@ -622,7 +636,7 @@ function ArrivalsPageInner() {
     setMoveTargets(null);
     setMoveDepartmentId("");
     setMoveDoctorId("");
-    setMoveError(null);
+    setMoveReason(""); setMoveReasonNote(""); setMoveError(null);
   }
 
   async function selectMoveEntry(entryId: string) {
@@ -630,7 +644,7 @@ function ArrivalsPageInner() {
     setMoveDepartmentId("");
     setMoveDoctorId("");
     setMoveTargets(null);
-    setMoveError(null);
+    setMoveReason(""); setMoveReasonNote(""); setMoveError(null);
     const entry = rows.find((r) => r.id === entryId);
     if (!entry) return;
     const res = await authedFetch(`/departments/${entry.departmentId}/transfer-targets`);
@@ -642,14 +656,21 @@ function ArrivalsPageInner() {
     setMoveTargets(await res.json());
   }
 
+  // The reason is required only when the department changes (same-department = doctor change).
+  const movingDept = moveDepartmentId !== "" && moveDepartmentId !== rows.find((r) => r.id === moveEntryId)?.departmentId;
+  const reasonMissing = movingDept && !moveReason;
   async function submitMove() {
     if (!moveEntryId || !moveDepartmentId || !moveDoctorId) return;
+    if (reasonMissing) { setMoveError("Choose a reason for moving the patient to another department."); return; }
     setMoveSubmitting(true);
     setMoveError(null);
     try {
       const res = await authedFetch(`/queue/${moveEntryId}/transfer`, {
         method: "POST",
-        body: JSON.stringify({ toDepartmentId: moveDepartmentId, doctorId: moveDoctorId }),
+        body: JSON.stringify({
+          toDepartmentId: moveDepartmentId, doctorId: moveDoctorId,
+          ...(moveReason ? { reason: moveReason, ...(moveReason === "other" && moveReasonNote.trim() ? { reasonNote: moveReasonNote.trim() } : {}) } : {}),
+        }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -784,11 +805,6 @@ function ArrivalsPageInner() {
               <Link className={styles.segment} href="/schedule">Schedule</Link>
               <span className={styles.segmentActive} aria-current="page">Live Queue</span>
             </nav>
-            {grants.billingCreate && grants.billingView && (
-              <button type="button" className={styles.secondaryBtn} onClick={() => router.push("/checkout/otc")}>
-                Counter sale
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -1024,7 +1040,7 @@ function ArrivalsPageInner() {
                     {guardian ? (
                       <div className={styles.selectedPatient}>
                         <span>{guardian.name} · {guardian.phone}</span>
-                        <button type="button" className={styles.linkBtn} onClick={() => { registeredRef.current = null; setGuardian(null); setGuardianQuery(""); }}>Change</button>
+                        <button type="button" className={styles.linkBtn} onClick={() => { registeredRef.current = null; setGuardian(null); setGuardianQuery(""); setGuardianConsent(false); setGuardianChannel(""); }}>Change</button>
                       </div>
                     ) : (
                       <>
@@ -1041,6 +1057,19 @@ function ArrivalsPageInner() {
                             ))}
                           </div>
                         )}
+                      </>
+                    )}
+                    {guardian && (
+                      <>
+                        <label className={styles.label}>
+                          <input type="checkbox" checked={guardianConsent} onChange={(e) => setGuardianConsent(e.target.checked)} /> Guardian has agreed to access on this patient&apos;s behalf
+                        </label>
+                        <select aria-label="How consent was given" className={styles.select} value={guardianChannel} onChange={(e) => setGuardianChannel(e.target.value)}>
+                          <option value="">How was consent given…</option>
+                          <option value="in_person">In person</option>
+                          <option value="phone">Phone</option>
+                          <option value="written">Written</option>
+                        </select>
                       </>
                     )}
                   </div>
@@ -1295,13 +1324,30 @@ function ArrivalsPageInner() {
                     </select>
                   </div>
                 )}
+                {moveDoctorId && (
+                  <>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="moveReason">Reason{movingDept ? " (required)" : ""}</label>
+                      <select id="moveReason" className={styles.select} value={moveReason} required={movingDept} onChange={(e) => setMoveReason(e.target.value)}>
+                        <option value="">Select a reason…</option>
+                        {MOVE_REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                    {moveReason === "other" && (
+                      <div className={styles.field}>
+                        <label className={styles.label} htmlFor="moveReasonNote">Note</label>
+                        <input id="moveReasonNote" className={styles.input} maxLength={200} value={moveReasonNote} onChange={(e) => setMoveReasonNote(e.target.value)} />
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )
           )}
           {moveError && <div className={styles.formError} role="alert">{moveError}</div>}
           <div className={styles.modalActions}>
             <button type="button" className={styles.cancelBtn} onClick={closeMove}>Cancel</button>
-            <button type="button" className={styles.submitBtn} disabled={moveSubmitting || !moveDepartmentId || !moveDoctorId}
+            <button type="button" className={styles.submitBtn} disabled={moveSubmitting || !moveDepartmentId || !moveDoctorId || reasonMissing}
               onClick={submitMove}>
               {moveSubmitting ? "Moving…" : "Move"}
             </button>

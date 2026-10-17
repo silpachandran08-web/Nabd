@@ -1,6 +1,7 @@
 package com.nabd.hms.clinical;
 
 import com.nabd.hms.common.ClinicClock;
+import com.nabd.hms.clinical.dto.VitalsHistoryResponse;
 import com.nabd.hms.clinical.dto.VitalsResponse;
 import com.nabd.hms.clinical.dto.VitalsWriteRequest;
 import com.nabd.hms.common.ApiException;
@@ -56,6 +57,18 @@ public class VitalsService {
         return toResponse(tenantId, row);
     }
 
+    /** NUR-022: previous vitals of a patient across visits, newest first (the caller drops the current visit). */
+    @Transactional
+    public VitalsHistoryResponse previous(UUID tenantId, UUID patientId, int limit) {
+        tenantContext.set(tenantId);
+        if (!repo.patientExists(tenantId, patientId)) {
+            throw notFound();
+        }
+        int ageYears = repo.findPatientDob(tenantId, patientId).map(dob -> ageInYears(dob, clock.today(tenantId))).orElse(30);
+        return new VitalsHistoryResponse(repo.findByPatient(tenantId, patientId, limit).stream()
+                .map(v -> toResponse(v, ageYears)).toList());
+    }
+
     @Transactional
     public VitalsResponse record(UUID tenantId, UUID callerStaffId, UUID queueEntryId, VitalsWriteRequest req) {
         tenantContext.set(tenantId);
@@ -63,7 +76,8 @@ public class VitalsService {
 
         // An empty save must never move the visit on to the doctor with no vitals, and BP is a pair.
         if (req.heightCm() == null && req.weightKg() == null && req.bpSystolic() == null && req.bpDiastolic() == null
-                && req.pulseBpm() == null && req.tempCelsius() == null && req.spo2Percent() == null) {
+                && req.pulseBpm() == null && req.tempCelsius() == null && req.spo2Percent() == null
+                && req.bloodSugar() == null && req.painScore() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "no-measurement", "No measurement",
                     "Enter at least one measurement before saving vitals.");
         }
@@ -79,7 +93,7 @@ public class VitalsService {
         VitalsRow previous = repo.findByQueueEntry(tenantId, queueEntryId).orElse(null);
         repo.upsert(tenantId, queueEntryId, snapshot.patientId(), req.heightCm(), req.weightKg(),
                 req.bpSystolic(), req.bpDiastolic(), req.pulseBpm(), req.tempCelsius(), req.spo2Percent(),
-                callerStaffId);
+                req.bloodSugar(), req.painScore(), callerStaffId);
 
         if ("vitals_pending".equals(snapshot.status())) {
             queueService.updateStatus(tenantId, callerStaffId, queueEntryId, new QueueStatusUpdateRequest("vitals_done"));
@@ -106,6 +120,8 @@ public class VitalsService {
         diff("pulseBpm", before.pulseBpm(), after.pulseBpm(), was, now);
         diff("tempCelsius", before.tempCelsius(), after.tempCelsius(), was, now);
         diff("spo2Percent", before.spo2Percent(), after.spo2Percent(), was, now);
+        diff("bloodSugar", before.bloodSugar(), after.bloodSugar(), was, now);
+        diff("painScore", before.painScore(), after.painScore(), was, now);
         if (now.isEmpty()) {
             return;
         }
@@ -126,10 +142,14 @@ public class VitalsService {
 
     private VitalsResponse toResponse(UUID tenantId, VitalsRow v) {
         int ageYears = repo.findPatientDob(tenantId, v.patientId()).map(dob -> ageInYears(dob, clock.today(tenantId))).orElse(30);
+        return toResponse(v, ageYears);
+    }
+
+    private VitalsResponse toResponse(VitalsRow v, int ageYears) {
         List<String> flags = VitalsRanges.flags(v, ageYears);
         return new VitalsResponse(v.id(), v.queueEntryId(), v.patientId(), v.heightCm(), v.weightKg(),
                 v.bpSystolic(), v.bpDiastolic(), v.pulseBpm(), v.tempCelsius(), v.spo2Percent(),
-                v.recordedBy(), v.recordedAt(), flags);
+                v.bloodSugar(), v.painScore(), v.recordedBy(), v.recordedAt(), flags);
     }
 
     private static int ageInYears(LocalDate dob, LocalDate today) {

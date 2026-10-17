@@ -164,6 +164,8 @@ export default function ConsultPage() {
   const [transferTargets, setTransferTargets] = useState<TransferTarget[] | null>(null);
   const [transferDepartmentId, setTransferDepartmentId] = useState("");
   const [transferDoctorId, setTransferDoctorId] = useState("");
+  const [transferReason, setTransferReason] = useState(""); // REC-021: server requires a reason for a department move
+  const [transferNote, setTransferNote] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
   const [rxItems, setRxItems] = useState<PrescriptionItem[]>([]);
@@ -810,6 +812,8 @@ export default function ConsultPage() {
     setTransferError(null);
     setTransferDepartmentId("");
     setTransferDoctorId("");
+    setTransferReason("");
+    setTransferNote("");
     setTransferTargets(null);
     setShowTransfer(true);
     const res = await authedFetch(`/departments/${activeEntry.departmentId}/transfer-targets`);
@@ -822,13 +826,13 @@ export default function ConsultPage() {
   }
 
   async function submitTransfer() {
-    if (!activeEntry || !transferDepartmentId || !transferDoctorId) return;
+    if (!activeEntry || !transferDepartmentId || !transferDoctorId || !transferReason) return;
     setTransferring(true);
     setTransferError(null);
     try {
       const res = await authedFetch(`/queue/${activeEntry.id}/transfer`, {
         method: "POST",
-        body: JSON.stringify({ toDepartmentId: transferDepartmentId, doctorId: transferDoctorId }),
+        body: JSON.stringify({ toDepartmentId: transferDepartmentId, doctorId: transferDoctorId, reason: transferReason, ...(transferReason === "other" && transferNote.trim() ? { reasonNote: transferNote.trim() } : {}) }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -1365,12 +1369,30 @@ export default function ConsultPage() {
                     </select>
                   </div>
                 )}
+                {transferDoctorId && (
+                  <div className={styles.formRow}>
+                    <label className={styles.fieldLabel} htmlFor="trReason">Reason</label>
+                    <select id="trReason" className={styles.select} value={transferReason} onChange={(e) => setTransferReason(e.target.value)}>
+                      <option value="">Select a reason…</option>
+                      <option value="wrong_department">Wrong department</option>
+                      <option value="doctor_unavailable">Doctor unavailable</option>
+                      <option value="patient_request">Patient request</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                )}
+                {transferReason === "other" && (
+                  <div className={styles.formRow}>
+                    <label className={styles.fieldLabel} htmlFor="trNote">Note</label>
+                    <input id="trNote" className={styles.select} maxLength={200} value={transferNote} onChange={(e) => setTransferNote(e.target.value)} />
+                  </div>
+                )}
               </>
             )}
             {transferError && <div className={`${p.notice} ${p.noticeDanger}`} role="alert">{transferError}</div>}
             <div className={p.dialogActions}>
               <button type="button" className={p.btn} onClick={() => setShowTransfer(false)}>Cancel</button>
-              <button type="button" className={p.btnPrimary} onClick={submitTransfer} disabled={transferring || !transferDepartmentId || !transferDoctorId}>
+              <button type="button" className={p.btnPrimary} onClick={submitTransfer} disabled={transferring || !transferDepartmentId || !transferDoctorId || !transferReason}>
                 {transferring ? "Transferring…" : "Transfer"}
               </button>
             </div>

@@ -198,6 +198,9 @@ public class PatientService {
         requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
         validateGuardian(tenantId, req);
+        if (req.guardianId() != null) {
+            requireGuardianConsent(req.guardianConsent());
+        }
 
         String phone = PhoneNumbers.e164(req.phone(), repo.region(tenantId)); // one stored format, whatever was typed
         List<MatchCandidateRow> candidates = Boolean.TRUE.equals(req.confirmedNotDuplicate())
@@ -216,7 +219,7 @@ public class PatientService {
         UUID id = repo.insert(tenantId, req.name(), phone, req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
         if (req.guardianId() != null) {
-            grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId());
+            grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId(), req.guardianConsent().channel());
         }
         log.info("patient {} registered by {} (tenant {})", id, callerStaffId, tenantId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
@@ -270,6 +273,10 @@ public class PatientService {
         if (req.has("dob")) changes.put("dob", java.sql.Date.valueOf(req.dob()));
         if (req.has("gender")) changes.put("gender", req.gender());
         if (req.has("guardianId")) changes.put("guardian_id", req.guardianId());
+        if (!Objects.equals(before.guardianId(), guardianId)) {
+            changes.put("guardian_review_kept_at", null); // CGV-002: a different guardian needs a fresh review
+            changes.put("guardian_review_kept_by", null);
+        }
         if (req.has("address")) changes.put("address", req.address());
         if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(req.nationalId()));
         repo.update(tenantId, id, changes);
@@ -338,6 +345,27 @@ public class PatientService {
         log.info("guardian revoked for patient {} by {} (tenant {})", id, callerStaffId, tenantId);
     }
 
+    /** CGV-002: staff decide to keep the guardian as proxy after the patient turned 18. Stamps the review done (the
+     * patient leaves the due worklist) and audits it; guardian_id and the guardian_access consent are untouched.
+     * Revoke is the separate DELETE /guardian. Only valid for an adult who still has a guardian on file. */
+    @Transactional
+    public PatientDetailResponse keepGuardian(UUID tenantId, UUID callerStaffId, UUID id) {
+        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        tenantContext.set(tenantId);
+        PatientRow before = repo.findVisibleById(tenantId, id, scopedToDoctorId)
+                .filter(r -> "active".equals(r.status())).orElseThrow(this::notFound);
+        if (before.guardianId() == null || isMinor(before.dob(), clock.today(tenantId))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-review-not-due", "No guardian review due",
+                    "Only an adult patient who still has a guardian on file has a guardian review.");
+        }
+        java.util.Map<String, Object> changes = new java.util.LinkedHashMap<>();
+        changes.put("guardian_review_kept_at", java.sql.Timestamp.from(java.time.Instant.now()));
+        changes.put("guardian_review_kept_by", callerStaffId);
+        repo.update(tenantId, id, changes);
+        audit(tenantId, callerStaffId, "patient.guardian_review_kept", id, null, Map.of("guardianId", before.guardianId().toString()));
+        return get(tenantId, callerStaffId, id);
+    }
+
     /** NB-082: patients who've turned 18 but still have a guardian on file — the "automatic" part
      * of the age-18 handover is this always-current computed worklist; staff perform the actual
      * handover with a normal patch() clearing guardianId, which changeGuardian() already audits. */
@@ -351,9 +379,20 @@ public class PatientService {
                 .toList();
     }
 
-    private void grantGuardianConsent(UUID tenantId, UUID callerStaffId, UUID patientId, UUID guardianId) {
-        repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS);
-        audit(tenantId, callerStaffId, "patient.guardian_grant", patientId, null, Map.of("guardianId", guardianId));
+    private static final List<String> CONSENT_CHANNELS = List.of("in_person", "phone", "written");
+
+    /** CGV-005: no guardian link without an explicit confirmation and a known channel. */
+    private static void requireGuardianConsent(PatientWriteRequest.GuardianConsent c) {
+        if (c == null || !Boolean.TRUE.equals(c.confirmed()) || c.channel() == null || !CONSENT_CHANNELS.contains(c.channel())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "guardian-consent-required", "Guardian consent required",
+                    "guardianConsent.confirmed must be true and guardianConsent.channel one of in_person, phone, written.");
+        }
+    }
+
+    private void grantGuardianConsent(UUID tenantId, UUID callerStaffId, UUID patientId, UUID guardianId, String channel) {
+        repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS, callerStaffId, channel);
+        audit(tenantId, callerStaffId, "patient.guardian_grant", patientId, null,
+                Map.of("guardianId", guardianId, "consentChannel", channel));
     }
 
     private void changeGuardian(UUID tenantId, UUID callerStaffId, UUID patientId, UUID oldGuardianId, UUID newGuardianId) {
@@ -480,7 +519,8 @@ public class PatientService {
                 : repo.findActiveConsentGrantedAt(tenantId, row.id(), GUARDIAN_ACCESS).orElse(null);
         return new PatientDetailResponse(row.id(), row.mrn(), row.name(), row.phone(), row.dob(), row.gender(),
                 row.status(), allergies, chronicConditions, 0, outstandingBalance, lastVisitAt, isMinor(row.dob(), clock.today(row.tenantId())),
-                row.guardianId(), guardianName, guardianConsentGrantedAt);
+                row.guardianId(), guardianName, guardianConsentGrantedAt,
+                row.guardianId() == null ? null : repo.findGuardianReviewKeptAt(tenantId, row.id()).orElse(null));
     }
 
     private ApiException notFound() {

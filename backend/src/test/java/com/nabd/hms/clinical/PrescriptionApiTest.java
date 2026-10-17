@@ -290,6 +290,43 @@ class PrescriptionApiTest extends ApiTestBase {
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
+    // DOC-032: pregnancy and controlled warnings appear in the flat warnings[], block signing, and the decision is audited with its kind.
+    @Test
+    void pregnancyAndControlledWarningsAreFlatBlockSigningAndTheirDecisionIsAuditedWithKind() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc32@a.com", "+919800020032", false);
+        String token = loginAndGetAccessToken(doc);
+        ResponseEntity<Map> reg = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "P32", "phone", "+919999960032", "dob", "1995-01-01", "gender", "female")), Map.class);
+        String queueEntryId = checkIn(token, (String) reg.getBody().get("id"), doc.id());
+        String path = "/v1/clinical/prescriptions/" + queueEntryId;
+
+        ResponseEntity<Map> draft = exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Doxycycline", "dosage", "100mg"),
+                        Map.of("drugName", "Alprazolam", "dosage", "0.25mg")))), Map.class);
+        List<?> flat = (List<?>) draft.getBody().get("warnings");
+        assertThat(flat.stream().map(w -> (Object) ((Map<?, ?>) w).get("kind")).toList()).contains("pregnancy", "controlled");
+        Map<?, ?> preg = (Map<?, ?>) flat.stream().filter(w -> "pregnancy".equals(((Map<?, ?>) w).get("kind"))).findFirst().orElseThrow();
+        assertThat(preg.get("itemIndex")).isEqualTo(0);
+        assertThat(preg.get("severity")).isEqualTo("caution");
+        assertThat(exchange(path + "/sign", HttpMethod.POST, authed(token), Map.class).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+
+        exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Doxycycline", "dosage", "100mg",
+                        "overrides", List.of(Map.of("kind", "pregnancy", "reasonCode", "benefit_outweighs_risk", "note", "ENT infection")))))), Map.class);
+        String audited = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT after::text FROM audit_log WHERE tenant_id = ? AND action = 'prescription.pregnancy_override' ORDER BY created_at DESC LIMIT 1",
+                String.class, tenant.id()));
+        assertThat(audited).contains("\"warningKind\"").contains("pregnancy").contains("benefit_outweighs_risk").contains("ENT infection");
+
+        // a bogus reason for the kind is refused
+        assertThat(exchange(path, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "Doxycycline", "dosage", "100mg",
+                        "overrides", List.of(Map.of("kind", "pregnancy", "reasonCode", "direct_supervision")))))), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
     @Test
     void roleWithoutClinicalGrantIsForbidden() {
         SeededTenant tenant = seedTenant();

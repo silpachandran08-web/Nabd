@@ -223,6 +223,51 @@ class ReportsApiTest extends ApiTestBase {
         List<Map> rows = resp.getBody();
         Map referralRow = rows.stream().filter(m -> "referral".equals(m.get("source"))).findFirst().orElseThrow();
         assertThat(((Number) referralRow.get("visitCount")).longValue()).isEqualTo(2L);
+        assertThat(((Number) referralRow.get("revenue")).doubleValue()).isZero();
+        assertThat(((Number) referralRow.get("untaggedCount")).longValue()).isZero(); // source is NOT NULL, defaults to walk_in
+    }
+
+    @Test
+    void sourceBreakdownCarriesRevenueOfTheVisitsInEachSource() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "owner31@a.com", "+919800060031", false);
+        String token = loginAndGetAccessToken(staff);
+        String e = checkIn(token, registerPatient(token, "S1a", "+919999970131"), staff.id(), "online");
+        moveTo(token, e, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        checkoutAndPay(token, e, 450);
+        checkIn(token, registerPatient(token, "S1b", "+919999970132"), staff.id(), "online"); // unbilled
+
+        List<Map> rows = exchange("/v1/reports/sources", HttpMethod.GET, authed(token), List.class).getBody();
+
+        Map online = rows.stream().filter(m -> "online".equals(m.get("source"))).findFirst().orElseThrow();
+        assertThat(((Number) online.get("visitCount")).longValue()).isEqualTo(2L);
+        assertThat(((Number) online.get("revenue")).doubleValue()).isEqualTo(450.0);
+    }
+
+    @Test
+    void staffPerformanceCountsHandledDiscountsAndOverridesPerStaffMember() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "owner32@a.com", "+919800060032", false);
+        String token = loginAndGetAccessToken(owner);
+        String e = checkIn(token, registerPatient(token, "S2a", "+919999970133"), owner.id(), null);
+        moveTo(token, e, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
+        ResponseEntity<Map> invoice = exchange("/v1/billing/checkout/" + e, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "discount", 10, "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 200, "taxRatePercent", 0)))), Map.class);
+        exchange("/v1/billing/invoices/" + invoice.getBody().get("id") + "/payments", HttpMethod.POST,
+                authedJsonBody(token, Map.of("method", "cash", "amount", 190)), Map.class);
+        moveTo(token, e, "completed");
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "INSERT INTO audit_log (tenant_id, actor_type, actor_id, actor_name, actor_role, action, entity_type) " +
+                        "VALUES (?, 'staff', ?, 'o', 'Owner', 'prescription.allergy_override', 'prescription')", tenant.id(), owner.id()));
+
+        Map body = exchange("/v1/reports/staff-performance", HttpMethod.GET, authed(token), Map.class).getBody();
+
+        Map row = (Map) ((List<?>) body.get("rows")).get(0);
+        assertThat(((Number) row.get("handledCount")).longValue()).isEqualTo(1L);   // same visit as doctor and biller counts once
+        assertThat(((Number) row.get("discountCount")).longValue()).isEqualTo(1L);
+        assertThat(((Number) row.get("overrideCount")).longValue()).isEqualTo(1L);
+        assertThat(((Number) row.get("collected")).doubleValue()).isEqualTo(190.0);
     }
 
     @Test

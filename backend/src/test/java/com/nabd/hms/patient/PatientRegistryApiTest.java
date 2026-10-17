@@ -23,7 +23,7 @@ class PatientRegistryApiTest extends ApiTestBase {
     /** confirmed = the Register dialog's second step, after staff reviewed the duplicate candidates. */
     private String register(String token, String name, String phone, String dob, String guardianId, boolean confirmed) {
         Map<String, Object> body = new java.util.HashMap<>(Map.of("name", name, "phone", phone, "dob", dob, "gender", "female"));
-        if (guardianId != null) body.put("guardianId", guardianId);
+        if (guardianId != null) { body.put("guardianId", guardianId); body.put("guardianConsent", Map.of("confirmed", true, "channel", "in_person")); }
         if (confirmed) body.put("confirmedNotDuplicate", true);
         var resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, body), Map.class);
         assertThat(resp.getStatusCode()).as(name).isEqualTo(HttpStatus.CREATED);

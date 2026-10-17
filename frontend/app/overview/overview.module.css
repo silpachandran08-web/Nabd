@@ -160,6 +160,9 @@
   margin-top: 2px;
 }
 
+.alertLink { display: block; min-block-size: 44px; text-decoration: none; color: inherit; }
+.alertLink:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
+
 .alertDanger { background: var(--nb-danger-tint); border-color: var(--nb-danger-500); }
 .alertWarn { background: var(--nb-warn-tint); border-color: var(--nb-warn-500); }
 .alertOk { background: var(--nb-ok-tint); border-color: var(--nb-ok-500); }

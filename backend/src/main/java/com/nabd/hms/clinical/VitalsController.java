@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.clinical.dto.VitalsHistoryResponse;
 import com.nabd.hms.clinical.dto.VitalsResponse;
 import com.nabd.hms.clinical.dto.VitalsWriteRequest;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -29,6 +31,13 @@ public class VitalsController {
     @PreAuthorize("hasAuthority('clinical:view')")
     public VitalsResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
         return service.get(tenantId(jwt), queueEntryId);
+    }
+
+    @GetMapping("/patient/{patientId}/previous")
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public VitalsHistoryResponse previous(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
+                                           @RequestParam(defaultValue = "5") int limit) {
+        return service.previous(tenantId(jwt), patientId, Math.max(1, Math.min(limit, 20)));
     }
 
     @PatchMapping("/{queueEntryId}")

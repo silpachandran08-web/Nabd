@@ -2,6 +2,7 @@ package com.nabd.hms.patient;
 
 import com.nabd.hms.patient.dto.PatientRegistryResponse;
 import com.nabd.hms.patient.dto.DuplicateCandidatesResponse;
+import com.nabd.hms.patient.dto.GuardianReviewDecisionRequest;
 import com.nabd.hms.patient.dto.GuardianReviewResponse;
 import com.nabd.hms.patient.dto.MergeRequest;
 import com.nabd.hms.patient.dto.PatientDetailResponse;
@@ -95,6 +96,13 @@ public class PatientController {
     public ResponseEntity<Void> revokeGuardian(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         service.revokeGuardian(tenantId(jwt), staffId(jwt), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/guardian/review")
+    @PreAuthorize("hasAuthority('patients:edit')")
+    public PatientDetailResponse keepGuardian(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                              @Valid @RequestBody GuardianReviewDecisionRequest req) {
+        return service.keepGuardian(tenantId(jwt), staffId(jwt), id);
     }
 
     @PostMapping("/{id}/merge")

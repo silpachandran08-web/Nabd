@@ -270,6 +270,12 @@ class PatientRepository {
                 tenantId, patientId, consentType);
     }
 
+    /** CGV-005: grant with evidence (who recorded it and through which channel); granted_at is the when. */
+    void grantConsent(UUID tenantId, UUID patientId, String consentType, UUID capturedBy, String channel) {
+        jdbc.update("INSERT INTO consents (tenant_id, patient_id, consent_type, captured_by, capture_channel) VALUES (?,?,?,?,?)",
+                tenantId, patientId, consentType, capturedBy, channel);
+    }
+
     Optional<Instant> findActiveConsentGrantedAt(UUID tenantId, UUID patientId, String consentType) {
         return jdbc.query(
                 "SELECT granted_at FROM consents WHERE tenant_id = ? AND patient_id = ? AND consent_type = ? " +
@@ -282,9 +288,14 @@ class PatientRepository {
      * review task is this computed worklist, not a background job (none exists yet, NB-308). */
     List<PatientRow> findGuardianReviewsDue(UUID tenantId) {
         return jdbc.query("SELECT " + COLUMNS + "FROM patients WHERE tenant_id = ? AND status = 'active' " +
-                        "AND guardian_id IS NOT NULL AND dob <= ?::date - INTERVAL '18 years' " +
+                        "AND guardian_id IS NOT NULL AND guardian_review_kept_at IS NULL AND dob <= ?::date - INTERVAL '18 years' " +
                         "ORDER BY dob",
                 patientMapper(), tenantId, java.sql.Date.valueOf(clock.today(tenantId)));
+    }
+
+    Optional<java.time.Instant> findGuardianReviewKeptAt(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT guardian_review_kept_at FROM patients WHERE tenant_id = ? AND id = ? AND guardian_review_kept_at IS NOT NULL",
+                (rs, i) -> rs.getTimestamp(1).toInstant(), tenantId, id).stream().findFirst();
     }
 
     /** NB-085: audit_log's actor_name/actor_role snapshot — same per-module pattern as Dental. */

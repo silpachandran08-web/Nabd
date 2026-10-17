@@ -28,6 +28,7 @@ tags:
   - name: Audit
   - name: Clinical
   - name: Pharmacy
+  - name: Billing
   - name: Nursing
   - name: Reports
   - name: Platform
@@ -707,6 +708,37 @@ paths:
       responses:
         "201": { description: "Created licence", content: { application/json: { schema: { $ref: "#/components/schemas/Licence" } } } }
 
+  /compliance/health:
+    get:
+      tags: [Setup]
+      summary: Compliance health (licence counts and attention items)
+      description: Built only from licence_registry (expiringSoon = expiry within 30 days inclusive, expired = past expiry, judged at read time). Consent-template and retention items are not returned until those tables exist.
+      x-required-permission: setup:view
+      responses:
+        "200":
+          description: Compliance health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [licences, items]
+                properties:
+                  licences:
+                    type: object
+                    required: [total, expiringSoon, expired]
+                    properties: { total: { type: integer }, expiringSoon: { type: integer }, expired: { type: integer } }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, label, status, detail, link]
+                      properties:
+                        kind: { type: string, enum: [licence, consent_template, retention] }
+                        label: { type: string }
+                        status: { type: string, enum: [ok, attention, expired] }
+                        detail: { type: string }
+                        link: { type: string, example: "/setup?tab=licences" }
+
   /setup/licences/{id}:
     patch:
       tags: [Setup]
@@ -752,6 +784,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PatientWrite" } } }
       responses:
         "201": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
+        "400": { description: "validation-failed, guardian-required, guardian-not-found, or guardian-consent-required (guardianId without a valid guardianConsent)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409":
           description: >
             Likely-duplicate match found (same phone digits, or same DOB + similar name) — client should
@@ -867,6 +900,26 @@ paths:
         "400": { description: "guardian-required: the patient is still a minor", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /patients/{id}/guardian/review:
+    post:
+      tags: [Patients]
+      summary: Age-18 guardian review outcome "keep proxy" — marks the review done (patient leaves guardian-reviews-due), keeps guardian and consent; audited patient.guardian_review_kept (CGV-002). Revoke is DELETE /patients/{id}/guardian.
+      x-required-permission: patients:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [keep] }
+      responses:
+        "200": { description: "Refreshed patient detail incl. guardianReviewKeptAt", content: { application/json: { schema: { $ref: "#/components/schemas/PatientDetail" } } } }
+        "400": { description: "validation, or guardian-review-not-due (still a minor / no guardian on file)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /patients/{id}/consent/withdraw:
     post:
       tags: [Patients]
@@ -974,6 +1027,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/AppointmentWrite" } } }
       responses:
         "201": { description: "Booked", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
+        "404": { description: "patient-not-found or doctor-not-found (unknown id or another clinic's)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "Slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/{id}:
@@ -1037,6 +1091,7 @@ paths:
             schema: { type: object, required: [doctorId, patientId], properties: { doctorId: { type: string, format: uuid }, patientId: { type: string, format: uuid } } }
       responses:
         "201": { description: "Joined", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
+        "404": { description: "patient-not-found or doctor-not-found (unknown id or another clinic's)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "already-waitlisted", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /waitlist/{id}/accept:
@@ -1089,6 +1144,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/CheckInRequest" } } }
       responses:
         "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch)" }
 
   /queue:
     get:
@@ -1122,6 +1178,38 @@ paths:
       responses:
         "200": { description: "Updated", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
         "400": { description: "Illegal transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /queue/{id}/transfer:
+    post:
+      tags: [Queue]
+      summary: "Close this leg (transferred_out) and open a new one in another department (REC-021)"
+      description: "reason is required (400 transfer-reason-required) when toDepartmentId differs from the entry's current department. Stored on the new leg and audited as queue.transfer. Queue position uses POST /queue/{id}/reorder."
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [toDepartmentId, doctorId]
+              properties:
+                toDepartmentId: { type: string, format: uuid }
+                doctorId: { type: string, format: uuid }
+                reason: { type: string, enum: [wrong_department, doctor_unavailable, patient_request, other] }
+                reasonNote: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: "Both legs"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  closedLeg: { $ref: "#/components/schemas/QueueEntry" }
+                  newLeg: { $ref: "#/components/schemas/QueueEntry" }
+        "400": { description: "transfer-reason-required / transfer-not-allowed / illegal-transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /queue/{id}/reorder:
@@ -1643,6 +1731,18 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /clinical/vitals/patient/{patientId}/previous:
+    get:
+      tags: [Clinical]
+      summary: A patient's vitals across visits, newest first (NUR-022). The caller drops the current visit. 404 for an unknown patient.
+      x-required-permission: clinical:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 5, minimum: 1, maximum: 20 }, description: Values above 20 are capped at 20. }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/VitalsHistory" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /clinical/patients/{patientId}/dose-calculator:
     get:
       tags: [Clinical]
@@ -1713,6 +1813,65 @@ paths:
       x-required-permission: pharmacy:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DispensingQueueEntry" } } } } }
+  /billing/otc-charges:
+    get:
+      tags: [Billing]
+      summary: >
+        Chargeable catalogue for counter sales. Each charge carries `stockQty` (PHA-011).
+        409 `otc-not-available` when the pharmacy mode is `external` (hybrid and in_house are allowed; PHA-010).
+      x-required-permission: billing:view
+      responses:
+        "409": { description: Pharmacy mode is external (problem type otc-not-available) }
+        "200": { description: OK, content: { application/json: { schema: { type: object, properties: { currency: { type: string }, charges: { type: array, items: { $ref: "#/components/schemas/BillingCharge" } } } } } } }
+  /billing/otc-checkout:
+    post:
+      tags: [Billing]
+      summary: >
+        Counter sale (standalone invoice, no patient/queue entry). 409 `otc-not-available` when the pharmacy mode is `external`
+        (PHA-010). Lines whose `chargeCode` is in the catalogue are priced SERVER-side (QA-OI-2): name, category, tax and unit price
+        come from the catalogue and the client's values are silently ignored (no 400 on mismatch); a catalogue entry flagged
+        doctorOverride keeps the client's unitPrice. Lines with no catalogue entry use the client's values (chargeName required,
+        unitPrice and taxRatePercent >= 0, else 400 validation-failed). Non-zero discount needs billing.discount (403 discount-not-permitted).
+      x-required-permission: billing:create
+      responses:
+        "200": { description: The invoice (lineItems show the price actually charged), content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "409": { description: otc-not-available, item-inactive, insufficient-stock or day-closed }
+  /billing/checkout/{queueEntryId}:
+    post:
+      tags: [Billing]
+      summary: >
+        Bill a visit at a billing checkpoint. Catalogue lines are priced server-side exactly as in otc-checkout (QA-OI-2); a
+        Consultation line uses the catalogue followUpAmount instead of baseAmount when the patient had a completed visit with the
+        same doctor in the last 14 days (the same rule as `followUpEligible` in the checkout context). Not gated by pharmacy mode.
+      x-required-permission: billing:create
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "409": { description: Conflict }
+  /billing/invoices/{id}/void:
+    post:
+      tags: [Billing]
+      summary: >
+        Void an invoice that has taken no payment and restore its pharmacy stock (PHA-011). One transaction: invoice
+        status becomes `void`, one immutable `restock` stock movement per stocked item, audit event `billing.invoice_voided`.
+        Needs billing:edit and the `billing.discount` (refund/discount) grant, else 403 void-not-permitted.
+        400 reason-required; 409 invoice-already-void; 409 invoice-has-payments (refund flow does not exist yet); 409 day-closed.
+        Over-selling is rejected at checkout / otc-checkout with 400 insufficient-stock (unchanged, covered by tests).
+      x-required-permission: billing:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 1 } } } } }
+      responses:
+        "200": { description: The voided invoice (status `void`), content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Conflict }
   /pharmacy/items/{id}/stock-adjustments:
     post:
       tags: [Pharmacy]
@@ -1795,6 +1954,59 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MoneyReport" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /reports/sources:
+    get:
+      tags: [Reports]
+      summary: "Visits by source tag (OWN-024). Bare array; each row carries revenue (invoice totals of that source's visits) and the report-wide untaggedCount (visits with no source tag; 0 today as source is NOT NULL)."
+      x-required-permission: reports:view
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, default: 30 } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    source: { type: string }
+                    visitCount: { type: integer, format: int64 }
+                    revenue: { type: number, description: "Sum of invoice totals for the visits in this source" }
+                    untaggedCount: { type: integer, format: int64, description: "Report-wide count of untagged visits, repeated on every row" }
+  /reports/staff-performance:
+    get:
+      tags: [Reports]
+      summary: "Per-staff performance (OWN-025). own_patients_only staff get only their own row (see scopeNote)."
+      x-required-permission: reports:view
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, default: 30 } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scopeNote: { type: string }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        staffId: { type: string, format: uuid }
+                        staffName: { type: string }
+                        collected: { type: number }
+                        paymentCount: { type: integer, format: int64 }
+                        handledCount: { type: integer, format: int64, description: "Distinct visits: completed as doctor plus billed by this staff member" }
+                        discountCount: { type: integer, format: int64, description: "Invoices raised with a discount" }
+                        overrideCount: { type: integer, format: int64, description: "Prescription safety overrides/acknowledgements from audit_log" }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:
@@ -2231,8 +2443,8 @@ components:
       required: [itemIndex, kind, severity, message]
       properties:
         itemIndex: { type: integer, minimum: 0, description: "0-based index into the response's items" }
-        kind: { type: string, enum: [allergy] }
-        severity: { type: string, enum: [mild, moderate, severe] }
+        kind: { type: string, enum: [allergy, pregnancy, controlled], description: "pregnancy also covers lactation. Each kind that requires a decision uses the same items[].overrides[] reason flow and is audited with warningKind (DOC-032)." }
+        severity: { type: string, enum: [mild, moderate, severe, caution], description: "mild|moderate|severe for allergies; caution for pregnancy/controlled (severe when raised by a recorded pregnant/lactating status)" }
         message: { type: string }
     PrescriptionItem:
       type: object
@@ -2268,6 +2480,19 @@ components:
         price: { type: number, minimum: 0 }
         taxRatePercent: { type: [number, "null"], minimum: 0, description: Defaults to 0 }
         stockQty: { type: [integer, "null"], minimum: 0, description: Opening stock on POST; ignored on PATCH }
+    BillingCharge:
+      type: object
+      description: Row of the checkout / OTC charge lists (ChargeResponse).
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        category: { type: string }
+        baseAmount: { type: number }
+        followUpAmount: { type: [number, "null"] }
+        taxRatePercent: { type: number }
+        stockQty: { type: [integer, "null"], description: "Units on hand; null when the item is not stock-tracked. PHA-011." }
+
     DispensingQueueEntry:
       type: object
       properties:
@@ -2277,11 +2502,15 @@ components:
         patientName: { type: string }
         doctorName: { type: string }
         signedAt: { type: string, format: date-time }
+        token: { type: integer, description: "The visit's queue token number (same value as QueueEntry.tokenNumber). PHA-003." }
         items:
           type: array
           items:
             type: object
             properties:
+              stockQty:
+                type: [integer, "null"]
+                description: "Current stock of the active pharmacy item whose name equals drugName (case-insensitive); null when no stocked item matches. Prescription items carry no catalogue link, so this is a name match. PHA-003."
               drugName: { type: string }
               dosage: { type: [string, "null"] }
               frequency: { type: [string, "null"] }
@@ -2298,6 +2527,8 @@ components:
         pulseBpm: { type: [integer, "null"], minimum: 20, maximum: 300 }
         tempCelsius: { type: [number, "null"], minimum: 20, maximum: 45 }
         spo2Percent: { type: [integer, "null"], minimum: 1, maximum: 100 }
+        bloodSugar: { type: [number, "null"], exclusiveMinimum: 0, maximum: 9999.99, description: "Display unit mg/dL is a UI constant, not stored (needs clinical sign-off). No clinical range is enforced." }
+        painScore: { type: [integer, "null"], minimum: 0, maximum: 10, description: "0-10 numeric rating scale; outside 0-10 is 400." }
     Vitals:
       type: object
       properties:
@@ -2311,9 +2542,15 @@ components:
         pulseBpm: { type: [integer, "null"] }
         tempCelsius: { type: [number, "null"] }
         spo2Percent: { type: [integer, "null"] }
+        bloodSugar: { type: [number, "null"] }
+        painScore: { type: [integer, "null"], minimum: 0, maximum: 10 }
         recordedBy: { type: string, format: uuid }
         recordedAt: { type: string, format: date-time }
         abnormalFlags: { type: array, items: { type: string } }
+    VitalsHistory:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Vitals" } }
     DoseCalculation:
       type: object
       properties:
@@ -2346,7 +2583,7 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [adjustment, dispense] }
+        kind: { type: string, enum: [adjustment, dispense, restock] }
         delta: { type: integer }
         qtyBefore: { type: integer }
         qtyAfter: { type: integer }
@@ -2381,8 +2618,8 @@ components:
           type: array
           description: >-
             DOC-031. Flat structured allergy matches across all lines (same check as items[].warnings and the legacy
-            allergyWarning strings, which are kept). Recomputed on every read. Pregnancy and controlled-substance
-            warnings are not included here (they have no mild/moderate/severe severity); read them from items[].warnings.
+            allergyWarning strings, which are kept). Recomputed on every read. Pregnancy/lactation and controlled-substance
+            warnings (DOC-032) are included too, with severity "caution"; the decision state (requiresDecision, resolved, reasonOptions, decision) is on items[].warnings.
             A severe match still blocks signing (409 warning-unresolved) until an override reason is recorded.
           items: { $ref: "#/components/schemas/PrescriptionWarning" }
         allergySnapshot:
@@ -2643,6 +2880,17 @@ components:
         confirmedNotDuplicate:
           type: [boolean, "null"]
           description: "Set after staff reviewed the 409 duplicate candidates and confirmed this is a different person; skips the duplicate check"
+        guardianConsent:
+          type: object
+          description: >
+            CGV-005. Required whenever guardianId is supplied, else 400 `guardian-consent-required`
+            (also when confirmed is not true or channel is not one of the listed values). Stored with the
+            guardian_access consent (captured_by = calling staff, capture_channel, granted_at) and audited
+            in `patient.guardian_grant` (consentChannel). PATCH guardian changes are unchanged.
+          required: [confirmed, channel]
+          properties:
+            confirmed: { type: boolean, description: "Must be true" }
+            channel: { type: string, enum: [in_person, phone, written] }
 
     PatientPatch:
       type: object
@@ -2682,6 +2930,7 @@ components:
             activePackages: { type: integer }
             outstandingBalance: { type: number }
             lastVisitAt: { type: [string, "null"], format: date-time }
+            guardianReviewKeptAt: { type: [string, "null"], format: date-time, description: "CGV-002: when staff chose keep-proxy at the age-18 review; cleared if the guardian changes" }
 
     PatientRegistryRow:
       type: object
@@ -2823,6 +3072,13 @@ components:
         paymentMode: { type: [string, "null"], enum: [cash, card, upi, other] }
         priority: { type: boolean }
         priorityReason: { type: [string, "null"] }
+        ageYears: { type: [integer, "null"], description: "Whole years at queueDate (NUR-012)" }
+        gender: { type: [string, "null"], enum: [male, female, other, null] }
+        doctorName: { type: [string, "null"] }
+        waitMinutes: { type: integer, description: "Minutes since check-in on the server clock, >= 0" }
+        visitType: { type: string, enum: [appointment, follow_up, walk_in, transfer] }
+        transferReason: { type: [string, "null"], enum: [wrong_department, doctor_unavailable, patient_request, other, null], description: "Set on legs opened by a transfer (REC-021)" }
+        transferReasonNote: { type: [string, "null"], maxLength: 200 }
 
     AuditEvent:
       type: object

@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
 import { formatMoney } from "../../lib/money";
+import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
 import { getIdentity } from "../../lib/session";
 import { can } from "../../lib/permissions";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
-type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number };
+type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
 type PrescribedItem = { drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null };
 type CheckoutContext = {
   queueEntryId: string; patientName: string; doctorName: string; visitType: string;
@@ -24,7 +25,7 @@ type Invoice = {
   subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
   balanceDue: number; status: string; lineItems: LineItem[]; payments: Payment[];
 };
-type Problem = { title: string; detail: string };
+type Problem = { type?: string; title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -158,6 +159,7 @@ export default function CheckoutPage() {
     setItems((prev) => {
       const existing = prev.find((i) => i.chargeCode === charge.code);
       if (existing) {
+        if (charge.stockQty != null && existing.quantity >= charge.stockQty) return prev; // PHA-011: cap at stock
         return prev.map((i) => (i.chargeCode === charge.code ? { ...i, quantity: i.quantity + 1 } : i));
       }
       return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice, taxRatePercent: charge.taxRatePercent }];
@@ -165,6 +167,8 @@ export default function CheckoutPage() {
   }
 
   function setQty(code: string, qty: number) {
+    const stock = context?.charges.find((c) => c.code === code)?.stockQty;
+    if (stock != null && qty > stock) return; // PHA-011: cap at stock
     if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.chargeCode !== code));
       return;
@@ -200,7 +204,7 @@ export default function CheckoutPage() {
       if (!res) return;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
-        setCreateError(p.detail || "Couldn't generate the invoice.");
+        setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
         return;
       }
       setInvoice(await res.json());
@@ -285,15 +289,19 @@ export default function CheckoutPage() {
         {visibleCharges.map((c) => {
           const price = effectivePrice(c);
           const isFollowUp = price !== c.baseAmount;
-          return (
-            <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>
-              <span className={styles.chargeName}>{c.name}</span>
+          const body = (
+            <>
+              <span className={styles.chargeName}>{c.name} <StockPill qty={c.stockQty} /></span>
               <span className={styles.chargePrice}>
                 {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{formatMoney(c.baseAmount, context.currency)}</span>}
                 {formatMoney(price, context.currency)}
               </span>
-            </button>
+            </>
           );
+          // PHA-011: a 0-stock item is flagged and not offered (no button at all).
+          return c.stockQty != null && c.stockQty <= 0
+            ? <div key={c.id} className={styles.chargeItem} style={{ cursor: "default", opacity: 0.7 }}>{body}</div>
+            : <button key={c.id} className={styles.chargeItem} onClick={() => addCharge(c)}>{body}</button>;
         })}
       </div>
 
@@ -402,7 +410,7 @@ export default function CheckoutPage() {
                 ))}
               </>
             )}
-            {!showAddMore && canBill && (
+            {!showAddMore && canBill && invoice.status !== "void" && (
               <button type="button" className={styles.backBtn} style={{ marginTop: "16px" }} onClick={() => setShowAddMore(true)}>
                 + Add more charges
               </button>
@@ -432,7 +440,7 @@ export default function CheckoutPage() {
               </>
             )}
 
-            {context.queueStatus === "checkout_pending" && canBill && (
+            {context.queueStatus === "checkout_pending" && canBill && invoice.status !== "void" && (
               <>
                 <p className={styles.muted} style={{ marginTop: "12px" }}>
                   {invoice.balanceDue > 0 ? "Record the remaining payment, then complete checkout." : "Nothing further to charge for this visit."}
@@ -444,7 +452,7 @@ export default function CheckoutPage() {
               </>
             )}
 
-            {invoice.status !== "paid" && canPay && (
+            {invoice.status !== "paid" && invoice.status !== "void" && canPay && (
               <form onSubmit={submitPayment}>
                 <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Record payment</h2>
                 <div className={styles.paymentMethods}>

@@ -15,6 +15,7 @@ import com.nabd.hms.setup.dto.ExportJobRequest;
 import com.nabd.hms.setup.dto.ExportJobResponse;
 import com.nabd.hms.setup.dto.ImportJobRequest;
 import com.nabd.hms.setup.dto.ImportJobResponse;
+import com.nabd.hms.setup.dto.ComplianceHealthResponse;
 import com.nabd.hms.setup.dto.LicenceResponse;
 import com.nabd.hms.setup.dto.LicenceWriteRequest;
 import com.nabd.hms.setup.dto.PayrollExportRowResponse;
@@ -254,6 +255,18 @@ public class SetupService {
     public List<LicenceResponse> listLicences(UUID tenantId) {
         tenantContext.set(tenantId);
         return repo.listLicences(tenantId).stream().map(this::toLicenceResponse).toList();
+    }
+
+    @Transactional
+    public ComplianceHealthResponse complianceHealth(UUID tenantId) {
+        tenantContext.set(tenantId);
+        int[] c = repo.licenceCounts(tenantId);
+        String status = c[2] > 0 ? "expired" : (c[1] > 0 || c[0] == 0) ? "attention" : "ok";
+        String detail = c[0] == 0 ? "No licences registered"
+                : c[0] + " registered, " + c[1] + " expiring within 30 days, " + c[2] + " expired";
+        // shortcut: consent templates and retention settings have no tables yet, so only the licence item exists
+        return new ComplianceHealthResponse(new ComplianceHealthResponse.Licences(c[0], c[1], c[2]),
+                List.of(new ComplianceHealthResponse.Item("licence", "Licences", status, detail, "/setup?tab=licences")));
     }
 
     @Transactional

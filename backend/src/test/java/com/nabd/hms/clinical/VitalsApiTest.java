@@ -191,4 +191,89 @@ class VitalsApiTest extends ApiTestBase {
         assertThat(impossible.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(String.valueOf(impossible.getBody().get("detail"))).contains("spo2Percent");
     }
+
+    // NUR-021: blood sugar + pain score are stored, validated (pain 0-10) and corrections of them are audited.
+    @Test
+    void bloodSugarAndPainScoreAreStoredValidatedAndCorrectionsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "nurse-v21@a.com", "+919800010021", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V21", "+919999950021");
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "vitals_pending");
+        String url = "/v1/clinical/vitals/" + queueEntryId;
+
+        assertThat(exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("painScore", 11)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("painScore", -1)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("bloodSugar", 0)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+
+        // pain 0 is a real answer, and blood sugar / pain alone count as a measurement
+        ResponseEntity<Map> first = exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("bloodSugar", 5.4, "painScore", 0)), Map.class);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Number) first.getBody().get("bloodSugar")).doubleValue()).isEqualTo(5.4);
+        assertThat(((Number) first.getBody().get("painScore")).intValue()).isEqualTo(0);
+
+        // a pulse-only save keeps them; a new value corrects and is audited
+        ResponseEntity<Map> keep = exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("pulseBpm", 80)), Map.class);
+        assertThat(((Number) keep.getBody().get("painScore")).intValue()).isEqualTo(0);
+        ResponseEntity<Map> fix = exchange(url, HttpMethod.PATCH, authedJsonBody(token, Map.of("painScore", 7)), Map.class);
+        assertThat(((Number) fix.getBody().get("painScore")).intValue()).isEqualTo(7);
+
+        Map<String, Object> audited = inTenantTx(tenant.id(), () -> jdbc.queryForMap(
+                "SELECT before, after FROM audit_log WHERE tenant_id = ? AND action = 'vitals.corrected' ORDER BY created_at DESC LIMIT 1",
+                tenant.id()));
+        assertThat(audited.get("before").toString()).contains("painScore");
+        assertThat(audited.get("after").toString()).contains("painScore").contains("7");
+    }
+
+    // NUR-022: previous vitals across visits, newest first, limit default 5 / max 20, tenant-scoped, same read permission.
+    @Test
+    void previousVitalsListsThePatientsVisitsNewestFirstWithLimitAndIsTenantScoped() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "nurse-v22@a.com", "+919800010022", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V22", "+919999950022");
+        String empty = "/v1/clinical/vitals/patient/" + patientId + "/previous";
+        assertThat(((java.util.List<?>) exchange(empty, HttpMethod.GET, authed(token), Map.class).getBody().get("items"))).isEmpty();
+
+        java.util.List<String> entries = new java.util.ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            String q = checkIn(token, patientId, staff.id());
+            moveTo(token, q, "waiting", "vitals_pending");
+            exchange("/v1/clinical/vitals/" + q, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                    "bpSystolic", 120 + i, "bpDiastolic", 80, "bloodSugar", 5 + i, "painScore", i)), Map.class);
+            moveTo(token, q, "in_consult", "checkout_pending", "completed");
+            entries.add(q);
+        }
+        ResponseEntity<Map> all = exchange(empty, HttpMethod.GET, authed(token), Map.class);
+        assertThat(all.getStatusCode()).isEqualTo(HttpStatus.OK);
+        java.util.List<Map<String, Object>> items = (java.util.List<Map<String, Object>>) all.getBody().get("items");
+        assertThat(items).hasSize(3);
+        assertThat(items.get(0).get("queueEntryId")).isEqualTo(entries.get(2));
+        assertThat(items.get(2).get("queueEntryId")).isEqualTo(entries.get(0));
+        assertThat(items.get(0)).containsKeys("recordedAt", "bpSystolic", "bpDiastolic", "bloodSugar", "painScore");
+        assertThat(((Number) items.get(0).get("painScore")).intValue()).isEqualTo(2);
+
+        ResponseEntity<Map> one = exchange(empty + "?limit=1", HttpMethod.GET, authed(token), Map.class);
+        assertThat(((java.util.List<?>) one.getBody().get("items"))).hasSize(1);
+        assertThat(exchange(empty + "?limit=999", HttpMethod.GET, authed(token), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        // another tenant cannot see this patient's vitals (404, not an empty list that confirms nothing leaks)
+        SeededTenant other = seedTenant();
+        UUID otherRole = seedFullAccessRole(other.id());
+        SeededStaff otherStaff = seedStaff(other, otherRole, "nurse-v22b@b.com", "+919800010023", false);
+        String otherToken = loginAndGetAccessToken(otherStaff);
+        assertThat(exchange(empty, HttpMethod.GET, authed(otherToken), Map.class).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        // no clinical grant -> 403
+        UUID noClinical = seedRole(tenant.id(), "FrontDeskOnly22", false, fullGrant("queue"), fullGrant("patients"));
+        SeededStaff desk = seedStaff(tenant, noClinical, "desk-v22@a.com", "+919800010024", false);
+        assertThat(exchange(empty, HttpMethod.GET, authed(loginAndGetAccessToken(desk)), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+    }
 }

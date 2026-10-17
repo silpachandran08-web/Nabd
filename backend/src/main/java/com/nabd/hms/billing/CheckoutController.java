@@ -5,7 +5,9 @@ import com.nabd.hms.billing.dto.CheckoutRequest;
 import com.nabd.hms.billing.dto.InvoiceResponse;
 import com.nabd.hms.billing.dto.OtcChargesResponse;
 import com.nabd.hms.billing.dto.PaymentRequest;
+import com.nabd.hms.billing.dto.VoidInvoiceRequest;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.RequestMeta;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -76,6 +78,19 @@ public class CheckoutController {
     public InvoiceResponse recordPayment(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                           @Valid @RequestBody PaymentRequest req) {
         return service.recordPayment(tenantId(jwt), id, staffId(jwt), req);
+    }
+
+    /** PHA-011: void an unpaid invoice and restore its pharmacy stock. Same grant as discounts/refunds. */
+    @PostMapping("/invoices/{id}/void")
+    @PreAuthorize("hasAuthority('billing:edit')")
+    public InvoiceResponse voidInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                        @Valid @RequestBody VoidInvoiceRequest req, jakarta.servlet.http.HttpServletRequest http) {
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        if (permissions == null || !permissions.contains("billing.discount")) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "void-not-permitted", "Void not permitted",
+                    "Your role cannot void an invoice.");
+        }
+        return service.voidInvoice(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
     /** REC-043: any non-zero discount needs billing.discount (the billing module's refund/discount grant). */

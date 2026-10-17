@@ -11,7 +11,7 @@ import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
-import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalKey, type VitalsForm } from "../lib/vitals";
+import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "../lib/vitals";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
@@ -22,12 +22,14 @@ type QueueEntry = {
   priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
   priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
   source: string; presentingComplaint: string | null; appointmentId: string | null;
+  // NUR-012 (S4 contract): optional until the backend ships them; the UI falls back to patient/staff lookups.
+  ageYears?: number | null; gender?: string | null; doctorName?: string | null; waitMinutes?: number | null; visitType?: string | null;
 };
 type Row = QueueEntry & {
   patientName: string; patientMrn: string; doctorName: string;
   allergies: string[]; chronicConditions: string[];
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
-  dob: string | null; gender: string | null; hasAppointment: boolean;
+  dob: string | null; gender: string | null; hasAppointment: boolean; ageYears: number | null; wait: number;
   // The patient record could not be read (no patients:view, 404, 5xx): allergies are UNKNOWN, not absent.
   flagsUnknown: boolean;
 };
@@ -45,9 +47,10 @@ function flagsFor(r: { allergies: string[]; chronicConditions: string[]; present
 }
 
 // "58 M" from the patient's real dob/gender; either part is simply left out when unknown.
-function ageSex(dob: string | null, gender: string | null): string {
+function ageSex(dob: string | null, gender: string | null, ageYears?: number | null): string {
   const parts: string[] = [];
-  if (dob) {
+  if (ageYears != null) parts.push(String(ageYears));
+  else if (dob) {
     const d = new Date(dob);
     if (!Number.isNaN(d.getTime())) {
       const now = new Date();
@@ -195,9 +198,18 @@ function NursingWorklist() {
 
   const [vitalsEntryId, setVitalsEntryId] = useState<string | null>(null);
   const [vitalsForm, setVitalsForm] = useState<VitalsForm>(EMPTY_VITALS);
-  const [vitalsTouched, setVitalsTouched] = useState<Partial<Record<VitalKey, boolean>>>({});
+  const [vitalsTouched, setVitalsTouched] = useState<Partial<Record<string, boolean>>>({});
+  const [bpInput, setBpInput] = useState("");
+  const [vitalsExtras, setVitalsExtras] = useState<VitalsExtras>(EMPTY_EXTRAS);
+  // NUR-022: previous measurements for the open visit's patient (null = loading).
+  const [prevVitals, setPrevVitals] = useState<PreviousVitals[] | null>(null);
+  const [prevError, setPrevError] = useState(false);
   const [vitalsAttempted, setVitalsAttempted] = useState(false);
   const [vitalsError, setVitalsError] = useState<string | null>(null);
+  // NUR-012: read-only view of a recorded visit's vitals (GET /clinical/vitals/{queueEntryId}).
+  const [viewRow, setViewRow] = useState<Row | null>(null);
+  const [viewVitals, setViewVitals] = useState<(PreviousVitals & { abnormalFlags?: string[] }) | null>(null);
+  const [viewError, setViewError] = useState(false);
   const [vitalsFlags, setVitalsFlags] = useState<string[] | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
 
@@ -293,10 +305,11 @@ function NursingWorklist() {
         const pRes = await authedFetch(`/patients/${e.patientId}`);
         const p: { name?: string; mrn?: string; dob?: string; gender?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
         return {
-          ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—",
+          ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
           allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
           lastVitalsAt: null, vitalsOutOfRange: false,
-          dob: p?.dob ?? null, gender: p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
+          dob: p?.dob ?? null, gender: e.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
+          ageYears: e.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
         };
       }));
       // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today —
@@ -354,14 +367,41 @@ function NursingWorklist() {
     void load();
   }
 
+  const loadPrevious = useCallback(async (patientId: string, currentEntryId: string) => {
+    try {
+      // One extra row requested because the current visit is excluded client-side (contract: server excludes nothing).
+      const res = await authedFetch(`/clinical/vitals/patient/${patientId}/previous?limit=6`);
+      if (!res?.ok) throw new Error("load");
+      const body = await res.json();
+      const items: PreviousVitals[] = Array.isArray(body?.items) ? body.items : [];
+      setPrevVitals(items.filter((v) => v.queueEntryId !== currentEntryId).slice(0, 5));
+    } catch { setPrevError(true); }
+  }, [authedFetch]);
+
   function openVitalsModal(entryId: string) {
     setVitalsEntryId(entryId);
     setVitalsForm(EMPTY_VITALS);
+    setBpInput("");
+    setPrevVitals(null); setPrevError(false);
+    setVitalsExtras(EMPTY_EXTRAS);
     setVitalsTouched({});
     setVitalsAttempted(false);
     setVitalsError(null);
     setVitalsFlags(null);
   }
+
+  async function openViewVitals(r: Row) {
+    setViewRow(r); setViewVitals(null); setViewError(false);
+    try {
+      const res = await authedFetch(`/clinical/vitals/${r.id}`);
+      if (!res?.ok) throw new Error("load");
+      setViewVitals(await res.json());
+    } catch { setViewError(true); }
+  }
+  const canViewVitals = can(PERM.vitalsRead);
+  // Row click / Enter / Space: capture for a waiting visit, read-only view for a recorded one.
+  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureVitals) openVitalsModal(r.id); } else if (canViewVitals) void openViewVitals(r); };
+  const rowActionable = (r: Row) => (r.status === "vitals_pending" ? canCaptureVitals : canViewVitals);
 
   function closeVitalsModal() {
     setVitalsEntryId(null);
@@ -375,12 +415,12 @@ function NursingWorklist() {
     setVitalsError(null);
     // An empty or implausible save must never move the visit on to the doctor with no vitals.
     setVitalsAttempted(true);
-    if (Object.keys(vitalsErrors(vitalsForm)).length > 0) return;
+    if (Object.keys(nurseVitalsErrors(vitalsForm, bpInput, vitalsExtras)).length > 0) return;
     setVitalsSubmitting(true);
     try {
       const res = await authedFetch(`/clinical/vitals/${vitalsEntryId}`, {
         method: "PATCH",
-        body: JSON.stringify(vitalsPayload(vitalsForm)),
+        body: JSON.stringify(nurseVitalsPayload(vitalsForm, bpInput, vitalsExtras)),
       });
       if (!res) return;
       if (!res.ok) {
@@ -597,8 +637,15 @@ function NursingWorklist() {
     recorded: { title: "No vitals recorded yet today", hint: "Patients whose vitals you capture will show up here." },
     all: { title: "No patients on the worklist", hint: "Nobody has been checked in for vitals today." },
   }[vitalsFilter];
-  const vErrors = vitalsErrors(vitalsForm);
+  const vErrors = nurseVitalsErrors(vitalsForm, bpInput, vitalsExtras);
   const vitalsRow = vitalsEntryId ? [...rows, ...recordedRows].find((r) => r.id === vitalsEntryId) : undefined;
+  const vitalsPatientId = vitalsRow?.patientId;
+  useEffect(() => {
+    // Fetch-on-open; state resets happen in openVitalsModal. Same pattern as useMySchedule.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (vitalsEntryId && vitalsPatientId && can(PERM.vitalsRead)) void loadPrevious(vitalsPatientId, vitalsEntryId);
+  }, [vitalsEntryId, vitalsPatientId, loadPrevious]);
+  const vitalsFormEmpty = VITAL_FIELDS.every((d) => vitalsForm[d.key].trim() === "") && !bpInput.trim() && !vitalsExtras.bloodSugar.trim() && !vitalsExtras.painScore.trim();
   // ClinicNav's "Vaccines & Injections" sidebar item deep-links here (?tab=vaccines) even though
   // no backend exists for it — not one of the 5 real tabs, so it's checked from the raw query
   // param (validTab() would just fall it back to "vitals") and shown as its own honest section.
@@ -688,10 +735,11 @@ function NursingWorklist() {
                         const hasAllergy = flags.some((f) => f.kind === "danger");
                         const rowClass = hasAllergy ? styles.rowFlagged : r.priority ? styles.rowUrgent : undefined;
                         return (
-                          <tr key={r.id} className={rowClass}>
+                          <tr key={r.id} className={`${rowClass ?? ""} ${rowActionable(r) ? styles.rowClickable : ""}`}
+                            {...(rowActionable(r) ? { tabIndex: 0, onClick: () => openRow(r), onKeyDown: (e: React.KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openRow(r); } } } : {})}>
                             <td data-label="Patient" className={styles.patientCell} title={r.patientMrn ? `MRN ${r.patientMrn}` : undefined}>
                               <div><span className={styles.patientName}>{r.patientName}</span>
-                              <span className={styles.mrn} title={r.doctorName !== "—" ? r.doctorName : undefined}>{[ageSex(r.dob, r.gender), `T-${r.tokenNumber}`, r.doctorName !== "—" ? r.doctorName : ""].filter(Boolean).join(" · ")}</span></div>
+                              <span className={styles.mrn} title={r.doctorName !== "—" ? r.doctorName : undefined}>{[ageSex(r.dob, r.gender, r.ageYears), `T-${r.tokenNumber}`, r.doctorName !== "—" ? r.doctorName : "", `${r.wait}m wait`].filter(Boolean).join(" · ")}</span></div>
                             </td>
                             <td data-label="Visit">
                               <span className={styles.visitCell}>
@@ -714,7 +762,8 @@ function NursingWorklist() {
                                 ? <StatusPill tone="warn" label="Waiting" icon="clock" />
                                 : <StatusPill tone={r.vitalsOutOfRange ? "danger" : "ok"} label={r.vitalsOutOfRange ? `${statusLabel(r.status)} · out of range` : statusLabel(r.status)} icon={r.vitalsOutOfRange ? "alert" : "check"} />}
                             </td>
-                            <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}><Icon name="pulse" size={14} />Capture vitals</button>}</td>
+                            <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); openVitalsModal(r.id); }}><Icon name="pulse" size={14} />Capture vitals</button>}
+                              {r.status !== "vitals_pending" && canViewVitals && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); void openViewVitals(r); }}><Icon name="pulse" size={14} />View vitals</button>}</td>
                           </tr>
                         );
                       })}
@@ -972,23 +1021,41 @@ function NursingWorklist() {
           while nothing is typed: a stray tap must not discard half-typed vitals; Cancel is the explicit way out. */}
       {vitalsEntryId && !vitalsFlags && canCaptureVitals && (
         <Dialog title={`Capture vitals${vitalsRow ? ` — ${vitalsRow.patientName}` : ""}`} size="lg"
-          onClose={() => { if (!vitalsSubmitting && VITAL_FIELDS.every((d) => vitalsForm[d.key].trim() === "")) closeVitalsModal(); }}>
+          onClose={() => { if (!vitalsSubmitting && vitalsFormEmpty) closeVitalsModal(); }}>
+          {vitalsRow && (
+            <div className={styles.vitalsPatient}>
+              <strong>{vitalsRow.patientName}</strong>
+              <span className={styles.muted}>#{vitalsRow.tokenNumber}{ageSex(vitalsRow.dob, vitalsRow.gender) ? ` · ${ageSex(vitalsRow.dob, vitalsRow.gender)}` : ""}{vitalsRow.patientMrn ? ` · ${vitalsRow.patientMrn}` : ""}</span>
+            </div>
+          )}
+          <div className={styles.vitalsLayout}>
           <form noValidate onSubmit={submitVitals}>
             <p className={styles.muted}>{VITALS_BLANK_HINT}</p>
             {vitalsAttempted && vErrors.form && <div className={styles.formError} role="alert">{vErrors.form}</div>}
             <div className={styles.fieldGrid}>
-              {VITAL_FIELDS.map((d) => {
-                const showErr = (vitalsAttempted || vitalsTouched[d.key]) ? vErrors[d.key] : undefined;
-                const warn = showErr ? null : softWarning(d.key, vitalsForm[d.key], isAdult(vitalsRow?.dob ?? null));
+              {([
+                { key: "bp", label: "Blood pressure", unit: "mmHg", value: bpInput, set: (v: string) => setBpInput(v), type: "text", mode: "numeric", ph: "120/80", soft: null },
+                ...VITAL_FIELDS.filter((d) => d.key !== "bpSystolic" && d.key !== "bpDiastolic").map((d) => ({
+                  key: d.key as string, label: d.label, unit: d.unit, value: vitalsForm[d.key], type: "number", mode: "decimal", ph: undefined, step: d.step, min: d.min, max: d.max,
+                  set: (v: string) => setVitalsForm((prev) => ({ ...prev, [d.key]: v })), soft: d.key as VitalKey,
+                })),
+                { key: "bloodSugar", label: "Blood sugar", unit: BLOOD_SUGAR_UNIT, value: vitalsExtras.bloodSugar, type: "number", mode: "decimal", ph: undefined, step: "any", min: 0, soft: null,
+                  set: (v: string) => setVitalsExtras((prev) => ({ ...prev, bloodSugar: v })) },
+                { key: "painScore", label: "Pain score", unit: `/${PAIN_SCORE_MAX}`, value: vitalsExtras.painScore, type: "number", mode: "numeric", ph: undefined, step: "1", min: 0, max: PAIN_SCORE_MAX, soft: null,
+                  set: (v: string) => setVitalsExtras((prev) => ({ ...prev, painScore: v })) },
+              ] as { key: string; label: string; unit: string; value: string; type: string; mode: "numeric" | "decimal"; ph?: string; step?: string; min?: number; max?: number; soft: VitalKey | null; set: (v: string) => void }[]).map((d) => {
+                const errKey = d.key as keyof typeof vErrors;
+                const showErr = (vitalsAttempted || vitalsTouched[d.key]) ? vErrors[errKey] : undefined;
+                const warn = showErr || !d.soft ? null : softWarning(d.soft, d.value, isAdult(vitalsRow?.dob ?? null));
                 return (
                   <div className={styles.field} key={d.key}>
                     <label className={styles.label} htmlFor={d.key}>{d.label} ({d.unit})</label>
                     <div className={styles.unitInput}>
-                      <input id={d.key} type="number" inputMode="decimal" step={d.step} min={d.min} max={d.max}
-                        className={styles.input} value={vitalsForm[d.key]} aria-invalid={!!showErr}
+                      <input id={d.key} type={d.type} inputMode={d.mode} step={d.step} min={d.min} max={d.max} placeholder={d.ph}
+                        className={styles.input} value={d.value} aria-invalid={!!showErr}
                         aria-describedby={showErr || warn ? `${d.key}-msg` : undefined}
                         onBlur={() => setVitalsTouched((prev) => ({ ...prev, [d.key]: true }))}
-                        onChange={(e) => setVitalsForm((prev) => ({ ...prev, [d.key]: e.target.value }))} />
+                        onChange={(e) => d.set(e.target.value)} />
                       <span className={styles.unit} aria-hidden="true">{d.unit}</span>
                     </div>
                     {showErr && <div className={styles.fieldError} id={`${d.key}-msg`} role="alert"><Icon name="alert" size={12} />{showErr}</div>}
@@ -1006,6 +1073,60 @@ function NursingWorklist() {
               <button type="submit" className={styles.submitBtn} disabled={vitalsSubmitting}>{vitalsSubmitting ? "Saving…" : "Save and mark ready"}</button>
             </div>
           </form>
+          {can(PERM.vitalsRead) && (
+            <aside className={styles.prevPanel} aria-label="Previous measurements">
+              <h3 className={styles.prevTitle}>Previous measurements</h3>
+              {prevError ? (
+                <div className={styles.formError} role="alert">
+                  Couldn&apos;t load previous measurements.{" "}
+                  {vitalsPatientId && vitalsEntryId && <button type="button" className={styles.smallBtn} onClick={() => { setPrevError(false); setPrevVitals(null); void loadPrevious(vitalsPatientId, vitalsEntryId); }}>Retry</button>}
+                </div>
+              ) : prevVitals === null ? (
+                <Skeleton rows={3} label="Loading previous measurements" />
+              ) : prevVitals.length === 0 ? (
+                <p className={styles.muted}>No earlier measurements for this patient.</p>
+              ) : (
+                <div className={styles.prevScroll}>
+                  <table className={styles.prevTable}>
+                    <thead><tr><th scope="col">Recorded</th><th scope="col">BP</th><th scope="col">Pulse</th><th scope="col">Temp</th><th scope="col">SpO2</th><th scope="col">Weight</th><th scope="col">Height</th><th scope="col">Sugar ({BLOOD_SUGAR_UNIT})</th><th scope="col">Pain</th></tr></thead>
+                    <tbody>
+                      {prevVitals.map((v) => (
+                        <tr key={v.queueEntryId}>
+                          <td>{v.recordedAt ? new Date(v.recordedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</td>
+                          <td>{formatBp(v)}</td><td>{v.pulseBpm ?? "—"}</td><td>{v.tempCelsius ?? "—"}</td><td>{v.spo2Percent ?? "—"}</td>
+                          <td>{v.weightKg ?? "—"}</td><td>{v.heightCm ?? "—"}</td><td>{v.bloodSugar ?? "—"}</td><td>{v.painScore ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </aside>
+          )}
+          </div>
+        </Dialog>
+      )}
+
+      {viewRow && (
+        <Dialog title={`Vitals — ${viewRow.patientName}`} onClose={() => setViewRow(null)}>
+          <div className={styles.vitalsPatient}>
+            <span className={styles.muted}>T-{viewRow.tokenNumber}{ageSex(viewRow.dob, viewRow.gender, viewRow.ageYears) ? ` · ${ageSex(viewRow.dob, viewRow.gender, viewRow.ageYears)}` : ""}{viewRow.patientMrn ? ` · ${viewRow.patientMrn}` : ""}</span>
+          </div>
+          {viewError ? <div className={styles.formError} role="alert">Couldn&apos;t load vitals. <button type="button" className={styles.smallBtn} onClick={() => void openViewVitals(viewRow)}>Retry</button></div>
+            : !viewVitals ? <Skeleton rows={3} label="Loading vitals" /> : (
+              <>
+                <p className={styles.muted}>Recorded {viewVitals.recordedAt ? `${new Date(viewVitals.recordedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} ${hhmm(viewVitals.recordedAt)}` : "—"}</p>
+                <table className={styles.prevTable}>
+                  <tbody>
+                    {([["Blood pressure (mmHg)", formatBp(viewVitals)], ["Pulse (bpm)", viewVitals.pulseBpm], ["Temp (°C)", viewVitals.tempCelsius], ["SpO2 (%)", viewVitals.spo2Percent],
+                      ["Weight (kg)", viewVitals.weightKg], ["Height (cm)", viewVitals.heightCm], [`Blood sugar (${BLOOD_SUGAR_UNIT})`, viewVitals.bloodSugar], [`Pain (/${PAIN_SCORE_MAX})`, viewVitals.painScore]] as [string, string | number | null | undefined][])
+                      .map(([k, v]) => <tr key={k}><th scope="row">{k}</th><td>{v ?? "—"}</td></tr>)}
+                  </tbody>
+                </table>
+                {(viewVitals.abnormalFlags?.length ?? 0) > 0 && <div className={styles.formError} role="alert">{viewVitals.abnormalFlags!.map((f) => <div key={f} className={styles.flagLine}><Icon name="alert" size={14} />{f}</div>)}</div>}
+              </>
+            )}
+          <div className={styles.modalActions}><button type="button" className={styles.cancelBtn} onClick={() => setViewRow(null)}>Close</button></div>
         </Dialog>
       )}
 

@@ -109,6 +109,7 @@
 .actionCell { text-align: end; white-space: nowrap; position: sticky; inset-inline-end: 0; background-color: var(--nb-surface-1); }
 .flagCell { min-width: 180px; }
 .patientCell { min-width: 160px; max-width: 200px; }
+.patientCell .mrn { white-space: normal; } /* NUR-012: meta line (age · token · doctor · wait) wraps instead of widening the table */
 
 .secondaryBtn {
   display: inline-flex;
@@ -426,6 +427,14 @@
   column-gap: var(--nb-space-12);
 }
 
+.vitalsPatient { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--nb-space-8); margin-bottom: var(--nb-space-12); }
+.vitalsLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--nb-space-16); align-items: start; }
+.prevPanel { min-width: 0; border-inline-start: 1px solid var(--nb-border-subtle, currentColor); padding-inline-start: var(--nb-space-16); }
+.prevTitle { margin: 0 0 var(--nb-space-8); font-size: 14px; font-weight: 600; }
+.prevScroll { overflow-x: auto; }
+.prevTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.prevTable th, .prevTable td { text-align: start; padding: var(--nb-space-4) var(--nb-space-8); white-space: nowrap; }
+@media (max-width: 1023px) { .vitalsLayout { grid-template-columns: 1fr; } .prevPanel { border-inline-start: 0; padding-inline-start: 0; } }
 .unitInput { position: relative; }
 .unitInput .input { padding-inline-end: 52px; }
 .unit {
@@ -583,3 +592,7 @@
   .flagList { max-width: none; min-inline-size: 0; flex: 1; justify-content: flex-end; }
   .flagList > * { white-space: normal; max-inline-size: 100%; }
 }
+
+.rowClickable { cursor: pointer; }
+.rowClickable:hover td { background-color: var(--nb-surface-2); }
+.rowClickable:focus-visible { outline: 2px solid var(--nb-focus, currentColor); outline-offset: -2px; }

@@ -7,6 +7,7 @@ import { RegisterDialog } from "./RegistryDialogs";
 import { CheckInDialog } from "../components/arrivals/CheckInDialog";
 import Dialog from "../components/ui/Dialog";
 import ConfirmDialog from "./ConfirmDialog";
+import GuardianReviews from "./GuardianReviews";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
@@ -693,6 +694,8 @@ function PatientsList() {
 
       {flash && <div className={styles.flash} role="status">{flash}</div>}
 
+      {!forbidden && <GuardianReviews authedFetch={authedFetch} canAct={patientsEdit} onOpen={(id) => void openDrawer(id)} onChanged={() => void load(q, filter)} />}
+
       <div className={styles.card}>
         {loading ? (
           <Skeleton rows={6} label="Loading patients" />
@@ -972,7 +975,7 @@ function PatientsList() {
                         )}
                       </div>
                       {drawerPatient.isMinor && (
-                        <div className={styles.muted}>A minor&apos;s guardian can&apos;t be removed — reassign instead, or wait for the automatic age-18 review.</div>
+                        <div className={styles.muted}>A minor&apos;s guardian can&apos;t be removed — reassign instead. At 18 the patient appears in Guardian reviews due.</div>
                       )}
                     </div>
                   )}

@@ -9,10 +9,11 @@ final class ReportsModels {
     private ReportsModels() {
     }
 
-    record SourceCount(String source, long visitCount) {
+    record SourceCount(String source, long visitCount, BigDecimal revenue) {
     }
 
-    record StaffCollectionRow(UUID staffId, String staffName, BigDecimal collected, long paymentCount) {
+    record StaffCollectionRow(UUID staffId, String staffName, BigDecimal collected, long paymentCount,
+                              long handledCount, long discountCount, long overrideCount) {
     }
 
     record NoShowRiskRow(UUID patientId, String patientName, long priorNoShowCount) {

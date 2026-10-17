@@ -21,6 +21,7 @@ import static com.nabd.hms.billing.CheckoutModels.LineItemRow;
 import static com.nabd.hms.billing.CheckoutModels.PaymentRow;
 import static com.nabd.hms.billing.CheckoutModels.PrescribedItemRow;
 import static com.nabd.hms.billing.CheckoutModels.QueueEntryContext;
+import static com.nabd.hms.billing.CheckoutModels.VoidableInvoice;
 
 @Repository
 class CheckoutRepository {
@@ -41,13 +42,13 @@ class CheckoutRepository {
     // wireframe's "in External mode every inventory and dispensing screen is genuinely absent" rule.
     List<ChargeRow> listActiveCharges(UUID tenantId) {
         return jdbc.query(
-                "SELECT c.id, c.code, c.name, c.category, c.base_amount, c.follow_up_amount, c.tax_rate_percent " +
+                "SELECT c.id, c.code, c.name, c.category, c.base_amount, c.follow_up_amount, c.tax_rate_percent, c.stock_qty " +
                         "FROM charge_catalogue c LEFT JOIN pharmacy_settings ps ON ps.tenant_id = c.tenant_id " +
                         "WHERE c.tenant_id = ? AND c.active = true AND (c.stock_qty IS NULL OR ps.mode = 'hybrid') " +
                         "ORDER BY c.display_order, c.name",
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("code"), rs.getString("name"),
                         rs.getString("category"), rs.getBigDecimal("base_amount"), rs.getBigDecimal("follow_up_amount"),
-                        rs.getBigDecimal("tax_rate_percent")),
+                        rs.getBigDecimal("tax_rate_percent"), (Integer) rs.getObject("stock_qty")),
                 tenantId);
     }
 
@@ -59,7 +60,7 @@ class CheckoutRepository {
                         "WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'completed' AND billed = false",
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("charge_code"),
                         rs.getString("charge_name"), "Procedure", rs.getBigDecimal("base_amount"), null,
-                        rs.getBigDecimal("tax_rate_percent")),
+                        rs.getBigDecimal("tax_rate_percent"), null),
                 tenantId, queueEntryId);
     }
 
@@ -155,13 +156,19 @@ class CheckoutRepository {
     }
 
     /** V3-004: the catalogue row for a stocked (pharmacy) code, active or not; empty for any non-pharmacy code. */
-    Optional<PharmacyChargeRow> findPharmacyCharge(UUID tenantId, String chargeCode) {
+    Optional<PharmacyChargeRow> findCatalogueCharge(UUID tenantId, String chargeCode) {
         return jdbc.query(
-                "SELECT name, category, base_amount, tax_rate_percent, active FROM charge_catalogue " +
-                        "WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
+                "SELECT name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
+                        "stock_qty IS NOT NULL AS stocked FROM charge_catalogue WHERE tenant_id = ? AND code = ?",
                 (rs, i) -> new PharmacyChargeRow(rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
-                        rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active")),
+                        rs.getBigDecimal("follow_up_amount"), rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active"),
+                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked")),
                 tenantId, chargeCode).stream().findFirst();
+    }
+
+    Optional<String> findPharmacyMode(UUID tenantId) {
+        return jdbc.query("SELECT mode FROM pharmacy_settings WHERE tenant_id = ?",
+                (rs, i) -> rs.getString("mode"), tenantId).stream().findFirst();
     }
 
     /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same
@@ -188,6 +195,48 @@ class CheckoutRepository {
                             "VALUES (?,?,'dispense',?,?,?,?,?)",
                     tenantId, pharmacy.get(0), -quantity, after.get(0) + quantity, after.get(0), "Dispensed at checkout", invoiceId);
         }
+    }
+
+    /** PHA-011: locks the invoice row so two concurrent voids (or a void racing a payment) run one after the other. */
+    Optional<VoidableInvoice> lockInvoiceForVoid(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT invoice_number, status, paid FROM invoices WHERE tenant_id = ? AND id = ? FOR UPDATE",
+                (rs, i) -> new VoidableInvoice(rs.getString("invoice_number"), rs.getString("status"), rs.getBigDecimal("paid")),
+                tenantId, invoiceId).stream().findFirst();
+    }
+
+    void markInvoiceVoid(UUID tenantId, UUID invoiceId, UUID staffId, String reason) {
+        jdbc.update("UPDATE invoices SET status = 'void', voided_at = now(), voided_by = ?, void_reason = ? " +
+                "WHERE tenant_id = ? AND id = ?", staffId, reason, tenantId, invoiceId);
+    }
+
+    /** PHA-011: puts every stocked line of the invoice back on the shelf, one immutable 'restock' movement per
+     * line. Returns {code, quantity} pairs restored, for the audit detail. Caller holds the invoice lock and
+     * the transaction, so the restock and the status change commit or roll back together. */
+    List<Object[]> restockInvoiceLines(UUID tenantId, UUID invoiceId, UUID staffId, String reason) {
+        List<Object[]> restored = new java.util.ArrayList<>();
+        // Sum per code so a code billed on two lines (two checkpoints) restocks in one movement; ORDER BY keeps lock order stable.
+        List<Object[]> lines = jdbc.query(
+                "SELECT c.id, li.charge_code, SUM(li.quantity) AS qty FROM invoice_line_items li " +
+                        "JOIN charge_catalogue c ON c.tenant_id = li.tenant_id AND c.code = li.charge_code AND c.stock_qty IS NOT NULL " +
+                        "WHERE li.tenant_id = ? AND li.invoice_id = ? GROUP BY c.id, li.charge_code ORDER BY li.charge_code",
+                (rs, i) -> new Object[]{UUID.fromString(rs.getString("id")), rs.getString("charge_code"), rs.getInt("qty")},
+                tenantId, invoiceId);
+        for (Object[] l : lines) {
+            int qty = (Integer) l[2];
+            Integer after = jdbc.queryForObject(
+                    "UPDATE charge_catalogue SET stock_qty = stock_qty + ?, updated_at = now() WHERE tenant_id = ? AND id = ? RETURNING stock_qty",
+                    Integer.class, qty, tenantId, l[0]);
+            jdbc.update("INSERT INTO pharmacy_stock_movements (tenant_id, item_id, kind, delta, qty_before, qty_after, reason, invoice_id, actor_id) " +
+                            "VALUES (?,?,'restock',?,?,?,?,?,?)",
+                    tenantId, l[0], qty, after - qty, after, reason, invoiceId, staffId);
+            restored.add(new Object[]{l[1], qty});
+        }
+        return restored;
+    }
+
+    Optional<String[]> findActor(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new String[]{rs.getString("name"), rs.getString("role_name")}, tenantId, staffId).stream().findFirst();
     }
 
     Optional<InvoiceRow> findInvoice(UUID tenantId, UUID invoiceId) {

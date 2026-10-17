@@ -437,4 +437,136 @@ class PharmacyApiTest extends ApiTestBase {
         assertThat(exchange("/v1/pharmacy/items/" + id + "/stock-movements", HttpMethod.GET, authed(viewToken), List.class).getStatusCode())
                 .isEqualTo(HttpStatus.OK);
     }
+
+    // ---- PHA-011 / PHA-003 ----
+
+    private Map<?, ?> otcCharge(String token, String code) {
+        Map<?, ?> body = exchange("/v1/billing/otc-charges", HttpMethod.GET, authed(token), Map.class).getBody();
+        return ((List<Map<?, ?>>) body.get("charges")).stream().filter(c -> code.equals(c.get("code"))).findFirst().orElseThrow();
+    }
+
+    private int itemStock(String token, String code) {
+        List<Map<?, ?>> items = exchange("/v1/pharmacy/items", HttpMethod.GET, authed(token), List.class).getBody();
+        return (Integer) items.stream().filter(i -> code.equals(i.get("code"))).findFirst().orElseThrow().get("stockQty");
+    }
+
+    private Map<String, Object> pharmacyLine(String code, int qty) {
+        return Map.of("chargeCode", code, "chargeName", "x", "category", "Pharmacy", "quantity", qty,
+                "unitPrice", 350.00, "taxRatePercent", 12.00);
+    }
+
+    @Test
+    void chargesCarryStockQtyAndOverSellingIsRejectedWithoutChangingStock() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "pharm20@a.com", "+919600000020", false);
+        String token = loginAndGetAccessToken(staff);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        String code = addHybridItem(token, "Cough syrup", 3);
+
+        assertThat(otcCharge(token, code).get("stockQty")).isEqualTo(3);
+
+        ResponseEntity<Map> over = exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(pharmacyLine(code, 4)))), Map.class);
+        assertThat(over.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(over.getBody().get("type")).asString().contains("insufficient-stock");
+        assertThat(itemStock(token, code)).isEqualTo(3);
+    }
+
+    @Test
+    void voidingAnUnpaidInvoiceRestoresStockWithAnImmutableMovementAndAuditRow() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedRole(tenant.id(), "Owner2", true, fullGrant("pharmacy"), fullGrant("billing"));
+        SeededStaff staff = seedStaff(tenant, roleId, "pharm21@a.com", "+919600000021", false);
+        String token = loginAndGetAccessToken(staff);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        String code = addHybridItem(token, "Ibuprofen", 10);
+        ResponseEntity<Map> sale = exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(pharmacyLine(code, 4)))), Map.class);
+        String invoiceId = (String) sale.getBody().get("id");
+        assertThat(itemStock(token, code)).isEqualTo(6);
+
+        ResponseEntity<Map> blank = exchange("/v1/billing/invoices/" + invoiceId + "/void", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", " ")), Map.class);
+        assertThat(blank.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<Map> voided = exchange("/v1/billing/invoices/" + invoiceId + "/void", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "Customer changed mind")), Map.class);
+        assertThat(voided.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(voided.getBody().get("status")).isEqualTo("void");
+        assertThat(itemStock(token, code)).isEqualTo(10);
+
+        List<Map<?, ?>> items = exchange("/v1/pharmacy/items", HttpMethod.GET, authed(token), List.class).getBody();
+        String itemId = (String) items.get(0).get("id");
+        List<Map<?, ?>> moves = exchange("/v1/pharmacy/items/" + itemId + "/stock-movements", HttpMethod.GET, authed(token), List.class).getBody();
+        assertThat(moves.get(0).get("kind")).isEqualTo("restock");
+        assertThat(moves.get(0).get("delta")).isEqualTo(4);
+        Integer audit = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE action = 'billing.invoice_voided' AND entity_id = ?", Integer.class, UUID.fromString(invoiceId)));
+        assertThat(audit).isEqualTo(1);
+
+        ResponseEntity<Map> again = exchange("/v1/billing/invoices/" + invoiceId + "/void", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "again")), Map.class);
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(itemStock(token, code)).isEqualTo(10);
+
+        ResponseEntity<Map> pay = exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
+                authedJsonBody(token, Map.of("method", "cash", "amount", 10)), Map.class);
+        assertThat(pay.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(pay.getBody().get("type")).asString().contains("invoice-void");
+    }
+
+    @Test
+    void voidIsRefusedWhenPaymentsExistAndWithoutTheDiscountGrant() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "pharm22@a.com", "+919600000022", false);
+        String token = loginAndGetAccessToken(staff);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        String code = addHybridItem(token, "Vitamin C", 5);
+        String invoiceId = (String) exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(pharmacyLine(code, 2)))), Map.class).getBody().get("id");
+        exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
+                authedJsonBody(token, Map.of("method", "cash", "amount", 10)), Map.class);
+
+        ResponseEntity<Map> resp = exchange("/v1/billing/invoices/" + invoiceId + "/void", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "oops")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(resp.getBody().get("type")).asString().contains("invoice-has-payments");
+        assertThat(itemStock(token, code)).isEqualTo(3);
+
+        // A billing role without the refund/discount grant cannot void at all.
+        String invoice2 = (String) exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(pharmacyLine(code, 1)))), Map.class).getBody().get("id");
+        UUID biller = seedRole(tenant.id(), "Biller", false,
+                new com.nabd.hms.common.ModuleGrant("billing", true, true, true, false, false, false, false));
+        String billerToken = loginAndGetAccessToken(seedStaff(tenant, biller, "pharm23@a.com", "+919600000023", false));
+        ResponseEntity<Map> denied = exchange("/v1/billing/invoices/" + invoice2 + "/void", HttpMethod.POST,
+                authedJsonBody(billerToken, Map.of("reason", "nope")), Map.class);
+        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(itemStock(token, code)).isEqualTo(2);
+    }
+
+    @Test
+    void dispensingQueueRowsCarryQueueEntryIdTokenAndPerItemStock() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "pharm24@a.com", "+919600000024", false);
+        String token = loginAndGetAccessToken(staff);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        addHybridItem(token, "Cetirizine", 7);
+        String patientId = registerPatient(token, "PharmTok", "+919999940024");
+        ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", staff.id().toString())), Map.class);
+        String queueEntryId = (String) checkIn.getBody().get("id");
+        exchange("/v1/clinical/prescriptions/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of(
+                "items", List.of(Map.of("drugName", "cetirizine", "dosage", "10mg", "frequency", "OD"),
+                        Map.of("drugName", "Unstocked drug", "dosage", "5mg", "frequency", "OD")))), Map.class);
+        exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
+
+        List<Map<?, ?>> queue = exchange("/v1/pharmacy/dispensing-queue", HttpMethod.GET, authed(token), List.class).getBody();
+        Map<?, ?> row = queue.get(0);
+        assertThat(row.get("queueEntryId")).isEqualTo(queueEntryId);
+        assertThat(row.get("token")).isEqualTo(checkIn.getBody().get("tokenNumber"));
+        List<Map<?, ?>> items = (List<Map<?, ?>>) row.get("items");
+        assertThat(items.get(0).get("stockQty")).isEqualTo(7);
+        assertThat(items.get(1).get("stockQty")).isNull();
+    }
 }

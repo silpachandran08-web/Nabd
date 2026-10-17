@@ -176,10 +176,10 @@ public class PharmacyService {
 
     private DispensingQueueEntryResponse toDispensingResponse(UUID tenantId, DispensingQueueRow r) {
         List<DispensingQueueEntryResponse.Item> items = repo.listDispensingItems(tenantId, r.prescriptionId()).stream()
-                .map(i -> new DispensingQueueEntryResponse.Item(i.drugName(), i.dosage(), i.frequency(), i.duration(), i.instructions()))
+                .map(i -> new DispensingQueueEntryResponse.Item(i.drugName(), i.dosage(), i.frequency(), i.duration(), i.instructions(), i.stockQty()))
                 .toList();
         return new DispensingQueueEntryResponse(r.prescriptionId(), r.queueEntryId(), r.patientId(), r.patientName(),
-                r.doctorName(), r.signedAt(), items);
+                r.doctorName(), r.signedAt(), r.token(), items);
     }
 
     private void requireHybridMode(UUID tenantId) {

@@ -11,7 +11,8 @@ final class VitalsModels {
 
     record VitalsRow(UUID id, UUID queueEntryId, UUID patientId, BigDecimal heightCm, BigDecimal weightKg,
                       Integer bpSystolic, Integer bpDiastolic, Integer pulseBpm, BigDecimal tempCelsius,
-                      Integer spo2Percent, UUID recordedBy, Instant recordedAt) {
+                      Integer spo2Percent, BigDecimal bloodSugar, Integer painScore, UUID recordedBy,
+                      Instant recordedAt) {
     }
 
     /** Patient id + current queue status — status decides whether recording vitals should also

@@ -139,8 +139,9 @@ public class ReportsService {
     @Transactional
     public List<SourceBreakdownResponse> sourceBreakdown(UUID tenantId, Range r) {
         tenantContext.set(tenantId);
+        long untagged = repo.untaggedVisits(tenantId, r.from(), r.to());
         return repo.sourceBreakdown(tenantId, r.from(), r.to()).stream()
-                .map(s -> new SourceBreakdownResponse(s.source(), s.visitCount())).toList();
+                .map(s -> new SourceBreakdownResponse(s.source(), s.visitCount(), s.revenue(), untagged)).toList();
     }
 
     /** NB-231: same row-scoping convention as NB-051 — "own_patients_only" staff see only their own row. */
@@ -152,8 +153,9 @@ public class ReportsService {
         UUID scopedToStaffId = "own_patients_only".equals(caller.scope()) ? callerStaffId : null;
         Instant since = r.from().atStartOfDay(zone).toInstant();
         Instant until = r.to().plusDays(1).atStartOfDay(zone).toInstant();
-        return repo.staffCollection(tenantId, since, until, scopedToStaffId).stream()
-                .map(s -> new StaffPerformanceResponse(s.staffId(), s.staffName(), s.collected(), s.paymentCount())).toList();
+        return repo.staffCollection(tenantId, r.from(), r.to(), since, until, scopedToStaffId).stream()
+                .map(s -> new StaffPerformanceResponse(s.staffId(), s.staffName(), s.collected(), s.paymentCount(),
+                        s.handledCount(), s.discountCount(), s.overrideCount())).toList();
     }
 
     /** NB-231: the access rule stated on the surface, same convention as NB-235's echoed rule text. */
@@ -232,16 +234,18 @@ public class ReportsService {
             case "sources" -> {
                 List<SourceBreakdownResponse> rows = sourceBreakdown(tenantId, period);
                 rowCount = rows.size();
-                StringBuilder sb = new StringBuilder("source,visitCount\n");
-                rows.forEach(r -> sb.append(csvField(r.source())).append(',').append(r.visitCount()).append('\n'));
+                StringBuilder sb = new StringBuilder("source,visitCount,revenue\n");
+                rows.forEach(r -> sb.append(csvField(r.source())).append(',').append(r.visitCount())
+                        .append(',').append(r.revenue()).append('\n'));
                 csv = sb.toString();
             }
             case "staff-performance" -> {
                 List<StaffPerformanceResponse> rows = staffPerformance(tenantId, callerStaffId, period);
                 rowCount = rows.size();
-                StringBuilder sb = new StringBuilder("staffName,collected,paymentCount\n");
+                StringBuilder sb = new StringBuilder("staffName,collected,paymentCount,handledCount,discountCount,overrideCount\n");
                 rows.forEach(r -> sb.append(csvField(r.staffName())).append(',').append(r.collected())
-                        .append(',').append(r.paymentCount()).append('\n'));
+                        .append(',').append(r.paymentCount()).append(',').append(r.handledCount())
+                        .append(',').append(r.discountCount()).append(',').append(r.overrideCount()).append('\n'));
                 csv = sb.toString();
             }
             default -> throw new ApiException(HttpStatus.BAD_REQUEST, "unknown-report", "Unknown report",

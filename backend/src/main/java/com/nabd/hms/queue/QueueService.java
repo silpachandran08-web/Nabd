@@ -72,9 +72,12 @@ public class QueueService {
     private final TenantContext tenantContext;
 
     private final ClinicClock clock;
+    private final com.nabd.hms.common.AuditService auditService;
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
-                 ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext, ClinicClock clock) {
+                 ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext, ClinicClock clock,
+                 com.nabd.hms.common.AuditService auditService) {
+        this.auditService = auditService;
         this.clock = clock;
         this.repo = repo;
         this.appointmentRepo = appointmentRepo;
@@ -88,6 +91,15 @@ public class QueueService {
     public QueueEntryResponse checkIn(UUID tenantId, UUID callerStaffId, CheckInRequest req) {
         tenantContext.set(tenantId);
         LocalDate today = clock.today(tenantId);
+
+        if (!repo.patientExists(tenantId, req.patientId())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "patient-not-found", "Patient not found",
+                    "That patient doesn't exist in this clinic.");
+        }
+        if (!repo.staffExists(tenantId, req.doctorId())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found",
+                    "That doctor doesn't exist in this clinic.");
+        }
 
         if (req.appointmentId() != null) {
             appointmentRepo.findById(tenantId, req.appointmentId())
@@ -110,7 +122,7 @@ public class QueueService {
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
         UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
-                null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode());
+                null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode(), null, null);
         log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",
                 callerStaffId, token, req.doctorId(), req.appointmentId() == null ? "walk-in" : "scheduled", id);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
@@ -164,6 +176,10 @@ public class QueueService {
                     "This department isn't configured to transfer patients to the requested department.");
         }
 
+        if (req.reason() == null && !req.toDepartmentId().equals(current.departmentId())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "transfer-reason-required", "Transfer reason required",
+                    "A reason is required when moving a patient to another department.");
+        }
         repo.updateStatus(tenantId, id, "transferred_out");
         log.info("queue entry {} transferred_out by {} (patient {} -> department {})",
                 id, callerStaffId, current.patientId(), req.toDepartmentId());
@@ -174,10 +190,15 @@ public class QueueService {
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
         // though this is a brand-new queue_entries row with its own status/practitioner/department.
         UUID newId = repo.insert(tenantId, null, current.patientId(), req.doctorId(), req.toDepartmentId(),
-                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null);
+                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null, req.reason(), blankToNull(req.reasonNote()));
         log.info("queue entry {} opened by transfer from {} (doctor {}, department {})",
                 newId, id, req.doctorId(), req.toDepartmentId());
 
+        var actor = repo.actor(tenantId, callerStaffId);
+        auditService.record(tenantId, "staff", callerStaffId, (String) actor.get("name"), (String) actor.get("role"), null,
+                "queue.transfer", "queue_entry", newId, java.util.Map.of("departmentId", current.departmentId(), "fromEntryId", id),
+                java.util.Map.of("departmentId", req.toDepartmentId(), "doctorId", req.doctorId(),
+                        "reason", req.reason() == null ? "" : req.reason(), "reasonNote", blankToNull(req.reasonNote()) == null ? "" : req.reasonNote().trim()));
         return new TransferResponse(
                 toResponse(repo.findById(tenantId, id).orElseThrow()),
                 toResponse(repo.findById(tenantId, newId).orElseThrow()));
@@ -249,7 +270,13 @@ public class QueueService {
                 row.workflowDefinitionId(), row.queueDate(), row.tokenNumber(), row.status(),
                 row.priority(), row.priorityReason(), row.priorityFlaggedBy(), row.priorityFlaggedAt(),
                 row.priorityAcknowledgedBy(), row.priorityAcknowledgedAt(), row.source(),
-                row.presentingComplaint(), row.paymentMode(), row.createdAt());
+                row.presentingComplaint(), row.paymentMode(), row.createdAt(),
+                row.transferReason(), row.transferReasonNote(), row.ageYears(), row.gender(), row.doctorName(),
+                row.waitMinutes(), row.visitType());
+    }
+
+    private static String blankToNull(String v) {
+        return v == null || v.isBlank() ? null : v.trim();
     }
 
     private ApiException notFound() {

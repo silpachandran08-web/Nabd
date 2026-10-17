@@ -59,6 +59,7 @@ public class AppointmentService {
     @Transactional
     public AppointmentResponse book(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req) {
         tenantContext.set(tenantId);
+        requirePatientAndDoctor(tenantId, req.patientId(), req.doctorId());
         requireNotHoliday(tenantId, req.startTime());
         enforceSessionCapacity(tenantId, req.doctorId(), req.startTime());
         int slotMinutes = resolveSlotMinutes(tenantId, req.doctorId(), req.startTime());
@@ -188,6 +189,22 @@ public class AppointmentService {
             log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.get().maxPatients());
             throw sessionFull();
         }
+    }
+
+    /** QA-03: shared with WaitlistService.join(). */
+    static void requirePatientAndDoctor(AppointmentRepository repo, UUID tenantId, UUID patientId, UUID doctorId) {
+        if (!repo.patientExists(tenantId, patientId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "patient-not-found", "Patient not found",
+                    "patientId does not reference a patient in this clinic.");
+        }
+        if (!repo.doctorExists(tenantId, doctorId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found",
+                    "doctorId does not reference a doctor in this clinic.");
+        }
+    }
+
+    private void requirePatientAndDoctor(UUID tenantId, UUID patientId, UUID doctorId) {
+        requirePatientAndDoctor(repo, tenantId, patientId, doctorId);
     }
 
     private AppointmentResponse toResponse(AppointmentRow row) {
