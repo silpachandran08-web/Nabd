@@ -29,7 +29,7 @@
       ".ph-cl{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--div)}",
       ".ph-cl:last-child{border-bottom:0}.ph-cl .nm b{display:block;font-size:13.5px;font-weight:500}.ph-cl .nm small{display:block;color:var(--tx3);font-size:11.5px}",
       ".ph-cl .bl{grid-column:1/-1}",
-      ".ph-step{display:inline-flex;align-items:center;border:1px solid var(--b-def);border-radius:10px;overflow:hidden;background:var(--s2)}",
+      ".ph-cl .ph-step{justify-self:start}.ph-step{display:inline-flex;align-items:center;border:1px solid var(--b-def);border-radius:10px;overflow:hidden;background:var(--s2)}",
       ".ph-step button{width:32px;height:32px;border:0;background:transparent;cursor:pointer;color:var(--tx2);font-size:16px}.ph-step button:hover{background:var(--s3);color:var(--tx)}",
       ".ph-step span{min-width:34px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}",
       ".ph-sum{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:13px}.ph-sum dt{color:var(--tx3)}.ph-sum dd{margin:0;text-align:end}",
@@ -60,6 +60,7 @@
       ".ph-pay{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px;border-radius:var(--r-md);background:var(--s2);border:1px solid var(--b-sub);text-align:center}",
       ".frame.mobile .ph-pos{grid-template-columns:minmax(0,1fr)}",
       ".frame.mobile .ph-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}",
+      "@media (max-width:1180px){.ph-pos{grid-template-columns:minmax(0,1fr) 300px}.ph-tiles{grid-template-columns:repeat(auto-fill,minmax(128px,1fr))}.ph-cl .nm{grid-column:1/-1}}",
       "@media (max-width:760px){.ph-pos{grid-template-columns:minmax(0,1fr)}.ph-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.ph-mode .t{min-width:0;flex-basis:100%}}"
     ].join("\n");
     document.head.appendChild(s);

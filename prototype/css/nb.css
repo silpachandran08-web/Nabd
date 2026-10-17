@@ -352,3 +352,8 @@ table.t td.r, table.t th.r { text-align: end; font-variant-numeric: tabular-nums
   .pbar .grp.hide-m { display: none; }
   .pbar select { max-width: 170px; }
 }
+
+/* Narrow desktop windows: keep the top bar inside the frame. */
+.top > * { flex-shrink: 0; }
+.top .search, .top .grow { flex-shrink: 1; min-width: 0; }
+@media (max-width: 1200px) { .top .sync, .top .search .kbd { display: none; } }
