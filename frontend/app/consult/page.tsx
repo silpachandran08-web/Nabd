@@ -165,6 +165,7 @@ export default function ConsultPage() {
   const [transferDepartmentId, setTransferDepartmentId] = useState("");
   const [transferDoctorId, setTransferDoctorId] = useState("");
   const [transferReason, setTransferReason] = useState(""); // REC-021: server requires a reason for a department move
+  const [transferNote, setTransferNote] = useState("");
   const [transferring, setTransferring] = useState(false);
   const [transferError, setTransferError] = useState<string | null>(null);
   const [rxItems, setRxItems] = useState<PrescriptionItem[]>([]);
@@ -812,6 +813,7 @@ export default function ConsultPage() {
     setTransferDepartmentId("");
     setTransferDoctorId("");
     setTransferReason("");
+    setTransferNote("");
     setTransferTargets(null);
     setShowTransfer(true);
     const res = await authedFetch(`/departments/${activeEntry.departmentId}/transfer-targets`);
@@ -830,7 +832,7 @@ export default function ConsultPage() {
     try {
       const res = await authedFetch(`/queue/${activeEntry.id}/transfer`, {
         method: "POST",
-        body: JSON.stringify({ toDepartmentId: transferDepartmentId, doctorId: transferDoctorId, reason: transferReason }),
+        body: JSON.stringify({ toDepartmentId: transferDepartmentId, doctorId: transferDoctorId, reason: transferReason, ...(transferReason === "other" && transferNote.trim() ? { reasonNote: transferNote.trim() } : {}) }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -1377,6 +1379,12 @@ export default function ConsultPage() {
                       <option value="patient_request">Patient request</option>
                       <option value="other">Other</option>
                     </select>
+                  </div>
+                )}
+                {transferReason === "other" && (
+                  <div className={styles.formRow}>
+                    <label className={styles.fieldLabel} htmlFor="trNote">Note</label>
+                    <input id="trNote" className={styles.select} maxLength={200} value={transferNote} onChange={(e) => setTransferNote(e.target.value)} />
                   </div>
                 )}
               </>

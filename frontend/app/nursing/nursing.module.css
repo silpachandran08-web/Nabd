@@ -109,6 +109,7 @@
 .actionCell { text-align: end; white-space: nowrap; position: sticky; inset-inline-end: 0; background-color: var(--nb-surface-1); }
 .flagCell { min-width: 180px; }
 .patientCell { min-width: 160px; max-width: 200px; }
+.patientCell .mrn { white-space: normal; } /* NUR-012: meta line (age · token · doctor · wait) wraps instead of widening the table */
 
 .secondaryBtn {
   display: inline-flex;
