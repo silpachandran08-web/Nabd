@@ -45,6 +45,7 @@ export default function BillingPage() {
   const [forbidden, setForbidden] = useState(false);
   const [canApprove, setCanApprove] = useState(false);
   const [canSetup, setCanSetup] = useState(false);
+  const [canOtc, setCanOtc] = useState(false); // PHA-010: counter sale entry, absent unless allowed
   const [region, setRegion] = useState<string | undefined>(undefined);
   const [counted, setCounted] = useState(""); // cash counted, as typed
   const [dialog, setDialog] = useState<"close" | "reopen" | null>(null);
@@ -76,6 +77,14 @@ export default function BillingPage() {
       setCanApprove(getPermissions().includes("billing:approve"));
       setCanSetup(can("setup:view"));
       setRegion(getIdentity()?.tenantRegion);
+      // PHA-010: counter sales exist only in hybrid/in_house pharmacy mode and need billing:create.
+      // A failed lookup (e.g. no pharmacy:view) just leaves the button absent.
+      if (can("billing:create") && can("billing:view")) {
+        void authedFetch("/pharmacy/settings").then(async (r) => {
+          const mode = r?.ok ? (await r.json()).mode : null;
+          setCanOtc(mode === "hybrid" || mode === "in_house");
+        }).catch(() => {});
+      }
       const res = await authedFetch("/billing/day-close");
       if (!res) return;
       if (res.status === 403) {
@@ -150,6 +159,7 @@ export default function BillingPage() {
           </p>
         </div>
         <div className={styles.headerActions}>
+          {canOtc && <Link className={styles.btn} href="/checkout/otc">Counter sale</Link>}
           {canSetup && <Link className={styles.btn} href="/setup?tab=charges">Charges &amp; Taxes</Link>}
           {canApprove && s.today && (closed
             ? <button type="button" className={styles.btnPrimary} onClick={() => setDialog("reopen")}>Unlock day</button>
