@@ -236,6 +236,33 @@ public class PatientService {
     }
 
     /**
+     * NUR-019: GET /patients/{id}'s response for many patients at once, keyed by id, with the same consent / own-patients
+     * scope gates and field grants. Unlike get() it never throws: an unverified caller gets an empty map and a scoped-out
+     * or missing patient is simply absent, so a list built on it degrades to "patient unknown" per row.
+     * The base row, last visit, allergies and conditions are batched; guardian name/consent/review stay per-row
+     * (toDetailResponse), which only costs queries for patients that have a guardian on file.
+     */
+    @Transactional
+    public java.util.Map<UUID, PatientDetailResponse> getVisibleMany(UUID tenantId, UUID callerStaffId, java.util.Collection<UUID> ids) {
+        CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
+        if (ids.isEmpty() || !caller.emailVerified() || !caller.mobileVerified()) {
+            return java.util.Map.of();
+        }
+        tenantContext.set(tenantId);
+        List<UUID> idList = List.copyOf(new java.util.LinkedHashSet<>(ids));
+        UUID scopedToDoctorId = "own_patients_only".equals(caller.scope()) ? callerStaffId : null;
+        java.util.Map<UUID, java.time.Instant> lastVisits = repo.findLastVisitAts(tenantId, idList);
+        java.util.Map<UUID, List<String>> allergies = repo.findActiveAllergySubstances(tenantId, idList);
+        java.util.Map<UUID, List<String>> conditions = repo.findActiveConditionNames(tenantId, idList);
+        java.util.Map<UUID, PatientDetailResponse> out = new java.util.HashMap<>();
+        for (PatientRow row : repo.findVisibleByIds(tenantId, idList, scopedToDoctorId)) {
+            out.put(row.id(), toDetailResponse(tenantId, row, lastVisits.get(row.id()), allergies.getOrDefault(row.id(), List.of()),
+                    conditions.getOrDefault(row.id(), List.of()), caller.fieldGrants()));
+        }
+        return out;
+    }
+
+    /**
      * True partial update: only the properties present in the request are written (an absent
      * address / nationalId / guardianId is left alone; an explicit JSON null clears it). Revoking a
      * guardian is therefore just {"guardianId": null} and cannot touch the other columns.
