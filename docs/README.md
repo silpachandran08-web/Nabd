@@ -7,8 +7,8 @@ Two workstreams, written on 2026-10-17 against `main` at `03942d3`. "Nabd" is th
 | | |
 |---|---|
 | [00-SUMMARY.md](00-SUMMARY.md) | The whole plan on two pages, in plain language |
-| [Nabd-Development-Tracker.xlsx](Nabd-Development-Tracker.xlsx) | Every code task to complete development (295 rows) with priority, phase, sprint, team, effort, acceptance criteria and status; live dashboard |
-| [../prototype/](../prototype/README.md) | Clickable prototype of the end product: 13 roles, 70 screens, 4 markets, English/Hindi/Arabic |
+| [Nabd-Development-Tracker.xlsx](Nabd-Development-Tracker.xlsx) | Every code task to complete development (384 rows) plus a coverage sheet tracing 1,165 requirements with priority, phase, sprint, team, effort, acceptance criteria and status; live dashboard |
+| [../prototype/](../prototype/README.md) | Clickable prototype of the end product: 16 roles, 100 screens, 4 markets, English/Hindi/Arabic, dark and light |
 
 ## Validation snapshot (at `03942d3`)
 
