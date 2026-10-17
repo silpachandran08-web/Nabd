@@ -20,6 +20,8 @@ type QueueEntry = {
   id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
   queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
   createdAt: string; source: string;
+  // REC-011: already on GET /v1/queue rows; optional so an older backend just shows less.
+  visitType?: string | null; presentingComplaint?: string | null; ageYears?: number | null; gender?: string | null;
 };
 type Row = QueueEntry & { patientName: string; patientMrn: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
@@ -43,6 +45,11 @@ type TransferTarget = { departmentId: string; departmentName: string; doctors: {
 const VISIT_LABEL: Record<string, string> = {
   walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
   returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
+};
+
+// REC-011: the table's Visit column (QueueRepository's visit_type), same labels as /schedule.
+const VISIT_TYPE_LABEL: Record<string, string> = {
+  appointment: "Appointment", follow_up: "Follow-up", walk_in: "Walk-in", transfer: "Transfer",
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -876,8 +883,10 @@ function ArrivalsPageInner() {
                             #{r.tokenNumber}
                             {r.priority && <span className={styles.priorityTag}><StatusPill tone="urgent" label="Priority" /></span>}
                           </td>
-                          <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span><span className={styles.mrn}>{r.patientMrn}</span></td>
-                          <td className={`${styles.muted} ${styles.colVisit}`} data-label="Visit">{VISIT_LABEL[r.source] ?? r.source}</td>
+                          <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span>
+                            <span className={styles.mrn}>{[r.patientMrn, [r.ageYears, (r.gender ?? "").trim().charAt(0).toUpperCase()].filter((x) => x != null && x !== "").join(" ")].filter(Boolean).join(" · ")}</span>
+                            {r.presentingComplaint && <span className={styles.complaint} title={r.presentingComplaint}>{r.presentingComplaint}</span>}</td>
+                          <td className={`${styles.muted} ${styles.colVisit}`} data-label="Visit">{(r.visitType && VISIT_TYPE_LABEL[r.visitType]) || (VISIT_LABEL[r.source] ?? r.source)}</td>
                           <td className={styles.colDoctor} data-label="Doctor">{staff.find((s) => s.id === r.doctorId)?.name ?? "—"}</td>
                           <td className={styles.muted} data-label="Wait">{b === "waiting" || b === "in_consult" ? `${waitMinutes(r.createdAt)}m` : "—"}</td>
                           <td data-label="Status"><StatusBadge status={r.status} /></td>
