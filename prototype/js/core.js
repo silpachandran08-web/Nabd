@@ -272,8 +272,11 @@ window.NB = window.NB || {};
   }
   function topBar(r) {
     var h = '<div class="top">';
-    h += '<div class="search" data-act="palette" role="button" tabindex="0">' + ui.icon("search", "sm") + "<span>" +
-      NB.L("Search patient by name, phone, " + NB.mkt().natId + " or token", "ابحث عن مريض بالاسم أو الهاتف أو الرقم", "नाम, फ़ोन या टोकन से खोजें") + '</span><span class="kbd">Ctrl K</span></div>';
+    var ph = NB.state.role === "patient" ? NB.L("Search doctors, clinics or your records", "ابحث عن طبيب أو عيادة أو سجلاتك", "डॉक्टर, क्लिनिक या अपने रिकॉर्ड खोजें")
+      : NB.state.role === "pharmacist" ? NB.L("Search medicine, batch, barcode or Rx number", "ابحث عن دواء أو تشغيلة أو وصفة", "दवा, बैच या Rx खोजें")
+      : NB.state.role === "platform" ? NB.L("Search clinics, tenants or tickets", "ابحث عن عيادة أو مستأجر أو تذكرة", "क्लिनिक या टिकट खोजें")
+      : NB.L("Search patient by name, phone, " + NB.mkt().natId + " or token", "ابحث عن مريض بالاسم أو الهاتف أو الرقم", "नाम, फ़ोन या टोकन से खोजें");
+    h += '<div class="search" data-act="palette" role="button" tabindex="0">' + ui.icon("search", "sm") + "<span>" + ph + '</span><span class="kbd">Ctrl K</span></div>';
     h += '<div class="grow"></div>';
     var primary = { reception: ["Register walk-in", "walkin", "userplus"], doctor: ["Call next patient", null, "play"], solo: ["Call next", null, "play"], pharmacist: ["New counter sale", null, "cart"], lab: ["Scan sample", null, "barcode"], billing: ["New invoice", null, "plus"], ward: ["Admit patient", null, "userplus"] }[NB.state.role];
     if (primary) h += primary[1] ? ui.btn(primary[0], { cls: "pri", ov: primary[1], icon: primary[2] }) : ui.btn(primary[0], { cls: "pri", act: "primary", icon: primary[2] });
