@@ -132,6 +132,7 @@ function ArrivalsPageInner() {
   const tabParam = searchParams.get("tab");
   const [rows, setRows] = useState<Row[]>([]);
   const [staff, setStaff] = useState<StaffOption[]>([]);
+  const [rosterFailed, setRosterFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -256,6 +257,7 @@ function ArrivalsPageInner() {
       const entries: QueueEntry[] = await queueRes.json();
       const staffMap = new Map<string, string>();
       let doctorIds: string[] = [];
+      setRosterFailed(!staffRes?.ok);
       if (staffRes?.ok) {
         const roster: StaffOption[] = await staffRes.json();
         setStaff(roster.map((s) => ({ id: s.id, name: s.name, departmentName: s.departmentName ?? null })));
@@ -265,7 +267,7 @@ function ArrivalsPageInner() {
       const withNames = await Promise.all(entries.map(async (e) => {
         const cached = patientCache.current.get(e.patientId);
         if (cached) return { ...e, patientName: cached.name, patientMrn: cached.mrn };
-        const pRes = await authedFetch(`/patients/${e.patientId}`);
+        const pRes = can("patients:view") ? await authedFetch(`/patients/${e.patientId}`) : null;
         const p = pRes?.ok ? await pRes.json() : null;
         if (p?.name) patientCache.current.set(e.patientId, { name: p.name, mrn: p.mrn ?? "" });
         return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "" };
@@ -624,7 +626,7 @@ function ArrivalsPageInner() {
     const alreadyArrived = new Set(rows.map((r) => r.appointmentId).filter(Boolean));
     const pending = list.filter((a) => a.status === "scheduled" && !alreadyArrived.has(a.id));
     const withNames = await Promise.all(pending.map(async (a) => {
-      const pRes = await authedFetch(`/patients/${a.patientId}`);
+      const pRes = can("patients:view") ? await authedFetch(`/patients/${a.patientId}`) : null;
       const p = pRes?.ok ? await pRes.json() : null;
       return {
         id: a.id, patientId: a.patientId, doctorId: a.doctorId,
@@ -905,7 +907,9 @@ function ArrivalsPageInner() {
           <div className={styles.sideCol}>
           <div className={styles.card}>
             <div className={styles.sideTitle}>Doctor queues</div>
-            {doctorQueues.length === 0 ? (
+            {rosterFailed ? (
+              <ErrorState message="Couldn't load the doctor roster." onRetry={() => void load()} />
+            ) : doctorQueues.length === 0 ? (
               <EmptyState icon="stethoscope" title="No doctors on the roster" />
             ) : (
               doctorQueues.map((d) => (
