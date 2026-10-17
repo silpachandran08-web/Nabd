@@ -134,6 +134,37 @@ class RoleApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    /** QA-01 regression: every role GET /v1/roles lists must resolve by id and be usable for a staff invite. */
+    @Test
+    void everyListedRoleResolvesByIdAndCanBeUsedToInviteStaff() {
+        SeededTenant tenant = seedTenant();
+        UUID ownerRoleId = seedFullAccessRole(tenant.id());
+        SeededStaff owner = seedStaff(tenant, ownerRoleId, "owner-qa01@a.com", "+919200000201", false);
+        String token = loginAndGetAccessToken(owner);
+        for (String name : List.of("Receptionist", "Front Desk")) {
+            assertThat(exchange("/v1/roles", HttpMethod.POST, authedJsonBody(token, Map.of("name", name,
+                    "grants", List.of(Map.of("module", "queue", "view", true, "create", false, "edit", false,
+                            "delete", false, "approve", false, "refundDiscount", false, "export", false)))),
+                    Map.class).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        }
+        // a role in another tenant must not leak into this tenant's list
+        seedRole(seedTenant().id(), "Front Desk", false, fullGrant("queue"));
+
+        List<Map<String, Object>> listed = exchange("/v1/roles", HttpMethod.GET, authed(token), List.class).getBody();
+        assertThat(listed).extracting(r -> r.get("name")).containsExactly("Front Desk", "Owner", "Receptionist");
+        int i = 0;
+        for (Map<String, Object> role : listed) {
+            String id = (String) role.get("id");
+            assertThat(exchange("/v1/roles/" + id, HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                    .isEqualTo(HttpStatus.OK);
+            ResponseEntity<Map> invite = exchange("/v1/staff", HttpMethod.POST, authedJsonBody(token, Map.of(
+                    "email", "qa01-" + i + "@a.com", "name", "QA01 " + i, "mobilePhone", "+91920000030" + i,
+                    "roleId", id)), Map.class);
+            assertThat(invite.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+            i++;
+        }
+    }
+
     // ---- delegations (NB-057) ----
 
     @Test
