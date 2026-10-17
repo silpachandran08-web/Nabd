@@ -154,6 +154,37 @@ class QueueApiTest extends ApiTestBase {
     }
 
     @Test
+    void checkInWithUnknownOrOtherTenantPatientOrDoctorIs404() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner4@a.com", "+919600000004", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "Q5", "+919999910005");
+        SeededTenant other = seedTenant();
+        SeededStaff otherStaff = seedStaff(other, seedFullAccessRole(other.id()), "owner5@b.com", "+919600000005", false);
+        String otherPatient = registerPatient(loginAndGetAccessToken(otherStaff), "Q6", "+919999910006");
+
+        ResponseEntity<Map> badPatient = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", UUID.randomUUID().toString(), "doctorId", staff.id().toString())), Map.class);
+        assertThat(badPatient.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(badPatient.getBody().get("type")).asString().contains("patient-not-found");
+
+        ResponseEntity<Map> foreignPatient = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", otherPatient, "doctorId", staff.id().toString())), Map.class);
+        assertThat(foreignPatient.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+
+        ResponseEntity<Map> badDoctor = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", UUID.randomUUID().toString())), Map.class);
+        assertThat(badDoctor.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(badDoctor.getBody().get("type")).asString().contains("doctor-not-found");
+
+        ResponseEntity<Map> foreignDoctor = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", otherStaff.id().toString())), Map.class);
+        assertThat(foreignDoctor.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(foreignDoctor.getBody().get("type")).asString().contains("doctor-not-found");
+    }
+
+    @Test
     void listReturnsCheckedInEntries() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());

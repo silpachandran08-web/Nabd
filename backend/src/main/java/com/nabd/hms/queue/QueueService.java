@@ -89,6 +89,15 @@ public class QueueService {
         tenantContext.set(tenantId);
         LocalDate today = clock.today(tenantId);
 
+        if (!repo.patientExists(tenantId, req.patientId())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "patient-not-found", "Patient not found",
+                    "That patient doesn't exist in this clinic.");
+        }
+        if (!repo.staffExists(tenantId, req.doctorId())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found",
+                    "That doctor doesn't exist in this clinic.");
+        }
+
         if (req.appointmentId() != null) {
             appointmentRepo.findById(tenantId, req.appointmentId())
                     .filter(a -> "scheduled".equals(a.status()))

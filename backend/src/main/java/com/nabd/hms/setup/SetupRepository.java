@@ -329,6 +329,16 @@ class SetupRepository {
                 Date.valueOf(req.expiryDate()), req.region(), status, tenantId, id);
     }
 
+    /** {total, expiringSoon (expiry within 30 days, inclusive), expired}, judged from expiry_date today (the stored status can be stale). */
+    int[] licenceCounts(UUID tenantId) {
+        LocalDate today = clock.today(tenantId);
+        return jdbc.queryForObject(
+                "SELECT count(*), count(*) FILTER (WHERE expiry_date >= ? AND expiry_date <= ?), count(*) FILTER (WHERE expiry_date < ?) " +
+                        "FROM licence_registry WHERE tenant_id = ?",
+                (rs, i) -> new int[]{rs.getInt(1), rs.getInt(2), rs.getInt(3)},
+                Date.valueOf(today), Date.valueOf(today.plusDays(30)), Date.valueOf(today), tenantId);
+    }
+
     private String computeLicenceStatus(LocalDate expiry, LocalDate now) {
         if (expiry.isBefore(now)) {
             return "expired";

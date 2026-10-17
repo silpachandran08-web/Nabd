@@ -59,6 +59,16 @@ class QueueRepository {
         return id;
     }
 
+    boolean patientExists(UUID tenantId, UUID patientId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, patientId));
+    }
+
+    boolean staffExists(UUID tenantId, UUID staffId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM staff WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, staffId));
+    }
+
     /** Server-derived, never client-supplied — a doctor's own assigned department, falling back to
      * the tenant's single default department if nobody has assigned one yet (so check-in never
      * breaks for a doctor no one has gotten around to configuring). */

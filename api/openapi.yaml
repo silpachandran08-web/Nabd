@@ -708,6 +708,37 @@ paths:
       responses:
         "201": { description: "Created licence", content: { application/json: { schema: { $ref: "#/components/schemas/Licence" } } } }
 
+  /compliance/health:
+    get:
+      tags: [Setup]
+      summary: Compliance health (licence counts and attention items)
+      description: Built only from licence_registry (expiringSoon = expiry within 30 days inclusive, expired = past expiry, judged at read time). Consent-template and retention items are not returned until those tables exist.
+      x-required-permission: setup:view
+      responses:
+        "200":
+          description: Compliance health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [licences, items]
+                properties:
+                  licences:
+                    type: object
+                    required: [total, expiringSoon, expired]
+                    properties: { total: { type: integer }, expiringSoon: { type: integer }, expired: { type: integer } }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, label, status, detail, link]
+                      properties:
+                        kind: { type: string, enum: [licence, consent_template, retention] }
+                        label: { type: string }
+                        status: { type: string, enum: [ok, attention, expired] }
+                        detail: { type: string }
+                        link: { type: string, example: "/setup?tab=licences" }
+
   /setup/licences/{id}:
     patch:
       tags: [Setup]
@@ -1110,6 +1141,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/CheckInRequest" } } }
       responses:
         "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch)" }
 
   /queue:
     get:

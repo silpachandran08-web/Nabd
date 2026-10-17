@@ -239,6 +239,39 @@ class SetupApiTest extends ApiTestBase {
     }
 
     @Test
+    void complianceHealthCountsLicencesAndIsPermissionGated() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner@h.com", "+919400000071", false);
+        String token = loginAndGetAccessToken(staff);
+
+        ResponseEntity<Map> empty = exchange("/v1/compliance/health", HttpMethod.GET, authed(token), Map.class);
+        assertThat(empty.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Map) empty.getBody().get("licences")).get("total")).isEqualTo(0);
+        assertThat(((Map) ((List) empty.getBody().get("items")).get(0)).get("status")).isEqualTo("attention");
+
+        int n = 0;
+        for (int days : new int[]{400, 10, -5}) {
+            exchange("/v1/setup/licences", HttpMethod.POST, authedJsonBody(token, Map.of("licenceType", "facility",
+                    "number", "L-" + n++, "expiryDate", LocalDate.now().plusDays(days).toString(), "region", "KSA")), Map.class);
+        }
+        ResponseEntity<Map> resp = exchange("/v1/compliance/health", HttpMethod.GET, authed(token), Map.class);
+        Map lic = (Map) resp.getBody().get("licences");
+        assertThat(lic.get("total")).isEqualTo(3);
+        assertThat(lic.get("expiringSoon")).isEqualTo(1);
+        assertThat(lic.get("expired")).isEqualTo(1);
+        Map item = (Map) ((List) resp.getBody().get("items")).get(0);
+        assertThat(item.get("kind")).isEqualTo("licence");
+        assertThat(item.get("status")).isEqualTo("expired");
+        assertThat(item.get("link")).isEqualTo("/setup?tab=licences");
+
+        UUID noSetup = seedRole(tenant.id(), "QueueOnly", false, fullGrant("queue"));
+        SeededStaff other = seedStaff(tenant, noSetup, "q@h.com", "+919400000072", false);
+        ResponseEntity<Map> denied = exchange("/v1/compliance/health", HttpMethod.GET, authed(loginAndGetAccessToken(other)), Map.class);
+        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
     void licenceCrud() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
