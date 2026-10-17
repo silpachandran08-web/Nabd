@@ -112,7 +112,8 @@ type ProcedureOrder = {
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
 type Problem = { title: string; detail: string };
-const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueView: "queue:view", queueEdit: "queue:edit" } as const;
+// REC-060: first vitals need clinical:create or clinical:edit; correcting recorded ones only clinical:edit.
+const PERM = { vitalsCreate: "clinical:create", vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueView: "queue:view", queueEdit: "queue:edit" } as const;
 type Tab = "vitals" | "priority" | "administration" | "procedures" | "activity";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -395,8 +396,8 @@ function NursingWorklist() {
   }
   const canViewVitals = can(PERM.vitalsRead);
   // Row click / Enter / Space: capture for a waiting visit, read-only view for a recorded one.
-  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureVitals) openVitalsModal(r.id); } else if (canViewVitals && r.lastVitalsAt) void openViewVitals(r); };
-  const rowActionable = (r: Row) => (r.status === "vitals_pending" ? canCaptureVitals : canViewVitals && !!r.lastVitalsAt);
+  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureFor(r)) openVitalsModal(r.id); } else if (canViewVitals && r.lastVitalsAt) void openViewVitals(r); };
+  const rowActionable = (r: Row) => (r.status === "vitals_pending" ? canCaptureFor(r) : canViewVitals && !!r.lastVitalsAt);
 
   function closeVitalsModal() {
     setVitalsEntryId(null);
@@ -618,7 +619,9 @@ function NursingWorklist() {
   const recordedCount = recordedRows.filter((r) => r.lastVitalsAt).length;
   const outOfRangeCount = recordedRows.filter((r) => r.vitalsOutOfRange).length;
   const staffName = (id: string | null) => (id ? staff.find((s) => s.id === id)?.name ?? null : null);
-  const canCaptureVitals = allow(PERM.vitalsWrite);
+  const canCaptureVitals = allow(PERM.vitalsCreate) || allow(PERM.vitalsWrite);
+  // A visit that already has vitals (sent back to vitals_pending) is a correction: clinical:edit only.
+  const canCaptureFor = (r: Row) => (r.lastVitalsAt ? allow(PERM.vitalsWrite) : canCaptureVitals);
   const canCreateOrders = allow(PERM.create);
   const canEditOrders = allow(PERM.edit);
   // Flagging and acknowledging priority call POST /queue/{id}/reorder and /priority/acknowledge (queue:edit);
@@ -758,7 +761,7 @@ function NursingWorklist() {
                                 ? <StatusPill tone="warn" label="Waiting" icon="clock" />
                                 : <StatusPill tone={r.vitalsOutOfRange ? "danger" : "ok"} label={r.vitalsOutOfRange ? `${statusLabel(r.status)} · out of range` : statusLabel(r.status)} icon={r.vitalsOutOfRange ? "alert" : "check"} />}
                             </td>
-                            <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); openVitalsModal(r.id); }}><Icon name="pulse" size={14} />Capture vitals</button>}
+                            <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureFor(r) && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); openVitalsModal(r.id); }}><Icon name="pulse" size={14} />Capture vitals</button>}
                               {r.status !== "vitals_pending" && canViewVitals && r.lastVitalsAt && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); void openViewVitals(r); }}><Icon name="pulse" size={14} />View vitals</button>}</td>
                           </tr>
                         );
@@ -1130,10 +1133,10 @@ function NursingWorklist() {
         <div className={styles.overlay} onClick={() => setShowCapturePicker(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2 className={styles.modalTitle}>Capture vitals — pick a patient</h2>
-            {rows.length === 0 ? (
+            {rows.filter(canCaptureFor).length === 0 ? (
               <EmptyState icon="pulse" title="No one is waiting for vitals" hint="New arrivals appear here as soon as reception checks them in." />
             ) : (
-              rows.map((r) => (
+              rows.filter(canCaptureFor).map((r) => (
                 <button type="button" key={r.id} className={styles.pickerRow} onClick={() => { setShowCapturePicker(false); openVitalsModal(r.id); }}>
                   <span className={styles.patientName}>{r.patientName}</span>
                   <span className={styles.muted}>{waitMinutes(r.createdAt)}m waiting</span>
