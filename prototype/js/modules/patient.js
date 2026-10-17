@@ -127,8 +127,8 @@
     /* WhatsApp */
     ".pt-wa-shell{display:flex;flex-direction:column;flex:1 1 0;min-height:0;width:100%;max-width:430px;margin-inline:auto}",
     ".frame.desktop .pt-wa-shell,.frame.tablet .pt-wa-shell{border-inline:1px solid var(--b-sub)}",
-    ".pt-scn{display:flex;gap:3px;overflow-x:auto;padding:8px 8px 6px;background:var(--bg-nav);flex:none}",
-    ".pt-scn button{flex:none;display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 8px;border-radius:999px;border:1px solid var(--b-def);background:var(--s2);color:var(--tx2);font:600 11.5px/1 inherit;font-family:inherit;cursor:pointer;white-space:nowrap}",
+    ".pt-scn{display:flex;flex-wrap:wrap;gap:4px;padding:8px 8px 6px;background:var(--bg-nav);flex:none}",
+    ".pt-scn button{flex:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:999px;border:1px solid var(--b-def);background:var(--s2);color:var(--tx2);font:600 11.5px/1 inherit;font-family:inherit;cursor:pointer;white-space:nowrap}",
     ".pt-scn button i{font-style:normal;width:18px;height:18px;border-radius:99px;background:var(--s3);display:grid;place-items:center;font-size:10.5px}",
     ".pt-scn button.on{background:var(--acc-fill);border-color:transparent;color:var(--on-acc)}",
     ".pt-scn button.on i{background:rgba(4,35,31,.2)}",
@@ -166,6 +166,75 @@
     ".pt-wa-end{align-self:center;font-size:11.5px;color:var(--tx3);padding:8px 12px;text-align:center}",
     ".pt-wa-in .ib{width:40px;height:40px;border-radius:99px;display:grid;place-items:center;background:var(--wa);color:var(--wa-bg);flex:none}",
     ".pt-wa-in .ico{flex:none}",
+    ".pt-chsw{display:flex;align-items:center;gap:8px;padding:0 12px 8px;background:var(--bg-nav);flex:none;flex-wrap:wrap;min-width:0}",
+    ".pt-chsw .lb{font-size:11.5px;color:var(--tx3)}",
+    ".pt-chsw .seg button{height:30px;font-size:11.5px;padding:0 10px}",
+    ".pt-chsw .seg .ico{width:13px;height:13px}",
+    ".pt-chsw .pill{text-transform:none;letter-spacing:0;font-size:11px;height:26px}",
+    ".pt-wa-h .av.pt-avc{background:var(--info-t);color:var(--info)}",
+    ".pt-chn{display:flex;align-items:center;gap:6px;padding:5px 14px 6px;background:var(--wa-bar);color:var(--wa-mute);font-size:11.5px;line-height:15px;border-top:1px solid var(--wa-line);flex:none}",
+    ".pt-chn>span:first-of-type{flex:1;min-width:0}",
+    ".pt-chn.nabd .ico{color:var(--acc)}",
+    ".pt-route{align-self:center;display:flex;align-items:flex-start;gap:6px;max-width:92%;background:var(--wa-bar);color:var(--wa-mute);font-size:11.5px;line-height:16px;padding:6px 10px;border-radius:8px;margin:2px 0 4px}",
+    ".pt-route .ico{flex:none;margin-top:1px}",
+    ".pt-wl .sh{padding:10px 14px 2px;font:600 10.5px/14px var(--font);letter-spacing:.6px;text-transform:uppercase;color:var(--wa-mute)}",
+    "[dir=rtl] .pt-wl .sh{letter-spacing:0}",
+    ".pt-scope{display:block;font-size:12px;line-height:17px;color:var(--wa-mute);margin-top:2px}",
+    ".pt-from{display:flex;align-items:center;gap:5px;font-size:11.5px;line-height:15px;color:var(--wa-mute);margin-bottom:4px}",
+    ".pt-warnl{display:block;font-weight:500}",
+    ".pt-warnl .ico{color:var(--warn);vertical-align:-2px;margin-inline-end:5px}",
+    ".pt-pips{display:flex;gap:4px;margin:6px 0 4px}",
+    ".pt-pips i{flex:1;height:8px;border-radius:99px;background:var(--s3)}",
+    ".pt-pips i.u{background:var(--acc-fill)}",
+    ".pt-pips i.b{background:var(--acc-tint2);box-shadow:inset 0 0 0 1px var(--acc-line)}",
+    ".pt-pips i.g{background:var(--sub-t);box-shadow:inset 0 0 0 1px var(--sub)}",
+    ".bub .pt-pips i{background:var(--wa-mute);opacity:.3}",
+    ".bub .pt-pips i.u{background:var(--wa);opacity:1}",
+    /* SMS fallback: the phone's Messages app, drawn with theme tokens */
+    ".pt-sms{display:flex;flex-direction:column;flex:1;min-height:0;background:var(--bg-canvas)}",
+    ".pt-sms-h{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s1);border-bottom:1px solid var(--b-sub);flex:none}",
+    ".pt-sms-h .av{background:var(--s3);color:var(--tx2)}",
+    ".pt-sms-h b{display:block;font-size:14.5px}.pt-sms-h small{display:block;font-size:11.5px;color:var(--tx3)}",
+    ".pt-sms-h .hb{background:none;border:0;color:var(--tx2);display:grid;place-items:center;width:36px;height:36px;cursor:pointer;flex:none}",
+    ".pt-sms-b{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:8px}",
+    ".pt-smsday{align-self:center;color:var(--tx3);font-size:11.5px}",
+    ".pt-smsb{align-self:flex-start;max-width:86%;background:var(--s3);color:var(--tx);padding:9px 12px 6px;border-radius:16px;border-start-start-radius:4px;font-size:13.5px;line-height:19px;word-wrap:break-word}",
+    ".pt-smsb .pt-ts{color:var(--tx3)}",
+    ".pt-smsl{color:var(--acc);text-decoration:underline}",
+    ".pt-sysn{display:flex;gap:6px;align-items:flex-start;font-size:11px;line-height:15px;color:var(--tx3);padding:0 4px;min-width:0;word-break:break-word}",
+    ".pt-sysn .ico{flex:none;margin-top:1px}",
+    ".pt-smsfrom{align-self:center;margin-top:10px;font:600 11px/14px var(--font);color:var(--tx2);direction:ltr}",
+    ".pt-dlv{display:flex;flex-direction:column;gap:5px;background:var(--s1);border:1px solid var(--b-sub);border-radius:var(--r-md);padding:10px 12px;font-size:12px}",
+    ".pt-dlv b{font:600 10.5px/14px var(--font);color:var(--tx3);text-transform:uppercase;letter-spacing:.6px}",
+    "[dir=rtl] .pt-dlv b{letter-spacing:0}",
+    ".pt-dlv .r{display:flex;align-items:center;gap:6px;color:var(--tx2)}.pt-dlv .r>span:nth-of-type(1){flex:1;min-width:0}",
+    ".pt-dlv .r.ok .ico{color:var(--ok)}.pt-dlv .r.bad{color:var(--tx)}.pt-dlv .r.bad .ico{color:var(--crit)}",
+    ".pt-sms-in{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--s1);border-top:1px solid var(--b-sub);flex:none}",
+    ".pt-sms-in span{flex:1;background:var(--s2);border-radius:999px;padding:9px 14px;color:var(--tx3);font-size:13.5px}",
+    ".pt-demo{display:flex;flex-direction:column;gap:6px;align-self:flex-start;width:82%}",
+    ".pt-demo button{min-height:44px;background:var(--s2);border:1px dashed var(--acc-line);border-radius:10px;color:var(--acc);font:500 13.5px/18px inherit;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;padding:6px 10px}",
+    /* packages */
+    ".pt-pk{display:flex;flex-direction:column;gap:14px}",
+    ".pt-pkh{display:flex;align-items:flex-start;gap:12px}",
+    ".pt-pkh .t{flex:1;min-width:0}.pt-pkh .t b{display:block;font-size:15px;font-weight:600;line-height:21px}.pt-pkh .t small{display:block;color:var(--tx3);font-size:12px;line-height:17px}",
+    ".pt-pkn{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}",
+    ".pt-pkn b{font:700 28px/32px var(--font);font-variant-numeric:tabular-nums}",
+    ".pt-pkn span{color:var(--tx2);font-size:13px}",
+    ".pt-pkn .lft{margin-inline-start:auto;color:var(--acc);font-weight:600;font-size:14px}",
+    ".pt-pk .pt-pips i{height:10px}",
+    ".pt-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}",
+    ".pt-fact{background:var(--s2);border:1px solid var(--b-sub);border-radius:var(--r-md);padding:9px 12px;min-width:0}",
+    ".pt-fact small{display:block;font-size:11px;color:var(--tx3);line-height:15px}",
+    ".pt-fact b{display:block;font-size:13.5px;font-weight:600;line-height:19px;margin-top:2px}",
+    ".pt-fact.warn{border-color:rgba(232,179,60,.45);background:var(--warn-t)}",
+    ".pt-fact.warn small{color:var(--tx2)}",
+    ".pt-save{font-size:12.5px;line-height:18px;color:var(--tx2)}.pt-save s{color:var(--tx3)}.pt-save b{color:var(--ok);font-weight:600}",
+    ".pt-math{display:flex;flex-direction:column;gap:8px;font-size:13.5px}",
+    ".pt-math .r{display:flex;justify-content:space-between;gap:12px;align-items:baseline}",
+    ".pt-math .r>span:first-child{color:var(--tx2);min-width:0}",
+    ".pt-math .r.tot{border-top:1px solid var(--div);padding-top:10px;font-weight:600;font-size:16px}.pt-math .r.tot>span:first-child{color:var(--tx)}",
+    ".pt-math .r.ok>span:last-child{color:var(--ok)}",
+    ".pt-enf{cursor:default}",
     /* Connect */
     ".pt-cx{display:flex;flex-direction:column;min-width:0;width:100%}",
     ".pt-cxn{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--b-sub);background:var(--bg-nav);position:sticky;top:0;z-index:2}",
@@ -882,6 +951,203 @@
       foot: ui.btn(L("Cancel", "إلغاء", "रद्द"), { act: "close", cls: "ghost" }) + ui.btn(L("Prepare my download", "جهّز التنزيل", "डाउनलोड तैयार करें"), { cls: "pri", act: "toast", arg: L("Preparing · ready in a few minutes", "جارٍ التجهيز · جاهز خلال دقائق", "तैयार हो रहा है · कुछ मिनट में"), icon: "download" }) };
   });
 
+  /* ---------------- Patient app: My packages ---------------- */
+  // Packages bought by Rakesh for himself and Meenu (INR-scale; NB.money converts per market).
+  PA.pk = [
+    { id: "PKG-0211", who: "me", f: 1, ic: "activity", name: ["Physiotherapy · 10 sessions", "علاج طبيعي · 10 جلسات", "फ़िज़ियोथेरेपी · 10 सत्र"], safe: ["Therapy package", "باقة العلاج", "थेरेपी पैकेज"],
+      total: 10, used: 6, booked: 1, single: 900, price: 7500, sum: 9000, exp: "14 Nov 2026", hij: ["4 Jumada II 1448", "4 جمادى الآخرة 1448"], days: 28, grace: 7, start: "20 Jul 2026",
+      plan: "inst", inst: [[2500, "20 Jul 2026", "paid"], [2500, "20 Aug 2026", "paid"], [2500, "20 Oct 2026", "due"]],
+      next: ["Mon 19 Oct · 17:30", "الاثنين 19 أكتوبر · 17:30", "सोम 19 अक्टूबर · 17:30"],
+      up: { total: 15, price: 10500 }, hist: [["20 Jul", "you"], ["27 Jul", "you"], ["03 Aug", "latha"], ["17 Aug", "you"], ["07 Sep", "nikhil"], ["05 Oct", "you"]] },
+    { id: "MEM-0041", who: "me", f: 0, ic: "heartpulse", name: ["Diabetes care plan · 4 reviews + 4 HbA1c tests", "خطة رعاية السكري · 4 مراجعات + 4 تحاليل", "डायबिटीज़ केयर प्लान · 4 जाँच + 4 HbA1c टेस्ट"], safe: ["Care plan", "خطة الرعاية", "केयर प्लान"],
+      total: 8, used: 4, booked: 0, comps: [[["Doctor review", "مراجعة الطبيب", "डॉक्टर जाँच"], 1100, 4, 2], [["HbA1c test", "تحليل HbA1c", "HbA1c टेस्ट"], 800, 4, 2]], price: 7200, sum: 7600,
+      exp: "31 Mar 2027", hij: ["23 Shawwal 1448", "23 شوال 1448"], days: 165, start: "01 Apr 2026", plan: "full", paidOn: "01 Apr 2026",
+      next: ["Review due · around 24 Oct", "مراجعة مستحقة · نحو 24 أكتوبر", "जाँच बाकी · लगभग 24 अक्टूबर"], up: { total: 12, price: 9900 },
+      hist: [["12 Apr", "you", 0], ["12 Apr", "you", 1], ["11 Jul", "nikhil", 0], ["11 Jul", "you", 1]] },
+    { id: "PKG-0230", who: "meenu", f: 2, ic: "sparkle", name: ["Skin care · 5 sessions", "العناية بالبشرة · 5 جلسات", "त्वचा देखभाल · 5 सत्र"], safe: ["Skin package", "باقة البشرة", "स्किन पैकेज"],
+      total: 5, used: 1, booked: 0, single: 2200, per: 1800, price: 9000, sum: 11000, exp: "12 Feb 2027", hij: ["5 Ramadan 1448", "5 رمضان 1448"], days: 118, start: "14 Oct 2026",
+      plan: "pps", next: ["Not booked yet · every 3 weeks", "لم تُحجز بعد · كل 3 أسابيع", "अभी बुक नहीं · हर 3 हफ़्ते"], hist: [["14 Oct", "you"]] }
+  ];
+  function pkById(id) { return PA.pk.find(function (k) { return k.id === id; }) || PA.pk[0]; }
+  function pkGift(K) { return NB.v("ptPkGift_" + K.id, null); }
+  function pkLeft(K) { var g = pkGift(K); return K.total - K.used - (g ? +g.n : 0); }
+  function pkInstPaid(K) { return NB.v("ptPkPaid_" + K.id, false); }
+  function pkPaid(K) {
+    if (K.plan === "inst") return K.inst.reduce(function (a, i) { return a + (i[2] === "paid" || pkInstPaid(K) ? i[0] : 0); }, 0);
+    return K.plan === "pps" ? K.used * K.per : K.price;
+  }
+  // Used value at the full single-session (list) price — FRD PKG-08 / PR-06.
+  function pkUsedVal(K) { return K.comps ? K.comps.reduce(function (a, c) { return a + c[1] * c[3]; }, 0) : K.used * K.single; }
+  function pkName(K) { return esc(L3(K.name)); }
+  function pkSave(K) {
+    var pct = Math.round(100 * (K.sum - K.price) / K.sum);
+    return '<div class="pt-save">' + tx("Bought separately {0} → package {1} · you save {2} ({3}%)", "منفصلة {0} ← الباقة {1} · توفّر {2} ({3}%)", "अलग-अलग {0} → पैकेज {1} · आपकी बचत {2} ({3}%)", ["<s>" + NB.money(K.sum) + "</s>", NB.money(K.price), "<b>" + NB.money(K.sum - K.price) + "</b>", nm(pct)]) + "</div>";
+  }
+  function actorPill(a) {
+    if (a === "latha") return ui.pill("info", L("By Latha", "بواسطة لاثا", "लता द्वारा"), "users");
+    if (a === "nikhil") return ui.pill("info", L("By Nikhil", "بواسطة نيخيل", "निखिल द्वारा"), "users");
+    return "";
+  }
+  function pkPlanLine(K) {
+    if (K.plan === "inst") {
+      var paidN = K.inst.filter(function (i) { return i[2] === "paid" || pkInstPaid(K); }).length;
+      return paidN === K.inst.length ? L("Instalments · all " + paidN + " paid", "أقساط · دُفعت كلها (" + paidN + ")", "किस्तें · सभी " + paidN + " भरी") : L("Instalments · " + paidN + " of " + K.inst.length + " paid", "أقساط · " + paidN + " من " + K.inst.length + " مدفوعة", "किस्तें · " + K.inst.length + " में से " + paidN + " भरी");
+    }
+    return K.plan === "pps" ? L("Pay per session · discount locked", "الدفع لكل جلسة · الخصم مثبّت", "हर सत्र पर भुगतान · छूट लॉक") : L("Paid in full · " + K.paidOn, "مدفوعة بالكامل · " + K.paidOn, "पूरा भुगतान · " + K.paidOn);
+  }
+  function pkCard(K) {
+    var left = pkLeft(K), g = pkGift(K), bk = NB.v("ptPkBook_" + K.id, null), soon = K.days <= 30, instDue = K.plan === "inst" && !pkInstPaid(K);
+    var forWho = K.who === "me" ? "" : " · " + esc(L("for ", "لـ", "") + first(mem(K.who)) + L("", "", " के लिए"));
+    var h = '<div class="card pt-pk' + (soon ? " warnb" : "") + '">';
+    h += '<div class="pt-pkh">' + ico(K.ic, soon ? "warn" : "acc") + '<div class="t"><b>' + pkName(K) + "</b><small>" + esc(fshort(K.f)) + forWho + " · " + nm(K.id) + "</small></div>" +
+      (soon ? ui.pill("warn", L("Expiring soon", "تنتهي قريبًا", "जल्द ख़त्म"), "clockh") : K.plan === "pps" ? ui.pill("sub", L("Per session", "لكل جلسة", "हर सत्र"), "wallet") : ui.pill("ok", L("Active", "نشطة", "चालू"))) + "</div>";
+    h += '<div><div class="pt-pkn"><b>' + nm(K.used) + "</b><span>" + esc(L("of " + K.total + " used", "من " + K.total + " مستخدمة", K.total + " में से इस्तेमाल")) + '</span><span class="lft">' + esc(L(left + " left", "متبقٍ " + left, left + " बाकी")) + "</span></div>" +
+      pips(K.used, K.total, (bk || K.booked) ? 1 : 0, g ? +g.n : 0) + "</div>";
+    h += '<div class="pt-facts">' +
+      '<div class="pt-fact' + (soon ? " warn" : "") + '"><small>' + t("Valid until", "صالحة حتى", "मान्य") + "</small><b>" + expDate(K.exp, K.hij) + "</b><small>" + esc(L(K.days + " days left" + (K.grace ? " · +" + K.grace + " days grace" : ""), "متبقٍ " + K.days + " يومًا" + (K.grace ? " · مهلة " + K.grace + " أيام" : ""), K.days + " दिन बाकी" + (K.grace ? " · +" + K.grace + " दिन मोहलत" : ""))) + "</small></div>" +
+      '<div class="pt-fact"><small>' + t("Next session", "الجلسة التالية", "अगला सत्र") + "</small><b>" + esc(bk || L3(K.next)) + "</b><small>" + esc(K.f === 1 ? physio() : K.who === "meenu" ? NB.dname(NB.doc("d1")) : NB.dname(NB.doc("d2"))) + "</small></div>" +
+      '<div class="pt-fact' + (instDue ? " warn" : "") + '"><small>' + t("Payment", "الدفع", "भुगतान") + "</small><b>" + esc(pkPlanLine(K)) + "</b><small>" +
+        (instDue ? tx("Next {0} on 20 Oct · AutoPay on", "التالي {0} في 20 أكتوبر · الدفع التلقائي مفعّل", "अगली {0}, 20 अक्टूबर · AutoPay चालू", [NB.money(2500)]) : K.plan === "pps" ? tx("{0} per session (list {1})", "{0} للجلسة (السعر الأصلي {1})", "{0} प्रति सत्र (सूची {1})", [NB.money(K.per), NB.money(K.single)]) : tx("Total {0}", "الإجمالي {0}", "कुल {0}", [NB.money(K.price)])) + "</small></div>" +
+      '<div class="pt-fact"><small>' + t("Shared", "مشاركة", "साझा") + "</small><b>" + (g ? esc(L(g.n + " gifted to " + g.name, "أُهديت " + g.n + " إلى " + g.name, g.n + " " + g.name + " को उपहार")) : t("Not shared", "غير مشاركة", "साझा नहीं")) + "</b><small>" +
+        (K.plan === "pps" ? t("Can't be gifted while paying per session", "لا يمكن الإهداء أثناء الدفع لكل جلسة", "हर सत्र भुगतान में उपहार नहीं") : g ? t("Transfer used · expiry unchanged", "استُخدم النقل · الانتهاء دون تغيير", "ट्रांसफ़र हो चुका · समाप्ति वही") : t("1 gift or transfer allowed", "يُسمح بإهداء أو نقل واحد", "1 उपहार या ट्रांसफ़र की अनुमति")) + "</small></div></div>";
+    h += pkSave(K);
+    h += ui.btn(L("Book session " + (K.used + 1) + " of " + K.total, "احجز الجلسة " + (K.used + 1) + " من " + K.total, "सत्र " + (K.used + 1) + "/" + K.total + " बुक करें"), { cls: "pri pt-big", ov: "ptpkbook", arg: K.id, icon: "calendar" });
+    h += '<div class="pt-2">' + (instDue ? ui.btn(L("Pay instalment", "ادفع القسط", "किस्त भरें"), { cls: "pt-big", ov: "ptpkpay", arg: K.id, icon: "wallet" })
+        : K.plan === "pps" || g ? ui.btn(L("History", "السجل", "इतिहास"), { cls: "pt-big", ov: "ptpk", arg: K.id, icon: "history" }) : ui.btn(L("Gift sessions", "أهدِ جلسات", "सत्र उपहार दें"), { cls: "pt-big", ov: "ptpkgift", arg: K.id, icon: "share" })) +
+      ui.btn(L("More options", "خيارات أخرى", "और विकल्प"), { cls: "pt-big", ov: "ptpk", arg: K.id, icon: "sliders" }) + "</div>";
+    if (NB.v("ptPkRef_" + K.id)) h += ui.note("warn", t("Cancellation requested · bookings on this package are paused until the clinic confirms the amount.", "طُلب الإلغاء · تتوقف حجوزات هذه الباقة حتى تؤكد العيادة المبلغ.", "रद्द करने का अनुरोध भेजा · क्लिनिक की पुष्टि तक इस पैकेज पर बुकिंग रुकी है।"), "hourglass");
+    return h + "</div>";
+  }
+
+  NB.screen("patient.packages", function (c) {
+    var w = NB.v("ptPkWho", "all"), list = PA.pk.filter(function (k) { return w === "all" || k.who === w; });
+    var h = '<div class="pt-col"><div class="pt-hello"><div class="fl"><h1>' + t("My packages", "باقاتي", "मेरे पैकेज") + "</h1><p>" + t("Sessions you've paid for, for you and your family. A session is used only when the visit is completed.", "جلسات دفعت ثمنها لك ولعائلتك. لا تُحتسب الجلسة إلا بعد اكتمال الزيارة.", "आपके और परिवार के लिए ख़रीदे गए सत्र। सत्र तभी गिना जाता है जब विज़िट पूरी हो।") + "</p></div></div>";
+    h += "<div>" + ui.seg("ptPkWho", [["all", L("Everyone", "الجميع", "सभी"), PA.pk.length], ["me", L("Me", "أنا", "मैं")], ["meenu", L("Meenu", "مينو", "मीनू")]], "all") + "</div>";
+    // Needs attention: instalment due and expiry warning.
+    var A = PA.pk[0], att = "";
+    if ((w === "all" || w === "me") && !pkInstPaid(A)) att += it(ico("wallet", "warn"), tx("Instalment 3 of 3 · {0} due Tue 20 Oct", "القسط 3 من 3 · {0} مستحق الثلاثاء 20 أكتوبر", "किस्त 3/3 · {0} मंगल 20 अक्टूबर को देय", [NB.money(2500)]),
+      esc(L("AutoPay collects it on the day · reminder sent on WhatsApp", "يُحصَّل تلقائيًا في يومه · أُرسل تذكير على واتساب", "AutoPay उसी दिन लेगा · व्हाट्सऐप पर रिमाइंडर भेजा")), ui.btn(L("Pay", "ادفع", "भरें"), { cls: "sm pri", ov: "ptpkpay", arg: A.id }));
+    if (w === "all" || w === "me") att += it(ico("clockh", "warn"), esc(L(pkLeft(A) + " sessions left · " + A.days + " days to use them", "متبقٍ " + pkLeft(A) + " جلسات · " + A.days + " يومًا لاستخدامها", pkLeft(A) + " सत्र बाकी · इस्तेमाल के लिए " + A.days + " दिन")),
+      esc(L("Book them now so none expire. Reminders go out at 30, 14 and 7 days.", "احجزها الآن حتى لا تنتهي. نذكّرك قبل 30 و14 و7 أيام.", "अभी बुक करें ताकि कोई बेकार न जाए। 30, 14 और 7 दिन पहले रिमाइंडर।")), ui.btn(L("Book", "احجز", "बुक"), { cls: "sm", ov: "ptpkbook", arg: A.id }));
+    if (att) h += '<div class="card pt-req">' + att + "</div>";
+    h += list.map(pkCard).join("");
+    // Session history with "acted by" labels.
+    var rows = [];
+    var MO = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
+    list.forEach(function (K) { K.hist.forEach(function (x, i) { var q = x[0].split(" "); rows.push({ K: K, n: i + 1, d: x[0], by: x[1], comp: x[2], key: MO[q[1]] * 100 + +q[0] + i / 100 }); }); });
+    rows.sort(function (a, b) { return b.key - a.key; });
+    h += sec(t("Session history", "سجل الجلسات", "सत्र इतिहास"));
+    h += '<div class="card">' + rows.slice(0, 6).map(function (r) {
+      var what = r.K.comps ? L3(r.K.comps[r.comp][0]) : L("Session " + r.n, "الجلسة " + r.n, "सत्र " + r.n);
+      return it(ico(r.K.ic, ""), esc(what) + ' <span class="faint" style="font-weight:400">· ' + esc(L3(r.K.safe)) + "</span>", nm(r.d) + " · " + esc(fshort(r.K.f)) + (r.K.who !== "me" ? " · " + esc(first(mem(r.K.who))) : ""), actorPill(r.by) || ui.pill("ok", L("Done", "تمت", "पूरा"), "check"));
+    }).join("") + "</div>";
+    h += ui.note("info", t("Changed your mind? There's no cancellation fee: you pay only for sessions used, at the single-session price, and get the rest back.", "غيّرت رأيك؟ لا رسوم إلغاء: تدفع فقط ثمن الجلسات المستخدمة بسعر الجلسة المفردة ويُرد لك الباقي.", "मन बदल गया? कोई रद्दीकरण शुल्क नहीं: सिर्फ़ इस्तेमाल हुए सत्र एकल-सत्र मूल्य पर, बाकी वापस।"), "shieldcheck");
+    h += ui.btn(L("Manage packages on WhatsApp", "أدِر باقاتك عبر واتساب", "व्हाट्सऐप पर पैकेज संभालें"), { cls: "blk lg", act: "ptWaGo", arg: "pkg", icon: "chat" });
+    return h + "</div>";
+  });
+
+  NB.overlay("ptpk", function (id) {
+    var K = pkById(id), g = pkGift(K), paid = pkPaid(K);
+    var body = '<div class="pt-pkh">' + ico(K.ic, "acc") + '<div class="t"><b>' + pkName(K) + "</b><small>" + esc(fname(K.f)) + " · " + nm(K.id) + " · " + esc(L("since ", "منذ ", "शुरू ") + K.start) + "</small></div></div>" + pkSave(K);
+    body += '<div class="card"><div class="pt-sec" style="margin-bottom:6px"><h2>' + t("Sessions", "الجلسات", "सत्र") + "</h2></div>" + K.hist.map(function (x, i) {
+      var what = K.comps ? L3(K.comps[x[2]][0]) : L("Session " + (i + 1), "الجلسة " + (i + 1), "सत्र " + (i + 1));
+      return it(ico("check", "ok"), esc(what), nm(x[0]) + " · " + esc(K.f === 1 ? physio() : fshort(K.f)), actorPill(x[1]));
+    }).join("") + (K.booked || NB.v("ptPkBook_" + K.id) ? it(ico("calendar", "acc"), esc(L("Session " + (K.used + 1) + " · booked", "الجلسة " + (K.used + 1) + " · محجوزة", "सत्र " + (K.used + 1) + " · बुक")), esc(NB.v("ptPkBook_" + K.id, L3(K.next))), ui.pill("acc", L("Upcoming", "قادمة", "आगामी"), "clockh")) : "") + "</div>";
+    if (K.plan === "inst") body += '<div class="card"><div class="pt-sec" style="margin-bottom:6px"><h2>' + t("Instalments", "الأقساط", "किस्तें") + "</h2></div>" + K.inst.map(function (x, i) {
+      var pd = x[2] === "paid" || pkInstPaid(K);
+      return it(ico(pd ? "checkcircle" : "clockh", pd ? "ok" : "warn"), esc(L("Instalment " + (i + 1) + " of " + K.inst.length, "القسط " + (i + 1) + " من " + K.inst.length, "किस्त " + (i + 1) + "/" + K.inst.length)) + " · " + NB.money(x[0]), nm(x[1]) + " · " + (pd ? t("Paid", "مدفوع", "भरी") : t("AutoPay on · reminder 3 days before", "دفع تلقائي · تذكير قبل 3 أيام", "AutoPay चालू · 3 दिन पहले रिमाइंडर")), pd ? ui.pill("ok", L("Paid", "مدفوع", "भरी")) : ui.pill("warn", L("Due", "مستحق", "देय"), "clockh"));
+    }).join("") + '<p class="small faint" style="margin:8px 0 0">' + t("If 2 instalments are missed, new bookings pause until it's settled. You can always pay early.", "إذا فات قسطان تتوقف الحجوزات الجديدة حتى السداد. يمكنك الدفع مبكرًا دائمًا.", "2 किस्तें छूटने पर भुगतान तक नई बुकिंग रुकेगी। आप पहले भी भर सकते हैं।") + "</p></div>";
+    if (K.plan === "pps") body += ui.note("info", tx("You pay {0} at each visit instead of {1}. The discount stays locked as long as you finish all {2} sessions — and if you stop early, nothing is clawed back.", "تدفع {0} في كل زيارة بدلًا من {1}. يبقى الخصم ثابتًا ما دمت تكمل الجلسات الـ{2} — وإن توقفت مبكرًا لا يُسترد شيء منك.", "हर विज़िट पर {1} की जगह {0}। सभी {2} सत्र पूरे करने तक छूट लॉक रहेगी — और बीच में रुकने पर कुछ वापस नहीं लिया जाएगा।", [NB.money(K.per), NB.money(K.single), nm(K.total)]), "wallet");
+    body += '<div class="card">' + (K.plan !== "pps" && !g ? it(ico("share", "sub"), t("Gift sessions to family", "أهدِ جلسات لعائلتك", "परिवार को सत्र उपहार दें"), t("Once per package · expiry stays the same · you approve with a code", "مرة واحدة · لا يتغير الانتهاء · توافق برمز", "एक बार · समाप्ति वही · कोड से मंज़ूरी"), chev(), { ov: "ptpkgift", arg: K.id }) : "") +
+      (K.up ? it(ico("layers", "acc"), esc(L("Upgrade to " + K.up.total + " sessions", "الترقية إلى " + K.up.total + " جلسة", K.up.total + " सत्र में अपग्रेड")), t("Unused sessions count towards the new package", "تُحتسب الجلسات غير المستخدمة لصالح الباقة الجديدة", "बचे सत्र नए पैकेज में गिने जाते हैं"), chev(), { ov: "ptpkup", arg: K.id }) : "") +
+      it(ico("refresh", "crit"), t("Cancel & refund", "الإلغاء والاسترداد", "रद्द करें और रिफ़ंड"), t("See your quote first · no cancellation fee", "اطّلع على المبلغ أولًا · بلا رسوم إلغاء", "पहले हिसाब देखें · कोई रद्दीकरण शुल्क नहीं"), chev(), { ov: "ptpkrefund", arg: K.id }) + "</div>";
+    body += '<dl class="kv"><dt>' + t("Paid so far", "المدفوع حتى الآن", "अब तक भुगतान") + "</dt><dd>" + NB.money(paid) + "</dd><dt>" + t("Valid until", "صالحة حتى", "मान्य") + "</dt><dd>" + expDate(K.exp, K.hij) + "</dd>" + (K.grace ? "<dt>" + t("Grace period", "فترة السماح", "मोहलत") + "</dt><dd>" + esc(L(K.grace + " days", K.grace + " أيام", K.grace + " दिन")) + "</dd>" : "") + "</dl>";
+    return { title: esc(L3(K.safe)), body: body, foot: ui.btn(L("Close", "إغلاق", "बंद करें"), { act: "close", cls: "ghost" }) + ui.btn(L("Book session " + (K.used + 1), "احجز الجلسة " + (K.used + 1), "सत्र " + (K.used + 1) + " बुक करें"), { cls: "pri", ov: "ptpkbook", arg: K.id, icon: "calendar" }) };
+  });
+
+  NB.overlay("ptpkbook", function (id) {
+    var K = pkById(id), sel = NB.v("ptPkSlot", null);
+    var slots = [["Mon 19 Oct", "17:30", 12], ["Wed 21 Oct", "08:00", 3], ["Sat 24 Oct", "10:00", 9], ["Mon 26 Oct", "18:00", 6]];
+    var body = '<div class="pt-res"><span class="pt-ic acc" style="width:56px;height:56px;border-radius:999px">' + ui.icon("calendar", "lg") + "</span><h2>" + esc(L("Session " + (K.used + 1) + " of " + K.total, "الجلسة " + (K.used + 1) + " من " + K.total, "सत्र " + (K.used + 1) + "/" + K.total)) + '</h2><span class="small muted">' + pkName(K) + " · " + esc(fshort(K.f)) + "</span></div>" +
+      '<span class="small muted">' + t("Pick a time · expected wait at the clinic", "اختر وقتًا · الانتظار المتوقع في العيادة", "समय चुनें · क्लिनिक पर अनुमानित इंतज़ार") + '</span><div class="pt-slots">' + slots.map(function (s, i) {
+        var v = s[0] + " · " + s[1];
+        return '<button class="pt-slot' + (sel === v ? " on" : i === 1 ? " hint" : "") + '" data-set="ptPkSlot" data-val="' + esc(v) + '">' + (i === 1 ? '<span class="h">' + t("Least wait", "أقل انتظار", "कम इंतज़ार") + "</span>" : "") + "<b>" + nm(s[1]) + "</b><small>" + esc(s[0]) + " · ~" + s[2] + " " + t("min", "د", "मि") + "</small></button>";
+      }).join("") + "</div>" +
+      ui.note("info", t("The session is used only when your visit is completed. Cancel up to 2 hours before and nothing is used.", "لا تُحتسب الجلسة إلا بعد اكتمال الزيارة. ألغِ قبل ساعتين ولن يُحتسب شيء.", "सत्र तभी गिना जाता है जब विज़िट पूरी हो। 2 घंटे पहले तक रद्द करें तो कुछ नहीं गिना जाएगा।"), "info") +
+      (K.plan === "pps" ? ui.note("info", tx("You'll pay {0} for this session at the visit.", "ستدفع {0} لهذه الجلسة في الزيارة.", "इस सत्र के लिए विज़िट पर {0} भरेंगे।", [NB.money(K.per)]), "wallet") : "");
+    return { kind: "modal", title: t("Book a session", "احجز جلسة", "सत्र बुक करें"), body: body, foot: ui.btn(L("Cancel", "إلغاء", "रद्द"), { act: "close", cls: "ghost" }) + ui.btn(L("Confirm booking", "تأكيد الحجز", "बुकिंग पक्की करें"), { cls: "pri", act: "ptPkBook", arg: K.id, icon: "check", disabled: !sel }) };
+  });
+  NB.act("ptPkBook", function (id) { var s = NB.v("ptPkSlot", null); if (!s) return; NB.state.ui["ptPkBook_" + id] = s; NB.state.ui.ptPkSlot = null; NB.state.overlay = null; NB.toast(L("Booked · confirmation sent on WhatsApp", "تم الحجز · أُرسل التأكيد عبر واتساب", "बुक हो गया · व्हाट्सऐप पर पुष्टि भेजी")); });
+
+  NB.overlay("ptpkpay", function (id) {
+    var K = pkById(id), x = K.inst[K.inst.length - 1];
+    return { kind: "modal", title: t("Pay instalment", "دفع القسط", "किस्त भरें"), body:
+      '<div class="pt-res"><span class="pt-ic acc" style="width:56px;height:56px;border-radius:999px">' + ui.icon("wallet", "lg") + '</span><div class="pt-tok" style="color:var(--tx)">' + NB.money(x[0]) + '</div><span class="small muted">' + esc(L("Instalment 3 of 3 · due ", "القسط 3 من 3 · مستحق ", "किस्त 3/3 · देय ")) + nm(x[1]) + " · " + pkName(K) + "</span></div>" +
+      '<div class="card stack s4">' + ui.toggle("ptAuto_" + K.id, L("AutoPay on the due date", "الدفع التلقائي في تاريخ الاستحقاق", "देय तिथि पर AutoPay"), NB.gcc() ? L("Saved card · retried once if it fails", "البطاقة المحفوظة · إعادة محاولة مرة عند الفشل", "सेव कार्ड · विफल होने पर एक बार फिर") : L("UPI AutoPay mandate · retried once if it fails", "تفويض UPI AutoPay · إعادة محاولة مرة عند الفشل", "UPI AutoPay मैंडेट · विफल होने पर एक बार फिर"), true) +
+      ui.toggle("ptRem_" + K.id, L("Remind me 3 days before", "ذكّرني قبل 3 أيام", "3 दिन पहले याद दिलाएँ"), L("On WhatsApp, with a pay link", "عبر واتساب مع رابط دفع", "व्हाट्सऐप पर, पेमेंट लिंक के साथ"), true) + "</div>" +
+      ui.note("info", t("Instalments are the clinic's own payment plan — not a loan. No interest, no extra charges.", "الأقساط خطة دفع من العيادة نفسها — ليست قرضًا. بلا فوائد أو رسوم إضافية.", "किस्तें क्लिनिक की अपनी भुगतान योजना हैं — कोई लोन नहीं। कोई ब्याज या अतिरिक्त शुल्क नहीं।"), "info"),
+      foot: ui.btn(L("Later", "لاحقًا", "बाद में"), { act: "close", cls: "ghost" }) + ui.btn(L("Pay now with ", "ادفع الآن عبر ", "अभी भरें · ") + payWay(), { cls: "pri", act: "ptPkPay", arg: K.id, icon: "wallet" }) };
+  });
+  NB.act("ptPkPay", function (id) { NB.state.ui["ptPkPaid_" + id] = true; NB.state.overlay = null; NB.toast(L("Paid · all instalments done · receipt on WhatsApp", "تم الدفع · اكتملت الأقساط · الإيصال على واتساب", "भुगतान हो गया · सभी किस्तें पूरी · रसीद व्हाट्सऐप पर")); });
+
+  NB.overlay("ptpkgift", function (id) {
+    var K = pkById(id), to = NB.v("ptGiftTo", "latha"), n = NB.v("ptGiftN", "2"), left = pkLeft(K);
+    var people = [["latha", "Latha"], ["amma", "Amma"], ["meenu", "Meenu"]];
+    var body = '<p class="small muted" style="margin:0">' + esc(L("Give some of your " + left + " remaining sessions to someone in your Nabd family. They get their own package card.", "امنح بعض جلساتك المتبقية (" + left + ") لأحد أفراد عائلتك في نبض. يحصل على بطاقة باقة خاصة به.", "अपने बचे " + left + " सत्रों में से कुछ अपने Nabd परिवार के किसी सदस्य को दें। उन्हें अपना पैकेज कार्ड मिलेगा।")) + "</p>" +
+      '<span class="small muted">' + t("Who gets them?", "لمن؟", "किसे देने हैं?") + '</span><div class="stack s8">' + people.map(function (p) {
+        var m = mem(p[0]);
+        return ui.radio("ptGiftTo", p[0], mname(m), rel(m) + " · " + (p[0] === "latha" ? L("adult — she accepts on her own phone", "بالغة — تقبل من هاتفها", "वयस्क — अपने फ़ोन पर स्वीकार करेंगी") : p[0] === "meenu" ? L("under 18 — you accept as guardian", "دون 18 — تقبل بصفتك ولي الأمر", "18 से कम — अभिभावक के रूप में आप स्वीकार करेंगे") : L("you hold power of attorney", "لديك وكالة عنها", "आपके पास पावर ऑफ़ अटॉर्नी")), "latha");
+      }).join("") + "</div>" +
+      '<span class="small muted">' + t("How many sessions?", "كم جلسة؟", "कितने सत्र?") + '</span><div class="pt-chips">' + [1, 2, 3, left].filter(function (v, i, a) { return v <= left && a.indexOf(v) === i; }).map(function (v) {
+        return '<button class="pt-chip' + (String(v) === String(n) ? " on" : "") + '" data-set="ptGiftN" data-val="' + v + '">' + esc(v === left ? L("All " + v, "الكل (" + v + ")", "सभी " + v) : L(v + (v === 1 ? " session" : " sessions"), v + " جلسة", v + " सत्र")) + "</button>";
+      }).join("") + "</div>" +
+      ui.field(L("Gift message (optional)", "رسالة الإهداء (اختياري)", "उपहार संदेश (वैकल्पिक)"), "", { id: "pt-gm", ph: L("For your back — get well soon", "لظهرك — بالشفاء", "आपकी कमर के लिए — जल्दी ठीक हो जाओ") }) +
+      '<div class="card stack s4">' + [["lock", L("Only 1 transfer or gift per package", "نقل أو إهداء واحد فقط لكل باقة", "हर पैकेज पर सिर्फ़ 1 ट्रांसफ़र या उपहार")], ["calendar", tx("Expiry stays {0} — it never resets", "يبقى الانتهاء {0} — لا يُعاد ضبطه", "समाप्ति {0} ही रहेगी — कभी रीसेट नहीं होती", [nm(K.exp)])], ["fingerprint", L("You approve with a one-time code", "توافق برمز لمرة واحدة", "आप एक बार के कोड से मंज़ूरी देंगे")]].map(function (r) {
+        return '<div class="pt-it">' + ico(r[0]) + '<div class="t"><b>' + (r[1].indexOf("<") >= 0 ? r[1] : esc(r[1])) + "</b></div></div>"; }).join("") + "</div>";
+    return { title: t("Gift sessions", "إهداء جلسات", "सत्र उपहार दें"), body: body,
+      foot: ui.btn(L("Cancel", "إلغاء", "रद्द"), { act: "close", cls: "ghost" }) + ui.btn(L("Approve with code", "وافق بالرمز", "कोड से मंज़ूर करें"), { cls: "pri", act: "ptPkGift", arg: K.id, icon: "fingerprint" }) };
+  });
+  NB.act("ptPkGift", function (id) {
+    var to = NB.v("ptGiftTo", "latha"), n = NB.v("ptGiftN", "2"), m = mem(to);
+    NB.state.ui["ptPkGift_" + id] = { to: to, n: n, name: first(m) }; NB.state.overlay = null;
+    NB.toast(to === "latha" ? L("Sent · Latha accepts on her phone", "أُرسل · تقبل لاثا من هاتفها", "भेजा · लता अपने फ़ोन पर स्वीकार करेंगी") : L("Done · " + first(m) + " has her own package card", "تم · لدى " + first(m) + " بطاقة باقة خاصة", "हो गया · " + first(m) + " का अपना पैकेज कार्ड"));
+  });
+
+  NB.overlay("ptpkup", function (id) {
+    var K = pkById(id), unused = K.total - K.used, credit = Math.round(unused / K.total * K.price), diff = K.up.price - credit, open = K.plan === "inst" && !pkInstPaid(K) ? K.inst[K.inst.length - 1][0] : 0;
+    var body = '<p class="small muted" style="margin:0">' + esc(L("Move to a bigger package. Your unused sessions are credited, so you pay only the difference.", "انتقل إلى باقة أكبر. تُحتسب جلساتك غير المستخدمة، فتدفع الفرق فقط.", "बड़े पैकेज में जाएँ। बचे सत्रों का क्रेडिट मिलेगा, आप सिर्फ़ अंतर भरेंगे।")) + "</p>" +
+      '<div class="card pt-math">' +
+      '<div class="r"><span>' + esc(L("Unused sessions", "الجلسات غير المستخدمة", "बचे सत्र")) + "</span><b>" + nm(unused + " / " + K.total) + "</b></div>" +
+      '<div class="r"><span>' + tx("Credit = {0} ÷ {1} × {2} package price", "الرصيد = {0} ÷ {1} × {2} سعر الباقة", "क्रेडिट = {0} ÷ {1} × {2} पैकेज मूल्य", [nm(unused), nm(K.total), NB.money(K.price)]) + "</span><b>−" + NB.money(credit) + "</b></div>" +
+      '<div class="r"><span>' + esc(L("New package · " + K.up.total + " sessions", "الباقة الجديدة · " + K.up.total + " جلسة", "नया पैकेज · " + K.up.total + " सत्र")) + "</span><b>" + NB.money(K.up.price) + "</b></div>" +
+      (open ? '<div class="r"><span>' + t("Open instalment, settled first", "القسط المفتوح يُسدَّد أولًا", "खुली किस्त, पहले चुकाई जाएगी") + "</span><b>" + NB.money(open) + "</b></div>" : "") +
+      '<div class="r tot"><span>' + t("You pay now", "تدفع الآن", "अभी भरना है") + "</span><b>" + NB.money(diff + open) + "</b></div></div>" +
+      ui.note("info", t("The clinic issues a credit note for the old package and a new invoice. Your history stays. The new package's validity starts today.", "تُصدر العيادة إشعارًا دائنًا للباقة القديمة وفاتورة جديدة. يبقى سجلك، وتبدأ صلاحية الباقة الجديدة اليوم.", "क्लिनिक पुराने पैकेज का क्रेडिट नोट और नया इनवॉइस जारी करेगा। इतिहास बना रहेगा। नए पैकेज की वैधता आज से।"), "receipt");
+    return { kind: "modal", title: esc(L("Upgrade to " + K.up.total + " sessions", "الترقية إلى " + K.up.total + " جلسة", K.up.total + " सत्र में अपग्रेड")), body: body,
+      foot: ui.btn(L("Not now", "ليس الآن", "अभी नहीं"), { act: "close", cls: "ghost" }) + ui.btn(L("Upgrade & pay ", "ترقية ودفع ", "अपग्रेड करें और भरें ") + plain(NB.money(diff + open)), { cls: "pri", act: "toast", arg: L("Payment link sent · the new card starts when it's paid", "أُرسل رابط الدفع · تبدأ البطاقة الجديدة بعد الدفع", "पेमेंट लिंक भेजा · भुगतान के बाद नया कार्ड शुरू"), icon: "layers" }) };
+  });
+
+  NB.overlay("ptpkrefund", function (id) {
+    var K = pkById(id), paid = pkPaid(K), usedV = pkUsedVal(K), net = paid - usedV, pps = K.plan === "pps", open = K.plan === "inst" && !pkInstPaid(K);
+    var rows = '<div class="r"><span>' + t("Paid so far", "المدفوع حتى الآن", "अब तक भुगतान") + "</span><b>" + NB.money(paid) + "</b></div>";
+    if (K.comps) rows += K.comps.map(function (c) { return '<div class="r"><span>' + tx("Used: {0} × {1} {2}", "المستخدم: {0} × {1} {2}", "इस्तेमाल: {0} × {1} {2}", [nm(c[3]), esc(L3(c[0])), NB.money(c[1])]) + "</span><b>−" + NB.money(c[1] * c[3]) + "</b></div>"; }).join("");
+    else rows += '<div class="r"><span>' + tx("Used: {0} sessions × {1} single-session price", "المستخدم: {0} جلسات × {1} سعر الجلسة المفردة", "इस्तेमाल: {0} सत्र × {1} एकल-सत्र मूल्य", [nm(K.used), NB.money(pps ? K.per : K.single)]) + "</span><b>−" + NB.money(pps ? paid : usedV) + "</b></div>";
+    rows += '<div class="r"><span>' + t("Processing fee", "رسوم المعالجة", "प्रोसेसिंग शुल्क") + "</span><b>" + t("None (clinic policy)", "لا شيء (سياسة العيادة)", "कोई नहीं (क्लिनिक नीति)") + "</b></div>";
+    var res = pps ? '<div class="r tot"><span>' + t("Nothing to refund, nothing owed", "لا استرداد ولا مستحقات", "न रिफ़ंड, न बकाया") + "</span><b>" + NB.money(0) + "</b></div>"
+      : net >= 0 ? '<div class="r tot ok"><span>' + t("Refund to you", "المبلغ المسترد لك", "आपको रिफ़ंड") + "</span><b>" + NB.money(net) + "</b></div>"
+      : '<div class="r tot"><span>' + t("You'd owe", "سيكون عليك", "आपको देने होंगे") + "</span><b>" + NB.money(-net) + "</b></div>";
+    var body = '<div class="pt-pkh">' + ico(K.ic, "acc") + '<div class="t"><b>' + pkName(K) + "</b><small>" + esc(fshort(K.f)) + " · " + nm(K.id) + "</small></div></div>" +
+      '<div class="card pt-math">' + rows + res + "</div>" +
+      (open ? ui.note("info", tx("Instalment 3 ({0}) is cancelled and AutoPay stops.", "يُلغى القسط 3 ({0}) ويتوقف الدفع التلقائي.", "किस्त 3 ({0}) रद्द होगी और AutoPay बंद होगा।", [NB.money(2500)]), "wallet") : "") +
+      (pps ? ui.note("info", t("You paid per session, so stopping costs nothing extra — the discount isn't clawed back.", "دفعت لكل جلسة، لذا لا يكلّفك التوقف شيئًا — لا يُسترد الخصم.", "आपने हर सत्र पर भुगतान किया, इसलिए रुकने पर कुछ अतिरिक्त नहीं — छूट वापस नहीं ली जाएगी।"), "info") : "") +
+      ui.note("info", t("Used sessions are counted at the normal single-session price, not the package price. Any tax on the refunded part is reversed and comes back to you. Money returns to the way you paid.", "تُحتسب الجلسات المستخدمة بسعر الجلسة المفردة العادي لا بسعر الباقة. تُرد أي ضريبة على الجزء المسترد، ويعود المال إلى وسيلة الدفع نفسها.", "इस्तेमाल हुए सत्र पैकेज मूल्य पर नहीं, सामान्य एकल-सत्र मूल्य पर गिने जाते हैं। रिफ़ंड वाले हिस्से का टैक्स भी वापस मिलेगा। पैसा उसी तरीके से लौटेगा जिससे भरा था।"), "shieldcheck") +
+      '<span class="small muted">' + t("Why are you cancelling? (helps the clinic)", "لماذا تلغي؟ (يساعد العيادة)", "क्यों रद्द कर रहे हैं? (क्लिनिक के लिए)") + "</span>" +
+      ui.seg("ptRefWhy", [["move", L("Moving away", "سأنتقل", "शहर छोड़ रहा हूँ")], ["health", L("Health reason", "سبب صحي", "स्वास्थ्य कारण")], ["cost", L("Cost", "التكلفة", "ख़र्च")], ["other", L("Other", "آخر", "अन्य")]], "move");
+    return { title: t("Cancel & refund", "الإلغاء والاسترداد", "रद्द करें और रिफ़ंड"), body: body,
+      foot: ui.btn(L("Keep my package", "أبقِ باقتي", "पैकेज रखें"), { act: "close", cls: "ghost" }) + ui.btn(L("Send cancellation request", "أرسل طلب الإلغاء", "रद्द करने का अनुरोध भेजें"), { cls: "dng", act: "ptPkRef", arg: K.id, icon: "send" }) };
+  });
+  NB.act("ptPkRef", function (id) { NB.state.ui["ptPkRef_" + id] = true; NB.state.overlay = null; NB.toast(L("Request sent · the clinic confirms the amount", "أُرسل الطلب · تؤكد العيادة المبلغ", "अनुरोध भेजा · क्लिनिक राशि की पुष्टि करेगा")); });
+
   /* ---------------- WhatsApp conversation ---------------- */
   var WA_CLINIC = function () { return fshort(0); };
   function bub(html, at, o) {
@@ -983,52 +1249,420 @@
           bub(esc(L("Your caregiver access: appointments, prescriptions, lab results, bills · until 31 Mar 2027. Abba chose this.", "صلاحياتك كمقدّم رعاية: المواعيد والوصفات والنتائج والفواتير · حتى 31 مارس 2027. والدك اختار ذلك.", "आपका देखभालकर्ता एक्सेस: अपॉइंटमेंट, पर्चे, लैब रिपोर्ट, बिल · 31 मार्च 2027 तक। यह अब्बा ने चुना है।")), "07:15")] };
       } }
   };
-  var SCN_ORDER = ["book", "queue", "after", "consent", "care"];
+
+  /* ---- Helpers for the newer scenarios ---- */
+  // Sentence with {0},{1}… placeholders: the words are escaped, the values (already HTML, e.g. money) are dropped in.
+  function tx(en, ar, hi, vals) {
+    var s = esc(L(en, ar, hi));
+    (vals || []).forEach(function (v, i) { s = s.split("{" + i + "}").join(v); });
+    return s;
+  }
+  function plain(html) { return String(html).replace(/<[^>]+>/g, ""); }
+  function hm(min) { var h = Math.floor(min / 60), m = min % 60; return (h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m; }
+  function tt(html) { return '<span class="tt">' + html + "</span>"; }
+  function sosNo() { return { india: "112", uae: "998", ksa: "997", qatar: "999" }[NB.mkt().id] || "112"; }
+  function waNum(kind) {
+    var m = NB.mkt().id;
+    return kind === "nabd" ? { india: "+91 80 4718 2200", uae: "+971 4 512 7700", ksa: "+966 11 520 7700", qatar: "+974 4000 7700" }[m]
+      : { india: "+91 80 4110 2233", uae: "+971 4 330 2210", ksa: "+966 11 460 2210", qatar: "+974 4441 2210" }[m];
+  }
+  // Expiry with the Hijri date beside it in Saudi Arabia (FRD LS-06).
+  function expDate(g, hij) { return nm(g) + (NB.mkt().id === "ksa" && hij ? " · " + esc(L(hij[0], hij[1], hij[0])) : ""); }
+  // Session pips: used, booked (dashed), gifted away (violet, at the end), free.
+  function pips(used, total, booked, gifted) {
+    var h = '<span class="pt-pips" aria-hidden="true">';
+    for (var i = 0; i < total; i++) h += "<i" + (i < used ? ' class="u"' : i >= total - (gifted || 0) ? ' class="g"' : i < used + (booked || 0) ? ' class="b"' : "") + "></i>";
+    return h + "</span>";
+  }
+  function fromLine(nabd) { return nabd ? '<span class="pt-from">' + ui.icon("building", "xs") + tx("From {0} · sent via Nabd", "من {0} · عبر نبض", "{0} से · Nabd के ज़रिए", [esc(fshort(0))]) + "</span>" : ""; }
+  function physio() { return NB.gcc() ? L("Omar Haddad, physiotherapist", "عمر حداد، أخصائي علاج طبيعي", "उमर हद्दाद, फ़िज़ियोथेरेपिस्ट") : L("Arun Kumar, physiotherapist", "أرون كومار، أخصائي علاج طبيعي", "अरुण कुमार, फ़िज़ियोथेरेपिस्ट"); }
+  var MR = function () { return [["menu", L("Main menu", "القائمة الرئيسية", "मुख्य मेनू")], ["done", L("That's all", "هذا كل شيء", "बस इतना ही")]]; };
+
+  /* ---- Scenario: My records (patient manages all their data from WhatsApp; each item opens via secure link + OTP) ---- */
+  function recMenu(nabd) {
+    return { title: L("My records", "سجلاتي", "मेरे रिकॉर्ड"), rows: [
+      ["visits", L("Past visits", "الزيارات السابقة", "पिछली विज़िट"), nabd ? L("4 visits · 2 clinics", "4 زيارات · عيادتان", "4 विज़िट · 2 क्लिनिक") : L("3 visits", "3 زيارات", "3 विज़िट"), L("Health records", "السجلات الصحية", "स्वास्थ्य रिकॉर्ड")],
+      ["rx", L("Prescriptions", "الوصفات", "पर्चे"), L("2 active", "2 سارية", "2 चालू")],
+      ["labs", L("Lab reports", "تقارير المختبر", "लैब रिपोर्ट"), L("1 new report", "تقرير جديد", "1 नई रिपोर्ट")],
+      ["bills", L("Bills & receipts", "الفواتير والإيصالات", "बिल और रसीदें"), L("1 bill due", "فاتورة مستحقة", "1 बिल बाकी"), L("Money & family", "المال والعائلة", "पैसा और परिवार")],
+      ["pkgs", L("My packages", "باقاتي", "मेरे पैकेज"), L("2 active · 1 instalment due", "2 نشطة · قسط مستحق", "2 चालू · 1 किस्त बाकी")],
+      ["family", L("Family", "العائلة", "परिवार"), L("Latha, Meenu, Amma", "لاثا، مينو، أمي", "लता, मीनू, माँ")],
+      ["privacy", L("Privacy & sharing", "الخصوصية والمشاركة", "गोपनीयता और साझा करना"), L("Who viewed · stop sharing · my data", "من اطّلع · إيقاف المشاركة · بياناتي", "किसने देखा · साझा रोकें · मेरा डेटा"), L("Privacy", "الخصوصية", "गोपनीयता")]
+    ] };
+  }
+  function recDoc(x, nabd) {
+    var C0 = fshort(0), C1 = fshort(1);
+    var D = {
+      visits: [L("Past visits", "الزيارات السابقة", "पिछली विज़िट"), nabd ? tx("4 visits at {0} and {1}.", "4 زيارات في {0} و{1}.", "{0} और {1} में 4 विज़िट।", [esc(C0), esc(C1)]) : tx("3 visits at {0}.", "3 زيارات في {0}.", "{0} में 3 विज़िट।", [esc(C0)]), "v/7QK2"],
+      rx: [L("Prescriptions", "الوصفات", "पर्चे"), t("2 active and 1 past prescription. The pharmacy can scan the QR on the page.", "وصفتان ساريتان وواحدة سابقة. يمكن للصيدلية مسح الرمز في الصفحة.", "2 चालू और 1 पुराना पर्चा। फ़ार्मेसी पेज का QR स्कैन कर सकती है।"), "rx/88412"],
+      labs: [L("Lab reports", "تقارير المختبر", "लैब रिपोर्ट"), t("1 new report, released by your doctor. 1 more is still being processed.", "تقرير جديد أصدره طبيبك، وآخر قيد المعالجة.", "1 नई रिपोर्ट आपके डॉक्टर ने जारी की। 1 और अभी तैयार हो रही है।"), "lab/5521"],
+      bills: [L("Bills & receipts", "الفواتير والإيصالات", "बिल और रसीदें"), tx("1 bill due: {0}. 2 paid receipts and 1 insurance claim.", "فاتورة مستحقة: {0}. إيصالان مدفوعان ومطالبة تأمين واحدة.", "1 बिल बाकी: {0}। 2 भुगतान रसीदें और 1 बीमा क्लेम।", [NB.money(600)]), "b/04412"],
+      pkgs: [L("My packages", "باقاتي", "मेरे पैकेज"), tx("2 active packages. Next instalment {0} on 20 Oct.", "باقتان نشطتان. القسط التالي {0} في 20 أكتوبر.", "2 चालू पैकेज। अगली किस्त {0}, 20 अक्टूबर को।", [NB.money(2500)]), "pk/0211"],
+      who: [L("Who viewed my records", "من اطّلع على سجلاتي", "मेरे रिकॉर्ड किसने देखे"), t("Your records were opened 4 times in the last 30 days. See who, when and why.", "فُتحت سجلاتك 4 مرات في آخر 30 يومًا. اعرف من ومتى ولماذا.", "पिछले 30 दिनों में आपके रिकॉर्ड 4 बार खोले गए। देखें किसने, कब और क्यों।"), "a/log"],
+      fammeenu: [L("Meenu's records", "سجلات مينو", "मीनू के रिकॉर्ड"), t("You're Meenu's guardian until 12 Mar 2029. Some teen topics stay private to her and her doctor.", "أنت ولي أمر مينو حتى 12 مارس 2029. بعض مواضيع المراهقين تبقى خاصة بها وبطبيبها.", "12 मार्च 2029 तक आप मीनू के अभिभावक हैं। किशोर स्वास्थ्य के कुछ विषय निजी रहते हैं।"), "m/meenu"],
+      famamma: [L("Amma's records", "سجلات أمي", "माँ के रिकॉर्ड"), t("Power of attorney verified at the clinic. You can see and manage Amma's records.", "الوكالة موثّقة في العيادة. يمكنك رؤية سجلات أمك وإدارتها.", "पावर ऑफ़ अटॉर्नी क्लिनिक में सत्यापित। आप माँ के रिकॉर्ड देख और संभाल सकते हैं।"), "m/amma"]
+    };
+    return D[x] || D.visits;
+  }
+  function recState(p) {
+    var s = "start";
+    p.forEach(function (x) {
+      if (x === "menu") { s = "menu"; return; }
+      if (x === "done") { s = "bye"; return; }
+      var b = s.split(":")[0];
+      if (b === "start" || b === "menu") s = x === "family" ? "fam" : x === "privacy" ? "priv" : "doc:" + x;
+      else if (b === "doc") s = "open:" + s.slice(4);
+      else if (b === "priv") s = x === "stop" ? "stopl" : x === "wd" ? "wd" : x === "exp" ? "exp" : "doc:who";
+      else if (b === "stopl") s = "stopc:" + x;
+      else if (b === "stopc") s = x === "stopok" ? "stopped:" + s.slice(6) : "menu";
+      else if (b === "wd") s = x === "mkt" ? "wdmkt" : "wduse";
+      else if (b === "exp") s = "expok";
+      else if (b === "fam") s = x === "latha" ? "famL" : "doc:fam" + x;
+      else if (b === "famL") s = "famLs";
+    });
+    return s;
+  }
+  function recStage(p, nabd) {
+    var s = recState(p), b = s.split(":")[0], arg = s.slice(b.length + 1), at = hm(602 + p.length * 1), C0 = fshort(0);
+    var openBtn = function () { return { btns: [["list", L("Open menu", "افتح القائمة", "मेनू खोलें"), 'aria-hidden="true"']] }; };
+    var shares = activeShares();
+    if (b === "start") return { at: at, list: recMenu(nabd), bot: [bub(
+      (nabd ? tx("Hi Rakesh. Here is everything from the clinics you've used with Nabd ({0}, {1}).", "مرحبًا راكيش. هذه كل بياناتك من العيادات التي استخدمتها عبر نبض ({0}، {1}).", "नमस्ते राकेश। Nabd से जुड़े आपके सभी क्लिनिक ({0}, {1}) का सब कुछ यहाँ है।", [esc(C0), esc(fshort(1))])
+        : tx("Hi Rakesh. Here is everything {0} holds for you and your family.", "مرحبًا راكيش. هذا كل ما لدى {0} لك ولعائلتك.", "नमस्ते राकेश। {0} के पास आपका और आपके परिवार का जो कुछ है, वह यहाँ है।", [esc(C0)])) + "\n\n" +
+      t("Each item opens on a secure page with a one-time code. No health details are sent in this chat.", "يُفتح كل عنصر في صفحة آمنة برمز لمرة واحدة. لا تُرسل أي تفاصيل صحية في هذه المحادثة.", "हर चीज़ एक बार के कोड से सुरक्षित पेज पर खुलती है। इस चैट में कोई स्वास्थ्य जानकारी नहीं भेजी जाती।") + "\n" +
+      '<span class="pt-scope">' + t("I only help with visits, records and privacy requests — I can't answer medical questions.", "أساعد فقط في الزيارات والسجلات وطلبات الخصوصية — لا أجيب عن أسئلة طبية.", "मैं सिर्फ़ विज़िट, रिकॉर्ड और गोपनीयता अनुरोधों में मदद करता हूँ — चिकित्सा सवालों के जवाब नहीं देता।") + "</span>", at, openBtn())] };
+    if (b === "menu") return { at: at, list: recMenu(nabd), bot: [bub(t("Anything else?", "هل من شيء آخر؟", "और कुछ?"), at, openBtn())] };
+    if (b === "doc") {
+      var d = recDoc(arg, nabd);
+      return { at: at, bot: [bub(tt(esc(d[0])) + d[1] + lk("nabd.link/" + d[2], L("Opens with a one-time code · link works for 15 min", "يُفتح برمز لمرة واحدة · يعمل الرابط 15 دقيقة", "एक बार के कोड से खुलता है · लिंक 15 मिनट चलेगा")), at)],
+        replies: [["open", L("Open securely", "افتح بأمان", "सुरक्षित रूप से खोलें")], ["menu", L("Main menu", "القائمة الرئيسية", "मुख्य मेनू")]] };
+    }
+    if (b === "open") return { at: at, bot: [code(at), bub(t("Opened on your phone ✓ The link stops working in 15 minutes.", "فُتح على هاتفك ✓ يتوقف الرابط بعد 15 دقيقة.", "आपके फ़ोन पर खुला ✓ लिंक 15 मिनट में बंद हो जाएगा।"), at)], replies: MR() };
+    if (b === "priv") return { at: at, bot: [bub(t("Privacy & sharing. What would you like to do?", "الخصوصية والمشاركة. ماذا تريد أن تفعل؟", "गोपनीयता और साझा करना। आप क्या करना चाहते हैं?"), at, openBtn())],
+      list: { title: L("Privacy & sharing", "الخصوصية والمشاركة", "गोपनीयता और साझा करना"), rows: [
+        ["who", L("Who viewed my records", "من اطّلع على سجلاتي", "मेरे रिकॉर्ड किसने देखे"), L("Every view is logged", "كل اطلاع مسجّل", "हर बार देखना दर्ज होता है")],
+        ["stop", L("Stop sharing", "إيقاف المشاركة", "साझा करना रोकें"), L(shares.length + " active shares", shares.length + " مشاركات نشطة", shares.length + " चालू साझेदारी")],
+        ["wd", L("Withdraw consent", "سحب الموافقة", "सहमति वापस लें"), L("Offers, or a clinic's use of your data", "العروض أو استخدام العيادة لبياناتك", "ऑफ़र, या क्लिनिक द्वारा डेटा का उपयोग")],
+        ["exp", L("Download my data", "تنزيل بياناتي", "मेरा डेटा डाउनलोड करें"), L("A copy of everything", "نسخة من كل شيء", "हर चीज़ की कॉपी")]] } };
+    if (b === "stopl") return { at: at, bot: [bub(t("Which one do you want to stop?", "أي مشاركة تريد إيقافها؟", "कौन-सी रोकनी है?"), at, openBtn())],
+      list: { title: L("Active shares", "مشاركات نشطة", "चालू साझेदारी"), rows: shares.map(function (x) { return [x.id, x.from.split(",")[0] + " → " + x.to.split(" · ").pop(), L("Ends ", "تنتهي ", "ख़त्म: ") + x.until]; }) } };
+    if (b === "stopc") {
+      var sh = shares.find(function (x) { return x.id === arg; }) || shares[0], who = sh.to.split(" · ").pop();
+      return { at: at, bot: [bub(tx("Stop sharing with {0}? They lose access right away. What they already opened stays in your log.", "إيقاف المشاركة مع {0}؟ سيفقدون الوصول فورًا، ويبقى ما فتحوه مسجّلًا لديك.", "{0} के साथ साझा करना रोकें? उनका एक्सेस तुरंत ख़त्म होगा। उन्होंने जो खोला वह आपके लॉग में रहेगा।", [esc(who)]), at)],
+        replies: [["stopok", L("Stop sharing", "أوقف المشاركة", "साझा करना रोकें")], ["keep", L("Keep it", "أبقِها", "रहने दें")]] };
+    }
+    if (b === "stopped") {
+      var sh2 = shares.find(function (x) { return x.id === arg; }) || shares[0];
+      return { at: at, bot: [code(at), bub(tt(t("Sharing stopped ✓", "أُوقفت المشاركة ✓", "साझा करना रोका गया ✓")) + tx("{0} can no longer see your records. This is in your privacy history ({1}).", "لم يعد بإمكان {0} رؤية سجلاتك. مسجّل في سجل الخصوصية ({1}).", "{0} अब आपके रिकॉर्ड नहीं देख सकता। यह आपके गोपनीयता इतिहास में है ({1})।", [esc(sh2.to.split(" · ").pop()), nm(sh2.id)]), at)], replies: MR() };
+    }
+    if (b === "wd") return { at: at, bot: [bub(t("Which consent do you want to withdraw?", "أي موافقة تريد سحبها؟", "कौन-सी सहमति वापस लेनी है?"), at)],
+      replies: [["mkt", L("Offers & news", "العروض والأخبار", "ऑफ़र और ख़बरें")], ["use", L("A clinic's use of my data", "استخدام العيادة لبياناتي", "क्लिनिक द्वारा मेरे डेटा का उपयोग")], ["menu", L("Main menu", "القائمة الرئيسية", "मुख्य मेनू")]] };
+    if (b === "wdmkt") return { at: at, bot: [bub(tt(t("Done ✓", "تم ✓", "हो गया ✓")) + tx("No more offers from {0} on WhatsApp, SMS or calls — one stop for all three. Visit reminders and safety messages still come.", "لا مزيد من عروض {0} عبر واتساب أو الرسائل أو المكالمات — إيقاف واحد للثلاثة. تستمر تذكيرات المواعيد ورسائل السلامة.", "{0} से व्हाट्सऐप, SMS या कॉल पर अब कोई ऑफ़र नहीं — तीनों के लिए एक ही रोक। विज़िट रिमाइंडर और सुरक्षा संदेश आते रहेंगे।", [esc(nabd ? L("any clinic", "أي عيادة", "किसी भी क्लिनिक") : C0)]) + "\n" +
+      t("Meenu is under 18, so she never gets offers anyway.", "مينو دون 18، لذا لا تصلها أي عروض أصلًا.", "मीनू 18 से कम है, इसलिए उसे वैसे भी कभी ऑफ़र नहीं भेजे जाते।"), at)], replies: MR() };
+    if (b === "wduse") return { at: at, bot: [bub(t("This needs a short secure form so the clinic can act on it. The clinic must answer within the legal time limit — we track it for you.", "يحتاج هذا إلى نموذج آمن قصير لتتمكن العيادة من التنفيذ. يجب أن ترد العيادة خلال المهلة القانونية — ونتابعها لك.", "इसके लिए एक छोटा सुरक्षित फ़ॉर्म चाहिए ताकि क्लिनिक कार्रवाई कर सके। क्लिनिक को कानूनी समय-सीमा में जवाब देना होगा — हम इस पर नज़र रखते हैं।") +
+      lk("nabd.link/dr/2291", L("Request form · opens with a code", "نموذج الطلب · يُفتح برمز", "अनुरोध फ़ॉर्म · कोड से खुलता है")), at)], replies: MR() };
+    if (b === "exp") return { at: at, bot: [bub(nabd ? t("We'll put together a copy of everything, from every clinic you've visited. Which format?", "سنجهّز نسخة من كل شيء من كل عيادة زرتها. أي صيغة؟", "हम आपके हर क्लिनिक से सब कुछ की एक कॉपी तैयार करेंगे। कौन-सा फ़ॉर्मैट?") : tx("We'll put together a copy of everything {0} holds. Which format?", "سنجهّز نسخة من كل ما لدى {0}. أي صيغة؟", "{0} के पास जो कुछ है उसकी कॉपी तैयार करेंगे। कौन-सा फ़ॉर्मैट?", [esc(C0)]), at)],
+      replies: [["pdf", L("Readable PDF", "PDF مقروء", "पढ़ने योग्य PDF")], ["fhir", L("Health data file", "ملف بيانات صحية", "हेल्थ डेटा फ़ाइल")], ["menu", L("Main menu", "القائمة الرئيسية", "मुख्य मेनू")]] };
+    if (b === "expok") return { at: at, bot: [bub(tt(t("Request received ✓", "تم استلام الطلب ✓", "अनुरोध मिला ✓")) + tx("Ref {0}. A secure link comes here in a few minutes. It opens with a code and expires in 24 hours. No doctor's approval is needed — it's your right.", "المرجع {0}. سيصلك رابط آمن هنا خلال دقائق، يُفتح برمز وينتهي خلال 24 ساعة. لا يحتاج موافقة طبيب — إنه حقك.", "संदर्भ {0}। कुछ मिनट में यहाँ सुरक्षित लिंक आएगा। यह कोड से खुलेगा और 24 घंटे में ख़त्म होगा। डॉक्टर की मंज़ूरी नहीं चाहिए — यह आपका अधिकार है।", [nm("DSR-2291")]), at)], replies: MR() };
+    if (b === "fam") return { at: at, bot: [bub(t("You look after 3 people. Whose records?", "تعتني بـ 3 أشخاص. سجلات من؟", "आप 3 लोगों की देखभाल करते हैं। किसके रिकॉर्ड?"), at)],
+      replies: [["latha", L("Latha (wife)", "لاثا (الزوجة)", "लता (पत्नी)")], ["meenu", L("Meenu, 15", "مينو، 15", "मीनू, 15")], ["amma", L("Amma", "أمي", "माँ")]] };
+    if (b === "famL") return { at: at, bot: [bub(t("Latha is an adult with her own records. She lets you book for her, but she hasn't approved sharing her health records with you. We can ask her — she decides on her own phone with a code.", "لاثا بالغة ولها سجلاتها. تسمح لك بالحجز لها، لكنها لم توافق على مشاركة سجلاتها الصحية معك. يمكننا سؤالها — تقرر من هاتفها برمز.", "लता वयस्क हैं और उनके अपने रिकॉर्ड हैं। वे आपको बुक करने देती हैं, पर उन्होंने अपने स्वास्थ्य रिकॉर्ड आपसे साझा करने की मंज़ूरी नहीं दी है। हम उनसे पूछ सकते हैं — वे अपने फ़ोन पर कोड से तय करेंगी।"), at)],
+      replies: [["ask", L("Ask Latha", "اسأل لاثا", "लता से पूछें")], ["menu", L("Main menu", "القائمة الرئيسية", "मुख्य मेनू")]] };
+    if (b === "famLs") return { at: at, bot: [bub(tt(t("Request sent ✓", "أُرسل الطلب ✓", "अनुरोध भेजा ✓")) + t("Latha gets a link on her own WhatsApp. Nothing is shared until she says yes, and she can stop it any time.", "تصل لاثا رسالة برابط على واتسابها. لا يُشارك شيء حتى توافق، ويمكنها الإيقاف في أي وقت.", "लता को उनके अपने व्हाट्सऐप पर लिंक मिलेगा। उनकी हाँ तक कुछ साझा नहीं होगा, और वे कभी भी रोक सकती हैं।"), at)], replies: MR() };
+    return { at: at, end: true, bot: [bub(t("Okay! Send MENU any time to see your records.", "حسنًا! أرسل «القائمة» في أي وقت لرؤية سجلاتك.", "ठीक है! अपने रिकॉर्ड देखने के लिए कभी भी MENU भेजें।"), at)] };
+  }
+  SCN.records = { n: 6, label: ["My records", "سجلاتي", "मेरे रिकॉर्ड"], me: ["Rakesh Menon · manages his family's records", "راكيش مينون · يدير سجلات عائلته", "राकेश मेनन · परिवार के रिकॉर्ड संभालते हैं"],
+    pre: ["MENU", "القائمة", "मेनू"], preAt: "10:01", nums: ["clinic", "nabd"], stage: recStage };
+
+  /* ---- Scenario: Find a doctor on the shared Nabd number (aggregator discovery → book into a clinic's live queue) ---- */
+  function otherDoc() {
+    return NB.gcc() ? { n: L("Dr. Hana Al-Mutairi", "د. هناء المطيري", "डॉ. हना अल-मुतैरी"), c: L("City Care Clinic", "عيادة سيتي كير", "सिटी केयर क्लिनिक") } : { n: L("Dr. Rohan Das", "د. روهان داس", "डॉ. रोहन दास"), c: L("Sanjeevani Clinic", "عيادة سانجيفاني", "संजीवनी क्लिनिक") };
+  }
+  function specList(again) {
+    return { title: L("Type of doctor", "نوع الطبيب", "डॉक्टर का प्रकार"), rows: PA.needs.map(function (n) { return [n.id, spec(n.spec), L3(n.sub)]; }).concat(again ? [] : [["ask", L("I have a health question", "لدي سؤال صحي", "मेरा एक स्वास्थ्य सवाल है"), L("We'll point you to the right place", "سنرشدك إلى المكان المناسب", "हम सही जगह बताएँगे")]]) };
+  }
+  function findOpt(sp, i) {
+    var o = (PA.options[sp] || PA.options.gm), x = o[+i];
+    if (x) return { name: NB.dname(NB.doc(x.d)), clinic: fshort(x.f), wait: x.wait, km: x.km, fee: x.fee, slot: x.slots[0][0], w: x.slots[0][1] };
+    var od = otherDoc(); return { name: od.n, clinic: od.c, wait: "35–45", km: "6.4", fee: 650, slot: "12:20", w: 30 };
+  }
+  function findState(p) {
+    var s = "start";
+    p.forEach(function (x) {
+      var b = s.split(":")[0];
+      if (b === "start" || b === "again") s = x === "ask" ? "ask" : "area:" + x;
+      else if (b === "ask") s = x === "find" ? "again" : "sos";
+      else if (b === "area") s = "lang:" + s.slice(5);
+      else if (b === "lang") s = "docs:" + s.slice(5);
+      else if (b === "docs") s = "conf:" + s.slice(5) + ":" + x;
+      else if (b === "conf") s = "booked:" + s.slice(5);
+    });
+    return s;
+  }
+  function findStage(p) {
+    var s = findState(p), b = s.split(":")[0], parts = s.split(":"), at = hm(8 * 60 + 50 + p.length), g = NB.gcc();
+    var openBtn = function (lbl) { return { btns: [["list", lbl, 'aria-hidden="true"']] }; };
+    if (b === "start") return { at: at, list: specList(), bot: [bub(t("Hello! This is Nabd. I help you find a doctor near you and book straight into the clinic's live queue.", "مرحبًا! هذه نبض. أساعدك في إيجاد طبيب قريب منك والحجز مباشرة في طابور العيادة المباشر.", "नमस्ते! यह Nabd है। मैं आपके पास डॉक्टर ढूँढने और सीधे क्लिनिक की लाइव क़तार में बुक करने में मदद करता हूँ।") + "\n" +
+      '<span class="pt-scope">' + t("I can't give medical advice or answer health questions.", "لا أقدّم نصائح طبية ولا أجيب عن أسئلة صحية.", "मैं चिकित्सा सलाह नहीं देता और स्वास्थ्य सवालों के जवाब नहीं देता।") + "</span>\n" + t("What kind of doctor do you need?", "أي نوع من الأطباء تحتاج؟", "आपको किस तरह का डॉक्टर चाहिए?"), at, openBtn(L("Choose", "اختر", "चुनें")))] };
+    if (b === "again") return { at: at, list: specList(true), bot: [bub(t("What kind of doctor do you need?", "أي نوع من الأطباء تحتاج؟", "आपको किस तरह का डॉक्टर चाहिए?"), at, openBtn(L("Choose", "اختر", "चुनें")))] };
+    if (b === "ask") return { at: at, bot: [bub(t("I can only help you find a doctor, book a visit or manage your records — I can't give medical advice.", "أستطيع فقط مساعدتك في إيجاد طبيب أو حجز زيارة أو إدارة سجلاتك — لا أقدّم نصائح طبية.", "मैं सिर्फ़ डॉक्टर ढूँढने, विज़िट बुक करने या रिकॉर्ड संभालने में मदद कर सकता हूँ — चिकित्सा सलाह नहीं दे सकता।") + "\n" +
+      tx("If you feel very unwell, call {0} or go to the nearest emergency department.", "إذا كنت متعبًا جدًا، اتصل بـ {0} أو اذهب إلى أقرب قسم طوارئ.", "अगर तबीयत बहुत ख़राब है, तो {0} पर कॉल करें या नज़दीकी इमरजेंसी में जाएँ।", [nm(sosNo())]), at)],
+      replies: [["find", L("Find a doctor", "ابحث عن طبيب", "डॉक्टर खोजें")], ["sos", L("It's an emergency", "إنها حالة طارئة", "यह इमरजेंसी है")]] };
+    if (b === "sos") return { at: at, end: true, bot: [bub(tt(tx("Call {0} now", "اتصل بـ {0} الآن", "अभी {0} पर कॉल करें", [nm(sosNo())])) + tx("Nearest 24×7 emergency: {0}, {1} · 9.8 km.", "أقرب طوارئ على مدار الساعة: {0}، {1} · 9.8 كم.", "नज़दीकी 24×7 इमरजेंसी: {0}, {1} · 9.8 किमी।", [esc(fname(1)), esc(F(1).area)]), at,
+      { btns: [["phone", L("Call ", "اتصل ", "कॉल ") + sosNo(), 'data-act="toast" data-arg="' + esc(L("Calling ", "جارٍ الاتصال ", "कॉल हो रहा है ") + sosNo()) + '"'], ["map", L("Directions", "الاتجاهات", "रास्ता"), 'data-act="toast" data-arg="' + esc(L("Opening maps…", "جارٍ فتح الخرائط…", "मैप्स खुल रहा है…")) + '"']] })] };
+    var sp = parts[1], need = PA.needs.find(function (n) { return n.id === sp; }) || PA.needs[0];
+    if (b === "area") {
+      var a1 = F(0).area.split(",")[0], a2 = F(2).area.split(",")[0];
+      return { at: at, bot: [bub(tx("{0}. Where should the clinic be?", "{0}. أين تريد أن تكون العيادة؟", "{0}। क्लिनिक कहाँ होना चाहिए?", [esc(spec(need.spec))]), at)],
+        replies: [["near", L("Near me (share location)", "بالقرب مني (مشاركة الموقع)", "मेरे पास (लोकेशन भेजें)")], ["a1", a1], ["a2", a2]] };
+    }
+    if (b === "lang") return { at: at, bot: [bub(t("Any language you'd like the doctor to speak?", "هل تفضّل لغة معيّنة للطبيب؟", "डॉक्टर कौन-सी भाषा बोलें?"), at)],
+      replies: g ? [["any", L("Any language", "أي لغة", "कोई भी भाषा")], ["ar", L("Arabic", "العربية", "अरबी")], ["en", L("English", "الإنجليزية", "अंग्रेज़ी")]] : [["any", L("Any language", "أي لغة", "कोई भी भाषा")], ["hi", L("Hindi", "الهندية", "हिंदी")], ["kn", L("Kannada", "الكنادية", "कन्नड़")]] };
+    if (b === "docs") {
+      var o = PA.options[sp] || PA.options.gm;
+      var rows = o.map(function (x, i) { return [String(i), NB.dname(NB.doc(x.d)) + " · " + fshort(x.f), L("Wait now ~", "الانتظار الآن ~", "अभी इंतज़ार ~") + x.wait + " " + L("min", "د", "मि") + " · " + x.km + " km · " + plain(NB.money(x.fee))]; });
+      var od = otherDoc(); rows.push(["x", od.n + " · " + od.c, L("Wait now ~", "الانتظار الآن ~", "अभी इंतज़ार ~") + "35–45 " + L("min", "د", "मि") + " · 6.4 km · " + plain(NB.money(650))]);
+      return { at: at, list: { title: L("Near you · live wait", "بالقرب منك · الانتظار المباشر", "आपके पास · लाइव इंतज़ार"), rows: rows },
+        bot: [bub(tx("{0} doctors near you. The wait is live from each clinic's queue.", "{0} أطباء بالقرب منك. وقت الانتظار مباشر من طابور كل عيادة.", "आपके पास {0} डॉक्टर। इंतज़ार हर क्लिनिक की क़तार से लाइव है।", [nm(rows.length)]), at, openBtn(L("See doctors", "عرض الأطباء", "डॉक्टर देखें")))] };
+    }
+    var op = findOpt(sp, parts[2]);
+    if (b === "conf") return { at: at, bot: [bub(tt(esc(op.name)) + esc(op.clinic) + " · " + nm(op.km + " km") + "\n" + tx("Next time: today {0} · expected wait at the clinic ~{1} min", "أقرب وقت: اليوم {0} · الانتظار المتوقع في العيادة ~{1} د", "अगला समय: आज {0} · क्लिनिक पर अनुमानित इंतज़ार ~{1} मि", [nm(op.slot), nm(op.w)]) + "\n" +
+      tx("Fee {0} · pay at the clinic or online", "الرسوم {0} · الدفع في العيادة أو عبر الإنترنت", "फ़ीस {0} · क्लिनिक पर या ऑनलाइन", [NB.money(op.fee)]), at)],
+      replies: [["ok", L("Book ", "احجز ", "बुक करें ") + op.slot], ["back", L("Other doctors", "أطباء آخرون", "दूसरे डॉक्टर")]] };
+    return { at: at, end: true, bot: [bub(tt(t("Booked ✓", "تم الحجز ✓", "बुकिंग पक्की ✓")) + tx("Token {0} · {1} · {2} · today {3}.", "رقم الدور {0} · {1} · {2} · اليوم {3}.", "टोकन {0} · {1} · {2} · आज {3}।", [nm("T-31"), esc(op.name), esc(op.clinic), nm(op.slot)]) + "\n" +
+      t("You're in the clinic's live queue — we'll tell you when to leave home.", "أنت في طابور العيادة المباشر — سنخبرك متى تخرج من المنزل.", "आप क्लिनिक की लाइव क़तार में हैं — घर से निकलने का समय हम बताएँगे।"), at,
+      { btns: [["map", L("Directions", "الاتجاهات", "रास्ता"), 'data-act="toast" data-arg="' + esc(L("Opening maps…", "جارٍ فتح الخرائط…", "मैप्स खुल रहा है…")) + '"'], ["calendar", L("Add to calendar", "أضف إلى التقويم", "कैलेंडर में जोड़ें"), 'data-act="toast" data-arg="' + esc(L("Added to calendar", "أُضيف إلى التقويم", "कैलेंडर में जोड़ा")) + '"']] }),
+      bub(tx("From now on, {0} messages you about this visit. You can come back to Nabd any time to find another doctor.", "من الآن ستراسلك {0} بشأن هذه الزيارة. يمكنك العودة إلى نبض في أي وقت لإيجاد طبيب آخر.", "अब इस विज़िट के बारे में {0} आपको संदेश भेजेगा। दूसरा डॉक्टर ढूँढने के लिए कभी भी Nabd पर लौटें।", [esc(op.clinic)]), at),
+      '<div class="pt-route">' + ui.icon("shieldcheck", "xs") + tx("Nabd shared only your name and phone number with {0}, for this booking.", "شاركت نبض اسمك ورقم هاتفك فقط مع {0} لهذا الحجز.", "Nabd ने इस बुकिंग के लिए {0} से सिर्फ़ आपका नाम और फ़ोन नंबर साझा किया।", [esc(op.clinic)]) + "</div>"] };
+  }
+  SCN.find = { n: 7, label: ["Find a doctor", "ابحث عن طبيب", "डॉक्टर खोजें"], me: ["Deepa Krishnan · new in town", "ديبا كريشنان · جديدة في المدينة", "दीपा कृष्णन · शहर में नई"], pre: ["Hi", "مرحبًا", "नमस्ते"], preAt: "08:49", nums: ["nabd"], stage: findStage };
+
+  /* ---- Scenario: Package card (sessions left, expiry warning, book from chat, pay instalment, gift, upgrade, refund) ---- */
+  function pkgState(p) {
+    var s = "start";
+    p.forEach(function (x) {
+      if (x === "done") { s = "bye"; return; }
+      if (x === "card") { s = "card"; return; }
+      var b = s.split(":")[0];
+      if (b === "start" || b === "card") s = x === "book" ? "slots" : x === "pay" ? "pay" : "more";
+      else if (b === "slots") s = "booked:" + x;
+      else if (b === "booked") s = "pay";
+      else if (b === "pay") s = x === "paynow" ? "paid" : "auto";
+      else if (b === "more") s = x === "gift" ? "gwho" : x === "up" ? "up" : x === "ext" ? "ext" : "rq";
+      else if (b === "gwho") s = "gn:" + x;
+      else if (b === "gn") s = "gok:" + s.slice(3) + ":" + x;
+      else if (b === "gok") s = "gifted:" + s.slice(4);
+      else if (b === "up") s = "upped";
+      else if (b === "ext") s = "exted";
+      else if (b === "rq") s = x === "req" ? "rqsent" : "kept";
+    });
+    return s;
+  }
+  function pkgStage(p, num) {
+    var nabd = num === "nabd", s = pkgState(p), b = s.split(":")[0], parts = s.split(":"), at = hm(9 * 60 + (p.length ? 2 + p.length : 0)), K = PA.pk[0];
+    var who = { latha: L("Latha", "لاثا", "लता"), amma: L("Amma", "أمي", "माँ"), meenu: L("Meenu", "مينو", "मीनू") };
+    var back = [["card", L("Package card", "بطاقة الباقة", "पैकेज कार्ड")], ["done", L("Done", "تم", "हो गया")]];
+    var autoWay = NB.gcc() ? L("card on file", "البطاقة المحفوظة", "सेव कार्ड") : "UPI AutoPay";
+    var card = function (lead) {
+      return bub(fromLine(nabd) + (lead ? esc(lead) + "\n" : "") + tt(tx("Your {0}", "{0} الخاصة بك", "आपका {0}", [esc(L3(K.safe))])) + pips(K.used, K.total) +
+        tx("{0} of {1} sessions used · {2} left", "استُخدمت {0} من {1} جلسات · متبقٍ {2}", "{1} में से {0} सत्र इस्तेमाल · {2} बाकी", [nm(K.used), nm(K.total), "<b>" + nm(K.total - K.used) + "</b>"]) + "\n" +
+        tx("Valid until {0} ({1} days)", "صالحة حتى {0} ({1} يومًا)", "{0} तक मान्य ({1} दिन)", [expDate(K.exp, K.hij), nm(K.days)]) + "\n" +
+        '<span class="pt-warnl">' + ui.icon("clockh", "xs") + tx("30-day reminder: book your {0} sessions so none expire.", "تذكير 30 يومًا: احجز جلساتك الـ{0} حتى لا تنتهي.", "30-दिन रिमाइंडर: अपने {0} सत्र बुक करें ताकि कोई बेकार न जाए।", [nm(K.total - K.used)]) + "</span>" +
+        tx("Next instalment {0} on 20 Oct · {1} is on", "القسط التالي {0} في 20 أكتوبر · {1} مفعّل", "अगली किस्त {0}, 20 अक्टूबर · {1} चालू", [NB.money(2500), esc(autoWay)]) + "\n" +
+        '<span class="pt-scope">' + t("The package name is kept general so lock screens show no health details.", "اسم الباقة عام حتى لا تظهر تفاصيل صحية على شاشة القفل.", "पैकेज का नाम सामान्य रखा गया है ताकि लॉक स्क्रीन पर कोई स्वास्थ्य जानकारी न दिखे।") + "</span>", at);
+    };
+    var main = [["book", L("Book next session", "احجز الجلسة التالية", "अगला सत्र बुक करें")], ["pay", L("Pay instalment", "ادفع القسط", "किस्त भरें")], ["more", L("More options", "خيارات أخرى", "और विकल्प")]];
+    if (b === "start") return { at: at, bot: [card()], replies: main };
+    if (b === "card") return { at: at, bot: [card(L("Here's your package:", "هذه باقتك:", "यह रहा आपका पैकेज:"))], replies: main };
+    if (b === "slots") return { at: at, bot: [bub(tx("Session {0} of {1} · {2}. Pick a time — the expected wait is shown:", "الجلسة {0} من {1} · {2}. اختر وقتًا — يظهر الانتظار المتوقع:", "सत्र {0}/{1} · {2}। समय चुनें — अनुमानित इंतज़ार दिखाया गया है:", [nm(K.used + 1), nm(K.total), esc(physio())]), at)],
+      replies: [["a", L("Mon 19 Oct 17:30", "الاثنين 19 أكتوبر 17:30", "सोम 19 अक्टूबर 17:30")], ["b", L("Wed 21 Oct 08:00 · least wait", "الأربعاء 21 أكتوبر 08:00 · أقل انتظار", "बुध 21 अक्टूबर 08:00 · सबसे कम इंतज़ार")], ["c", L("Sat 24 Oct 10:00", "السبت 24 أكتوبر 10:00", "शनि 24 अक्टूबर 10:00")]] };
+    if (b === "booked") {
+      var sl = { a: L("Mon 19 Oct, 17:30", "الاثنين 19 أكتوبر، 17:30", "सोम 19 अक्टूबर, 17:30"), b: L("Wed 21 Oct, 08:00", "الأربعاء 21 أكتوبر، 08:00", "बुध 21 अक्टूबर, 08:00"), c: L("Sat 24 Oct, 10:00", "السبت 24 أكتوبر، 10:00", "शनि 24 अक्टूबर, 10:00") }[parts[1]];
+      return { at: at, bot: [bub(tt(tx("Booked ✓ Session {0} of {1}", "تم الحجز ✓ الجلسة {0} من {1}", "बुकिंग पक्की ✓ सत्र {0}/{1}", [nm(K.used + 1), nm(K.total)])) + esc(sl) + "\n" +
+        t("A session is used only when your visit is completed. Cancel up to 2 hours before and nothing is used.", "لا تُحتسب الجلسة إلا بعد اكتمال زيارتك. ألغِ قبل ساعتين على الأقل ولن يُحتسب شيء.", "सत्र तभी गिना जाता है जब विज़िट पूरी हो। 2 घंटे पहले तक रद्द करें तो कुछ नहीं गिना जाएगा।"), at)],
+        replies: [["pay", L("Pay instalment", "ادفع القسط", "किस्त भरें")], ["done", L("Done", "تم", "हो गया")]] };
+    }
+    if (b === "pay") return { at: at, bot: [bub(tt(t("Instalment 3 of 3", "القسط 3 من 3", "किस्त 3/3")) + tx("{0} due Tue 20 Oct. {1} collects it on the day — or pay now.", "{0} مستحق الثلاثاء 20 أكتوبر. يُحصَّل عبر {1} في يومه — أو ادفع الآن.", "{0} मंगल 20 अक्टूबर को देय। {1} उसी दिन ले लेगा — या अभी भरें।", [NB.money(2500), esc(autoWay)]), at)],
+      replies: [["paynow", L("Pay ", "ادفع ", "अभी भरें ") + plain(NB.money(2500)) + L(" now", " الآن", "")], ["auto", L("Keep AutoPay", "أبقِ الدفع التلقائي", "AutoPay रहने दें")]] };
+    if (b === "paid") return { at: at, bot: [bub(tt(t("Payment received ✓", "تم استلام الدفع ✓", "भुगतान मिल गया ✓")) + t("All 3 instalments paid — your package is fully paid.", "دُفعت الأقساط الثلاثة — باقتك مدفوعة بالكامل.", "तीनों किस्तें भर दी गईं — आपका पैकेज पूरा भुगतान हो गया।") +
+      lk("nabd.link/rc/0211", L("Receipt (" + NB.mkt().tax + ")", "إيصال (" + NB.mkt().tax + ")", "रसीद (" + NB.mkt().tax + ")")), at)], replies: back };
+    if (b === "auto") return { at: at, bot: [bub(tx("Okay — {0} will be collected on 20 Oct and confirmed here. If it fails we retry once and tell you. After 2 missed instalments, new bookings pause until it's settled.", "حسنًا — سيُحصَّل {0} في 20 أكتوبر ونؤكد هنا. إذا فشل نعيد المحاولة مرة ونخبرك. بعد قسطين فائتين تتوقف الحجوزات الجديدة حتى السداد.", "ठीक है — {0} 20 अक्टूबर को लिया जाएगा और यहाँ पुष्टि होगी। विफल होने पर एक बार फिर कोशिश करेंगे और बताएँगे। 2 किस्तें छूटने पर भुगतान तक नई बुकिंग रुकेगी।", [NB.money(2500)]), at)], replies: back };
+    if (b === "more") return { at: at, bot: [bub(t("What would you like to do?", "ماذا تريد أن تفعل؟", "आप क्या करना चाहेंगे?"), at, { btns: [["list", L("Options", "الخيارات", "विकल्प"), 'aria-hidden="true"']] })],
+      list: { title: L("Package options", "خيارات الباقة", "पैकेज विकल्प"), rows: [
+        ["gift", L("Gift sessions to family", "أهدِ جلسات لعائلتك", "परिवार को सत्र उपहार दें"), L("Once per package · expiry stays the same", "مرة واحدة لكل باقة · لا يتغير تاريخ الانتهاء", "हर पैकेज में एक बार · समाप्ति वही रहेगी")],
+        ["up", L("Upgrade to 15 sessions", "الترقية إلى 15 جلسة", "15 सत्र में अपग्रेड"), L("Pay only the difference", "ادفع الفرق فقط", "सिर्फ़ अंतर भरें")],
+        ["ext", L("Extend validity", "تمديد الصلاحية", "वैधता बढ़ाएँ"), L("Add 30 days", "أضف 30 يومًا", "30 दिन जोड़ें")],
+        ["refund", L("Cancel & refund", "الإلغاء والاسترداد", "रद्द करें और रिफ़ंड"), L("See your quote first", "اطّلع على المبلغ أولًا", "पहले अपना हिसाब देखें")]] } };
+    if (b === "gwho") return { at: at, bot: [bub(t("Who should get the sessions? They need to be in your Nabd family.", "لمن الجلسات؟ يجب أن يكون من عائلتك في نبض.", "सत्र किसे देने हैं? उन्हें आपके Nabd परिवार में होना चाहिए।"), at)],
+      replies: [["latha", L("Latha (wife)", "لاثا (الزوجة)", "लता (पत्नी)")], ["amma", L("Amma (mother)", "أمي", "माँ")], ["meenu", L("Meenu (daughter)", "مينو (الابنة)", "मीनू (बेटी)")]] };
+    if (b === "gn") return { at: at, bot: [bub(tx("How many sessions for {0}?", "كم جلسة لـ{0}؟", "{0} के लिए कितने सत्र?", [esc(who[parts[1]])]), at)],
+      replies: [["1", L("1 session", "جلسة واحدة", "1 सत्र")], ["2", L("2 sessions", "جلستان", "2 सत्र")], ["4", L("All 4", "الأربع كلها", "सभी 4")]] };
+    if (b === "gok") {
+      var gw = who[parts[1]], gn = parts[2];
+      return { at: at, bot: [code(at), bub(tx("Approve with the code above. {0} gets her own package card for {1} session(s). The expiry stays {2}. This is the only transfer allowed on this package.", "وافق بالرمز أعلاه. تحصل {0} على بطاقة باقة خاصة بها لـ{1} جلسة. يبقى تاريخ الانتهاء {2}. هذا هو النقل الوحيد المسموح لهذه الباقة.", "ऊपर के कोड से मंज़ूर करें। {0} को {1} सत्र का अपना पैकेज कार्ड मिलेगा। समाप्ति {2} ही रहेगी। इस पैकेज पर बस यही एक ट्रांसफ़र हो सकता है।", [esc(gw), nm(gn), nm(K.exp)]) +
+        (parts[1] === "latha" ? "\n" + t("Latha accepts on her own phone.", "تقبل لاثا من هاتفها.", "लता अपने फ़ोन पर स्वीकार करेंगी।") : parts[1] === "meenu" ? "\n" + t("Meenu is under 18 — you accept for her as guardian.", "مينو دون 18 — تقبل عنها بصفتك ولي الأمر.", "मीनू 18 से कम है — अभिभावक के रूप में आप स्वीकार करेंगे।") : ""), at)],
+        replies: [["ok", L("Approve gift", "وافق على الإهداء", "उपहार मंज़ूर करें")], ["card", L("Cancel", "إلغاء", "रद्द करें")]] };
+    }
+    if (b === "gifted") return { at: at, end: true, bot: [bub(tt(t("Gift sent ✓", "أُرسل الإهداء ✓", "उपहार भेजा ✓")) + tx("{0} session(s) now belong to {1}. You have {2} left.", "أصبحت {0} جلسة لـ{1}. متبقٍ لك {2}.", "{0} सत्र अब {1} के हैं। आपके पास {2} बाकी।", [nm(parts[2]), esc(who[parts[1]]), nm(K.total - K.used - +parts[2])]), at)] };
+    if (b === "up") return { at: at, bot: [bub(tt(t("Upgrade to 15 sessions", "الترقية إلى 15 جلسة", "15 सत्र में अपग्रेड")) +
+      tx("Unused: {0} of {1} sessions", "غير المستخدم: {0} من {1} جلسات", "बचे हुए: {1} में से {0} सत्र", [nm(4), nm(10)]) + "\n" +
+      tx("Credit: 4 ÷ 10 × {0} paid = {1}", "الرصيد: 4 ÷ 10 × {0} مدفوع = {1}", "क्रेडिट: 4 ÷ 10 × {0} भुगतान = {1}", [NB.money(7500), NB.money(3000)]) + "\n" +
+      tx("15-session package: {0}", "باقة 15 جلسة: {0}", "15-सत्र पैकेज: {0}", [NB.money(10500)]) + "\n<b>" + tx("Difference to pay: {0}", "الفرق المطلوب: {0}", "भरना है: {0}", [NB.money(7500)]) + "</b>\n" +
+      tx("Your open instalment ({0}) is settled first. The clinic issues a credit note and a new invoice.", "يُسدَّد قسطك المفتوح ({0}) أولًا. تُصدر العيادة إشعارًا دائنًا وفاتورة جديدة.", "पहले आपकी खुली किस्त ({0}) चुकाई जाएगी। क्लिनिक क्रेडिट नोट और नया इनवॉइस जारी करेगा।", [NB.money(2500)]), at)],
+      replies: [["upok", L("Upgrade", "ترقية", "अपग्रेड करें")], ["card", L("Not now", "ليس الآن", "अभी नहीं")]] };
+    if (b === "upped") return { at: at, end: true, bot: [bub(tt(t("Upgrade ready ✓", "الترقية جاهزة ✓", "अपग्रेड तैयार ✓")) + t("Pay securely to start your new 15-session card. Your 6 used sessions stay in your history.", "ادفع بأمان لتفعيل بطاقتك الجديدة بـ15 جلسة. تبقى جلساتك الست المستخدمة في سجلك.", "नया 15-सत्र कार्ड शुरू करने के लिए सुरक्षित भुगतान करें। आपके 6 इस्तेमाल सत्र इतिहास में रहेंगे।") +
+      lk("nabd.link/p/0211U", L("Payment link · ", "رابط الدفع · ", "पेमेंट लिंक · ") + plain(NB.money(10000))), at, { btns: [["wallet", L("Pay", "ادفع", "भुगतान करें")]] })] };
+    if (b === "ext") return { at: at, bot: [bub(tx("Extend by 30 days for {0} (the clinic's extension fee). The clinic can also extend for free in special cases — just ask at the desk.", "مدّد 30 يومًا مقابل {0} (رسوم التمديد لدى العيادة). يمكن للعيادة التمديد مجانًا في حالات خاصة — اسأل في الاستقبال.", "{0} (क्लिनिक का एक्सटेंशन शुल्क) में 30 दिन बढ़ाएँ। ख़ास मामलों में क्लिनिक मुफ़्त भी बढ़ा सकता है — डेस्क पर पूछें।", [NB.money(600)]), at)],
+      replies: [["extok", L("Extend 30 days", "مدّد 30 يومًا", "30 दिन बढ़ाएँ")], ["card", L("Not now", "ليس الآن", "अभी नहीं")]] };
+    if (b === "exted") return { at: at, end: true, bot: [bub(tt(t("Extended ✓", "تم التمديد ✓", "बढ़ा दिया ✓")) + tx("Now valid until {0}.", "صالحة الآن حتى {0}.", "अब {0} तक मान्य।", [expDate("14 Dec 2026", ["3 Rajab 1448", "3 رجب 1448"])]), at)] };
+    if (b === "rq") return { at: at, bot: [bub(tt(t("Your refund quote", "مبلغ الاسترداد", "आपका रिफ़ंड हिसाब")) +
+      tx("Paid so far: {0}", "المدفوع حتى الآن: {0}", "अब तक भुगतान: {0}", [NB.money(5000)]) + "\n" +
+      tx("Used: 6 sessions × {0} single-session price = {1}", "المستخدم: 6 جلسات × {0} سعر الجلسة المفردة = {1}", "इस्तेमाल: 6 सत्र × {0} एकल-सत्र मूल्य = {1}", [NB.money(900), NB.money(5400)]) + "\n" +
+      t("Cancellation fee: none", "رسوم الإلغاء: لا شيء", "रद्द करने का शुल्क: कोई नहीं") + "\n<b>" + tx("You'd owe {0}", "سيكون عليك {0}", "आपको {0} देने होंगे", [NB.money(400)]) + "</b> · " + tx("instalment 3 ({0}) is cancelled", "يُلغى القسط 3 ({0})", "किस्त 3 ({0}) रद्द होगी", [NB.money(2500)]), at)],
+      replies: [["keep", L("Keep my package", "أبقِ باقتي", "पैकेज रखें")], ["req", L("Cancel anyway", "ألغِ على أي حال", "फिर भी रद्द करें")]] };
+    if (b === "kept") return { at: at, end: true, bot: [bub(t("Great — your 4 sessions are waiting. Book any time from this chat.", "رائع — جلساتك الأربع بانتظارك. احجز في أي وقت من هذه المحادثة.", "बढ़िया — आपके 4 सत्र इंतज़ार कर रहे हैं। इसी चैट से कभी भी बुक करें।"), at)] };
+    if (b === "rqsent") return { at: at, end: true, bot: [bub(tt(t("Cancellation requested", "طُلب الإلغاء", "रद्द करने का अनुरोध भेजा")) + tx("The clinic confirms the final amount before anything is charged. Bookings on this package pause until then. Ref {0}.", "تؤكد العيادة المبلغ النهائي قبل أي تحصيل. تتوقف حجوزات هذه الباقة حتى ذلك الحين. المرجع {0}.", "कुछ भी लेने से पहले क्लिनिक अंतिम राशि की पुष्टि करेगा। तब तक इस पैकेज पर बुकिंग रुकी रहेगी। संदर्भ {0}।", [nm("RF-0019")]), at)] };
+    return { at: at, end: true, bot: [bub(t("Okay! Send PACKAGE any time to see this card.", "حسنًا! أرسل «باقة» في أي وقت لرؤية هذه البطاقة.", "ठीक है! यह कार्ड देखने के लिए कभी भी PACKAGE भेजें।"), at)] };
+  }
+  SCN.pkg = { n: 8, label: ["Package", "الباقة", "पैकेज"], me: ["Rakesh Menon · 10-session package", "راكيش مينون · باقة 10 جلسات", "राकेश मेनन · 10-सत्र पैकेज"], nums: ["clinic", "nabd"], stage: pkgStage };
+
+  /* ---- Scenario: Recall (doctor-ordered follow-up / chronic review → one-tap booking) ---- */
+  function recallState(p) {
+    var s = "start";
+    p.forEach(function (x) {
+      var b = s.split(":")[0];
+      if (b === "start") s = x === "ok" ? "bk:ok" : x === "other" ? "slots" : "later";
+      else if (b === "slots") s = "bk:" + x;
+      else if (b === "bk") s = x === "amma" ? "both" : "solo";
+    });
+    return s;
+  }
+  function recallStage(p, num) {
+    var nabd = num === "nabd", s = recallState(p), b = s.split(":")[0], at = hm(9 * 60 + 5 + p.length), D = NB.dname(NB.doc("d2"));
+    var SL = { ok: L("Sat 24 Oct, 09:20", "السبت 24 أكتوبر، 09:20", "शनि 24 अक्टूबर, 09:20"), s1: L("Sat 24 Oct, 11:00", "السبت 24 أكتوبر، 11:00", "शनि 24 अक्टूबर, 11:00"), s2: L("Mon 26 Oct, 18:00", "الاثنين 26 أكتوبر، 18:00", "सोम 26 अक्टूबर, 18:00"), s3: L("Wed 28 Oct, 09:40", "الأربعاء 28 أكتوبر، 09:40", "बुध 28 अक्टूबर, 09:40") };
+    if (b === "start") return { at: at, bot: [bub(fromLine(nabd) + tt(t("Time for your review", "حان موعد مراجعتك", "आपकी जाँच का समय")) +
+      tx("Hello Rakesh, {0} asked to see you again around now for your regular review.", "مرحبًا راكيش، طلب {0} رؤيتك مجددًا في هذا الوقت لمراجعتك الدورية.", "नमस्ते राकेश, {0} ने आपको अपनी नियमित जाँच के लिए अभी के आसपास फिर बुलाया है।", [esc(D)]) + "\n" +
+      tx("Your care plan covers this visit (5 of 8) — nothing to pay.", "تغطي خطة الرعاية هذه الزيارة (5 من 8) — لا شيء للدفع.", "आपका केयर प्लान यह विज़िट कवर करता है (8 में से 5) — कुछ नहीं भरना।", []) + "\n" +
+      tx("Suggested: {0} · usually a short wait.", "المقترح: {0} · عادةً انتظار قصير.", "सुझाव: {0} · आमतौर पर कम इंतज़ार।", [esc(SL.ok)]), at)],
+      replies: [["ok", L("Book Sat 24 Oct 09:20", "احجز السبت 24 أكتوبر 09:20", "शनि 24 अक्टूबर 09:20 बुक करें")], ["other", L("Other times", "أوقات أخرى", "दूसरे समय")], ["later", L("Remind me next week", "ذكّرني الأسبوع القادم", "अगले हफ़्ते याद दिलाएँ")]] };
+    if (b === "slots") return { at: at, bot: [bub(t("Here are other times with the expected wait:", "هذه أوقات أخرى مع الانتظار المتوقع:", "ये दूसरे समय हैं, अनुमानित इंतज़ार के साथ:"), at, { btns: [["list", L("See times", "عرض الأوقات", "समय देखें"), 'aria-hidden="true"']] })],
+      list: { title: L("Free times", "الأوقات المتاحة", "ख़ाली समय"), rows: [["s1", SL.s1, L("~15 min wait", "انتظار ~15 د", "~15 मि इंतज़ार")], ["s2", SL.s2, L("~5 min wait", "انتظار ~5 د", "~5 मि इंतज़ार")], ["s3", SL.s3, L("~10 min wait", "انتظار ~10 د", "~10 मि इंतज़ार")]] } };
+    if (b === "bk") return { at: at, bot: [bub(tt(t("Booked ✓", "تم الحجز ✓", "बुकिंग पक्की ✓")) + esc(SL[s.split(":")[1]] || SL.ok) + " · " + esc(D) + " · " + esc(fshort(0)) + "\n" +
+      t("Before you come, read the short prep note — it opens with a code.", "قبل حضورك، اقرأ ملاحظة التحضير القصيرة — تُفتح برمز.", "आने से पहले छोटा तैयारी नोट पढ़ें — यह कोड से खुलता है।") + lk("nabd.link/pp/RV24", L("Prep note · opens with a one-time code", "ملاحظة التحضير · تُفتح برمز لمرة واحدة", "तैयारी नोट · एक बार के कोड से खुलता है")), at,
+      { btns: [["calendar", L("Add to calendar", "أضف إلى التقويم", "कैलेंडर में जोड़ें"), 'data-act="toast" data-arg="' + esc(L("Added to calendar", "أُضيف إلى التقويم", "कैलेंडर में जोड़ा")) + '"']] }),
+      bub(t("Amma's yearly check-up is due too. Book her right after you, with the same doctor?", "فحص أمك السنوي مستحق أيضًا. هل نحجز لها بعدك مباشرة مع الطبيب نفسه؟", "माँ की सालाना जाँच भी बाकी है। उन्हें आपके ठीक बाद, उसी डॉक्टर से बुक करें?"), at)],
+      replies: [["amma", L("Book Amma right after", "احجز لأمي بعدي مباشرة", "माँ को ठीक बाद बुक करें")], ["no", L("Not now", "ليس الآن", "अभी नहीं")]] };
+    if (b === "both") return { at: at, end: true, bot: [bub(tt(t("Both booked ✓", "تم حجز الموعدين ✓", "दोनों बुक ✓")) + t("You first, then Amma 20 minutes later. One reminder for both of you the day before — Amma also gets it as a voice message.", "أنت أولًا ثم أمك بعد 20 دقيقة. تذكير واحد لكما قبلها بيوم — وتصل أمك رسالة صوتية أيضًا.", "पहले आप, फिर 20 मिनट बाद माँ। एक दिन पहले दोनों के लिए एक रिमाइंडर — माँ को वॉइस मैसेज भी।"), at)] };
+    if (b === "solo") return { at: at, end: true, bot: [bub(t("Okay. We'll remind you the day before.", "حسنًا. سنذكّرك قبلها بيوم.", "ठीक है। एक दिन पहले याद दिलाएँगे।"), at)] };
+    return { at: at, end: true, bot: [bub(tx("Okay — we'll remind you on {0}. If we don't hear back, the clinic may give you a call.", "حسنًا — سنذكّرك في {0}. إن لم نسمع منك، قد تتصل بك العيادة.", "ठीक है — {0} को याद दिलाएँगे। जवाब न मिलने पर क्लिनिक आपको कॉल कर सकता है।", [esc(L("Sat 24 Oct", "السبت 24 أكتوبر", "शनि 24 अक्टूबर"))]) + "\n" +
+      t("Reply STOP REVIEWS to stop review reminders.", "أرسل «إيقاف المراجعات» لإيقاف تذكيرات المراجعة.", "जाँच रिमाइंडर रोकने के लिए STOP REVIEWS भेजें।"), at)] };
+  }
+  SCN.recall = { n: 9, label: ["Recall", "تذكير المتابعة", "रिकॉल"], me: ["Rakesh Menon · regular review due", "راكيش مينون · مراجعة دورية مستحقة", "राकेश मेनन · नियमित जाँच बाकी"], nums: ["clinic", "nabd"], stage: recallStage };
+
+  /* ---- Scenario: SMS fallback when WhatsApp isn't delivered (India DLT: registered header + template; GCC: registered sender) ---- */
+  function smsMeta() {
+    var m = NB.mkt().id, hi = NB.state.lang === "hi", ar = NB.state.lang === "ar";
+    if (m === "india") return { from: "VM-SUVCLN", otpFrom: "VM-NABDHL", reg: L("DLT-registered sender", "مرسل مسجّل في DLT", "DLT-पंजीकृत प्रेषक"),
+      note: "DLT · " + L("header", "المرسل", "हेडर") + " SUVCLN · " + L("template ID", "معرّف القالب", "टेम्पलेट ID") + " " + (hi ? "1207172934810562384" : "1207172934810562371") + " · PE ID 1201169274536601840 · " + L("service-implicit", "خدمي ضمني", "सर्विस-इम्प्लिसिट") + (hi ? " · " + L("Hindi (Unicode) template", "قالب هندي (يونيكود)", "हिंदी (यूनिकोड) टेम्पलेट") : ""),
+      otpNote: "DLT · " + L("header", "المرسل", "हेडर") + " NABDHL · " + L("template ID", "معرّف القالب", "टेम्पलेट ID") + " 1207172934810577015 · OTP" };
+    var reg = { uae: ["TDRA", "هيئة تنظيم الاتصالات"], ksa: ["CST", "هيئة الاتصالات والفضاء والتقنية"], qatar: ["CRA", "هيئة تنظيم الاتصالات"] }[m];
+    return { from: "ALNOOR", otpFrom: "NABD", reg: L("Registered sender ID", "معرّف مرسل مسجّل", "पंजीकृत प्रेषक ID"),
+      note: L("Sender ID registered with " + reg[0], "معرّف المرسل مسجّل لدى " + reg[1], "प्रेषक ID " + reg[0] + " में पंजीकृत") + " · " + L("template", "القالب", "टेम्पलेट") + " REM-04" + (ar ? " (AR)" : " (EN)"),
+      otpNote: L("Sender ID registered with " + reg[0], "معرّف المرسل مسجّل لدى " + reg[1], "प्रेषक ID " + reg[0] + " में पंजीकृत") + " · " + L("template", "القالب", "टेम्पलेट") + " OTP-01" };
+  }
+  function sms(html, at) { return '<div class="pt-smsb">' + html + '<span class="pt-ts">' + at + "</span></div>"; }
+  function sysn(html, icon) { return '<div class="pt-sysn">' + ui.icon(icon || "info", "xs") + "<span>" + html + "</span></div>"; }
+  function smsStage(p) {
+    var M = smsMeta(), C = fshort(0);
+    var dlv = '<div class="pt-dlv"><b>' + t("Delivery", "التسليم", "डिलीवरी") + "</b>" +
+      [["ok", "check", L("Sent on WhatsApp", "أُرسلت عبر واتساب", "व्हाट्सऐप पर भेजा"), "11:20"], ["bad", "close", L("Not delivered after 10 min", "لم تُسلَّم بعد 10 دقائق", "10 मिनट बाद भी नहीं पहुँचा"), "11:30"], ["ok", "check", L("Sent as SMS instead", "أُرسلت كرسالة SMS بدلًا من ذلك", "इसके बजाय SMS भेजा"), "11:30"], ["ok", "checkcircle", L("SMS delivered", "سُلّمت الرسالة", "SMS पहुँच गया"), "11:30"]].map(function (r) {
+        return '<span class="r ' + r[0] + '">' + ui.icon(r[1], "xs") + "<span>" + esc(r[2]) + "</span>" + nm(r[3]) + "</span>"; }).join("") + "</div>";
+    var body1 = L("Dear Kavya, your visit at " + C + " is on 17-10-2026 at 11:40, token T-26. Track your turn: nabd.link/q/T26 -SUVCLN",
+      "عزيزتي كافيا، موعد زيارتك في " + C + " يوم 17-10-2026 الساعة 11:40، رقم الدور T-26. تابعي دورك: nabd.link/q/T26",
+      "प्रिय काव्या, " + C + " में आपकी विज़िट 17-10-2026 को 11:40 बजे है, टोकन T-26. अपनी बारी देखें: nabd.link/q/T26 -SUVCLN");
+    if (NB.gcc()) body1 = body1.replace(" -SUVCLN", "");
+    var first = [dlv, sysn(esc(M.note), "shieldcheck"), sms(esc(body1).replace("nabd.link/q/T26", '<span class="ltr pt-smsl">nabd.link/q/T26</span>'), "11:30")];
+    if (!p.length) return { at: "11:30", silent: true, bot: first, replies: [["open", L("Tap the link (demo)", "اضغط الرابط (عرض)", "लिंक दबाएँ (डेमो)")]] };
+    var otp = L("482913 is your Nabd code to open your visit page. Valid 10 min. Do not share it. -NABDHL", "482913 هو رمزك من نبض لفتح صفحة زيارتك. صالح 10 دقائق. لا تشاركه.", "482913 आपका Nabd कोड है, विज़िट पेज खोलने के लिए। 10 मिनट मान्य। किसी से साझा न करें। -NABDHL");
+    if (NB.gcc()) otp = otp.replace(" -NABDHL", "");
+    return { at: "11:31", end: true, silent: true, bot: [sysn(t("Secure page opened in the browser — it asks for a one-time code", "فُتحت الصفحة الآمنة في المتصفح — تطلب رمزًا لمرة واحدة", "ब्राउज़र में सुरक्षित पेज खुला — यह एक बार का कोड माँगता है"), "lock"),
+      '<div class="pt-smsfrom">' + esc(M.otpFrom) + "</div>", sysn(esc(M.otpNote), "shieldcheck"), sms(esc(otp).replace("482913", '<b class="ltr">482913</b>'), "11:31")] };
+  }
+  SCN.sms = { n: 10, label: ["SMS fallback", "رسالة SMS بديلة", "SMS विकल्प"], me: ["Kavya Reddy · phone not on WhatsApp", "كافيا ريدي · الهاتف بلا واتساب", "काव्या रेड्डी · फ़ोन पर व्हाट्सऐप नहीं"], sms: true, stage: smsStage };
+  SCN.book.nums = ["clinic", "nabd"];
+
+  var SCN_ORDER = ["book", "queue", "after", "consent", "care", "records", "find", "pkg", "recall", "sms"];
 
   NB.screen("whatsapp.chat", function (c) {
     var cur = NB.v("waScn", "book"), sc = SCN[cur] || SCN.book, ch = NB.v("waCh", []);
+    var nums = sc.nums || ["clinic"], num = nums.indexOf(NB.v("waNum", "clinic")) >= 0 ? NB.v("waNum", "clinic") : nums[0], nabd = num === "nabd";
     var h = '<div class="pt-wa-shell">';
     h += '<div class="pt-scn" role="tablist" aria-label="' + t("Scenarios", "السيناريوهات", "परिदृश्य") + '">' + SCN_ORDER.map(function (k) {
       var s = SCN[k];
       return '<button role="tab" class="' + (k === cur ? "on" : "") + '" aria-selected="' + (k === cur) + '" data-act="ptWaScn" data-arg="' + k + '">' + esc(L3(s.label)) + "</button>";
     }).join("") + "</div>";
+    // Which number the chat comes from: the clinic's own WhatsApp number or the shared Nabd number.
+    if (!sc.sms) {
+      h += '<div class="pt-chsw"><span class="lb">' + t("Chat with", "المحادثة مع", "चैट किससे") + "</span>" + (nums.length > 1
+        ? '<div class="seg" role="tablist">' + [["clinic", L("Clinic's own number", "رقم العيادة", "क्लिनिक का नंबर"), "building"], ["nabd", L("Nabd number", "رقم نبض", "Nabd नंबर"), "logo"]].map(function (o) {
+            return '<button role="tab" class="' + (num === o[0] ? "on" : "") + '" aria-selected="' + (num === o[0]) + '" data-act="ptWaNum" data-arg="' + o[0] + '">' + ui.icon(o[2], "xs") + esc(o[1]) + "</button>"; }).join("") + "</div>"
+        : '<span class="pill ' + (nabd ? "acc" : "mute") + '">' + ui.icon(nabd ? "logo" : "building") + esc(nabd ? L("Nabd number only", "رقم نبض فقط", "सिर्फ़ Nabd नंबर") : L("Clinic's own number", "رقم العيادة", "क्लिनिक का नंबर")) + "</span>" +
+          (nabd ? '<span class="fl small faint">' + t("Discovery runs only here", "البحث يعمل هنا فقط", "खोज सिर्फ़ यहीं होती है") + "</span>" : "")) + "</div>";
+    }
     // Build conversation
     var body = '<div class="wa-day">' + t("Today", "اليوم", "आज") + "</div>", done = false, lastAt = "09:40";
-    if (sc.pre) body += '<div class="bub out pt-b">' + esc(L3(sc.pre)) + '<span class="pt-ts">' + (cur === "care" ? "07:11" : "09:39") + '<span class="pt-tick">✓✓</span></span></div>';
+    if (nabd && cur !== "find") body += '<div class="pt-route">' + ui.icon("logo", "xs") + tx("Shared Nabd number · this chat is linked to {0}. Send CLINICS to switch.", "رقم نبض المشترك · هذه المحادثة مرتبطة بـ{0}. أرسل «العيادات» للتبديل.", "साझा Nabd नंबर · यह चैट {0} से जुड़ी है। बदलने के लिए CLINICS भेजें।", [esc(WA_CLINIC())]) + "</div>";
+    if (sc.pre) body += '<div class="bub out pt-b">' + esc(L3(sc.pre)) + '<span class="pt-ts">' + (sc.preAt || (cur === "care" ? "07:11" : "09:39")) + '<span class="pt-tick">✓✓</span></span></div>';
     for (var k = 0; k <= ch.length; k++) {
-      var st = sc.stage(ch.slice(0, k));
+      var st = sc.stage(ch.slice(0, k), num);
       if (!st) break;
       body += st.bot.join("");
       lastAt = st.at;
       if (k < ch.length) {
         var opts = (st.replies || []).concat(st.list ? st.list.rows : []);
         var picked = opts.find(function (r) { return r[0] === ch[k]; });
-        body += '<div class="bub out pt-b">' + esc(picked ? picked[1] : ch[k]) + '<span class="pt-ts">' + st.at + '<span class="pt-tick">✓✓</span></span></div>';
+        if (!st.silent) body += '<div class="bub out pt-b">' + esc(picked ? picked[1] : ch[k]) + '<span class="pt-ts">' + st.at + '<span class="pt-tick">✓✓</span></span></div>';
       } else if (st.end) { done = true; }
       else if (st.list) {
         body += '<div class="pt-wl"><div class="hd">' + esc(st.list.title) + "</div>" + st.list.rows.map(function (r) {
-          return '<button data-act="ptWa" data-arg="' + esc(r[0]) + '"><div class="t"><b>' + esc(r[1]) + "</b><small>" + esc(r[2]) + '</small></div><span class="rd"></span></button>';
+          return (r[3] ? '<div class="sh">' + esc(r[3]) + "</div>" : "") + '<button data-act="ptWa" data-arg="' + esc(r[0]) + '"><div class="t"><b>' + esc(r[1]) + "</b><small>" + esc(r[2]) + '</small></div><span class="rd"></span></button>';
         }).join("") + "</div>";
       } else if (st.replies) {
-        body += '<div class="pt-wrb">' + st.replies.map(function (r) { return '<button data-act="ptWa" data-arg="' + esc(r[0]) + '">' + ui.icon("arrowright", "xs flip") + esc(r[1]) + "</button>"; }).join("") + "</div>";
+        body += '<div class="' + (sc.sms ? "pt-demo" : "pt-wrb") + '">' + st.replies.map(function (r) { return '<button data-act="ptWa" data-arg="' + esc(r[0]) + '">' + ui.icon(sc.sms ? "link" : "arrowright", "xs flip") + esc(r[1]) + "</button>"; }).join("") + "</div>";
       }
     }
-    if (done) body += '<div class="pt-wa-end">' + ui.icon("lock", "xs") + " " + t("No health details were sent in this chat — only links that open with a code.", "لم تُرسل أي تفاصيل صحية في هذه المحادثة — روابط تُفتح برمز فقط.", "इस चैट में कोई स्वास्थ्य जानकारी नहीं भेजी गई — सिर्फ़ कोड से खुलने वाले लिंक।") + "</div>";
+    if (done && sc.sms) body += '<div class="pt-wa-end">' + ui.icon("lock", "xs") + " " + (NB.gcc() ? t("Both texts used registered templates and sender IDs. No health details — only a link that opens with a code.", "استخدمت الرسالتان قوالب ومعرّفات مرسل مسجّلة. لا تفاصيل صحية — رابط يُفتح برمز فقط.", "दोनों SMS पंजीकृत टेम्पलेट और प्रेषक ID से गए। कोई स्वास्थ्य जानकारी नहीं — सिर्फ़ कोड से खुलने वाला लिंक।")
+      : t("Both texts matched DLT-registered templates — operators block anything else. No health details, and one STOP opts out of SMS and WhatsApp together.", "طابقت الرسالتان قوالب مسجّلة في DLT — يحظر المشغّلون أي شيء آخر. لا تفاصيل صحية، و«STOP» واحدة تلغي الاشتراك في الرسائل وواتساب معًا.", "दोनों SMS DLT-पंजीकृत टेम्पलेट से मेल खाते थे — ऑपरेटर बाकी सब रोक देते हैं। कोई स्वास्थ्य जानकारी नहीं, और एक STOP से SMS और व्हाट्सऐप दोनों बंद।")) + "</div>";
+    else if (done) body += '<div class="pt-wa-end">' + ui.icon("lock", "xs") + " " + t("No health details were sent in this chat — only links that open with a code.", "لم تُرسل أي تفاصيل صحية في هذه المحادثة — روابط تُفتح برمز فقط.", "इस चैट में कोई स्वास्थ्य जानकारी नहीं भेजी गई — सिर्फ़ कोड से खुलने वाले लिंक।") + "</div>";
     // Tap counter / context line
     var taps = ch.length + (done ? 0 : 0), secs = 6 + taps * 8;
     var meta = cur === "book" ? (done ? '<span class="fl okc">' + ui.icon("checkcircle", "xs") + " <b>" + esc(L("Booked in " + taps + " taps · " + secs + " s", "حُجز في " + taps + " نقرات · " + secs + " ث", taps + " टैप में बुक · " + secs + " सेकंड")) + "</b> · " + t("target under 60 s", "الهدف أقل من 60 ث", "लक्ष्य 60 सेकंड से कम") + "</span>"
       : '<span class="fl"><b>' + esc(L("Tap " + taps + " · 0:" + (secs < 10 ? "0" : "") + secs, "نقرة " + taps + " · 0:" + (secs < 10 ? "0" : "") + secs, "टैप " + taps + " · 0:" + (secs < 10 ? "0" : "") + secs)) + "</b> · " + t("buttons only, no typing", "أزرار فقط بلا كتابة", "सिर्फ़ बटन, टाइपिंग नहीं") + "</span>")
       : '<span class="fl">' + ui.icon("user", "xs") + " " + esc(L3(sc.me)) + "</span>";
     h += '<div class="pt-scm">' + meta + '<button data-act="ptWaScn" data-arg="' + cur + '">' + ui.icon("refresh", "xs") + t("Restart", "إعادة", "फिर से") + "</button></div>";
+    if (sc.sms) {
+      // Phone's own Messages app (theme tokens, not WhatsApp's).
+      var M = smsMeta();
+      h += '<div class="pt-sms"><div class="pt-sms-h"><button class="hb" title="' + t("Back", "رجوع", "वापस") + '">' + ui.icon("chevleft", "sm flip") + '</button><span class="av">' + ui.icon("chat", "sm") + '</span><div class="fl" style="min-width:0"><b class="ltr">' + esc(M.from) + "</b><small>" + esc(L("Text message · ", "رسالة نصية · ", "टेक्स्ट मैसेज · ") + M.reg) + "</small></div></div>";
+      h += '<div class="pt-sms-b" id="pt-wa-b">' + body.replace('<div class="wa-day">', '<div class="pt-smsday">') + "</div>";
+      h += '<div class="pt-sms-in"><span>' + t("Text message", "رسالة نصية", "टेक्स्ट मैसेज") + "</span>" + ui.icon("send", "sm faint flip") + "</div></div></div>";
+      return h;
+    }
     h += '<div class="wa">';
-    h += '<div class="wa-h pt-wa-h"><button class="hb" title="' + t("Back", "رجوع", "वापस") + '">' + ui.icon("chevleft", "sm flip") + "</button>" + '<span class="av">' + ui.icon("logo", "sm") + '</span><div class="fl" style="min-width:0"><b>' + esc(WA_CLINIC()) + '<span class="pt-vf" title="' + t("Verified business", "نشاط تجاري موثّق", "सत्यापित व्यवसाय") + '">' + ui.icon("check") + "</span></b><small>" + t("Official business account", "حساب أعمال رسمي", "आधिकारिक बिज़नेस अकाउंट") + "</small></div>" +
+    h += '<div class="wa-h pt-wa-h"><button class="hb" title="' + t("Back", "رجوع", "वापस") + '">' + ui.icon("chevleft", "sm flip") + "</button>" +
+      (nabd ? '<span class="av">' + ui.icon("logo", "sm") + "</span>" : '<span class="av pt-avc">' + ui.icon("building", "sm") + "</span>") +
+      '<div class="fl" style="min-width:0"><b>' + esc(nabd ? "Nabd" : WA_CLINIC()) + '<span class="pt-vf" title="' + t("Verified business", "نشاط تجاري موثّق", "सत्यापित व्यवसाय") + '">' + ui.icon("check") + "</span></b><small>" +
+      (nabd ? t("Find doctors & manage visits", "ابحث عن أطباء وأدِر زياراتك", "डॉक्टर खोजें और विज़िट संभालें") : t("Official business account", "حساب أعمال رسمي", "आधिकारिक बिज़नेस अकाउंट")) + "</small></div>" +
       '<button class="hb" title="' + t("Call", "اتصال", "कॉल") + '">' + ui.icon("phone", "sm") + '</button><button class="hb" title="' + t("More", "المزيد", "अधिक") + '">' + ui.icon("dots", "sm") + "</button></div>";
+    h += '<div class="pt-chn ' + (nabd ? "nabd" : "") + '">' + ui.icon(nabd ? "globe" : "building", "xs") + "<span>" + (nabd ? t("Shared Nabd number", "رقم نبض المشترك", "साझा Nabd नंबर") : t("Clinic's own number", "رقم العيادة الخاص", "क्लिनिक का अपना नंबर")) + '</span><span class="ltr num">' + waNum(num) + "</span></div>";
     h += '<div class="wa-b pt-wa-b" id="pt-wa-b">' + body + "</div>";
     h += '<div class="wa-in pt-wa-in">' + ui.icon("plus", "sm faint") + "<span>" + t("Message", "رسالة", "संदेश") + '</span><span class="ib">' + ui.icon("mic", "sm") + "</span></div>";
     h += "</div></div>";
     return h;
   });
   NB.act("ptWaScn", function (a) { NB.setUI({ waScn: a, waCh: [] }); });
+  NB.act("ptWaNum", function (a) { NB.setUI({ waNum: a, waCh: [] }); });
+  NB.act("ptWaGo", function (a) { Object.assign(NB.state.ui, { waScn: a, waCh: [] }); NB.go("whatsapp", "chat"); });
   NB.act("ptWa", function (a) {
     var ch = NB.v("waCh", []).slice(), cur = NB.v("waScn", "book");
     if (a === "back") { ch.pop(); NB.setUI({ waCh: ch }); return; }
