@@ -69,6 +69,7 @@ public class WaitlistService {
     @Transactional
     public WaitlistEntryResponse join(UUID tenantId, UUID doctorId, UUID patientId) {
         tenantContext.set(tenantId);
+        AppointmentService.requirePatientAndDoctor(appointmentRepo, tenantId, patientId, doctorId);
         try {
             UUID id = repo.insert(tenantId, doctorId, patientId);
             log.info("patient {} joined waitlist {} for doctor {}", patientId, id, doctorId);

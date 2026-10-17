@@ -270,6 +270,12 @@ class PatientRepository {
                 tenantId, patientId, consentType);
     }
 
+    /** CGV-005: grant with evidence (who recorded it and through which channel); granted_at is the when. */
+    void grantConsent(UUID tenantId, UUID patientId, String consentType, UUID capturedBy, String channel) {
+        jdbc.update("INSERT INTO consents (tenant_id, patient_id, consent_type, captured_by, capture_channel) VALUES (?,?,?,?,?)",
+                tenantId, patientId, consentType, capturedBy, channel);
+    }
+
     Optional<Instant> findActiveConsentGrantedAt(UUID tenantId, UUID patientId, String consentType) {
         return jdbc.query(
                 "SELECT granted_at FROM consents WHERE tenant_id = ? AND patient_id = ? AND consent_type = ? " +
