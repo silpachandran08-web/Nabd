@@ -65,7 +65,10 @@ class NursingWorklistApiTest extends ApiTestBase {
         List<Map<String, Object>> items = items(token);
         List<Map> queue = exchange("/v1/queue", HttpMethod.GET, authed(token), List.class).getBody();
         assertThat(items).hasSize(queue.size()).hasSize(2);
-        assertThat(items.stream().map(i -> i.get("entry")).toList()).isEqualTo(queue);
+        // waitMinutes is computed per request and can tick over between the two calls, so compare without it.
+        java.util.function.Function<Object, Map<?, ?>> noWait = m -> { Map<Object, Object> c = new java.util.HashMap<>((Map<?, ?>) m); c.remove("waitMinutes"); return c; };
+        assertThat(items.stream().map(i -> noWait.apply(i.get("entry"))).toList())
+                .isEqualTo(queue.stream().map(noWait).toList());
 
         Map<String, Object> recorded = itemFor(items, withVitals);
         assertThat(recorded.get("patient")).isEqualTo(exchange("/v1/patients/" + p1, HttpMethod.GET, authed(token), Map.class).getBody());

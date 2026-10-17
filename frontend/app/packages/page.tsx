@@ -131,7 +131,7 @@ export default function PackagesPage() {
       const [pkgRes, instRes, refundRes, expRes, liabRes, settingsRes, staffRes] = await Promise.all([
         authedFetch("/packages"), authedFetch("/packages/instances"), authedFetch("/packages/refunds"),
         authedFetch("/packages/expiring-soon"), authedFetch("/packages/liability"), authedFetch("/packages/settings"),
-        authedFetch("/staff/roster"),
+        can("queue:view") ? authedFetch("/staff/roster") : null,
       ]);
       if (!pkgRes) return;
       if (pkgRes.status === 403) {

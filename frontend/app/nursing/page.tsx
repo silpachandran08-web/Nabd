@@ -285,12 +285,13 @@ function NursingWorklist() {
       // NUR-019: one worklist call (queue entry + patient + vitals per row) replaces GET /queue,
       // GET /queue?priority=true and the per-row /patients/{id} + /clinical/vitals/{id} fan-out.
       const [queueRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
-        authedFetch("/nursing/worklist"), authedFetch("/staff/roster"),
+        can(PERM.queueView) ? authedFetch("/nursing/worklist") : null, can(PERM.queueView) ? authedFetch("/staff/roster") : null,
         authedFetch("/nursing/administration-orders/today"), authedFetch("/nursing/procedure-orders/today"),
         authedFetch("/nursing/activity/today"),
       ]);
-      if (!queueRes) return;
-      const noQueue = queueRes.status === 403;
+      // LIVE-09: without queue:view the worklist is never requested; treat it like the server's 403.
+      if (!queueRes && can(PERM.queueView)) return; // authedFetch returned null: session redirect
+      const noQueue = !queueRes || queueRes.status === 403;
       if (!noQueue && !queueRes.ok) {
         setError("Couldn't load the nursing worklist. Try again.");
         return;
@@ -302,7 +303,7 @@ function NursingWorklist() {
         // null = none recorded yet, or the caller lacks clinical:view.
         vitals: { recordedAt: string; abnormalFlags?: string[] } | null;
       };
-      const items: WorklistItem[] = noQueue ? [] : ((await queueRes.json())?.items ?? []);
+      const items: WorklistItem[] = noQueue || !queueRes ? [] : ((await queueRes.json())?.items ?? []);
       const staffMap = new Map<string, string>();
       if (staffRes?.ok) {
         const options: StaffOption[] = await staffRes.json();

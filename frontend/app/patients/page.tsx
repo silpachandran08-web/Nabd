@@ -26,6 +26,7 @@ type PatientDetail = Patient & {
   activePackages: number;
   outstandingBalance?: number; // NB-052: omitted entirely from the response when the caller's field grants restrict financial data
   lastVisitAt: string | null;
+  lastVisit?: string | null; // LIVE-03: same definition as the registry list (date)
   isMinor: boolean;
   guardianId: string | null;
   guardianName: string | null;
@@ -929,7 +930,7 @@ function PatientsList() {
                     <div className={styles.section}>
                       <div className={styles.sectionLabel}>Last visit</div>
                       <div className={styles.sectionValue}>{/* LIVE-03: the list row's value first so list and drawer agree; detail when the row is not on this page */}
-                      {formatLastVisit(registry?.rows.find((r) => r.id === drawerPatient.id)?.lastVisit ?? drawerPatient.lastVisitAt)}</div>
+                      {formatLastVisit(registry?.rows.find((r) => r.id === drawerPatient.id)?.lastVisit ?? drawerPatient.lastVisit ?? null)}</div>
                     </div>
                     <div className={styles.section}>
                       <div className={styles.sectionLabel}>Active packages</div>
