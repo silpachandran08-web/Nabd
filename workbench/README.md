@@ -33,10 +33,10 @@ Deep links: `#board`, `#services`, or a story id such as `#ACC-001`.
 
 ## Updating the plan
 
-Specs live per domain (`PLT`, `ACC`, `COM`, `CLN`, `PHL`, `FIN`, `IDC`, `HOS`, `ADM`, `FEF`, `OPS`). To change them, edit the domain JSON in `workbench/specs/` and regenerate the bundle:
+Specs live per domain in `workbench/specs/` (`PLT`, `ACC`, `COM`, `CLN`, `PHL`, `FIN`, `IDC`, `HOS`, `ADM`, `FEF`, `OPS`), written by the principal engineers from the brief in `specs/BRIEF.md`. Cross-domain ownership decisions live in `specs/reconcile.json`: duplicate stories that were merged, edits that folded their details into the surviving story, migration number bands per domain and ownership notes (all visible under **Open questions**). To change the plan, edit the domain JSON (or the reconciliation file) and regenerate the bundle:
 
 ```bash
-python3 workbench/tools/merge_specs.py workbench/specs workbench/specs/tracker_tasks.json
+python3 workbench/tools/merge_specs.py workbench/specs workbench/specs/tracker_tasks.json workbench/specs/reconcile.json
 ```
 
-The script validates personas, services, duplicate ids and dependencies, and reports tracker tasks no story covers. Team state (status, comments) is stored separately and survives regeneration as long as story ids don't change; never renumber a story that has started.
+The script validates personas, services, duplicate ids and dependencies, resolves dependencies written as tracker ids to stories, and reports tracker tasks no story covers. Team state (status, comments) is stored separately and survives regeneration as long as story ids don't change; never renumber a story that has started.

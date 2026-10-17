@@ -1,0 +1,1023 @@
+{
+ "drop": [
+  {
+   "id": "COM-034",
+   "replaced_by": [
+    "ACC-039"
+   ],
+   "reason": "T-120 Edge skeleton is built once by ACC-039 (patient-edge is owned by Patient Access per the brief); the threat-model and abuse-control criteria are folded in."
+  },
+  {
+   "id": "COM-035",
+   "replaced_by": [
+    "ACC-038"
+   ],
+   "reason": "Same Core /internal/v1 booking API as ACC-038; the minimal-fields lookup and slot-race criteria are folded in and idempotency storage reuses PLT-026."
+  },
+  {
+   "id": "COM-036",
+   "replaced_by": [
+    "ACC-039"
+   ],
+   "reason": "ACC-039 already builds the Edge availability projection with event invalidation; the cold-miss and Valkey-restart criteria are folded in."
+  },
+  {
+   "id": "COM-037",
+   "replaced_by": [
+    "ACC-039"
+   ],
+   "reason": "Conversation state machine is in ACC-039, 'status' replies in ACC-044; intents, handover and emergency interception are folded into ACC-039/ACC-040."
+  },
+  {
+   "id": "COM-038",
+   "replaced_by": [
+    "ACC-040"
+   ],
+   "reason": "Same returning-patient five-tap WhatsApp booking (T-162) as ACC-040; holds, request-mode and locale criteria are folded in."
+  },
+  {
+   "id": "COM-039",
+   "replaced_by": [
+    "ACC-042"
+   ],
+   "reason": "Same family picker (T-165) as ACC-042; age-18 drop-off and proxy-revocation criteria are folded in."
+  },
+  {
+   "id": "COM-040",
+   "replaced_by": [
+    "ACC-043"
+   ],
+   "reason": "Same chat registration (T-166) as ACC-043; duplicate-suggestion and declined-consent criteria are folded in."
+  },
+  {
+   "id": "COM-042",
+   "replaced_by": [
+    "ACC-045"
+   ],
+   "reason": "Same Edge GA for cohort B (T-189) as ACC-045; funnel dashboard, game day and per-clinic rollout criteria are folded in."
+  },
+  {
+   "id": "OPS-022",
+   "replaced_by": [
+    "ACC-021"
+   ],
+   "reason": "T-094 is a Patient Access task; the SSE transport is built once in ACC-021 and OPS keeps the later extraction (OPS-024)."
+  },
+  {
+   "id": "OPS-023",
+   "replaced_by": [
+    "ACC-022"
+   ],
+   "reason": "Same /v1/queue/board projection and batch patient read as ACC-022; the nurse worklist and encrypted-cache criteria are folded in."
+  },
+  {
+   "id": "OPS-029",
+   "replaced_by": [
+    "ACC-019"
+   ],
+   "reason": "T-164 (Patient Access) ETA accuracy rollup, tile and drift alert are already in ACC-019; low-confidence and trend criteria are folded in."
+  },
+  {
+   "id": "PLT-017",
+   "replaced_by": [
+    "OPS-003"
+   ],
+   "reason": "T-011/T-041 are Data & Infra tasks; OPS-003 builds the role split and FORCE RLS, with PLT-017's owner-PIN and exemption-file details folded in."
+  },
+  {
+   "id": "PLT-020",
+   "replaced_by": [
+    "OPS-005"
+   ],
+   "reason": "T-132 is a Data & Infra task; OPS-005 builds the composite tenant FKs, with PLT-020's extra child tables folded in."
+  },
+  {
+   "id": "PLT-042",
+   "replaced_by": [
+    "OPS-068",
+    "OPS-069"
+   ],
+   "reason": "T-156/T-209 are Data & Infra tasks already built by OPS-068/OPS-069; archive-manifest and restore-drill criteria are folded in."
+  },
+  {
+   "id": "ADM-001",
+   "replaced_by": [
+    "PLT-058"
+   ],
+   "reason": "T-087 provisioning CAS is a Platform & Trust task built by PLT-058; the stuck-step reaper is folded in."
+  },
+  {
+   "id": "ADM-017",
+   "replaced_by": [
+    "PLT-016"
+   ],
+   "reason": "T-305 role presets and staff.is_clinician are Platform & Trust (iam) work built by PLT-016."
+  },
+  {
+   "id": "ADM-035",
+   "replaced_by": [
+    "PLT-059"
+   ],
+   "reason": "T-123 entitlement and seat enforcement is built by PLT-059 (Platform & Trust); read-only downgrade and /v1/me/entitlements are folded in."
+  },
+  {
+   "id": "ADM-036",
+   "replaced_by": [
+    "PLT-059"
+   ],
+   "reason": "Per-tenant feature overrides and kill switches are part of PLT-059; global kill switch and expiry criteria are folded in."
+  },
+  {
+   "id": "ADM-038",
+   "replaced_by": [
+    "PLT-061",
+    "PLT-063"
+   ],
+   "reason": "T-207 Control Plane service, tenant directory and login router are Platform & Trust work in PLT-061/PLT-063."
+  },
+  {
+   "id": "ADM-039",
+   "replaced_by": [
+    "PLT-061"
+   ],
+   "reason": "Moving master.* to the Control Plane is the copy-and-cutover in PLT-061; dual-read and grant-revocation criteria are folded in."
+  },
+  {
+   "id": "ADM-040",
+   "replaced_by": [
+    "PLT-062"
+   ],
+   "reason": "Same idempotent provisioning saga as PLT-062; the Core command log and branch-job criteria are folded in."
+  },
+  {
+   "id": "ADM-022",
+   "replaced_by": [
+    "PLT-022"
+   ],
+   "reason": "T-332 add-branch wizard is a Platform & Trust (organization) task built by PLT-022."
+  },
+  {
+   "id": "ADM-023",
+   "replaced_by": [
+    "PLT-023"
+   ],
+   "reason": "One login and branch switcher is PLT-023; cache-clearing and reports-only mode criteria are folded in."
+  },
+  {
+   "id": "ADM-024",
+   "replaced_by": [
+    "PLT-025"
+   ],
+   "reason": "Per-branch invoice series and fee overrides are in PLT-025; GSTIN-per-state and KSA EGS criteria are folded in."
+  },
+  {
+   "id": "ADM-025",
+   "replaced_by": [
+    "PLT-025"
+   ],
+   "reason": "Per-branch WhatsApp routing is in PLT-025 (with the 'which branch?' bot step in ACC-040); own-number switch criteria are folded in."
+  },
+  {
+   "id": "ADM-026",
+   "replaced_by": [
+    "PLT-024"
+   ],
+   "reason": "Cross-branch patient recognition is PLT-024 (works in Phase 2 without the Phase 3 person plane); exact-match and unlink criteria are folded in."
+  },
+  {
+   "id": "ADM-027",
+   "replaced_by": [
+    "PLT-025"
+   ],
+   "reason": "Combined per-branch owner view from rollups is in PLT-025; 7/30-day and multi-branch patient count criteria are folded in."
+  },
+  {
+   "id": "PLT-050",
+   "replaced_by": [
+    "IDC-025",
+    "ADM-033"
+   ],
+   "reason": "T-334 is split by layer: IDC-025 owns the per-facility notice and grievance contact (privacy_notices is IDC's table), ADM-033 owns the health card."
+  },
+  {
+   "id": "IDC-021",
+   "replaced_by": [
+    "PLT-047"
+   ],
+   "reason": "T-237 DSR engine has one owner (PLT privacy operations); PLT-047 builds intake, queue and export, with IDC-021's guardian-scope and FHIR-bundle criteria folded in."
+  },
+  {
+   "id": "IDC-023",
+   "replaced_by": [
+    "PLT-048"
+   ],
+   "reason": "Erasure execution is PLT-048; the erasure plan, cancel window and certificate criteria are folded in."
+  },
+  {
+   "id": "IDC-024",
+   "replaced_by": [
+    "PLT-049"
+   ],
+   "reason": "T-238 retention clocks and legal hold are PLT-049; per-patient clocks and read-only defaults are folded in."
+  },
+  {
+   "id": "IDC-053",
+   "replaced_by": [
+    "PLT-021"
+   ],
+   "reason": "T-133 brand-widening removal is tenancy work owned by Platform & Trust in PLT-021 (after PLT-018 containment)."
+  },
+  {
+   "id": "ADM-058",
+   "replaced_by": [
+    "HOS-053"
+   ],
+   "reason": "T-381 ward roster is a Hospital task built by HOS-053; float-pool and publish-notice criteria are folded in."
+  },
+  {
+   "id": "ADM-008",
+   "replaced_by": [
+    "ACC-013"
+   ],
+   "reason": "T-177 Solo preset is a Patient Access task built by ACC-013; the generic preset catalogue moves to ADM-009 (T-351)."
+  },
+  {
+   "id": "FIN-002",
+   "replaced_by": [
+    "FEF-008"
+   ],
+   "reason": "T-032 is a Frontend task; FEF-008 builds idempotent payment submit and status recovery, with FIN-002's key-reuse and OTC/package criteria folded in."
+  },
+  {
+   "id": "FIN-007",
+   "replaced_by": [
+    "FEF-037"
+   ],
+   "reason": "T-117 is a Frontend task; FEF-037 builds the single ISO-4217 formatter, with the server-quote preview criterion folded in."
+  }
+ ],
+ "edit": [
+  {
+   "id": "ACC-038",
+   "append_context": "Reconciliation: COM-035 merged here. The household lookup returns only patientRef, first name, relationship and age band for a WhatsApp-verified phone. Idempotency storage and the filter are PLT-026 (T-031); no second idempotency_keys table is created. Cancel and reschedule carry a coded reason from ACC-007. COM's patient-edge stories that remain (COM-016, COM-041, COM-045, COM-047, COM-049..051) call only this API.",
+   "add_acceptance": [
+    "Given a household lookup for a verified phone, then only patientRef, first name, relationship and age band are returned (no DOB, no full name)",
+    "Given two different patients race for the last slot through the internal API, then exactly one gets 201 and the other 409 SLOT_TAKEN"
+   ],
+   "add_depends_on": [
+    "PLT-026"
+   ],
+   "add_source_refs": [
+    "doc01 §5 idempotency",
+    "EP10"
+   ]
+  },
+  {
+   "id": "ACC-039",
+   "append_context": "Reconciliation: COM-034, COM-036 and the framework half of COM-037 merged here. Threat model uses the T-077 template (bots, scraping, OTP abuse, enumeration by phone, replayed button payloads); button payloads are signed with the token scheme shared with COM-011; conversation state TTL 24 h with optimistic version lock. Keyword intents (EN/HI/Hinglish) live in the flow framework; the handover and emergency behaviour is accepted in ACC-040. Inbound event name is comms.inbound.received.v1 as published by COM-030 (not comms.inbound.message_received.v1). Estimate note: absorbs about 3 days of unique scope from the dropped COM stories; re-check at S5 planning.",
+   "add_acceptance": [
+    "Given 100 messages/min from one phone, when the 20/min limit is exceeded, then the Edge answers once with 'Please wait a moment' and drops the rest without calling Core",
+    "Given a projection miss or a Valkey restart, then one Core call refills the doctor-day and no slot reply exceeds 3 s",
+    "Given concurrent inbound messages on one conversation, then version locking serialises them and no state is lost",
+    "Given the threat model review, then each listed threat has a mapped control and an automated test"
+   ],
+   "add_depends_on": [
+    "COM-011"
+   ],
+   "add_source_refs": [
+    "doc01 §10.3 (2)",
+    "T-077",
+    "ADR-03"
+   ],
+   "add_also_touches": [
+    "comms-gateway/whatsapp"
+   ]
+  },
+  {
+   "id": "ACC-040",
+   "append_context": "Reconciliation: COM-038 and the behaviour half of COM-037 merged here. The Edge places a 2-minute soft hold when a time is picked, posts with Idempotency-Key = conversation id + step and re-offers the 3 nearest slots on 409; the confirmation carries a token/QR link and the booking shows on reception.arrivals with source WhatsApp. Unclear free text twice, or 'talk to clinic', hands the thread to reception through the COM-032 thread mode; while staff hold a thread the bot is silent. On a shared sender that serves several branches of one brand (PLT-025) the bot asks 'which branch?' once per conversation.",
+   "add_acceptance": [
+    "Given 'Hi' from a known phone, then a menu (Book, My appointment, Talk to clinic) arrives in < 3 s p95",
+    "Given two unrecognised free-text messages in a row, then the thread is handed to reception, the patient is told a person will reply, and the bot does not reply until staff hand it back",
+    "Given 'chest pain' or another phrase from the clinically signed emergency list, then the local emergency number (108 India, 997 KSA, 998 UAE, 999 Qatar) is sent immediately and the thread is flagged urgent",
+    "Given the patient abandons after picking a time, when 2 minutes pass, then the soft hold is released",
+    "Given a clinic in request mode, when the patient confirms, then the request appears in reception.requests and the patient is told it is pending",
+    "Given an India and a KSA clinic, then date, time and currency on the confirmation card follow the clinic locale (Asia/Kolkata INR; Asia/Riyadh SAR)",
+    "Given a shared sender serving branches A and B, when a new patient writes 'hi', then the bot asks which branch once and the booking lands in that branch's tenant"
+   ],
+   "add_depends_on": [
+    "COM-010",
+    "COM-032"
+   ],
+   "add_source_refs": [
+    "BQ-01",
+    "NB-202",
+    "CEO-14 emergency interception",
+    "FRD SYS-24"
+   ]
+  },
+  {
+   "id": "ACC-041",
+   "append_context": "Reconciliation with COM-043 (legitimate split): COM-043 schedules the T-24 h and T-2 h reminders, the nudge cascade and late-cancel protection; this story owns the Edge flows the reminder buttons land in and the Core confirm/reschedule/cancel actions. This story is the single owner of appointments.patient_confirmed_at and of the event scheduling.appointment.patient_confirmed.v1; COM-043 adds only confirmation_state. Build both in S7-S8."
+  },
+  {
+   "id": "COM-043",
+   "append_context": "Reconciliation with ACC-041 (legitimate split): this story owns reminder scheduling, dedupe/cancellation and the unconfirmed cascade. The Confirm/Reschedule/Cancel button flows and the Core actions are ACC-041 (Edge), which also owns appointments.patient_confirmed_at and publishes scheduling.appointment.patient_confirmed.v1 for the patient's confirmation; this story's migration adds only confirmation_state and cancel_reason_code is ACC-007's list. Leave-now timing in the T-2 h message comes from ACC-044."
+  },
+  {
+   "id": "ACC-042",
+   "append_context": "Reconciliation: COM-039 merged here. The list is built from /internal/v1 household lookup (patients.guardian_id and IDC-009 proxies); dependants who turned 18 drop off per IDC-012.",
+   "add_acceptance": [
+    "Given a child who turned 18, when the family list is built, then the child is not listed and the parent sees nothing about them",
+    "Given a guardian proxy is revoked, when the next booking starts, then the dependant disappears from the list within 1 minute"
+   ],
+   "add_source_refs": [
+    "NB-080",
+    "NB-083",
+    "QA §3.12 guardian scope"
+   ]
+  },
+  {
+   "id": "ACC-043",
+   "append_context": "Reconciliation: COM-040 merged here. DOB is captured with day/month/year list pickers; name is the only free-text field.",
+   "add_acceptance": [
+    "Given a likely duplicate (same phone, similar name and DOB), when chat registration completes, then no second patient is created and the desk sees a merge suggestion (ACC-030)",
+    "Given the patient declines the notice, then only the declined-consent record is stored and the bot offers 'Talk to clinic'"
+   ],
+   "add_depends_on": [
+    "ACC-030"
+   ],
+   "add_source_refs": [
+    "B-24",
+    "NB-201"
+   ]
+  },
+  {
+   "id": "ACC-045",
+   "append_context": "Reconciliation: COM-042 merged here. Adds production funnel analytics per step from conversation states (no PHI), 409-rate and reply-p95 panels, a per-clinic feature flag for staged rollout, and a per-clinic onboarding checklist (number, templates, QR poster with click-to-chat link). Sender auto-throttle (COM-021) must be live before GA.",
+   "add_acceptance": [
+    "Given the game day, when Meta, Core and Valkey are failed one at a time, then the runbook restores service and no booking is double-created",
+    "Given the funnel dashboard, then median booking time and drop-off per step are shown per clinic with no PHI",
+    "Given a new cohort B clinic, then it is switched on by a per-clinic flag only after its onboarding checklist is complete"
+   ],
+   "add_depends_on": [
+    "COM-021"
+   ],
+   "add_source_refs": [
+    "doc06 §6.5 S8",
+    "doc06 §7.6"
+   ]
+  },
+  {
+   "id": "COM-030",
+   "append_context": "Ownership note (inbox access path): staff-web reaches threads only through Core /v1/inbox/** which keeps staff auth, tenant and permission checks, audit and PHI read logging, and calls this service's internal API over mTLS (aud=internal). Comms never validates staff JWTs. comms.inbound.received.v1 is the canonical inbound event name; the Edge (ACC-039) consumes it."
+  },
+  {
+   "id": "COM-051",
+   "append_context": "Reconciliation: requests are created through the DSR engine owned by PLT-047 (/internal/v1/privacy/requests); corrections are resolved by IDC-022 and erasure by PLT-048."
+  },
+  {
+   "id": "ACC-021",
+   "append_context": "Reconciliation: OPS-022 merged here; T-094 is a Patient Access task, so this squad owns the SSE transport in core.realtime. Deltas are built from visit.queue_entry.changed.v1, scheduling.doctor_status.changed.v1, scheduling.doctor_delay.changed.v1 and visit.eta.updated.v1; auth is the BFF session cookie (T-063). Data & Infra reviews the Valkey channel sizing and owns the later extraction into a stateless service (OPS-024). The shared browser client stays FEF-020.",
+   "add_acceptance": [
+    "Given 3,000 concurrent connections per region across 3 pods, when load-tested, then heap stays < 70% and delivery p95 < 2 s",
+    "Given the synthetic probe in each cell, then 95% of events reach the screen in < 2 s and 99% in < 5 s"
+   ],
+   "add_depends_on": [
+    "OPS-017",
+    "OPS-020"
+   ],
+   "add_source_refs": [
+    "FRD SYS-05",
+    "DP §5.2 class A",
+    "NB-096"
+   ]
+  },
+  {
+   "id": "ACC-022",
+   "add_other_personas": [
+    "nurse"
+   ],
+   "append_context": "Reconciliation: OPS-023 merged here. The projection also serves the nurse triage worklist: it includes MRN, allergy flag, vitals-recorded flag and priority. GET /v1/patients?ids= writes phi_read_log rows. An optional encrypted Valkey copy (token, first name + last initial, stage; AES-GCM with the region data key; TTL <= 12 h; tenant-scoped keys) follows ADR-04 rule 2. Board and batch DTOs are published in OpenAPI for FEF-020. Ownership note: hospital encounters reuse queue_entries with class 'inpatient'/'emergency' (HOS-005, HOS-020); this story's board, queue and ETA queries filter class = 'ambulatory' and the board index is partial on that class.",
+   "add_acceptance": [
+    "Given a clinic with 5 doctors and 60 visits, when the nurse worklist loads, then it makes 1 board request plus at most 1 batch header request instead of ~90 per refresh",
+    "Given GET /v1/patients?ids= with ids from another tenant, then those ids are silently absent",
+    "Given the board projection cached in Valkey, then values are AES-GCM encrypted, keys are tenant-scoped, TTL <= 12 h and no full name, phone or DOB is stored",
+    "Given queue_entries rows with class 'inpatient' or 'emergency', then they never appear on the OPD board, queue or ETA"
+   ],
+   "add_source_refs": [
+    "ADR-04",
+    "DP §5.3.4",
+    "FRD RCP-14"
+   ]
+  },
+  {
+   "id": "ACC-019",
+   "append_context": "Reconciliation: OPS-029 merged here. eta_accuracy_daily also stores within10_pct; metric export bounds cardinality (per cell, top-N clinics by volume plus an aggregate); drift goes to the Patient Access rotation as an alert, not a page. ADM-041 reads this rollup for its ETA tile.",
+   "add_acceptance": [
+    "Given a clinic with fewer than 30 visits on a day, then its figure is marked low-confidence and no drift alert fires for that day",
+    "Given the owner opens Live operations, then the tile shows yesterday's share of visits within ±10 min per facility and a 14-day trend"
+   ],
+   "add_source_refs": [
+    "ADR-14",
+    "RP-01",
+    "doc06 §7.6"
+   ]
+  },
+  {
+   "id": "OPS-003",
+   "append_context": "Reconciliation: PLT-017 merged here (Platform & Trust reviews it as the security acceptance). Owner PIN hashes become reachable only through a SECURITY DEFINER owner_auth_lookup owned by nabd_definer (REVOKE SELECT (pin_hash) ON owners FROM nabd_app); workflow_definitions allows tenant_id IS NULL rows for read only; package_eligible_doctors gains tenant_id; brands get RLS via owner -> tenant; any tenant_id table without forced RLS must be listed in a reviewed exemption file. Sequencing with PLT-018 (T-010 array policy and brand containment): both ship in the S0 release, PLT-018's migration first and this story's V98/V99 second, so the two-way dependency in the bundle means 'ship together'.",
+   "add_acceptance": [
+    "Given nabd_app selects owners.pin_hash directly, then permission is denied and owner sign-in still works through owner_auth_lookup",
+    "Given scripts/dev-up.sh on the split-role topology, then the existing ~560 RLS tests are green"
+   ],
+   "add_source_refs": [
+    "SEC-33",
+    "doc02 §3.2-3.3",
+    "NB-002"
+   ]
+  },
+  {
+   "id": "PLT-018",
+   "append_context": "Reconciliation: PLT-017 was merged into OPS-003 (T-011/T-041 are Data & Infra tasks). This story and OPS-003 ship together in S0: the array-policy and containment migration here applies first, OPS-003's FORCE RLS migration second."
+  },
+  {
+   "id": "OPS-005",
+   "append_context": "Reconciliation: PLT-020 merged here. Also add composite FKs on patient_allergies, chronic_conditions, clinical_documents, vaccine_records, dental_chart_entries and consents, and UNIQUE (tenant_id, id) on clinical_notes and departments. VALIDATE runs with lock_timeout 3 s.",
+   "add_acceptance": [
+    "Given production-size data (500k patients), then each VALIDATE CONSTRAINT completes without blocking writes longer than lock_timeout (3 s)"
+   ],
+   "add_source_refs": [
+    "NB-002",
+    "B-25"
+   ]
+  },
+  {
+   "id": "OPS-068",
+   "append_context": "Reconciliation: PLT-042 merged here (Platform & Trust reviews chain verification). Each archived partition gets an archive_manifests row (table, partition, region, object key, row count, sha256, archived_at, restored_at). Actor names in audit rows are never erased by DSR; erased patients appear by pseudonymous reference (PLT-048).",
+   "add_acceptance": [
+    "Given an archived month, when the restore drill runs, then the partition is readable again within 1 h and its hash matches the manifest"
+   ],
+   "add_depends_on": [
+    "PLT-038",
+    "PLT-039"
+   ]
+  },
+  {
+   "id": "PLT-058",
+   "append_context": "Reconciliation: ADM-001 merged here. Steps carry attempt and lease_until with a partial index for the reaper; each completed step publishes provisioning.job.step_completed.v1. The self-serve trial (ADM-003) advances jobs automatically through this path.",
+   "add_acceptance": [
+    "Given a step stuck in running for more than 10 minutes, when the reaper runs, then the step is marked failed with error_detail 'timeout' and the job can be retried"
+   ]
+  },
+  {
+   "id": "PLT-016",
+   "sprint": "S2",
+   "phase": 0,
+   "append_context": "Reconciliation: ADM-017 merged here. Ownership note: iam is the single writer of staff.is_clinician; Clinical sets it from verified licence data through iam.api, never by direct SQL. Pulled into S2 (Phase 0) because CLN-005 (licensed-clinician signing, S2) reads the flag; if preset seeding slips, the column, backfill and ActorDirectory read ship first. ADM-018 builds the owner staff screen on top.",
+   "add_source_refs": [
+    "QA-17",
+    "RBAC Matrix"
+   ]
+  },
+  {
+   "id": "CLN-005",
+   "append_context": "Ownership note: staff.is_clinician is owned by PLT-016 (iam), pulled into S2 for this story; read it through ActorDirectory and set it only via iam.api when a licence is verified.",
+   "add_depends_on": [
+    "PLT-016"
+   ]
+  },
+  {
+   "id": "PLT-059",
+   "append_context": "Reconciliation: ADM-035 and ADM-036 merged here. Adds global kill switches (master.kill_switches, evaluated before tenant overrides), GET /v1/me/entitlements for staff-web nav gating, a per-tenant entitlement snapshot cached as class C, and override history visible to the owner. Downgrades never delete data. Canonical event: platform.entitlements.changed.v1 (ADM-034 and ADM-037 use it instead of plans.*). Module codes come from ADM-034's closed list; the owner plan/usage page UI is ADM-037.",
+   "add_acceptance": [
+    "Given a module switched off by a downgrade, when staff open its screens, then data is read-only with an export button for 90 days and no row is deleted",
+    "Given a global kill switch on a feature, when activated, then no tenant can use it within 60 s while other features continue",
+    "Given an override with expires_at, when the time passes, then the plan default applies again automatically",
+    "Given GET /v1/me/entitlements, then staff-web hides navigation for modules the tenant does not have"
+   ],
+   "add_source_refs": [
+    "FRD SYS-20",
+    "QA-33"
+   ]
+  },
+  {
+   "id": "ADM-034",
+   "append_context": "Reconciliation with PLT-059 (legitimate split): PLT-059 creates master.plan_entitlements and the enforcement path; this story adds only the commercial catalogue on the same table (plan_version in the key, market, pricing_basis, branch_limit, on_trial_expiry, AED/QAR, public catalogue) and publishes platform.entitlements.changed.v1 on plan publish.",
+   "add_depends_on": [
+    "PLT-059"
+   ]
+  },
+  {
+   "id": "ADM-037",
+   "append_context": "Reconciliation: consumes platform.entitlements.changed.v1 from PLT-059 (not a separate plans.* event). This story owns the owner plan and usage page that PLT-059 feeds."
+  },
+  {
+   "id": "ADM-018",
+   "append_context": "Reconciliation (legitimate split): backend grant rules are PLT-015 (T-028), preset roles and is_clinician are PLT-016 (T-305), seat checks are PLT-059 (T-123), session revocation is PLT-007. This story is only the owner-facing staff screen.",
+   "add_depends_on": [
+    "PLT-015",
+    "PLT-016"
+   ]
+  },
+  {
+   "id": "ADM-019",
+   "append_context": "Reconciliation (legitimate split): delegation rules are enforced by PLT-014 (T-003); this story is the owner screen only.",
+   "add_depends_on": [
+    "PLT-014"
+   ]
+  },
+  {
+   "id": "ADM-020",
+   "append_context": "Reconciliation (legitimate split): transitions revoke sessions through PLT-007; with the Control Plane (PLT-061/062) lifecycle changes become saga commands with second-operator approval.",
+   "add_depends_on": [
+    "PLT-007"
+   ]
+  },
+  {
+   "id": "PLT-061",
+   "append_context": "Reconciliation: ADM-038 and ADM-039 merged here. Adds the tenant_directory (tenant, brand, owner, region, cell, status) fed by the provisioning saga, a 2-week dual-read window before Core's master grants are revoked, and operator login through the control-plane issuer (T-111). Owner Admin keeps the operator console screens on top.",
+   "add_acceptance": [
+    "Given a tenant created in Core IN, then its tenant_directory row exists in the Control Plane within 1 minute",
+    "Given cut-over, when Core's app role attempts any DML on master.*, then the database refuses and the boot self-check confirms it",
+    "Given a support access grant requested from the console, then Core still enforces tenant approval and writes to the tenant audit"
+   ]
+  },
+  {
+   "id": "PLT-062",
+   "append_context": "Reconciliation: ADM-040 merged here. Core keeps provisioning_command_log (idempotency_key pk, step, result) behind /internal/v1 provisioning commands; compensation commands replace the V9 rollback inside Core; self-serve trials (ADM-003) and branch jobs (PLT-022) use the same saga.",
+   "add_acceptance": [
+    "Given the network drops after Core executed create_tenant, when the saga retries, then Core returns the stored result and no second tenant is created",
+    "Given a branch job (origin owner_branch), then it uses the same saga with config-copy steps and targets only the brand's region"
+   ]
+  },
+  {
+   "id": "PLT-022",
+   "append_context": "Reconciliation: ADM-022 merged here. The add-branch drawer also captures the branch licence number and expiry for the licence register (ADM-032) and invites new front-desk staff at the end; doctor schedules copy through scheduling api (ACC) and the price list through billing (FIN, T-306). Owner Admin reviews the drawer UX.",
+   "add_acceptance": [
+    "Given two doctors are copied, when they next sign in, then they keep one login and switch to the new branch with their own role there (PLT-023)"
+   ],
+   "add_source_refs": [
+    "NB-274"
+   ]
+  },
+  {
+   "id": "PLT-023",
+   "append_context": "Reconciliation: ADM-023 merged here. Switching clears TanStack Query caches keyed by tenant; 'All branches' is a reports-only mode that never mints a clinical token.",
+   "add_acceptance": [
+    "Given the owner switches branch on the patients screen, then no data from the previous branch remains in client caches",
+    "Given 'All branches (reports)' mode, when a clinical endpoint is called, then it returns 403"
+   ]
+  },
+  {
+   "id": "PLT-024",
+   "append_context": "Reconciliation: ADM-026 merged here. Matching is exact mobile + date of birth within the brand, never fuzzy across tenants. Where market or brand policy requires it, the link is confirmed by a patient OTP sent through Comms before demographics are copied. When Person/Practitioner (IDC-032..039, Phase 3) ships, patient_branch_links migrate into identity.person_links (IDC-035).",
+   "add_acceptance": [
+    "Given mobile matches but date of birth differs, then no link suggestion is made and the desk is told to check in person",
+    "Given the patient (via WhatsApp) or the owner unlinks, then the link ends, both rows stand alone and the change is audited in both tenants"
+   ],
+   "add_also_touches": [
+    "comms-gateway/whatsapp"
+   ]
+  },
+  {
+   "id": "PLT-025",
+   "append_context": "Reconciliation: ADM-024, ADM-025 and ADM-027 merged here. Invoice series allocation and tax logic stay in billing (FIN, T-107); this story orchestrates per-branch settings (PUT /v1/organization/branches/{tenantId}/billing-settings). WhatsApp: Comms keeps sender_branch_routes (sender -> branch tenants) in its own database, the 'which branch?' step on a shared number is in the Edge booking flow (ACC-040), and every inbound message carries exactly one tenant_id before reaching Core. The combined view runs under nabd_reports on OPS-010 rollups only (ADR-07 aggregated-views exception). Estimate note: re-check the 13 d at Phase 2 planning.",
+   "add_acceptance": [
+    "Given a new branch in another Indian state, when the owner selects the group GSTIN, then the UI blocks and asks for that state's GSTIN",
+    "Given a KSA branch, when created, then a separate ZATCA counter and EGS onboarding task are created for it",
+    "Given a consult fee override at branch B, when reception bills a consult at B, then B's fee is suggested and branch A keeps its own",
+    "Given branch C moves to its own WhatsApp number, when Meta approves it, then new conversations for C start on the new number and C's existing patients get one notice",
+    "Given the combined view, then it reads only rollup tables (SQL-ownership test), offers today, 7 and 30 days, and counts patients seen at 2+ branches without names"
+   ],
+   "add_depends_on": [
+    "COM-011",
+    "COM-019",
+    "ACC-040",
+    "OPS-010"
+   ],
+   "add_also_touches": [
+    "patient-edge/bot-flows"
+   ],
+   "add_source_refs": [
+    "SYS-25",
+    "FRD CAD-07",
+    "B-78"
+   ]
+  },
+  {
+   "id": "IDC-025",
+   "append_context": "Reconciliation: PLT-050 (notice and grievance part) merged here. privacy_notices is created once by IDC-003; this story adds facility_id. Canonical event organization.privacy_notice.published.v1. The traffic-light card is ADM-033, fed by GET /v1/settings/privacy/metrics.",
+   "add_acceptance": [
+    "Given the owner publishes a new notice version, then the clinic's public booking page shows the current version within 1 minute",
+    "Given a patient opens the notice link from WhatsApp, then it renders in their language (English fallback) in < 2 s on 3G"
+   ],
+   "add_also_touches": [
+    "patient-edge/branded-sites"
+   ]
+  },
+  {
+   "id": "ADM-033",
+   "append_context": "Reconciliation: PLT-050 (card part) merged here. Light sources: privacy metrics from IDC-025, DSR queue from PLT-047, last breach drill from PLT-051, template status from Comms, licences from ADM-032.",
+   "add_acceptance": [
+    "Given any data-subject request past its statutory due date, then the Patient requests light is red and links to the privacy queue"
+   ],
+   "add_depends_on": [
+    "PLT-047",
+    "PLT-051"
+   ]
+  },
+  {
+   "id": "PLT-047",
+   "append_context": "Reconciliation: IDC-021 merged here. Ownership note: the DSR engine, erasure and retention live in core module 'patient' (package patient/internal/privacy) and are owned by Platform & Trust privacy operations (PLT). Patient-web intake uses /v1/me/dsr-requests as a thin alias of /v1/privacy/requests; the WhatsApp intake flow is COM-051 and correction resolution is IDC-022, both on this engine's dsr_requests table. Delivery uses IDC-015 secure links.",
+   "add_acceptance": [
+    "Given a guardian with FULL proxy scope for a minor, then they can request the minor's export; a BOOK_ONLY proxy cannot",
+    "Given the export, then it holds only that tenant's data and only signed clinical notes, as a readable PDF plus a FHIR R4 JSON bundle (IDC-055 mapping when available, plain JSON before)"
+   ],
+   "add_depends_on": [
+    "IDC-015"
+   ],
+   "add_source_refs": [
+    "SC-51",
+    "CONS §3.2"
+   ]
+  },
+  {
+   "id": "PLT-048",
+   "append_context": "Reconciliation: IDC-023 merged here. Adds erasure_certificates (categories erased and retained, hash), GET .../erasure-plan and POST .../cancel.",
+   "add_acceptance": [
+    "Given an erasure request, then within 24 h the patient receives a plain-language plan of what will be erased now and what is retained, with legal basis and end date",
+    "Given India, then the patient can cancel the erasure within the 48 h notice window",
+    "Given execution, then WhatsApp opt-ins are removed in Comms, exchange artefacts referencing the person are revoked and an erasure certificate is stored"
+   ],
+   "add_also_touches": [
+    "core/consent",
+    "core/exchange"
+   ],
+   "add_source_refs": [
+    "SC-50",
+    "SC-53"
+   ]
+  },
+  {
+   "id": "PLT-049",
+   "append_context": "Reconciliation: IDC-024 merged here. Adds per-patient retention_clocks per data class computed from last activity (tenant table, FORCE RLS); placing a legal hold needs owner step-up; KSA and Qatar periods stay pending counsel and ship only as platform-owned rules (FRD DPO-05A).",
+   "add_acceptance": [
+    "Given an India tenant, then retention defaults are active from day one and shown read-only in Settings → Privacy, with no API to shorten them",
+    "Given a legal hold, then every blocked retention or erasure attempt is logged"
+   ],
+   "add_source_refs": [
+    "SC-52",
+    "CONS §8"
+   ]
+  },
+  {
+   "id": "IDC-022",
+   "append_context": "Reconciliation: uses the DSR engine owned by PLT-047 (dsr_requests, /v1/privacy/requests/{id}/decision); this story owns only the correction resolution flow.",
+   "add_depends_on": [
+    "PLT-047"
+   ]
+  },
+  {
+   "id": "PLT-021",
+   "append_context": "Reconciliation: IDC-053 merged here; Consent & Identity reviews the M0 owner contacts.",
+   "add_acceptance": [
+    "Given the M0 inventory re-run, then the list of non-FACILITY brands is empty or each owner has been contacted and recorded before M4 ships"
+   ],
+   "add_source_refs": [
+    "SC-15",
+    "B-25"
+   ]
+  },
+  {
+   "id": "HOS-053",
+   "append_context": "Reconciliation: ADM-058 merged here. Weekly shift templates from the clinic hr module (ADM-054) seed the roster.",
+   "add_acceptance": [
+    "Given approved leave, when the roster is built, then the person is excluded and the gap shows float-pool suggestions within weekly hour limits (<= 48 h)",
+    "Given the roster is published, then rostered staff are notified (WhatsApp only with staff consent) and the roster is read-only except via swaps"
+   ],
+   "add_depends_on": [
+    "ADM-054"
+   ]
+  },
+  {
+   "id": "HOS-054",
+   "append_context": "Reconciliation with ADM-056/ADM-057 (legitimate split): leave_requests and leave_balances are created once by ADM-056 (Phase 2 clinic leave with doctor patient impact); this story extends them with shift swaps and roster 'L' marking and does not create a second leave_requests table. Payroll file formats are ADM-057; this story only adds rostered shift and overtime columns.",
+   "add_depends_on": [
+    "ADM-056",
+    "ADM-057"
+   ]
+  },
+  {
+   "id": "ACC-013",
+   "append_context": "Reconciliation: ADM-008 merged here. The preset definition is versioned; the owner-doctor role bundle comes from PLT-016. The generic preset catalogue (GET /v1/setup/presets, facility_presets) is built by ADM-009 (T-351) with Solo as its first entry calling this endpoint; the setup wizard (ADM-007) calls it at the clinic-type step.",
+   "add_acceptance": [
+    "Given the Solo preset is applied, then the owner sees a list of every setting it changed within 2 s",
+    "Given the owner later turns vitals back on, then only that toggle changes and the clinic is marked 'Solo (customised)'",
+    "Given the preset is re-applied on a clinic with existing visits, then no clinical or billing data is changed"
+   ],
+   "add_source_refs": [
+    "AD-01",
+    "ASM-04"
+   ]
+  },
+  {
+   "id": "ADM-009",
+   "append_context": "Reconciliation: owns the facility_presets catalogue and /v1/setup/presets orchestrator moved from dropped ADM-008; Solo preset content and the booking-policy apply endpoint are ACC-013."
+  },
+  {
+   "id": "FEF-008",
+   "append_context": "Reconciliation: FIN-002 merged here; Money & Pharmacy reviews. Covers visit checkout, OTC checkout and package sale submits.",
+   "add_acceptance": [
+    "Given the same Idempotency-Key reused with a different amount, then the server returns 422 IDEMPOTENCY_KEY_REUSED and the UI shows a clear message",
+    "Given checkout, OTC checkout and package sale POSTs, then each sends an Idempotency-Key header (e2e network assertions)"
+   ],
+   "add_depends_on": [
+    "FIN-001"
+   ]
+  },
+  {
+   "id": "FEF-037",
+   "append_context": "Reconciliation: FIN-007 merged here. The checkout preview calls POST /v1/billing/quotes (FIN-008); lint also bans toFixed on money values.",
+   "add_acceptance": [
+    "Given a cart with a discount and mixed tax rates, then the preview total equals the issued invoice to the minor unit across 100 randomised e2e cases"
+   ],
+   "add_depends_on": [
+    "FIN-008"
+   ]
+  },
+  {
+   "id": "FEF-047",
+   "append_context": "Reconciliation with FIN-012 (legitimate split, ownership note on invoice PDF rendering): Core billing renders the PDF once per invoice version in the worker, stores it (billing_documents) and owns GET /document and POST /share; this story owns the staff-web A4/80 mm print layouts, receipt print and share UI. The BFF react-pdf route is dropped so staff, WhatsApp links and patient-web get the identical document.",
+   "add_depends_on": [
+    "FIN-012"
+   ]
+  },
+  {
+   "id": "FIN-012",
+   "append_context": "Reconciliation with FEF-047 (legitimate split): the staff-web print route and layouts are built in FEF-047 on the FEF-046 kit; this story keeps the document model, server-side PDF rendering, storage and the share endpoint."
+  },
+  {
+   "id": "ACC-035",
+   "sprint": "S8",
+   "append_context": "Reconciliation with FEF-062 (legitimate split): the help panel and tour engine are built once in FEF-062; this story owns per-role tour and tip content, vernacular videos, the train-the-trainer pack, the competency check and staff_onboarding_progress. Content work starts in S6; in-app delivery lands with FEF-062 in S8.",
+   "add_depends_on": [
+    "FEF-062"
+   ]
+  },
+  {
+   "id": "FEF-062",
+   "append_context": "Reconciliation with ACC-035: tour completion and competency are stored by ACC-035 (staff_onboarding_progress); content, videos and training are ACC-035."
+  },
+  {
+   "id": "ADM-041",
+   "append_context": "Reconciliation (legitimate split): tenant_daily_metrics and doctor_daily_metrics are created by OPS-010 (T-112); this story only adds time-KPI columns and the overview UI. ETA accuracy comes from ACC-019's eta_accuracy_daily.",
+   "add_depends_on": [
+    "OPS-010",
+    "ACC-019"
+   ]
+  },
+  {
+   "id": "ADM-045",
+   "append_context": "Ownership note (OLAP store): Data & Infra (OPS) picks and runs the regional OLAP store, starting with the per-cell Postgres analytics replica (OPS-011) and moving to ClickHouse only on measured need; CDC comes from OPS-019. This story builds the chain models on it; OLAP schema numbers follow the 'olap' band.",
+   "add_depends_on": [
+    "OPS-019",
+    "OPS-011"
+   ]
+  },
+  {
+   "id": "FEF-045",
+   "append_context": "Reconciliation (legitimate split, T-271): calendar rules, prayer blocks and Ramadan hours are computed in Core by ADM-029..031; this story only renders them.",
+   "add_depends_on": [
+    "ADM-029",
+    "ADM-030",
+    "ADM-031"
+   ]
+  },
+  {
+   "id": "OPS-044",
+   "append_context": "Reconciliation (legitimate split, T-021/T-072): the hazard log content, CSO appointment and signatures are Clinical (CLN-002, CLN-007); this story owns the tooling (hazard log as code, nightly gate, release report).",
+   "add_depends_on": [
+    "CLN-002",
+    "CLN-007"
+   ]
+  },
+  {
+   "id": "CLN-007",
+   "append_context": "Reconciliation: the first safety test report in S2 is assembled manually from the signed hazard log; OPS-044 (S7) automates it as hazard log as code with a nightly gate."
+  },
+  {
+   "id": "HOS-005",
+   "append_context": "Ownership note: queue_entries stays the encounter spine owned by core visit (Patient Access); inpatient segments (class='inpatient') are opened through VisitCommands, not direct SQL, and ACC-022 owns the class='ambulatory' filter and partial index. If Clinical later splits ENCOUNTER from queue_entries, admissions.encounter_id moves with it.",
+   "add_depends_on": [
+    "ACC-022"
+   ]
+  },
+  {
+   "id": "HOS-020",
+   "append_context": "Ownership note: ER visits reuse queue_entries with class='emergency' via VisitCommands (see HOS-005 and ACC-022).",
+   "add_depends_on": [
+    "ACC-022"
+   ]
+  },
+  {
+   "id": "HOS-044",
+   "append_context": "Ownership note (shared stock ledger): there is one inventory engine, owned by core pharmacy (Money & Pharmacy) behind StockCommands. Stores use stock_batches and pharmacy_stock_movements generalised with a store/location id and item category, and the T-214 supplier/PO/GRN model; no separate store_stock_ledger is created. This story owns the non-pharmacy item categories, par levels, requisitions and hospital stores UI.",
+   "add_depends_on": [
+    "PHL-003",
+    "PHL-005"
+   ]
+  },
+  {
+   "id": "HOS-046",
+   "append_context": "Ownership note (shared stock ledger): there is one inventory engine, owned by core pharmacy (Money & Pharmacy) behind StockCommands. Stores use stock_batches and pharmacy_stock_movements generalised with a store/location id and item category, and the T-214 supplier/PO/GRN model; no separate store_stock_ledger is created. This story owns the non-pharmacy item categories, par levels, requisitions and hospital stores UI.",
+   "add_depends_on": [
+    "PHL-003",
+    "PHL-005"
+   ]
+  },
+  {
+   "id": "ACC-058",
+   "append_context": "Reconciliation (legitimate split, T-256): the relationship and scope model is identity.person_relationships from IDC-036; this story owns the patient-facing invite, approve, downgrade and revoke flow and the caregiver notification fan-out, and consumes identity.relationship.changed.v1.",
+   "add_depends_on": [
+    "IDC-036"
+   ]
+  },
+  {
+   "id": "ACC-048",
+   "append_context": "Ownership note: these pages mount in the patient-web shell scaffolded by FEF-061; Patient Access owns apps/patient-web after the scaffold (doc 06 §8.1).",
+   "add_depends_on": [
+    "FEF-061"
+   ]
+  },
+  {
+   "id": "ACC-050",
+   "append_context": "Ownership note: these pages mount in the patient-web shell scaffolded by FEF-061; Patient Access owns apps/patient-web after the scaffold (doc 06 §8.1).",
+   "add_depends_on": [
+    "FEF-061"
+   ]
+  },
+  {
+   "id": "FEF-061",
+   "append_context": "Ownership note: FEF scaffolds apps/patient-web once (shell, i18n, auth to secure links, design tokens); afterwards Patient Access owns the app in CODEOWNERS (doc 06 §8.1). IDC-015 secure links, IDC consent approvals and ACC booking pages plug in as features."
+  },
+  {
+   "id": "IDC-015",
+   "append_context": "Ownership note: the patient-web pages for secure links mount in the FEF-061 shell; this story owns the link, OTP and document API."
+  },
+  {
+   "id": "ACC-014",
+   "add_tracker_refs": [
+    "T-373"
+   ],
+   "append_context": "Reconciliation (T-373 split): this story carries the KSA gender-of-doctor attribute and filter; the default for KSA stays off until DEC-27/CEO-13 decide. Other T-373 parts: prayer-window sends COM-024, mada/STC Pay FIN-024, NCNICC/PDPL infrastructure evidence OPS-065."
+  },
+  {
+   "id": "OPS-065",
+   "append_context": "Reconciliation (T-373 split): this story covers only infrastructure evidence and the pen test; prayer-window sends are COM-024, mada/Apple Pay/STC Pay FIN-024, gender-of-doctor ACC-014. The SDAIA registration and RoPA export of the PDPL pack belong to IDC and still need a story before the first KSA tenant."
+  }
+ ],
+ "migration_bands": {
+  "PLT": "core V100–V199 (public and master schema; replaces PLT's V1xx placeholders). Master-schema changes before Control Plane extraction come from this band.",
+  "OPS": "core V86–V99 already used for Sprint 0 (V86, V88, V89–V96, V97, V98 FORCE RLS, V99 remaining-table RLS); later work V200–V299 (replaces V1xx/V2xx placeholders).",
+  "ACC": "core V300–V399 (keeps its V300–V338 as written; its V337 identity-schema change moves to the identity sequence).",
+  "ADM": "core V400–V499: renumber the written V300–V336 by +100 (V300→V400 … V336→V436), master-schema files included.",
+  "COM": "core V500–V599 for Core-side tables (e.g. notification_requests); replaces V1xx.",
+  "HOS": "core V600–V699 (keeps V601–V660 as written).",
+  "CLN": "core V700–V799 (replaces V1xx placeholders).",
+  "PHL": "core V800–V899 (replaces V1xx placeholders).",
+  "FIN": "core V900–V999 (replaces V1xx placeholders).",
+  "IDC": "core public schema V1000–V1099 (privacy_notices, consents, patient_proxies and other tenant tables); identity and consent schemas use their own sequences below.",
+  "FEF": "core V1100–V1149 for the small Core changes FEF stories carry (staff_preferences, web_push_subscriptions, invoice document read), reviewed by PLT.",
+  "comms-gateway": "Own Flyway history in services/comms-gateway (Comms DB), owned by COM: COM V1–V99 (keeps comms/V1–V23); OPS V100–V119 (OPS-069 whatsapp_messages partitioning); other domains ask COM for numbers V120+. No Comms table is created from Core's history.",
+  "patient-edge": "Own Flyway history in services/patient-edge (Edge DB), owned by ACC: ACC V1–V99 (keeps patient-edge V1–V8; COM's edge/V1–V4 files are void with the dropped stories); remaining COM bot-flow stories take V100–V149 through ACC review.",
+  "control-plane": "Own Flyway history in services/control-plane (CP DB), owned by PLT: PLT V1–V99 (control-plane V1 initial, V2 saga, V3 login_routes); ADM V100–V199 (renumber cp/V1–V14 to cp/V100–V114); COM-018 onboarding tracker V200–V209.",
+  "identity": "db/migrations/identity (own owner role), owned by IDC: IDC V1–V99 (keeps identity/V1–V8); any other domain (e.g. ACC's V337) requests V100+ from IDC.",
+  "consent": "db/migrations/consent (own owner role), owned by IDC: IDC V1–V99 (keeps consent/V1–V2).",
+  "clinical-intelligence": "Own store of the Python service, owned by CLN: cds/V1–V99.",
+  "olap": "Regional OLAP store schema, owned by OPS: OPS V1–V49; ADM/HOS reporting models V50–V99 (ADM-045 olap/V1 becomes olap/V50).",
+  "_rules": "Flyway runs with outOfOrder=true because squads merge in parallel bands; the OPS-002 migration lint plus a central VERSIONS file fails any PR whose version is outside its domain's band or reuses a number; numbers inside a band go in merge order; a migration may only use another domain's objects once that story is merged (depends_on); applied migrations are never edited; repeatable scripts are named R__<domain>_*."
+ },
+ "ownership_notes": [
+  {
+   "topic": "Event naming: notification command and related events",
+   "decision": "The canonical command is comms.notification.requested.v1 (with comms.notification.cancelled.v1), emitted only through NotificationPort (COM-004), which writes notification_requests plus an outbox event carrying ids only (claim check). doc 06's 'notification.requested' is an alias and is retired: ADM, CLN, FIN, HOS and PHL stories that wrote 'notification.requested' use the canonical name. Inbound messages are comms.inbound.received.v1 (COM-030); entitlement changes are platform.entitlements.changed.v1 (PLT-059); privacy notices organization.privacy_notice.published.v1 (IDC-003/025). New names are registered in the T-079 event catalogue.",
+   "domains": "COM,ACC,ADM,CLN,FIN,HOS,PHL,PLT,IDC,OPS",
+   "rationale": "Matches the <module>.<entity>.<verb>.v1 rule in the brief and gives one contract owner (COM) for all senders."
+  },
+  {
+   "topic": "Patient Access Edge and WhatsApp bot ownership",
+   "decision": "Patient Access (ACC) owns services/patient-edge: the service, its database, the conversation framework and the booking, family, registration, reminder-landing, status and GA flows (ACC-038..045). Comms (COM) owns sending, templates, webhooks, inbox, STOP, reminder scheduling and the provider stub. COM's remaining Edge flows (COM-016, 041, 045, 047, 049, 050, 051) are built on ACC-039 and reviewed by ACC as code owner.",
+   "domains": "ACC,COM",
+   "rationale": "Brief and ADR-01: conversation logic lives in patient-edge and sending in comms-gateway; tracker Team for T-120/162/165/166/189 is Patient Access."
+  },
+  {
+   "topic": "Shared inbox access path",
+   "decision": "staff-web calls Core /v1/inbox/**; Core checks staff auth, tenant and permission, writes audit and PHI read logs, then calls the Comms Gateway internal API over mTLS (aud=internal). Comms never validates staff JWTs. New messages reach screens through the core.realtime SSE topic inbox:{tenantId}.",
+   "domains": "COM,FEF,PLT,ACC",
+   "rationale": "Keeps one staff identity and audit path (ADR-06/07); Comms stays contract-only with no staff session handling."
+  },
+  {
+   "topic": "SSE transport and queue board (T-094)",
+   "decision": "ACC owns the SSE endpoint, fan-out and /v1/queue/board (ACC-021, ACC-022); FEF owns the browser client (FEF-020); OPS owns Valkey sizing, the probe dashboards and the later extraction into a stateless service (OPS-024).",
+   "domains": "ACC,OPS,FEF",
+   "rationale": "T-094 is a Patient Access task; doc 06 lists realtime under Platform & Trust, but splitting one endpoint across two squads would duplicate the build."
+  },
+  {
+   "topic": "Inpatient and ER visit record (reuse of queue_entries)",
+   "decision": "Hospital admissions and ER visits reuse queue_entries as the encounter segment (class 'ambulatory' | 'inpatient' | 'emergency') so notes, prescriptions, orders and invoices keep their FKs. Core visit (Patient Access) stays the single writer: HOS opens segments through VisitCommands, and ACC-022 owns the class='ambulatory' filter and partial index on every OPD queue, board and ETA query. If Clinical later splits ENCOUNTER out, admissions.encounter_id and er_visits.encounter_id move with it.",
+   "domains": "HOS,ACC,CLN",
+   "rationale": "Avoids a parallel encounter table in Phase 5 and keeps ADR-02 single-writer table ownership."
+  },
+  {
+   "topic": "patient-web skeleton",
+   "decision": "FEF scaffolds apps/patient-web once (FEF-061: shell, i18n, secure-link auth, tokens). After the scaffold Patient Access owns the app in CODEOWNERS (doc 06 §8.1); IDC (secure links, consent approvals), ACC (booking, live queue, aggregator) and COM add features on it.",
+   "domains": "FEF,ACC,IDC,COM",
+   "rationale": "One shell built by the UI guild; ownership then follows doc 06 §8.1 so no squad scaffolds a second app."
+  },
+  {
+   "topic": "Privacy operations module placement",
+   "decision": "DSR intake/export, erasure, retention clocks and legal hold live in core module 'patient' (package patient/internal/privacy) and are owned by Platform & Trust privacy operations (PLT-047..049). No new 'privacy' module for now. IDC keeps consent capture, notices, the correction flow (IDC-022) and the exchange; COM keeps the WhatsApp intake flow (COM-051); ADM keeps the compliance card (ADM-033).",
+   "domains": "PLT,IDC,COM,ADM",
+   "rationale": "Erasure and retention act on patient-owned data; ADR-01/02 discourage new modules; T-237/T-238 are Platform & Trust tasks."
+  },
+  {
+   "topic": "OLAP store owner",
+   "decision": "Data & Infra (OPS) chooses and runs the regional OLAP store per cell, starting with the Postgres analytics replica (OPS-011) and moving to ClickHouse only on measured need; CDC comes from OPS-019. ADM-045/046 build chain models and dashboards on it; HOS-017/HOS-055 read it. OPS-010 owns the in-database rollups.",
+   "domains": "OPS,ADM,HOS",
+   "rationale": "ADR-01: reporting becomes CDC to OLAP; infra/data-platform is an OPS module and the store must stay in-region (ADR-09)."
+  },
+  {
+   "topic": "staff.is_clinician column",
+   "decision": "PLT-016 (iam) owns the column, backfill and ActorDirectory read, pulled into S2 so CLN-005 can use it. Clinical sets the flag from verified licence data only through iam.api; ADM, ACC and HOS read it via ActorDirectory for doctor pickers, rosters and OT lists.",
+   "domains": "PLT,CLN,ADM,ACC,HOS",
+   "rationale": "T-305 is a Platform & Trust task and iam owns staff (doc 06 §4.4); one writer avoids the role-name ILIKE problem coming back."
+  },
+  {
+   "topic": "Shared stock ledger for pharmacy and hospital stores",
+   "decision": "One inventory engine owned by core pharmacy (Money & Pharmacy) behind StockCommands: stock_batches and pharmacy_stock_movements gain a store/location id and item category, and T-214 suppliers, POs and GRNs serve both. HOS-044/046 add non-pharmacy item categories, par levels, requisitions and the stores UI, and do not create store_stock_ledger.",
+   "domains": "PHL,HOS,FIN",
+   "rationale": "doc 06 §4.4 makes pharmacy the single writer of stock; ADR-01 rejects parallel engines."
+  },
+  {
+   "topic": "Tenancy, RLS and audit partitioning",
+   "decision": "Data & Infra builds role split and FORCE RLS (OPS-003), composite tenant FKs (OPS-005) and audit/high-volume partitioning (OPS-068/069); Platform & Trust reviews them as security acceptance and owns brand-widening containment and removal (PLT-018, PLT-021), the audit chain (PLT-038) and phi_read_log (PLT-039). PLT-018 and OPS-003 ship together in S0.",
+   "domains": "OPS,PLT,IDC",
+   "rationale": "Tracker Team for T-011/T-041/T-132/T-156/T-209 is Data & Infra; T-010/T-133/T-048/T-053 are Platform & Trust."
+  },
+  {
+   "topic": "Control Plane, provisioning, entitlements and roles",
+   "decision": "Platform & Trust owns provisioning CAS (PLT-058), entitlements and kill switches (PLT-059), Control Plane extraction, saga and login router (PLT-061..063) and role presets (PLT-016). Owner Admin keeps the commercial plan catalogue (ADM-034), owner plan page (ADM-037) and the owner/operator screens (ADM-018..020).",
+   "domains": "PLT,ADM",
+   "rationale": "Tracker Team for T-087/T-123/T-207/T-305 is Platform & Trust and doc 06 §8.1 gives it the Control Plane."
+  },
+  {
+   "topic": "Multi-branch lite (T-332)",
+   "decision": "Platform & Trust builds it in PLT-022..025. Billing keeps series and tax logic (FIN), Comms keeps sender routing data, the Edge asks 'which branch?' (ACC-040), and the cross-branch link migrates into identity.person_links when IDC-032..039 land in Phase 3.",
+   "domains": "PLT,ADM,IDC,COM,FIN,ACC",
+   "rationale": "T-332 is a Platform & Trust tenancy task; the PLT design works in Phase 2 without the Phase 3 person plane."
+  },
+  {
+   "topic": "Invoice PDF rendering",
+   "decision": "Core billing renders invoice and receipt PDFs in the worker once per invoice version and stores them (FIN-012); staff-web prints HTML layouts from the same document model (FEF-047); the BFF react-pdf route is dropped.",
+   "domains": "FIN,FEF",
+   "rationale": "WhatsApp links and patient-web must produce the document without a staff session, and one renderer keeps the legal text identical."
+  },
+  {
+   "topic": "Idempotency-Key storage",
+   "decision": "PLT-026 owns the IdempotencyFilter and idempotency_keys table (T-031); Core internal APIs (ACC-038), billing (FIN) and the client (FEF-008) use it and create no second table.",
+   "domains": "PLT,ACC,FIN,FEF",
+   "rationale": "COM-035 and FEF/FIN stories each assumed a different owner; one filter in core shared/web matches doc 06 §5.1."
+  },
+  {
+   "topic": "KSA pack split (T-373)",
+   "decision": "Legitimate split: prayer-window sends COM-024, mada/Apple Pay/STC Pay FIN-024, NCNICC/PDPL infrastructure evidence and pen test OPS-065, gender-of-doctor attribute ACC-014 (default off until DEC-27/CEO-13). Gap: the PDPL SDAIA registration and RoPA export belong to IDC and need a story before the first KSA tenant.",
+   "domains": "COM,FIN,OPS,ACC,IDC",
+   "rationale": "Each part sits with the module that owns the behaviour; the tracker task is a bundle."
+  },
+  {
+   "topic": "Regional calendar (T-271)",
+   "decision": "Legitimate split: Core organization computes Hijri dates, weekends, prayer blocks and Ramadan hours (ADM-029..031) and scheduling consumes the blocks (ACC); FEF-045 renders them and depends on ADM-029..031.",
+   "domains": "ADM,FEF,ACC",
+   "rationale": "Backend rules and UI rendering are different layers."
+  },
+  {
+   "topic": "Leave, shifts and ward roster",
+   "decision": "Owner Admin owns the clinic hr base (ADM-054 shifts, ADM-056 leave_requests/balances, ADM-057 payroll export); Hospital owns ward rostering and swaps (HOS-053/054) on top of those tables.",
+   "domains": "ADM,HOS",
+   "rationale": "T-381 is a Hospital task, but both domains created leave_requests; one table owner avoids a fork."
+  },
+  {
+   "topic": "Clinical safety case (T-021/T-072/T-160)",
+   "decision": "Clinical with the CSO owns hazard log content and sign-off (CLN-002, CLN-007); QA & CI (OPS) owns hazard log as code, the nightly journey gate and the release safety report (OPS-044); FEF writes the Playwright journeys (FEF-049..051).",
+   "domains": "CLN,OPS,FEF",
+   "rationale": "Sign-off rights stay with the CSO (doc 06 §8.1); tooling stays with QA & CI."
+  },
+  {
+   "topic": "Help, tours and training (T-318)",
+   "decision": "FEF-062 builds the help panel and tour engine once; ACC-035 owns content, vernacular videos, training and competency tracking.",
+   "domains": "FEF,ACC",
+   "rationale": "Framework in the shell, content with the squad that knows the desk work."
+  }
+ ]
+}

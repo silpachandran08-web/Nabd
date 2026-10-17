@@ -2,10 +2,14 @@
 """Merge the per-domain spec files into the Workbench data bundle.
 
 Usage:
-  python3 workbench/tools/merge_specs.py <specs_dir> <tracker_tasks.json>
+  python3 workbench/tools/merge_specs.py <specs_dir> <tracker_tasks.json> [reconcile.json]
 
 Reads every <DOMAIN>.json in specs_dir (files starting with "_" are ignored),
-validates them, and writes workbench/data/specs.json. Prints a validation
+validates them, applies the optional reconciliation file (cross-domain
+ownership decisions: stories to drop and their replacements, small edits to
+surviving stories, migration number bands per domain), resolves dependencies
+written as tracker ids (T-xxx) to the stories that cover them, and writes
+workbench/data/specs.json. Prints a validation
 report: duplicate ids, unknown personas/services, dangling dependencies and
 tracker tasks that no story covers.
 """
@@ -55,7 +59,7 @@ STATUS_DEFAULT = "backlog"
 def load_specs(spec_dir):
     out = []
     for name in sorted(os.listdir(spec_dir)):
-        if not name.endswith(".json") or name.startswith("_"):
+        if not name.endswith(".json") or name.startswith("_") or name in ("tracker_tasks.json", "reconcile.json"):
             continue
         with open(os.path.join(spec_dir, name)) as f:
             out.append((name, json.load(f)))
@@ -101,6 +105,47 @@ def main():
             d["epics"].append(e)
         domains.append(d)
 
+    rec = json.load(open(sys.argv[3])) if len(sys.argv) > 3 else {}
+    dropped = {d["id"]: d for d in rec.get("drop", [])}
+    replaced = {k: as_list(v.get("replaced_by")) for k, v in dropped.items()}
+    stories = [s for s in stories if s["id"] not in dropped]
+    for d in domains:
+        for e in d["epics"]:
+            e["stories"] = [x for x in e["stories"] if x not in dropped]
+        d["epics"] = [e for e in d["epics"] if e["stories"]]
+    by_id = {s["id"]: s for s in stories}
+    for ed in rec.get("edit", []):
+        s = by_id.get(ed["id"])
+        if not s:
+            problems.append(f"reconcile edit for unknown story {ed['id']}")
+            continue
+        for k in ("depends_on", "tracker_refs", "source_refs", "acceptance", "also_touches", "other_personas"):
+            for v in as_list(ed.get("add_" + k)):
+                if v not in s[k]:
+                    s[k].append(v)
+        if ed.get("append_context"):
+            s["context"] = (s.get("context", "") + "\n\n" + ed["append_context"]).strip()
+        for k in ("priority", "phase", "sprint", "service", "module", "persona", "estimate_days"):
+            if k in ed:
+                s[k] = ed[k]
+    bands = rec.get("migration_bands", {})
+    for d in domains:
+        d["migration_band"] = bands.get(d["id"], "")
+        d["ownership_notes"] = [n for n in rec.get("ownership_notes", []) if d["id"] in str(n.get("domains", ""))]
+    # Resolve dependencies: dropped stories -> replacements, tracker ids -> covering stories.
+    cover_pre = defaultdict(list)
+    for s in stories:
+        for t in s["tracker_refs"]:
+            cover_pre[str(t)].append(s["id"])
+    for s in stories:
+        out = []
+        for dep in s["depends_on"]:
+            dep = str(dep)
+            targets = replaced.get(dep) if dep in dropped else ([x for x in cover_pre.get(dep, []) if x != s["id"]] if re.match(r"^T-\d{3}$", dep) else [dep])
+            for t in targets or [dep]:
+                if t not in out and t != s["id"]:
+                    out.append(t)
+        s["depends_on"] = out
     ids = {s["id"] for s in stories}
     for sid, n in seen.items():
         if n > 1:
@@ -130,6 +175,8 @@ def main():
         "stories": stories,
         "tracker": trk,
         "status_default": STATUS_DEFAULT,
+        "reconciliation": {"dropped": [{"id": k, "replaced_by": replaced[k], "reason": v.get("reason", "")} for k, v in dropped.items()],
+                           "notes": rec.get("ownership_notes", []), "migration_bands": bands},
     }
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w") as f:
@@ -139,6 +186,7 @@ def main():
     subs = sum(len(s["subtasks"]) for s in stories)
     print(f"domains={len(domains)} stories={len(stories)} subtasks={subs} estimate_days={est:.0f}")
     print(f"tracker covered {len(trk) - len(uncovered)}/{len(trk)}; uncovered ({len(uncovered)}): {', '.join(uncovered[:40]) or 'none'}{' ...' if len(uncovered) > 40 else ''}")
+    print(f"dropped by reconciliation: {len(dropped)}")
     print(f"problems: {len(problems)}")
     for p in problems[:60]:
         print("  ", p)

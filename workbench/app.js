@@ -372,7 +372,15 @@
   }
 
   function viewQuestions() {
-    var h = head("Open questions", "Questions the principal engineers raised while specifying their domains. Resolve them before the affected stories start.");
+    var h = head("Open questions", "Questions the principal engineers raised while specifying their domains, and the chief architect's ownership decisions. Resolve open questions before the affected stories start.");
+    var rec = S.data.reconciliation || {};
+    if ((rec.notes || []).length) h += '<div class="panel"><h2>Ownership decisions <small>' + rec.notes.length + '</small></h2><div class="tw"><table><thead><tr><th>Topic</th><th>Decision</th><th>Domains</th><th>Why</th></tr></thead><tbody>' +
+      rec.notes.map(function (n) { return "<tr><td>" + esc(n.topic) + "</td><td>" + esc(n.decision) + '</td><td class="mono">' + esc(n.domains) + "</td><td>" + esc(n.rationale || "") + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
+    var bands = rec.migration_bands || {};
+    if (Object.keys(bands).length) h += '<div class="panel"><h2>Migration number bands</h2><p class="ctx" style="margin:0 0 10px">Each domain numbers its Flyway migrations inside its own band so squads never collide.</p><dl class="kv">' +
+      Object.keys(bands).map(function (k) { return '<dt class="mono">' + esc(k) + '</dt><dd class="mono">' + esc(bands[k]) + "</dd>"; }).join("") + "</dl></div>";
+    if ((rec.dropped || []).length) h += '<div class="panel"><h2>Merged duplicates <small>' + rec.dropped.length + '</small></h2><p class="ctx" style="margin:0 0 10px">Stories two domains had both written. The duplicate was removed and its unique details folded into the story that remains.</p><div class="tw"><table><thead><tr><th>Removed</th><th>Now built in</th><th>Why</th></tr></thead><tbody>' +
+      rec.dropped.map(function (d) { return '<tr><td class="mono">' + esc(d.id) + '</td><td><div class="links">' + (d.replaced_by || []).map(function (r) { return '<button class="linkchip" data-story="' + esc(r) + '">' + esc(r) + "</button>"; }).join("") + "</div></td><td>" + esc(d.reason) + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
     h += S.data.domains.map(function (d) {
       if (!d.open_questions.length) return "";
       return '<div class="panel"><h2>' + esc(d.id + " · " + d.name) + " <small>" + d.open_questions.length + '</small></h2><ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">' +
