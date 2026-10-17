@@ -78,12 +78,10 @@ export default function BillingPage() {
       setCanSetup(can("setup:view"));
       setRegion(getIdentity()?.tenantRegion);
       // PHA-010: counter sales exist only in hybrid/in_house pharmacy mode and need billing:create.
-      // A failed lookup (e.g. no pharmacy:view) just leaves the button absent.
+      // otc-charges needs only billing:view and returns 409 in external mode, so a 200 means counter sales
+      // are available (no pharmacy:view needed). Any failure leaves the button absent.
       if (can("billing:create") && can("billing:view")) {
-        void authedFetch("/pharmacy/settings").then(async (r) => {
-          const mode = r?.ok ? (await r.json()).mode : null;
-          setCanOtc(mode === "hybrid" || mode === "in_house");
-        }).catch(() => {});
+        void authedFetch("/billing/otc-charges").then((r) => setCanOtc(!!r?.ok)).catch(() => {});
       }
       const res = await authedFetch("/billing/day-close");
       if (!res) return;
