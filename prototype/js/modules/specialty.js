@@ -47,7 +47,7 @@
     }).join("") + "</div>";
   }
   function kpis(list) {
-    return '<div class="grid g4 kpis">' + list.map(function (k) { return ui.kpi(k[0], L(k[1], k[2], k[3]), k[4] ? ui.icon(k[6] || "dot", "xs") + esc(k[4]) : "", k[5]); }).join("") + "</div>";
+    return '<div class="grid g4 kpis">' + list.map(function (k) { return ui.kpi('<bdi class="num">' + k[0] + "</bdi>", L(k[1], k[2], k[3]), k[4] ? ui.icon(k[6] || "dot", "xs") + "<bdi>" + esc(k[4]) + "</bdi>" : "", k[5]); }).join("") + "</div>";
   }
   function sub(title, right) { return '<div class="sp-sh"><h3 class="h">' + title + "</h3>" + (right || "") + "</div>"; }
   function chip(on, label, o) { return '<button class="chip' + (on ? " on" : "") + '"' + attrs(o) + ">" + (on ? ui.icon("check", "xs") : "") + esc(label) + "</button>"; }
@@ -107,7 +107,7 @@
     ".sp-tag .ico{width:12px;height:12px}",
     /* generic SVG */
     ".sp-svg{display:block;width:100%;height:auto;direction:ltr}",
-    ".sp-svg text{font-family:var(--font);fill:var(--tx2);font-size:10px}",
+    ".sp-svg text{font-family:var(--font);fill:var(--tx2);font-size:11px}",
     ".sp-svg .t3{fill:var(--tx3)}.sp-svg .t1{fill:var(--tx);font-weight:600}",
     ".sp-ax{stroke:var(--b-str);stroke-width:1;fill:none}.sp-gl{stroke:var(--div);stroke-width:1;fill:none}.sp-gl2{stroke:var(--b-sub);stroke-width:1;fill:none}",
     ".sp-box{border:1px solid var(--b-sub);border-radius:var(--r-lg);background:var(--sunk);padding:10px;min-width:0}",
@@ -120,7 +120,7 @@
     ".sp-sw.crown{background:var(--warn-t);border-color:var(--warn)}.sp-sw.implant{background:var(--sync-t);border-color:var(--sync)}.sp-sw.missing{background:transparent;border-style:dashed;border-color:var(--tx3)}",
     ".sp-sw.watch{background:var(--urg-t);border-color:var(--urg)}.sp-sw.healthy{background:var(--s2)}",
     /* dental chart */
-    ".sp-chartw{overflow-x:auto;border:1px solid var(--b-sub);border-radius:var(--r-lg);background:var(--sunk);padding:6px 8px}",
+    ".sp-chartw{direction:ltr;overflow-x:auto;border:1px solid var(--b-sub);border-radius:var(--r-lg);background:var(--sunk);padding:6px 8px}",
     ".frame.mobile .sp-chartw .sp-svg,.frame.tablet .sp-chartw .sp-svg{min-width:620px}",
     "@media (max-width:760px){.sp-chartw .sp-svg{min-width:620px}}",
     ".sp-t{cursor:pointer;outline:none}",
@@ -206,18 +206,18 @@
     ".sp-svg text.sr{fill:var(--crit);font-weight:700;font-size:12px}.sp-svg text.sl{fill:var(--info);font-weight:700;font-size:12px}",
     ".sp-arc{fill:none;stroke:var(--s3);stroke-width:12;stroke-linecap:round}.sp-arc.v{stroke:var(--acc-fill)}.sp-arc.tg{stroke:var(--ok);stroke-width:2;stroke-dasharray:3 3}",
     /* pregnancy timeline */
-    ".sp-preg{position:relative;padding:26px 0 46px}",
+    ".sp-preg{position:relative;padding:26px 0 76px}",
     ".sp-preg .trk{display:flex;height:14px;border-radius:99px;overflow:hidden;background:var(--s3)}",
     ".sp-preg .trk i{display:block;height:100%}.sp-preg .t1{background:var(--info-t);border-inline-end:2px solid var(--bg-canvas)}.sp-preg .t2{background:var(--acc-tint2);border-inline-end:2px solid var(--bg-canvas)}.sp-preg .t3{background:var(--sub-t)}",
     ".sp-preg .fill{position:absolute;top:26px;height:14px;inset-inline-start:0;border-radius:99px;background:var(--acc-grad);opacity:.9}",
     ".sp-preg .now{position:absolute;top:14px;width:2px;height:38px;background:var(--tx);margin-inline-start:-1px}",
-    ".sp-preg .now span{position:absolute;top:-16px;inset-inline-start:50%;transform:translateX(-50%);font:600 11px/14px var(--font);white-space:nowrap;color:var(--tx)}",
-    "[dir=rtl] .sp-preg .now span{transform:translateX(50%)}",
+    ".sp-preg .nowl{position:absolute;top:0;transform:translateX(-50%);font:600 11px/14px var(--font);white-space:nowrap;color:var(--tx)}",
+    "[dir=rtl] .sp-preg .nowl{transform:translateX(50%)}",
     ".sp-preg .mk{position:absolute;top:44px;width:18px;height:18px;margin-inline-start:-9px;border-radius:6px;display:grid;place-items:center;border:1px solid var(--b-def);background:var(--s2);color:var(--tx3)}",
     ".sp-preg .mk .ico{width:11px;height:11px}.sp-preg .mk.d{background:var(--ok-t);border-color:var(--ok);color:var(--ok)}.sp-preg .mk.n{background:var(--acc-tint);border-color:var(--acc);color:var(--acc)}",
     ".sp-preg .wk{position:absolute;top:66px;font-size:10.5px;color:var(--tx3);transform:translateX(-50%);white-space:nowrap}",
     "[dir=rtl] .sp-preg .wk{transform:translateX(50%)}",
-    ".sp-preg .tl{position:absolute;top:0;font:600 10.5px/14px var(--font);letter-spacing:.4px;text-transform:uppercase;color:var(--tx3)}",
+    ".sp-preg .tl{position:absolute;top:86px;font:600 10.5px/14px var(--font);letter-spacing:.4px;text-transform:uppercase;color:var(--tx3)}",
     /* prakriti */
     ".sp-vpk{display:flex;height:14px;border-radius:99px;overflow:hidden;background:var(--s3)}",
     ".sp-vpk i{display:block;height:100%}.sp-vpk .va{background:var(--info)}.sp-vpk .pi{background:var(--urg)}.sp-vpk .ka{background:var(--ok)}",
@@ -238,7 +238,7 @@
     ".sp-sil{fill:var(--s3);stroke:var(--b-def)}",
     ".sp-stage .who{position:absolute;bottom:12px;inset-inline-start:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}",
     ".sp-stage .lbl{background:var(--s1);border:1px solid var(--b-def);border-radius:8px;padding:3px 8px;font-size:12px;font-weight:600;color:var(--tx)}",
-    ".sp-stage .top{position:absolute;top:10px;inset-inline-start:10px;inset-inline-end:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}",
+    ".sp-stage .tbar{position:absolute;top:10px;inset-inline-start:10px;inset-inline-end:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}",
     ".sp-pip{position:absolute;bottom:12px;inset-inline-end:12px;width:24%;min-width:96px;aspect-ratio:4/3;border-radius:12px;border:2px solid var(--b-str);background:var(--s2);overflow:hidden;display:grid;place-items:center}",
     ".frame.mobile .sp-pip{width:34%;bottom:60px}",
     ".sp-pip svg{position:absolute;inset:0;width:100%;height:100%}.sp-pip span{position:relative;font-size:11px;font-weight:600;color:var(--tx);background:var(--s1);border-radius:6px;padding:1px 6px;align-self:end;margin-bottom:6px}",
@@ -291,6 +291,12 @@
     ".sp-ain{width:52px;height:30px;border-radius:8px;border:1px solid var(--b-def);background:var(--s3);text-align:center;font-weight:600;font-variant-numeric:tabular-nums;color:var(--tx)}",
     ".sp-ain:focus{outline:2px solid var(--acc);outline-offset:1px}",
     ".sp-sigc{color:var(--tx)}",
+    ".sp-wl .sp-kv + .note,.sp-wl .lst + .note,.sp-wl .tw + .note,.sp-wl .fgrid + .note,.sp-wl .sp-pt + .note,.sp-wl .sp-g2 + .note{margin-top:12px}",
+    ".sp-wl span[data-toggle]{flex:none;display:inline-flex;cursor:pointer}",
+    ".sp-qa.sp-qa3{grid-template-columns:repeat(3,minmax(0,1fr))}",
+    ".drawer .sp-xr{max-width:260px}",
+    ".sp-g3k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}",
+    ".sp-qi.sp-od{border-inline-start:3px solid var(--crit)}",
     ".sp-mute{opacity:.6}"
   ].join("\n");
   if (!document.getElementById("sp-css")) { var stEl = document.createElement("style"); stEl.id = "sp-css"; stEl.textContent = CSS; document.head.appendChild(stEl); }
@@ -564,7 +570,7 @@
     var s = '<svg class="sp-svg" viewBox="0 0 ' + W + ' 204" role="group" aria-label="' + esc(prim ? "Primary dentition chart, 20 teeth" : "Adult dentition chart, 32 teeth") + '">';
     s += '<line class="sp-mid" x1="' + W / 2 + '" x2="' + W / 2 + '" y1="20" y2="184"/><line class="sp-gl2" x1="16" x2="' + (W - 16) + '" y1="100" y2="100"/>';
     s += '<text class="t1" x="10" y="104">R</text><text class="t1" x="' + (W - 10) + '" y="104" text-anchor="end">L</text>';
-    s += '<text class="t3" x="26" y="96">' + esc(L("Upper", "العلوي", "ऊपरी")) + '</text><text class="t3" x="26" y="114">' + esc(L("Lower", "السفلي", "निचला")) + "</text>";
+    s += '<text class="t3" x="' + (W / 2 + 8) + '" y="96">' + esc(L("Upper", "العلوي", "ऊपरी")) + '</text><text class="t3" x="' + (W / 2 + 8) + '" y="114">' + esc(L("Lower", "السفلي", "निचला")) + "</text>";
     return s + row(up, true) + row(lo, false) + "</svg>";
   }
   function dentLegend() {
@@ -802,7 +808,7 @@
       '<div class="chips">' + SD.dentPresets.map(function (t, i) { var on = notes.indexOf(t) >= 0; return chip(on, ["LA given", "Rubber dam", "Access opened", "Working length", "Cleaned & shaped", "Ca(OH)₂ dressing", "Next: obturation"][i], { act: "sp-dnote", arg: i }); }).join("") + "</div>" +
       '<ol class="small" style="margin:12px 0 0;padding-inline-start:18px;display:flex;flex-direction:column;gap:4px">' + notes.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ol>" +
       '<div class="btns" style="margin-top:12px">' + ui.btn(L("Dictate", "إملاء صوتي", "बोलकर लिखें"), { cls: "sm", act: "toast", arg: "Voice-to-text listening (English + " + (NB.gcc() ? "Arabic" : "Hindi") + ")", icon: "mic" }) + ui.btn(L("Save to tooth + visit", "حفظ للسن والزيارة", "दाँत + विज़िट में सेव"), { cls: "sm pri", act: "toast", arg: "Chair-side note saved to tooth " + tLabel(46) + " and today's visit", icon: "check" }) + "</div>", { icon: "edit" });
-    var att = card(L("X-rays & photos", "الأشعة والصور", "एक्स-रे और फ़ोटो") + " · DENT-02", '<div class="sp-g3">' + [["IOPA 46", "Today 10:12"], ["OPG", "14 Sep"], ["Bitewing R", "14 Sep"]].map(function (x) { return '<div class="stack s4">' + xray(x[0], true) + '<span class="small"><b>' + esc(x[0]) + '</b> <span class="faint">' + esc(x[1]) + "</span></span></div>"; }).join("") + "</div>" +
+    var att = card(L("X-rays & photos", "الأشعة والصور", "एक्स-रे और फ़ोटो") + " · DENT-02", '<div class="sp-g3k">' + [["IOPA 46", "Today 10:12"], ["OPG", "14 Sep"], ["Bitewing R", "14 Sep"]].map(function (x) { return '<div class="stack s4">' + xray(x[0], true) + '<span class="small"><b>' + esc(x[0]) + '</b> <span class="faint">' + esc(x[1]) + "</span></span></div>"; }).join("") + "</div>" +
       '<div class="btns" style="margin-top:10px">' + ui.btn(L("Attach X-ray / photo", "إرفاق أشعة / صورة", "एक्स-रे / फ़ोटो जोड़ें"), { cls: "sm", act: "toast", arg: "Sensor image pinned to tooth " + tLabel(46) + " · visible in the tooth history", icon: "upload" }) + "</div>", { icon: "image" });
     var lab = card(L("Lab work tracker", "متابعة أعمال المختبر", "लैब वर्क ट्रैकर") + " · DENT-05", '<div class="lst">' + SD.lab.map(function (l) {
       return ui.li(lead(l[5], "box"), esc((+l[0] ? L("Tooth", "السن", "दाँत") + " " + tLabel(+l[0]) : l[0]) + " · " + l[1]), esc(l[2] + " · sent " + fd(addD(TODAY, -l[3]), true)), ui.pill(l[5], l[6], l[5] === "crit" ? "alertfill" : l[5] === "ok" ? "checkcircle" : "clockh"));
@@ -869,7 +875,7 @@
         if (st === "given") given += r[2].length; if (st === "overdue") odue += r[2].length;
         var lbl = { given: "Given", due: "Due now", overdue: "Overdue", upcoming: "Upcoming" }[st];
         var chips = '<div class="chips">' + r[2].map(function (x) { return '<span class="sp-vx ' + kind + '">' + ui.icon(ic) + esc(x) + "</span>"; }).join("") + "</div>";
-        var info = st === "given" ? '<span class="small">' + fd(dd) + '</span><small class="faint" style="display:block">Batch ' + ("B" + (2400 + i * 37)) + " · " + (i % 2 ? "L thigh IM" : "R thigh IM") + "</small>"
+        var info = st === "given" ? '<span class="small">' + fd(dd) + '</span><small class="faint" style="display:block">Batch ' + ("B" + (2400 + i * 37)) + " · " + (r[1] === 0 ? "BCG L upper arm ID · OPV oral" : r[1] < 12 ? (i % 2 ? "L thigh IM" : "R thigh IM") + (/Rota/.test(r[2].join()) ? " · rota oral" : "") : /MMR|Varic/.test(r[2].join()) ? "R upper arm SC" : "L deltoid IM") + "</small>"
           : st === "upcoming" ? '<span class="small">' + fd(dd) + "</span>" : '<span class="small">' + (st === "due" ? "Oct 2026 season" : fd(addD(dob, 48 * 30.44 | 0)) + " – " + fd(dd)) + "</span>";
         var act = st === "due" || st === "overdue" ? ui.btn(L("Record", "تسجيل", "दर्ज करें"), { cls: "sm" + (st === "overdue" ? " pri" : ""), ov: "clvaccine", arg: /MMR|DTa|DTw|DPT/.test(r[2].join()) ? (/MMR/.test(r[2].join()) ? "MMR" : "DTaP") : "MMR", icon: "syringe" }) : "";
         return { cls: st === "overdue" ? "crit" : "", cells: ['<b class="small">' + esc(r[0]) + "</b>", chips, info, ui.pill(kind, lbl, ic), act] };
@@ -934,12 +940,12 @@
         [["rAC", "Right · air", "sr"], ["rBC", "Right · bone", "sr"], ["lAC", "Left · air", "sl"], ["lBC", "Left · bone", "sl"]].map(function (rw) {
           return "<tr><td><b class=\"small\">" + esc(rw[1]) + "</b></td>" + SD.freqs.map(function (f, i) { return "<td>" + (SD.aud[rw[0]][i] == null ? '<span class="faint">—</span>' : '<input class="sp-ain" aria-label="' + esc(rw[1] + " " + f + " Hz") + '" inputmode="numeric" data-change="spAudIn_' + rw[0] + ":" + i + '" value="' + audVal(rw[0], i) + '">') + "</td>"; }).join("") + "</tr>";
         }).join("") + "</tbody></table></div>";
-      body = '<div class="sp-g2" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)">' + card(L("Pure-tone audiogram", "مخطط السمع النغمي", "प्योर-टोन ऑडियोग्राम") + " · ENT-02", '<div class="sp-box">' + audiogram() + "</div>" +
+      body = card(L("Pure-tone audiogram", "مخطط السمع النغمي", "प्योर-टोन ऑडियोग्राम") + " · ENT-02", '<div class="sp-box" style="max-width:640px;margin-inline:auto">' + audiogram() + "</div>" +
         '<div class="sp-leg" style="margin-top:10px"><span><b class="critc">O</b> Right air</span><span><b class="critc">&lt;</b> Right bone</span><span><b class="infoc">X</b> Left air</span><span><b class="infoc">&gt;</b> Left bone</span></div>' +
         '<div class="tog" data-toggle="spAudPrev" role="switch" aria-checked="' + !!v("spAudPrev", false) + '" tabindex="0"><div class="t"><b>Compare with 12 Jun 2026</b><small>Right air conduction then: PTA 17 dB (normal)</small></div>' + sw(v("spAudPrev", false)) + "</div>", { icon: "ear" }) +
-        '<div class="stack s16">' + card(L("Summary", "الملخص", "सारांश"), '<dl class="sp-kv"><dt>PTA right</dt><dd>' + n(pr + " dB") + " " + ui.pill(gr[0], gr[1]) + "</dd><dt>PTA left</dt><dd>" + n(pl + " dB") + " " + ui.pill(gl[0], gl[1]) + "</dd><dt>Air–bone gap R</dt><dd>" + n(abg + " dB") + (abg >= 15 ? " · conductive" : "") + "</dd><dt>Tympanometry</dt><dd>R type B (flat) · L type A</dd></dl>" +
-          ui.note("info", "Impression: right conductive hearing loss with flat tympanogram, in keeping with otitis media with effusion. Plan: autoinflation, review with repeat audiogram in 6–8 weeks (auto recall)."), { icon: "clipboard" }) +
-        '<p class="tiny faint" style="margin:0">Grades: WHO World Report on Hearing 2021 (PTA 0.5–4 kHz shown as 0.5/1/2 kHz average here).</p></div></div>' +
+        card(L("Summary", "الملخص", "सारांश"), '<dl class="sp-kv"><dt>PTA right</dt><dd>' + n(pr + " dB") + " " + ui.pill(gr[0], gr[1]) + "</dd><dt>PTA left</dt><dd>" + n(pl + " dB") + " " + ui.pill(gl[0], gl[1]) + "</dd><dt>Air–bone gap R</dt><dd>" + n(abg + " dB") + (abg >= 15 ? " · conductive" : "") + "</dd><dt>Tympanometry</dt><dd>R type B (flat) · L type A</dd></dl>" +
+          ui.note("info", "Impression: right conductive hearing loss with flat tympanogram, in keeping with otitis media with effusion. Plan: autoinflation, review with repeat audiogram in 6–8 weeks (auto recall).") +
+        '<p class="tiny faint" style="margin:10px 0 0">Grades: WHO World Report on Hearing 2021. PTA here is the 0.5 / 1 / 2 kHz average.</p>', { icon: "clipboard" }) +
         card(L("Grid entry · air and bone conduction", "إدخال القيم · هوائي وعظمي", "ग्रिड एंट्री · वायु और अस्थि चालन"), grid + '<p class="tiny faint" style="margin:8px 0 0">Change a value and press Enter: the audiogram redraws. Or attach the audiometer image instead.</p>', { icon: "edit" });
     } else if (tab === "endo") {
       var tags = [["Ear", ["TM dull, retracted (R)", "Fluid level / bubbles (R)", "Light reflex absent (R)", "TM normal (L)"]], ["Nose", ["DNS to left", "Inferior turbinate hypertrophy", "Mucopurulent discharge"]], ["Throat", ["Tonsils grade 2", "Post-nasal drip", "Adenoid facies"]]];
@@ -970,10 +976,10 @@
   function orthWork(c) {
     var tab = v("spOrthTab", "rom"), body = "", sess = 5 + (v("spPhysioDone", false) ? 1 : 0);
     var tabs = ui.tabs("spOrthTab", [["rom", L("Range of motion", "مدى الحركة", "गति की सीमा"), "ruler"], ["ex", L("Exercise plan", "خطة التمارين", "व्यायाम योजना"), "activity"], ["inj", L("Injury, X-ray & cast", "الإصابة والأشعة والجبيرة", "चोट, एक्स-रे और कास्ट"), "bone"]], "rom");
-    var head = ptBar(NB.pname(NB.pat("p8")), "67 M · right knee osteoarthritis (Kellgren–Lawrence 3) · physio block 10 sessions", ui.pill("warn", "CKD 3 · avoid oral NSAIDs", "alertcircle") + ui.pill("sub", "Physio " + sess + "/10", "layers"));
+    var head = ptBar(NB.pname(NB.pat("p8")), "67 M · right knee osteoarthritis (Kellgren–Lawrence 3) · physio block 10 sessions", ui.pill("warn", "CKD 3 · avoid oral NSAIDs", "alertcircle") + ui.pill("sub", "Physio " + sess + "/10 done", "layers"));
     if (tab === "rom") {
       var rows = SD.rom.map(function (r) {
-        var pctR = r[2] ? Math.max(0, Math.round(r[3] / r[2] * 100)) : r[3] === 0 ? 100 : Math.max(0, 100 + r[3] * 5), pctL = r[2] ? Math.round(r[4] / r[2] * 100) : r[4] === 0 ? 100 : 100 + r[4] * 5;
+        var pctR = r[2] ? Math.max(0, Math.round(r[3] / r[2] * 100)) : r[3] === 0 ? 100 : Math.max(0, 100 + r[3] * 3), pctL = r[2] ? Math.round(r[4] / r[2] * 100) : r[4] === 0 ? 100 : 100 + r[4] * 3;
         return [ui.cellp(esc(r[0]), "Normal " + esc(r[1])), '<div class="stack s4"><span class="small">' + n(r[3] + "°") + " · " + pctR + "%</span>" + ui.bar(pctR, pctR < 85 ? "warn" : "ok") + "</div>", '<div class="stack s4"><span class="small">' + n(r[4] + "°") + " · " + pctL + "%</span>" + ui.bar(pctL, pctL < 85 ? "warn" : "ok") + "</div>", r[5] === "ok" ? ui.pill("ok", "Functional", "checkcircle") : ui.pill("warn", "Restricted", "alertcircle")];
       });
       body = '<div class="sp-g2">' + card(L("Knee flexion", "ثني الركبة", "घुटना मोड़ना"), '<div class="sp-box">' + romGauge(100, 115, 135) + "</div>" + '<div class="stack s4" style="margin-top:10px"><span class="eyebrow">' + L("Across physio sessions", "عبر جلسات العلاج", "फ़िज़ियो सत्रों में") + "</span>" + spark(SD.romTrend.map(function (x) { return ["S" + x[0], x[1], x[1] + "°"]; }), { target: 115, tl: "goal 115°", min: 80, max: 120, label: "Knee flexion over sessions" }) + "</div>", { icon: "ruler" }) +
@@ -1013,7 +1019,7 @@
     var marks = SD.anc.map(function (a) { var st = a[0] * 7 <= P.ga - 4 ? "d" : Math.abs(a[0] * 7 - P.ga) < 4 ? "n" : ""; return '<span class="mk ' + st + '" style="inset-inline-start:' + (a[0] / 40 * 100) + '%" title="' + esc("Week " + a[0] + ": " + a[1]) + '">' + ui.icon(st === "d" ? "check" : st === "n" ? "dot" : "calendar") + "</span>"; }).join("");
     var tl = '<div class="sp-preg" role="img" aria-label="' + esc("Pregnancy timeline, week " + P.w + " of 40") + '"><span class="tl" style="inset-inline-start:0">' + esc(L("1st trimester", "الثلث الأول", "पहली तिमाही")) + '</span><span class="tl" style="inset-inline-start:35%">' + esc(L("2nd", "الثاني", "दूसरी")) + '</span><span class="tl" style="inset-inline-start:70%">' + esc(L("3rd", "الثالث", "तीसरी")) + "</span>" +
       '<div class="trk"><i class="t1" style="width:35%"></i><i class="t2" style="width:35%"></i><i class="t3" style="width:30%"></i></div><div class="fill" style="width:' + Math.min(100, P.ga / 280 * 100) + '%"></div>' +
-      '<div class="now" style="inset-inline-start:' + Math.min(100, P.ga / 280 * 100) + '%"><span>' + esc(L("Today", "اليوم", "आज")) + " · " + P.w + "+" + P.d + "</span></div>" + marks +
+      '<div class="now" style="inset-inline-start:' + Math.min(100, P.ga / 280 * 100) + '%"></div><span class="nowl" style="inset-inline-start:' + Math.min(100, P.ga / 280 * 100) + '%">' + esc(L("Today", "اليوم", "आज")) + " · " + P.w + "+" + P.d + "</span>" + marks +
       [0, 12, 20, 28, 36, 40].map(function (w) { return '<span class="wk" style="inset-inline-start:' + (w / 40 * 100) + '%">' + w + "</span>"; }).join("") + "</div>";
     var rows = SD.anc.map(function (a) {
       var st = a[0] * 7 <= P.ga - 4 ? "d" : Math.abs(a[0] * 7 - P.ga) < 4 ? "n" : "", dt = addD(P.lmp, a[0] * 7);
@@ -1038,7 +1044,7 @@
     }).join("");
     var cased = card(L("Case-taking", "أخذ الحالة", "केस-टेकिंग") + " · HOM-01", '<div class="stack s8">' + secs + '<p class="tiny faint" style="margin:4px 0 0">Every section auto-saves and can be resumed another day. Follow-up visits open a short version of this form.</p></div>', { icon: "file" });
     var mx = SD.reper[0][1];
-    var rep = card(L("Repertorisation", "الريبرتوري", "रिपर्टराइज़ेशन"), '<div class="stack s8">' + SD.reper.map(function (r) { return '<div class="stack s4"><div class="row sb"><span class="small"><b>' + esc(r[0]) + '</b></span><span class="small faint">' + n(r[1] + " / " + r[2] + " rubrics") + "</span></div>" + ui.bar(r[1] / mx * 100) + "</div>"; }).join("") + "</div>" +
+    var rep = card(L("Repertorisation", "الريبرتوري", "रिपर्टराइज़ेशन"), '<div class="stack s8">' + SD.reper.map(function (r) { return '<div class="stack s4"><div class="row sb"><span class="small"><b>' + esc(r[0]) + '</b></span><span class="small faint">' + n("score " + r[1] + " · " + r[2] + " rubrics") + "</span></div>" + ui.bar(r[1] / mx * 100) + "</div>"; }).join("") + "</div>" +
       '<p class="tiny faint" style="margin:10px 0 0">Rubrics: head pain, bursting, sun aggravates; craving salt; consolation aggravates; grief, silent.</p>', { icon: "chart" });
     var rx = card(L("Remedy & potency", "العلاج والفاعلية", "रेमेडी और पोटेंसी") + " · HOM-02", '<div class="fgrid"><div class="field full"><label for="sp-rem">Remedy</label><select id="sp-rem" data-change="spRem">' + SD.remedies.map(function (r) { return "<option" + (r === rem ? " selected" : "") + ">" + esc(r) + "</option>"; }).join("") + "</select></div></div>" +
       '<div class="stack s8" style="margin-top:12px"><span class="eyebrow">' + L("Potency", "الفاعلية", "पोटेंसी") + "</span>" + ui.seg("spPot", [["30C", "30C"], ["200C", "200C"], ["1M", "1M"], ["LM1", "LM 1"]], "200C") +
@@ -1068,10 +1074,10 @@
     var herb = card(L("Herbal prescription", "الوصفة العشبية", "हर्बल पर्चा") + " · AYU-03", ui.table([{ h: L("Formulation", "التركيبة", "योग") }, { h: L("Dose", "الجرعة", "मात्रा") }, { h: "Anupana" }, { h: L("Timing", "التوقيت", "समय") }, { h: L("Duration", "المدة", "अवधि") }], SD.herb.map(function (h) { return [esc(h[0]), esc(h[1]), esc(h[2]), esc(h[3]), esc(h[4])]; }), { min: 600 }) +
       ui.note("warn", "Continue levothyroxine 50 mcg on an empty stomach; keep herbal powders at least 4 hours apart from it. Recheck TSH in 6 weeks (recall set). Herbal Rx does not replace thyroid hormone.") +
       '<div class="btns" style="margin-top:12px">' + ui.btn(L("Sign herbal Rx", "توقيع الوصفة العشبية", "हर्बल Rx पर हस्ताक्षर"), { cls: "pri", act: "toast", arg: "Herbal Rx signed · printable and shared on WhatsApp", icon: "pen" }) + ui.btn(L("Edit formulary", "تعديل قائمة التركيبات", "फ़ॉर्मुलरी संपादित करें"), { cls: "ghost", act: "toast", arg: "Clinic formulation list opens in settings", icon: "edit" }) + "</div>", { icon: "leaf" });
-    var days = '<div class="sp-days">' + Array.apply(null, Array(14)).map(function (_, i) { var d = i + 1, cls = d < day ? "d" : d === day ? "t" : ""; return '<div class="sp-day ' + cls + '"><b>' + d + "</b>" + (d < day ? "✓" : d === day ? L("Today", "اليوم", "आज") : fd(addD(TODAY, d - day), true)) + "</div>"; }).join("") + "</div>";
+    var days = '<div class="sp-days">' + Array.apply(null, Array(14)).map(function (_, i) { var d = i + 1, cls = d < day ? "d" : d === day ? "t" : ""; return '<div class="sp-day ' + cls + '"><b>' + d + "</b>" + (d < day ? "✓" : d === day ? L("Today", "اليوم", "आज") : DOW[addD(TODAY, d - day).getDay()]) + "</div>"; }).join("") + "</div>";
     var pkc = card(L("Panchakarma · 14-day block", "بانشاكارما · ١٤ يومًا", "पंचकर्म · 14 दिन") + " · AYU-02", days + '<div class="lst" style="margin-top:12px">' + SD.pk.map(function (p) { var st = p[2] < day ? "ok" : p[1] <= day ? "acc" : "mute"; return ui.li(lead(st, st === "ok" ? "check" : st === "acc" ? "play" : "calendar"), esc(p[0]), "Day " + p[1] + (p[2] !== p[1] ? "–" + p[2] : ""), ui.pill(st, st === "ok" ? "Done" : st === "acc" ? "Today" : "Planned")); }).join("") + "</div>" +
       '<p class="tiny faint" style="margin:10px 0 0">Per-day attendance, therapist notes and a WhatsApp reminder the evening before each therapy day.</p>', { icon: "calendar" });
-    return '<div class="stack s16">' + head + '<div class="sp-g2">' + pk + '<div class="stack s16">' + notes + pkc + "</div></div>" + herb +
+    return '<div class="stack s16">' + head + pk + '<div class="sp-g2">' + notes + pkc + "</div>" + herb +
       ui.note("info", esc(mktNote("AYUSH profile: practitioners registered with NCISM (Ayurveda) or NCH (Homeopathy); AYUSH prescription fields are MVP for AYUSH tenants.", "In " + NB.mkt().name + ", Ayurveda and homeopathy are licensed as traditional, complementary and integrative medicine under " + NB.mkt().regulator + "; the profile is enabled only for licensed practitioners."))) + "</div>";
   }
 
@@ -1090,7 +1096,7 @@
         q: [["Start consult", "ابدأ الاستشارة", "परामर्श शुरू करें", "steth", { go: "doctor.consult" }], ["Capture progress photo", "التقاط صورة متابعة", "प्रगति फ़ोटो लें", "camera", { act: "sp-photo" }], ["New package / session", "باقة أو جلسة جديدة", "नया पैकेज / सत्र", "layers", { set: ["spDermTab", "proc"] }],
           ["Schedule patch test", "جدولة اختبار الرقعة", "पैच टेस्ट शेड्यूल", "clockh", { set: ["spDermTab", "patch"] }], ["Open consent form", "فتح نموذج الموافقة", "सहमति फ़ॉर्म खोलें", "pen", { ov: "procconsent", arg: "lhr|p5" }], ["Write e-Rx", "كتابة وصفة", "e-Rx लिखें", "pill", { go: "doctor.consult" }]],
         n: [["warn", "clockh", "Patch-test readings", "Deepa Krishnan D2 (48 h) now · D4 Monday", { set: ["spDermTab", "patch"] }], ["crit", "alertfill", "Allergy / safety alert in the waiting room", "Ananya Rao: pregnant 14 wk · isotretinoin and peels blocked"], ["sub", "layers", "Package sessions this week · 9", "Suresh Pillai LHR 4/6 today · Meena Joshi peel 4/6 overdue 1 d", { set: ["spDermTab", "proc"] }]] },
-      dent: { k: [["14", "Today's patients", "مرضى اليوم", "आज के मरीज़", "2 chairs · 5 seen", "faint", "users"], ["18 min", "In chair now · C1", "على الكرسي الآن", "अभी कुर्सी पर", "Rahul Verma · RCT 46 visit 2", "faint", "play"],
+      dent: { k: [["14", "Today's patients", "مرضى اليوم", "आज के मरीज़", "2 chairs · 5 seen", "faint", "users"], ["18 min", "In chair now · C1", "على الكرسي الآن", "अभी कुर्सी पर", (NB.gcc() ? dentPatient().name : "Rahul Verma") + " · RCT 46 visit 2", "faint", "play"],
           ["4", "Plans awaiting approval", "خطط بانتظار الموافقة", "मंज़ूरी हेतु योजनाएँ", "2 sent on WhatsApp today", "warn", "hourglass"], ["3", "Lab work due back", "أعمال مختبر مستحقة", "लैब वर्क वापसी देय", "1 overdue 3 days", "crit", "truck"]],
         q: [["Open dental chart", "فتح مخطط الأسنان", "डेंटल चार्ट खोलें", "tooth", { ov: "toothedit", arg: "46" }], ["Chair-side quick note", "ملاحظة سريعة", "चेयर-साइड नोट", "edit", { act: "sp-dnote", arg: "6" }], ["Attach X-ray / photo", "إرفاق أشعة / صورة", "एक्स-रे / फ़ोटो जोड़ें", "image", { act: "toast", arg: "Sensor image pinned to tooth 46" }],
           ["New treatment plan", "خطة علاج جديدة", "नई उपचार योजना", "clipboard", { act: "toast", arg: "New plan started from the crown / implant templates" }], ["Start procedure + consent", "بدء إجراء + موافقة", "प्रक्रिया + सहमति", "pen", { ov: "procconsent", arg: "rct|dent" }], RX],
@@ -1125,7 +1131,8 @@
     return P[id];
   }
   function rail(id) {
-    var list = SD.today[id] || [], pr = profile(id);
+    var list = (SD.today[id] || []).slice(), pr = profile(id);
+    if (id === "dent" && NB.gcc()) { list[0] = list[0].slice(); list[0][1] = dentPatient().name; list[0][2] = "52 M"; list[1] = list[1].slice(); list[1][1] = "Omar Haddad"; list[1][2] = "38 M"; }
     var today = card(L("Today", "اليوم", "आज"), '<div class="sp-q">' + list.map(function (r) {
       return '<div class="sp-qi' + (r[7] ? " now" : "") + '"><span class="tok">' + esc(r[0]) + '</span><div class="t"><b>' + esc(r[1]) + "</b><small>" + esc(r[2] + " · " + r[3]) + "</small></div>" + ui.pill(r[4], r[5], r[6]) + "</div>";
     }).join("") + "</div>", { icon: "users", right: ui.btn(L("My day", "يومي", "मेरा दिन"), { cls: "sm ghost", go: "doctor.myday" }) });
@@ -1187,7 +1194,7 @@
     var h = ui.header(L("Skin workspace", "مساحة الجلدية", "त्वचा कार्यक्षेत्र"), L("Photos, body map, patch tests and procedure sessions · built for one hand", "الصور وخريطة الجسم واختبارات الرقعة والجلسات · بيد واحدة", "फ़ोटो, बॉडी मैप, पैच टेस्ट और सत्र · एक हाथ से"));
     var k = '<div class="grid g4 kpis">' + [["5", L("Photos due", "صور مستحقة", "फ़ोटो देय"), "camera", "warn"], ["4", L("Sessions today", "جلسات اليوم", "आज के सत्र"), "layers", ""], ["1", L("Patch reading", "قراءة رقعة", "पैच रीडिंग"), "clockh", "warn"], ["2", L("Consents to sign", "موافقات للتوقيع", "सहमति बाकी"), "pen", "warn"]].map(function (x) {
       return ui.kpi(x[0], x[1], ui.icon(x[2], "xs") + (x[3] === "warn" ? L("Today", "اليوم", "आज") : L("Booked", "محجوز", "बुक")), x[3] || "faint"); }).join("") + "</div>";
-    var quick = '<div class="sp-qa">' + [["Capture photo", "التقاط صورة", "फ़ोटो लें", "camera", { act: "sp-photo" }], ["Consent", "موافقة", "सहमति", "pen", { ov: "procconsent", arg: "sal|p1" }], ["Patch test", "اختبار الرقعة", "पैच टेस्ट", "clockh", { set: ["spDermTab", "patch"] }],
+    var quick = '<div class="sp-qa sp-qa3">' + [["Capture photo", "التقاط صورة", "फ़ोटो लें", "camera", { act: "sp-photo" }], ["Consent", "موافقة", "सहमति", "pen", { ov: "procconsent", arg: "sal|p1" }], ["Patch test", "اختبار الرقعة", "पैच टेस्ट", "clockh", { set: ["spDermTab", "patch"] }],
       ["Session", "جلسة", "सत्र", "layers", { set: ["spDermTab", "proc"] }], ["e-Rx", "وصفة", "e-Rx", "pill", { go: "solo.consult" }], ["Body map", "خريطة الجسم", "बॉडी मैप", "user", { set: ["spDermTab", "map"] }]].map(function (q) {
       return '<button class="sp-qb"' + attrs(q[4]) + ">" + ui.icon(q[3]) + "<span>" + esc(L(q[0], q[1], q[2])) + "</span></button>"; }).join("") + "</div>";
     var list = '<div class="sp-q">' + [["p1", "T-26", "Acne review · peel 2/4", "warn", "Photo due", "camera"], ["p5", "T-17", "Laser hair reduction 4/6", "sub", "Package 4/6", "layers"], ["p2", "T-14", "Melasma · pregnant 14 wk", "crit", "Teratogen block", "lock"], [null, "T-24", "Deepa Krishnan · patch test D2", "warn", "48 h reading", "clockh"]].map(function (r) {
@@ -1229,9 +1236,10 @@
       var acts = '<div class="btns" style="flex-wrap:nowrap">' + ui.btn(L("Send now", "إرسال الآن", "अभी भेजें"), { cls: "sm" + (r.od > 0 && !r.st ? " pri" : ""), act: "sp-rc", arg: r.id + "|sent", icon: "send" }) +
         '<button class="ibtn" style="width:32px;height:32px" data-act="sp-rc" data-arg="' + r.id + '|call" title="' + esc(L("Call", "اتصال", "कॉल")) + '">' + ui.icon("phone", "sm") + "</button>" +
         '<button class="ibtn" style="width:32px;height:32px" data-act="sp-rc" data-arg="' + r.id + '|nn" title="' + esc(L("Mark not needed", "غير مطلوب", "ज़रूरत नहीं")) + '">' + ui.icon("close", "sm") + "</button></div>";
+      if (c.mobile) return '<div class="sp-qi' + (r.od > 0 ? " sp-od" : "") + '"><div class="t"><b>' + esc(r.name) + " · " + esc(r.as) + '</b><small class="sp-wrap">' + ui.icon(rs[4], "xs") + " " + esc(r.what) + '</small><small>' + esc("Due " + r.due + " · " + r.last) + '</small><div class="row" style="margin-top:8px">' + state + "</div></div>" + acts + "</div>";
       return { cls: r.od > 0 ? "crit" : "", cells: [ui.cellp(esc(r.name), esc(r.as + " · " + (r.lang === "ar" ? "Arabic" : r.lang === "hi" ? "Hindi" : "English"))), ui.cellp(ui.icon(rs[4], "xs") + " " + esc(r.what), esc(r.src)), ui.cellp(n(esc(r.due)), esc(r.att + " of 2 nudges")), '<span class="small">' + esc(r.last) + "</span>", state, acts] };
     });
-    var dueCard = card(L("Due recalls", "الاستدعاءات المستحقة", "देय रिकॉल"), '<div class="stack">' + seg + ui.table([{ h: L("Patient", "المريض", "मरीज़") }, { h: L("Reason", "السبب", "कारण") }, { h: L("Due", "الاستحقاق", "देय") }, { h: L("Last contact", "آخر تواصل", "अंतिम संपर्क") }, { h: L("Status", "الحالة", "स्थिति") }, { h: "" }], list, { min: 900, empty: "Nothing due for this reason." }) +
+    var dueCard = card(L("Due recalls", "الاستدعاءات المستحقة", "देय रिकॉल"), '<div class="stack">' + seg + (c.mobile ? '<div class="sp-q">' + (list.join("") || '<div class="empty">Nothing due for this reason.</div>') + "</div>" : ui.table([{ h: L("Patient", "المريض", "मरीज़") }, { h: L("Reason", "السبب", "कारण") }, { h: L("Due", "الاستحقاق", "देय") }, { h: L("Last contact", "آخر تواصل", "अंतिम संपर्क") }, { h: L("Status", "الحالة", "स्थिति") }, { h: "" }], list, { min: 900, empty: "Nothing due for this reason." })) +
       '<p class="tiny faint" style="margin:0">Ignored recalls get one second nudge, then rest; non-bookers move to the front-desk callback list (PAT-20). Doctors add recalls in one tap at consult close: 3 d · 1 w · 2 w · 1 m · custom (DOC-07).</p></div>', { icon: "refresh" });
     var rules = card(L("Auto-WhatsApp recall rules", "قواعد الاستدعاء التلقائي", "ऑटो-व्हाट्सऐप रिकॉल नियम"), '<div class="lst">' + SD.rules.map(function (r) {
       var on = v("spRule_" + r[0], r[8]), rs = SD.reasons.find(function (x) { return x[0] === r[1]; });
@@ -1243,7 +1251,7 @@
       '<div class="hr" style="margin:14px 0"></div>' + ui.table([{ h: L("Reason", "السبب", "कारण") }, { h: L("Recalled", "استُدعي", "रिकॉल"), cls: "r" }, { h: L("Booked", "حجز", "बुक"), cls: "r" }, { h: "%", cls: "r" }, { h: L("Days to book", "أيام حتى الحجز", "बुक होने में दिन"), cls: "r" }], SD.conv.map(function (x) {
         var rs = SD.reasons.find(function (y) { return y[0] === x[0]; }), pc = Math.round(x[2] / x[1] * 100); return [ui.icon(rs[4], "xs") + " " + esc(L(rs[1], rs[2], rs[3])), n(x[1]), n(x[2]), '<b class="num ' + (pc >= 70 ? "okc" : pc < 55 ? "warnc" : "") + '">' + pc + "%</b>", n(x[3])]; }), { min: 520 }) +
       '<p class="tiny faint" style="margin:10px 0 0">By attempt: first message 48% · second nudge +14% · front-desk call +7%.</p>', { icon: "chart" });
-    return h + '<div class="sp-split" style="grid-template-columns:minmax(0,1fr) 380px"><div class="stack s16">' + dueCard + funnel + '</div><div class="stack s16">' + rules + "</div></div>";
+    return h + dueCard + '<div class="sp-g2">' + rules + funnel + "</div>";
   });
 
   /* ================= doctor.tele ================= */
@@ -1275,7 +1283,7 @@
     } else {
       var mic = v("spTmic", true), cam = v("spTcam", true);
       stage = '<div class="stack s8"><div class="sp-stage"><div class="vt">' + sil() + "</div>" +
-        '<div class="top">' + ui.pill("crit", "Live · 04:12", "dot") + ui.pill("perm", "Not recording", "lock") + '<span class="grow" style="flex:1"></span>' + ui.pill("ok", "HD · 42 ms", "checkcircle") + "</div>" +
+        '<div class="tbar">' + ui.pill("crit", "Live · 04:12", "dot") + ui.pill("perm", "Not recording", "lock") + '<span class="grow" style="flex:1"></span>' + ui.pill("ok", "HD · 42 ms", "checkcircle") + "</div>" +
         '<div class="who"><span class="lbl">' + esc(tname) + "</span></div>" +
         '<div class="sp-pip">' + (cam ? sil() : "") + "<span>" + esc(L("You", "أنت", "आप")) + (cam ? "" : " · " + L("camera off", "الكاميرا مغلقة", "कैमरा बंद")) + "</span></div></div>" +
         '<div class="row sb"><span class="small faint">' + esc(NB.dname(dr) + " · Reg. " + dr.regNo + " · shown to the patient") + '</span></div><div class="sp-ctl">' +
@@ -1296,9 +1304,9 @@
       return ui.li(lead(x[0], x[0] === "ok" ? "checkcircle" : "lock"), (x[0] === "mute" ? "<s>" + esc(x[1]) + "</s>" : esc(x[1])), esc(x[2]), x[0] === "crit" ? ui.btn(L("Remove", "إزالة", "हटाएँ"), { cls: "sm dng", act: "sp-trxfix" }) : x[0] === "mute" ? ui.pill("mute", "Removed") : ui.pill("ok", "OK"));
     }).join("") + "</div>" + (rxBlocked ? ui.note("crit", "The e-Rx cannot be shared until the prohibited medicine is removed. Suggest an in-person visit for insomnia.") : ui.note("ok", "Rx passes the teleconsult rules and can be shared in the call.")), { icon: "shieldcheck" });
     var notice = gcc ? card(L("Telehealth licensing", "ترخيص الرعاية الصحية عن بعد", "टेलीहेल्थ लाइसेंस") + " · " + esc(m.name), '<ul class="small" style="margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:6px">' +
-        ["The facility needs a telehealth licence from " + m.regulator + "; the practitioner's licence must be active and shown before the call.", "Consent before the consult; separate consent before any recording.", "Records and recordings are stored in " + m.residency + ".", "Controlled and narcotic medicines cannot be prescribed by telehealth; e-prescriptions go through " + m.eRx + ".", "Nabd connects through a licensed partner; the module stays off until the clinic's licence is verified."].map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>", { icon: "scroll" })
+        ["The facility needs a telehealth licence from " + m.regulator + "; the practitioner's licence must be active and shown before the call.", "Consent before the consult; separate consent before any recording.", "Records and recordings are stored in " + m.residency + ".", "Controlled and narcotic medicines cannot be prescribed by telehealth; e-prescriptions go through " + m.eRx + ".", "Nabd connects through a licensed partner; the module stays off until the clinic's licence is verified."].map(function (x) { return '<li dir="auto">' + esc(x) + "</li>"; }).join("") + "</ul>", { icon: "scroll" })
       : card("Telemedicine Practice Guidelines 2020 · India", '<ul class="small" style="margin:0;padding-inline-start:18px;display:flex;flex-direction:column;gap:6px">' +
-        ["Only registered medical practitioners; name and registration number are shown to the patient.", "Identify the patient (name, age, address; ID if needed) and record consent: implied when the patient starts the call, explicit when the doctor or a health worker does.", "First consult: video preferred. On audio or text, only List O medicines may be prescribed.", "List O: safe OTC-type medicines (e.g. paracetamol, ORS) on any mode · List A: first consult on video, or re-fills · List B: add-ons in follow-up of the same condition.", "Prohibited: Schedule X drugs and any narcotic or psychotropic substance under the NDPS Act.", "Keep the consult record, chat and prescriptions; the e-Rx carries the registration number and signature."].map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>", { icon: "scroll" });
+        ["Only registered medical practitioners; name and registration number are shown to the patient.", "Identify the patient (name, age, address; ID if needed) and record consent: implied when the patient starts the call, explicit when the doctor or a health worker does.", "First consult: video preferred. On audio or text, only List O medicines may be prescribed.", "List O: safe OTC-type medicines (e.g. paracetamol, ORS) on any mode · List A: first consult on video, or re-fills · List B: add-ons in follow-up of the same condition.", "Prohibited: Schedule X drugs and any narcotic or psychotropic substance under the NDPS Act.", "Keep the consult record, chat and prescriptions; the e-Rx carries the registration number and signature."].map(function (x) { return '<li dir="auto">' + esc(x) + "</li>"; }).join("") + "</ul>", { icon: "scroll" });
     var mob = c.mobile;
     return h + (mob ? stage + (inCall ? chat + rxc : "") + visits + notice : '<div class="sp-split" style="grid-template-columns:minmax(0,1fr) 360px"><div class="stack s16">' + stage + (inCall ? '<div class="sp-g2">' + chat + rxc + "</div>" : rxc) + '</div><div class="stack s16">' + visits + notice + "</div></div>");
   });
