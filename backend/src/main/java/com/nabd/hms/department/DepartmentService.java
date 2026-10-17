@@ -157,16 +157,16 @@ public class DepartmentService {
 
     // ── workflow (platform-authored templates; owner picks one plus its toggles) ──
 
-    /** The resolved, ordered step-type list for consult/checkout/nursing pages — empty when
-     * nothing's been picked yet (those pages already know to apply the same default themselves,
-     * mirroring resolveStatusSequence's fallback). */
+    /** The resolved, ordered step-type list for consult/checkout/nursing pages — QA-08: the default
+     * flow when nothing's been picked yet, same fallback as resolveStatusSequence. Bare array, so no
+     * isDefault flag here (GET /workflow's null templateCode says that). */
     @Transactional
     public List<FlowStepResponse> listFlow(UUID tenantId, UUID departmentId) {
         tenantContext.set(tenantId);
         repo.findById(tenantId, departmentId).orElseThrow(this::notFound);
         return repo.findSelection(tenantId, departmentId)
                 .map(this::expandToggledSteps)
-                .orElse(List.of())
+                .orElse(DEFAULT_FLOW_STEP_TYPES)
                 .stream().map(FlowStepResponse::new).toList();
     }
 

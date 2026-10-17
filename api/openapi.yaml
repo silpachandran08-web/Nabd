@@ -1070,6 +1070,21 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "New slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /departments/{id}/flow:
+    get:
+      tags: [Queue]
+      summary: "Resolved ordered step types; the default flow (vitals, consultation) when no workflow is picked (QA-08)"
+      description: "Bare array, so there is no isDefault flag; GET /departments/{id}/workflow has templateCode null when the default applies."
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200":
+          description: "Flow steps in order"
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, properties: { stepType: { type: string } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /waitlist:
     get:
       tags: [Queue]
@@ -3044,6 +3059,8 @@ components:
         startTime: { type: string, format: date-time }
         endTime: { type: string, format: date-time }
         status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+        isFollowUp: { type: boolean }
+        cancelReason: { type: [string, "null"], description: "QA-06: the reason given on cancel (\"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
 
     CheckInRequest:
       type: object
