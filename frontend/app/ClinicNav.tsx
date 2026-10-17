@@ -142,7 +142,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [showMore, setShowMore] = useState(false);
   const moreBtnRef = useRef<HTMLButtonElement>(null);
   const [showClinic, setShowClinic] = useState(false);
-  const [plan, setPlan] = useState<{ plan: string; status: string; branchesUsed: number; branchesLimit: number } | null>(null);
+  const [plan, setPlan] = useState<{ plan: string | null; status: string; branchesUsed: number; branchesLimit: number } | null>(null);
   const [canReturnToWorkspaces, setCanReturnToWorkspaces] = useState(false);
   const [badges, setBadges] = useState<Record<string, number>>({});
 
@@ -253,7 +253,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     void fetch(`${API_BASE}/setup/subscription`, { headers: { Authorization: `Bearer ${token}` } })
       .then(async (res) => {
         if (cancelled || !res.ok) return;
-        const body: { plan: string; status: string; branchesUsed: number; branchesLimit: number } = await res.json();
+        const body: { plan: string | null; status: string; branchesUsed: number; branchesLimit: number } = await res.json();
         if (!cancelled) setPlan({ plan: body.plan, status: body.status, branchesUsed: Number(body.branchesUsed), branchesLimit: Number(body.branchesLimit) });
       })
       .catch(() => {});
@@ -405,7 +405,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
 
       {owner && plan && (
         <Link href="/setup?tab=subscription" className={styles.planChip}>
-          <span className={styles.planName}>Plan: {plan.plan}</span>
+          <span className={styles.planName}>{plan.plan ? `Plan: ${plan.plan}` : "No plan assigned"}</span>
           <span className={styles.planSub}>{plan.status.replace(/_/g, " ")} · view catalog</span>
         </Link>
       )}
