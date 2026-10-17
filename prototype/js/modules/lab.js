@@ -139,7 +139,7 @@
 
   var ST = [
     ["ordered", "Ordered", "مطلوب", "ऑर्डर", "mute", "clipboard"], ["collected", "Collected", "تم السحب", "सैंपल लिया", "info", "syringe"], ["received", "Received", "مستلم", "प्राप्त", "info", "box"],
-    ["inprocess", "In process", "قيد التحليل", "प्रोसेस में", "sync", null], ["resulted", "Awaiting validation", "بانتظار التحقق", "सत्यापन बाकी", "warn", "eye"],
+    ["inprocess", "In process", "قيد التحليل", "प्रोसेस में", "sync", null], ["resulted", "To validate", "للتحقق", "सत्यापन बाकी", "warn", "eye"],
     ["validated", "Validated", "تم التحقق", "सत्यापित", "ok", "shieldcheck"], ["released", "Released", "صدر", "जारी", "acc", "send"]
   ];
   function stOf(k) { return ST.find(function (s) { return s[0] === k; }); }
@@ -214,7 +214,7 @@
     rail += ui.card(L("Home collection today", "السحب المنزلي اليوم", "आज होम कलेक्शन"), '<div class="lst">' + [["07:30", "Collected", "ok"], ["11:00", "En route", "sync"], ["12:30", "Scheduled", "mute"]].map(function (x, i) {
       return ui.li('<span class="av">' + n(x[0].slice(0, 2)) + "</span>", [NB.gcc() ? "Aisha Rahman" : "Thankamma Joseph", NB.gcc() ? "Faisal Noor" : "Vinod Shetty", NB.gcc() ? "Mona Adel" : "Ruksana Begum"][i], x[0] + " · " + ["Manoj K.", "Manoj K.", "Priya D."][i], ui.pill(x[2], x[1], x[2] === "mute" ? "calendar" : undefined));
     }).join("") + "</div>", { icon: "home", right: ui.btn(L("Schedule", "الجدول", "शेड्यूल"), { cls: "sm ghost", go: "lab.collect" }) });
-    return h + '<div class="split">' + body + '<div class="stack s16">' + rail + "</div></div>";
+    return h + body + '<div class="grid g2">' + rail + "</div>";
   });
 
   NB.overlay("labresult", function (id) {
@@ -360,7 +360,7 @@
         var val = v == null ? '<span class="pill sync"><span class="pulse"></span>' + L("Running", "قيد التحليل", "चल रहा") + "</span>"
           : '<input class="lb-in' + (f === "C" ? " c" : f ? " h" : "") + '" value="' + fmtV(a, v) + '" aria-label="' + esc(A.n) + '"' + (mode === "analyser" ? " readonly" : "") + ">";
         var prev = r[2] != null ? '<span class="small num ltr">' + fmtV(a, r[2]) + "</span>" + (dlt.txt ? ' <span class="small num ltr ' + (dlt.bad ? "warnc" : "faint") + '">(' + dlt.txt + ")</span>" : "") + (dlt.bad ? " " + ui.pill("warn", L("Delta", "فرق", "डेल्टा"), "alertcircle") : "") : '<span class="faint">—</span>';
-        body += '<tr' + (f === "C" ? ' class="crit"' : "") + "><td>" + esc(A.n) + "</td><td>" + val + '</td><td><span class="small muted">' + esc(unitOf(a)) + '</span></td><td><span class="small num ltr">' + refTxt(a, p) + "</span></td><td>" + flagPill(f) + '</td><td style="white-space:nowrap">' + prev + "</td></tr>";
+        body += '<tr' + (f === "C" ? ' class="crit"' : "") + "><td>" + esc(A.n) + "</td><td>" + val + '</td><td><span class="small muted ltr">' + esc(unitOf(a)) + '</span></td><td><span class="small num ltr">' + refTxt(a, p) + "</span></td><td>" + flagPill(f) + '</td><td style="white-space:nowrap">' + prev + "</td></tr>";
       });
     });
     var tbl = '<div class="tw"><table class="t" style="min-width:760px"><thead><tr><th>' + L("Analyte", "التحليل", "एनालाइट") + "</th><th>" + L("Result", "النتيجة", "परिणाम") + "</th><th>" + L("Unit", "الوحدة", "इकाई") + "</th><th>" + L("Reference", "المرجع", "रेफ़रेंस") + " · " + p.age + " " + p.sex + "</th><th>" + L("Flag", "العلامة", "फ़्लैग") + "</th><th>" + L("Previous", "السابق", "पिछला") + (R.prev ? " · " + R.prev : "") + " · Δ</th></tr></thead><tbody>" + body + "</tbody></table></div>";
@@ -394,7 +394,7 @@
     }).join("") + "</div>" + '<p class="tiny faint" style="margin:10px 0 0">' + L("Auto-verification releases normal, delta-clean results from interfaced analysers after QC passes; anything flagged waits for a pathologist.", "التحقق الآلي للنتائج الطبيعية فقط.", "सामान्य और डेल्टा-साफ़ रिज़ल्ट QC पास होने पर ऑटो-वेरिफ़ाई होते हैं।") + "</p>", { icon: "shieldcheck" });
 
     var res = [];
-    Object.keys(R).filter(function (k) { return k !== "prev"; }).forEach(function (tc) { R[tc].forEach(function (r) { if (r[1] == null) return; var f = flagOf(r[0], r[1], p), dl = delta(r[0], r[1], r[2]); res.push({ cls: f === "C" ? "crit" : "", cells: [esc(AN[r[0]].n), '<b class="num ltr' + (f === "C" ? " critc" : f ? " warnc" : "") + '">' + fmtV(r[0], r[1]) + "</b> " + '<span class="small faint">' + esc(unitOf(r[0])) + "</span>", '<span class="small num ltr">' + refTxt(r[0], p) + "</span>", flagPill(f), r[2] != null ? '<span class="small num ltr faint">' + fmtV(r[0], r[2]) + "</span>" + (dl.bad ? " " + ui.icon("alertcircle", "xs warnc") : "") : "—"] }); }); });
+    Object.keys(R).filter(function (k) { return k !== "prev"; }).forEach(function (tc) { R[tc].forEach(function (r) { if (r[1] == null) return; var f = flagOf(r[0], r[1], p), dl = delta(r[0], r[1], r[2]); res.push({ cls: f === "C" ? "crit" : "", cells: [esc(AN[r[0]].n), '<b class="num ltr' + (f === "C" ? " critc" : f ? " warnc" : "") + '">' + fmtV(r[0], r[1]) + "</b> " + '<span class="small faint ltr">' + esc(unitOf(r[0])) + "</span>", '<span class="small num ltr">' + refTxt(r[0], p) + "</span>", flagPill(f), r[2] != null ? '<span class="small num ltr faint">' + fmtV(r[0], r[2]) + "</span>" + (dl.bad ? " " + ui.icon("alertcircle", "xs warnc") : "") : "—"] }); }); });
     var resCard = ui.card(esc(p.name) + " · " + p.age + " " + p.sex + " · " + sel.id, ui.table([{ h: L("Analyte", "التحليل", "एनालाइट") }, { h: L("Result", "النتيجة", "परिणाम") }, { h: L("Reference", "المرجع", "रेफ़रेंस") }, { h: L("Flag", "العلامة", "फ़्लैग") }, { h: L("Previous", "السابق", "पिछला") }], res, { min: 560 }) +
       (sel.id === "LB-0141" ? '<p class="small muted" style="margin:12px 0 0">' + ui.icon("edit", "xs") + " " + esc("Hyperkalaemia with rising creatinine; non-haemolysed sample, confirmed on rerun. Suggest urgent clinical review.") + "</p>" : ""), { icon: "file", right: priPill(sel.pri) });
 
@@ -480,7 +480,7 @@
     q.v.forEach(function (v, i) {
       var cls = Math.abs(v) > 2 ? (i >= n - 2 && Math.abs(q.v[n - 1]) > 2 && Math.abs(q.v[n - 2]) > 2 ? "bad" : "wn") : "";
       s += '<circle class="pt ' + cls + '" cx="' + (pl + i * sx).toFixed(1) + '" cy="' + y(v).toFixed(1) + '" r="' + (cls ? 4.5 : 3.2) + '"><title>Run ' + (i + 1) + ": " + (q.mean + v * q.sd).toFixed(q.sd < 0.5 ? 2 : 1) + " " + q.u + "</title></circle>";
-      if (i % 4 === 0 || i === n - 1) s += '<text x="' + (pl + i * sx).toFixed(1) + '" y="' + (h - 6) + '" text-anchor="middle">' + (i === n - 1 ? "17 Oct" : String(i + 1)) + "</text>";
+      if (i % 4 === 0 || i === n - 1) s += '<text x="' + (pl + i * sx).toFixed(1) + '" y="' + (h - 6) + '" text-anchor="' + (i === n - 1 ? "end" : "middle") + '">' + (i === n - 1 ? "17 Oct" : String(i + 1)) + "</text>";
     });
     return s + "</svg>";
   }
@@ -516,7 +516,7 @@
         (fail ? ui.pill("crit", L("Run rejected", "تشغيل مرفوض", "रन अस्वीकृत")) : warn ? ui.pill("warn", L("Warning, run accepted", "تحذير، مقبول", "चेतावनी, रन स्वीकृत")) : ui.pill("ok", L("In control", "تحت السيطرة", "नियंत्रण में"))) + "</div>" +
         '<div class="split wide">' + ui.card(esc(q.n) + " · Levey-Jennings", ljChart(q) + '<p class="tiny faint" style="margin:6px 0 0">' + esc(q.lot) + " · mean " + q.mean + " " + esc(q.u) + " · SD " + q.sd + " · " + L("last 20 runs, 2 per day", "آخر 20 تشغيلاً", "पिछले 20 रन") + "</p>", { icon: "activity", right: '<span class="small faint">' + (an === "HB" ? "HA-01" : "CC-01") + "</span>" }) +
         ui.card(L("Westgard rules", "قواعد ويستغارد", "वेस्टगार्ड नियम"), '<div class="lst">' + wr.map(function (r) {
-          return ui.li('<span class="tok" style="min-width:42px">' + r[0] + "</span>", esc(r[1]), "", r[2] ? ui.pill(r[3] === "warn" ? "warn" : "crit", r[3] === "warn" ? L("Warning", "تحذير", "चेतावनी") : L("Violated", "مخالفة", "उल्लंघन")) : ui.pill("ok", L("Pass", "ناجح", "पास")));
+          return '<div class="li"><span class="tok" style="min-width:42px">' + r[0] + '</span><div class="t"><span class="small muted">' + esc(r[1]) + "</span></div>" + (r[2] ? ui.pill(r[3] === "warn" ? "warn" : "crit", r[3] === "warn" ? L("Warning", "تحذير", "चेतावनी") : L("Violated", "مخالفة", "उल्लंघन")) : ui.pill("ok", L("Pass", "ناجح", "पास"))) + "</div>";
         }).join("") + "</div>", { icon: "scale" }) + "</div>" +
         (fail ? ui.note("crit", "<b>" + L("2-2s violation on glucose: systematic error.", "مخالفة 2-2s: خطأ منهجي.", "ग्लूकोज़ पर 2-2s उल्लंघन: व्यवस्थित त्रुटि।") + "</b> " + L("Glucose results from CC-01 are on hold. Check reagent lot and calibration, recalibrate, rerun both QC levels, then re-test the 14 patient samples run since the last accepted QC (08:10). Each step is logged for the accreditation audit.", "النتائج معلقة. أعد المعايرة ثم أعد فحص 14 عينة منذ آخر ضبط مقبول.", "CC-01 के ग्लूकोज़ रिज़ल्ट रोके गए। रीएजेंट और कैलिब्रेशन जाँचें, दोबारा QC चलाएँ, फिर पिछली स्वीकृत QC (08:10) के बाद के 14 सैंपल दोबारा जाँचें।") +
           '<div class="btns" style="margin-top:8px">' + ui.btn(L("Start corrective action", "بدء الإجراء التصحيحي", "सुधारात्मक कार्रवाई शुरू करें"), { cls: "sm", act: "toast", arg: "Corrective action CA-0412 opened · 14 samples on hold", icon: "sliders" }) + "</div>")

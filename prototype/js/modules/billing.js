@@ -23,6 +23,7 @@
     ".bl-sum .r.tot{font-size:18px;font-weight:600;padding-top:10px;border-top:1px solid var(--div)}.bl-sum .r.tot>span:first-child{color:var(--tx)}",
     ".bl-sum .r.ins>span:last-child{color:var(--info)}.bl-sum .r.neg>span:last-child{color:var(--ok)}",
     ".bl-ct .cellp b,.bl-ct .cellp small{white-space:normal}.bl-ct td:first-child{min-width:200px}.bl-ct td:not(:first-child){white-space:nowrap}",
+    ".bl-nw td.r{white-space:nowrap}",
     ".bl-strike{text-decoration:line-through;color:var(--tx3)}",
     ".bl-pay{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}",
     ".bl-qr{background:var(--tx);color:var(--bg-root);padding:8px;border-radius:var(--r-sm);display:inline-block;line-height:0;justify-self:start;width:max-content}",
@@ -544,7 +545,7 @@
       ["checkcircle", "okc", "One refund per invoice", "A refund issues one credit note. A second request is blocked, not queued."],
       ["checkcircle", "okc", "Tax after discount", "Discounts reduce the taxable value on the invoice line before " + (m.id === "india" ? "GST" : "VAT") + " is charged."]
     ].map(function (x) { return '<div class="ci">' + ui.icon(x[0], "sm " + x[1]) + '<div class="t"><b>' + x[2] + "</b><small>" + x[3] + "</small></div></div>"; }).join("") + "</div>", { icon: "shieldcheck" });
-    return h + table + rail;
+    return h + '<div class="bl-nw">' + table + "</div>" + rail;
   });
 
   NB.overlay("payment", function (no) {
@@ -633,7 +634,7 @@
       ui.li('<span class="pill mute" style="height:32px;width:32px;padding:0;justify-content:center">' + ui.icon("edit", "sm") + "</span>", "PA-2216 · draft, 2 documents missing", "Guardian's policy card, ENT note", ui.icon("chevright", "sm faint flip"), { ov: "preauth", arg: "PA-2216" }) +
       ui.li('<span class="pill info" style="height:32px;width:32px;padding:0;justify-content:center">' + ui.icon("alertcircle", "sm") + "</span>", "PA-2211 · partially approved", "Tell the family about the shortfall before day 6", ui.icon("chevright", "sm faint flip"), { ov: "preauth", arg: "PA-2211" }) + "</div>", { icon: "bell" }) +
       "" + ui.card(L("Asked for at order time", "يُطلب عند الطلب", "ऑर्डर के समय"), '<p class="small muted" style="margin:0">When a doctor orders an admission, surgery or a high-cost scan for an insured patient, Nabd drafts the pre-auth with the note, estimate and reports attached, so it is never requested after the service.</p>', { icon: "sparkle" });
-    return h + table + '<div class="grid g2">' + rail + "</div>";
+    return h + '<div class="bl-nw">' + table + "</div>" + '<div class="grid g2">' + rail + "</div>";
   });
   NB.overlay("preauth", function (id) {
     var m = NB.mkt(), x = D.preauths.find(function (p) { return p.id === id; });
@@ -711,7 +712,7 @@
     var ck = ui.card(L("Claim-ready check · CLM-8841", "فحص جاهزية المطالبة", "क्लेम-तैयार जाँच"), '<div class="row sb" style="margin-bottom:6px"><span class="small muted">Fatima Sheikh · OPD today · ' + NB.money(1243) + "</span>" + ui.pill(ready === ckItems.length ? "ok" : "warn", ready + "/" + ckItems.length + " passed") + "</div>" +
       '<div class="bl-ck">' + ckItems.map(function (i) { return '<div class="ci">' + ui.icon(i[0] === "ok" ? "checkcircle" : "alertcircle", "sm " + (i[0] === "ok" ? "okc" : "warnc")) + '<div class="t"><b>' + i[1] + "</b><small>" + i[2] + "</small></div></div>"; }).join("") + "</div>" +
       '<div class="btns" style="margin-top:10px">' + ui.btn("Ask doctor to confirm code", { cls: "sm", act: "toast", arg: "Sent to Dr. Vikram Shah · one-tap confirm", icon: "steth" }) + ui.btn("Submit when ready", { cls: "sm pri", act: "toast", arg: "CLM-8841 will auto-submit when all checks pass", icon: "send" }) + "</div>", { icon: "shieldcheck", cls: "hl" });
-    return h + table + '<div class="grid g2">' + rej + ck + "</div>" + '<div class="grid g2">' + age + chan + "</div>";
+    return h + '<div class="bl-nw">' + table + "</div>" + '<div class="grid g2">' + rej + ck + "</div>" + '<div class="grid g2">' + age + chan + "</div>";
   });
   NB.overlay("claim", function (id) {
     var m = NB.mkt(), x = D.claims.find(function (k) { return k.id === id; }) || D.claims[0], s = CLS[x.st], ri = x.rej ? rejInfo(x.rej) : null;
@@ -761,7 +762,7 @@
     var rules = ui.card(L("Refund rules", "قواعد الاسترداد", "रिफ़ंड नियम"), '<div class="bl-ck">' + [["One refund per package", "A pending request blocks a second one."], ["Redemption is frozen while a refund is pending", "No session can be used between request and approval."],
       ["Amount is recalculated at approval", "Used sessions are repriced at the single-session rate, then a 5% processing fee."], ["Requester never approves", "Owner or finance approves; a credit note reverses the tax."]].map(function (r) {
       return '<div class="ci">' + ui.icon("checkcircle", "sm okc") + '<div class="t"><b>' + r[0] + "</b><small>" + r[1] + "</small></div></div>"; }).join("") + "</div>", { icon: "shieldcheck" });
-    return h + table + '<div class="grid g2">' + cat + rules + "</div>";
+    return h + '<div class="bl-nw">' + table + "</div>" + '<div class="grid g2">' + cat + rules + "</div>";
   });
   NB.overlay("pkrefund", function (id) {
     var m = NB.mkt(), k = D.packages.find(function (p) { return p.id === id; }) || D.packages[0], P = NB.pat(k.p), req = NB.v("blPkReq", {});
@@ -793,7 +794,7 @@
   function denCounts() {
     var k = mi(), saved = NB.v("blDen", {})[k]; if (saved) return saved;
     var d = D.day, target = Math.round(cv(d.float + d.cashIn - d.cashRefund - d.petty - d.short)), out = {};
-    var share = [0.42, 0.25, 0.15, 0.08, 0.05, 0.03, 0.01, 0.01, 0.01];  // a realistic drawer mix, then greedy for the rest
+    var share = [0.42, 0.26, 0.15, 0.08, 0.05, 0.03, 0.005, 0.002, 0.001];  // a realistic drawer mix, then greedy for the rest
     DEN[k].forEach(function (v, i) { out[v] = Math.floor(target * (share[i] || 0) / v); });
     var left = target - DEN[k].reduce(function (a, v) { return a + v * out[v]; }, 0);
     DEN[k].forEach(function (v) { var n = Math.floor(left / v); out[v] += n; left -= n * v; });
@@ -810,7 +811,7 @@
       locked ? ui.pill("perm", L("Day locked", "اليوم مقفل", "दिन लॉक"), "lock") : ui.pill("ok", L("Day open", "اليوم مفتوح", "दिन खुला"), "unlock"));
     h += '<div class="grid g4 kpis">' + ui.kpi(NB.money(tot), L("Collected today", "المحصل اليوم", "आज प्राप्त"), d.modes.reduce(function (a, x) { return a + x[1]; }, 0) + " payments", "faint") +
       ui.kpi(NB.money(d.ins), L("Insurance receivable", "مستحق التأمين", "बीमा प्राप्य"), d.insN + " claims · not cash", "faint") + ui.kpi(NB.money(d.disc), L("Discounts given", "الخصومات", "छूट दी"), d.discN + " · all within limits", "faint") +
-      ui.kpi(fm(variance), L("Cash variance", "فرق النقد", "नकद अंतर"), over ? "Above tolerance " + fm(tol).replace(/<[^>]+>/g, "") + " · reason needed" : "Within tolerance " + fm(tol).replace(/<[^>]+>/g, ""), over ? "critc" : "okc") + "</div>";
+      ui.kpi(fm(variance), L("Cash variance", "فرق النقد", "नकद अंतर"), over ? (why ? "Reason: " + ui.esc(why) : "Above tolerance " + fm(tol).replace(/<[^>]+>/g, "") + " · reason needed") : "Within tolerance " + fm(tol).replace(/<[^>]+>/g, ""), over ? "critc" : "okc") + "</div>";
 
     var checks = [
       ["ok", "All completed visits are billed", "0 visits without an invoice · a visit cannot complete without one"],
@@ -835,7 +836,7 @@
 
     var dens = DEN[m.id].map(function (v) {
       return '<div class="dr"><span><b class="num ltr">' + (m.id === "india" ? "₹" + v : v + " " + m.cur) + "</b> " + (v < (m.id === "india" ? 10 : 5) ? '<span class="faint small">coin</span>' : "") + "</span>" +
-        '<span class="bl-step"><button data-act="blden" data-arg="' + v + '|-1" aria-label="Fewer">−</button><span>' + (counts[v] || 0) + '</span><button data-act="blden" data-arg="' + v + '|1" aria-label="More">+</button></span>' +
+        '<span class="bl-step">' + (locked ? "" : '<button data-act="blden" data-arg="' + v + '|-1" aria-label="Fewer">−</button>') + "<span>" + (counts[v] || 0) + "</span>" + (locked ? "" : '<button data-act="blden" data-arg="' + v + '|1" aria-label="More">+</button>') + "</span>" +
         '<span style="text-align:end">' + fm(v * (counts[v] || 0)) + "</span></div>"; }).join("");
     var s3 = ui.card("3 · " + L("Cash drawer count", "عد صندوق النقد", "कैश ड्रॉअर गिनती"), '<div class="bl-den">' + dens + "</div>" +
       '<div class="bl-sum" style="margin-top:12px"><div class="r"><span>Opening float</span>' + fm(cv(d.float)) + '</div><div class="r"><span>+ Cash received</span>' + fm(cv(d.cashIn)) + '</div><div class="r"><span>− Cash refunds</span>' + fm(cv(d.cashRefund)) + "</div>" +
