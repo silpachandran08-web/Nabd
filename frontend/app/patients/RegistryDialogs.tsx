@@ -14,6 +14,10 @@ function formatScore(score: number): string {
   return `${Math.round(Math.min(1, Math.max(0, score)) * 100)}%`;
 }
 
+// TODO(needs-legal-review): consent wording is a placeholder from S4 CGV-005; legal must approve before go-live.
+const GUARDIAN_CONSENT_TEXT = "Guardian has agreed to access on this patient's behalf";
+const CONSENT_CHANNELS = [["in_person", "In person"], ["phone", "Phone"], ["written", "Written"]] as const;
+
 function useEscape(onClose: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -40,6 +44,8 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
   const [guardianResults, setGuardianResults] = useState<{ id: string; name: string; phone: string }[]>([]);
   const [guardian, setGuardian] = useState<{ id: string; name: string } | null>(null);
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [consent, setConsent] = useState(false);
+  const [channel, setChannel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   useEscape(onClose);
@@ -76,6 +82,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
       const body = {
         name: form.name.trim(), phone: form.phone.trim(), dob: form.dob, gender: form.gender,
         address: form.address.trim() || null, guardianId: minor ? guardian?.id ?? null : null,
+        ...(minor && guardian ? { guardianConsent: { confirmed: true, channel } } : {}),
         ...(confirmed ? { confirmedNotDuplicate: true } : {}),
       };
       const res = await authedFetch("/patients", { method: "POST", body: JSON.stringify(body) });
@@ -98,7 +105,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
     }
   }
 
-  const ready = form.name.trim() && form.phone.trim() && form.dob && form.gender && (!minor || guardian);
+  const ready = form.name.trim() && form.phone.trim() && form.dob && form.gender && (!minor || (guardian && consent && channel));
   return (
     <div className={styles.dialogOverlay} onClick={onClose}>
       <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="register-title"
@@ -152,7 +159,17 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
               <>
                 <label className={styles.fieldLabel} htmlFor="reg-guardian">Guardian (required for under-18s)</label>
                 {guardian ? (
-                  <button type="button" className={styles.secondaryBtn} onClick={() => setGuardian(null)}>{guardian.name} · change</button>
+                  <>
+                    <button type="button" className={styles.secondaryBtn} onClick={() => { setGuardian(null); setConsent(false); }}>{guardian.name} · change</button>
+                    <label className={styles.fieldLabel}>
+                      <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> {GUARDIAN_CONSENT_TEXT}
+                    </label>
+                    <label className={styles.fieldLabel} htmlFor="reg-consent-channel">How was consent given?</label>
+                    <select id="reg-consent-channel" className={styles.input} value={channel} onChange={(e) => setChannel(e.target.value)}>
+                      <option value="">Select…</option>
+                      {CONSENT_CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </>
                 ) : (
                   <>
                     <input id="reg-guardian" className={styles.input} value={guardianQuery} placeholder="Search the guardian's record by name or mobile"
