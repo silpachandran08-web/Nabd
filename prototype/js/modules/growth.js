@@ -62,8 +62,8 @@
     ".gr-swb i{width:24px;height:24px;border-radius:99px;background:var(--gr-b);display:block}",
     ".gr-swb.on{border-color:var(--gr-b);box-shadow:0 0 0 2px var(--gr-b)}",
     ".gr-b-acc{--gr-b:var(--acc)}.gr-b-info{--gr-b:var(--info)}.gr-b-sync{--gr-b:var(--sync)}.gr-b-sub{--gr-b:var(--sub)}.gr-b-ok{--gr-b:var(--ok)}.gr-b-urg{--gr-b:var(--urg)}",
-    ".gr-bbtn{background:var(--gr-b);color:var(--bg-canvas);border-color:transparent}",
-    ".gr-bbtn:hover{color:var(--bg-canvas);filter:brightness(1.06)}",
+    ".gr-bbtn,.btn.gr-bbtn{background:var(--gr-b);color:var(--bg-canvas);border-color:transparent}",
+    ".btn.gr-bbtn:hover{color:var(--bg-canvas);border-color:transparent;filter:brightness(1.06)}",
     ".gr-bt{color:var(--gr-b)}",
     ".gr-bmark{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--gr-b);color:var(--bg-canvas);font:700 16px/1 var(--font);flex:none}",
     ".gr-bmark.sm{width:28px;height:28px;border-radius:8px;font-size:12px}",
@@ -82,7 +82,7 @@
     ".frame.mobile .gr-fn{grid-template-columns:repeat(2,minmax(0,1fr))}",
     ".gr-fs{border-radius:var(--r-md);border:1px solid var(--b-sub);background:var(--s2);padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}",
     ".gr-fs b{font:600 22px/28px var(--font);font-variant-numeric:tabular-nums}",
-    ".gr-fs span{font-size:12px;color:var(--tx2);line-height:16px}",
+    ".gr-fs>span{font-size:12px;color:var(--tx2);line-height:16px}",
     ".gr-rlib{display:flex;flex-direction:column;gap:2px}",
     ".gr-rg{font:600 10.5px/14px var(--font);letter-spacing:.8px;text-transform:uppercase;color:var(--tx3);padding:12px 10px 4px}",
     "[dir=rtl] .gr-rg{letter-spacing:0}",
@@ -113,7 +113,7 @@
     "[dir=rtl] .gr-hero h1{font-family:var(--font-ar);letter-spacing:0}",
     ".gr-hero p{margin:0;color:var(--tx2);max-width:680px}",
     ".frame.mobile .gr-hero{padding:18px}.frame.mobile .gr-hero h1{font-size:22px;line-height:29px}",
-    ".gr-hero.acc{border-color:var(--acc-line);background:linear-gradient(135deg,rgba(46,211,224,.12),rgba(62,224,196,.03) 60%),var(--s1)}",
+    ".gr-hero.hacc{border-color:var(--acc-line);background:linear-gradient(135deg,rgba(46,211,224,.12),rgba(62,224,196,.03) 60%),var(--s1)}",
     ".gr-vp{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}",
     ".frame.tablet .gr-vp{grid-template-columns:repeat(2,minmax(0,1fr))}.frame.mobile .gr-vp{grid-template-columns:minmax(0,1fr)}",
     ".gr-vp .card{display:flex;flex-direction:column;gap:6px}",
@@ -122,19 +122,21 @@
     ".frame.tablet .gr-plans,.frame.mobile .gr-plans{grid-template-columns:minmax(0,1fr)}",
     ".gr-plan{display:flex;flex-direction:column;gap:12px}",
     ".gr-plan.hl{border-color:var(--acc)}",
-    ".gr-plan .pr{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.gr-plan .pr b{font:600 28px/34px var(--font)}.gr-plan .pr span{color:var(--tx2);font-size:12.5px}",
+    ".gr-plan .pr{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.gr-plan .pr b{font:600 28px/34px var(--font)}.gr-plan .pr>span{color:var(--tx2);font-size:12.5px}.gr-plan>.btn{margin-top:auto}",
     ".gr-ul{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--tx2);margin:0;padding:0;list-style:none}",
     ".gr-ul li{display:flex;gap:8px;align-items:flex-start}.gr-ul .ico{color:var(--ok);width:15px;height:15px;margin-top:2px;flex:none}",
     ".gr-tst{display:flex;flex-direction:column;gap:10px;border-style:dashed}",
     ".gr-ph{border:1px dashed var(--b-str);border-radius:var(--r-md);padding:12px;color:var(--tx2);font-size:12.5px;line-height:18px}",
     ".gr-kv{margin:0}",
+    ".gr-scr{display:flex;flex-direction:column;gap:20px;min-width:0}.gr-scr.gr-ob{gap:16px}.frame.mobile .gr-scr{gap:16px}",
+    ".gr-scr table.t td .num.ltr{white-space:nowrap}",
     ".gr-stk{display:flex;height:14px;border-radius:6px;overflow:hidden;gap:2px;background:var(--s1)}.gr-stk i{display:block;height:100%}",
     ".gr-stk .p,.gr-leg .p{background:var(--ok)}.gr-stk .n,.gr-leg .n{background:var(--warn)}.gr-stk .d,.gr-leg .d{background:var(--crit)}",
     ".gr-mini{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}",
     ".frame.mobile .gr-mini{grid-template-columns:repeat(2,minmax(0,1fr))}",
     ".gr-mini .card{padding:14px;display:flex;flex-direction:column;gap:4px}",
     ".gr-mini .card b{font:600 22px/28px var(--font);font-variant-numeric:tabular-nums}",
-    ".gr-mini .card span{font-size:12px;color:var(--tx2);line-height:16px}",
+    ".gr-mini .card>span{font-size:12px;color:var(--tx2);line-height:16px}",
     ".gr-cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}",
     ".frame.mobile .gr-cmp{grid-template-columns:minmax(0,1fr)}",
     ".gr-prog{display:flex;flex-direction:column;gap:6px}",
@@ -168,6 +170,10 @@
     if (document.getElementById("gr-css")) return;
     var s = document.createElement("style"); s.id = "gr-css"; s.textContent = CSS; document.head.appendChild(s);
   })();
+
+  /* Every screen and overlay body sits in a .gr-scr wrapper so module styles stay scoped. */
+  function scr(id, fn) { NB.screen(id, function (c) { return '<div class="gr-scr">' + fn(c) + "</div>"; }); }
+  function ovl(id, fn) { NB.overlay(id, function (a, c) { var o = fn(a, c); if (o && o.body) o.body = '<div class="gr-scr gr-ob">' + o.body + "</div>"; return o; }); }
 
   /* ================= Helpers ================= */
   function mk() { return NB.mkt(); }
@@ -311,7 +317,7 @@
       { d: "d4", type: "Visiting consultant", model: "mix", desc: "70% of consult fees · " + "fixed per echo", c: 0.7, p: 0, per: 2500, tds: true },
       { d: "d5", type: "Visiting consultant", model: "fixed", desc: "Fixed per OPD session (3 a week)", c: 0, p: 0, sess: 6000, tds: true }
     ],
-    stm: { d1: [182, 425000, 41, 214000], d3: [348, 211000, 6, 9000], d4: [96, 115200, 22, 0], d5: [6, 0, 0, 0], d2: [402, 241000, 18, 22000] },
+    stm: { d1: [182, 425000, 41, 214000], d3: [348, 211000, 6, 9000], d4: [96, 115200, 22, 77000], d5: [104, 83200, 0, 0], d2: [402, 241000, 18, 22000] },
     staff: [
       { n: "Sneha Kulkarni", r: "Receptionist", sh: ["09–14", "17–21"], m: "Desk PIN", in: "08:56", st: "ok", h: 8.5, d: 24, ot: 6, lv: 1, sal: 28000, adv: 0 },
       { n: "Anita D'Souza", r: "OPD nurse", sh: ["08–16"], m: "App (geo-fenced)", in: "07:58", st: "ok", h: 8, d: 25, ot: 2, lv: 0, sal: 34000, adv: 2000 },
@@ -506,7 +512,7 @@
       '<div class="gr-foot"><div class="btns">' + (cur > 0 ? ui.btn("Back", { cls: "ghost", icon: "chevleft", act: "grStep", arg: cur - 1 }) : "") + "</div><div class=\"btns\">" +
       (cur < S.length - 1 ? ui.btn("Skip for now", { cls: "ghost", act: "grStep", arg: cur + 1 }) + ui.btn("Save & continue", { cls: "pri", icon: "check", act: "grStep", arg: cur + 1 }) : "") + "</div></div></div>";
     var help = '<div class="grid g2">' + ui.card("Prefer we set it up?", '<p class="small muted" style="margin:0 0 12px">White-glove setup: a call and screen-share, your price list and doctors entered for you, and Meta verification done. ' +
-      RAW(pick({ india: 4999, uae: 499, ksa: 499, qatar: 499 })) + " one-time, waived on annual plans.</p>" + ui.btn("Book a slot", { cls: "sm", icon: "calendar", act: "grWhite" }), { icon: "handshake" }) +
+      pp(pick({ india: 4999, uae: 499, ksa: 499, qatar: 499 })) + " one-time, waived on annual plans.</p>" + ui.btn("Book a slot", { cls: "sm", icon: "calendar", act: "grWhite" }), { icon: "handshake" }) +
       ui.card("Your data, no lock-in", '<p class="small muted" style="margin:0 0 12px">Export everything (patients, bookings, bills, consents, files) any time in Excel/CSV, without asking support. Delete your account and get a deletion certificate.</p>' +
         ui.btn("Export or delete data", { cls: "sm", icon: "download", ov: "exportall" }), { icon: "shieldcheck" }) + "</div>";
     return '<div class="gr-wz">' + left + '<div class="stack s16">' + body + help + "</div></div>";
@@ -557,16 +563,19 @@
       var x0 = 8 * 60, x1 = 24 * 60, pct = function (t) { return ((t - x0) / (x1 - x0) * 100).toFixed(2); };
       var open = rm ? [["10:00", "16:00"], ["21:00", "24:00"]] : [["09:00", "13:00"], ["16:30", "22:00"]];
       var blocks = rm ? [["17:31", "20:30", "rm"]] : [];
-      if (pr) P.t.slice(1).forEach(function (t) { var s = toMin(t[1]); blocks.push([t[1], Math.floor((s + 20) / 60) + ":" + ("0" + (s + 20) % 60).slice(-2), "pr"]); });
+      if (pr) P.t.slice(1).forEach(function (t) {
+        var s = toMin(t[1]), inOpen = open.some(function (o) { return s + 20 > toMin(o[0]) && s < toMin(o[1]); }), inRm = blocks.some(function (b) { return s >= toMin(b[0]) && s < toMin(b[1]); });
+        if (inOpen && !inRm) blocks.push([t[1], Math.floor((s + 20) / 60) + ":" + ("0" + (s + 20) % 60).slice(-2), "pr"]);
+      });
       var strip = '<div class="stack s4" dir="ltr"><div class="gr-strip" role="img" aria-label="Clinic hours with prayer and Ramadan blocks">' +
         open.map(function (o) { return '<i class="op" style="left:' + pct(toMin(o[0])) + "%;width:" + (pct(toMin(o[1])) - pct(toMin(o[0]))).toFixed(2) + '%"></i>'; }).join("") +
         blocks.map(function (b) { return '<i class="' + b[2] + '" title="' + b[0] + "–" + b[1] + '" style="left:' + pct(toMin(b[0])) + "%;width:" + Math.max(0.8, pct(toMin(b[1])) - pct(toMin(b[0]))).toFixed(2) + '%"></i>'; }).join("") +
         '</div><div class="gr-sx">' + ["08:00", "12:00", "16:00", "20:00", "24:00"].map(function (t) { return '<span style="left:' + Math.min(97, Math.max(3, pct(toMin(t)))) + '%">' + t + "</span>"; }).join("") + "</div></div>";
       h += '<div class="grid g2">' + ui.card(L("Hijri dates", "التاريخ الهجري", "हिजरी तारीख़"), ui.toggle("grHijri", "Show Hijri beside Gregorian", "On the schedule, invoices, package expiry messages and the owner dashboard", true) +
         (hj ? '<div class="stack s8" style="margin-top:12px">' + [["2026-10-17", "Today"], ["2026-11-07", "Facility licence expiry"], ["2027-02-08", "Ramadan expected to start"]].map(function (d) {
-          return '<div class="row sb"><span class="small muted">' + esc(d[1]) + '</span><span class="small"><b class="num">' + esc(gd(d[0])) + '</b> · <bdi>' + esc(hijri(d[0])) + "</bdi></span></div>";
+          return '<div class="row sb"><span class="small muted">' + esc(d[1]) + '</span><span class="small"><b class="num ltr">' + esc(gd(d[0])) + '</b> · <bdi>' + esc(hijri(d[0])) + "</bdi></span></div>";
         }).join("") + "</div>" : ""), { icon: "calendar" }) +
-        ui.card(L("Prayer-time blocks", "أوقات الصلاة", "नमाज़ समय"), ui.toggle("grPray", "Block prayer times on every doctor's schedule", "20 minutes from each adhan · " + P.meth + " · " + P.city, true) +
+        ui.card(L("Prayer-time blocks", "أوقات الصلاة", "नमाज़ समय"), ui.toggle("grPray", "Block prayer times on every doctor's schedule", "Blocks 20 minutes from each adhan · " + P.meth + " · " + P.city, true) +
           '<div class="chips" style="margin-top:12px">' + P.t.map(function (t) { return '<span class="pill ' + (pr && t[0] !== "Fajr" ? "warn" : "mute") + '" style="text-transform:none;letter-spacing:0">' + ui.icon("clockh") + esc(t[0]) + ' <span class="num ltr">' + t[1] + "</span></span>"; }).join("") + "</div>" +
           '<p class="small muted" style="margin:10px 0 0">Times update daily. Reminders and recall messages are never sent inside a prayer window.</p>', { icon: "clockh" }) + "</div>";
       h += ui.card(L("Today's schedule · Dr. Khalid Al-Saeed", "جدول اليوم", "आज का शेड्यूल"), strip + '<div class="gr-leg" style="margin-top:8px"><span><i class="op"></i>Open for bookings</span><span><i class="pr"></i>Prayer block</span><span><i class="rm"></i>Iftar break (Ramadan)</span></div>', { icon: "activity", right: ui.seg("grRamPrev", [["", "Normal days"], ["1", "Preview Ramadan"]], "") });
@@ -581,7 +590,7 @@
       h += '<div class="split">' + '<div class="stack s8"><div class="row sb"><h2 class="h">' + L("Regional holidays", "العطل الإقليمية", "क्षेत्रीय छुट्टियाँ") + "</h2>" + sel("State template", "grState", [["ka", "Karnataka"], ["mh", "Maharashtra"], ["tn", "Tamil Nadu"], ["kl", "Kerala"], ["dl", "Delhi"]], "ka") + "</div>" +
         ui.table([{ h: "Date" }, { h: "Holiday" }, { h: "List" }, { h: "Clinic" }, { h: "Bookings" }], hol.map(function (x, i) {
           var st = ST[x[3]];
-          return ['<span class="num gr-nw">' + esc(gd(x[0])) + "</span>", esc(x[1]), '<span class="small muted">' + esc(x[2]) + "</span>", ui.pill(st[0], st[1], st[2]),
+          return ['<span class="num ltr gr-nw">' + esc(gd(x[0])) + "</span>", esc(x[1]), '<span class="small muted">' + esc(x[2]) + "</span>", ui.pill(st[0], st[1], st[2]),
             x[3] === "open" ? '<span class="small faint">—</span>' : '<span class="small">' + [12, 0, 18, 4, 0, 0, 0, 0][i] + " to move</span>"];
         }), { min: 720 }) + "</div>" +
         '<div class="stack s16">' + ui.card("What happens on a closed day", '<div class="gr-on"><span>' + ui.icon("check", "okc") + "Booking slots disappear 30 days ahead</span><span>" + ui.icon("check", "okc") + "Patients already booked are told 7 days before and offered the next slot</span><span>" + ui.icon("check", "okc") + "Package validity does not run on closed days</span><span>" + ui.icon("check", "okc") + "Recall messages wait until the clinic reopens</span></div>", { icon: "info" }) +
@@ -610,9 +619,9 @@
       return '<div class="gr-hct">' + tl(x.k) + '<div class="t"><b>' + esc(x.t) + "</b><small>" + esc(x.s) + "</small>" + '<span><span class="pill ' + x.k + '">' + ui.icon(x.k === "ok" ? "checkcircle" : x.k === "warn" ? "alertcircle" : "alertfill") + esc(tlText(x.k)) + "</span></span></div></div>";
     }).join("") + "</div>";
     h += '<div class="stack s8"><div class="row sb"><h2 class="h">' + L("Licence expiry reminders", "تذكيرات انتهاء التراخيص", "लाइसेंस समाप्ति रिमाइंडर") + "</h2>" + ui.btn("Add licence", { cls: "sm", icon: "plus", act: "toast", arg: "Add a licence: number, authority, expiry and a photo of the certificate" }) + "</div>" +
-      ui.table([{ h: "Licence" }, { h: "Holder" }, { h: "Number" }, { h: "Expiry" }, { h: "Status" }, { h: "Reminders" }, { h: "If it lapses" }], LC.slice().sort(function (a, b) { return a.d - b.d; }).map(function (x) {
-        return { cls: x.d <= 7 ? "crit" : x.d <= 30 ? "urg" : "", cells: [ui.cellp(esc(x.k), esc(x.by)), esc(x.w), '<span class="gr-mono">' + esc(x.no) + "</span>", '<div class="cellp"><b class="num">' + esc(gd(x.exp)) + "</b>" + (gcc() ? "<small><bdi>" + esc(hijri(x.exp)) + "</bdi></small>" : "") + "</div>", daysPill(x.d), remPill(x.d),
-          x.kind === "doc" ? ui.pill("sub", "Auto-hide from online booking", "eye") : '<span class="small muted">Owner alert only</span>'] };
+      ui.table([{ h: "Licence · holder" }, { h: "Authority" }, { h: "Number" }, { h: "Expiry" }, { h: "Status" }, { h: "Reminders" }, { h: "If it lapses" }], LC.slice().sort(function (a, b) { return a.d - b.d; }).map(function (x) {
+        return { cls: x.d <= 7 ? "crit" : x.d <= 30 ? "urg" : "", cells: [ui.cellp(esc(x.k), esc(x.w)), '<span class="small muted">' + esc(x.by) + "</span>", '<span class="gr-mono">' + esc(x.no) + "</span>", '<div class="cellp"><b class="num ltr">' + esc(gd(x.exp)) + "</b>" + (gcc() ? "<small><bdi>" + esc(hijri(x.exp)) + "</bdi></small>" : "") + "</div>", daysPill(x.d), remPill(x.d),
+          x.kind === "doc" ? ui.pill("sub", "Hidden from booking", "eye") : '<span class="small muted">Owner alert only</span>'] };
       }), { min: 1060 }) + "</div>";
     h += '<div class="grid g2">' + ui.card("Grievance & privacy contact", kv([["Name", esc(dpo().n)], ["Email", '<span class="ltr">' + esc(dpo().mail) + "</span>"], ["Published in", "Privacy notice, booking page footer, every invoice"], ["Law", esc(m.privacyLaw)]]) +
       '<div class="btns" style="margin-top:12px">' + ui.btn("Grievance queue", { cls: "sm", icon: "chat", act: "grGo", arg: "feedback" }) + "</div>", { icon: "shielduser" }) +
@@ -621,7 +630,7 @@
   }
   NB.act("grGo", function (a) { NB.state.ui.grGrTab = a; NB.go("owner", "growth"); });
 
-  NB.screen("owner.setup", function (c) {
+  scr("owner.setup", function (c) {
     var tab = NB.v("grSetTab", "wizard");
     var h = ui.header(L("Clinic setup & branches", "إعداد العيادة والفروع", "क्लिनिक सेटअप और शाखाएँ"), "Guided setup a non-IT owner finishes in under an hour · every step skippable and resumable · " + esc(c.m.name),
       ui.btn(L("Export or delete data", "تصدير البيانات أو حذفها", "डेटा एक्सपोर्ट या डिलीट"), { icon: "download", ov: "exportall" }) + ui.btn(L("Add a branch", "إضافة فرع", "शाखा जोड़ें"), { cls: "pri", icon: "plus", ov: "branchadd" }));
@@ -631,7 +640,7 @@
   });
 
   /* ---------- Overlay: add a branch (< 15 min) ---------- */
-  NB.overlay("branchadd", function (arg, c) {
+  ovl("branchadd", function (arg, c) {
     var st = +NB.v("grBrStep", 0), fs = facs(), S = ["Branch details", "Copy from", "Schedules", "Fees", "Invoice series", "WhatsApp routing"];
     var h = '<div class="row sb"><span class="small muted">Step ' + (st + 1) + " of " + S.length + " · " + esc(S[st]) + '</span><span class="small muted">' + ui.icon("clockh", "xs") + " about " + (14 - st * 2) + " min left</span></div>" + ui.bar((st + 1) / S.length * 100);
     if (st === 0) h += '<div class="fgrid">' + ui.field("Branch name", gcc() ? "Al Noor Clinic · " + pick({ uae: "Mirdif", ksa: "Al Malqa", qatar: "Al Wakrah" }) : "Suvidha Clinic · HSR Layout", { id: "gr-bn" }) +
@@ -654,14 +663,14 @@
   NB.act("grBrDone", function () { NB.state.ui.grBrStep = "0"; NB.state.overlay = null; NB.toast("Branch created in 12 min · invite its front desk next"); });
 
   /* ---------- Overlay: full export & delete (no lock-in) ---------- */
-  NB.overlay("exportall", function (arg, c) {
+  ovl("exportall", function (arg, c) {
     var st = NB.v("grExp", "setup"), m = c.m, fmt = NB.v("grExpFmt", "xlsx");
     var h = "";
     if (st === "setup") {
       h += ui.note("info", "Everything you put into Nabd is yours. Export it any time, as often as you like, without contacting support.");
       h += '<div class="stack s8"><b class="small">What to export</b><div class="gr-cks">' +
-        ck("grE1", "Patients and family links", "18,240 people", true) + ck("grE2", "Appointments and queue history", "212,904 rows", true) + ck("grE3", "Visits, notes, prescriptions and results", "Clinical records", true) +
-        ck("grE4", "Invoices, payments, refunds and day-close", "Tax-ready", true) + ck("grE5", "Consents, privacy notice versions and audit log", "Evidence for regulators", true) + ck("grE6", "Photos and attached files", "2.1 GB", true) + "</div></div>";
+        ck("grE1", "Patients and family links", "People: 18,240", true) + ck("grE2", "Appointments and queue history", "Rows: 212,904", true) + ck("grE3", "Visits, notes, prescriptions and results", "Clinical records", true) +
+        ck("grE4", "Invoices, payments, refunds and day-close", "Tax-ready", true) + ck("grE5", "Consents, privacy notice versions and audit log", "Evidence for regulators", true) + ck("grE6", "Photos and attached files", "Size: 2.1 GB", true) + "</div></div>";
       h += '<div class="stack s8"><b class="small">Format</b>' + ui.seg("grExpFmt", [["xlsx", "Excel (.xlsx)"], ["csv", "CSV (zip)"], ["fhir", "FHIR R4 JSON"], ["pdf", "PDF per patient"]], "xlsx") + "</div>";
       h += kv([["Branches", "All " + facs().length], ["Estimated time", "about 14 minutes"], ["Download link", "Sent to the owner by WhatsApp and email · OTP to open · expires in 72 h"], ["Logged", "The export itself is written to the audit log"]]);
     } else if (st === "running") {
@@ -702,20 +711,19 @@
     }).join("") + "</div>" + '<p class="small muted" style="margin:12px 0 0">This is exactly what the receptionist taps at checkout, in this order (most used first). Inactive heads disappear here but stay on past bills.</p>', { icon: "receipt", right: ui.pill("ok", "Live for new bills") });
     h += '<div class="row sb">' + ui.seg("grPrCat", [["all", "All", G.heads.length]].concat(CATS.map(function (k) { return [k, k, G.heads.filter(function (x) { return x.cat === k; }).length]; })), "all") +
       ui.btn("Add charge head", { cls: "sm", icon: "plus", ov: "pricechange", arg: "new" }) + "</div>";
-    h += ui.table([{ h: "Charge head" }, { h: "Category" }, { h: "Normal", cls: "r" }, { h: "Follow-up", cls: "r" }, { h: "Emergency", cls: "r" }, { h: "Per doctor" }, { h: "Tax" }, { h: "Package" }, { h: "Status" }, { h: "" }],
+    h += ui.table([{ h: "Charge head" }, { h: "Category" }, { h: "Normal", cls: "r" }, { h: "Follow-up", cls: "r" }, { h: "Emergency", cls: "r" }, { h: "Per doctor" }, { h: "Tax" }, { h: "Package" }, { h: "Status" }],
       rows.map(function (x) {
         var nov = Object.keys(x.ov).length;
         return { ov: "pricechange", arg: x.id, cells: [ui.cellp(esc(x.en), '<span class="gr-mono">' + esc(x.id) + "</span>" + (gcc() ? " · <bdi>" + esc(x.ar) + "</bdi>" : "")), esc(x.cat), M(x.base),
           x.cat === "Consultation" ? tierCell(x.fu) : '<span class="small muted">n/a</span>', tierCell(x.em),
           x.cat !== "Consultation" ? '<span class="small muted">n/a</span>' : nov ? ui.pill("info", nov + " overrides", "users") : '<span class="small muted">None</span>',
-          taxPill(x.tx), x.pkg ? ui.pill("acc", "Eligible", "layers") : '<span class="small muted">—</span>', x.act ? ui.pill("ok", "Active") : ui.pill("mute", "Inactive", "pause"),
-          ui.btn("Edit", { cls: "sm ghost", icon: "edit", ov: "pricechange", arg: x.id })] };
+          taxPill(x.tx), x.pkg ? ui.pill("acc", "Eligible", "layers") : '<span class="small muted">—</span>', x.act ? ui.pill("ok", "Active") : ui.pill("mute", "Inactive", "pause")] };
       }), { min: 1180 });
     var con = head("CON");
     h += '<div class="grid g2">' + ui.card(L("Per-doctor consultation fees", "رسوم الاستشارة لكل طبيب", "डॉक्टर-वार परामर्श शुल्क"), ui.table([{ h: "Doctor" }, { h: "Normal", cls: "r" }, { h: "Follow-up", cls: "r" }, { h: "Emergency", cls: "r" }],
       ["d1", "d2", "d3", "d4", "d5"].map(function (d) {
         var o = con.ov[d];
-        return [ui.cellp(esc(dn(d)), esc(NB.doc(d).spec)), o ? "<b>" + M(o) + "</b>" : '<span class="small muted">' + M(con.base) + " (default)</span>", M(o ? Math.round(o * 0.57) : con.fu), M(o ? Math.round(o * 1.6) : con.em)];
+        return [ui.cellp(esc(dn(d)), esc(NB.doc(d).spec)), o ? "<b>" + M(o) + "</b>" : '<span class="small muted">' + M(con.base) + " (default)</span>", M(o ? Math.round(o * 0.057) * 10 : con.fu), M(o ? Math.round(o * 0.16) * 10 : con.em)];
       }), { min: 520 }) + '<p class="small muted" style="margin:10px 0 0">Blank override = clinic default, in every case. Applied automatically at checkout.</p>', { icon: "users" }) +
       ui.card(L("Price rules in force", "قواعد التسعير المطبقة", "लागू मूल्य नियम"), kv([["Follow-up window", "<b>" + NB.v("grFuWin", "7") + " days</b> · same doctor · Consultation only"], ["Free follow-up", NB.v("grFreeFu", true) ? "First review for the same complaint" : "Off"], ["Emergency tier", "Suggested when check-in is flagged urgent · receptionist confirms"],
         ["After-hours tier", NB.v("grAfter", true) ? "Suggested after 21:00 and on " + (gcc() ? "Fridays" : "Sundays") : "Off"], ["Tax", esc(mk().tax) + (mk().taxRate ? " · " + mk().taxRate + "% standard" : "")]]) +
@@ -797,7 +805,7 @@
       }), { min: 720 }) +
       '<div class="btns">' + ui.btn("Add missing heads to my list", { cls: "pri sm", icon: "plus", act: "toast", arg: "Missing heads added as inactive drafts · set amounts before switching them on" }) + "</div>";
   }
-  NB.screen("owner.prices", function (c) {
+  scr("owner.prices", function (c) {
     var tab = NB.v("grPrTab", "list"), m = c.m;
     var h = ui.header(L("Price master & fees", "قائمة الأسعار والرسوم", "मूल्य सूची और शुल्क"), "One list for every charge · " + esc(m.tax) + (m.taxRate ? " " + m.taxRate + "%" : "") + " · " + esc(m.taxNote),
       ui.btn(L("Change log", "سجل التغييرات", "बदलाव लॉग"), { icon: "history", act: "grPrTab", arg: "log" }) + ui.btn(L("Add charge head", "إضافة بند", "शुल्क जोड़ें"), { cls: "pri", icon: "plus", ov: "pricechange", arg: "new" }));
@@ -807,7 +815,7 @@
     return h;
   });
 
-  NB.overlay("pricechange", function (id, c) {
+  ovl("pricechange", function (id, c) {
     var isNew = id === "new", x = isNew ? { id: "", en: "", ar: "", cat: "Procedure", base: null, fu: null, em: null, tx: "svc", ov: {}, pkg: false, act: true } : head(id);
     var h = "";
     h += '<div class="fgrid">' + ui.field("Name", x.en, { id: "gr-pn", ph: "e.g. Wart removal (cryo)" }) + ui.field("Short label (billing button)", x.id, { id: "gr-pl", ph: "max 6 letters" }) +
@@ -818,7 +826,7 @@
     if (x.cat === "Consultation") h += '<div class="stack s8"><b class="small">Per-doctor normal fee (blank = clinic default)</b><div class="fgrid">' + ["d1", "d2", "d3", "d4", "d5"].map(function (d) {
       return ui.field(dn(d), x.ov[d] ? String(Math.round(x.ov[d] * mk().fx * 100) / 100) : "", { id: "gr-o" + d, ph: "default" });
     }).join("") + "</div></div>";
-    h += '<div class="stack s8"><b class="small">Tax</b>' + ui.seg("grPcTax", [["svc", tax("svc")[1]], ["cos", tax("cos")[1]], ["cons", tax("cons")[1]]], x.tx === "cert" ? "svc" : x.tx) + "</div>";
+    h += '<div class="stack s8"><b class="small">Tax</b>' + ui.seg("grPcTax", [["svc", "Clinical · " + tax("svc")[1]], ["cos", "Cosmetic · " + tax("cos")[1]], ["cons", "Goods · " + tax("cons")[1]]], x.tx === "cert" ? "svc" : x.tx) + "</div>";
     h += ui.toggle("grPcPkg_" + (x.id || "new"), "Package-eligible", "Can be bundled in packages with its own session price", x.pkg) + ui.toggle("grPcAct_" + (x.id || "new"), "Active on the billing screen", "Inactive heads stay on past bills and reports", x.act);
     h += '<div class="fgrid">' + ui.field("Applies from", "Next bill", { id: "gr-pw", options: ["Next bill", "Tomorrow 00:00", "1 Nov 2026"] }) + ui.field("Reason (kept in the change log)", "", { id: "gr-pr", ph: "e.g. annual revision" }) + "</div>";
     h += ui.note("info", "Issued bills and invoices never change. The change log records who, when, old value and new value.");
@@ -840,7 +848,7 @@
     if (id === "leak") {
       var E = [["p5", "LHR", "Laser hair reduction · session", 3500, "Today 09:48", "d1"], ["p3", "DRS", "Wound dressing", 250, "Today 09:31", "d2"], ["p7", "NEB", "Nebulisation", 200, "Yesterday 17:12", "d3"], ["p2", "PEEL", "Chemical peel", 2500, "15 Oct 12:05", "d1"], ["p8", "ECG", "ECG (12-lead)", 300, "14 Oct 10:40", "d2"], ["p4", "VAC", "Vaccination (administration)", 250, "13 Oct 11:15", "d3"]];
       return { kpis: [[E.length, "items done but not billed"], [M(E.reduce(function (s, e) { return s + e[3]; }, 0)), "value at risk"], [M(18400), "recovered this month"], ["3", "linked to one doctor"]],
-        rule: "Procedure orders marked done with no bill line, amount ≥ " + M(thr) + ", last 7 days. Rule shown as the API returns it.",
+        rule: "Procedure orders marked done with no bill line, amount ≥ " + M(thr) + ", in the selected period. Rule shown as the API returns it.",
         chart: W.cols([2, 0, 1, 3, 1, 0, 2, 4, 1, 2, 0, 1, 2, 2], { labels: lab, h: 120, aria: "Unbilled items per day", title: function (v, i) { return days[i] + " Oct · " + v + " items"; } }),
         cols: [{ h: "Patient" }, { h: "Charge" }, { h: "Amount", cls: "r" }, { h: "Completed" }, { h: "Doctor" }, { h: "" }],
         rows: E.map(function (e) { return [esc(NB.pname(NB.pat(e[0]))), ui.cellp(esc(e[2]), '<span class="gr-mono">' + e[1] + "</span>"), M(e[3]), '<span class="small num">' + esc(e[4]) + "</span>", esc(dn(e[5])), ui.btn("Bill now", { cls: "sm", act: "toast", arg: "Added to " + NB.pname(NB.pat(e[0])) + "'s bill · patient gets the receipt on WhatsApp" })]; }), min: 820 };
@@ -919,7 +927,7 @@
       " · WhatsApp PDF to " + esc(owner()) + " · email to accountant</span></div>" + '<div class="btns">' + ui.btn("Schedule", { cls: "sm", icon: "calendar", ov: "reportview", arg: id }) +
       ui.btn("Excel", { cls: "sm ghost", icon: "download", act: "toast", arg: rname(r) + " exported to Excel" }) + ui.btn("CSV", { cls: "sm ghost", icon: "download", act: "toast", arg: rname(r) + " exported to CSV" }) + ui.btn("PDF", { cls: "sm ghost", icon: "printer", act: "toast", arg: rname(r) + " PDF ready" }) + "</div></div>";
   }
-  NB.screen("owner.reports", function (c) {
+  scr("owner.reports", function (c) {
     var id = NB.v("grRep", "leak"), r = rp(id), d = repData(id, c), fs = facs();
     var h = ui.header(L("Reports", "التقارير", "रिपोर्ट"), "Straight from live records · every number opens the rows behind it · export to Excel or CSV",
       ui.btn(L("Export everything", "تصدير الكل", "सब एक्सपोर्ट करें"), { icon: "download", ov: "exportall" }));
@@ -940,7 +948,7 @@
     h += '<div class="split l">' + lib + body + "</div>";
     return h;
   });
-  NB.overlay("reportview", function (id, c) {
+  ovl("reportview", function (id, c) {
     var r = rp(id), d = repData(id, c);
     var freq = NB.v("grRf", "weekly");
     var h = '<div class="gr-mini">' + d.kpis.map(function (k) { return '<div class="card"><b>' + k[0] + "</b><span>" + esc(k[1]) + "</span></div>"; }).join("") + "</div>" +
@@ -979,7 +987,7 @@
         '<hr class="hr" style="margin:14px 0">' + kv([["Google rating", '<span class="gr-stars">★</span> <b class="num">4.7</b> <span class="small muted">(1,284 reviews · was 4.4 in June)</span>'], ["Replied within 48 h", num("92%")], ["Private feedback captured", num("34")]]), { icon: "chart" }) + "</div>";
     h += '<div class="stack s8"><h2 class="h">' + L("Recent reviews · reply tracking", "أحدث التقييمات", "हाल की समीक्षाएँ") + "</h2>" + ui.table([{ h: "Reviewer" }, { h: "Rating" }, { h: "Review" }, { h: "When" }, { h: "Reply" }], G.reviews.map(function (r) {
       return [esc(r.n), '<span class="gr-stars">' + "★★★★★".slice(0, r.s) + '</span><span class="small muted num"> ' + r.s + "/5</span>", '<span class="small gr-wrap">' + esc(r.t) + "</span>", '<span class="small num gr-nw">' + esc(r.w) + "</span>",
-        r.rep ? ui.pill("ok", "Replied") : '<div class="btns">' + ui.pill(r.s <= 2 ? "urg" : "warn", r.s <= 2 ? "Reply today" : "Not replied", r.s <= 2 ? "bolt" : "clockh") + ui.btn("Draft reply", { cls: "sm", icon: "sparkle", act: "toast", arg: "Draft reply ready to edit · nothing is posted without you" }) + "</div>"];
+        r.rep ? ui.pill("ok", "Replied") : '<div class="row nw">' + ui.pill(r.s <= 2 ? "urg" : "warn", r.s <= 2 ? "Reply today" : "Not replied", r.s <= 2 ? "bolt" : "clockh") + ui.btn("Draft reply", { cls: "sm", icon: "sparkle", act: "toast", arg: "Draft reply ready to edit · nothing is posted without you" }) + "</div>"];
     }), { min: 900 }) + "</div>";
     return h;
   }
@@ -1011,7 +1019,7 @@
       return { ov: "grievance", arg: x.id, cls: x.st === "esc" ? "crit" : x.st === "new" ? "urg" : "", cells: ['<span class="tok">' + x.id + "</span>", esc(NB.pname(NB.pat(x.p))), esc(x.cat), '<span class="small">' + esc(x.ch) + "</span>", '<span class="small num gr-nw">' + esc(x.recv) + "</span>", '<span class="small">' + esc(x.sla) + "</span>",
         '<span class="small gr-nw">L' + x.lvl + " · " + esc(x.who) + "</span>", ui.pill(s[0], s[1], s[2])] };
     }), { min: 1060 }) + "</div>";
-    h += ui.note("info", "Escalation: <b>L1</b> front desk (24 h) → <b>L2</b> clinic manager (3 days) → <b>L3</b> owner or grievance officer. Privacy complaints go straight to L3. Patients can always reach the " + esc(m.regulator.split(" / ")[0]) + " as well; the reply letter says how.");
+    h += ui.note("info", "Escalation: <b>L1</b> front desk (24 h) → <b>L2</b> clinic manager (3 days) → <b>L3</b> owner or grievance officer. Privacy complaints go straight to L3. Patients can always go to " + esc(pick({ india: "the Data Protection Board (privacy) or the state health department", uae: "the DHA patient-complaints service", ksa: "the MOH (937) complaints service", qatar: "the MOPH complaints service" })) + " as well; the reply letter says how.");
     return h;
   }
   function waTab(c) {
@@ -1026,17 +1034,18 @@
       '<div class="tl" style="margin-top:12px">' + [["High", "Everything sends: care reminders, recalls, reviews, campaigns", "ok"], ["Medium", "Marketing pauses (win-back, review requests). Queue updates, reminders and OTPs keep flowing", "warn"], ["Low", "Only patient-started chats, queue updates and OTPs. Owner alerted", "crit"]].map(function (x) {
         return '<div class="ev"><span class="dotc ' + x[2] + '">' + ui.icon(x[2] === "ok" ? "check" : x[2] === "warn" ? "pause" : "stop", "sm") + '</span><div class="bd"><b>' + esc(x[0]) + "</b><small>" + esc(x[1]) + "</small></div></div>";
       }).join("") + "</div>" + (thr ? "" : ui.note("warn", "With auto-throttle off, a bad campaign can get the number restricted for every patient message, including queue updates.")), { icon: "shieldcheck" }) +
-      ui.card("What happened", '<div class="lst">' + [["14 Oct 19:10", "Whitefield number dropped to Medium after the win-back campaign (2.1% blocks)", "warn"], ["14 Oct 19:11", "Marketing paused automatically · 3 templates held", "info"], ["16 Oct 08:00", "Block rate back under 1.5% · marketing stays paused 24 h more", "ok"], ["17 Oct 08:00", "Review requests resume tomorrow 10:00 if the rate holds", "info"]].map(function (x) {
+      ui.card("What happened", '<div class="lst">' + [["14 Oct 19:10", short(facs()[1]) + " number fell to Medium after win-back (2.1% blocks)", "warn"], ["14 Oct 19:11", "Marketing paused automatically · 3 templates held", "info"], ["16 Oct 08:00", "Block rate back under 1.5% · marketing stays paused 24 h more", "ok"], ["17 Oct 08:00", "Review requests resume tomorrow 10:00 if the rate holds", "info"]].map(function (x) {
         return ui.li(ii(x[2] === "ok" ? "checkcircle" : x[2] === "warn" ? "alertcircle" : "info", x[2]), esc(x[1]), '<span class="num">' + esc(x[0]) + "</span>", "");
       }).join("") + "</div>", { icon: "history" }) + "</div>";
     h += '<div class="stack s8"><h2 class="h">' + L("Message templates", "قوالب الرسائل", "मैसेज टेम्पलेट") + "</h2>" + ui.table([{ h: "Template" }, { h: "Category" }, { h: "Languages" }, { h: "Status" }, { h: "Quality" }], G.templates.map(function (t) {
       var st = { ok: ["ok", "Approved", "checkcircle"], warn: ["warn", "Paused (throttle)", "pause"], crit: ["crit", "Paused by Meta", "alertfill"] }[t[3]];
-      return ['<span class="gr-mono">' + esc(t[0]) + "</span>", t[1] === "Marketing" ? ui.pill("sub", t[1], "sparkle") : t[1] === "Authentication" ? ui.pill("perm", t[1], "lock") : ui.pill("info", t[1]), esc(t[2]), ui.pill(st[0], st[1], st[2]), ui.pill(t[4] === "High" ? "ok" : t[4] === "Medium" ? "warn" : "crit", t[4])];
+      var lg = gcc() ? (t[2].indexOf("HI") >= 0 ? "EN · AR" : t[2]) : t[2].replace("AR", "KN");
+      return ['<span class="gr-mono">' + esc(t[0]) + "</span>", t[1] === "Marketing" ? ui.pill("sub", t[1], "sparkle") : t[1] === "Authentication" ? ui.pill("perm", t[1], "lock") : ui.pill("info", t[1]), esc(lg), ui.pill(st[0], st[1], st[2]), ui.pill(t[4] === "High" ? "ok" : t[4] === "Medium" ? "warn" : "crit", t[4])];
     }), { min: 760 }) + "</div>";
     h += ui.note("info", "Burst lanes: OTPs and queue updates always go first, then reminders, then everything else. Meta templates are managed by Nabd; clinics never need to open Business Manager.");
     return h;
   }
-  NB.screen("owner.growth", function (c) {
+  scr("owner.growth", function (c) {
     var tab = NB.v("grGrTab", "recalls");
     var h = ui.header(L("Recalls, reviews & feedback", "الاستدعاء والتقييمات والملاحظات", "रिकॉल, रिव्यू और फ़ीडबैक"), "Bring patients back, earn reviews fairly, hear complaints early and keep the WhatsApp number healthy",
       ui.btn(L("Doctor recalls", "استدعاءات الطبيب", "डॉक्टर रिकॉल"), { icon: "refresh", go: "doctor.recalls" }));
@@ -1045,7 +1054,7 @@
     h += tab === "reviews" ? reviewsTab(c) : tab === "referrals" ? referralsTab(c) : tab === "feedback" ? feedbackTab(c) : tab === "wa" ? waTab(c) : recallsTab(c);
     return h;
   });
-  NB.overlay("grievance", function (id, c) {
+  ovl("grievance", function (id, c) {
     var x = G.complaints.find(function (q) { return q.id === id; }) || G.complaints[0], p = NB.pat(x.p), s = CST[x.st], m = c.m;
     var tlv = [["Received via " + x.ch, x.recv, "acc"], ["Acknowledged on WhatsApp (auto)", x.st === "new" ? "Pending" : x.recv + " + 12 min", x.st === "new" ? "" : "ok"], ["Assigned to L1 · front desk lead", x.st === "new" ? "Pending" : "Same day", x.st === "new" ? "" : "ok"]];
     if (x.lvl >= 2) tlv.push(["Escalated to L2 · clinic manager", "SLA missed at L1", "warn"]);
@@ -1082,7 +1091,7 @@
         return '<div class="dr">' + ui.av(NB.doc(d).name) + '<div class="t"><b>' + esc(dn(d)) + "</b><small>" + esc(NB.doc(d).spec) + ' · wait <span class="ltr">' + w[i][0] + "–" + w[i][1] + '</span> min</small></div><span class="gr-pb gr-bbtn">Book</span></div>';
       }).join("") + '</div><div class="ft">Powered by nabd</div></div>';
   }
-  NB.screen("owner.bookingpage", function (c) {
+  scr("owner.bookingpage", function (c) {
     var b = brandOf(), wm = NB.v("grWaMode", "own"), useDom = NB.v("grDomR", "dom") === "dom";
     var url = useDom ? ownDomain() : slug() + ".nabd.health";
     var h = ui.header(L("Booking page & widget", "صفحة الحجز والأداة", "बुकिंग पेज और विजेट"), "Your own booking channel, in your name · bookings land in the same live queue · no commission on your own channels",
@@ -1100,8 +1109,8 @@
     h += ui.card(L("Website widget", "أداة الموقع", "वेबसाइट विजेट"), '<p class="small muted" style="margin:0 0 10px">Paste once into your website. It shows a “Book a visit” button that opens the booking flow in your colours.</p>' +
       '<pre class="gr-code">' + esc('<script src="https://book.nabd.health/w.js"\n  data-clinic="' + slug() + '" data-lang="auto" data-colour="' + b + '" async></script>') + "</pre>" +
       '<div class="btns" style="margin-top:10px">' + ui.btn("Copy code", { cls: "sm", icon: "copy", act: "toast", arg: "Widget code copied" }) + ui.btn("WordPress plug-in", { cls: "sm ghost", icon: "download", act: "toast", arg: "Plug-in downloaded" }) + "</div>", { icon: "monitor", right: ui.pill("ok", "Seen on suvidhaclinic.in", "checkcircle") });
-    h += '<div class="grid g2">' + ui.card("Google Business “Book” button", '<div class="stack s8">' + ui.pill("ok", "Linked to Google Business Profile", "checkcircle") + '<span class="small muted">The “Book online” link on Google Search and Maps opens your page with source tag <span class="gr-mono">utm_source=google</span>.</span>' + ui.btn("Re-check", { cls: "sm ghost", icon: "refresh", act: "toast", arg: "Google Business link is working" }) + "</div>", { icon: "map" }) +
-      ui.card("QR poster", '<div class="row nw" style="align-items:flex-start">' + qr(11) + '<div class="stack s8"><span class="small muted">For the reception desk, lift and pharmacy counter. Scanning opens WhatsApp booking or this page.</span>' + ui.btn("Print A4", { cls: "sm", icon: "printer", act: "toast", arg: "A4 poster sent to the printer" }) + ui.btn("Print A5 table tent", { cls: "sm ghost", icon: "printer", act: "toast", arg: "A5 table tent sent to the printer" }) + "</div></div>", { icon: "qr" }) + "</div>";
+    h += '<div class="grid g2">' + ui.card("Google Business “Book” button", '<div class="stack s8"><div>' + ui.pill("ok", "Linked to Google Business Profile", "checkcircle") + '</div><span class="small muted">The “Book online” link on Google Search and Maps opens your page with source tag <span class="gr-mono">utm_source=google</span>.</span><div class="btns">' + ui.btn("Re-check", { cls: "sm", icon: "refresh", act: "toast", arg: "Google Business link is working" }) + "</div></div>", { icon: "map" }) +
+      ui.card("QR poster", '<div class="row nw" style="align-items:flex-start">' + qr(11) + '<div class="stack s8"><span class="small muted">For the reception desk, lift and pharmacy counter. Scanning opens WhatsApp booking or this page.</span><div class="btns">' + ui.btn("Print A4", { cls: "sm", icon: "printer", act: "toast", arg: "A4 poster sent to the printer" }) + ui.btn("Print A5 tent", { cls: "sm ghost", icon: "printer", act: "toast", arg: "A5 table tent sent to the printer" }) + "</div></div></div>", { icon: "qr" }) + "</div>";
     h += ui.card(L("WhatsApp number on the page", "رقم واتساب في الصفحة", "पेज पर व्हाट्सऐप नंबर"), '<div class="gr-cmp">' + ui.radio("grWaMode", "own", "Clinic's own number · " + waNum(0), "Your name and logo in chat; your own quality rating", "own") + ui.radio("grWaMode", "shared", "Shared Nabd number", "Shows “" + clinicName() + " via Nabd”; nothing to set up", "own") + "</div>" +
       '<p class="small muted" style="margin:10px 0 0">' + (wm === "own" ? "Patients who tap “Book on WhatsApp” chat with your number." : "Switching to your own number later keeps every conversation.") + "</p>", { icon: "chat" });
     h += "</div><div class=\"stack s16\">" + ui.card(L("Preview", "معاينة", "प्रीव्यू"), phonePreview(b) + '<div class="btns" style="margin-top:12px;justify-content:center">' + ui.btn("Open full page", { cls: "sm", icon: "globe", go: "connect.branded" }) + "</div>", { icon: "smartphone" });
@@ -1123,12 +1132,12 @@
       if (r.p) lines.push(["Procedures", s[3], Math.round(r.p * 100) + "%", s[3] * r.p]);
     }
     if (r.model === "mix") lines.push(["Echo (per procedure)", s[2], "× " + RAW(Math.round(r.per * mk().fx)).replace(/<[^>]+>/g, ""), s[2] * r.per]);
-    if (r.model === "fixed") lines.push(["OPD sessions", s[0], "× " + RAW(Math.round(r.sess * mk().fx)).replace(/<[^>]+>/g, ""), s[0] * r.sess]);
+    if (r.model === "fixed") lines.push(["OPD sessions (" + s[0] + " patients)", 6, "× " + RAW(Math.round(r.sess * mk().fx)).replace(/<[^>]+>/g, ""), 6 * r.sess]);
     lines.forEach(function (l) { share += l[3]; });
     var tds = r.tds && mid() === "india" ? Math.round(share * 0.1) : 0, adv = d === "d4" ? 5000 : 0;
     return { r: r, s: s, gross: gross, share: Math.round(share), tds: tds, adv: adv, net: Math.round(share - tds - adv), lines: lines };
   }
-  NB.screen("owner.payouts", function (c) {
+  scr("owner.payouts", function (c) {
     var tab = NB.v("grPoTab", "rules"), m = c.m;
     var h = ui.header(L("Doctor payouts & referrals", "مستحقات الأطباء والإحالات", "डॉक्टर भुगतान और रेफ़रल"), "Revenue share for partners and visiting consultants, payout statements, and referral tracking",
       ui.btn(L("Export to accounts", "تصدير للحسابات", "अकाउंट्स में एक्सपोर्ट"), { icon: "download", act: "toast", arg: pick({ india: "Payout journal exported for Tally (XML)", uae: "Payout journal exported (CSV) · bank file ready", ksa: "Payout journal exported (CSV) · SARIE bank file ready", qatar: "Payout journal exported (CSV)" }) }));
@@ -1162,7 +1171,7 @@
     }
     return h;
   });
-  NB.overlay("payoutstmt", function (d, c) {
+  ovl("payoutstmt", function (d, c) {
     var s = stmt(d || "d1"), m = c.m;
     var h = ui.li(ui.av(NB.doc(d).name, "lg"), esc(dn(d)), esc(s.r.type) + " · " + esc(s.r.desc), ui.pill("info", "1–15 Oct 2026"));
     h += ui.table([{ h: "Line" }, { h: "Base", cls: "r" }, { h: "Rate" }, { h: "Share", cls: "r" }], s.lines.map(function (l) { return [esc(l[0]), typeof l[1] === "number" && l[1] > 100 ? M(l[1]) : num(l[1]), '<span class="num ltr">' + esc(l[2]) + "</span>", M(l[3])]; }), { min: 460 });
@@ -1174,7 +1183,7 @@
   });
 
   /* ================= owner.hr ================= */
-  NB.screen("owner.hr", function (c) {
+  scr("owner.hr", function (c) {
     var tab = NB.v("grHrTab", "shifts"), m = c.m, S = G.staff;
     var h = ui.header(L("Shifts, attendance & payroll", "المناوبات والحضور والرواتب", "शिफ़्ट, उपस्थिति और पेरोल"), "For small teams: split shifts, simple check-in, leave, and a payroll file for your accountant · no payroll engine",
       ui.btn(L("Export payroll", "تصدير الرواتب", "पेरोल एक्सपोर्ट"), { cls: "pri", icon: "download", act: "grHrTab", arg: "payroll" }));
@@ -1182,7 +1191,7 @@
     if (tab === "shifts") {
       var days = gcc() ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       var off = gcc() ? [5] : [6];
-      h += '<div class="row sb"><span class="small muted">Week of 19 Oct · ' + (gcc() ? "weekend " + (mid() === "uae" ? "Sat–Sun" : "Fri–Sat") : "Sunday closed") + "</span>" + (gcc() ? ui.seg("grHrRam", [["", "Normal roster"], ["1", "Ramadan roster"]], "") : "") + "</div>";
+      h += '<div class="row sb"><span class="small muted">Week of 19 Oct · ' + (gcc() ? "clinic closed Friday morning · staff day off Friday" : "Sunday closed") + "</span>" + (gcc() ? ui.seg("grHrRam", [["", "Normal roster"], ["1", "Ramadan roster"]], "") : "") + "</div>";
       var ram = gcc() && NB.v("grHrRam", "") === "1";
       h += '<div class="tw"><div class="gr-rost"><div class="h">Staff</div>' + days.map(function (d) { return '<div class="h">' + d + "</div>"; }).join("") + S.map(function (s, si) {
         return '<div><b style="display:block;font-size:13px">' + esc(s.n) + '</b><span class="small muted">' + esc(s.r) + "</span></div>" + days.map(function (d, di) {
@@ -1225,7 +1234,7 @@
     } else {
       var SL = licences().filter(function (x) { return x.kind !== "fac"; }).concat([{ w: "Anita D'Souza", k: gcc() ? "Nursing licence" : "Nursing registration", no: gcc() ? pick({ uae: "DHA-N-55102", ksa: "SCFHS-N-55102", qatar: "QCHP-N-55102" }) : "KNC-55102", by: gcc() ? m.regulator.split(" / ")[0] : "Karnataka Nursing Council", exp: "2027-04-30", d: 195, kind: "staff" }, { w: "Kiran Rao", k: "Lab technologist registration", no: gcc() ? "LT-31008" : "KPMC-LT-31008", by: gcc() ? m.regulator.split(" / ")[0] : "Karnataka Paramedical Board", exp: "2026-12-05", d: 49, kind: "staff" }]);
       h += ui.table([{ h: "Person" }, { h: "Licence" }, { h: "Number" }, { h: "Expiry" }, { h: "Status" }, { h: "Reminders" }, { h: "When it lapses" }], SL.sort(function (a, b) { return a.d - b.d; }).map(function (x) {
-        return [esc(x.w), ui.cellp(esc(x.k), esc(x.by)), '<span class="gr-mono">' + esc(x.no) + "</span>", '<span class="num gr-nw">' + esc(gd(x.exp)) + "</span>", daysPill(x.d), remPill(x.d), x.kind === "doc" ? ui.pill("sub", "Hidden from online booking", "eye") : '<span class="small muted">Owner alert</span>'];
+        return [esc(x.w), ui.cellp(esc(x.k), esc(x.by)), '<span class="gr-mono">' + esc(x.no) + "</span>", '<span class="num ltr gr-nw">' + esc(gd(x.exp)) + "</span>", daysPill(x.d), remPill(x.d), x.kind === "doc" ? ui.pill("sub", "Hidden from booking", "eye") : '<span class="small muted">Owner alert</span>'];
       }), { min: 1000 });
       h += ui.note("info", "Reminders go to the person and the owner at 60, 30 and 7 days. When a doctor's licence lapses they are hidden from online booking until a new expiry date is entered.");
     }
@@ -1233,7 +1242,7 @@
   });
 
   /* ================= connect.branded (clinic's own booking site) ================= */
-  NB.screen("connect.branded", function (c) {
+  scr("connect.branded", function (c) {
     var b = brandOf(), f = facs()[0], g = gcc();
     var D = [["d2", 0, [22, 30], "10:40", 600], ["d1", 1, [9, 14], "11:40", 700], ["d3", 2, [14, 20], "11:00", 650], ["d5", 3, [15, 22], "12:40", 800]];
     var h = '<div class="gr-site gr-b-' + b + '"><div class="gr-snav"><span class="gr-bmark">' + esc(f.name.slice(0, 1)) + '</span><div class="nm"><b>' + esc(f.name) + "</b><small>" + esc(f.area) + '</small></div><div class="sp"></div>' +
@@ -1267,16 +1276,17 @@
   });
 
   /* ================= connect.forclinics (Nabd sales & trial page) ================= */
+  function pp(v) { var m = mk(); return '<span class="num ltr">' + (m.id === "india" ? "₹" + nf(v) : nf(v) + " " + m.cur) + "</span>"; }
   function plans() {
     var P = pick({ india: [0, 1499, 2499, 4999], uae: [0, 449, 799, 499], ksa: [0, 499, 899, 499], qatar: [0, 449, 799, 499] });
     return { p: P, tax: pick({ india: "+ 18% GST", uae: "+ 5% VAT", ksa: "+ 15% VAT", qatar: "No VAT" }) };
   }
-  NB.screen("connect.forclinics", function (c) {
+  scr("connect.forclinics", function (c) {
     var m = c.m, P = plans(), spec = NB.v("grTrSpec", "derm");
     var h = '<div class="gr-site"><div class="gr-snav"><div class="logo"><span class="mark">' + ui.icon("logo") + '</span><div class="nm"><b>nabd</b><small>' + esc(L("for clinics", "للعيادات", "क्लिनिक के लिए")) + '</small></div></div><div class="sp"></div>' +
       ui.btn(L("Pricing", "الأسعار", "क़ीमत"), { cls: "ghost hide-s", act: "toast", arg: "Scroll to pricing" }) + ui.btn(L("Log in", "دخول", "लॉग इन"), { cls: "ghost hide-s", go: "owner.overview" }) + ui.btn(L("Start free trial", "ابدأ التجربة", "फ़्री ट्रायल शुरू करें"), { cls: "pri sm", act: "grTrial" }) + "</div>";
     h += '<div class="gr-sbody">';
-    h += '<div class="gr-hero acc"><div class="eyebrow">' + ui.icon("sparkle", "sm acc") + esc(L("For clinics in " + m.name, "للعيادات في " + ({ uae: "الإمارات", ksa: "السعودية", qatar: "قطر" }[m.id] || "الهند"), m.name + " के क्लिनिकों के लिए")) + "</div><h1>" +
+    h += '<div class="gr-hero hacc"><div class="eyebrow">' + ui.icon("sparkle", "sm acc") + esc(L("For clinics in " + m.name, "للعيادات في " + ({ uae: "الإمارات", ksa: "السعودية", qatar: "قطر" }[m.id] || "الهند"), m.name + " के क्लिनिकों के लिए")) + "</div><h1>" +
       esc(L("Give every patient a time, not a token. Get two hours of your day back.", "امنح كل مريض موعدًا لا رقم انتظار، واستعد ساعتين من يومك.", "हर मरीज़ को टोकन नहीं, समय दें। अपने दिन के दो घंटे वापस पाएँ।")) + "</h1><p>" +
       esc(L("Bookings and reminders on WhatsApp, a live queue patients can watch from home, prescriptions in under 90 seconds and a 30-second checkout. Set up in under an hour.", "حجوزات وتذكيرات عبر واتساب، وطابور مباشر يتابعه المريض من بيته، ووصفة في أقل من 90 ثانية، ودفع في 30 ثانية. الإعداد في أقل من ساعة.", "व्हाट्सऐप पर बुकिंग और रिमाइंडर, घर से देखी जा सकने वाली लाइव क़तार, 90 सेकंड में नुस्ख़ा और 30 सेकंड में चेकआउट। एक घंटे से कम में सेटअप।")) + "</p>" +
       '<div class="btns">' + ui.btn(L("Start free trial", "ابدأ التجربة المجانية", "फ़्री ट्रायल शुरू करें"), { cls: "pri lg", icon: "play", act: "grTrial" }) + ui.btn(L("Book a white-glove setup", "احجز إعدادًا كاملًا", "व्हाइट-ग्लव सेटअप बुक करें"), { cls: "lg", icon: "handshake", act: "grWhite" }) + "</div>" +
@@ -1289,7 +1299,7 @@
       ["Everything in Free", "Unlimited doctors at one clinic", "EMR, e-Rx, billing with " + m.tax, "Recalls and Google review requests", "Price master, reports, data export"],
       ["Everything in Clinic", "Packages and session tracking", "2–3 branches, one login", "Own booking page and widget", "Shifts, attendance and payroll export"]];
     h += '<div class="stack s8"><h2 class="h">' + esc(L("Simple pricing, per clinic", "أسعار بسيطة لكل عيادة", "हर क्लिनिक के लिए आसान क़ीमत")) + '</h2><div class="gr-plans">' + [["Free", P.p[0], 0], ["Clinic", P.p[1], 1], ["Clinic Plus", P.p[2], 2]].map(function (x) {
-      return '<div class="card gr-plan' + (x[2] === 1 ? " hl" : "") + '"><div class="row sb"><h3 class="h">' + esc(x[0]) + "</h3>" + (x[2] === 1 ? ui.pill("acc", "Most clinics", "star") : "") + '</div><div class="pr"><b>' + RAW(x[1]) + "</b><span>" + esc(x[1] ? "per clinic / month " + P.tax : "forever") + "</span></div>" +
+      return '<div class="card gr-plan' + (x[2] === 1 ? " hl" : "") + '"><div class="row sb"><h3 class="h">' + esc(x[0]) + "</h3>" + (x[2] === 1 ? ui.pill("acc", "Most clinics", "star") : "") + '</div><div class="pr"><b>' + pp(x[1]) + "</b><span>" + esc(x[1] ? "per clinic / month " + P.tax : "forever") + "</span></div>" +
         '<ul class="gr-ul">' + feat[x[2]].map(function (f) { return "<li>" + ui.icon("check") + esc(f) + "</li>"; }).join("") + "</ul>" + ui.btn(x[2] ? "Start free trial" : "Start free", { cls: x[2] === 1 ? "pri blk" : "blk", act: "grTrial" }) + "</div>";
     }).join("") + "</div>" +
       ui.note("info", "Never a per-booking commission. Each plan includes about 2,000 WhatsApp conversations a month; above that, Meta's price is passed through at cost and shown on your bill. Pay yearly and get two months free plus white-glove setup. Hospitals and groups: talk to us.") + "</div>";
@@ -1303,9 +1313,9 @@
       ].map(function (x) { return ui.li(ii(x[0]), esc(x[1]), esc(x[2]), ""); }).join("") + "</div>", { icon: "sparkle" }) + "</div>";
     h += ui.card(L("White-glove setup", "إعداد كامل نيابة عنك", "व्हाइट-ग्लव सेटअप"), '<div class="row sb" style="align-items:flex-start"><div class="stack s8 fl" style="min-width:240px"><span class="small muted">We set the clinic up with you on a call: doctors and timings, price list, WhatsApp verification with Meta, old patient list imported, staff invited. Usually done in one sitting.</span>' +
       '<div class="chips">' + ["Price list entered", "Meta verification done for you", "Excel import", "Staff trained"].map(function (x) { return ui.pill("ok", x, "check"); }).join("") + "</div></div>" +
-      '<div class="stack s8" style="align-items:flex-end"><div class="gr-plan"><div class="pr"><b>' + RAW(P.p[3]) + "</b><span>one-time · waived on annual plans</span></div></div>" + ui.btn("Book a slot", { cls: "pri", icon: "calendar", act: "grWhite" }) + "</div></div>", { icon: "handshake" });
+      '<div class="stack s8" style="align-items:flex-end"><div class="gr-plan"><div class="pr"><b>' + pp(P.p[3]) + "</b><span>one-time · waived on annual plans</span></div></div>" + ui.btn("Book a slot", { cls: "pri", icon: "calendar", act: "grWhite" }) + "</div></div>", { icon: "handshake" });
     h += '<div class="stack s8"><h2 class="h">' + esc(L("What clinics say", "ماذا تقول العيادات", "क्लिनिक क्या कहते हैं")) + '</h2><div class="grid g3">' + [1, 2, 3].map(function (i) {
-      return '<div class="card gr-tst"><span class="pill mute">' + ui.icon("chat") + "Testimonial placeholder</span>" + '<div class="gr-ph">Quote from pilot clinic ' + i + ", published only with the clinic's written consent.</div>" + '<div class="row nw">' + ui.av("Clinic " + i) + '<div class="fl"><b class="small">Clinic owner</b><div class="small muted">Specialty · City</div></div></div></div>';
+      return '<div class="card gr-tst"><div><span class="pill mute">' + ui.icon("chat") + "Testimonial placeholder</span></div>" + '<div class="gr-ph">Quote from pilot clinic ' + i + ", published only with the clinic's written consent.</div>" + '<div class="row nw">' + ui.av("Clinic " + i) + '<div class="fl"><b class="small">Clinic owner</b><div class="small muted">Specialty · City</div></div></div></div>';
     }).join("") + "</div></div>";
     h += ui.card(L("Questions", "أسئلة", "सवाल"), kv([["Can I take my data out?", "Yes, everything, any time, in Excel/CSV, from settings. No lock-in."], ["Where is patient data stored?", esc(m.residency) + ", never outside the country."], ["Do you charge per booking?", "No. One flat price per clinic."], ["I have two branches", "Clinic Plus covers 2–3 branches with one login."], ["Who owns the WhatsApp number?", "You do. Use your own number, or start on ours and move later."]]), { icon: "info" });
     h += '</div><div class="gr-sfoot"><span>© 2026 Nabd Health</span><a href="javascript:void 0" data-act="toast" data-arg="Data Processing Agreement and sub-processor list">DPA &amp; sub-processors</a><a href="javascript:void 0" data-go="connect.search">Find a doctor</a></div></div>';
