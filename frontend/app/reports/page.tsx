@@ -22,6 +22,12 @@ type Liability = {
   activePatientPackages: number; sessionsOwed: number; remainingListValue: number; remainingAllocatedValue: number;
   inGracePeriod: number; expiringIn30Days: number; potentialExpiryLoss: number; refundsAwaitingApproval: number;
 };
+// OWN-026 (S7 contract): range report for the Packages tab; every field optional so an older backend still renders.
+type PackagesReport = {
+  salesByDay?: { date: string; count: number; amount: number }[] | null;
+  redemption?: { sessionsRedeemed: number; sessionsSold: number } | null;
+  expiredWithValue?: { instanceId: string; patientName: string; packageName: string; expiredOn: string; remainingValue: number }[] | null;
+};
 type BillingLeakage = {
   rule: string; thresholdAmount: number;
   entries: { procedureOrderId: string; patientName: string; chargeCode: string; chargeName: string; amount: number; completedAt: string }[];
@@ -46,6 +52,10 @@ type DoctorPunctuality = {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dash = (n: number | null | undefined) => (typeof n === "number" ? n : "—");
+const shortDate = (iso: string) => {
+  const [y, mo, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, mo - 1, d)).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+};
 
 // DESIGN.md owner "Reports": period switch, then seven tabs.
 type Period = "today" | "yesterday" | "week" | "month" | "custom";
@@ -89,6 +99,9 @@ export default function ReportsPage() {
   const [retention, setRetention] = useState<Retention | null>(null);
   const [noShowRisk, setNoShowRisk] = useState<NoShowRisk | null>(null);
   const [liability, setLiability] = useState<Liability | null>(null);
+  const [pkReport, setPkReport] = useState<PackagesReport | null>(null);
+  const [pkErr, setPkErr] = useState(false);
+  const [reminded, setReminded] = useState<Record<string, string>>({}); // instanceId -> "sent" or an error message
   const [leakage, setLeakage] = useState<BillingLeakage | null>(null);
   const [leakageThreshold, setLeakageThreshold] = useState("0");
   const [punctuality, setPunctuality] = useState<DoctorPunctuality | null>(null);
@@ -109,13 +122,13 @@ export default function ReportsPage() {
   const qs = `from=${range.from}&to=${range.to}`;
 
   const authedFetch = useCallback(
-    async (path: string) => {
+    async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
         router.replace("/login");
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}${path}`, { ...init, headers: { Authorization: `Bearer ${token}` } });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
         router.replace("/login");
@@ -129,12 +142,13 @@ export default function ReportsPage() {
   const load = useCallback(async () => {
     setError(null); // `loading` is only the first load — switching period keeps the page on screen
     try {
-      const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes, liabilityRes, leakageRes, punctualityRes, dayCloseRes] = await Promise.all([
+      const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes, liabilityRes, leakageRes, punctualityRes, dayCloseRes, pkRes] = await Promise.all([
         authedFetch(`/reports/money?${qs}`), authedFetch(`/reports/sources?${qs}`),
         authedFetch(`/reports/staff-performance?${qs}`), authedFetch("/reports/retention"),
-        authedFetch("/reports/no-show-risk"), authedFetch("/packages/liability"),
+        authedFetch("/reports/no-show-risk"), authedFetch(`/packages/liability?${qs}`),
         authedFetch("/reports/billing-leakage?thresholdAmount=0"), authedFetch("/reports/doctor-punctuality"),
         authedFetch("/billing/day-close"),
+        can("packages:view") ? authedFetch(`/reports/packages?${qs}`) : Promise.resolve(null),
       ]);
       if (!moneyRes) return;
       if (moneyRes.status === 403) {
@@ -159,7 +173,13 @@ export default function ReportsPage() {
       setTabErr({ sources: !!sourcesRes && !sourcesRes.ok, staff: !!staffRes && !staffRes.ok });
       if (retentionRes?.ok) setRetention(await retentionRes.json());
       if (riskRes?.ok) setNoShowRisk(await riskRes.json());
-      if (liabilityRes?.ok) setLiability(await liabilityRes.json());
+      const liabilityBody = liabilityRes?.ok ? await liabilityRes.json() : null;
+      setLiability(liabilityBody);
+      // OWN-026: the contract allows either a reports/packages endpoint or extra fields on liability; take whichever answers.
+      const pkBody: PackagesReport | null = pkRes?.ok ? await pkRes.json()
+        : liabilityBody && ("salesByDay" in liabilityBody || "redemption" in liabilityBody) ? liabilityBody : null;
+      setPkReport(pkBody);
+      setPkErr(!pkBody && !!pkRes && pkRes.status !== 404);
       if (leakageRes?.ok) setLeakage(await leakageRes.json());
       if (punctualityRes?.ok) setPunctuality(await punctualityRes.json());
       // Roles without billing access simply don't get the Day close card.
@@ -182,6 +202,17 @@ export default function ReportsPage() {
   useEffect(() => {
     void Promise.resolve().then(load);
   }, [load]);
+
+  async function remind(instanceId: string) {
+    try {
+      const res = await authedFetch(`/packages/instances/${instanceId}/send-reminder`, { method: "POST" });
+      if (!res) return;
+      const p = res.ok ? null : await res.json().catch(() => null);
+      setReminded((r) => ({ ...r, [instanceId]: res.ok ? "sent" : p?.detail || "Couldn't send the reminder. Try again." }));
+    } catch {
+      setReminded((r) => ({ ...r, [instanceId]: "Couldn't reach the server. The reminder wasn't sent." }));
+    }
+  }
 
   async function exportCsv(reportType: string) {
     setExportError(null);
@@ -435,7 +466,7 @@ export default function ReportsPage() {
 
       {tab === "packages" && (
         <>
-          <div className={styles.rule}>Current position — not affected by the period.</div>
+          <div className={styles.rule}>Liability is the current position; sales, redemption and expiry losses follow the period.</div>
       {liability && (
         <div className={styles.card + " " + styles.section}>
           <div className={styles.sectionHeader}>
@@ -465,6 +496,85 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+      {pkErr ? (
+        <div className={styles.errorState} role="alert">Couldn&apos;t load the packages report. Try again.</div>
+      ) : !pkReport ? (
+        <div className={styles.muted}>Package sales, redemption and expiry losses aren&apos;t available from this server yet.</div>
+      ) : (() => {
+        const sales = pkReport.salesByDay ?? [];
+        const salesMax = Math.max(0, ...sales.map((d) => Number(d.amount)));
+        const r = pkReport.redemption;
+        const pct = r && r.sessionsSold > 0 ? Math.round((r.sessionsRedeemed / r.sessionsSold) * 100) : null;
+        const expired = pkReport.expiredWithValue ?? [];
+        const canEdit = can("packages:edit"); // send-reminder needs packages:edit; Remind is absent without it
+        return (
+          <>
+            <div className={styles.card + " " + styles.section}>
+              <div className={styles.cardLabel}>Package sales by day (selected period)</div>
+              {sales.length === 0 ? (
+                <div className={styles.muted}>No package sales in this period.</div>
+              ) : (
+                <div className={styles.columns} role="img" aria-label="Package sales by day">
+                  {sales.map((d) => (
+                    <div key={d.date} className={styles.column}>
+                      <span className={styles.columnValue}>{money(Number(d.amount))}</span>
+                      <span className={styles.columnBar} style={{ height: `${salesMax > 0 ? Math.max(2, (Number(d.amount) / salesMax) * 100) : 2}px`, background: "var(--rp-series-1)" }} />
+                      <span className={styles.columnLabel}>{shortDate(d.date)}</span>
+                      <span className={styles.columnSub}>{d.count} sold</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.card + " " + styles.section}>
+              <div className={styles.cardLabel}>Redemption rate</div>
+              {pct === null ? (
+                <div className={styles.muted}>No package sessions sold yet.</div>
+              ) : (
+                <>
+                  <div className={styles.meter} role="meter" aria-label="Redemption rate" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, pct)}>
+                    <span className={styles.meterFill} style={{ width: `${Math.min(100, pct)}%` }} />
+                  </div>
+                  <div className={styles.statSub}>{pct}% · {r!.sessionsRedeemed} of {r!.sessionsSold} sessions redeemed</div>
+                </>
+              )}
+            </div>
+
+            <div className={styles.card + " " + styles.section}>
+              <div className={styles.cardLabel}>Expired with value left</div>
+              {expired.length === 0 ? (
+                <div className={styles.muted}>No expired packages with value left.</div>
+              ) : (
+                <div style={{ overflowX: "auto" }}><table className={styles.table}>
+                  <thead><tr><th>Patient</th><th>Package</th><th>Expired on</th><th>Value left</th>{canEdit && <th>Action</th>}</tr></thead>
+                  <tbody>
+                    {expired.map((e) => (
+                      <tr key={e.instanceId}>
+                        <td>{e.patientName}</td><td>{e.packageName}</td><td>{shortDate(e.expiredOn)}</td><td>{money(Number(e.remainingValue))}</td>
+                        {canEdit && (
+                          <td>
+                            {reminded[e.instanceId] === "sent" ? <span className={styles.muted}>Reminder sent</span> : (
+                              <>
+                                <button type="button" className={styles.remindBtn} onClick={() => void remind(e.instanceId)}>Remind</button>
+                                {reminded[e.instanceId] && <div className={styles.errorState} role="alert">{reminded[e.instanceId]}</div>}
+                              </>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table></div>
+              )}
+            </div>
+          </>
+        );
+      })()}
+      <div className={styles.card + " " + styles.section}>
+        <div className={styles.cardLabel}>Recognised vs deferred revenue</div>
+        <div className={styles.muted}>Not built yet — the revenue recognition split needs an accounting decision.</div>
+      </div>
 
         </>
       )}
