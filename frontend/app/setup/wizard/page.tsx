@@ -6,7 +6,7 @@ import styles from "./wizard.module.css";
 import TimezoneSelect from "../TimezoneSelect";
 import AccessGate from "../../components/ui/AccessGate";
 import { can } from "../../lib/permissions";
-import { MODE_DESC, type PharmacyMode } from "../../components/setup/PharmacyPanel";
+import { MODE_DESC, ModeChangeDialog, type PharmacyMode } from "../../components/setup/PharmacyPanel";
 import pharmacyStyles from "../../components/setup/pharmacy.module.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -53,6 +53,8 @@ function SetupWizard() {
 
   const [canPharmacy, setCanPharmacy] = useState(false);
   const [pharmacyMode, setPharmacyMode] = useState<PharmacyMode | null>(null);
+  const [savedMode, setSavedMode] = useState<PharmacyMode | null>(null);
+  const [confirmMode, setConfirmMode] = useState(false);
 
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("nabd_access_token");
@@ -88,7 +90,7 @@ function SetupWizard() {
       setCanPharmacy(can("pharmacy:edit"));
       if (can("pharmacy:view")) {
         const phRes = await authedFetch("/pharmacy/settings");
-        if (phRes?.ok) setPharmacyMode((await phRes.json()).mode);
+        if (phRes?.ok) { const m: PharmacyMode = (await phRes.json()).mode; setPharmacyMode(m); setSavedMode(m); }
       }
       setLoading(false);
     }
@@ -134,8 +136,15 @@ function SetupWizard() {
     }
   };
 
+  // PHA-006: an unchanged mode is not re-sent; a change goes through the reason dialog.
   const savePharmacy = async () => {
-    if (canPharmacy && pharmacyMode && !(await patch("/pharmacy/settings", { mode: pharmacyMode }))) return;
+    if (canPharmacy && pharmacyMode && pharmacyMode !== savedMode) { setError(null); setConfirmMode(true); return; }
+    await mark("done");
+    next();
+  };
+  const pharmacySaved = async () => {
+    setConfirmMode(false);
+    setSavedMode(pharmacyMode);
     await mark("done");
     next();
   };
@@ -236,7 +245,15 @@ function SetupWizard() {
             <p className={styles.text}>Choose the pharmacy operating mode. This can be changed later from Clinic Setup.</p>
             {canPharmacy ? (
               <div className={pharmacyStyles.choices} role="radiogroup" aria-label="Pharmacy mode">
-                {PHARMACY_CHOICES.map((c) => (
+                {PHARMACY_CHOICES.map((c) => c.mode === "in_house" && savedMode !== "in_house" ? (
+                  <div key={c.mode} className={pharmacyStyles.choice}>
+                    <span>
+                      <span className={pharmacyStyles.choiceTitle}>{c.title} · Not available yet</span>
+                      <br />
+                      <span className={pharmacyStyles.choiceHint}>{c.hint}</span>
+                    </span>
+                  </div>
+                ) : (
                   <label key={c.mode} className={`${pharmacyStyles.choice} ${pharmacyMode === c.mode ? pharmacyStyles.choiceOn : ""}`}>
                     <input type="radio" name="pharmacy-mode" checked={pharmacyMode === c.mode} onChange={() => setPharmacyMode(c.mode)} />
                     <span>
@@ -333,6 +350,9 @@ function SetupWizard() {
           )}
         </div>
       </div>
+      {confirmMode && pharmacyMode && (
+        <ModeChangeDialog from={savedMode} to={pharmacyMode} authedFetch={authedFetch} onClose={() => setConfirmMode(false)} onSaved={() => void pharmacySaved()} />
+      )}
     </main>
   );
 }
