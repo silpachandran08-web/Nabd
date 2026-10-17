@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import styles from "../../login/login.module.css";
 import { API_BASE } from "../surfaces";
 import { storePlatformSession } from "../platformApi";
+import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
 
 // Matches POST /v1/platform/auth/login's oneOf response and RFC 7807 Problem errors.
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
@@ -24,23 +25,26 @@ export default function PlatformLoginPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
 
   function handleTokens(pair: TokenPair) {
     storePlatformSession(pair);
     router.replace("/platform");
   }
 
-  async function submitLogin(e: FormEvent) {
-    e.preventDefault();
+  async function submitLogin(e?: FormEvent) {
+    e?.preventDefault();
     setFormError(null);
     setFieldErrors({});
+    setTimedOut(false);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/platform/auth/login`, {
+      const res = await loginFetch(`${API_BASE}/platform/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, pin }),
-      });
+      }, () => setSlow(true));
       const body = await res.json();
       if (res.ok) {
         if ("challengeId" in body) setChallenge(body as MfaChallenge);
@@ -48,9 +52,11 @@ export default function PlatformLoginPage() {
         return;
       }
       applyProblem(res.status, body as Problem);
-    } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
+      else setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
+      setSlow(false);
       setLoading(false);
     }
   }
@@ -135,6 +141,8 @@ export default function PlatformLoginPage() {
         <p className={styles.subtitle}>Sign in with your operator email and PIN.</p>
         <form onSubmit={submitLogin} noValidate>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
+          {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
+          {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}
 
           <div className={styles.field}>
             <label className={styles.label} htmlFor="email">Email</label>
