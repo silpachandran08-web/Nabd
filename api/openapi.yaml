@@ -1180,6 +1180,38 @@ paths:
         "400": { description: "Illegal transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /queue/{id}/transfer:
+    post:
+      tags: [Queue]
+      summary: "Close this leg (transferred_out) and open a new one in another department (REC-021)"
+      description: "reason is required (400 transfer-reason-required) when toDepartmentId differs from the entry's current department. Stored on the new leg and audited as queue.transfer. Queue position uses POST /queue/{id}/reorder."
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [toDepartmentId, doctorId]
+              properties:
+                toDepartmentId: { type: string, format: uuid }
+                doctorId: { type: string, format: uuid }
+                reason: { type: string, enum: [wrong_department, doctor_unavailable, patient_request, other] }
+                reasonNote: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: "Both legs"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  closedLeg: { $ref: "#/components/schemas/QueueEntry" }
+                  newLeg: { $ref: "#/components/schemas/QueueEntry" }
+        "400": { description: "transfer-reason-required / transfer-not-allowed / illegal-transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /queue/{id}/reorder:
     post:
       tags: [Queue]
@@ -3040,6 +3072,13 @@ components:
         paymentMode: { type: [string, "null"], enum: [cash, card, upi, other] }
         priority: { type: boolean }
         priorityReason: { type: [string, "null"] }
+        ageYears: { type: [integer, "null"], description: "Whole years at queueDate (NUR-012)" }
+        gender: { type: [string, "null"], enum: [male, female, other, null] }
+        doctorName: { type: [string, "null"] }
+        waitMinutes: { type: integer, description: "Minutes since check-in on the server clock, >= 0" }
+        visitType: { type: string, enum: [appointment, follow_up, walk_in, transfer] }
+        transferReason: { type: [string, "null"], enum: [wrong_department, doctor_unavailable, patient_request, other, null], description: "Set on legs opened by a transfer (REC-021)" }
+        transferReasonNote: { type: [string, "null"], maxLength: 200 }
 
     AuditEvent:
       type: object

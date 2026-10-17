@@ -415,7 +415,8 @@ class QueueApiTest extends ApiTestBase {
         exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", "in_consult")), Map.class);
 
         ResponseEntity<Map> transfer = exchange("/v1/queue/" + entryId + "/transfer", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "toDepartmentId", dentalId, "doctorId", dentist.id().toString())), Map.class);
+                "toDepartmentId", dentalId, "doctorId", dentist.id().toString(),
+                "reason", "other", "reasonNote", "needs dental review")), Map.class);
         assertThat(transfer.getStatusCode()).isEqualTo(HttpStatus.OK);
         Map<String, Object> closedLeg = (Map<String, Object>) transfer.getBody().get("closedLeg");
         Map<String, Object> newLeg = (Map<String, Object>) transfer.getBody().get("newLeg");
@@ -424,6 +425,11 @@ class QueueApiTest extends ApiTestBase {
         assertThat(newLeg.get("departmentId")).isEqualTo(dentalId);
         assertThat(newLeg.get("parentQueueEntryId")).isEqualTo(entryId);
         assertThat(newLeg.get("doctorId")).isEqualTo(dentist.id().toString());
+        assertThat(newLeg.get("transferReason")).isEqualTo("other");
+        assertThat(newLeg.get("transferReasonNote")).isEqualTo("needs dental review");
+        Integer audited = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_log WHERE action = 'queue.transfer' AND after->>'reason' = 'other'", Integer.class));
+        assertThat(audited).isEqualTo(1);
 
         // NB-360: one visit, two department legs, one encounter — the transfer propagates the
         // original leg's encounter_id onto the new leg rather than each leg minting its own.
@@ -605,5 +611,63 @@ class QueueApiTest extends ApiTestBase {
                     invoiceId, tenantId, queueEntryId, UUID.fromString(patientId), doctorId, doctorId, queueEntryId, minutesLater);
             return null;
         });
+    }
+
+    @Test
+    void transferToAnotherDepartmentRequiresAReason() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff generalDoctor = seedStaff(tenant, roleId, "tr1@a.com", "+919600000031", false);
+        SeededStaff dentist = seedStaff(tenant, roleId, "tr2@a.com", "+919600000032", false);
+        String token = loginAndGetAccessToken(generalDoctor);
+        addWorkingHours(token, generalDoctor.id(), null);
+        addWorkingHours(token, dentist.id(), null);
+        String generalId = (String) defaultDepartment(token).get("id");
+        String dentalId = createDepartment(token, "Dental");
+        configureFlowWithoutVitals(token, dentalId);
+        exchange("/v1/departments/transfers", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "edges", List.of(Map.of("fromDepartmentId", generalId, "toDepartmentId", dentalId)))), List.class);
+        String patientId = registerPatient(token, "TR", "+919999910031");
+        String entryId = (String) exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", generalDoctor.id().toString())), Map.class).getBody().get("id");
+        for (String st : List.of("waiting", "vitals_pending", "vitals_done", "in_consult")) {
+            exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", st)), Map.class);
+        }
+        ResponseEntity<Map> noReason = exchange("/v1/queue/" + entryId + "/transfer", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "toDepartmentId", dentalId, "doctorId", dentist.id().toString())), Map.class);
+        assertThat(noReason.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(noReason.getBody().get("type")).asString().contains("transfer-reason-required");
+        ResponseEntity<Map> badReason = exchange("/v1/queue/" + entryId + "/transfer", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "toDepartmentId", dentalId, "doctorId", dentist.id().toString(), "reason", "because")), Map.class);
+        assertThat(badReason.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        ResponseEntity<Map> longNote = exchange("/v1/queue/" + entryId + "/transfer", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "toDepartmentId", dentalId, "doctorId", dentist.id().toString(), "reason", "other", "reasonNote", "x".repeat(201))), Map.class);
+        assertThat(longNote.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        // nothing was closed by the rejected attempts
+        List<Map<String, Object>> rows = exchange("/v1/queue", HttpMethod.GET, authed(token), List.class).getBody();
+        assertThat(rows).filteredOn(r -> entryId.equals(r.get("id"))).extracting(r -> r.get("status")).containsExactly("in_consult");
+    }
+
+    @Test
+    void worklistRowsCarryPatientDoctorWaitAndVisitTypeFields() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "wl1@a.com", "+919600000033", false);
+        String token = loginAndGetAccessToken(doctor);
+        addWorkingHours(token, doctor.id(), null);
+        String patientId = registerPatientWithDob(token, "Worklist Pat", "+919999910033");
+        String entryId = (String) exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", doctor.id().toString())), Map.class).getBody().get("id");
+        inTenantTx(tenant.id(), () -> jdbc.update(
+                "UPDATE queue_entries SET created_at = now() - interval '12 minutes 30 seconds' WHERE id = ?", UUID.fromString(entryId)));
+
+        List<Map<String, Object>> rows = exchange("/v1/queue", HttpMethod.GET, authed(token), List.class).getBody();
+        Map<String, Object> row = rows.stream().filter(r -> entryId.equals(r.get("id"))).findFirst().orElseThrow();
+        assertThat(row.get("gender")).isEqualTo("male");
+        assertThat(((Number) row.get("ageYears")).intValue()).isGreaterThanOrEqualTo(30);
+        assertThat(row.get("doctorName")).isNotNull();
+        assertThat(((Number) row.get("waitMinutes")).intValue()).isEqualTo(12);
+        assertThat(row.get("tokenNumber")).isEqualTo(1);
+        assertThat(row.get("visitType")).isEqualTo("walk_in");
     }
 }
