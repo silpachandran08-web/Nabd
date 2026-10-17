@@ -198,6 +198,7 @@
     ".hs-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}",
     ".hs-num{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate;white-space:nowrap}",
     ".hs-row-a{cursor:pointer}",
+    ".li.hs-wrap{flex-wrap:wrap;row-gap:8px}.li.hs-wrap>.t{min-width:200px}",
     "@media (max-width:760px){.hs-2p,.hs-vit{grid-template-columns:minmax(0,1fr)}.hs-sf{grid-template-columns:minmax(0,1fr)}.hs-sf dd{border-top:0;padding-top:0;background:var(--s2)}.hs-zh .bar{width:100%}}",
     "@media (max-width:760px){.drawer .hs-vit{grid-template-columns:repeat(2,minmax(0,1fr))}}"
   ].join("\n");
@@ -232,6 +233,7 @@
   NB.act("hsck", function (a) { var p = String(a).split("|"), o = {}; o[p[0]] = !NB.v(p[0], p[1] === "1"); NB.setUI(o); });
   NB.act("hsgo", function (a) { var p = String(a).split("|"); if (p[1]) NB.state.ui[p[1]] = p[2]; var r = p[0].split("."); NB.go(r[0], r[1]); });
   NB.act("hsdone", function (a) { var p = String(a).split("|"), m = Object.assign({}, NB.v("hsDone", {})); m[p[0]] = p[2] || true; NB.state.ui.hsDone = m; if (p[3] !== "keep") NB.state.overlay = null; NB.toast(p[1] || "Done"); });
+  function wrapLi(h) { return h.replace(/class="li( click)?"/g, 'class="li$1 hs-wrap"'); }
   function isDone(k) { return NB.v("hsDone", {})[k]; }
 
   /* ---------------- Market-specific facts (examples) ---------------- */
@@ -1013,11 +1015,11 @@
       var inv = ui.card(L("Inventory by group & component", "المخزون حسب الفصيلة والمكوّن", "ग्रुप और कंपोनेंट अनुसार स्टॉक"), ui.table([{ h: "Group" }].concat(B.comps.map(function (cp) { return { h: cp[1] + " · " + cp[2] + " d", cls: "r" }; })), rows, { min: 460 }) +
         '<div class="row hs-leg" style="margin-top:10px"><span class="hs-u low">' + ui.icon("alertcircle") + "Low</span><span class=\"hs-u out\">" + ui.icon("alertfill") + "Out</span><span class=\"small faint\">Minimum levels set per group · shelf life shown per component</span></div>", { icon: "heartpulse" });
       var exp = ui.card(L("Expiring soon", "تنتهي قريبًا", "जल्द एक्सपायर"), '<div class="lst">' + B.exp.map(function (e) { return ui.li(grp(e[0]), esc(e[1]) + " · " + n(e[2]) + (e[2] === 1 ? " unit" : " units"), L("Expires", "تنتهي", "एक्सपायर") + " " + esc(e[3]), ui.btn("Offer", { cls: "sm", act: "toast", arg: "Offered to ICU and OT · FEFO", icon: "send" })); }).join("") + "</div>", { icon: "clockh" });
-      var req = ui.card(L("Crossmatch & issue requests", "طلبات التوافق والصرف", "क्रॉसमैच और इश्यू अनुरोध"), '<div class="lst">' + B.req.map(function (r) {
+      var req = ui.card(L("Crossmatch & issue requests", "طلبات التوافق والصرف", "क्रॉसमैच और इश्यू अनुरोध"), '<div class="lst">' + wrapLi(B.req.map(function (r) {
         var st = isDone("iss_" + r.id) ? XST.issued : XST[r.st], g0 = r.grp.split(" ")[0];
         var btn = r.st === "issue" || r.st === "ready" ? (isDone("iss_" + r.id) ? "" : ui.btn(L("Issue", "صرف", "जारी"), { cls: "sm " + (r.st === "issue" ? "dng" : "pri"), ov: "issueblood", arg: r.id, icon: "send" })) : r.st === "sample" ? ui.btn(L("Start grouping", "بدء التصنيف", "ग्रुपिंग शुरू"), { cls: "sm", act: "toast", arg: "Grouping and antibody screen started for " + r.id, icon: "flask" }) : "";
         return ui.li(grp(g0 === "O-" ? "B+" : g0), '<span dir="auto">' + esc(r.pid ? NB.pname(NB.pat(r.pid)) : r.name) + '</span> <span class="small faint">· ' + esc(r.loc) + "</span>", esc(r.comp + " · " + r.note), '<div class="row nw">' + ui.pill(st[0], st[1], st[2]) + btn + "</div>");
-      }).join("") + "</div>", { icon: "flask" });
+      }).join("")) + "</div>", { icon: "flask" });
       h += '<div class="split wide"><div class="stack s16">' + inv + req + '</div><div class="stack s16">' + exp + ui.card(L("Safety rules", "قواعد السلامة", "सुरक्षा नियम"), '<div class="hs-ck">' +
         stRow("ok", "Two-person check at issue and at the bedside", "Bag, label and wristband scanned; no override") + stRow("ok", "Electronic issue only with two concordant groups", "Current sample + historical group") + stRow("ok", "Start within 30 min, finish within 4 h", "Unit returned if not started in time") + stRow("info", "Reactions reported to " + esc(R().hv), "Example national programme") + "</div>", { icon: "shieldcheck" }) + "</div></div>";
     } else if (tab === "donors") {
@@ -1211,7 +1213,7 @@
     if (tab === "ds") {
       h += ui.table([{ h: "IP no." }, { h: "Patient" }, { h: "Discharged" }, { h: "Consultant" }, { h: "Summary" }, { h: "Days", cls: "r" }, { h: "Coding · " + R().icd }], M.ds.map(function (d) {
         var s = isDone("ds_" + d[0]) ? DSS.signed : DSS[d[5]], cd = COD[d[7]];
-        return [n(d[0]), ui.cellp(esc(d[1]), esc(d[2])), esc(d[3]), esc(d[4]), ui.pill(s[0], s[1], s[2]) + (d[5] === "pending" && !isDone("ds_" + d[0]) ? " " + ui.btn("Remind", { cls: "sm ghost", act: "hsdone", arg: "ds_" + d[0] + "|Reminder sent to " + d[4] + "|1|keep", icon: "bell" }) : ""), '<span class="num' + (d[6] >= 2 && d[5] !== "signed" ? " critc" : "") + '">' + d[6] + "</span>",
+        return ['<span class="hs-num">' + d[0] + "</span>", ui.cellp(esc(d[1]), esc(d[2])), esc(d[3]), esc(d[4]), ui.pill(s[0], s[1], s[2]) + (d[5] === "pending" && !isDone("ds_" + d[0]) ? " " + ui.btn("Remind", { cls: "sm ghost", act: "hsdone", arg: "ds_" + d[0] + "|Reminder sent to " + d[4] + "|1|keep", icon: "bell" }) : ""), '<span class="num' + (d[6] >= 2 && d[5] !== "signed" ? " critc" : "") + '">' + d[6] + "</span>",
           ui.cellp(ui.pill(cd[0], cd[1], cd[2]), esc(d[8]))];
       }), { min: 1000 });
       h += '<div class="grid g2">' + ui.card(L("Coding query", "استفسار الترميز", "कोडिंग प्रश्न"), '<div class="small" style="margin-bottom:10px"><b>IP-26-1181 · Ramaswamy K.</b> · The summary says “sepsis” but the culture grew <i>Klebsiella pneumoniae</i>. Can the principal diagnosis be coded as A41.5 (sepsis due to other Gram-negative organisms) instead of A41.9?</div>' +
