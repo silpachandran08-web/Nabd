@@ -49,7 +49,7 @@ class BillingApiTest extends ApiTestBase {
         SeededTenant tenant = seedTenant();
         jdbc.update("UPDATE tenants SET status = 'trialing' WHERE id = ?", tenant.id());
         UUID planId = seedPlan("base-" + tenant.slug(), 100000, "INR", 3);
-        String token = platformLoginAndGetAccessToken(seedOperator("billing5@nabd.internal", "billing", false));
+        String token = platformLoginAndGetAccessToken(seedOperator("billing-live07@nabd.internal", "billing", false));
 
         ResponseEntity<Map> before = exchange("/v1/platform/billing/subscriptions?limit=100", HttpMethod.GET, authed(token), Map.class);
         assertThat((List) before.getBody().get("data")).extracting(o -> ((Map) o).get("tenantId"))
