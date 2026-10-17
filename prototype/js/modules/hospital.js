@@ -550,7 +550,7 @@
     return '<div class="hs-bay e' + p.esi + '" data-ov="erpatient" data-arg="' + p.id + '" role="button" tabindex="0">' +
       '<div class="row sb nw"><span class="hs-bn ltr">' + p.bay + "</span>" + esiPill(p.esi, true) + "</div>" +
       '<div class="hs-pn" dir="auto">' + esc(pnm(p)) + "</div><small dir=\"auto\">" + esc(p.age + " " + p.sex + " · " + p.cc) + "</small>" +
-      '<div class="hs-meta"><span class="' + (t >= 240 ? "critc" : t >= 180 ? "warnc" : "") + '">' + ui.icon("clockh") + '<span class="num">' + dur(t) + "</span></span><span>" + ui.icon("steth") + esc(short(p.doc)) + "</span><span>" + ui.icon("heartpulse") + esc(p.nurse.replace(/^(Sr\.|Br\.)\s*/, "")) + "</span></div>" +
+      '<div class="hs-meta"><span class="' + (t >= 240 ? "critc" : t >= 180 ? "warnc" : "") + '">' + ui.icon("clockh") + '<span class="num ltr">' + dur(t) + "</span></span><span>" + ui.icon("steth") + esc(short(p.doc)) + "</span><span>" + ui.icon("heartpulse") + esc(p.nurse.replace(/^(Sr\.|Br\.)\s*/, "")) + "</span></div>" +
       '<div class="hs-chips">' + (p.path ? ui.pill("crit", p.path.split(" · ")[0], "bolt") : "") + (p.mlc ? ui.pill("sub", R().mlcShort, "scroll") : "") + (p.allergy ? ui.pill("crit", L("Allergy", "حساسية", "एलर्जी"), "alertfill") : "") +
       (pend.length ? ui.pill("warn", pend.length + " " + L("pending", "معلّق", "बाक़ी"), "hourglass") : "") + (res ? ui.pill("ok", res + " " + L("ready", "جاهز", "तैयार"), "checkcircle") : "") + "</div>" +
       '<div class="row sb nw">' + dispPill(dp) + "</div>" + tidBar(t) + "</div>";
@@ -890,7 +890,7 @@
         var cls = s[2] === "done" ? "done" : s[2] === "live" ? "live" : s[2] === "down" ? "down" : "";
         return '<button class="hs-slot ' + cls + (s[5] ? " stat" : "") + '" style="grid-column:' + col + " / span " + span + '" ' + (s[2] === "down" ? "" : 'data-act="toast" data-arg="' + esc(s[3] + " · " + s[4] + " · " + s[0]) + '"') + ' title="' + esc(s[0] + " " + s[3] + " · " + s[4]) + '"><b>' + esc(s[2] === "down" ? s[3] : s[3]) + "</b><small>" + esc(s[2] === "down" ? "Downtime · " + s[0] : s[4]) + "</small></button>";
       }).join("");
-      return '<div class="hs-schr"><div class="hs-schl">' + esc(r[0]) + "<small>" + esc(r[1]) + '</small></div><div class="hs-lane">' + blocks + '<span class="hs-now" style="inset-inline-start:' + nowPct.toFixed(2) + '%"></span></div></div>';
+      return '<div class="hs-schr"><div class="hs-schl">' + esc(r[0]) + '<small dir="auto">' + esc(r[1]) + '</small></div><div class="hs-lane">' + blocks + '<span class="hs-now" style="inset-inline-start:' + nowPct.toFixed(2) + '%"></span></div></div>';
     }).join("");
     h += '<div class="hs-sch"><div class="hs-schin">' + hrs + lanes + "</div></div>";
     h += '<div class="row hs-leg">' + ui.pill("acc", L("In progress", "جارٍ", "जारी"), "play") + ui.pill("info", L("Booked", "محجوز", "बुक"), "calendar") + ui.pill("mute", L("Done", "تم", "पूर्ण"), "check") + ui.pill("crit", "STAT", "alertfill") + ui.pill("perm", L("Downtime / QA", "صيانة", "डाउनटाइम"), "lock") + '<span class="small faint">' + L("Red line = now", "الخط الأحمر = الآن", "लाल रेखा = अभी") + " " + n(hhmm(NOW)) + "</span></div>";
@@ -975,7 +975,7 @@
     h += ui.table([{ h: "Time" }, { h: "Patient · study" }, { h: "Finding" }, { h: "Category" }, { h: "Communicated to" }, { h: "Read-back" }, { h: "Time to call", cls: "r" }], log.map(function (x) {
       var cl = x.st === "open" && !isDone("crit_" + x.id);
       return [n(x.t), ui.cellp('<span dir="auto">' + esc(pnm(x)) + "</span>", esc(x.study)), '<span dir="auto">' + esc(x.finding) + "</span>", ui.pill(CAT[x.cat][0], "Cat " + x.cat, CAT[x.cat][2]), ui.cellp(esc(x.to), esc(x.via)),
-        cl ? ui.pill("crit", L("Pending", "معلّق", "बाक़ी"), "hourglass") : x.rb || isDone("crit_" + x.id) ? ui.pill("ok", L("Confirmed", "مؤكد", "पुष्टि"), "checkcircle") : ui.pill("mute", L("Not required", "غير مطلوب", "आवश्यक नहीं"), "dot"), '<span class="num">' + (cl ? dur(since(x.t)) : x.mins + " min") + "</span>"];
+        cl ? ui.pill("crit", L("Pending", "معلّق", "बाक़ी"), "hourglass") : x.rb || isDone("crit_" + x.id) ? ui.pill("ok", L("Confirmed", "مؤكد", "पुष्टि"), "checkcircle") : ui.pill("mute", L("Not required", "غير مطلوب", "आवश्यक नहीं"), "dot"), '<span class="num ltr">' + (cl ? dur(since(x.t)) : x.mins + " min") + "</span>"];
     }), { min: 980 });
     return h;
   });
