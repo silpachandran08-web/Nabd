@@ -156,13 +156,19 @@ class CheckoutRepository {
     }
 
     /** V3-004: the catalogue row for a stocked (pharmacy) code, active or not; empty for any non-pharmacy code. */
-    Optional<PharmacyChargeRow> findPharmacyCharge(UUID tenantId, String chargeCode) {
+    Optional<PharmacyChargeRow> findCatalogueCharge(UUID tenantId, String chargeCode) {
         return jdbc.query(
-                "SELECT name, category, base_amount, tax_rate_percent, active FROM charge_catalogue " +
-                        "WHERE tenant_id = ? AND code = ? AND stock_qty IS NOT NULL",
+                "SELECT name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
+                        "stock_qty IS NOT NULL AS stocked FROM charge_catalogue WHERE tenant_id = ? AND code = ?",
                 (rs, i) -> new PharmacyChargeRow(rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
-                        rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active")),
+                        rs.getBigDecimal("follow_up_amount"), rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active"),
+                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked")),
                 tenantId, chargeCode).stream().findFirst();
+    }
+
+    Optional<String> findPharmacyMode(UUID tenantId) {
+        return jdbc.query("SELECT mode FROM pharmacy_settings WHERE tenant_id = ?",
+                (rs, i) -> rs.getString("mode"), tenantId).stream().findFirst();
     }
 
     /** E16 Pharmacy: billing a pharmacy item (stock_qty IS NOT NULL) decrements stock in the same

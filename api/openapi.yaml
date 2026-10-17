@@ -1784,10 +1784,42 @@ paths:
   /billing/otc-charges:
     get:
       tags: [Billing]
-      summary: Chargeable catalogue for counter sales. Each charge carries `stockQty` (PHA-011).
+      summary: >
+        Chargeable catalogue for counter sales. Each charge carries `stockQty` (PHA-011).
+        409 `otc-not-available` when the pharmacy mode is `external` (hybrid and in_house are allowed; PHA-010).
       x-required-permission: billing:view
       responses:
+        "409": { description: Pharmacy mode is external (problem type otc-not-available) }
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { currency: { type: string }, charges: { type: array, items: { $ref: "#/components/schemas/BillingCharge" } } } } } } }
+  /billing/otc-checkout:
+    post:
+      tags: [Billing]
+      summary: >
+        Counter sale (standalone invoice, no patient/queue entry). 409 `otc-not-available` when the pharmacy mode is `external`
+        (PHA-010). Lines whose `chargeCode` is in the catalogue are priced SERVER-side (QA-OI-2): name, category, tax and unit price
+        come from the catalogue and the client's values are silently ignored (no 400 on mismatch); a catalogue entry flagged
+        doctorOverride keeps the client's unitPrice. Lines with no catalogue entry use the client's values (chargeName required,
+        unitPrice and taxRatePercent >= 0, else 400 validation-failed). Non-zero discount needs billing.discount (403 discount-not-permitted).
+      x-required-permission: billing:create
+      responses:
+        "200": { description: The invoice (lineItems show the price actually charged), content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "409": { description: otc-not-available, item-inactive, insufficient-stock or day-closed }
+  /billing/checkout/{queueEntryId}:
+    post:
+      tags: [Billing]
+      summary: >
+        Bill a visit at a billing checkpoint. Catalogue lines are priced server-side exactly as in otc-checkout (QA-OI-2); a
+        Consultation line uses the catalogue followUpAmount instead of baseAmount when the patient had a completed visit with the
+        same doctor in the last 14 days (the same rule as `followUpEligible` in the checkout context). Not gated by pharmacy mode.
+      x-required-permission: billing:create
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "409": { description: Conflict }
   /billing/invoices/{id}/void:
     post:
       tags: [Billing]
