@@ -93,6 +93,52 @@ class PatientRepository {
                 String.class, tenantId, patientId);
     }
 
+    // NUR-019: batched (IN-list) forms of the four GET /patients/{id} reads above, same SQL and gates.
+    List<PatientRow> findVisibleByIds(UUID tenantId, List<UUID> ids, UUID scopedToDoctorId) {
+        List<Object> args = new java.util.ArrayList<>(List.of(tenantId));
+        args.addAll(ids);
+        args.add(scopedToDoctorId);
+        args.add(scopedToDoctorId);
+        return jdbc.query("SELECT " + COLUMNS + "FROM patients WHERE tenant_id = ? AND id IN (" + marks(ids) + ") " + CONSENT_GATE + SCOPE_GATE,
+                patientMapper(), args.toArray());
+    }
+
+    java.util.Map<UUID, Instant> findLastVisitAts(UUID tenantId, List<UUID> patientIds) {
+        java.util.Map<UUID, Instant> out = new java.util.HashMap<>();
+        jdbc.query("SELECT patient_id, max(updated_at) AS last_visit FROM queue_entries " +
+                        "WHERE tenant_id = ? AND patient_id IN (" + marks(patientIds) + ") AND status = 'completed' GROUP BY patient_id",
+                rs -> { out.put(UUID.fromString(rs.getString("patient_id")), rs.getTimestamp("last_visit").toInstant()); },
+                withTenant(tenantId, patientIds));
+        return out;
+    }
+
+    java.util.Map<UUID, List<String>> findActiveAllergySubstances(UUID tenantId, List<UUID> patientIds) {
+        return groupStrings("SELECT patient_id, substance AS v FROM patient_allergies WHERE tenant_id = ? AND patient_id IN (" + marks(patientIds) + ") " +
+                "AND active ORDER BY recorded_at DESC", tenantId, patientIds);
+    }
+
+    java.util.Map<UUID, List<String>> findActiveConditionNames(UUID tenantId, List<UUID> patientIds) {
+        return groupStrings("SELECT patient_id, condition AS v FROM chronic_conditions WHERE tenant_id = ? AND patient_id IN (" + marks(patientIds) + ") " +
+                "AND status = 'active' ORDER BY recorded_at DESC", tenantId, patientIds);
+    }
+
+    private java.util.Map<UUID, List<String>> groupStrings(String sql, UUID tenantId, List<UUID> patientIds) {
+        java.util.Map<UUID, List<String>> out = new java.util.HashMap<>();
+        jdbc.query(sql, rs -> { out.computeIfAbsent(UUID.fromString(rs.getString("patient_id")), k -> new java.util.ArrayList<>()).add(rs.getString("v")); },
+                withTenant(tenantId, patientIds));
+        return out;
+    }
+
+    private static String marks(List<UUID> ids) {
+        return String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    }
+
+    private static Object[] withTenant(UUID tenantId, List<UUID> ids) {
+        List<Object> args = new java.util.ArrayList<>(List.of(tenantId));
+        args.addAll(ids);
+        return args.toArray();
+    }
+
     String region(UUID tenantId) {
         return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst().orElse("IN");
     }
