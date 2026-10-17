@@ -300,6 +300,18 @@
   font-size: 12px;
 }
 
+/* REC-023: department under the doctor's name; idle doctors (no one waiting) are muted. */
+.doctorDept {
+  display: block;
+  color: var(--nb-text-tertiary);
+  font-size: 12px;
+}
+
+.doctorIdle .doctorName {
+  color: var(--nb-text-secondary);
+  font-weight: 400;
+}
+
 .field {
   display: flex;
   flex-direction: column;
