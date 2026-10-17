@@ -283,7 +283,7 @@ function NursingWorklist() {
   const load = useCallback(async () => {
     try {
       const [queueRes, priorityRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
-        authedFetch("/queue"), authedFetch("/queue?priority=true"), authedFetch("/staff/roster"),
+        authedFetch("/queue"), can(PERM.queueView) ? authedFetch("/queue?priority=true") : null, can(PERM.queueView) ? authedFetch("/staff/roster") : null,
         authedFetch("/nursing/administration-orders/today"), authedFetch("/nursing/procedure-orders/today"),
         authedFetch("/nursing/activity/today"),
       ]);
@@ -302,7 +302,7 @@ function NursingWorklist() {
         options.forEach((s) => staffMap.set(s.id, s.name));
       }
       const withNames = async (list: QueueEntry[]) => Promise.all(list.map(async (e) => {
-        const pRes = await authedFetch(`/patients/${e.patientId}`);
+        const pRes = can("patients:view") ? await authedFetch(`/patients/${e.patientId}`) : null;
         const p: { name?: string; mrn?: string; dob?: string; gender?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
         return {
           ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
