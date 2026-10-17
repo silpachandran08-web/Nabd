@@ -2,6 +2,7 @@ package com.nabd.hms.queue;
 
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.dto.DelayAnnounceRequest;
 import com.nabd.hms.queue.dto.DoctorDelayResponse;
@@ -21,7 +22,9 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -37,13 +40,15 @@ public class ScheduleService {
 
     private final ScheduleRepository repo;
     private final TenantContext tenantContext;
+    private final AuditService auditService;
 
     private final ClinicClock clock;
 
-    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, ClinicClock clock) {
+    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock) {
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -55,12 +60,74 @@ public class ScheduleService {
     @Transactional
     public WorkingHoursResponse addWorkingHours(UUID tenantId, UUID callerStaffId, UUID doctorId, WorkingHoursWriteRequest req) {
         tenantContext.set(tenantId);
+        checkHours(doctorId, null, req);
         UUID id = repo.insertWorkingHours(tenantId, doctorId, req.dayOfWeek(), req.startTime(), req.endTime(),
                 req.slotMinutesOrDefault(), req.maxPatients());
         log.info("working hours {} added for doctor {} by {} (day {}, {}-{}, cap {})",
                 id, doctorId, callerStaffId, req.dayOfWeek(), req.startTime(), req.endTime(), req.maxPatients());
-        return new WorkingHoursResponse(id, req.dayOfWeek(), req.startTime(), req.endTime(),
+        WorkingHoursResponse created = new WorkingHoursResponse(id, req.dayOfWeek(), req.startTime(), req.endTime(),
                 req.slotMinutesOrDefault(), req.maxPatients());
+        auditHours(tenantId, callerStaffId, "schedule.working_hours_created", id, null, auditView(doctorId, created));
+        return created;
+    }
+
+    @Transactional
+    public WorkingHoursResponse updateWorkingHours(UUID tenantId, UUID callerStaffId, UUID doctorId, UUID hoursId,
+                                                   WorkingHoursWriteRequest req) {
+        tenantContext.set(tenantId);
+        WorkingHoursResponse before = toResponse(repo.findWorkingHours(doctorId, hoursId).orElseThrow(this::hoursNotFound));
+        checkHours(doctorId, hoursId, req);
+        repo.updateWorkingHours(doctorId, hoursId, req.dayOfWeek(), req.startTime(), req.endTime(),
+                req.slotMinutesOrDefault(), req.maxPatients());
+        WorkingHoursResponse after = new WorkingHoursResponse(hoursId, req.dayOfWeek(), req.startTime(), req.endTime(),
+                req.slotMinutesOrDefault(), req.maxPatients());
+        auditHours(tenantId, callerStaffId, "schedule.working_hours_updated", hoursId,
+                auditView(doctorId, before), auditView(doctorId, after));
+        log.info("working hours {} of doctor {} updated by {}", hoursId, doctorId, callerStaffId);
+        return after;
+    }
+
+    @Transactional
+    public void deleteWorkingHours(UUID tenantId, UUID callerStaffId, UUID doctorId, UUID hoursId) {
+        tenantContext.set(tenantId);
+        WorkingHoursResponse before = toResponse(repo.findWorkingHours(doctorId, hoursId).orElseThrow(this::hoursNotFound));
+        repo.deleteWorkingHours(doctorId, hoursId);
+        auditHours(tenantId, callerStaffId, "schedule.working_hours_deleted", hoursId, auditView(doctorId, before), null);
+        log.info("working hours {} of doctor {} deleted by {}", hoursId, doctorId, callerStaffId);
+    }
+
+    /** DOC-R7: start before end, and no overlap with the doctor's other blocks on that weekday. */
+    private void checkHours(UUID doctorId, UUID exceptHoursId, WorkingHoursWriteRequest req) {
+        if (!req.endTime().isAfter(req.startTime())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-time-range", "Invalid time range",
+                    "End time must be after start time.");
+        }
+        repo.lockDoctorHours(doctorId);
+        if (repo.hoursOverlap(doctorId, req.dayOfWeek(), req.startTime(), req.endTime(), exceptHoursId)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "hours-overlap", "Working hours overlap",
+                    "These hours overlap another block for this doctor on the same day.");
+        }
+    }
+
+    private static Map<String, Object> auditView(UUID doctorId, WorkingHoursResponse h) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("doctorId", doctorId.toString());
+        m.put("dayOfWeek", h.dayOfWeek());
+        m.put("startTime", h.startTime().toString());
+        m.put("endTime", h.endTime().toString());
+        m.put("slotMinutes", h.slotMinutes());
+        m.put("maxPatients", h.maxPatients());
+        return m;
+    }
+
+    private void auditHours(UUID tenantId, UUID callerStaffId, String action, UUID hoursId, Object before, Object after) {
+        QueueModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+                action, "doctor_working_hours", hoursId, before, after);
+    }
+
+    private ApiException hoursNotFound() {
+        return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
     @Transactional

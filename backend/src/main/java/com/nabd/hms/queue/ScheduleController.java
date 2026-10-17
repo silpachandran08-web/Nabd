@@ -12,9 +12,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,11 +43,30 @@ public class ScheduleController {
         return service.listWorkingHours(tenantId(jwt), id);
     }
 
+    // DOC-R7: a doctor writes only their own hours; anyone else needs setup:edit (queue:edit is not enough).
+    private static final String CAN_WRITE_HOURS = "hasAuthority('setup:edit') or authentication.name == #id.toString()";
+
     @PostMapping("/working-hours")
-    @PreAuthorize("hasAuthority('queue:edit')")
+    @PreAuthorize(CAN_WRITE_HOURS)
     public ResponseEntity<WorkingHoursResponse> addWorkingHours(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                                                   @Valid @RequestBody WorkingHoursWriteRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.addWorkingHours(tenantId(jwt), staffId(jwt), id, req));
+    }
+
+    @PutMapping("/working-hours/{hoursId}")
+    @PreAuthorize(CAN_WRITE_HOURS)
+    public WorkingHoursResponse updateWorkingHours(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                   @PathVariable UUID hoursId,
+                                                   @Valid @RequestBody WorkingHoursWriteRequest req) {
+        return service.updateWorkingHours(tenantId(jwt), staffId(jwt), id, hoursId, req);
+    }
+
+    @DeleteMapping("/working-hours/{hoursId}")
+    @PreAuthorize(CAN_WRITE_HOURS)
+    public ResponseEntity<Void> deleteWorkingHours(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                   @PathVariable UUID hoursId) {
+        service.deleteWorkingHours(tenantId(jwt), staffId(jwt), id, hoursId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/leave")

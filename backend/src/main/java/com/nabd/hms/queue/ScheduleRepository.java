@@ -72,6 +72,45 @@ class ScheduleRepository {
         return id;
     }
 
+    Optional<WorkingHoursRow> findWorkingHours(UUID doctorId, UUID hoursId) {
+        return jdbc.query(
+                "SELECT id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients " +
+                        "FROM doctor_working_hours WHERE doctor_id = ? AND id = ?",
+                workingHoursMapper(), doctorId, hoursId).stream().findFirst();
+    }
+
+    /** DOC-R7: serialises hour writes per doctor so two concurrent writes can't both pass the overlap check. */
+    void lockDoctorHours(UUID doctorId) {
+        jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?))", Object.class, "working-hours:" + doctorId);
+    }
+
+    /** Half-open blocks: 09:00-12:00 and 12:00-14:00 touch but don't overlap. excludeId = the row being updated. */
+    boolean hoursOverlap(UUID doctorId, int dayOfWeek, LocalTime start, LocalTime end, UUID excludeId) {
+        Boolean overlap = jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM doctor_working_hours WHERE doctor_id = ? AND day_of_week = ? " +
+                        "AND start_time < ? AND end_time > ? AND id IS DISTINCT FROM ?)",
+                Boolean.class, doctorId, dayOfWeek, Time.valueOf(end), Time.valueOf(start), excludeId);
+        return Boolean.TRUE.equals(overlap);
+    }
+
+    void updateWorkingHours(UUID doctorId, UUID hoursId, int dayOfWeek, LocalTime start, LocalTime end,
+                            int slotMinutes, Integer maxPatients) {
+        jdbc.update("UPDATE doctor_working_hours SET day_of_week = ?, start_time = ?, end_time = ?, slot_minutes = ?, " +
+                        "max_patients = ? WHERE doctor_id = ? AND id = ?",
+                dayOfWeek, Time.valueOf(start), Time.valueOf(end), slotMinutes, maxPatients, doctorId, hoursId);
+    }
+
+    void deleteWorkingHours(UUID doctorId, UUID hoursId) {
+        jdbc.update("DELETE FROM doctor_working_hours WHERE doctor_id = ? AND id = ?", doctorId, hoursId);
+    }
+
+    Optional<QueueModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
+        return jdbc.query("SELECT s.name, COALESCE(r.name, 'Staff') AS role_name FROM staff s " +
+                        "LEFT JOIN roles r ON r.id = s.role_id WHERE s.tenant_id = ? AND s.id = ?",
+                (rs, i) -> new QueueModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
+                tenantId, staffId).stream().findFirst();
+    }
+
     List<DoctorLeaveRow> listLeave(UUID doctorId) {
         return jdbc.query(
                 "SELECT id, doctor_id, date_from, date_to, reason FROM doctor_leave WHERE doctor_id = ? ORDER BY date_from",

@@ -226,4 +226,99 @@ class ScheduleApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(resp.getBody().get("type")).asString().contains("no-active-delay");
     }
+
+    // ── DOC-R7: working-hours write authorization, overlap, update/delete, audit ──
+
+    private ResponseEntity<Map> writeHours(String token, HttpMethod method, String path, String start, String end) {
+        return exchange(path, method, authedJsonBody(token, Map.of("dayOfWeek", 1, "startTime", start,
+                "endTime", end, "slotMinutes", 15)), Map.class);
+    }
+
+    @Test
+    void queueEditAloneCannotWriteAnotherDoctorsHoursButDoctorCanWriteOwn() {
+        SeededTenant tenant = seedTenant();
+        // queue:view/create/edit/delete, no setup grant
+        UUID queueOnly = seedRole(tenant.id(), "Receptionist", false, fullGrant("queue"));
+        SeededStaff doctor = seedStaff(tenant, queueOnly, "r7doc@a.com", "+919400000071", false);
+        SeededStaff reception = seedStaff(tenant, queueOnly, "r7rec@a.com", "+919400000072", false);
+        String docToken = loginAndGetAccessToken(doctor);
+        String recToken = loginAndGetAccessToken(reception);
+        String base = "/v1/doctors/" + doctor.id() + "/working-hours";
+
+        assertThat(writeHours(recToken, HttpMethod.POST, base, "09:00:00", "12:00:00").getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        ResponseEntity<Map> own = writeHours(docToken, HttpMethod.POST, base, "09:00:00", "12:00:00");
+        assertThat(own.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        String hoursPath = base + "/" + own.getBody().get("id");
+
+        assertThat(writeHours(recToken, HttpMethod.PUT, hoursPath, "09:00:00", "11:00:00").getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(exchange(hoursPath, HttpMethod.DELETE, authed(recToken), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.FORBIDDEN);
+
+        ResponseEntity<Map> ownUpdate = writeHours(docToken, HttpMethod.PUT, hoursPath, "09:00:00", "11:00:00");
+        assertThat(ownUpdate.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(ownUpdate.getBody().get("endTime")).isEqualTo("11:00:00");
+        assertThat(exchange(hoursPath, HttpMethod.DELETE, authed(docToken), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+    }
+
+    @Test
+    void setupEditCanWriteAnotherDoctorsHoursAndEveryWriteIsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID ownerRole = seedFullAccessRole(tenant.id());
+        UUID queueOnly = seedRole(tenant.id(), "Doctor", false, fullGrant("queue"));
+        SeededStaff owner = seedStaff(tenant, ownerRole, "r7own@a.com", "+919400000073", false);
+        SeededStaff doctor = seedStaff(tenant, queueOnly, "r7doc2@a.com", "+919400000074", false);
+        String token = loginAndGetAccessToken(owner);
+        String base = "/v1/doctors/" + doctor.id() + "/working-hours";
+
+        ResponseEntity<Map> created = writeHours(token, HttpMethod.POST, base, "09:00:00", "12:00:00");
+        assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        UUID hoursId = UUID.fromString(created.getBody().get("id").toString());
+        String hoursPath = base + "/" + hoursId;
+
+        assertThat(writeHours(token, HttpMethod.PUT, hoursPath, "10:00:00", "12:00:00").getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        assertThat(exchange(hoursPath, HttpMethod.DELETE, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(exchange(base, HttpMethod.GET, authed(token), List.class).getBody()).isEmpty();
+        assertThat(exchange(hoursPath, HttpMethod.DELETE, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.NOT_FOUND);
+
+        List<String> actions = inTenantTx(tenant.id(), () -> jdbc.queryForList(
+                "SELECT action FROM audit_log WHERE entity_type = 'doctor_working_hours' AND entity_id = ? ORDER BY id",
+                String.class, hoursId));
+        assertThat(actions).containsExactly("schedule.working_hours_created", "schedule.working_hours_updated",
+                "schedule.working_hours_deleted");
+    }
+
+    @Test
+    void overlappingHoursAreRejectedOnCreateAndUpdate() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doctor = seedStaff(tenant, roleId, "r7doc3@a.com", "+919400000075", false);
+        String token = loginAndGetAccessToken(doctor);
+        String base = "/v1/doctors/" + doctor.id() + "/working-hours";
+
+        ResponseEntity<Map> morning = writeHours(token, HttpMethod.POST, base, "09:00:00", "12:00:00");
+        assertThat(morning.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        ResponseEntity<Map> overlap = writeHours(token, HttpMethod.POST, base, "11:00:00", "13:00:00");
+        assertThat(overlap.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(overlap.getBody().get("type")).asString().contains("hours-overlap");
+
+        ResponseEntity<Map> touching = writeHours(token, HttpMethod.POST, base, "12:00:00", "14:00:00");
+        assertThat(touching.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        ResponseEntity<Map> badUpdate = writeHours(token, HttpMethod.PUT, base + "/" + touching.getBody().get("id"),
+                "10:00:00", "14:00:00");
+        assertThat(badUpdate.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(badUpdate.getBody().get("type")).asString().contains("hours-overlap");
+
+        // a block may be resized over its own old range
+        assertThat(writeHours(token, HttpMethod.PUT, base + "/" + morning.getBody().get("id"), "08:00:00", "11:00:00")
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
 }

@@ -949,13 +949,43 @@ paths:
         "200": { description: "Working hours", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WorkingHours" } } } } }
     post:
       tags: [Queue]
-      x-required-permission: queue:edit
+      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHoursWrite" } } }
       responses:
         "201": { description: "Working hours block created", content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHours" } } } }
+        "400": { description: "Validation error; type ends in hours-overlap when the block overlaps another block of this doctor on the same weekday (blocks are half-open, so 09:00-12:00 and 12:00-14:00 do not overlap), or invalid-time-range when endTime is not after startTime", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
+
+  /doctors/{id}/working-hours/{hoursId}:
+    parameters:
+      - $ref: "#/components/parameters/PathId"
+      - { name: hoursId, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Queue]
+      summary: Replace one working-hours block of this doctor
+      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHoursWrite" } } }
+      responses:
+        "200": { description: "Updated block", content: { application/json: { schema: { $ref: "#/components/schemas/WorkingHours" } } } }
+        "400": { description: "Validation error; type ends in hours-overlap when the block overlaps another block of this doctor on the same weekday (blocks are half-open, so 09:00-12:00 and 12:00-14:00 do not overlap), or invalid-time-range when endTime is not after startTime", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Queue]
+      summary: Delete one working-hours block of this doctor (existing appointments are not touched)
+      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
+      responses:
+        "204": { description: Deleted }
+        "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /doctors/{id}/leave:
     get:
