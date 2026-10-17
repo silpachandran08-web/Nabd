@@ -132,7 +132,9 @@ class DepartmentApiTest extends ApiTestBase {
         String id = createDepartment(token, "Fresh");
         ResponseEntity<List> resp = exchange("/v1/departments/" + id + "/flow", HttpMethod.GET, authed(token), List.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(resp.getBody()).isEmpty(); // nothing picked yet — the default only applies inside resolveStatusSequence()
+        // QA-08: nothing picked yet -> the resolved default flow, not an empty list
+        assertThat(((List<Map<String, Object>>) resp.getBody())).extracting(s -> s.get("stepType"))
+                .containsExactly("vitals", "consultation");
 
         ResponseEntity<Map> workflowResp = exchange("/v1/departments/" + id + "/workflow", HttpMethod.GET, authed(token), Map.class);
         assertThat(workflowResp.getStatusCode()).isEqualTo(HttpStatus.OK);

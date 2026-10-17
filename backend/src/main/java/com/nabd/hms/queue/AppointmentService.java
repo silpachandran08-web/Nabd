@@ -209,7 +209,7 @@ public class AppointmentService {
 
     private AppointmentResponse toResponse(AppointmentRow row) {
         return new AppointmentResponse(row.id(), row.patientId(), row.doctorId(), row.startTime(), row.endTime(),
-                row.status(), row.isFollowUp());
+                row.status(), row.isFollowUp(), row.cancelReason());
     }
 
     private ApiException notFound() {

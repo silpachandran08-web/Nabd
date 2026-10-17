@@ -187,6 +187,15 @@ class AppointmentApiTest extends ApiTestBase {
                 authedJsonBody(token, Map.of("reason", "patient request")), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("status")).isEqualTo("cancelled");
+        assertThat(resp.getBody().get("cancelReason")).isEqualTo("patient request"); // QA-06
+
+        // QA-06: the reason is on GET single and the list too; a live booking carries cancelReason: null
+        ResponseEntity<Map> single = exchange("/v1/appointments/" + id, HttpMethod.GET, authed(token), Map.class);
+        assertThat(single.getBody().get("cancelReason")).isEqualTo("patient request");
+        ResponseEntity<Map> list = exchange("/v1/appointments?patientId=" + patientId, HttpMethod.GET, authed(token), Map.class);
+        assertThat((java.util.List<Map<String, Object>>) list.getBody().get("data"))
+                .extracting(a -> a.get("cancelReason")).containsExactly("patient request");
+        assertThat(booked.getBody()).containsEntry("cancelReason", null);
 
         // cancelling an already-cancelled appointment is no longer "scheduled" -> 404
         ResponseEntity<Map> again = exchange("/v1/appointments/" + id + "/cancel", HttpMethod.POST,

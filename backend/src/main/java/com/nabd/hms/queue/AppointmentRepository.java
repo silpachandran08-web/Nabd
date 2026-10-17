@@ -19,7 +19,7 @@ import static com.nabd.hms.queue.QueueModels.CallbackEntryRow;
 class AppointmentRepository {
 
     private static final String COLUMNS =
-            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up ";
+            "id, tenant_id, patient_id, doctor_id, start_time, end_time, status, created_at, is_follow_up, cancel_reason ";
 
     private final JdbcTemplate jdbc;
 
@@ -105,7 +105,8 @@ class AppointmentRepository {
                 rs.getTimestamp("end_time").toInstant(),
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
-                rs.getBoolean("is_follow_up"));
+                rs.getBoolean("is_follow_up"),
+                rs.getString("cancel_reason"));
     }
 
     /** QA-03: existence checked up front so an unknown id is a 404, not an FK violation mis-reported as a slot conflict. */
