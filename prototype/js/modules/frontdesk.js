@@ -112,6 +112,7 @@
       ".fd-tv-h .fl b{display:block;font-size:22px;line-height:28px;font-weight:600}.fd-tv-h .fl small{display:block;color:var(--tx2);font-size:15px;line-height:20px}",
       ".fd-clock{text-align:end}.fd-clock b{display:block;font-size:40px;line-height:44px;font-weight:600;font-variant-numeric:tabular-nums;direction:ltr}.fd-clock small{color:var(--tx2);font-size:14px}",
       ".fd-l2{display:block;color:var(--tx2);font-size:.82em;line-height:1.3}",
+      ".fd-tv .fd-l2[dir=rtl]{text-align:left}",
       ".fd-l2[lang=ar]{font-family:var(--font-ar)}.fd-l2[lang=hi]{font-family:var(--font-hi)}",
       ".fd-tv-call{display:flex;align-items:center;gap:24px;padding:18px 28px;border-radius:var(--r-2xl);background:var(--acc-grad);color:var(--on-acc);flex-wrap:wrap}",
       ".fd-tv-call .lbl{font-size:18px;font-weight:600;line-height:24px}.fd-tv-call .lbl .fd-l2{color:var(--on-acc);opacity:.8}",
@@ -137,7 +138,8 @@
       ".fd-tv-note .ico{width:28px;height:28px;flex:none}",
       ".fd-tv-f{display:flex;gap:18px;align-items:center;flex-wrap:wrap;color:var(--tx3);font-size:13px;margin-top:auto}",
       ".fd-tv-f .fd-qr{width:56px;height:56px}.fd-tv-f .fd-qr .ico{width:38px;height:38px}",
-      ".frame.mobile .fd-tv{padding:16px;min-height:0;gap:14px}.frame.mobile .fd-tv-now{font-size:44px}.frame.mobile .fd-tv-call .tk{font-size:44px}.frame.mobile .fd-tv-call{padding:14px 18px;gap:12px}.frame.mobile .fd-clock b{font-size:28px;line-height:32px}",
+      "@media (max-width:760px){.fd-tv{padding:16px;min-height:0;gap:14px}.fd-tv-now{font-size:44px}.fd-tv-call .tk{font-size:44px}.fd-tv-call{padding:14px 18px;gap:12px}.fd-clock b{font-size:28px;line-height:32px}.fd-tv-h .fl b{font-size:17px;line-height:22px}.fd-tv-h .mark{width:40px;height:40px}.fd-tv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fd-tv-room{padding:14px}.fd-tv-room .dn small{min-height:0}}",
+      ".fd-dh b,.fd-dh small{display:block}",
       /* WhatsApp inbox */
       ".fd-inbox{display:grid;grid-template-columns:320px minmax(0,1fr);border:1px solid var(--b-sub);border-radius:var(--r-lg);overflow:hidden;background:var(--s1);height:760px}",
       ".frame.tablet .fd-inbox{grid-template-columns:280px minmax(0,1fr)}",
@@ -155,7 +157,7 @@
       ".fd-unr{min-width:20px;height:20px;border-radius:999px;background:var(--wa);color:var(--on-acc);font-size:11px;font-weight:700;line-height:20px;text-align:center;padding:0 6px}",
       ".fd-cv{display:flex;flex-direction:column;min-height:0;min-width:0}",
       ".fd-cv-h{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--b-sub);flex-wrap:wrap}",
-      ".fd-cv-h .fl b{display:block;font-size:14.5px;font-weight:600}.fd-cv-h .fl small{display:block;color:var(--tx3);font-size:12px}",
+      ".fd-cv-h .fl{min-width:160px}.fd-cv-h .fl b{display:block;font-size:14.5px;font-weight:600}.fd-cv-h .fl small{display:block;color:var(--tx3);font-size:12px}",
       ".fd-ctx{display:flex;gap:8px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--div);align-items:center}",
       ".fd-botbar{padding:0 14px;border-bottom:1px solid var(--div)}.fd-botbar .tog{padding:8px 0}",
       ".fd-cv .wa{flex:1;min-height:240px}",
@@ -184,6 +186,7 @@
       ".frame.mobile .fd-cmp{grid-template-columns:90px minmax(0,1fr) minmax(0,1fr)}",
       ".fd-famcard .li .t b{white-space:normal}",
       ".fd-search{display:flex;align-items:center;gap:10px;height:46px;background:var(--s1);border:1px solid var(--b-def);border-radius:var(--r-md);padding:0 14px;flex:1;min-width:220px}",
+      ".drawer .fd-search,.modal .fd-search{flex:none}",
       ".fd-search:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-tint)}",
       ".fd-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;font-size:14px}",
       ".fd-search .ico{color:var(--tx3)}",
@@ -442,7 +445,7 @@
         }), { min: 700, empty: L("Nobody in this list right now.", "لا أحد في هذه القائمة الآن.", "अभी इस सूची में कोई नहीं।") });
     }
 
-    var rail = ui.card(L("Needs you", "يحتاج تدخلك", "आपकी ज़रूरत"), '<div class="lst">' + [
+    var needs = ui.card(L("Needs you", "يحتاج تدخلك", "आपकी ज़रूरत"), '<div class="lst">' + [
       ["crit", "alertfill", L("Triage flag on a booking request", "علامة فرز على طلب حجز", "बुकिंग अनुरोध पर ट्राइएज फ़्लैग"), "Imtiaz Ahmed · chest discomfort · 18 min", { go: "reception.requests" }],
       ["urg", "qr", L("Self check-in outside geofence", "تسجيل ذاتي خارج النطاق", "जियोफ़ेंस के बाहर चेक-इन"), nm(NB.pat("p10")) + " · 1.4 km", { go: "reception.checkin" }],
       ["warn", "wallet", L("Unpaid dues at check-in", "مستحقات غير مدفوعة", "बकाया राशि"), nm(NB.pat("p9")) + " · " + NB.money(350), { ov: "patientfile", arg: "p9" }],
@@ -451,6 +454,7 @@
       return ui.li('<span class="pill ' + n[0] + '" style="height:32px;width:32px;padding:0;justify-content:center">' + ui.icon(n[1], "sm") + "</span>", n[2], n[3], ui.icon("chevright", "sm faint flip"), n[4]);
     }).join("") + "</div>", { icon: "bell", right: '<span class="pill warn">' + ui.icon("alertcircle") + "4</span>" });
 
+    var rail = c.mobile ? "" : needs;
     rail += ui.card(L("Doctor queues", "طوابير الأطباء", "डॉक्टर क़तारें"), '<div class="lst">' + NB.D.doctors.map(function (d) {
       var n = q.filter(function (x) { return x.d === d.id && /waiting|arrived|vitals|booked/.test(x.st); }).length;
       return ui.li(ui.av(d.name), esc(NB.dname(d)), esc(d.spec) + " · " + n + " " + L("waiting", "ينتظرون", "प्रतीक्षा में") + " · avg " + d.avgMin + " min",
@@ -461,7 +465,7 @@
     rail += ui.card(L("ETA shown to patients", "الوقت المتوقع للمرضى", "मरीज़ों को ETA"), '<p class="small muted" style="margin:0 0 10px">Set by the owner in Workflows. Patients get a WhatsApp “leave home now” message when their ETA drops below their travel time.</p>' +
       '<div class="chips">' + ui.pill("acc", "Range ±10 min", "hourglass") + ui.pill("mute", "Re-estimated every check-in", "refresh") + "</div>", { icon: "hourglass" });
 
-    return h + '<div class="split">' + list + '<div class="stack s16">' + rail + "</div></div>";
+    return h + (c.mobile ? needs : "") + '<div class="split">' + list + '<div class="stack s16">' + rail + "</div></div>";
   });
 
   /* =====================================================================
@@ -667,7 +671,7 @@
   }
   function docHead(d, noAv) {
     var pill = d.status === "break" ? ui.pill("perm", L("Break", "استراحة", "ब्रेक")) : d.id === "d5" ? ui.pill("sub", L("Leave 11:00", "إجازة 11:00", "छुट्टी 11:00"), "moon") : d.delay ? ui.pill("warn", "+" + d.delay + " min") : ui.pill("ok", L("On time", "في الموعد", "समय पर"));
-    return (noAv ? "" : ui.av(d.name)) + '<div class="fl"><b>' + esc(NB.dname(d)) + "</b><small>" + esc(d.spec) + " · " + esc(d.room) + '</small><div style="margin-top:6px">' + pill + "</div></div>";
+    return (noAv ? "" : ui.av(d.name)) + '<div class="fl fd-dh"><b>' + esc(NB.dname(d)) + "</b><small>" + esc(d.spec) + " · " + esc(d.room) + '</small><div style="margin-top:6px">' + pill + "</div></div>";
   }
 
   NB.screen("reception.calendar", function (c) {
