@@ -244,6 +244,7 @@ function ArrivalsPageInner() {
     const seq = ++loadSeq.current;
     setError(null);
     try {
+      if (!can("queue:view")) { setForbidden(true); return; } // LIVE-09: no requests that can only 403
       const [queueRes, staffRes] = await Promise.all([authedFetch("/queue"), authedFetch("/staff/roster")]);
       if (!queueRes) return;
       if (queueRes.status === 403) {
@@ -347,6 +348,7 @@ function ArrivalsPageInner() {
   }, [authedFetch]);
   useEffect(() => {
     void Promise.resolve().then(async () => {
+      if (!can("queue:view")) return;
       const res = await authedFetch("/appointments/callback-list");
       if (res?.ok) setCallbackList(await res.json());
     });
