@@ -15,11 +15,20 @@ import static com.nabd.hms.queue.QueueModels.QueueEntryRow;
 @Repository
 class QueueRepository {
 
+    // NUR-012: one joined read (patients, staff, appointments) so the worklist rows need no N+1.
     private static final String COLUMNS =
-            "id, appointment_id, patient_id, doctor_id, department_id, parent_queue_entry_id, encounter_id, class, " +
-                    "current_stage, workflow_definition_id, queue_date, token_number, " +
-                    "status, priority, priority_reason, priority_flagged_by, priority_flagged_at, priority_acknowledged_by, " +
-                    "priority_acknowledged_at, source, presenting_complaint, payment_mode, created_at ";
+            "q.id, q.appointment_id, q.patient_id, q.doctor_id, q.department_id, q.parent_queue_entry_id, q.encounter_id, q.class, " +
+                    "q.current_stage, q.workflow_definition_id, q.queue_date, q.token_number, " +
+                    "q.status, q.priority, q.priority_reason, q.priority_flagged_by, q.priority_flagged_at, q.priority_acknowledged_by, " +
+                    "q.priority_acknowledged_at, q.source, q.presenting_complaint, q.payment_mode, q.created_at, " +
+                    "q.transfer_reason, q.transfer_reason_note, " +
+                    "date_part('year', age(q.queue_date, p.dob))::int AS age_years, p.gender, d.name AS doctor_name, " +
+                    "GREATEST(0, floor(extract(epoch FROM (now() - q.created_at)) / 60))::int AS wait_minutes, " +
+                    "CASE WHEN a.is_follow_up THEN 'follow_up' WHEN q.appointment_id IS NOT NULL THEN 'appointment' " +
+                    "WHEN q.source = 'internal_transfer' THEN 'transfer' ELSE 'walk_in' END AS visit_type ";
+    private static final String FROM =
+            "FROM queue_entries q JOIN patients p ON p.id = q.patient_id JOIN staff d ON d.id = q.doctor_id " +
+                    "LEFT JOIN appointments a ON a.id = q.appointment_id ";
 
     private final JdbcTemplate jdbc;
 
@@ -49,13 +58,13 @@ class QueueRepository {
      * transfer() — propagating one visit's identity across however many department legs it takes. */
     UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
                 UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status,
-                String presentingComplaint, String paymentMode) {
+                String presentingComplaint, String paymentMode, String transferReason, String transferReasonNote) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
-                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode, transfer_reason, transfer_reason_note) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId, encounterId,
-                Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode);
+                Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode, transferReason, transferReasonNote);
         return id;
     }
 
@@ -78,27 +87,27 @@ class QueueRepository {
     }
 
     Optional<QueueEntryRow> findById(UUID tenantId, UUID id) {
-        return jdbc.query("SELECT " + COLUMNS + "FROM queue_entries WHERE tenant_id = ? AND id = ?",
+        return jdbc.query("SELECT " + COLUMNS + FROM + "WHERE q.tenant_id = ? AND q.id = ?",
                 mapper(), tenantId, id).stream().findFirst();
     }
 
     List<QueueEntryRow> listForDay(UUID tenantId, UUID doctorId, UUID departmentId, LocalDate date, boolean priorityOnly) {
-        String priorityGate = priorityOnly ? "AND priority = true " : "";
+        String priorityGate = priorityOnly ? "AND q.priority = true " : "";
         if (doctorId != null) {
-            return jdbc.query("SELECT " + COLUMNS + "FROM queue_entries " +
-                            "WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? " + priorityGate +
-                            "ORDER BY priority DESC, token_number",
+            return jdbc.query("SELECT " + COLUMNS + FROM +
+                            "WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " + priorityGate +
+                            "ORDER BY q.priority DESC, q.token_number",
                     mapper(), tenantId, doctorId, Date.valueOf(date));
         }
         if (departmentId != null) {
-            return jdbc.query("SELECT " + COLUMNS + "FROM queue_entries " +
-                            "WHERE tenant_id = ? AND department_id = ? AND queue_date = ? " + priorityGate +
-                            "ORDER BY doctor_id, priority DESC, token_number",
+            return jdbc.query("SELECT " + COLUMNS + FROM +
+                            "WHERE q.tenant_id = ? AND q.department_id = ? AND q.queue_date = ? " + priorityGate +
+                            "ORDER BY q.doctor_id, q.priority DESC, q.token_number",
                     mapper(), tenantId, departmentId, Date.valueOf(date));
         }
-        return jdbc.query("SELECT " + COLUMNS + "FROM queue_entries " +
-                        "WHERE tenant_id = ? AND queue_date = ? " + priorityGate +
-                        "ORDER BY doctor_id, priority DESC, token_number",
+        return jdbc.query("SELECT " + COLUMNS + FROM +
+                        "WHERE q.tenant_id = ? AND q.queue_date = ? " + priorityGate +
+                        "ORDER BY q.doctor_id, q.priority DESC, q.token_number",
                 mapper(), tenantId, Date.valueOf(date));
     }
 
@@ -159,6 +168,11 @@ class QueueRepository {
         return count == null ? 0 : count;
     }
 
+    /** Name + role snapshot for the audit trail. */
+    java.util.Map<String, Object> actor(UUID tenantId, UUID staffId) {
+        return jdbc.queryForMap("SELECT s.name, COALESCE(r.name, 'Staff') AS role FROM staff s LEFT JOIN roles r ON r.id = s.role_id WHERE s.tenant_id = ? AND s.id = ?", tenantId, staffId);
+    }
+
     private RowMapper<QueueEntryRow> mapper() {
         return (rs, i) -> {
             String appointmentId = rs.getString("appointment_id");
@@ -191,7 +205,10 @@ class QueueRepository {
                     rs.getString("source"),
                     rs.getString("presenting_complaint"),
                     rs.getString("payment_mode"),
-                    rs.getTimestamp("created_at").toInstant());
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getString("transfer_reason"), rs.getString("transfer_reason_note"),
+                    (Integer) rs.getObject("age_years"), rs.getString("gender"), rs.getString("doctor_name"),
+                    rs.getInt("wait_minutes"), rs.getString("visit_type"));
         };
     }
 }
