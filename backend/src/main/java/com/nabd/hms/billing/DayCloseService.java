@@ -51,10 +51,12 @@ public class DayCloseService {
         DayCloseSummaryResponse.Close close = repo.findClose(tenantId, day).map(c -> new DayCloseSummaryResponse.Close(
                 c.status(), c.expectedCash(), c.countedCash(), c.variance(), c.note(), c.closedByName(), c.closedAt(),
                 c.reopenedByName(), c.reopenedAt(), c.reopenReason())).orElse(null);
+        DayCloseRepository.Voided voided = repo.voided(tenantId, start, end);
         return new DayCloseSummaryResponse(day, day.equals(today), ksa ? "SAR" : "INR", ksa ? "VAT" : "GST",
                 ksa ? TOLERANCE_KSA : TOLERANCE_IN, repo.totals(tenantId, start, end), repo.methods(tenantId, start, end),
                 repo.outstanding(tenantId, start, end), repo.pendingCheckouts(tenantId, day), repo.unbilled(tenantId, day),
-                repo.taxBands(tenantId, start, end), repo.splitPaymentBills(tenantId, start, end), close);
+                repo.taxBands(tenantId, start, end), repo.splitPaymentBills(tenantId, start, end), close,
+                voided.count(), voided.total());
     }
 
     /** Closes the clinic's today. Blocked while any ended consultation has no bill. */

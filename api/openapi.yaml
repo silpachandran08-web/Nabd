@@ -1924,6 +1924,31 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: Forbidden }
         "409": { description: Conflict }
+  /billing/day-close:
+    get:
+      tags: [Billing]
+      summary: >
+        Day-close summary for one clinic day (default today). Only the OWN-019 fields are spelled out here; the rest of
+        the body (totals, methods, outstanding, pendingCheckouts, unbilled, taxBands, splitPaymentBills, close) is unchanged.
+        voidedCount / voidedTotal count invoices whose voided_at (Sprint 3 void flow) falls within that clinic day,
+        whenever the invoice was raised; voidedTotal sums their total. Voided bills are already excluded from totals.billed.
+        Payment-gateway failures are not recorded anywhere, so there is no failed field.
+      x-required-permission: billing:view
+      parameters:
+        - { name: date, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string, format: date }
+                  voidedCount: { type: integer, description: "Invoices voided on this clinic day (by voided_at)" }
+                  voidedTotal: { type: number, description: "Sum of those invoices' total" }
+                additionalProperties: true
+        "403": { description: Forbidden }
   /billing/invoices/{id}/void:
     post:
       tags: [Billing]

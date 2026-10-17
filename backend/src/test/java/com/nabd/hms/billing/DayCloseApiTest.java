@@ -111,6 +111,34 @@ class DayCloseApiTest extends ApiTestBase {
                 .containsExactly("day_close.close", "day_close.reopen");
     }
 
+    /** OWN-019: a bill voided today shows in voidedCount/voidedTotal and drops out of billed/outstanding. */
+    @Test
+    void voidedInvoicesAreCountedOnTheDayTheyWereVoided() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "dc3@a.com", "+919600000031", false);
+        String token = loginAndGetAccessToken(owner);
+        Map<String, Object> before = exchange("/v1/billing/day-close", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(before).containsEntry("voidedCount", 0);
+        assertThat(((Number) before.get("voidedTotal")).doubleValue()).isEqualTo(0.0);
+
+        String kept = bill(token, visitAtCheckout(token, owner.id(), "Meera Pillai", "+919999951031", "1980-01-01"));
+        String voided = bill(token, visitAtCheckout(token, owner.id(), "Arjun Menon", "+919999951032", "1990-02-02"));
+        assertThat(exchange("/v1/billing/invoices/" + voided + "/void", HttpMethod.POST,
+                authedJsonBody(token, Map.of("reason", "Raised in error")), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        Map<String, Object> s = exchange("/v1/billing/day-close", HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(s).containsEntry("voidedCount", 1);
+        assertThat(((Number) s.get("voidedTotal")).doubleValue()).isEqualTo(1036.0);
+        @SuppressWarnings("unchecked") Map<String, Object> totals = (Map<String, Object>) s.get("totals");
+        assertThat(totals).containsEntry("bills", 1);
+        assertThat(kept).isNotEqualTo(voided);
+
+        // another day has none
+        Map<String, Object> yesterday = exchange("/v1/billing/day-close?date=" + java.time.LocalDate.parse((String) s.get("date")).minusDays(1),
+                HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(yesterday).containsEntry("voidedCount", 0);
+    }
+
     @Test
     void closingNeedsBillingApprove() {
         SeededTenant tenant = seedTenant();
