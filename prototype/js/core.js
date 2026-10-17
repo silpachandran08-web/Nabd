@@ -37,7 +37,7 @@ window.NB = window.NB || {};
     var s = v.toLocaleString("en-IN", { minimumFractionDigits: m.id === "india" ? 0 : 2, maximumFractionDigits: m.id === "india" ? 0 : 2 });
     return '<span class="num ltr">' + (m.id === "india" ? "₹" + s : s + " " + m.cur) + "</span>";
   };
-  NB.facilities = function () { return NB.D.facilities[NB.gcc() ? "gcc" : "india"]; };
+  NB.facilities = function () { return NB.D.facilities[NB.state.market] || NB.D.facilities.india; };
   NB.fac = function () { return NB.facilities()[NB.state.facility] || NB.facilities()[0]; };
 
   /* ---------------- HTML helpers ---------------- */
@@ -115,7 +115,7 @@ window.NB = window.NB || {};
   };
   ui.note = function (kind, html, icon) { return '<div class="note ' + kind + '">' + ui.icon(icon || { info: "info", warn: "alertcircle", crit: "alertfill", ok: "checkcircle", ai: "sparkle" }[kind]) + "<div>" + html + "</div></div>"; };
   ui.header = function (title, sub, actions, eyebrow) {
-    return '<div class="ph"><div class="tt">' + (eyebrow ? '<div class="eyebrow">' + eyebrow + "</div>" : "") + "<h1>" + title + "</h1>" + (sub ? "<p>" + sub + "</p>" : "") + "</div>" + (actions ? '<div class="btns">' + actions + "</div>" : "") + "</div>";
+    return '<div class="ph"><div class="tt">' + (eyebrow ? '<div class="eyebrow">' + eyebrow + "</div>" : "") + "<h1>" + title + "</h1>" + (sub ? "<p><bdi>" + sub + "</bdi></p>" : "") + "</div>" + (actions ? '<div class="btns">' + actions + "</div>" : "") + "</div>";
   };
   ui.card = function (title, body, o) {
     o = o || {};
@@ -259,7 +259,8 @@ window.NB = window.NB || {};
     var s = NB.state, f = NB.fac();
     var h = '<div class="logo"><span class="mark">' + ui.icon("logo") + '</span><div class="nl fac-txt"><b>nabd</b><small>' +
       (s.role === "pharmacist" ? NB.L("Pharmacy", "الصيدلية", "फ़ार्मेसी") : s.role === "lab" ? NB.L("Laboratory", "المختبر", "लैब") : NB.L("Clinic management", "إدارة العيادة", "क्लिनिक प्रबंधन")) + "</small></div></div>";
-    h += '<button class="fac" data-ov="facswitch" title="Switch facility">' + '<span class="fi">' + ui.icon("building", "sm") + '</span><span class="fac-txt"><b>' + ui.esc(f.name) +
+    if (s.role === "platform") h += '<div class="fac"><span class="fi">' + ui.icon("globe", "sm") + '</span><span class="fac-txt"><b>Nabd platform</b><small>All regions · ' + ui.esc(NB.mkt().name) + " focus</small></span></div>";
+    else h += '<button class="fac" data-ov="facswitch" title="Switch facility">' + '<span class="fi">' + ui.icon("building", "sm") + '</span><span class="fac-txt"><b>' + ui.esc(f.name) +
       "</b><small>" + ui.esc(f.area) + "</small></span>" + ui.icon("chevdown", "sm faint") + "</button>";
     h += '<nav class="nav" aria-label="Main">';
     r.nav.forEach(function (n) {

@@ -38,10 +38,20 @@ NB.D.facilities = {
     { id: "f2", name: "Suvidha Hospital", area: "Whitefield, Bengaluru", type: "hospital" },
     { id: "f3", name: "Dr. Meera's Skin Clinic", area: "Indiranagar, Bengaluru", type: "solo" }
   ],
-  gcc: [
+  uae: [
     { id: "f1", name: "Al Noor Polyclinic", area: "Al Barsha, Dubai", type: "poly" },
-    { id: "f2", name: "Al Noor Hospital", area: "Olaya, Riyadh", type: "hospital" },
+    { id: "f2", name: "Al Noor Hospital", area: "Khalifa City, Abu Dhabi", type: "hospital" },
     { id: "f3", name: "Dr. Khalid Dental Studio", area: "Jumeirah, Dubai", type: "solo" }
+  ],
+  ksa: [
+    { id: "f1", name: "Al Noor Medical Complex", area: "Al Olaya, Riyadh", type: "poly" },
+    { id: "f2", name: "Al Noor Hospital", area: "Al Malqa, Riyadh", type: "hospital" },
+    { id: "f3", name: "Dr. Khalid Dental Clinic", area: "Al Rawdah, Jeddah", type: "solo" }
+  ],
+  qatar: [
+    { id: "f1", name: "Al Noor Polyclinic", area: "Al Sadd, Doha", type: "poly" },
+    { id: "f2", name: "Al Noor Hospital", area: "West Bay, Doha", type: "hospital" },
+    { id: "f3", name: "Dr. Khalid Dental Studio", area: "The Pearl, Doha", type: "solo" }
   ]
 };
 
