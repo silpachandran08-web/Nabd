@@ -1189,7 +1189,8 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/CheckInRequest" } } }
       responses:
         "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
-        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch)" }
+        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch, resolved, or already checked in)" }
+        "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue:
     get:

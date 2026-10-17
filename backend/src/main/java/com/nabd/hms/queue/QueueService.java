@@ -115,6 +115,10 @@ public class QueueService {
 
         if (req.appointmentId() == null) {
             enforceSessionCapacity(tenantId, req.doctorId(), today); // scheduled check-ins were already capacity-checked at booking
+        } else if (repo.appointmentCheckedIn(tenantId, req.appointmentId())) {
+            // QA-04: under the lock above, so a double-submit can't mint a second, uncounted token for one booking
+            throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
+                    "Appointment not found, already resolved, or doesn't match patient/doctor.");
         }
 
         UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
