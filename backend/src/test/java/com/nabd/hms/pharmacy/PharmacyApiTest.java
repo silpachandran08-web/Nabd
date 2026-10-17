@@ -68,7 +68,7 @@ class PharmacyApiTest extends ApiTestBase {
         SeededStaff staff = seedStaff(tenant, roleId, "pharm2@a.com", "+919600000002", false);
         String token = loginAndGetAccessToken(staff);
 
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         ResponseEntity<Map> resp = exchange("/v1/pharmacy/settings", HttpMethod.GET, authed(token), Map.class);
         assertThat(resp.getBody().get("mode")).isEqualTo("hybrid");
     }
@@ -93,7 +93,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm4@a.com", "+919600000004", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
 
         addHybridItem(token, "Medicated cleanser", 6);
 
@@ -110,7 +110,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm5@a.com", "+919600000005", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Topical antibiotic", 5);
 
         String queueEntryId = checkoutPendingEntry(token, staff.id(), "P5", "+919999940005");
@@ -118,7 +118,7 @@ class PharmacyApiTest extends ApiTestBase {
         List<?> hybridCharges = (List<?>) hybridCtx.getBody().get("charges");
         assertThat(hybridCharges.stream().anyMatch(c -> code.equals(((Map<?, ?>) c).get("code")))).isTrue();
 
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "external")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "external", "reason", "Test setup")), Map.class);
         ResponseEntity<Map> externalCtx = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.GET, authed(token), Map.class);
         List<?> externalCharges = (List<?>) externalCtx.getBody().get("charges");
         assertThat(externalCharges.stream().anyMatch(c -> code.equals(((Map<?, ?>) c).get("code")))).isFalse();
@@ -130,7 +130,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm6@a.com", "+919600000006", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Amoxicillin 500mg", 2);
 
         String firstEntry = checkoutPendingEntry(token, staff.id(), "P6a", "+919999940006");
@@ -203,7 +203,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, email, phone, false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         return token;
     }
 
@@ -263,7 +263,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm-v24b@a.com", "+919600000042", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         addHybridItem(token, "ORS sachets", 4);
         String id = itemId(token);
         exchange("/v1/pharmacy/items/" + id + "/stock-adjustments", HttpMethod.POST,
@@ -283,7 +283,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm-v24c@a.com", "+919600000043", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         addHybridItem(token, "Bandages", 5);
 
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
@@ -343,7 +343,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm-v24f@a.com", "+919600000046", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Loratadine", 5);
         String entry = checkoutPendingEntry(token, staff.id(), "Dispense Logged", "+919999940046");
         exchange("/v1/billing/checkout/" + entry, HttpMethod.POST, authedJsonBody(token, Map.of(
@@ -364,7 +364,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm-v27@a.com", "+919600000047", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Expired syrup", 3);
         String id = itemId(token);
 
@@ -393,7 +393,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "pharm-v34@a.com", "+919600000050", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Recalled batch", 5);
         String id = itemId(token);
 
@@ -424,7 +424,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID ownerRole = seedFullAccessRole(tenant.id());
         SeededStaff owner = seedStaff(tenant, ownerRole, "pharm-v24g@a.com", "+919600000048", false);
         String ownerToken = loginAndGetAccessToken(owner);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(ownerToken, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(ownerToken, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         addHybridItem(ownerToken, "Cotton", 4);
         String id = itemId(ownerToken);
         UUID viewRole = seedRole(tenant.id(), "PharmView", false, new com.nabd.hms.common.ModuleGrant("pharmacy", true, false, false, false, false, false, false));
@@ -460,7 +460,7 @@ class PharmacyApiTest extends ApiTestBase {
         SeededTenant tenant = seedTenant();
         SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "pharm20@a.com", "+919600000020", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Cough syrup", 3);
 
         assertThat(otcCharge(token, code).get("stockQty")).isEqualTo(3);
@@ -478,7 +478,7 @@ class PharmacyApiTest extends ApiTestBase {
         UUID roleId = seedRole(tenant.id(), "Owner2", true, fullGrant("pharmacy"), fullGrant("billing"));
         SeededStaff staff = seedStaff(tenant, roleId, "pharm21@a.com", "+919600000021", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Ibuprofen", 10);
         ResponseEntity<Map> sale = exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "lineItems", List.of(pharmacyLine(code, 4)))), Map.class);
@@ -520,7 +520,7 @@ class PharmacyApiTest extends ApiTestBase {
         SeededTenant tenant = seedTenant();
         SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "pharm22@a.com", "+919600000022", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         String code = addHybridItem(token, "Vitamin C", 5);
         String invoiceId = (String) exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "lineItems", List.of(pharmacyLine(code, 2)))), Map.class).getBody().get("id");
@@ -550,7 +550,7 @@ class PharmacyApiTest extends ApiTestBase {
         SeededTenant tenant = seedTenant();
         SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "pharm24@a.com", "+919600000024", false);
         String token = loginAndGetAccessToken(staff);
-        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         addHybridItem(token, "Cetirizine", 7);
         String patientId = registerPatient(token, "PharmTok", "+919999940024");
         ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
@@ -568,5 +568,58 @@ class PharmacyApiTest extends ApiTestBase {
         List<Map<?, ?>> items = (List<Map<?, ?>>) row.get("items");
         assertThat(items.get(0).get("stockQty")).isEqualTo(7);
         assertThat(items.get(1).get("stockQty")).isNull();
+    }
+
+    // PHA-006: a mode change needs a 3-200 char reason and is audited with old mode, new mode and reason.
+    @Test
+    void modeChangeRequiresReasonAndIsAudited() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        String token = loginAndGetAccessToken(seedStaff(tenant, roleId, "pharm-pha6a@a.com", "+919600000091", false));
+
+        ResponseEntity<Map> noReason = exchange("/v1/pharmacy/settings", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("mode", "hybrid")), Map.class);
+        assertThat(noReason.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(noReason.getBody().get("type")).asString().contains("reason-required");
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "  ab ")),
+                Map.class).getBody().get("type")).asString().contains("reason-required");
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "x".repeat(201))),
+                Map.class).getBody().get("type")).asString().contains("reason-required");
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.GET, authed(token), Map.class).getBody().get("mode")).isEqualTo("external");
+
+        ResponseEntity<Map> ok = exchange("/v1/pharmacy/settings", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Opening OTC counter")), Map.class);
+        assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(ok.getBody().get("mode")).isEqualTo("hybrid");
+        // re-sending the current mode is a no-op: no reason needed, nothing audited
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid")),
+                Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        List<Map<String, Object>> audited = inTenantTx(tenant.id(), () -> jdbc.queryForList(
+                "SELECT before::text AS before, after::text AS after FROM audit_log WHERE tenant_id = ? AND action = 'pharmacy.mode_changed'",
+                tenant.id()));
+        assertThat(audited).hasSize(1);
+        assertThat(audited.get(0).get("before").toString()).contains("external");
+        assertThat(audited.get(0).get("after").toString()).contains("hybrid").contains("Opening OTC counter");
+    }
+
+    // PHA-006: in-house (Phase 3) can't be switched to; a tenant already on it is left alone.
+    @Test
+    void switchingToInHouseIsNotAvailableUnlessAlreadyInHouse() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        String token = loginAndGetAccessToken(seedStaff(tenant, roleId, "pharm-pha6b@a.com", "+919600000092", false));
+
+        ResponseEntity<Map> resp = exchange("/v1/pharmacy/settings", HttpMethod.PATCH,
+                authedJsonBody(token, Map.of("mode", "in_house", "reason", "Want batch tracking")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().get("type")).asString().contains("mode-not-available");
+
+        // legacy tenant already on in_house (set directly, as before PHA-006): re-saving it is fine, leaving it needs a reason
+        inTenantTx(tenant.id(), () -> jdbc.update("INSERT INTO pharmacy_settings (tenant_id, mode) VALUES (?, 'in_house')", tenant.id()));
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "in_house")),
+                Map.class).getBody().get("mode")).isEqualTo("in_house");
+        assertThat(exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Back to hybrid")),
+                Map.class).getBody().get("mode")).isEqualTo("hybrid");
     }
 }
