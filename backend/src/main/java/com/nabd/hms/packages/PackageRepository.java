@@ -183,9 +183,13 @@ class PackageRepository {
 
     // ── instances ─────────────────────────────────────────────────────────
 
-    List<InstanceRow> listInstances(UUID tenantId) {
-        return jdbc.query(
-                INSTANCE_SELECT + "WHERE i.tenant_id = ? ORDER BY i.created_at DESC", this::mapInstance, tenantId);
+    List<InstanceRow> listInstances(UUID tenantId, UUID patientId) {
+        if (patientId == null) {
+            return jdbc.query(
+                    INSTANCE_SELECT + "WHERE i.tenant_id = ? ORDER BY i.created_at DESC", this::mapInstance, tenantId);
+        }
+        return jdbc.query(INSTANCE_SELECT + "WHERE i.tenant_id = ? AND i.patient_id = ? ORDER BY i.created_at DESC",
+                this::mapInstance, tenantId, patientId);
     }
 
     Optional<InstanceRow> findInstance(UUID tenantId, UUID id) {

@@ -45,7 +45,8 @@ public class FleetService {
             byStatus.merge(row[0], 1, Integer::sum);
             regions.add(row[1]);
         }
-        return new FleetSummaryResponse(rows.size(), byStatus, List.copyOf(regions));
+        return new FleetSummaryResponse(rows.size(), byStatus.getOrDefault("active", 0),
+                byStatus.getOrDefault("trialing", 0), byStatus, List.copyOf(regions));
     }
 
     private TenantSummaryResponse toResponse(TenantSummary t) {

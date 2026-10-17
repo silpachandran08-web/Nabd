@@ -98,6 +98,26 @@ class FleetApiTest extends ApiTestBase {
         assertThat(regions).contains("IN"); // seedTenant() defaults to IN
     }
 
+    /** LIVE-07: "Tenants live" counted every tenant (incl. trialing); live is now status 'active' only. */
+    @Test
+    void summaryLiveCountsOnlyActiveTenantsAndTrialingSeparately() {
+        String token = superAdminToken();
+        Map<String, Object> before = exchange("/v1/platform/tenants/summary", HttpMethod.GET, authed(token), Map.class).getBody();
+        SeededTenant trial1 = seedTenant();
+        SeededTenant trial2 = seedTenant();
+        SeededTenant live = seedTenant();
+        jdbc.update("UPDATE tenants SET status = 'trialing' WHERE id IN (?, ?)", trial1.id(), trial2.id());
+        jdbc.update("UPDATE tenants SET status = 'active' WHERE id = ?", live.id());
+
+        Map<String, Object> after = exchange("/v1/platform/tenants/summary", HttpMethod.GET, authed(token), Map.class).getBody();
+        Map<String, Object> byStatus = (Map<String, Object>) after.get("byStatus");
+        assertThat((Integer) after.get("trialing") - (Integer) before.get("trialing")).isEqualTo(2);
+        assertThat((Integer) after.get("live") - (Integer) before.get("live")).isEqualTo(1);
+        assertThat(after.get("live")).isEqualTo(byStatus.getOrDefault("active", 0));
+        assertThat(after.get("trialing")).isEqualTo(byStatus.getOrDefault("trialing", 0));
+        assertThat((Integer) after.get("live")).isLessThan((Integer) after.get("total"));
+    }
+
     @Test
     void sreCannotSeeTheFleetSummaryEither() {
         SeededOperator sre = seedOperator("sre-fleet-summary@nabd.health", "sre", false);

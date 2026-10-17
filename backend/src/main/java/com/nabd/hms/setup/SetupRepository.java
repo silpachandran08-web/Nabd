@@ -241,13 +241,16 @@ class SetupRepository {
 
     // ── Subscription ──
 
-    // ponytail: 'plan' is a fixed placeholder, not tenants.name — there's no plan/tier column
-    // anywhere in the schema yet (that's NB-269, pricing & packaging, not built). branches_used
+    // LIVE-07: 'plan' is the platform plan record's name (master.plans via master.subscriptions) — the
+    // same source the platform console shows; null when the platform hasn't started a subscription yet
+    // (never a made-up label). Limits below are still fixed placeholders. branches_used
     // is correlated on tenants.brand_id directly: a brand-less tenant is its own one branch
     // (brand_id = NULL never equals anything in a subquery, so the naive join undercounts to 0).
     SubscriptionSummary getSubscription(UUID tenantId) {
         return jdbc.query(
                 "SELECT status, " +
+                        "(SELECT p.name FROM master.subscriptions sub JOIN master.plans p ON p.id = sub.plan_id " +
+                        " WHERE sub.tenant_id = tenants.id) AS plan_name, " +
                         "(SELECT count(*) FROM patients WHERE tenant_id = tenants.id AND status = 'active') AS patients_used, " +
                         "500 AS patients_limit, " +
                         "0 AS messages_used, " +
@@ -257,7 +260,7 @@ class SetupRepository {
                         "1 AS branches_limit " +
                         "FROM tenants WHERE id = ?",
                 (rs, i) -> new SubscriptionSummary(
-                        "Standard",
+                        rs.getString("plan_name"),
                         rs.getString("status"),
                         rs.getLong("patients_used"),
                         rs.getLong("patients_limit"),
