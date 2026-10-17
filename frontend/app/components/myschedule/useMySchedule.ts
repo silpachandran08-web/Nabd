@@ -108,6 +108,25 @@ export function useMySchedule() {
     return null;
   }, [load]);
 
+  // DOC-R7: PUT/DELETE /doctors/{id}/working-hours/{hoursId}. 400 hours-overlap / 403 detail is shown as-is.
+  const updateHours = useCallback(async (hoursId: string, input: WorkingHoursInput): Promise<string | null> => {
+    const a = auth();
+    if (!a) return "Signed out.";
+    const res = await call(`/doctors/${encodeURIComponent(a.selfId)}/working-hours/${encodeURIComponent(hoursId)}`, a.token, { method: "PUT", body: JSON.stringify(input) });
+    if (!res?.ok) return problem(res, "Couldn't save the working hours.");
+    await load();
+    return null;
+  }, [load]);
+
+  const deleteHours = useCallback(async (hoursId: string): Promise<string | null> => {
+    const a = auth();
+    if (!a) return "Signed out.";
+    const res = await call(`/doctors/${encodeURIComponent(a.selfId)}/working-hours/${encodeURIComponent(hoursId)}`, a.token, { method: "DELETE" });
+    if (!res?.ok) return problem(res, "Couldn't remove the working hours.");
+    await load();
+    return null;
+  }, [load]);
+
   const addLeave = useCallback(async (input: LeaveInput): Promise<{ error: string } | { affected: string[] }> => {
     const a = auth();
     if (!a) return { error: "Signed out." };
@@ -118,7 +137,7 @@ export function useMySchedule() {
     return { affected: created.affectedPackagePatients ?? [] };
   }, [load]);
 
-  return { selfId, hours, leave, loading, error, reload: load, addHours, addLeave };
+  return { selfId, hours, leave, loading, error, reload: load, addHours, updateHours, deleteHours, addLeave };
 }
 
 /** One day of the clinic grid (GET /schedule/day); the page picks this doctor's column out of it. */

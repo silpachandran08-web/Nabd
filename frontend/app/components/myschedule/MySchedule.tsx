@@ -6,8 +6,9 @@ import Icon from "../ui/Icon";
 import StatusPill, { type PillTone } from "../ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
-import { hhmm, isoDate, useDayGrid, useMySchedule, type DayCell, type Leave, type WorkingHours } from "./useMySchedule";
+import { WEEKDAYS, hhmm, isoDate, useDayGrid, useMySchedule, type DayCell, type Leave, type WorkingHours } from "./useMySchedule";
 import { LeaveDialog, WorkingHoursDialog } from "./ScheduleDialogs";
+import ConfirmDialog from "../../patients/ConfirmDialog";
 
 
 function parseIso(s: string): Date {
@@ -31,7 +32,10 @@ const CELL_PILL: Record<string, { tone: PillTone; label: string; icon?: "check" 
   leave: { tone: "warn", label: "On leave", icon: "alert" },
 };
 
-function WeekView({ start, hours, leave, onPickDay }: { start: Date; hours: WorkingHours[]; leave: Leave[]; onPickDay: (iso: string) => void }) {
+function WeekView({ start, hours, leave, onPickDay, onEdit, onDelete }: {
+  start: Date; hours: WorkingHours[]; leave: Leave[]; onPickDay: (iso: string) => void;
+  onEdit?: (h: WorkingHours) => void; onDelete?: (h: WorkingHours) => void;
+}) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   return (
     <ul className={styles.week} aria-label="Week of working hours">
@@ -58,6 +62,12 @@ function WeekView({ start, hours, leave, onPickDay }: { start: Date; hours: Work
                   <div key={b.id} className={styles.block}>
                     <span className={styles.blockTime}>{hhmm(b.startTime)}–{hhmm(b.endTime)}</span>
                     <span className={styles.meta}>{b.slotMinutes} min slots{b.maxPatients ? ` · max ${b.maxPatients}` : ""}</span>
+                    {onEdit && onDelete && (
+                      <span className={styles.rowActions}>
+                        <button type="button" className={styles.linkBtn} onClick={() => onEdit(b)} aria-label={`Edit ${WEEKDAYS[b.dayOfWeek]} ${hhmm(b.startTime)}–${hhmm(b.endTime)}`}>Edit</button>
+                        <button type="button" className={styles.linkBtn} onClick={() => onDelete(b)} aria-label={`Delete ${WEEKDAYS[b.dayOfWeek]} ${hhmm(b.startTime)}–${hhmm(b.endTime)}`}>Delete</button>
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -114,8 +124,22 @@ function DayView({ date, selfId, hours, leave }: { date: string; selfId: string;
 }
 
 export default function MySchedule() {
-  const { selfId, hours, leave, loading, error, reload, addHours, addLeave } = useMySchedule();
+  const { selfId, hours, leave, loading, error, reload, addHours, updateHours, deleteHours, addLeave } = useMySchedule();
   const canEdit = can("queue:edit");
+  // DOC-R7: a doctor may always write their OWN hours (others' need setup:edit); this page only shows
+  // the signed-in user's hours, so the hours controls need no grant. Leave still needs queue:edit.
+  const [editing, setEditing] = useState<WorkingHours | null>(null);
+  const [removing, setRemoving] = useState<WorkingHours | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  async function confirmRemove() {
+    if (!removing) return;
+    setRemoveBusy(true);
+    setRemoveError(null);
+    const err = await deleteHours(removing.id);
+    setRemoveBusy(false);
+    if (err) setRemoveError(err); else setRemoving(null);
+  }
   const [mode, setMode] = useState<"week" | "day">("week");
   const [anchor, setAnchor] = useState(() => isoDate(new Date()));
   const [dialog, setDialog] = useState<"hours" | "leave" | null>(null);
@@ -133,12 +157,8 @@ export default function MySchedule() {
           <p className={styles.subtitle}>Your weekly hours and leave</p>
         </div>
         <div className={styles.actions}>
-          {canEdit && (
-            <>
-              <button type="button" className={styles.btn} onClick={() => setDialog("hours")}><Icon name="plus" size={14} /> Add working hours</button>
-              <button type="button" className={styles.btnPrimary} onClick={() => setDialog("leave")}><Icon name="calendar" size={14} /> Apply leave</button>
-            </>
-          )}
+          <button type="button" className={styles.btn} onClick={() => setDialog("hours")}><Icon name="plus" size={14} /> Add working hours</button>
+          {canEdit && <button type="button" className={styles.btnPrimary} onClick={() => setDialog("leave")}><Icon name="calendar" size={14} /> Apply leave</button>}
           <button type="button" className={styles.btn} onClick={() => void reload()} aria-label="Refresh My Schedule"><Icon name="refresh" size={14} /> Refresh</button>
         </div>
       </header>
@@ -164,9 +184,10 @@ export default function MySchedule() {
               </h2>
               {hours.length === 0 && mode === "week" ? (
                 <EmptyState icon="clock" title="No working hours set yet."
-                  hint={canEdit ? "Add working hours so patients can be booked with you." : "Ask the clinic manager to set your working hours."} />
+                  hint="Add working hours so patients can be booked with you." />
               ) : mode === "week" ? (
-                <WeekView start={parseIso(anchor)} hours={hours} leave={leave} onPickDay={(iso) => { setAnchor(iso); setMode("day"); }} />
+                <WeekView start={parseIso(anchor)} hours={hours} leave={leave} onPickDay={(iso) => { setAnchor(iso); setMode("day"); }}
+                  onEdit={setEditing} onDelete={(h) => { setRemoveError(null); setRemoving(h); }} />
               ) : (
                 <DayView date={anchor} selfId={selfId} hours={hours} leave={leave} />
               )}
@@ -200,7 +221,13 @@ export default function MySchedule() {
           </div>
         )}
 
-      {dialog === "hours" && canEdit && <WorkingHoursDialog existing={hours} onClose={() => setDialog(null)} onSave={addHours} />}
+      {dialog === "hours" && <WorkingHoursDialog existing={hours} onClose={() => setDialog(null)} onSave={addHours} />}
+      {editing && <WorkingHoursDialog key={editing.id} existing={hours} editing={editing} onClose={() => setEditing(null)} onSave={(i) => updateHours(editing.id, i)} />}
+      {removing && (
+        <ConfirmDialog title="Delete working hours" confirmLabel="Delete" busy={removeBusy} error={removeError}
+          message={`Remove your ${WEEKDAYS[removing.dayOfWeek]} block ${hhmm(removing.startTime)}–${hhmm(removing.endTime)} from every week? New bookings will no longer open in it.`}
+          onConfirm={() => void confirmRemove()} onClose={() => setRemoving(null)} />
+      )}
       {dialog === "leave" && canEdit && <LeaveDialog onClose={() => setDialog(null)} onSave={addLeave} />}
     </main>
   );

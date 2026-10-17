@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../../login/login.module.css";
+import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
 
 // Matches POST /v1/owners/auth/login (OwnerController) — a separate top-level identity from any
 // one clinic's staff login (NB-350): this PIN is the owner's own, not tied to a tenant slug, and
@@ -19,20 +20,22 @@ export default function OwnerLoginPage() {
   const [pin, setPin] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
   // 423 from the server (OwnerService lockout): the wireframe's "blocked" step, with Start over.
   const [blocked, setBlocked] = useState<string | null>(null);
 
-  async function submit(e: FormEvent) {
-    e.preventDefault();
+  async function submit(e?: FormEvent) {
+    e?.preventDefault();
     setFormError(null);
+    setTimedOut(false);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/owners/auth/login`, {
+      const res = await loginFetch(`${API_BASE}/owners/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, pin }),
-        signal: AbortSignal.timeout(15_000),
-      });
+      }, () => setSlow(true));
       if (res.status === 429) {
         setFormError("Too many attempts. Wait a minute before trying again.");
         return;
@@ -53,10 +56,10 @@ export default function OwnerLoginPage() {
       sessionStorage.setItem("nabd_owner_pending_token", pair.pendingToken);
       router.replace("/owner/workspaces");
     } catch (err) {
-      setFormError(err instanceof DOMException && err.name === "TimeoutError"
-        ? "The server took too long to answer. Try again."
-        : "Couldn't reach the server. Check your connection and try again.");
+      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
+      else setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
+      setSlow(false);
       setLoading(false);
     }
   }
@@ -76,6 +79,8 @@ export default function OwnerLoginPage() {
         ) : (
         <form onSubmit={submit} noValidate>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
+          {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
+          {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submit()}>Retry</button>}
           <div className={styles.field}>
             <label className={styles.label} htmlFor="email">Email</label>
             <input
