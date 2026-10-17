@@ -965,7 +965,7 @@ function ArrivalsPageInner() {
           {railRow.priority && railRow.priorityReason && <p className={styles.railNote}>Priority reason: {railRow.priorityReason}</p>}
           <dl className={styles.railList}>
             <div><dt>MRN</dt><dd>{railRow.patientMrn || "—"}</dd></div>
-            <div><dt>Visit</dt><dd>{VISIT_LABEL[railRow.source] ?? railRow.source}</dd></div>
+            <div><dt>Visit</dt><dd>{(railRow.visitType && VISIT_TYPE_LABEL[railRow.visitType]) || (VISIT_LABEL[railRow.source] ?? railRow.source)}</dd></div>
             <div><dt>Doctor</dt><dd>{staff.find((s) => s.id === railRow.doctorId)?.name ?? "—"}</dd></div>
             <div><dt>Waiting</dt><dd>{bucketOf(railRow.status) === "waiting" || bucketOf(railRow.status) === "in_consult" ? `${waitMinutes(railRow.createdAt)} min` : "—"}</dd></div>
             <div><dt>Arrived</dt><dd>{new Date(railRow.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</dd></div>
