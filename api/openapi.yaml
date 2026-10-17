@@ -32,6 +32,7 @@ tags:
   - name: Nursing
   - name: Reports
   - name: Platform
+  - name: Packages
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -2057,6 +2058,37 @@ paths:
                         handledCount: { type: integer, format: int64, description: "Distinct visits: completed as doctor plus billed by this staff member" }
                         discountCount: { type: integer, format: int64, description: "Invoices raised with a discount" }
                         overrideCount: { type: integer, format: int64, description: "Prescription safety overrides/acknowledgements from audit_log" }
+  # ------------------------------------------------- Packages: instances (DOC-R6; rest of E14 documented in code)
+  /packages/instances:
+    get:
+      tags: [Packages]
+      summary: Sold package instances for the caller's tenant, newest first. Optional patientId filters server-side (tenant-scoped; another tenant's patient id returns []). Absent = every instance in the tenant.
+      x-required-permission: packages:view
+      parameters:
+        - { name: patientId, in: query, required: false, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Package instances (InstanceResponse, without per-item lines)", content: { application/json: { schema: { type: array, items: { type: object } } } } }
+        "403": { description: "Forbidden: no packages:view" }
+  # ------------------------------------------------- Platform console: fleet summary (LIVE-07)
+  /platform/tenants/summary:
+    get:
+      tags: [Platform]
+      summary: Fleet KPI counts. live = tenants with status 'active' (trialing excluded); trialing counted separately; byStatus has every status.
+      x-required-permission: clinics_fleet:view
+      responses:
+        "200":
+          description: Fleet summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer, description: "Every tenant, any status" }
+                  live: { type: integer, description: "Tenants whose status is 'active'" }
+                  trialing: { type: integer, description: "Tenants whose status is 'trialing'" }
+                  byStatus: { type: object, additionalProperties: { type: integer } }
+                  regions: { type: array, items: { type: string } }
+        "403": { description: "Forbidden: no clinics_fleet:view (sre)" }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:
@@ -3300,7 +3332,7 @@ components:
     SubscriptionSummary:
       type: object
       properties:
-        plan: { type: string }
+        plan: { type: [string, "null"], description: "Name of the platform plan record (master.plans.name) of this tenant's subscription — the same name the platform console shows. null when no subscription has been started yet." }
         status: { type: string }
         activePatientsUsed: { type: integer }
         activePatientsLimit: { type: integer }
