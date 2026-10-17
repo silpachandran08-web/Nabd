@@ -146,14 +146,14 @@ class DepartmentRepository {
                         "WHERE t.tenant_id = ? AND t.from_department_id = ? AND d.active = true ORDER BY d.display_order, d.name",
                 mapper(), tenantId, fromDepartmentId);
         return targets.stream()
-                .map(d -> new TransferTargetRow(d.id(), d.name(), listDoctorsInDepartment(tenantId, d.id())))
+                .map(d -> new TransferTargetRow(d.id(), d.name(), listDoctorsInDepartment(tenantId, d.id(), d.name())))
                 .toList();
     }
 
-    private List<StaffRosterEntry> listDoctorsInDepartment(UUID tenantId, UUID departmentId) {
+    private List<StaffRosterEntry> listDoctorsInDepartment(UUID tenantId, UUID departmentId, String departmentName) {
         return jdbc.query("SELECT s.id, s.name FROM staff s JOIN roles r ON r.id = s.role_id " +
                         "WHERE s.tenant_id = ? AND s.department_id = ? AND s.status = 'active' AND r.name ILIKE 'doctor' ORDER BY s.name",
-                (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name")),
+                (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name"), departmentName),
                 tenantId, departmentId);
     }
 

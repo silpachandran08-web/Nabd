@@ -68,9 +68,11 @@ class StaffRepository {
      * caller (Arrivals' check-in picker, Packages' "Allowed doctors") wants a doctor list, never
      * the whole staff directory. */
     List<StaffRosterEntry> listRoster(UUID tenantId) {
-        return jdbc.query("SELECT s.id, s.name FROM staff s JOIN roles r ON r.id = s.role_id " +
+        return jdbc.query("SELECT s.id, s.name, d.name AS department_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+                        "LEFT JOIN departments d ON d.id = s.department_id " +
                         "WHERE s.tenant_id = ? AND s.status = 'active' AND r.name ILIKE 'doctor' ORDER BY s.name",
-                (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name")),
+                (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name"),
+                        rs.getString("department_name")),
                 tenantId);
     }
 

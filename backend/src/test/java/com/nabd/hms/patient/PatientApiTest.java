@@ -259,6 +259,32 @@ class PatientApiTest extends ApiTestBase {
     }
 
     /** NB-074: lastVisitAt is real now — derived from a queue entry that actually reached 'completed'. */
+    /** LIVE-03: the drawer (GET /patients/{id}.lastVisit) and the registry row (lastVisit) use one
+     * definition — latest non-no-show queue_date — so a visit still in progress shows in both. */
+    @Test
+    void detailLastVisitMatchesTheRegistryDefinition() {
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff doc = seedStaff(tenant, roleId, "doc-live03@a.com", "+919300000031", false);
+        String token = loginAndGetAccessToken(doc);
+        exchange("/v1/doctors/" + doc.id() + "/working-hours", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "dayOfWeek", java.time.LocalDate.now(java.time.ZoneOffset.UTC).getDayOfWeek().getValue() % 7,
+                "startTime", "00:00:00", "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
+        String patientId = registerPatient(token, "Live Three", "+919888800031");
+        assertThat(exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody())
+                .doesNotContainKey("lastVisit");
+
+        exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "doctorId", doc.id().toString())), Map.class);
+
+        Map<String, Object> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody();
+        Map<String, Object> registryRow = ((List<Map<String, Object>>) exchange("/v1/patients/registry", HttpMethod.GET,
+                authed(token), Map.class).getBody().get("rows")).stream()
+                .filter(r -> patientId.equals(r.get("id"))).findFirst().orElseThrow();
+        assertThat(registryRow.get("lastVisit")).isNotNull();
+        assertThat(detail.get("lastVisit")).isEqualTo(registryRow.get("lastVisit"));
+    }
+
     @Test
     void getReflectsLastVisitAtFromACompletedQueueVisit() {
         SeededTenant tenant = seedTenant();
