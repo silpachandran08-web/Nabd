@@ -98,12 +98,12 @@
     ".hs-eta.info{background:var(--info-t);color:var(--info);border-color:" + mix("--info", 45) + "}",
     /* modality schedule */
     ".hs-sch{overflow-x:auto;border:1px solid var(--b-sub);border-radius:var(--r-lg);background:var(--s1)}",
-    ".hs-schin{min-width:980px;padding:12px 14px 14px}",
+    ".hs-schin{min-width:1060px;padding:12px 14px 14px}",
     ".hs-schr{display:grid;grid-template-columns:160px minmax(0,1fr);gap:10px;align-items:stretch}.hs-schr+.hs-schr{margin-top:8px}",
     ".hs-schl{display:flex;flex-direction:column;justify-content:center;font-size:13px;font-weight:600;min-width:0;line-height:17px}.hs-schl small{color:var(--tx3);font-weight:400;font-size:11px;line-height:14px}",
     ".hs-hrs{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));font:600 10.5px/14px var(--font);color:var(--tx3);font-variant-numeric:tabular-nums}",
     ".hs-hrs span{border-inline-start:1px solid var(--b-def);padding-inline-start:4px}",
-    ".hs-lane{position:relative;display:grid;grid-template-columns:repeat(24,minmax(0,1fr));min-height:58px;border-radius:var(--r-md);background-color:var(--sunk);background-image:linear-gradient(90deg,var(--div) 1px,transparent 1px);background-size:calc(100% / 12) 100%}",
+    ".hs-lane{position:relative;display:grid;grid-template-columns:repeat(72,minmax(0,1fr));min-height:58px;border-radius:var(--r-md);background-color:var(--sunk);background-image:linear-gradient(90deg,var(--div) 1px,transparent 1px);background-size:calc(100% / 12) 100%}",
     "[dir=rtl] .hs-lane{background-image:linear-gradient(270deg,var(--div) 1px,transparent 1px)}",
     ".hs-slot{grid-row:1;margin:4px 2px;border-radius:10px;border:1px solid var(--b-def);background:var(--s2);padding:5px 8px;text-align:start;cursor:pointer;min-width:0;overflow:hidden;font:inherit;color:var(--tx);display:flex;flex-direction:column;gap:1px}",
     ".hs-slot b{font-size:12px;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}.hs-slot small{font-size:10.5px;line-height:13px;color:var(--tx3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
@@ -119,9 +119,8 @@
     /* reporting + PACS */
     ".hs-rep{display:grid;grid-template-columns:270px minmax(0,1fr);gap:20px;align-items:start}",
     ".frame.tablet .hs-rep,.frame.mobile .hs-rep{grid-template-columns:minmax(0,1fr)}",
-    ".hs-rv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}",
+    ".hs-rv{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}",
     ".frame.tablet .hs-rv,.frame.mobile .hs-rv{grid-template-columns:minmax(0,1fr)}",
-    "@media (max-width:1360px){.hs-rv{grid-template-columns:minmax(0,1fr)}}",
     ".hs-pacs{background:var(--sunk);border:1px solid var(--b-def);border-radius:var(--r-lg);overflow:hidden;color:var(--tx3);display:flex;flex-direction:column;min-width:0}",
     ".hs-pacs svg{display:block;width:100%;height:auto}",
     ".hs-pacs .ln{fill:none;stroke:var(--b-str);stroke-width:1.5}.hs-pacs .ln2{fill:none;stroke:var(--tx4);stroke-width:1.5;stroke-dasharray:4 5}",
@@ -154,7 +153,7 @@
     ".hs-colh{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;line-height:18px}.hs-colh .fl{min-width:0}",
     ".hs-colh .ico{color:var(--acc)}",
     ".hs-set{background:var(--s2);border:1px solid var(--b-sub);border-radius:var(--r-md);padding:10px;display:flex;flex-direction:column;gap:4px;min-width:0}",
-    ".hs-set b{font-size:13px;font-weight:600;line-height:17px}.hs-set small{font-size:11.5px;line-height:15px;color:var(--tx3)}",
+    ".hs-set b{font-size:13px;font-weight:600;line-height:17px;white-space:nowrap}.hs-set small{font-size:11.5px;line-height:15px;color:var(--tx3)}",
     ".hs-set.q{border-color:" + mix("--crit", 50) + ";background:var(--crit-t)}",
     /* flow (PR to PO to GRN) */
     ".hs-flow{display:flex;align-items:center;gap:4px;flex-wrap:wrap}",
@@ -186,7 +185,7 @@
     ".hs-cov{display:inline-flex;align-items:center;gap:3px;font-variant-numeric:tabular-nums;white-space:nowrap}.hs-cov .ico{width:12px;height:12px}",
     ".hs-cov.gap{color:var(--crit)}.hs-cov.ok{color:var(--ok)}",
     /* map placeholder */
-    ".hs-map{border-radius:var(--r-lg);border:1px solid var(--b-def);background:var(--sunk);overflow:hidden;color:var(--tx3);position:relative}",
+    ".hs-map{align-self:start;border-radius:var(--r-lg);border:1px solid var(--b-def);background:var(--sunk);overflow:hidden;color:var(--tx3);position:relative}",
     ".hs-map svg{display:block;width:100%;height:auto}",
     ".hs-map .rd{fill:none;stroke:var(--b-str);stroke-width:7;stroke-linecap:round}.hs-map .rd2{fill:none;stroke:var(--b-def);stroke-width:3;stroke-linecap:round}",
     ".hs-map .blk{fill:var(--s1);stroke:var(--b-sub)}.hs-map .hos{fill:var(--acc-tint2);stroke:var(--acc);stroke-width:1.5}",
@@ -232,7 +231,6 @@
   }
   NB.act("hsck", function (a) { var p = String(a).split("|"), o = {}; o[p[0]] = !NB.v(p[0], p[1] === "1"); NB.setUI(o); });
   NB.act("hsgo", function (a) { var p = String(a).split("|"); if (p[1]) NB.state.ui[p[1]] = p[2]; var r = p[0].split("."); NB.go(r[0], r[1]); });
-  NB.act("hsset", function (a) { var p = String(a).split("|"), o = {}; o[p[0]] = p[1]; NB.state.overlay = p[2] === "keep" ? NB.state.overlay : NB.state.overlay; NB.setUI(o); });
   NB.act("hsdone", function (a) { var p = String(a).split("|"), m = Object.assign({}, NB.v("hsDone", {})); m[p[0]] = p[2] || true; NB.state.ui.hsDone = m; if (p[3] !== "keep") NB.state.overlay = null; NB.toast(p[1] || "Done"); });
   function isDone(k) { return NB.v("hsDone", {})[k]; }
 
@@ -270,7 +268,7 @@
       bayNote: { A3: ["clean", "Cleaning · ready 10:30"], A5: ["pre", "Pre-allocated · AMB 108 child, ETA 14 min"], O3: ["pre", "Pre-allocated · transfer-in chest pain, ETA 25 min"] },
       pts: [
         { id: "E1", name: "Unknown male (Trauma 0417)", age: "~30", sex: "M", esi: 1, bay: "R1", arr: "10:06", mode: "Ambulance · 108", cc: "Road traffic collision, motorcycle · GCS 9, hypotensive", doc: "Dr. Sameer Kulkarni", nurse: "Sr. Rekha Pillai",
-          pend: [["FAST ultrasound", "image", "done"], ["CT trauma series", "image"], ["Crossmatch 4 PRBC + 4 FFP", "heartpulse"], ["ABG", "flask", "done"]], mlc: "MLC-2026-0417", path: "Massive transfusion protocol", disp: null,
+          pend: [["FAST ultrasound", "image", "done"], ["CT trauma series", "image"], ["Crossmatch 4 PRBC + 4 FFP", "heartpulse"], ["ABG", "flask", "done"]], mlc: "MLC-2026-0417", path: "MTP · massive transfusion protocol", disp: null,
           vit: { hr: 128, sbp: 86, dbp: 52, rr: 26, spo2: 92, t: 36.1, gcs: 9, pain: "—" }, allergy: null, temp: true },
         { id: "E2", pid: "p3", age: 58, sex: "M", esi: 2, bay: "R2", arr: "09:58", mode: "Walk-in", cc: "Central chest pain 40 min, sweating · ST elevation V1–V4", doc: "Dr. Khalid Al-Saeed", nurse: "Br. Joel Mathew",
           pend: [["Troponin I (hs)", "flask"], ["Cath lab ready", "heartpulse"], ["ECG 12-lead", "activity", "done"]], path: "STEMI · door-to-balloon", disp: ["admit", "Cath lab → CCU"],
@@ -324,7 +322,7 @@
             ["Thrombolysis bolus", null, 60, "Due by 11:02"]] },
         { id: "sepsis", pt: "E4", t: ["Sepsis hour-1 bundle", "حزمة الإنتان", "सेप्सिस बंडल"], door: "09:40", target: 60, tLbl: "Time zero = triage 09:40 · bundle due 10:40 (Surviving Sepsis Campaign)", icon: "thermo",
           steps: [["Lactate measured", "09:52", 60, "3.6 mmol/L"], ["Blood cultures before antibiotics", "09:55", 60, "2 sets, 2 sites"], ["Broad-spectrum antibiotics", "10:12", 60, "Piperacillin-tazobactam 4.5 g IV · no penicillin allergy"],
-            ["30 mL/kg crystalloid (hypotension or lactate ≥ 4)", null, 60, "1,200 of 1,800 mL running"], ["Vasopressor if MAP < 65 after fluids", null, 60, "MAP 69 now · reassess at 10:40"], ["Repeat lactate if first > 2", null, 252, "Due 11:52"]] }
+            ["30 mL/kg crystalloid (hypotension or lactate ≥ 4)", null, 60, "1,200 of 1,800 mL running"], ["Vasopressor if MAP < 65 after fluids", null, 60, "MAP 69 now · reassess at 10:40"], ["Repeat lactate if first > 2", null, 132, "2 h after the first lactate"]] }
       ],
       amb: [
         { id: "AMB-07", src: "own", kind: "ALS", eta: 6, crew: "Paramedic Suresh B. · EMT Kiran V. · driver Mahesh", call: "Motorcycle vs truck, NH-75 · 1 adult", bay: "A2",
@@ -333,7 +331,7 @@
         { id: "108-KA-4412", src: "ems", kind: "BLS", eta: 14, crew: "State EMS crew", call: "8-year-old girl, febrile seizure at home", bay: "A5",
           atm: [["A", "Female, 8 years · mother with her"], ["T", "Seizure 09:58, lasted 4 min"], ["M", "Fever 2 days"], ["I", "Post-ictal, no injury"], ["S", "GCS 13 improving, HR 128, T 39.4 °C, SpO₂ 97% air, glucose 6.1"], ["T", "Recovery position, paracetamol not given"]],
           vit: [["10:12", 128, "100/62", 26, 97, 13]], team: "Paediatrics" },
-        { id: "TRF-0921", src: "transfer", kind: "ALS", eta: 25, crew: "Suvidha clinic transfer · nurse escort", call: "Inter-facility transfer: 61 M, chest pain, ECG ST depression", bay: "O3",
+        { id: "TRF-0921", src: "transfer", kind: "ALS", eta: 25, crew: "Polyclinic transfer · nurse escort", call: "Inter-facility transfer: 61 M, chest pain, ECG ST depression", bay: "O3",
           atm: [["A", "Male, 61 years · diabetic"], ["T", "Pain since 08:30"], ["M", "Referred from OPD after ECG"], ["I", "ST depression V4–V6 (ECG shared in Nabd)"], ["S", "HR 92, BP 142/88, SpO₂ 97%, pain 4/10"], ["T", "Aspirin 300 mg given 09:40, GTN spray"]],
           vit: [["09:50", 92, "142/88", 18, 97, 15]], team: "Cardiology" }
       ],
@@ -506,8 +504,8 @@
       ],
       need: { er: [2, 2, 2], icu: [1, 1, 1], wa: [1, 1, 1] },
       swaps: [
-        { id: "SW-41", a: "Br. Joel Mathew", b: "Sr. Teena M.", give: "Sun 18 · Morning", take: "Sat 17 · Night", reason: "Family function", ok: false, rule: "Sr. Teena would work Sat Evening then Sat Night: 16 h continuous (limit 12 h)" },
-        { id: "SW-40", a: "Sr. Divya K.", b: "Br. Akash P.", give: "Sun 18 · Evening", take: "Mon 19 · Morning", reason: "Exam", ok: true, rule: "Rest ≥ 11 h, skill mix and weekly hours all pass" }
+        { id: "SW-41", a: "Sr. Rekha Pillai", b: "Sr. Teena M.", give: "Sun 18 · Evening", take: "Mon 19 · Morning", reason: "Family function", ok: false, rule: "Sr. Teena would work Sun Morning then Sun Evening: 16 h continuous (limit 12 h)" },
+        { id: "SW-40", a: "Sr. Divya K.", b: "Br. Akash P.", give: "Sun 18 · Evening", take: "Tue 20 · Morning", reason: "Exam", ok: true, rule: "Rest ≥ 11 h, skill mix and weekly hours all pass" }
       ],
       leave: [["Sr. Anjali Rao", "Sun 18 – Tue 20", "Annual leave", "approved"], ["Br. Rahul T.", "Wed 21", "Sick leave (certificate)", "approved"], ["Sr. Lissy A.", "26 – 30 Oct", "Annual leave", "pending"]],
       oncall: [["Emergency medicine", "Dr. Sameer Kulkarni", "In house until 20:00", "2201"], ["Cardiology (cath lab)", "Dr. Khalid Al-Saeed", "On call from home · 20 min", "2240"], ["Neurology (stroke)", "Dr. Arjun Hegde", "On call · tele-stroke", "2255"],
@@ -517,8 +515,8 @@
       units: [
         { id: "AMB-07", kind: "ALS", st: "transport", where: "NH-75 near Hoodi junction → ER", crew: "Paramedic Suresh B., EMT Kiran V., driver Mahesh", o2: 70, fuel: 55, x: 300, y: 110 },
         { id: "AMB-03", kind: "ALS", st: "scene", where: "Brookefield, 2.8 km · fall from height", crew: "Paramedic Nisha R., EMT Ajay, driver Prakash", o2: 85, fuel: 62, x: 120, y: 200 },
-        { id: "AMB-02", kind: "BLS", st: "available", where: "Hospital base, bay 2", crew: "EMT Rafiq, driver Sunil", o2: 100, fuel: 90, x: 236, y: 152 },
-        { id: "AMB-06", kind: "Neonatal", st: "available", where: "Hospital base, bay 3", crew: "NICU nurse on call, driver Vasu", o2: 95, fuel: 80, x: 248, y: 162 },
+        { id: "AMB-02", kind: "BLS", st: "available", where: "Hospital base, bay 2", crew: "EMT Rafiq, driver Sunil", o2: 100, fuel: 90, x: 210, y: 142 },
+        { id: "AMB-06", kind: "Neonatal", st: "available", where: "Hospital base, bay 3", crew: "NICU nurse on call, driver Vasu", o2: 95, fuel: 80, x: 258, y: 142 },
         { id: "AMB-04", kind: "PTS", st: "transfer", where: "To Suvidha Clinic, Koramangala · discharge drop", crew: "Driver Anand, attendant", o2: 60, fuel: 40, x: 420, y: 230 },
         { id: "AMB-05", kind: "ALS", st: "maint", where: "Workshop · O₂ regulator & AC", crew: "—", o2: 0, fuel: 30, x: 60, y: 70 }
       ],
@@ -593,7 +591,7 @@
     var dispo = ui.card(L("Disposition & flow", "القرار والتدفق", "निर्णय और प्रवाह"), '<div class="lst">' +
       ["admit", "discharge", "transfer", "lama"].map(function (k) {
         var list = E.pts.filter(function (p) { var d = erDisp(p); return d && d[0] === k; });
-        return ui.li(dispPill([k]), list.length + " " + L("patients", "مرضى", "मरीज़"), esc(list.map(function (p) { return p.bay + " " + pnm(p).split(" (")[0]; }).join(" · ") || "—"), "");
+        return ui.li(dispPill([k]), list.length + " " + (list.length === 1 ? L("patient", "مريض", "मरीज़") : L("patients", "مرضى", "मरीज़")), esc(list.map(function (p) { return p.bay + " " + pnm(p).split(" (")[0]; }).join(" · ") || "—"), "");
       }).join("") + ui.li(dispPill(null), E.pts.filter(function (p) { return !erDisp(p); }).length + " " + L("patients", "مرضى", "मरीज़"), L("Work-up in progress", "التقييم جارٍ", "जाँच जारी"), "") +
       "</div>" + '<div class="small faint" style="margin-top:8px">' + L("Today: 41 seen · 11 admitted (27%) · 1 left without being seen · 1 LAMA", "اليوم: ٤١ مريضًا", "आज: 41 मरीज़ देखे") + "</div>", { icon: "logout" });
     return h + '<div class="grid g2">' + wt + dispo + "</div>";
@@ -603,7 +601,7 @@
   NB.overlay("erpatient", function (id) {
     var p = erPt(id); if (!p) return { title: id, body: "" };
     var po = pobj(p), t = since(p.arr), dsel = NB.v("hsDsel_" + id, (erDisp(p) || ["admit"])[0]);
-    var body = '<div class="row nw">' + ui.av(pnm(p), "lg") + '<div class="fl"><h2 class="h" dir="auto">' + esc(pnm(p)) + '</h2><div class="small muted">' + esc(p.age + " " + p.sex) + " · " + (po.mrn ? esc(po.mrn) : L("Temporary ER ID", "معرّف طوارئ مؤقت", "अस्थायी ईआर आईडी") + " ER-0417") + " · " + L("Bay", "السرير", "बे") + " " + n(p.bay) + " · " + esc(p.mode) + "</div></div>" + esiPill(p.esi) + "</div>";
+    var body = '<div class="row nw">' + ui.av(pnm(p), "lg") + '<div class="fl"><h2 class="h" dir="auto">' + esc(pnm(p)) + '</h2><div class="small muted">' + esc(p.age + " " + p.sex) + " · " + (po.mrn ? esc(po.mrn) : p.temp ? L("Temporary ER ID", "معرّف طوارئ مؤقت", "अस्थायी ईआर आईडी") + " ER-0417" : "ER no. ER-26-" + (1180 + parseInt(p.id.slice(1), 10))) + " · " + L("Bay", "السرير", "बे") + " " + n(p.bay) + " · " + esc(p.mode) + "</div></div>" + esiPill(p.esi) + "</div>";
     if (p.allergy) body += ui.note("crit", "<b>" + L("Allergy", "حساسية", "एलर्जी") + ":</b> " + esc(p.allergy));
     if (p.temp) body += ui.note("warn", "Unidentified patient: temporary ID and wristband issued. Merge to the real record when identified (police and family informed).");
     if (p.mlc) body += ui.note("info", "<b>" + esc(R().mlc) + " " + esc(p.mlc) + "</b> · " + esc(R().police) + ". " + '<a href="#" data-act="hsgo" data-arg="er.mlc|hsMlc|' + p.mlc + '">' + L("Open register", "فتح السجل", "रजिस्टर खोलें") + "</a>");
@@ -669,7 +667,7 @@
     var who = ui.card("", '<div class="row nw">' + ui.av(nm, "lg") + '<div class="fl"><h2 class="h" dir="auto">' + esc(nm) + ' <span class="small muted">' + cs.age + " " + cs.sex + '</span></h2><div class="small muted" dir="auto">' + esc(cs.cc) + '</div><div class="small faint">' + L("Arrived", "الوصول", "आगमन") + " " + n(cs.arr) + " · " + esc(cs.mode) + " · " + L("waiting", "ينتظر", "प्रतीक्षा") + " " + n(dur(since(cs.arr))) + "</div></div></div>" +
       (cs.pid && NB.pat(cs.pid).allergies && NB.pat(cs.pid).allergies.length ? ui.note("crit", "<b>Allergy on record:</b> " + esc(NB.pat(cs.pid).allergies.map(function (a) { return a.a + " (" + a.rx + ")"; }).join(", "))) : ""));
     var vit = ui.card(L("Vitals", "العلامات الحيوية", "वाइटल्स"), '<div class="hs-vit">' + [
-      ["HR", v.hr, "/min", v.hr > 100], ["BP", v.sbp + "/" + v.dbp, "mmHg", v.sbp <= 100], ["RR", v.rr, "/min", v.rr > 20], ["SpO₂", v.spo2 + "%", "room air", v.spo2 < 92],
+      ["HR", v.hr, "/min", v.hr > 100], ["BP", v.sbp + "/" + v.dbp, "mmHg", v.sbp <= 100 || v.sbp >= 180], ["RR", v.rr, "/min", v.rr > 20], ["SpO₂", v.spo2 + "%", "room air", v.spo2 < 92],
       ["Temp", v.t.toFixed(1), "°C", v.t >= 38.3], ["GCS", v.gcs, "/15", v.gcs < 15], ["Pain", v.pain + "/10", "", v.pain >= 7], ["Glucose", v.glu, "mmol/L", v.glu < 4 || v.glu > 15]
     ].map(function (x) { return '<div class="hs-v' + (x[3] ? " dz" : "") + '"><label>' + x[0] + '</label><b class="ltr">' + x[1] + "</b><small>" + (x[3] ? ui.icon("alertcircle", "xs") + " " + L("Abnormal", "غير طبيعي", "असामान्य") : esc(x[2])) + "</small></div>"; }).join("") + "</div>" +
       '<div class="small faint" style="margin-top:10px">' + ui.icon("bolt", "xs") + " Captured from the bedside monitor at 10:19 · edit if manual</div>", { icon: "heartpulse" });
@@ -691,7 +689,7 @@
       ["", "Immediate: resuscitation bay, physician at bedside now", "Within 10 min: acute bay, physician alerted", "Within 30 min: acute bay", "Within 60 min: fast track", "Within 120 min: fast track or OPD referral"][r.lvl] + "</small></div></div>" +
       '<div class="hs-ck" style="margin-top:8px">' + r.trail.map(function (x) { return stRow(x[2].indexOf("yes") === 0 ? "warn" : "mute", "<span class=\"ltr\">" + x[0] + "</span> · " + x[1], esc(x[2])); }).join("") + "</div>" +
       (r.dz.length ? ui.note("warn", "<b>Danger-zone vitals:</b> " + esc(r.dz.join(", ")) + ".") : "") +
-      '<div class="fgrid" style="margin-top:12px">' + ui.field(L("Assign bay", "تخصيص سرير", "बे असाइन करें"), r.lvl === 1 ? "R3 (after CT transfer)" : r.lvl === 2 ? "A3 (cleaning, 10:30)" : r.lvl === 3 ? "O4" : "F3", { id: "hs-tbay", options: ["R3 (after CT transfer)", "A3 (cleaning, 10:30)", "O4", "F3", "Waiting area (re-triage 30 min)"] }) +
+      '<div class="fgrid" style="margin-top:12px">' + ui.field(L("Assign bay", "تخصيص سرير", "बे असाइन करें"), r.lvl === 1 ? "R3" : r.lvl === 2 ? "A3 · 10:30" : r.lvl === 3 ? "O4" : "F3", { id: "hs-tbay", options: ["R3", "A3 · 10:30", "O4", "F3", "Waiting area"] }) +
       ui.field(L("Triage nurse", "ممرضة الفرز", "ट्राइएज नर्स"), "Sr. Teena M.", { id: "hs-tnur" }) + "</div>" +
       '<div class="btns" style="margin-top:12px">' + ui.btn(L("Save triage", "حفظ الفرز", "ट्राइएज सहेजें"), { cls: "pri", act: "toast", arg: "Triaged ESI " + r.lvl + " · bay assigned · ER doctor notified", icon: "check" }) + ui.btn(L("Re-triage", "إعادة الفرز", "पुनः ट्राइएज"), { cls: "ghost", act: "toast", arg: "Re-triage timer set for 30 min", icon: "clockh" }) + "</div>",
       { icon: "shieldcheck", cls: r.lvl <= 2 ? "crit" : "" });
@@ -715,14 +713,14 @@
         var k = "hsPs_" + pw.id + "_" + i, done = s[1] || NB.v(k, false), when = s[1] || (NB.v(k, false) ? hhmm(NOW) : null), due = d0 + s[2];
         if (done) doneN++;
         var tmCls = done ? "" : NOW > due ? "over" : due - NOW <= 10 ? "due" : "";
-        var right = '<span class="hs-tm ' + tmCls + '">' + (done ? n(when) + " · +" + (tm(when) - d0) + " min" : (NOW > due ? L("Overdue", "متأخر", "देर") + " " : L("Due", "مستحق", "देय") + " ") + n(hhmm(due))) + "</span>";
+        var right = '<span class="hs-tm ' + tmCls + '">' + (done ? n(when) + (tm(when) - d0 < 0 ? " · " + L("pre-arrival", "قبل الوصول", "आगमन से पहले") : " · +" + (tm(when) - d0) + " min") : (NOW > due ? L("Overdue", "متأخر", "देर") + " " : L("Due", "مستحق", "देय") + " ") + n(hhmm(due))) + "</span>";
         if (s[1]) return '<div class="hs-ci"><span class="hs-cb on">' + ui.icon("check") + '</span><div class="t"><b>' + esc(s[0]) + "</b>" + (s[3] ? "<small>" + esc(s[3]) + "</small>" : "") + "</div>" + right + "</div>";
         return ckRow(k, false, esc(s[0]), esc(s[3]), right);
       }).join("");
       var el = since(pw.door);
       return ui.card("", '<div class="hs-pw">' + pathClock(pw) + '<div class="fl"><div class="eyebrow">' + ui.icon(pw.icon, "sm") + L(pw.t[0], pw.t[1], pw.t[2]) + '</div><h2 class="h" dir="auto" style="margin-top:4px">' + esc(pnm(p)) + ' <span class="small muted">' + esc(p.age + " " + p.sex) + " · " + p.bay + "</span></h2>" +
         '<div class="small muted">' + L("Door", "الباب", "डोर") + " " + n(pw.door) + " · " + esc(pw.tLbl) + "</div>" +
-        '<div class="row" style="margin-top:8px">' + ui.bar(doneN / pw.steps.length * 100, el > pw.target ? "crit" : "") + '<span class="small muted">' + n(doneN + "/" + pw.steps.length) + " " + L("steps", "خطوات", "चरण") + "</span></div></div></div>" +
+        '<div class="row nw" style="margin-top:8px"><div class="fl">' + ui.bar(doneN / pw.steps.length * 100, el > pw.target ? "crit" : "") + '</div><span class="small muted">' + n(doneN + "/" + pw.steps.length) + " " + L("steps", "خطوات", "चरण") + "</span></div></div></div>" +
         '<div class="hs-ck" style="margin-top:12px">' + steps + "</div>" +
         '<div class="btns" style="margin-top:10px">' + ui.btn(L("Patient", "المريض", "मरीज़"), { cls: "sm", ov: "erpatient", arg: p.id, icon: "user" }) + ui.btn(L("Page team", "استدعاء الفريق", "टीम को पेज करें"), { cls: "sm", act: "toast", arg: "Team paged for " + pw.id.toUpperCase() + " pathway", icon: "bell" }) + "</div>", { cls: el > pw.target * 0.75 ? "warnb" : "" });
     });
@@ -743,7 +741,7 @@
       var vt = ui.table([{ h: "Time" }, { h: "HR", cls: "r" }, { h: "BP", cls: "r" }, { h: "RR", cls: "r" }, { h: "SpO₂", cls: "r" }, { h: "GCS", cls: "r" }], a.vit.map(function (v) {
         return [n(v[0]), '<span class="num' + (v[1] > 110 ? " critc" : "") + '">' + v[1] + "</span>", n(v[2]), '<span class="num' + (v[3] > 22 ? " warnc" : "") + '">' + v[3] + "</span>", '<span class="num' + (v[4] < 94 ? " warnc" : "") + '">' + v[4] + "%</span>", '<span class="num' + (v[5] < 13 ? " warnc" : "") + '">' + v[5] + "</span>"];
       }), { min: 380 });
-      return ui.card("", '<div class="row top nw"><div class="hs-eta' + (a.eta > 15 ? " info" : "") + '"><b class="ltr">' + a.eta + "</b><small>" + L("min ETA", "دقيقة", "मिनट") + '</small></div><div class="fl"><div class="row"><h2 class="h ltr">' + esc(a.id) + "</h2>" + srcP + ui.pill("mute", a.kind, "truck") + (ack ? ui.pill("ok", L("Acknowledged", "تم الاستلام", "स्वीकृत"), "checkcircle") : ui.pill("urg", L("New", "جديد", "नया"), "bell")) + "</div>" +
+      return ui.card("", '<div class="row nw" style="align-items:flex-start"><div class="hs-eta' + (a.eta > 15 ? " info" : "") + '"><b class="ltr">' + a.eta + "</b><small>" + L("min ETA", "دقيقة", "मिनट") + '</small></div><div class="fl"><div class="row"><h2 class="h ltr">' + esc(a.src === "ems" ? MV({ india: "108-KA-4412", uae: "DCAS-4412", ksa: "SRCA-4412", qatar: "HMC-4412" }) : a.id) + "</h2>" + srcP + ui.pill("mute", a.kind, "truck") + (ack ? ui.pill("ok", L("Acknowledged", "تم الاستلام", "स्वीकृत"), "checkcircle") : ui.pill("urg", L("New", "جديد", "नया"), "bell")) + "</div>" +
         '<div class="small muted" style="margin-top:4px" dir="auto">' + esc(a.call) + '</div><div class="small faint">' + ui.icon("users", "xs") + " " + esc(a.crew) + "</div></div></div>" +
         '<div class="grid g2" style="margin-top:14px"><div class="stack s8"><div class="eyebrow">ATMIST ' + L("handover", "التسليم", "हैंडओवर") + '</div><dl class="hs-atm">' + a.atm.map(function (x) { return "<dt class=\"ltr\">" + x[0] + "</dt><dd dir=\"auto\">" + esc(x[1]) + "</dd>"; }).join("") + "</dl></div>" +
         '<div class="stack s8"><div class="eyebrow">' + L("Crew vitals", "علامات الطاقم", "क्रू वाइटल्स") + "</div>" + vt + '<div class="eyebrow" style="margin-top:6px">' + L("Pre-allocate bay", "تخصيص سرير مسبق", "बे पूर्व-आवंटित करें") + "</div>" + ui.seg("hsAmbBay_" + a.id, bays.map(function (b) { return [b, b]; }), a.bay) + "</div></div>" +
@@ -762,7 +760,7 @@
       var p = m.er ? erPt(m.er) : null, nm = p ? pnm(p) : m.name;
       var pol = m.pol[0] === "done" || isDone("pol_" + m.no) ? ui.pill("ok", L("Informed", "تم الإبلاغ", "सूचित"), "checkcircle") : ui.pill("crit", L("Entry no. awaited", "بانتظار الرقم", "एंट्री नंबर बाक़ी"), "alertfill");
       var ct = CERT[isDone("cert_" + m.no) ? "issued" : m.cert];
-      return { cells: ['<span class="tok">' + m.no + "</span>", ui.cellp(esc(nm), esc((p ? p.age + " " + p.sex : m.age) + " · " + m.type)), esc(m.when), pol, ui.pill(ct[0], ct[1], ct[2]), m.custody.length ? n(m.custody.length) + " " + L("items", "عناصر", "आइटम") : '<span class="faint">—</span>'], ov: "mlcdetail", arg: m.no, cls: sel === m.no ? "sel" : "" };
+      return { cells: ['<span class="tok">' + m.no + "</span>", ui.cellp(esc(nm), esc((p ? p.age + " " + p.sex : m.age) + " · " + m.type)), esc(m.when), pol, ui.pill(ct[0], ct[1], ct[2]), m.custody.length ? n(m.custody.length) + " " + (m.custody.length === 1 ? L("item", "عنصر", "आइटम") : L("items", "عناصر", "आइटम")) : '<span class="faint">—</span>'], ov: "mlcdetail", arg: m.no, cls: sel === m.no ? "sel" : "" };
     });
     var h = ui.header(esc(R().mlc) + " " + L("register", "السجل", "रजिस्टर"), "Police intimation, consent, injury certificates and chain of custody in one place · every entry is time-stamped and tamper-evident",
       ui.btn(L("Print register", "طباعة السجل", "रजिस्टर प्रिंट"), { act: "toast", arg: "Register for October exported (PDF, signed)", icon: "printer" }) + ui.btn(L("New entry", "قيد جديد", "नई एंट्री"), { cls: "pri", act: "toast", arg: "New entry: pick the ER patient first", icon: "plus" }));
@@ -811,7 +809,7 @@
       var al = (p.allergies || []).filter(function (a) { return /contrast|iod|gado/i.test(a.a); });
       out.push(al.length ? ["crit", "Contrast allergy", "alertfill", al[0].a + " · premedication protocol"] : ["ok", "No contrast allergy", "checkcircle", "Allergy list checked" + ((p.allergies || []).length ? " (" + p.allergies.map(function (a) { return a.a; }).join(", ") + ": not contrast-related)" : "")]);
     }
-    if (o.preg === "pending") out.push(["warn", "Pregnancy check pending", "alertcircle", "Female of reproductive age: urine β-hCG before ionising radiation or contrast."]);
+    if (o.preg === "pending") out.push(["warn", "β-hCG pending", "alertcircle", "Female of reproductive age: urine β-hCG before ionising radiation or contrast."]);
     if (o.preg === "neg") out.push(["ok", "β-hCG negative", "checkcircle", "Checked today 08:30."]);
     if (o.preg === "pregnant") out.push(["info", "Pregnant · 14 wk", "baby", "Obstetric protocol."]);
     if (o.obst && R().pcpndt) { var f = isDone("pcp_" + o.id); out.push([f ? "ok" : "sub", "PCPNDT Form F", "scroll", f ? "Form F complete and signed" : "Form F required before the scan (India)"]); }
@@ -886,7 +884,7 @@
     var lanes = D.rad.sched.map(function (r) {
       var blocks = r[2].map(function (s) {
         var st0 = Math.max(T0, tm(s[0])), en = Math.min(T1, tm(s[0]) + s[1]); if (en <= st0) return "";
-        var col = (st0 - T0) / 15 + 1, span = Math.max(1, Math.round((en - st0) / 15));
+        var col = Math.round((st0 - T0) / 5) + 1, span = Math.max(1, Math.round((en - st0) / 5));
         var cls = s[2] === "done" ? "done" : s[2] === "live" ? "live" : s[2] === "down" ? "down" : "";
         return '<button class="hs-slot ' + cls + (s[5] ? " stat" : "") + '" style="grid-column:' + col + " / span " + span + '" ' + (s[2] === "down" ? "" : 'data-act="toast" data-arg="' + esc(s[3] + " · " + s[4] + " · " + s[0]) + '"') + ' title="' + esc(s[0] + " " + s[3] + " · " + s[4]) + '"><b>' + esc(s[2] === "down" ? s[3] : s[3]) + "</b><small>" + esc(s[2] === "down" ? "Downtime · " + s[0] : s[4]) + "</small></button>";
       }).join("");
@@ -905,7 +903,7 @@
 
   /* ---- radiology.report ---- */
   var TPL = {
-    ctstroke: { name: "CT brain stroke + CTA", prior: ["CT brain · 12 Mar 2025 · Suvidha Hospital", "Small chronic lacune in the right basal ganglia. No other abnormality."],
+    ctstroke: { name: "CT brain stroke + CTA", prior: ["CT brain · 12 Mar 2025 · group hospital", "Small chronic lacune in the right basal ganglia. No other abnormality."],
       f: [["Haemorrhage", "None"], ["Early ischaemic change", "Subtle loss of grey-white differentiation, left insula and lentiform nucleus"], ["ASPECTS", "8"], ["Hyperdense vessel", "Left MCA (M1)"],
         ["CT angiography", "Occlusion of the left M1 segment; moderate collaterals"], ["Carotids", "Less than 50% stenosis at both bifurcations"], ["Comparison", "Right basal ganglia lacune <span class=\"hs-hl\">unchanged</span> since 12 Mar 2025"],
         ["Impression", "Acute left MCA territory ischaemia with left M1 occlusion. No haemorrhage. Discussed with the stroke team for thrombolysis and thrombectomy."]], crit: true, kind: "ct" },
@@ -968,7 +966,7 @@
     h += '<div class="grid g4 kpis">' + ui.kpi(n(open.length), L("Open calls", "مكالمات مفتوحة", "खुली कॉल"), open.length ? "Escalates at 10:33" : "None", open.length ? "critc" : "okc") +
       ui.kpi(n("4 min"), L("Median time to communicate (Cat 1)", "متوسط زمن الإبلاغ", "संचार का औसत समय"), ui.icon("checkcircle", "xs") + " Target ≤ 30 min", "okc") + ui.kpi(n("100%"), L("Read-back documented", "التأكيد بالإعادة", "रीड-बैक दर्ज"), "Last 30 days, Cat 1", "okc") + ui.kpi(n(0), L("Escalations this week", "تصعيدات هذا الأسبوع", "इस सप्ताह एस्केलेशन"), "", "faint") + "</div>";
     h += open.map(function (x) {
-      return ui.card("", '<div class="row top"><div class="fl"><div class="row">' + ui.pill(CAT[x.cat][0], CAT[x.cat][1], CAT[x.cat][2]) + ui.pill("urg", L("Calling", "جارٍ الاتصال", "कॉल जारी") + " · " + dur(since(x.t)), "phone") + '</div><h2 class="h" style="margin-top:8px" dir="auto">' + esc(x.finding) + '</h2><div class="small muted">' + esc(pnm(x) + " · " + x.study + " · " + x.id + " · found " + x.t + " by " + x.by) + "</div></div></div>" +
+      return ui.card("", '<div class="fl"><div class="row">' + ui.pill(CAT[x.cat][0], CAT[x.cat][1], CAT[x.cat][2]) + ui.pill("urg", L("Calling", "جارٍ الاتصال", "कॉल जारी") + " · " + dur(since(x.t)), "phone") + '</div><h2 class="h" style="margin-top:8px" dir="auto">' + esc(x.finding) + '</h2><div class="small muted">' + esc(pnm(x) + " · " + x.study + " · " + x.id + " · found " + x.t + " by " + x.by) + "</div></div>" +
         '<div class="hs-ck" style="margin-top:10px">' + stRow("warn", "Call 1 · " + esc(x.to) + " · 10:18", "No answer · paged") + stRow("mute", "Call 2 due 10:23", "Then escalate to ER consultant in charge at 10:33") + "</div>" +
         '<div class="btns" style="margin-top:10px">' + ui.btn(L("Log call & read-back", "تسجيل المكالمة والتأكيد", "कॉल और रीड-बैक दर्ज"), { cls: "pri", ov: "critcall", arg: x.id, icon: "phone" }) + ui.btn(L("Escalate now", "تصعيد الآن", "अभी एस्केलेट"), { cls: "dng", act: "toast", arg: "Escalated to Dr. Sameer Kulkarni (ER consultant) · ext 2201", icon: "bell" }) + "</div>", { cls: "crit" });
     }).join("");
@@ -1013,8 +1011,8 @@
         return [grp(g)].concat(B.inv[g].map(function (u, i) { var cls = u === 0 ? "out" : u < mins[i] ? "low" : ""; return '<span class="hs-u ' + cls + '">' + (cls ? ui.icon(cls === "out" ? "alertfill" : "alertcircle") : "") + u + "</span>"; }));
       });
       var inv = ui.card(L("Inventory by group & component", "المخزون حسب الفصيلة والمكوّن", "ग्रुप और कंपोनेंट अनुसार स्टॉक"), ui.table([{ h: "Group" }].concat(B.comps.map(function (cp) { return { h: cp[1] + " · " + cp[2] + " d", cls: "r" }; })), rows, { min: 460 }) +
-        '<div class="row hs-leg" style="margin-top:10px"><span class="hs-u low">' + ui.icon("alertcircle") + "Low</span><span class=\"hs-u out\">" + ui.icon("alertfill") + "Out</span><span class=\"small faint\">Minimum levels set per group · shelf life shown per component</span></div>", { icon: "heartpulse", cls: "flushless" });
-      var exp = ui.card(L("Expiring soon", "تنتهي قريبًا", "जल्द एक्सपायर"), '<div class="lst">' + B.exp.map(function (e) { return ui.li(grp(e[0]), esc(e[1]) + " · " + n(e[2]) + " units", L("Expires", "تنتهي", "एक्सपायर") + " " + esc(e[3]), ui.btn("Offer", { cls: "sm", act: "toast", arg: "Offered to ICU and OT · FEFO", icon: "send" })); }).join("") + "</div>", { icon: "clockh" });
+        '<div class="row hs-leg" style="margin-top:10px"><span class="hs-u low">' + ui.icon("alertcircle") + "Low</span><span class=\"hs-u out\">" + ui.icon("alertfill") + "Out</span><span class=\"small faint\">Minimum levels set per group · shelf life shown per component</span></div>", { icon: "heartpulse" });
+      var exp = ui.card(L("Expiring soon", "تنتهي قريبًا", "जल्द एक्सपायर"), '<div class="lst">' + B.exp.map(function (e) { return ui.li(grp(e[0]), esc(e[1]) + " · " + n(e[2]) + (e[2] === 1 ? " unit" : " units"), L("Expires", "تنتهي", "एक्सपायर") + " " + esc(e[3]), ui.btn("Offer", { cls: "sm", act: "toast", arg: "Offered to ICU and OT · FEFO", icon: "send" })); }).join("") + "</div>", { icon: "clockh" });
       var req = ui.card(L("Crossmatch & issue requests", "طلبات التوافق والصرف", "क्रॉसमैच और इश्यू अनुरोध"), '<div class="lst">' + B.req.map(function (r) {
         var st = isDone("iss_" + r.id) ? XST.issued : XST[r.st], g0 = r.grp.split(" ")[0];
         var btn = r.st === "issue" || r.st === "ready" ? (isDone("iss_" + r.id) ? "" : ui.btn(L("Issue", "صرف", "जारी"), { cls: "sm " + (r.st === "issue" ? "dng" : "pri"), ov: "issueblood", arg: r.id, icon: "send" })) : r.st === "sample" ? ui.btn(L("Start grouping", "بدء التصنيف", "ग्रुपिंग शुरू"), { cls: "sm", act: "toast", arg: "Grouping and antibody screen started for " + r.id, icon: "flask" }) : "";
@@ -1043,11 +1041,11 @@
   NB.overlay("issueblood", function (id) {
     var r = bbReq(id) || D.bb.req[0], k = "iss_" + r.id, w1 = chk("hsIw1_" + r.id, false), w2 = chk("hsIw2_" + r.id, false);
     var units = r.id === "XM-881" ? [["26B-4471", "PRBC", "B+", "02 Nov", "Immediate-spin compatible"], ["26B-4472", "PRBC", "B+", "02 Nov", "Immediate-spin compatible"], ["26B-4473", "PRBC", "B+", "04 Nov", "Immediate-spin compatible"], ["26B-4474", "PRBC", "B+", "04 Nov", "Immediate-spin compatible"],
-      ["26F-1120", "FFP", "B+", "Thawed 10:20 · use by 15:20", "Group-compatible"], ["26F-1121", "FFP", "B+", "Thawed 10:20 · use by 15:20", "Group-compatible"], ["26F-1122", "FFP", "B+", "Thawed 10:20 · use by 15:20", "Group-compatible"], ["26F-1123", "FFP", "B+", "Thawed 10:20 · use by 15:20", "Group-compatible"], ["26S-0311", "SDP", "B+", "19 Oct", "Group-compatible"]]
+      ["26F-1120", "FFP", "B+", "Use by 15:20", "Group-compatible"], ["26F-1121", "FFP", "B+", "Use by 15:20", "Group-compatible"], ["26F-1122", "FFP", "B+", "Use by 15:20", "Group-compatible"], ["26F-1123", "FFP", "B+", "Use by 15:20", "Group-compatible"], ["26S-0311", "SDP", "B+", "19 Oct", "Group-compatible"]]
       : [["26B-4412", "PRBC", "B+", "29 Oct", "AHG crossmatch compatible"], ["26B-4418", "PRBC", "B+", "30 Oct", "AHG crossmatch compatible"]];
     var body = '<div class="row nw">' + ui.av(r.name, "lg") + '<div class="fl"><h2 class="h" dir="auto">' + esc(r.pid ? NB.pname(NB.pat(r.pid)) : r.name) + '</h2><div class="small muted">' + esc(r.loc + " · " + r.id + " · " + r.comp) + "</div></div>" + ui.pill(XST[r.st][0], XST[r.st][1], XST[r.st][2]) + "</div>";
     if (r.id === "XM-881") body += ui.note("warn", "Emergency: patient identified only by temporary ID <b>ER-0417</b>. Wristband and sample carry the same temporary ID.");
-    body += ui.card(L("Units", "الوحدات", "यूनिट"), ui.table([{ h: "Bag" }, { h: "Component" }, { h: "Group" }, { h: "Expiry" }, { h: "Compatibility" }], units.map(function (u) { return [n(u[0]), esc(u[1]), grp(u[2]), esc(u[3]), ui.pill("ok", u[4], "check")]; }), { min: 520 }), { icon: "heartpulse" });
+    body += ui.card(L("Units", "الوحدات", "यूनिट"), ui.table([{ h: "Bag" }, { h: "Component" }, { h: "Group" }, { h: "Expiry" }, { h: "Compatibility" }], units.map(function (u) { return ['<span class="hs-num">' + esc(u[0]) + "</span>", esc(u[1]), grp(u[2]), esc(u[3]), ui.pill("ok", u[4], "check")]; }), { min: 520 }), { icon: "heartpulse" });
     body += '<div class="hs-2p">' + '<div class="hs-who' + (w1 ? " ok" : "") + '" data-act="hsck" data-arg="hsIw1_' + r.id + '|0" role="checkbox" aria-checked="' + w1 + '" tabindex="0">' + ui.icon(w1 ? "checkcircle" : "fingerprint", w1 ? "okc" : "") + '<div class="t"><b>' + L("Issuer", "المُصدِر", "जारीकर्ता") + "</b><small>" + (w1 ? "Kiran Rao · blood bank technician · badge scanned 10:24" : "Scan badge · blood bank technician") + "</small></div></div>" +
       '<div class="hs-who' + (w2 ? " ok" : "") + '" data-act="hsck" data-arg="hsIw2_' + r.id + '|0" role="checkbox" aria-checked="' + w2 + '" tabindex="0">' + ui.icon(w2 ? "checkcircle" : "fingerprint", w2 ? "okc" : "") + '<div class="t"><b>' + L("Collector", "المستلِم", "प्राप्तकर्ता") + "</b><small>" + (w2 ? "Br. Joel Mathew · ER nurse · badge scanned 10:25" : "Scan badge · nurse or porter collecting") + "</small></div></div></div>";
     body += ui.card(L("Checks read aloud by both", "يتحقق كلاهما بصوت عالٍ", "दोनों ज़ोर से जाँचें"), '<div class="hs-ck">' + ckRow("hsIc1_" + r.id, true, "Patient identity on request, sample and label match", "Name / temporary ID, " + NB.mkt().natId + " or MRN, date of birth") +
@@ -1066,13 +1064,13 @@
     var C = D.cssd, recallDone = isDone("recall_A2-0412");
     var h = ui.header(L("CSSD sterilisation", "التعقيم المركزي", "सीएसएसडी स्टरलाइज़ेशन"), "Every instrument set is barcoded from decontamination to the patient · loads are released only on indicator results",
       ui.btn(L("Scan set", "مسح طقم", "सेट स्कैन करें"), { act: "toast", arg: "Scanner ready: scan a tray barcode", icon: "barcode" }) + ui.btn(L("Start a load", "بدء دورة", "लोड शुरू करें"), { cls: "pri", ov: "cssdload", arg: "new", icon: "play" }));
-    h += ui.note(recallDone ? "warn" : "crit", "<b>Load A2-0412 failed its biological indicator</b> (Autoclave 2, 16 Oct 15:20; read 09:40 today). 5 items traced, 2 already used on patients. " + (recallDone ? "Recall actions recorded; infection control is following up." : "Autoclave 2 is out of service until re-validated.") + " " + ui.btn(L("Open recall", "فتح الاستدعاء", "रिकॉल खोलें"), { cls: "sm " + (recallDone ? "" : "dng"), ov: "cssdload", arg: "A2-0412", icon: "alertfill" }));
+    h += ui.note(recallDone ? "warn" : "crit", "<b>Load A2-0412 failed its biological indicator</b> (Autoclave 2, 16 Oct 15:20; read 09:40 today). 5 items traced; 3 patients were exposed. " + (recallDone ? "Recall actions recorded; infection control is following up." : "Autoclave 2 is out of service until re-validated.") + " " + ui.btn(L("Open recall", "فتح الاستدعاء", "रिकॉल खोलें"), { cls: "sm " + (recallDone ? "" : "dng"), ov: "cssdload", arg: "A2-0412", icon: "alertfill" }));
     h += '<div class="grid g4 kpis">' + ui.kpi(n(C.sets.filter(function (s) { return s[3] !== "issued"; }).length), L("Sets in process or stored", "أطقم قيد المعالجة", "प्रोसेस में सेट"), "Barcode-tracked", "faint") + ui.kpi(n(5), L("Loads today", "دورات اليوم", "आज के लोड"), "Autoclave 1 · plasma · ETO", "faint") +
       ui.kpi(n(3), L("Biological indicators pending", "مؤشرات حيوية معلّقة", "BI बाक़ी"), "Rapid read 3 h · ETO 48 h", "warnc") + ui.kpi(n("14/16"), L("Sets ready for tomorrow's OT list", "أطقم جاهزة لغرفة العمليات", "कल की ओटी सूची हेतु"), "2 in sterilisation", "okc") + "</div>";
     h += '<div class="hs-kan">' + C.stages.map(function (sg) {
       var items = C.sets.filter(function (s) { return s[3] === sg[0]; });
       return '<div class="hs-col"><div class="hs-colh">' + ui.icon(sg[4], "sm") + '<span class="fl">' + L(sg[1], sg[2], sg[3]) + '</span><span class="nb-badge">' + items.length + "</span></div>" + items.map(function (s) {
-        return '<div class="hs-set' + (s[5] === "q" ? " q" : "") + '"><div class="row sb nw"><b class="ltr">' + esc(s[0]) + "</b>" + (s[5] === "q" ? ui.pill("crit", L("Recall", "استدعاء", "रिकॉल"), "alertfill") : ui.pill("mute", s[2], "building")) + "</div><small>" + esc(s[1]) + "</small><small>" + esc(s[4]) + "</small></div>";
+        return '<div class="hs-set' + (s[5] === "q" ? " q" : "") + '"><div class="row sb" style="gap:4px 8px"><b class="ltr">' + esc(s[0]) + "</b>" + (s[5] === "q" ? ui.pill("crit", L("Recall", "استدعاء", "रिकॉल"), "alertfill") : ui.pill("mute", s[2], "building")) + "</div><small>" + esc(s[1]) + "</small><small>" + esc(s[4]) + "</small></div>";
       }).join("") + "</div>";
     }).join("") + "</div>";
     h += ui.card(L("Cycle log", "سجل الدورات", "साइकिल लॉग"), ui.table([{ h: "Load" }, { h: "Steriliser · cycle" }, { h: "Start → end" }, { h: "Bowie-Dick" }, { h: "Chemical" }, { h: "Biological" }, { h: "Items", cls: "r" }, { h: "Status" }], C.cycles.map(function (y) {
@@ -1120,17 +1118,17 @@
     h += '<div class="grid g4 kpis">' + ui.kpi(n(21), L("Inpatients on diet orders", "مرضى بطلبات غذاء", "आहार ऑर्डर वाले मरीज़"), "All wards", "faint") + ui.kpi(n(13), L("Therapeutic diets", "أنظمة علاجية", "चिकित्सीय आहार"), "Diabetic, cardiac, renal, enteral", "faint") +
       ui.kpi(n(2), L("Allergy flags", "تنبيهات حساسية", "एलर्जी फ़्लैग"), "Egg · sulfonamide (drug, not food)", "critc") + ui.kpi(n(1), L("Nil by mouth", "صيام قبل العملية", "निल बाय माउथ"), "A-08 pre-op since 06:00", "warnc") + "</div>";
     if (R().ramadan) h += ui.card("", ui.toggle("hsRam", "Ramadan schedule", "Suhoor 03:45 and iftar at sunset (17:42) for patients the doctor has cleared to fast; insulin and drug timings follow the meal plan.", true), { cls: ram ? "hl" : "" });
-    var tbl = ui.table([{ h: "Bed" }, { h: "Patient" }, { h: "Diet" }, { h: "Texture" }, { h: "Allergy" }, { h: "Preference" }, { h: "Next meal" }], rows.map(function (r) {
+    var tbl = ui.table([{ h: "Bed" }, { h: "Patient" }, { h: "Diet · texture" }, { h: "Notes" }, { h: "Allergy" }, { h: "Preference" }, { h: "Next meal" }], rows.map(function (r) {
       var nm = r.nbm ? ui.pill("warn", "NBM", "stop") : /Enteral/.test(r.diet) ? ui.pill("info", "Feed running", "refresh") : ram && r.pref !== "—" && r.bed === "A-06" ? ui.pill("sub", "Iftar 17:42", "moon") : ui.pill("acc", "Mid-morning 10:30", "clockh");
-      return { cells: ['<span class="tok">' + r.bed + "</span>", ui.cellp('<span dir="auto">' + esc(r.name) + "</span>", esc(r.ward)), ui.cellp(esc(r.diet), esc(r.note)), esc(r.tex), r.al ? ui.pill("crit", r.al, "alertfill") : '<span class="faint">' + L("None", "لا يوجد", "कोई नहीं") + "</span>", esc(prefFor(r.pref)), nm], ov: "dietorder", arg: r.bed, cls: r.al ? "crit" : "" };
-    }), { min: 960 });
+      return { cells: ['<span class="tok">' + r.bed + "</span>", ui.cellp('<span dir="auto">' + esc(r.name) + "</span>", esc(r.ward)), ui.cellp(esc(r.diet), esc(r.tex)), '<span class="small">' + esc(r.note) + "</span>", r.al ? ui.pill("crit", r.al, "alertfill") : '<span class="faint">' + L("None", "لا يوجد", "कोई नहीं") + "</span>", esc(prefFor(r.pref)), nm], ov: "dietorder", arg: r.bed, cls: r.al ? "crit" : "" };
+    }), { min: 980 });
     var rounds = ui.card(L("Meal rounds", "جولات الوجبات", "भोजन राउंड"), '<div class="tl">' + (ram ? [["Suhoor", "03:45", "done", "6 fasting patients served"]] : []).concat(D.diet.rounds).map(function (r) {
       return '<div class="ev"><span class="dotc ' + (r[2] === "done" ? "ok" : r[2] === "live" ? "acc" : "") + '">' + ui.icon(r[2] === "done" ? "check" : r[2] === "live" ? "truck" : "clockh", "sm") + '</span><div class="bd"><b>' + esc(r[0]) + " · " + n(r[1]) + "</b><small>" + esc(r[3] || "") + "</small></div></div>";
     }).join("") + (ram ? '<div class="ev"><span class="dotc">' + ui.icon("moon", "sm") + '</span><div class="bd"><b>Iftar · ' + n("17:42") + "</b><small>Dates, water, soup first · 6 trays</small></div></div>" : "") + "</div>", { icon: "clockh" });
     var max = Math.max.apply(null, D.diet.prod.map(function (p) { return p[1]; }));
     var prod = ui.card(L("Kitchen production · lunch", "إنتاج المطبخ · الغداء", "रसोई उत्पादन · दोपहर"), '<div class="stack s8">' + D.diet.prod.map(function (p) { return '<div class="row nw"><span class="fl small">' + esc(p[0]) + '</span><span class="num small" style="width:24px;text-align:end">' + p[1] + '</span><div style="width:45%">' + ui.bar(p[1] / max * 100) + "</div></div>"; }).join("") + "</div>" +
       '<div class="small faint" style="margin-top:10px">Allergy trays are plated separately, sealed and labelled in red.</div>', { icon: "leaf" });
-    return h + '<div class="split wide"><div class="stack s16">' + tbl + '</div><div class="stack s16">' + rounds + prod + "</div></div>";
+    return h + tbl + '<div class="grid g2">' + rounds + prod + "</div>";
   });
   NB.overlay("dietorder", function (bed) {
     var r = dietRows().find(function (x) { return x.bed === bed; }) || dietRows()[0];
@@ -1196,3 +1194,163 @@
       (short ? ui.btn("Raise PR for shortfall", { act: "toast", arg: "PR-2215 raised for the shortfall", icon: "cart" }) : "") + ui.btn(L("Issue", "صرف", "जारी करें"), { cls: "pri", act: "hsdone", arg: "ind_" + id + "|" + id + " issued · stock moved to " + i.dept, icon: "send" });
     return { kind: "drawer", size: "lg", title: L("Indent", "طلب صرف", "इंडेंट") + " " + id, body: body, foot: foot };
   });
+
+  /* ---- hospops.mrd ---- */
+  var DSS = { draft: ["warn", "Draft by resident", "pen"], pending: ["urg", "Awaiting consultant", "hourglass"], signed: ["ok", "Signed", "checkcircle"] };
+  var COD = { pending: ["mute", "Not coded", "dot"], query: ["warn", "Query to doctor", "chat"], coded: ["ok", "Coded", "checkcircle"] };
+  var RQS = { preparing: ["info", "Preparing copy", "file"], review: ["acc", "MRD review", "eye"], legal: ["sub", "Legal review", "scale"], blocked: ["crit", "Document missing", "lock"], released: ["ok", "Released", "checkcircle"], consent: ["warn", "Consent pending", "hourglass"] };
+  var REGS = { submitted: ["info", "Submitted", "send"], due: ["warn", "Due", "clockh"], registered: ["ok", "Registered", "checkcircle"], police: ["sub", "Police case", "shielduser"] };
+  NB.screen("hospops.mrd", function (c) {
+    var M = D.mrd, tab = NB.v("hsMrdTab", "ds");
+    var h = ui.header(L("Medical records (MRD)", "السجلات الطبية", "मेडिकल रिकॉर्ड"), "Discharge summaries, clinical coding (" + esc(R().icd) + "), release of records and statutory birth & death registers",
+      ui.btn(L("Record requests", "طلبات السجلات", "रिकॉर्ड अनुरोध"), { act: "hsset", arg: "hsMrdTab|req", icon: "share" }) + ui.btn(L("Log a request", "تسجيل طلب", "अनुरोध दर्ज करें"), { cls: "pri", ov: "mrdrequest", arg: "MRQ-296", icon: "plus" }));
+    h += '<div class="grid g4 kpis">' + ui.kpi(n(M.ds.filter(function (d) { return d[5] !== "signed"; }).length), L("Summaries not signed", "ملخصات غير موقعة", "बिना हस्ताक्षर सारांश"), "1 older than 48 h", "warnc") +
+      ui.kpi(n(M.ds.filter(function (d) { return d[7] !== "coded"; }).length), L("Not yet coded", "غير مرمّزة", "कोडिंग बाक़ी"), "1 query to doctor", "warnc") + ui.kpi(n(M.req.filter(function (r) { return r.st !== "released"; }).length), L("Open record requests", "طلبات مفتوحة", "खुले अनुरोध"), "Response time: " + esc(R().reqSla), "faint") +
+      ui.kpi(n(1), L("Birth reports due", "تقارير ولادة مستحقة", "जन्म रिपोर्ट देय"), esc(R().birth.split(" · ")[1] || "per authority"), "warnc") + "</div>";
+    h += ui.tabs("hsMrdTab", [["ds", L("Summaries & coding", "الملخصات والترميز", "सारांश और कोडिंग"), "file"], ["req", L("Record requests", "طلبات السجلات", "रिकॉर्ड अनुरोध"), "share"], ["reg", L("Birth & death registers", "سجلات المواليد والوفيات", "जन्म और मृत्यु रजिस्टर"), "scroll"], ["ret", L("Retention", "الاحتفاظ", "प्रतिधारण"), "lock"]], "ds");
+    if (tab === "ds") {
+      h += ui.table([{ h: "IP no." }, { h: "Patient" }, { h: "Discharged" }, { h: "Consultant" }, { h: "Summary" }, { h: "Days", cls: "r" }, { h: "Coding · " + R().icd }], M.ds.map(function (d) {
+        var s = isDone("ds_" + d[0]) ? DSS.signed : DSS[d[5]], cd = COD[d[7]];
+        return [n(d[0]), ui.cellp(esc(d[1]), esc(d[2])), esc(d[3]), esc(d[4]), ui.pill(s[0], s[1], s[2]) + (d[5] === "pending" && !isDone("ds_" + d[0]) ? " " + ui.btn("Remind", { cls: "sm ghost", act: "hsdone", arg: "ds_" + d[0] + "|Reminder sent to " + d[4] + "|1|keep", icon: "bell" }) : ""), '<span class="num' + (d[6] >= 2 && d[5] !== "signed" ? " critc" : "") + '">' + d[6] + "</span>",
+          ui.cellp(ui.pill(cd[0], cd[1], cd[2]), esc(d[8]))];
+      }), { min: 1000 });
+      h += '<div class="grid g2">' + ui.card(L("Coding query", "استفسار الترميز", "कोडिंग प्रश्न"), '<div class="small" style="margin-bottom:10px"><b>IP-26-1181 · Ramaswamy K.</b> · The summary says “sepsis” but the culture grew <i>Klebsiella pneumoniae</i>. Can the principal diagnosis be coded as A41.5 (sepsis due to other Gram-negative organisms) instead of A41.9?</div>' +
+        '<div class="btns">' + ui.btn("Send to Dr. Vikram Shah", { cls: "sm pri", act: "toast", arg: "Query sent to the doctor's inbox", icon: "send" }) + ui.btn("Code as written", { cls: "sm", act: "toast", arg: "Coded A41.9 as written", icon: "check" }) + "</div>", { icon: "chat" }) +
+        ui.card(L("Discharge summary rules", "قواعد ملخص الخروج", "डिस्चार्ज सारांश नियम"), '<div class="hs-ck">' + stRow("ok", "Summary handed to the patient at discharge", "Also in the patient app and on WhatsApp") + stRow("ok", "Consultant signature within 24 h", "Escalates to the medical superintendent after 48 h") + stRow("info", "Coded within 3 working days", "Needed for insurance claims and statistics") + "</div>", { icon: "shieldcheck" }) + "</div>";
+    } else if (tab === "req") {
+      h += ui.table([{ h: "Request" }, { h: "Requested by" }, { h: "Patient" }, { h: "Scope" }, { h: "Consent / basis" }, { h: "Fee", cls: "r" }, { h: "Due" }, { h: "Status" }], M.req.map(function (r) {
+        var s = isDone("mrq_" + r.id) ? RQS.released : RQS[r.st];
+        return { cells: ['<span class="tok">' + r.id + "</span>", '<div class="row nw">' + ui.icon(r.whoI, "sm faint") + "<span>" + esc(r.who) + "</span></div>", '<span dir="auto">' + esc(r.pid ? NB.pname(NB.pat(r.pid)) : r.name) + "</span>", '<span class="small">' + esc(r.what) + "</span>", '<span class="small">' + esc(r.consent) + "</span>", r.fee ? NB.money(r.fee) : '<span class="faint">' + L("No fee", "بدون رسوم", "शुल्क नहीं") + "</span>", esc(r.due), ui.pill(s[0], s[1], s[2])], ov: "mrdrequest", arg: r.id, cls: r.st === "blocked" ? "crit" : "" };
+      }), { min: 1180 });
+      h += ui.note("info", "Patients can also download their own records in the app. Requests from insurers, courts and police are released only with consent or a valid legal instrument, are limited to what is asked for, and every release is logged and visible to the patient.");
+    } else if (tab === "reg") {
+      var birth = ui.card(L("Birth register", "سجل المواليد", "जन्म रजिस्टर") + " · " + esc(R().birth), ui.table([{ h: "Entry" }, { h: "Child" }, { h: "Born" }, { h: "Sex" }, { h: "Weight", cls: "r" }, { h: "Type" }, { h: "Statutory report" }], M.births.map(function (b) {
+        var s = isDone("birth_" + b[0]) ? REGS.submitted : REGS[b[7]];
+        return [n(b[0]), ui.cellp(esc(b[1]), esc(b[6])), esc(b[2]), esc(b[3]), n(b[4]), esc(b[5]), ui.cellp(ui.pill(s[0], s[1], s[2]), esc(b[8])) + (b[7] === "due" && !isDone("birth_" + b[0]) ? " " + ui.btn("Submit", { cls: "sm pri", act: "hsdone", arg: "birth_" + b[0] + "|Birth report submitted for " + b[1] + "|1|keep", icon: "send" }) : "")];
+      }), { min: 900 }), { icon: "baby" });
+      var death = ui.card(L("Death register", "سجل الوفيات", "मृत्यु रजिस्टर") + " · " + esc(R().death), ui.table([{ h: "Entry" }, { h: "Deceased" }, { h: "Date & time" }, { h: "Cause of death (I a–b, II)" }, { h: "Certified by" }, { h: "Statutory report" }], M.deaths.map(function (d) {
+        var s = REGS[d[5]];
+        return [n(d[0]), esc(d[1]), esc(d[2]), '<span class="small">' + esc(d[3]) + "</span>", esc(d[4]), ui.cellp(ui.pill(s[0], s[1], s[2]), esc(d[6]))];
+      }), { min: 900 }), { icon: "file" });
+      h += birth + death + exampleNote("Cause of death follows the WHO international certificate format (part I chain, part II contributing).");
+    } else {
+      h += ui.card(L("Retention schedule", "جدول الاحتفاظ", "प्रतिधारण अनुसूची") + " · " + esc(NB.mkt().name), ui.table([{ h: "Record type" }, { h: "Keep for" }], R().ret.map(function (x) { return [esc(x[0]), esc(x[1])]; }), { min: 420 }) +
+        '<div class="small faint" style="margin-top:10px">Records past retention are flagged for review, never deleted automatically. Records under legal hold (court cases, police cases, complaints) are excluded from purge.</div>', { icon: "lock" });
+      h += exampleNote();
+    }
+    return h;
+  });
+  NB.overlay("mrdrequest", function (id) {
+    var r = D.mrd.req.find(function (x) { return x.id === id; }) || D.mrd.req[0], s = isDone("mrq_" + r.id) ? RQS.released : RQS[r.st], nm = r.pid ? NB.pname(NB.pat(r.pid)) : r.name;
+    var legal = /Court|Police/.test(r.who);
+    var body = '<div class="row nw">' + avi(r.whoI, "lg") + '<div class="fl"><h2 class="h">' + esc(r.who) + '</h2><div class="small muted">' + esc(r.id) + " · " + L("for", "لـ", "के लिए") + ' <span dir="auto">' + esc(nm) + "</span></div></div>" + ui.pill(s[0], s[1], s[2]) + "</div>";
+    body += ui.card(L("Request", "الطلب", "अनुरोध"), '<dl class="hs-kv"><dt>Scope</dt><dd>' + esc(r.what) + "</dd><dt>Basis</dt><dd>" + esc(r.consent) + "</dd><dt>Due</dt><dd>" + esc(r.due) + " · " + esc(R().reqSla) + "</dd><dt>Fee</dt><dd>" + (r.fee ? NB.money(r.fee) + " · certified copy" : "No fee") + "</dd></dl>", { icon: "clipboard" });
+    body += ui.card(L("Checks before release", "تحققات قبل الإصدار", "जारी करने से पहले जाँच"), '<div class="hs-ck">' +
+      ckRow("hsMq1_" + id, !/Relative|Police/.test(r.who), "Requester identity verified", r.who.indexOf("Patient") === 0 ? "OTP to registered phone + ID" : "Letterhead, authorisation and contact verified") +
+      ckRow("hsMq2_" + id, r.st !== "consent" && r.st !== "blocked", legal ? "Valid legal instrument on file" : "Patient consent or authorisation on file", esc(r.consent)) +
+      ckRow("hsMq3_" + id, true, "Scope limited to what is asked", "Only the listed documents and dates") + ckRow("hsMq4_" + id, false, "Sensitive sections reviewed", "Third-party information, mental health and HIV status released only if specifically covered") +
+      (legal ? ckRow("hsMq5_" + id, r.st === "legal", "Legal / medical superintendent sign-off", "Certified copy · original stays in MRD") : "") + "</div>", { icon: "shieldcheck" });
+    body += '<div class="fgrid">' + ui.field("Delivery", r.who.indexOf("Patient") === 0 ? "Secure link in the patient app" : legal ? "Certified paper copy, hand delivered" : "Secure link (expires in 7 days)", { id: "hs-dl", options: ["Secure link in the patient app", "Secure link (expires in 7 days)", "Certified paper copy, hand delivered", "Registered post"] }) + ui.field("Notes", "", { id: "hs-mn", ph: "Visible in the audit log" }) + "</div>";
+    body += ui.note("info", "Every release is written to the audit log and appears in the patient's “who saw my records” list.");
+    var foot = ui.btn(L("Decline with reason", "رفض مع السبب", "कारण सहित अस्वीकार"), { cls: "ghost", act: "toast", arg: "Declined · requester informed with reason", icon: "close" });
+    foot += r.st === "consent" ? ui.btn(L("Request patient consent", "طلب موافقة المريض", "मरीज़ की सहमति माँगें"), { cls: "pri", act: "toast", arg: "Consent request sent to the patient on WhatsApp", icon: "send" }) :
+      r.st === "blocked" ? ui.btn(L("Ask for official letter", "طلب خطاب رسمي", "आधिकारिक पत्र माँगें"), { cls: "pri", act: "toast", arg: "Letter template sent to the police station", icon: "send" }) :
+      r.st === "released" || isDone("mrq_" + r.id) ? ui.btn("Close", { act: "close" }) : ui.btn(L("Release", "إصدار", "जारी करें"), { cls: "pri", act: "hsdone", arg: "mrq_" + r.id + "|" + r.id + " released · logged and visible to the patient", icon: "send" });
+    return { kind: "drawer", size: "lg", title: L("Record request", "طلب سجل", "रिकॉर्ड अनुरोध") + " " + r.id, body: body, foot: foot };
+  });
+
+  /* ---- hospops.roster ---- */
+  var SH = { M: ["Morning 07–15", "صباحي", "सुबह"], E: ["Evening 15–23", "مسائي", "शाम"], N: ["Night 23–07", "ليلي", "रात"], OC: ["On call", "مناوب", "ऑन-कॉल"], L: ["Leave", "إجازة", "छुट्टी"], OFF: ["Off", "راحة", "छुट्टी"] };
+  // Effective shift after approved swaps: returns [code, changedBySwap]
+  function effShift(nm, di, code) {
+    if (isDone("swap_SW-40") && di === 6) { if (nm === "Sr. Divya K.") return ["OFF", true]; if (nm === "Br. Akash P.") return ["E", true]; }
+    return [code, false];
+  }
+  NB.screen("hospops.roster", function (c) {
+    var RS = D.roster, dep = NB.v("hsDep", "er"), staff = RS.staff.filter(function (s) { return s[0] === dep; }), need = RS.need[dep];
+    var h = ui.header(L("Duty roster", "جدول المناوبات", "ड्यूटी रोस्टर"), "Nursing · week of 12–18 Oct · shifts M 07–15, E 15–23, N 23–07 (pattern is configurable, e.g. 2 × 12 h) · published to staff phones",
+      ui.btn(L("Auto-fill gaps", "ملء الفجوات تلقائيًا", "गैप स्वतः भरें"), { act: "toast", arg: "Suggested: float nurse Br. Akash P. for Sun Morning (ER) · within hours limit", icon: "sparkle" }) + ui.btn(L("Publish next week", "نشر الأسبوع القادم", "अगला सप्ताह प्रकाशित करें"), { cls: "pri", act: "toast", arg: "Roster for 19–25 Oct published · 48 staff notified", icon: "send" }));
+    var gaps = 0, cov = ["M", "E", "N"].map(function (sh, si) {
+      return RS.days.map(function (d, di) { var cnt = staff.filter(function (s) { return effShift(s[1], di, s[3][di])[0] === sh; }).length; if (cnt < need[si]) gaps++; return cnt; });
+    });
+    h += '<div class="grid g4 kpis">' + ui.kpi(n(gaps), L("Coverage gaps this week", "فجوات التغطية", "कवरेज गैप"), gaps ? cov.map(function (row, si) { return row.map(function (cn, di) { return cn < need[si] ? RS.days[di][0] + " " + ["M", "E", "N"][si] : ""; }).filter(Boolean).join(", "); }).filter(Boolean).join(", ") : L("Fully covered", "مغطى بالكامل", "पूरा कवरेज"), gaps ? "critc" : "okc") + ui.kpi(n(RS.swaps.filter(function (s) { return !isDone("swap_" + s.id); }).length), L("Swap requests", "طلبات التبديل", "स्वैप अनुरोध"), RS.swaps.some(function (s) { return !s.ok && !isDone("swap_" + s.id); }) ? "1 breaks a duty-hours rule" : "", "warnc") +
+      ui.kpi(n(1), L("Leave to approve", "إجازات للموافقة", "छुट्टी स्वीकृति"), "Sr. Lissy A. · 26–30 Oct", "faint") + ui.kpi(n("14 h"), L("Overtime this week", "ساعات إضافية", "इस सप्ताह ओवरटाइम"), "ER 10 h · ICU 4 h", "faint") + "</div>";
+    h += '<div class="row sb">' + ui.seg("hsDep", RS.depts.map(function (d) { return [d[0], d[1]]; }), "er") + '<div class="hs-leg">' + ["M", "E", "N", "L", "OFF"].map(function (k) { return '<span class="hs-sh ' + k + '" style="cursor:default">' + k + '</span><span class="small muted">' + L(SH[k][0], SH[k][1], SH[k][2]) + "</span>"; }).join("") + "</div></div>";
+    var th = '<tr><th class="n">' + L("Staff", "الموظف", "स्टाफ़") + "</th>" + RS.days.map(function (d, i) { return '<th class="' + (i === RS.today ? "today" : "") + '">' + d[0] + " " + d[1] + "</th>"; }).join("") + "</tr>";
+    var body = staff.map(function (s) {
+      return '<tr><td class="n"><b>' + esc(s[1]) + "</b><small>" + esc(s[2]) + "</small></td>" + s[3].map(function (code, di) {
+        var e = effShift(s[1], di, code), cd = e[0];
+        return '<td class="' + (di === RS.today ? "today" : "") + '"><button class="hs-sh ' + cd + (e[1] ? " SW" : "") + '" data-act="toast" data-arg="' + esc(s[1] + " · " + RS.days[di][0] + " " + RS.days[di][1] + " · " + SH[cd][0] + (e[1] ? " (swap SW-40)" : "")) + '" title="' + esc(SH[cd][0]) + '">' + cd + "</button></td>";
+      }).join("") + "</tr>";
+    }).join("");
+    body += '<tr class="sec"><td colspan="8">' + L("Coverage (scheduled / required)", "التغطية", "कवरेज") + "</td></tr>";
+    body += ["M", "E", "N"].map(function (sh, si) {
+      return '<tr class="cov"><td class="n">' + L(SH[sh][0], SH[sh][1], SH[sh][2]) + "</td>" + cov[si].map(function (cnt, di) {
+        var gap = cnt < need[si]; return '<td class="' + (di === RS.today ? "today" : "") + '"><span class="hs-cov ' + (gap ? "gap" : "ok") + '">' + ui.icon(gap ? "alertfill" : "check") + cnt + "/" + need[si] + "</span></td>";
+      }).join("") + "</tr>";
+    }).join("");
+    h += '<div class="hs-ros"><table><thead>' + th + "</thead><tbody>" + body + "</tbody></table></div>";
+    var swaps = ui.card(L("Swap requests", "طلبات التبديل", "स्वैप अनुरोध"), '<div class="lst">' + RS.swaps.map(function (s) {
+      var dn = isDone("swap_" + s.id);
+      return ui.li(avi("refresh"), esc(s.a + " ↔ " + s.b), esc(s.give + " for " + s.take + " · " + s.reason), dn ? ui.pill("ok", "Approved", "checkcircle") : s.ok ? ui.pill("ok", "Rules pass", "check") : ui.pill("crit", "Rule breach", "alertfill"), { ov: "shiftswap", arg: s.id });
+    }).join("") + "</div>", { icon: "refresh" });
+    var leave = ui.card(L("Leave", "الإجازات", "छुट्टी"), '<div class="lst">' + RS.leave.map(function (l) { return ui.li(ui.av(l[0]), esc(l[0]), esc(l[1] + " · " + l[2]), l[3] === "approved" ? ui.pill("ok", "Approved", "checkcircle") : ui.btn("Approve", { cls: "sm", act: "toast", arg: "Leave approved · roster gap check: covered by float pool", icon: "check" })); }).join("") + "</div>", { icon: "calendar" });
+    var oc = ui.card(L("On call today", "المناوبون اليوم", "आज ऑन-कॉल"), '<div class="lst">' + RS.oncall.map(function (o) { return ui.li(ui.av(o[1]), esc(o[0]), esc(o[1] + " · " + o[2]), '<span class="pill mute">' + ui.icon("phone") + '<span class="ltr">' + o[3] + "</span></span>"); }).join("") + "</div>", { icon: "phone" });
+    return h + '<div class="grid g3">' + swaps + leave + oc + "</div>";
+  });
+  NB.overlay("shiftswap", function (id) {
+    var s = D.roster.swaps.find(function (x) { return x.id === id; }) || D.roster.swaps[0];
+    var rules = s.ok ? [["ok", "Rest between shifts ≥ 11 h", "Both staff"], ["ok", "Maximum continuous duty 12 h", ""], ["ok", "Weekly hours ≤ 48", "Divya 40 h · Akash 44 h"], ["ok", "Skill mix: one ACLS-certified nurse per ER shift", "Kept on both days"], ["ok", "No overtime cost", ""]]
+      : [["crit", "Maximum continuous duty 12 h", s.rule], ["ok", "Weekly hours ≤ 48", "Rekha 40 h · Teena 48 h"], ["warn", "Skill mix: one ACLS-certified nurse per ER shift", "Sun Evening would lose the ER in-charge"], ["ok", "Rest between shifts ≥ 11 h for Sr. Rekha", ""]];
+    var body = '<div class="hs-2p"><div class="hs-box"><div class="eyebrow">' + L("Gives away", "يتنازل عن", "देता है") + '</div><b dir="auto">' + esc(s.a) + '</b><span class="small muted">' + esc(s.give) + '</span></div><div class="hs-box"><div class="eyebrow">' + L("Takes", "يأخذ", "लेता है") + '</div><b dir="auto">' + esc(s.b) + '</b><span class="small muted">' + esc(s.take) + "</span></div></div>" +
+      '<div class="small muted">' + L("Reason", "السبب", "कारण") + ": " + esc(s.reason) + "</div>" +
+      ui.card(L("Rule check", "فحص القواعد", "नियम जाँच"), '<div class="hs-ck">' + rules.map(function (r) { return stRow(r[0], esc(r[1]), esc(r[2])); }).join("") + "</div>", { icon: "shieldcheck" }) +
+      (s.ok ? "" : ui.note("ai", "Suggestion: Br. Joel Mathew is off on Sun 18 and ACLS-certified; giving the shift to him passes every rule."));
+    return { kind: "modal", title: L("Shift swap", "تبديل المناوبة", "शिफ़्ट स्वैप") + " · " + s.id, body: body,
+      foot: ui.btn(L("Decline", "رفض", "अस्वीकार"), { cls: "ghost", act: "toast", arg: "Swap declined · both staff notified with the rule", icon: "close" }) + ui.btn(L("Approve", "موافقة", "स्वीकृत करें"), { cls: "pri", disabled: !s.ok, act: "hsdone", arg: "swap_" + s.id + "|Swap approved · roster updated and both phones notified", icon: "check" }) };
+  });
+
+  /* ---- hospops.fleet ---- */
+  var UST = { transport: ["urg", "Transporting", "truck"], scene: ["crit", "At scene", "alertfill"], available: ["ok", "Available", "checkcircle"], transfer: ["info", "Patient transport", "arrowright"], maint: ["mute", "Maintenance", "settings"] };
+  function fleetMap(units) {
+    var tone = { transport: "urg", scene: "crit", available: "ok", transfer: "info", maint: "mute" };
+    return '<div class="hs-map"><svg viewBox="0 0 480 280" role="img" aria-label="Map placeholder with ambulance positions">' +
+      '<rect class="blk" x="20" y="20" width="120" height="80" rx="8"/><rect class="blk" x="160" y="20" width="140" height="70" rx="8"/><rect class="blk" x="330" y="20" width="130" height="90" rx="8"/><rect class="blk" x="20" y="130" width="90" height="120" rx="8"/><rect class="blk" x="300" y="150" width="70" height="100" rx="8"/><rect class="blk" x="390" y="140" width="70" height="60" rx="8"/>' +
+      '<path class="rd" d="M0 115 H480"/><path class="rd" d="M150 0 V280"/><path class="rd2" d="M150 210 C220 200 260 250 480 240"/><path class="rd2" d="M320 0 C310 60 330 120 380 130"/>' +
+      '<rect class="hos" x="200" y="128" width="70" height="46" rx="8"/><text x="235" y="166" text-anchor="middle">' + L("Hospital", "المستشفى", "अस्पताल") + "</text>" +
+      units.map(function (u) { return '<circle class="mk ' + tone[u.st] + '" cx="' + u.x + '" cy="' + u.y + '" r="8"/><text class="lb" x="' + (u.x + 12) + '" y="' + (u.y + 4) + '">' + esc(u.id.replace("AMB-", "")) + "</text>"; }).join("") +
+      '</svg><span class="cap">' + L("Map placeholder · live GPS from the vehicle tablet", "عنصر نائب للخريطة", "मैप प्लेसहोल्डर") + "</span></div>";
+  }
+  NB.screen("hospops.fleet", function (c) {
+    var F = D.fleet;
+    var h = ui.header(L("Ambulance fleet", "أسطول الإسعاف", "एम्बुलेंस बेड़ा"), "Hospital-owned ambulances · public emergency calls go to " + esc(R().ems) + " · our crews pre-alert the ER from the vehicle tablet",
+      ui.btn(L("ER pre-arrivals", "ما قبل الوصول", "ईआर प्री-अराइवल"), { go: "er.ambulance", icon: "bolt" }) + ui.btn(L("New dispatch", "إرسال جديد", "नया डिस्पैच"), { cls: "pri", ov: "dispatch", arg: "new", icon: "plus" }));
+    var av = F.units.filter(function (u) { return u.st === "available"; }).length;
+    h += '<div class="grid g4 kpis">' + ui.kpi(n(av + "/" + F.units.length), L("Available now", "متاح الآن", "अभी उपलब्ध"), "BLS + neonatal at base", av ? "okc" : "critc") + ui.kpi(n(3), L("On a mission", "في مهمة", "मिशन पर"), "2 emergency · 1 transport", "faint") +
+      ui.kpi(n("9 min"), L("P1 response (median today)", "زمن الاستجابة", "P1 रिस्पॉन्स"), "Call to on-scene · target example ≤ 15 min", "okc") + ui.kpi(n(1), L("Off road", "خارج الخدمة", "सेवा से बाहर"), "AMB-05 · back 18 Oct", "warnc") + "</div>";
+    var list = ui.card(L("Units", "الوحدات", "यूनिट"), '<div class="lst">' + F.units.map(function (u) {
+      var s = UST[u.st];
+      return ui.li(avi("truck"), '<span class="ltr">' + esc(u.id) + "</span> · " + esc(u.kind), esc(u.where) + " · " + esc(u.crew), '<div class="stack s4" style="align-items:flex-end">' + ui.pill(s[0], s[1], s[2]) + '<span class="small faint">O₂ ' + n(u.o2 + "%") + " · " + L("fuel", "وقود", "ईंधन") + " " + n(u.fuel + "%") + "</span></div>");
+    }).join("") + "</div>", { icon: "truck" });
+    h += '<div class="grid g2">' + fleetMap(F.units) + list + "</div>";
+    h += ui.card(L("Dispatch log · today", "سجل الإرسال", "डिस्पैच लॉग"), ui.table([{ h: "Call" }, { h: "Time" }, { h: "Unit" }, { h: "Nature" }, { h: "Priority" }, { h: "Dispatched → scene → left → hospital" }, { h: "Outcome" }], F.log.map(function (l) {
+      return ['<span class="tok">' + l[0] + "</span>", n(l[1]), '<span class="tok">' + l[2] + "</span>", '<span dir="auto">' + esc(l[3]) + "</span>", l[4] === "P1" ? ui.pill("crit", "P1", "alertfill") : l[4] === "P2" ? ui.pill("urg", "P2", "bolt") : ui.pill("mute", "P3", "calendar"), '<span class="num small ltr" style="white-space:nowrap">' + l[5].join(" → ") + "</span>", '<span class="small">' + esc(l[6]) + "</span>"];
+    }), { min: 1000 }), { icon: "list" });
+    h += ui.card(L("Maintenance & readiness", "الصيانة والجاهزية", "रखरखाव और तैयारी"), '<div class="grid g2" style="gap:0 24px"><div class="hs-ck">' + F.maint.slice(0, 3).map(function (m) { return stRow(m[3], esc(m[0] + " · " + m[1]), esc(m[2])); }).join("") + '</div><div class="hs-ck">' + F.maint.slice(3).map(function (m) { return stRow(m[3], esc(m[0] + " · " + m[1]), esc(m[2])); }).join("") + "</div></div>", { icon: "settings" });
+    return h + exampleNote("Emergency numbers: " + esc(R().ems) + ".");
+  });
+  NB.overlay("dispatch", function (arg) {
+    var pre = arg === "prealert";
+    if (pre) return { kind: "modal", title: L("Phone pre-alert", "إنذار هاتفي مسبق", "फ़ोन प्री-अलर्ट"), body: '<div class="fgrid">' + ui.field("From", R().ems.split(" ·")[0] + " control room", { id: "hs-pf" }) + ui.field("Vehicle", "", { id: "hs-pv", ph: "Registration or call sign" }) + ui.field("ETA (min)", "12", { id: "hs-pe" }) + ui.field("Bay to hold", "A3", { id: "hs-pb", options: ["A3", "A5", "O4", "R3 (after CT)"] }) + "</div>" +
+      '<div class="small muted">ATMIST</div><div class="fgrid">' + ["Age / sex", "Time of onset", "Mechanism / complaint", "Injuries / findings", "Signs (vitals)", "Treatment given"].map(function (x, i) { return ui.field(x, "", { id: "hs-at" + i }); }).join("") + "</div>",
+      foot: ui.btn("Cancel", { cls: "ghost", act: "close" }) + ui.btn("Save pre-alert", { cls: "pri", act: "toast", arg: "Pre-alert added to the ER board · bay held", icon: "check" }) };
+    var p = NB.v("hsDp", "P1");
+    var body = '<div class="fgrid">' + ui.field("Caller", "Meena R. (daughter)", { id: "hs-dc" }) + ui.field("Phone", NB.mkt().phone + " 98450 77812", { id: "hs-dph" }) + ui.field("Pickup location", "Prestige Shantiniketan, Tower 4, flat 1102", { id: "hs-dl", full: true }) + ui.field("Complaint", "Elderly man collapsed, breathing, not talking", { id: "hs-dcm", full: true }) + "</div>" +
+      '<div class="row sb"><span class="small muted">' + L("Priority", "الأولوية", "प्राथमिकता") + "</span>" + ui.seg("hsDp", [["P1", "P1 · life-threatening"], ["P2", "P2 · urgent"], ["P3", "P3 · transport"]], "P1") + "</div>" +
+      ui.card(L("Suggested unit", "الوحدة المقترحة", "सुझाई गई यूनिट"), '<div class="lst">' + ui.li(avi("truck"), "AMB-02 · BLS · at base", "2.4 km · ETA 7 min · EMT Rafiq, driver Sunil", ui.pill("ok", L("Nearest", "الأقرب", "निकटतम"), "check")) +
+        (p === "P1" ? ui.li(avi("bolt"), "ALS intercept: AMB-03 after current scene", "Clears in about 15 min · or request " + R().ems.split(" ·")[0], ui.pill("warn", "Backup", "alertcircle")) : "") + "</div>", { icon: "map" }) +
+      '<div class="hs-ck">' + ckRow("hsDpre", p === "P1", L("Pre-alert the ER on dispatch", "إنذار الطوارئ عند الإرسال", "डिस्पैच पर ईआर को प्री-अलर्ट"), "Appears on the ER ambulance screen with ETA") + ckRow("hsDcpr", p === "P1", "Give CPR instructions to the caller", "Scripted, in the caller's language") + "</div>";
+    return { kind: "drawer", title: L("New dispatch", "إرسال جديد", "नया डिस्पैच"), body: body,
+      foot: ui.btn("Cancel", { cls: "ghost", act: "close" }) + ui.btn(L("Dispatch AMB-02", "إرسال AMB-02", "AMB-02 भेजें"), { cls: "pri", act: "toast", arg: "AMB-02 dispatched · crew tablet and ER notified", icon: "send" }) };
+  });
+})();

@@ -416,7 +416,7 @@
       range: ["Last 12 months", "آخر 12 شهرًا", "पिछले 12 महीने"], purpose: ["Continuity of care for your heart check-up", "استمرارية الرعاية لفحص القلب", "आपकी हृदय जाँच के लिए निरंतर देखभाल"], mins: 18 },
     history: [
       { who: "Dr. Vikram Shah", f: 0, what: ["viewed lab results shared by Apollo Clinic", "اطّلع على نتائج المختبر من عيادة أبولو", "अपोलो क्लिनिक से साझा लैब रिपोर्ट देखी"], when: "16 Oct · 16:02", ic: "eye", c: "acc", tag: "C-2038" },
-      { who: "Nikhil Menon", f: -1, what: ["opened your prescription in the app (caregiver)", "فتح وصفتك في التطبيق (مقدّم رعاية)", "ऐप में आपका पर्चा खोला (देखभालकर्ता)"], when: "15 Oct · 21:14", ic: "eye", c: "", tag: "" },
+      { who: "Nikhil Menon", f: -1, what: ["opened your prescription in the app", "فتح وصفتك في التطبيق", "ऐप में आपका पर्चा खोला"], when: "15 Oct · 21:14", ic: "eye", c: "", tag: "", actor: true },
       { who: "Dr. Vikram Shah", f: 0, what: ["viewed discharge summary shared by Apollo Clinic", "اطّلع على ملخص الخروج من عيادة أبولو", "अपोलो क्लिनिक से साझा डिस्चार्ज सारांश देखा"], when: "14 Oct · 16:40", ic: "eye", c: "acc", tag: "C-2038" },
       { who: "You", f: -1, what: ["approved sharing with Suvidha Clinic (app, fingerprint)", "وافقت على المشاركة مع العيادة (التطبيق، البصمة)", "क्लिनिक के साथ साझा करने की मंज़ूरी दी (ऐप, फ़िंगरप्रिंट)"], when: "14 Oct · 14:02", ic: "shieldcheck", c: "ok", tag: "C-2038" },
       { who: "You", f: -1, what: ["declined a request from Kaya Skin Clinic", "رفضت طلبًا من عيادة كايا", "काया स्किन क्लिनिक का अनुरोध अस्वीकार किया"], when: "28 Sep · 10:15", ic: "close", c: "crit", tag: "C-2029" }
@@ -803,54 +803,119 @@
   });
 
   /* ---------------- Patient app: Family ---------------- */
+  // Adult family member added by Rakesh who has not yet approved being managed (FRD CGV-02).
+  PA.pending = { id: "rohan", name: "Rohan Menon", ar: "روهان مينون", rel: ["Son", "الابن", "बेटा"], age: 22, sent: "15 Oct" };
+  // Actions people took on Rakesh's behalf, or that Rakesh took for others (FRD CGV-04 "acted by").
+  function actedLog() {
+    return [
+      { by: "nikhil", ic: "calendar", what: L("Booked your review for Sat 24 Oct", "حجز مراجعتك ليوم السبت 24 أكتوبر", "शनि 24 अक्टूबर के लिए आपकी जाँच बुक की"), when: "16 Oct · 21:10", via: L("WhatsApp · from Dubai", "واتساب · من دبي", "व्हाट्सऐप · दुबई से") },
+      { by: "nikhil", ic: "wallet", what: L("Paid your lab bill", "دفع فاتورة المختبر", "आपका लैब बिल भरा") + " · " + plain(NB.money(1900)), when: "15 Oct · 22:02", via: L("App · card", "التطبيق · بطاقة", "ऐप · कार्ड") },
+      { by: "latha", ic: "check", what: L("Checked you in at " + fshort(1), "سجّلت حضورك في " + fshort(1), fshort(1) + " में आपका चेक-इन किया"), when: "05 Oct · 16:52", via: L("App", "التطبيق", "ऐप") },
+      { by: "me", ic: "calendar", what: L("You booked Amma's lab + doctor visit", "حجزت زيارة المختبر والطبيب لأمك", "आपने माँ की लैब + डॉक्टर विज़िट बुक की"), when: "14 Oct · 09:15", via: L("Acting for Amma · power of attorney", "نيابةً عن أمك · وكالة", "माँ की ओर से · पावर ऑफ़ अटॉर्नी") }
+    ];
+  }
+  function byName(k) { return { nikhil: L("Nikhil", "نيخيل", "निखिल"), latha: L("Latha", "لاثا", "लता"), me: L("You", "أنت", "आप") }[k]; }
+  function scopeOf(id) { return NB.v("ptScope_" + id, "full"); }
+  function enforcedRow() {
+    return '<div class="tog pt-enf"><div class="t"><b>' + t("Never send marketing to under-18 profiles", "لا تسويق أبدًا لملفات من هم دون 18", "18 से कम उम्र वालों को कभी मार्केटिंग नहीं") + "</b><small>" +
+      esc(L("Meenu (15) gets no offers, tracking or profiling from any clinic. Required by " + NB.mkt().privacyLaw + " — it can't be switched off.", "لا تتلقى مينو (15) أي عروض أو تتبّع أو تصنيف من أي عيادة. يفرضه " + NB.mkt().privacyLaw + " — ولا يمكن إيقافه.", "मीनू (15) को किसी क्लिनिक से कोई ऑफ़र, ट्रैकिंग या प्रोफ़ाइलिंग नहीं। " + NB.mkt().privacyLaw + " के तहत अनिवार्य — बंद नहीं हो सकता।")) + "</small></div>" +
+      ui.pill("ok", L("Enforced", "مفروض", "लागू"), "lock") + "</div>";
+  }
+  function handoverTl() {
+    return '<div class="tl">' + [
+      ["bell", "acc", L("11 Dec 2028 · 90 days before", "11 ديسمبر 2028 · قبل 90 يومًا", "11 दिसंबर 2028 · 90 दिन पहले"), L("Meenu and you both get a notice. She's invited to add her own phone number.", "تصلك أنت ومينو إشعارات، وتُدعى لإضافة رقم هاتفها.", "मीनू और आप दोनों को सूचना मिलेगी। उसे अपना फ़ोन नंबर जोड़ने का न्योता।")],
+      ["user", "ok", L("12 Mar 2029 · she turns 18", "12 مارس 2029 · تبلغ 18", "12 मार्च 2029 · वह 18 की होगी"), L("Meenu takes control of her profile and records, with fresh consent.", "تتولى مينو التحكم بملفها وسجلاتها بموافقة جديدة.", "मीनू नई सहमति के साथ अपनी प्रोफ़ाइल और रिकॉर्ड संभालेगी।")],
+      ["lock", "", L("Your guardian access ends", "ينتهي وصولك كولي أمر", "आपका अभिभावक एक्सेस ख़त्म"), L("Unless Meenu invites you back as a caregiver, with the scope she chooses.", "إلا إذا دعتك مينو مجددًا كمقدّم رعاية بالصلاحيات التي تختارها.", "जब तक मीनू आपको अपनी चुनी अनुमति के साथ देखभालकर्ता के रूप में फिर न बुलाए।")]
+    ].map(function (e) { return '<div class="ev"><span class="dotc ' + e[1] + '">' + ui.icon(e[0], "sm") + '</span><div class="bd"><b>' + esc(e[2]) + "</b><small>" + esc(e[3]) + "</small></div></div>"; }).join("") + "</div>";
+  }
   NB.screen("patient.family", function (c) {
     var h = '<div class="pt-col"><div class="pt-hello"><div class="fl"><h1>' + t("Family & caregivers", "العائلة ومقدّمو الرعاية", "परिवार और देखभालकर्ता") + "</h1><p>" + t("One phone number, the whole family. Each person's records stay their own.", "رقم هاتف واحد للعائلة كلها، وسجلات كل شخص تبقى خاصة به.", "एक फ़ोन नंबर, पूरा परिवार। हर व्यक्ति के रिकॉर्ड उसके अपने रहते हैं।") + "</p></div></div>";
-    h += sec(t("People you look after", "من تعتني بهم", "जिनकी आप देखभाल करते हैं"));
+    h += sec(t("People you look after", "من تعتني بهم", "जिनकी आप देखभाल करते हैं"), ui.btn(L("Add", "إضافة", "जोड़ें"), { cls: "sm", ov: "ptaddmember", icon: "userplus" }));
+    var Pn = PA.pending, pnOk = NB.v("ptRohanOk", false);
     h += '<div class="card">' + PA.members.filter(function (m) { return m.id !== "me"; }).map(function (m) {
-      var role = m.id === "meenu" ? ui.pill("info", L("Guardian", "ولي أمر", "अभिभावक"), "shielduser") : m.id === "amma" ? ui.pill("sub", L("POA", "وكالة", "POA"), "handshake") : ui.pill("mute", L("Family", "عائلة", "परिवार"));
-      var sub = m.id === "meenu" ? L("Until she turns 18 · 12 Mar 2029", "حتى تبلغ 18 · 12 مارس 2029", "18 साल होने तक · 12 मार्च 2029") : m.id === "amma" ? L("Verified at the clinic desk · can approve sharing", "موثّق في مكتب العيادة · يمكنك الموافقة على المشاركة", "क्लिनिक डेस्क पर सत्यापित · साझा करने की मंज़ूरी दे सकते हैं") : L("Adult · she shares appointments with you", "بالغة · تشاركك مواعيدها", "वयस्क · वे आपसे अपॉइंटमेंट साझा करती हैं");
+      var role = m.id === "meenu" ? ui.pill("info", L("Guardian", "ولي أمر", "अभिभावक"), "shielduser") : m.id === "amma" ? ui.pill("sub", L("POA", "وكالة", "POA"), "handshake") : ui.pill("ok", L("Approved", "موافقة", "मंज़ूर"), "checkcircle");
+      var sub = m.id === "meenu" ? L("Guardian until she turns 18 · 12 Mar 2029", "ولي أمر حتى تبلغ 18 · 12 مارس 2029", "18 साल होने तक अभिभावक · 12 मार्च 2029") : m.id === "amma" ? L("Verified at the clinic desk · can approve sharing", "موثّق في مكتب العيادة · يمكنك الموافقة على المشاركة", "क्लिनिक डेस्क पर सत्यापित · साझा करने की मंज़ूरी दे सकते हैं") : L("Adult · approved on her phone, 02 Sep · appointments only", "بالغة · وافقت من هاتفها 02 سبتمبر · المواعيد فقط", "वयस्क · 02 सितंबर को अपने फ़ोन पर मंज़ूरी · सिर्फ़ अपॉइंटमेंट");
       return it(ui.av(m.name, "lg"), esc(mname(m)), esc(rel(m)) + ", " + nm(m.age) + "<br>" + esc(sub), role, { ov: "ptmember", arg: m.id });
-    }).join("") + "</div>";
+    }).join("") +
+      it(ui.av(Pn.name, "lg"), esc(NB.rtl() ? Pn.ar : Pn.name), esc(L3(Pn.rel)) + ", " + nm(Pn.age) + "<br>" + (pnOk ? t("Approved · appointments and bills", "وافق · المواعيد والفواتير", "मंज़ूर · अपॉइंटमेंट और बिल") : esc(L("Waiting for Rohan's OK · link sent " + Pn.sent + ". You can book for him; his records stay hidden until he accepts.", "بانتظار موافقة روهان · أُرسل الرابط " + Pn.sent + ". يمكنك الحجز له؛ تبقى سجلاته مخفية حتى يوافق.", "रोहन की मंज़ूरी का इंतज़ार · लिंक " + Pn.sent + " को भेजा। आप उनके लिए बुक कर सकते हैं; स्वीकार करने तक उनके रिकॉर्ड छिपे रहेंगे।"))),
+        pnOk ? ui.pill("ok", L("Approved", "موافقة", "मंज़ूर"), "checkcircle") : ui.pill("warn", L("Awaiting OK", "بانتظار الموافقة", "मंज़ूरी बाकी"), "hourglass"), { ov: "ptmember", arg: "rohan" }) + "</div>";
+    // Age-18 handover
+    h += sec(t("When Meenu turns 18", "عندما تبلغ مينو 18", "जब मीनू 18 की होगी"));
+    h += '<div class="card">' + handoverTl() + "</div>";
     h += sec(t("Who can see your records", "من يمكنه رؤية سجلاتك", "आपके रिकॉर्ड कौन देख सकता है"), ui.btn(L("Invite", "دعوة", "आमंत्रित करें"), { cls: "sm pri", ov: "invitecaregiver", icon: "userplus" }));
     h += '<div class="card">' + PA.access.map(function (a) {
-      var gone = NB.v("ptAccOff_" + a.id, false);
-      return it(ui.av(a.name, "lg"), esc(NB.rtl() ? a.ar : a.name) + (a.abroad ? ' <span class="pill mute" style="height:20px">' + ui.icon("globe") + "UAE</span>" : ""), esc(L3(a.role)) + "<br>" + (gone ? t("Access removed", "أُزيل الوصول", "एक्सेस हटाया गया") : esc(L3(a.until))),
-        gone ? ui.pill("perm", L("Removed", "أُزيل", "हटाया")) : a.pending ? ui.pill("warn", L("Invited", "مدعو", "आमंत्रित")) : chev(), { ov: "ptmember", arg: a.id });
+      var gone = NB.v("ptAccOff_" + a.id, false), bo = scopeOf(a.id) === "book";
+      return it(ui.av(a.name, "lg"), esc(NB.rtl() ? a.ar : a.name) + (a.abroad ? ' <span class="pill mute" style="height:20px">' + ui.icon("globe") + "UAE</span>" : ""), esc(L3(a.role)) + "<br>" + (gone ? t("Access removed", "أُزيل الوصول", "एक्सेस हटाया गया") : bo ? t("Book only · can't see records", "الحجز فقط · لا يرى السجلات", "सिर्फ़ बुकिंग · रिकॉर्ड नहीं देख सकते") : esc(L3(a.until))),
+        gone ? ui.pill("perm", L("Removed", "أُزيل", "हटाया")) : a.pending ? ui.pill("warn", L("Invited", "مدعو", "आमंत्रित")) : bo ? ui.pill("mute", L("Book only", "حجز فقط", "सिर्फ़ बुकिंग"), "calendar") : chev(), { ov: "ptmember", arg: a.id });
     }).join("") + "</div>";
     // Capability matrix
     var cols = [["calendar", L("Book", "حجز", "बुक")], ["steth", L("Visits", "زيارات", "विज़िट")], ["pill", L("Prescriptions", "وصفات", "पर्चे")], ["flask", L("Lab results", "تحاليل", "लैब")], ["wallet", L("Pay bills", "دفع", "भुगतान")], ["shieldcheck", L("Approve sharing", "موافقة على المشاركة", "साझा करने की मंज़ूरी")]];
     h += sec(t("What each person can do", "ما يستطيع كل شخص فعله", "कौन क्या कर सकता है"));
     h += '<div class="card"><div class="pt-cap"><span></span>' + cols.map(function (c2) { return '<span class="h" title="' + esc(c2[1]) + '">' + ui.icon(c2[0], "sm") + "</span>"; }).join("") + '<hr class="hr">' +
-      [{ n: L("You", "أنت", "आप"), s: "", cap: [1, 1, 1, 1, 1, 1] }].concat(PA.access.map(function (a) { return { n: NB.rtl() ? a.ar : a.name, s: L3(a.role).split(" · ")[0], cap: a.cap }; })).map(function (r) {
+      [{ n: L("You", "أنت", "आप"), s: "", cap: [1, 1, 1, 1, 1, 1] }].concat(PA.access.filter(function (a) { return !NB.v("ptAccOff_" + a.id, false); }).map(function (a) { return { n: NB.rtl() ? a.ar : a.name, s: L3(a.role).split(" · ")[0], cap: scopeOf(a.id) === "book" ? [1, 0, 0, 0, 0, 0] : a.cap }; })).map(function (r) {
         return '<span class="nm">' + esc(r.n) + (r.s ? "<small>" + esc(r.s) + "</small>" : "") + "</span>" + r.cap.map(function (y, i) { return '<span class="c ' + (y ? "y" : "n") + '" aria-label="' + esc(cols[i][1] + ": " + (y ? L("yes", "نعم", "हाँ") : L("no", "لا", "नहीं"))) + '">' + ui.icon(y ? "checkcircle" : "lock", "sm") + "</span>"; }).join("");
       }).join("") + "</div>" +
       '<div class="pt-legend" style="margin-top:12px">' + cols.map(function (c2) { return "<span>" + ui.icon(c2[0], "xs") + esc(c2[1]) + "</span>"; }).join("") + "</div></div>";
+    // Acted-by audit
+    h += sec(t("Done on someone's behalf", "إجراءات نيابةً عن الآخرين", "किसी की ओर से किए काम"));
+    h += '<div class="card">' + actedLog().map(function (e) {
+      return it(ico(e.ic, e.by === "me" ? "sub" : "info"), esc(e.what), nm(e.when) + " · " + esc(e.via) + '<span style="display:block;margin-top:5px">' + ui.pill(e.by === "me" ? "sub" : "info", e.by === "me" ? L("Acted by you for Amma", "بواسطتك نيابةً عن أمك", "आपने माँ की ओर से किया") : L("Acted by ", "بواسطة ", "") + byName(e.by) + L("", "", " द्वारा"), "users") + "</span>", "");
+    }).join("") + '<p class="small faint" style="margin:10px 0 0">' + t("Every action a caregiver or guardian takes is labelled with who did it — the clinic sees the same label.", "كل إجراء يقوم به مقدّم رعاية أو ولي أمر يُوسم باسم من قام به — وترى العيادة الوسم نفسه.", "देखभालकर्ता या अभिभावक का हर काम इस लेबल के साथ दर्ज होता है कि किसने किया — क्लिनिक भी यही देखता है।") + "</p></div>";
+    h += '<div class="card">' + enforcedRow() + "</div>";
     h += ui.note("info", t("Caregivers never see visit notes unless you allow it. Only you — or someone with power of attorney — can approve sharing with a hospital.", "لا يرى مقدّمو الرعاية ملاحظات الزيارة إلا بإذنك. أنت فقط — أو من يحمل وكالة — يمكنه الموافقة على المشاركة مع مستشفى.", "देखभालकर्ता आपकी अनुमति के बिना विज़िट नोट्स नहीं देखते। अस्पताल से साझा करने की मंज़ूरी सिर्फ़ आप — या पावर ऑफ़ अटॉर्नी वाले — दे सकते हैं।"), "lock");
     h += ui.btn(L("Invite a caregiver abroad", "ادعُ مقدّم رعاية في الخارج", "विदेश में रहने वाले देखभालकर्ता को आमंत्रित करें"), { cls: "blk lg", ov: "invitecaregiver", icon: "globe" });
     return h + "</div>";
   });
 
   NB.overlay("ptmember", function (id) {
+    if (id === "rohan") {
+      var Pn = PA.pending;
+      return { title: esc(NB.rtl() ? Pn.ar : Pn.name), body: '<div class="pt-res">' + ui.av(Pn.name, "xl") + "<h2>" + esc(NB.rtl() ? Pn.ar : Pn.name) + '</h2><span class="small muted">' + esc(L3(Pn.rel)) + ", " + nm(Pn.age) + "</span>" + ui.pill("warn", L("Waiting for his OK", "بانتظار موافقته", "उनकी मंज़ूरी बाकी"), "hourglass") + "</div>" +
+        ui.note("info", t("Rohan is an adult with his own phone, so he decides. Until he accepts you can book for him, but you can't see his visits, prescriptions, results or bills.", "روهان بالغ وله هاتفه، لذا القرار له. حتى يوافق يمكنك الحجز له، لكن لا يمكنك رؤية زياراته أو وصفاته أو نتائجه أو فواتيره.", "रोहन वयस्क हैं और उनका अपना फ़ोन है, इसलिए फ़ैसला उनका है। स्वीकार करने तक आप उनके लिए बुक कर सकते हैं, पर उनकी विज़िट, पर्चे, रिपोर्ट या बिल नहीं देख सकते।"), "shieldcheck") +
+        '<span class="small muted">' + t("He received", "وصله", "उन्हें मिला") + '</span><div class="wa" style="border-radius:var(--r-md);padding:12px;flex:none"><div class="bub in pt-b" style="max-width:100%">' +
+        esc(L("Rakesh Menon wants to add you to his family on Nabd, to book visits for you. You choose what he can see. Open the link to accept or decline — you'll confirm with a code.", "يريد راكيش مينون إضافتك إلى عائلته على نبض لحجز الزيارات لك. أنت تختار ما يراه. افتح الرابط للقبول أو الرفض — ستؤكد برمز.", "राकेश मेनन आपको Nabd पर अपने परिवार में जोड़ना चाहते हैं ताकि आपके लिए विज़िट बुक कर सकें। वे क्या देखें, यह आप चुनेंगे। स्वीकार या मना करने के लिए लिंक खोलें — कोड से पुष्टि होगी।")) +
+        lk("nabd.link/fm/R7Q2", L("Consent link · opens with a code", "رابط الموافقة · يُفتح برمز", "सहमति लिंक · कोड से खुलता है")) + '<span class="pt-ts">' + nm("15 Oct · 18:20") + "</span></div></div>",
+        foot: ui.btn(L("Cancel request", "إلغاء الطلب", "अनुरोध रद्द करें"), { cls: "ghost", act: "toast", arg: L("Request cancelled", "أُلغي الطلب", "अनुरोध रद्द") }) + ui.btn(L("Resend link", "أعد إرسال الرابط", "लिंक फिर भेजें"), { cls: "pri", act: "toast", arg: L("Link sent again to Rohan's WhatsApp", "أُعيد إرسال الرابط إلى واتساب روهان", "रोहन के व्हाट्सऐप पर लिंक फिर भेजा"), icon: "send" }) };
+    }
     var a = PA.access.find(function (x) { return x.id === id; }), m = PA.members.find(function (x) { return x.id === id; });
     var name = a ? (NB.rtl() ? a.ar : a.name) : mname(m);
     var body = '<div class="pt-res">' + ui.av(a ? a.name : m.name, "xl") + "<h2>" + esc(name) + '</h2><span class="small muted">' + esc(a ? L3(a.role) : rel(m)) + "</span></div>";
     if (a) {
+      var bo = scopeOf(id) === "book";
       var caps = [["Book appointments", "حجز المواعيد", "अपॉइंटमेंट बुक करना"], ["See visits", "رؤية الزيارات", "विज़िट देखना"], ["See prescriptions", "رؤية الوصفات", "पर्चे देखना"], ["See lab results", "رؤية نتائج المختبر", "लैब रिपोर्ट देखना"], ["Pay bills", "دفع الفواتير", "बिल भरना"]];
-      body += '<div class="card stack s4">' + caps.map(function (c2, i) { return ui.toggle("cap_" + id + "_" + i, L(c2[0], c2[1], c2[2]), "", !!a.cap[i]); }).join("") +
-        '<div class="tog" style="cursor:default"><div class="t"><b>' + t("Approve sharing with hospitals", "الموافقة على المشاركة مع المستشفيات", "अस्पतालों से साझा करने की मंज़ूरी") + "</b><small>" + t("Only you or a verified power of attorney", "أنت فقط أو وكيل موثّق", "सिर्फ़ आप या सत्यापित पावर ऑफ़ अटॉर्नी") + "</small></div>" + ui.icon("lock", "sm faint") + "</div></div>" +
+      body += '<span class="small muted">' + t("Access level", "مستوى الوصول", "एक्सेस स्तर") + '</span><div class="stack s8">' +
+        ui.radio("ptScope_" + id, "full", L("Chosen items", "عناصر مختارة", "चुनी हुई चीज़ें"), L("Exactly what's switched on below", "ما هو مفعّل أدناه فقط", "नीचे जो चालू है, बस वही"), "full") +
+        ui.radio("ptScope_" + id, "book", L("Book only", "الحجز فقط", "सिर्फ़ बुकिंग"), L("Can book, reschedule and check you in. No records, prescriptions, results or bills.", "يمكنه الحجز وتغيير الموعد وتسجيل حضورك. بلا سجلات أو وصفات أو نتائج أو فواتير.", "बुक, समय बदलना और चेक-इन कर सकते हैं। रिकॉर्ड, पर्चे, रिपोर्ट या बिल नहीं।"), "full") + "</div>";
+      if (!bo) body += '<div class="card stack s4">' + caps.map(function (c2, i) { return ui.toggle("cap_" + id + "_" + i, L(c2[0], c2[1], c2[2]), "", !!a.cap[i]); }).join("") +
+        '<div class="tog" style="cursor:default"><div class="t"><b>' + t("Approve sharing with hospitals", "الموافقة على المشاركة مع المستشفيات", "अस्पतालों से साझा करने की मंज़ूरी") + "</b><small>" + t("Only you or a verified power of attorney", "أنت فقط أو وكيل موثّق", "सिर्फ़ आप या सत्यापित पावर ऑफ़ अटॉर्नी") + "</small></div>" + ui.icon("lock", "sm faint") + "</div></div>";
+      body += ui.note(bo ? "warn" : "info", bo ? tx("{0} is now book-only. This applies right away to bookings, records and notifications.", "أصبح {0} للحجز فقط. يسري ذلك فورًا على الحجوزات والسجلات والإشعارات.", "{0} अब सिर्फ़ बुकिंग कर सकते हैं। यह बुकिंग, रिकॉर्ड और सूचनाओं पर तुरंत लागू है।", [esc(name.split(" ")[0])]) : t("Changes apply right away and they're told.", "تسري التغييرات فورًا ويُبلَّغون.", "बदलाव तुरंत लागू होते हैं और उन्हें बताया जाता है।"), bo ? "alertcircle" : "info") +
         '<span class="small muted">' + t("Access ends", "ينتهي الوصول", "एक्सेस ख़त्म") + "</span>" + ui.seg("capEnd_" + id, [["3m", L("3 months", "3 أشهر", "3 महीने")], ["6m", L("6 months", "6 أشهر", "6 महीने")], ["1y", L("1 year", "سنة", "1 साल")], ["never", L("When I stop it", "عندما أوقفه", "जब मैं रोकूँ")]], "6m") +
-        (a.abroad ? ui.note("info", t("Nikhil is told within 5 minutes when you check in, get a prescription or a result — as a secure link, never the details in the message.", "يُبلَّغ نيخيل خلال 5 دقائق عند وصولك أو صدور وصفة أو نتيجة — برابط آمن دون تفاصيل في الرسالة.", "चेक-इन, पर्चा या रिपोर्ट आने पर निखिल को 5 मिनट में सुरक्षित लिंक मिलता है — संदेश में विवरण नहीं।"), "bell") : "");
+        (a.abroad && !bo ? ui.note("info", t("Nikhil is told within 5 minutes when you check in, get a prescription or a result — as a secure link, never the details in the message.", "يُبلَّغ نيخيل خلال 5 دقائق عند وصولك أو صدور وصفة أو نتيجة — برابط آمن دون تفاصيل في الرسالة.", "चेक-इन, पर्चा या रिपोर्ट आने पर निखिल को 5 मिनट में सुरक्षित लिंक मिलता है — संदेश में विवरण नहीं।"), "bell") : "");
     } else if (m.id === "meenu") {
-      body += ui.note("info", t("As guardian you can book, see her records and approve sharing until 12 Mar 2029. At 18 she gets her own login and your access ends automatically.", "بصفتك ولي الأمر يمكنك الحجز ورؤية سجلاتها والموافقة على المشاركة حتى 12 مارس 2029. عند 18 تحصل على حسابها وينتهي وصولك تلقائيًا.", "अभिभावक के रूप में आप 12 मार्च 2029 तक बुक कर सकते हैं, रिकॉर्ड देख सकते हैं और साझा करने की मंज़ूरी दे सकते हैं। 18 पर उसका अपना लॉगिन बनेगा और आपका एक्सेस अपने-आप ख़त्म होगा।"), "shielduser") +
-        ui.note("warn", t("Some teen health topics are confidential between Meenu and her doctor.", "بعض المواضيع الصحية للمراهقين سرية بين مينو وطبيبها.", "किशोर स्वास्थ्य के कुछ विषय मीनू और उसके डॉक्टर के बीच गोपनीय हैं।"), "lock");
+      body += ui.note("info", t("As guardian you can book, see her records and approve sharing until 12 Mar 2029.", "بصفتك ولي الأمر يمكنك الحجز ورؤية سجلاتها والموافقة على المشاركة حتى 12 مارس 2029.", "अभिभावक के रूप में आप 12 मार्च 2029 तक बुक कर सकते हैं, रिकॉर्ड देख सकते हैं और साझा करने की मंज़ूरी दे सकते हैं।"), "shielduser") +
+        '<div class="card"><div class="pt-sec" style="margin-bottom:10px"><h2>' + t("Handover at 18", "التسليم عند 18", "18 पर हस्तांतरण") + "</h2></div>" + handoverTl() + "</div>" +
+        ui.note("warn", t("Some teen health topics are confidential between Meenu and her doctor.", "بعض المواضيع الصحية للمراهقين سرية بين مينو وطبيبها.", "किशोर स्वास्थ्य के कुछ विषय मीनू और उसके डॉक्टर के बीच गोपनीय हैं।"), "lock") +
+        '<div class="card">' + enforcedRow() + "</div>";
     } else if (m.id === "amma") {
       body += ui.note("info", t("Power of attorney verified by Suvidha Clinic on 4 Jul 2026. You can book, see records, pay and approve sharing for Amma.", "وكالة موثّقة من العيادة في 4 يوليو 2026. يمكنك الحجز ورؤية السجلات والدفع والموافقة على المشاركة لأمك.", "पावर ऑफ़ अटॉर्नी 4 जुलाई 2026 को क्लिनिक ने सत्यापित की। आप माँ के लिए बुक, रिकॉर्ड देखना, भुगतान और साझा करने की मंज़ूरी दे सकते हैं।"), "handshake") +
         ui.toggle("ammaVoice", L("Voice reminders in Malayalam", "تذكيرات صوتية بالمالايالامية", "मलयालम में वॉइस रिमाइंडर"), L("She can't read SMS — reminders are spoken", "لا تقرأ الرسائل — التذكيرات صوتية", "वे SMS नहीं पढ़ पातीं — रिमाइंडर बोलकर"), true) +
-        ui.toggle("ammaAssist", L("Assisted consent at the clinic", "موافقة بمساعدة في العيادة", "क्लिनिक पर सहायता से सहमति"), L("A staff member explains and witnesses", "يشرح موظف ويشهد", "स्टाफ़ समझाता है और गवाह रहता है"), true);
+        ui.toggle("ammaAssist", L("Assisted consent at the clinic", "موافقة بمساعدة في العيادة", "क्लिनिक पर सहायता से सहमति"), L("A staff member explains and witnesses", "يشرح موظف ويشهد", "स्टाफ़ समझाता है और गवाह रहता है"), true) +
+        '<p class="small faint" style="margin:0">' + t("Things you do for Amma are labelled “acted by Rakesh” in her record.", "ما تفعله لأمك يُوسم «بواسطة راكيش» في سجلها.", "माँ के लिए आप जो करते हैं, उनके रिकॉर्ड में “राकेश द्वारा” लिखा जाता है।") + "</p>";
     } else {
-      body += ui.note("info", t("Latha is an adult with her own records. She chose to let you book and see her appointments.", "لاثا بالغة ولها سجلاتها. اختارت أن تسمح لك بالحجز ورؤية مواعيدها.", "लता वयस्क हैं और उनके अपने रिकॉर्ड हैं। उन्होंने आपको बुक करने और अपॉइंटमेंट देखने की अनुमति दी है।"));
+      body += ui.note("ok", t("Latha approved on her own phone on 02 Sep 2026 (one-time code). She lets you book and see her appointments — not her health records.", "وافقت لاثا من هاتفها في 02 سبتمبر 2026 (رمز لمرة واحدة). تسمح لك بالحجز ورؤية مواعيدها — لا سجلاتها الصحية.", "लता ने 02 सितंबर 2026 को अपने फ़ोन पर (एक बार के कोड से) मंज़ूरी दी। वे आपको बुक करने और अपॉइंटमेंट देखने देती हैं — स्वास्थ्य रिकॉर्ड नहीं।"), "checkcircle") +
+        ui.btn(L("Ask Latha for record access", "اطلب من لاثا الوصول إلى سجلاتها", "लता से रिकॉर्ड एक्सेस माँगें"), { cls: "blk", act: "toast", arg: L("Request sent · Latha decides on her phone", "أُرسل الطلب · تقرر لاثا من هاتفها", "अनुरोध भेजा · लता अपने फ़ोन पर तय करेंगी"), icon: "send" });
     }
-    return { title: esc(name), body: body, foot: (a ? ui.btn(L("Remove access", "إزالة الوصول", "एक्सेस हटाएँ"), { cls: "dng", act: "ptAccOff", arg: id, icon: "close" }) : "") + ui.btn(L("Save", "حفظ", "सहेजें"), { cls: "pri", act: "toast", arg: L("Saved · they're notified", "تم الحفظ · أُبلغوا", "सहेजा · उन्हें सूचना दी गई"), icon: "check" }) };
+    return { title: esc(name), body: body, foot: (a ? ui.btn(L("Remove access", "إزالة الوصول", "एक्सेस हटाएँ"), { cls: "dng", act: "ptAccOff", arg: id, icon: "close" }) : "") + ui.btn(L("Save", "حفظ", "सहेजें"), { cls: "pri", act: "toast", arg: L("Saved · applies now · they're notified", "تم الحفظ · يسري فورًا · أُبلغوا", "सहेजा · तुरंत लागू · उन्हें सूचना दी गई"), icon: "check" }) };
+  });
+  NB.overlay("ptaddmember", function () {
+    var age = NB.v("addAge", "adult");
+    return { title: t("Add a family member", "أضف فردًا من العائلة", "परिवार का सदस्य जोड़ें"), body:
+      '<div class="fgrid">' + ui.field(L("Name", "الاسم", "नाम"), "Rohan Menon", { id: "am-n" }) + ui.field(L("Relationship", "الصلة", "रिश्ता"), L("Son", "ابن", "बेटा"), { id: "am-r", options: [L("Son", "ابن", "बेटा"), L("Daughter", "ابنة", "बेटी"), L("Spouse", "زوج/زوجة", "पति/पत्नी"), L("Parent", "والد/والدة", "माता/पिता")] }) + "</div>" +
+      ui.seg("addAge", [["adult", L("18 or older", "18 أو أكثر", "18 या अधिक")], ["minor", L("Under 18", "دون 18", "18 से कम")]], "adult") +
+      (age === "adult" ? ui.field(L("Their own WhatsApp number", "رقم واتساب الخاص به", "उनका अपना व्हाट्सऐप नंबर"), NB.mkt().phone + " 98450 77120", { id: "am-p", type: "tel" }) +
+        ui.note("info", t("Adults decide for themselves. They get a consent link and choose what you can see. Until they accept, you can book for them but can't see their records.", "البالغون يقررون بأنفسهم. يصلهم رابط موافقة ويختارون ما تراه. حتى يوافقوا يمكنك الحجز لهم دون رؤية سجلاتهم.", "वयस्क ख़ुद तय करते हैं। उन्हें सहमति लिंक मिलेगा और वे चुनेंगे कि आप क्या देखें। स्वीकार करने तक आप बुक कर सकते हैं पर रिकॉर्ड नहीं देख सकते।"), "shieldcheck")
+        : ui.note("info", tx("You'll be the guardian. We verify it once ({0}). No marketing ever goes to under-18 profiles, and at 18 they take over their own profile.", "ستكون ولي الأمر. نتحقق مرة واحدة ({0}). لا تسويق أبدًا لمن هم دون 18، وعند 18 يتولون ملفهم.", "आप अभिभावक होंगे। हम एक बार सत्यापित करेंगे ({0})। 18 से कम उम्र वालों को कभी मार्केटिंग नहीं, और 18 पर वे अपनी प्रोफ़ाइल संभालेंगे।", [esc(NB.state.market === "india" ? L("DPDP verifiable guardian consent", "موافقة ولي أمر قابلة للتحقق", "DPDP सत्यापन योग्य अभिभावक सहमति") : L("at the clinic desk", "في مكتب العيادة", "क्लिनिक डेस्क पर"))]), "shielduser")),
+      foot: ui.btn(L("Cancel", "إلغاء", "रद्द"), { act: "close", cls: "ghost" }) + ui.btn(age === "adult" ? L("Send consent link", "أرسل رابط الموافقة", "सहमति लिंक भेजें") : L("Add as guardian", "أضف بصفتي ولي الأمر", "अभिभावक के रूप में जोड़ें"), { cls: "pri", act: "toast", arg: age === "adult" ? L("Consent link sent on WhatsApp", "أُرسل رابط الموافقة عبر واتساب", "व्हाट्सऐप पर सहमति लिंक भेजा") : L("Added · guardian verification next", "أُضيف · التحقق من ولي الأمر تاليًا", "जोड़ा · आगे अभिभावक सत्यापन"), icon: "send" }) };
   });
   NB.act("ptAccOff", function (id) { NB.state.ui["ptAccOff_" + id] = true; NB.state.overlay = null; NB.toast(L("Access removed — effective now", "أُزيل الوصول فورًا", "एक्सेस तुरंत हटाया गया")); });
 
@@ -906,14 +971,17 @@
     h += sec(t("Who viewed my records", "من اطّلع على سجلاتي", "मेरे रिकॉर्ड किसने देखे"));
     h += '<div class="card"><div class="tl">' + PA.history.map(function (e) {
       var who = e.who === "You" ? L("You", "أنت", "आप") : e.who.indexOf("Dr.") === 0 ? NB.dname(NB.D.doctors.find(function (d) { return d.name === e.who; }) || { name: e.who }) : (NB.rtl() ? (PA.access.find(function (a) { return a.name === e.who; }) || {}).ar || e.who : e.who);
-      return '<div class="ev"><span class="dotc ' + e.c + '">' + ui.icon(e.ic, "sm") + '</span><div class="bd"><b>' + esc(who) + (e.f >= 0 ? ' <span class="faint" style="font-weight:400">· ' + esc(fshort(e.f)) + "</span>" : "") + "</b><small>" + esc(L3(e.what)) + "</small><small>" + nm(e.when) + (e.tag ? " · " + nm(e.tag) : "") + "</small></div></div>";
+      return '<div class="ev"><span class="dotc ' + e.c + '">' + ui.icon(e.ic, "sm") + '</span><div class="bd"><b>' + esc(who) + (e.f >= 0 ? ' <span class="faint" style="font-weight:400">· ' + esc(fshort(e.f)) + "</span>" : "") + "</b><small>" + esc(L3(e.what)) + "</small><small>" + nm(e.when) + (e.tag ? " · " + nm(e.tag) : "") + "</small>" +
+        (e.actor ? '<div style="margin-top:4px">' + ui.pill("info", L("Acted by caregiver", "بواسطة مقدّم رعاية", "देखभालकर्ता द्वारा"), "users") + "</div>" : "") + "</div></div>";
     }).join("") + "</div></div>";
     h += sec(t("Your data", "بياناتك", "आपका डेटा"));
     h += '<div class="card">' + it(ico("download", "acc"), t("Download my data", "تنزيل بياناتي", "मेरा डेटा डाउनलोड करें"), t("A copy of everything, from every hospital", "نسخة من كل شيء من كل مستشفى", "हर अस्पताल से सब कुछ की एक कॉपी"), chev(), { ov: "ptdownload" }) +
+      it(ico("close", "crit"), t("Withdraw consent", "سحب الموافقة", "सहमति वापस लें"), t("Offers from clinics, or a clinic's use of your data", "عروض العيادات أو استخدام العيادة لبياناتك", "क्लिनिक के ऑफ़र, या क्लिनिक द्वारा डेटा का उपयोग"), chev(), { ov: "ptwithdraw" }) +
       it(ico("fingerprint"), esc(L(idRail()[0], idRail()[1], idRail()[2])), esc(L("Linked identity", "الهوية المرتبطة", "लिंक की गई पहचान")), chev(), { act: "ptRecTab", arg: "visits" }) +
+      it(ico("chat", "ok"), t("Do all of this on WhatsApp", "افعل كل هذا عبر واتساب", "यह सब व्हाट्सऐप पर करें"), t("Send MENU to your clinic or to Nabd", "أرسل «القائمة» إلى عيادتك أو إلى نبض", "अपने क्लिनिक या Nabd को MENU भेजें"), chev(), { act: "ptWaGo", arg: "records" }) +
       "</div>";
     h += '<div class="card stack s4">' + ui.toggle("ptLockSafe", L("Lock-screen safe messages", "رسائل آمنة على شاشة القفل", "लॉक-स्क्रीन सुरक्षित संदेश"), L("WhatsApp and notifications never include health details", "واتساب والإشعارات لا تتضمن تفاصيل صحية أبدًا", "व्हाट्सऐप और सूचनाओं में स्वास्थ्य जानकारी कभी नहीं"), true) +
-      ui.toggle("ptEmerg", L("Emergency access", "الوصول في الطوارئ", "आपातकालीन एक्सेस"), L("A doctor may open your records in an emergency. You'll be told and it's reviewed.", "قد يفتح طبيب سجلاتك في الطوارئ، وستُبلَّغ وتُراجع.", "आपात स्थिति में डॉक्टर रिकॉर्ड खोल सकते हैं। आपको बताया जाएगा और समीक्षा होगी।"), true) + "</div>";
+      enforcedRow() + ui.toggle("ptEmerg", L("Emergency access", "الوصول في الطوارئ", "आपातकालीन एक्सेस"), L("A doctor may open your records in an emergency. You'll be told and it's reviewed.", "قد يفتح طبيب سجلاتك في الطوارئ، وستُبلَّغ وتُراجع.", "आपात स्थिति में डॉक्टर रिकॉर्ड खोल सकते हैं। आपको बताया जाएगा और समीक्षा होगी।"), true) + "</div>";
     h += '<p class="small faint" style="margin:0;text-align:center">' + esc(L("Protected under " + NB.mkt().privacyLaw + " · data kept in " + NB.mkt().residency, "محمية بموجب " + NB.mkt().privacyLaw + " · البيانات محفوظة في " + NB.mkt().residency, NB.mkt().privacyLaw + " के तहत सुरक्षित · डेटा " + NB.mkt().residency + " में")) + "</p>";
     return h + "</div>";
   });
@@ -950,6 +1018,19 @@
       ui.note("info", t("We'll send a secure link to the app. It opens with a one-time code and expires in 24 hours.", "سنرسل رابطًا آمنًا إلى التطبيق يُفتح برمز لمرة واحدة وينتهي خلال 24 ساعة.", "हम ऐप में सुरक्षित लिंक भेजेंगे। यह एक बार के कोड से खुलेगा और 24 घंटे में ख़त्म होगा।"), "lock"),
       foot: ui.btn(L("Cancel", "إلغاء", "रद्द"), { act: "close", cls: "ghost" }) + ui.btn(L("Prepare my download", "جهّز التنزيل", "डाउनलोड तैयार करें"), { cls: "pri", act: "toast", arg: L("Preparing · ready in a few minutes", "جارٍ التجهيز · جاهز خلال دقائق", "तैयार हो रहा है · कुछ मिनट में"), icon: "download" }) };
   });
+
+  NB.overlay("ptwithdraw", function () {
+    var useReq = NB.v("ptWdUse", false);
+    return { title: t("Withdraw consent", "سحب الموافقة", "सहमति वापस लें"), body:
+      '<p class="small muted" style="margin:0">' + t("Switch off anything you no longer agree to. Visit reminders and safety messages always continue.", "أوقف ما لم تعد توافق عليه. تستمر تذكيرات الزيارات ورسائل السلامة دائمًا.", "जिस पर अब सहमत नहीं, उसे बंद करें। विज़िट रिमाइंडर और सुरक्षा संदेश हमेशा जारी रहेंगे।") + "</p>" +
+      '<div class="card stack s4">' + ui.toggle("wdM0", L("Offers & news from " + fshort(0), "عروض وأخبار من " + fshort(0), fshort(0) + " से ऑफ़र और ख़बरें"), L("WhatsApp, SMS and calls — one switch for all three", "واتساب والرسائل والمكالمات — مفتاح واحد للثلاثة", "व्हाट्सऐप, SMS और कॉल — तीनों के लिए एक स्विच"), true) +
+      ui.toggle("wdM2", L("Offers & news from " + fshort(2), "عروض وأخبار من " + fshort(2), fshort(2) + " से ऑफ़र और ख़बरें"), L("WhatsApp, SMS and calls", "واتساب والرسائل والمكالمات", "व्हाट्सऐप, SMS और कॉल"), false) +
+      ui.toggle("wdNabd", L("Nabd suggestions for nearby doctors", "اقتراحات نبض لأطباء قريبين", "पास के डॉक्टरों के Nabd सुझाव"), L("Only on the Nabd number", "على رقم نبض فقط", "सिर्फ़ Nabd नंबर पर"), false) + enforcedRow() + "</div>" +
+      '<div class="card stack s8">' + it(ico("building", "warn"), tx("Stop {0} using my data", "أوقف استخدام {0} لبياناتي", "{0} को मेरा डेटा इस्तेमाल करने से रोकें", [esc(fshort(2))]), t("The clinic reviews it and must reply within the legal time limit. Records the law requires them to keep are kept, but not used.", "تراجع العيادة الطلب ويجب أن ترد خلال المهلة القانونية. تُحفظ السجلات التي يلزم القانون بحفظها دون استخدامها.", "क्लिनिक समीक्षा करेगा और कानूनी समय-सीमा में जवाब देगा। जो रिकॉर्ड कानूनन रखने ज़रूरी हैं, वे रखे जाएँगे पर इस्तेमाल नहीं होंगे।"),
+        useReq ? ui.pill("sync", L("Requested", "مطلوب", "अनुरोध भेजा")) : ui.btn(L("Request", "اطلب", "अनुरोध"), { cls: "sm dng", act: "ptWdUse" })) + "</div>",
+      foot: ui.btn(L("Done", "تم", "हो गया"), { cls: "pri", act: "toast", arg: L("Saved · applies everywhere now", "تم الحفظ · يسري في كل مكان الآن", "सहेजा · अब हर जगह लागू"), icon: "check" }) };
+  });
+  NB.act("ptWdUse", function () { NB.setUI({ ptWdUse: true }); NB.toast(L("Request sent · ref DSR-2292", "أُرسل الطلب · المرجع DSR-2292", "अनुरोध भेजा · संदर्भ DSR-2292")); });
 
   /* ---------------- Patient app: My packages ---------------- */
   // Packages bought by Rakesh for himself and Meenu (INR-scale; NB.money converts per market).

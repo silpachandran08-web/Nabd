@@ -68,7 +68,9 @@
     ".bl-doc{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--div);font-size:13px}.bl-doc:last-child{border-bottom:0}",
     ".bl-doc span.fl{min-width:0}",
     "@media (max-width:760px){.bl-paper{padding:14px}.bl-paper .two{grid-template-columns:minmax(0,1fr)}.bl-pay{grid-template-columns:minmax(0,1fr)}}",
-    ".frame.mobile .bl-pay{grid-template-columns:minmax(0,1fr)}"
+    ".frame.mobile .bl-pay{grid-template-columns:minmax(0,1fr)}",
+    ".bl-plk{background:none;border:0;padding:4px 6px;margin:-4px -6px;border-radius:8px;color:inherit;font:inherit;text-align:start;cursor:pointer}.bl-plk:hover{background:var(--hover2)}.bl-plk .cellp b{color:var(--acc)}",
+    ".bl-pkt td:first-child{min-width:180px;max-width:240px}.bl-pkt td:first-child .cellp small,.bl-pkt td:first-child .cellp b{white-space:normal}"
   ].join("\n");
   if (!document.getElementById("bl-css")) { var st = document.createElement("style"); st.id = "bl-css"; st.textContent = CSS; document.head.appendChild(st); }
 
@@ -251,6 +253,9 @@
     packages: [
       { id: "PKG-0193", p: "p5", plan: "Laser hair reduction · 6 sessions", cat: "cos", sold: "02 Oct 2026", price: 18000, used: 3, total: 6, single: 3500, exp: "02 Apr 2027", st: "active", note: "Session 4 in progress" },
       { id: "PKG-0187", p: "p2", plan: "Melasma peel series · 4 sessions", cat: "cos", sold: "14 Sep 2026", price: 10000, used: 2, total: 4, single: 3000, exp: "14 Jan 2027", st: "active" },
+      { id: "PKG-0211", p: "p3", plan: "Physiotherapy · 10 sessions", cat: "svc", sold: "20 Jul 2026", price: 7500, used: 6, total: 10, single: 900, exp: "14 Nov 2026", st: "active", note: "Session 7 booked" },
+      { id: "PKG-0181", p: "p1", plan: "Hair PRP · 4 sessions", cat: "cos", sold: "10 Aug 2026", price: 14000, used: 2, total: 4, single: 4000, exp: "10 Feb 2027", st: "default" },
+      { id: "PKG-0162", p: "p6", plan: "Melasma peel series · 4 sessions", cat: "cos", sold: "14 Jul 2026", price: 10000, used: 1, total: 4, single: 3000, exp: "14 Jan 2027", st: "active", note: "2 gifted to sister" },
       { id: "MEM-0041", p: "p3", plan: "Diabetes care plan · 4 reviews + 4 HbA1c", cat: "svc", sold: "01 Apr 2026", price: 7200, used: 4, total: 8, single: 1100, exp: "31 Mar 2027", st: "active" },
       { id: "MEM-0038", p: "p8", plan: "Senior care membership · annual, unlimited GP visits", cat: "svc", sold: "01 Jan 2026", price: 6000, time: true, mUsed: 9.5, used: 7, exp: "31 Dec 2026", st: "active" },
       { id: "PKG-0169", p: "p9", plan: "Physiotherapy · 10 sessions", cat: "svc", sold: "20 Jul 2026", price: 6500, used: 6, total: 10, single: 800, exp: "20 Oct 2026", st: "expiring" },
@@ -735,52 +740,205 @@
   });
 
   /* ================= billing.packages ================= */
+  // Payment plan per sold package (FRD PKG-06/07, PR-03..05). inst: [amount, due, status, note]; status paid | due | sched | failed.
+  var PKX = {
+    "PKG-0193": { plan: "inst", inst: [[4500, "02 Oct 2026", "paid", "UPI AutoPay"], [4500, "01 Nov 2026", "sched", "AutoPay · reminder 29 Oct"], [4500, "01 Dec 2026", "sched", ""], [4500, "31 Dec 2026", "sched", ""]] },
+    "PKG-0211": { plan: "inst", inst: [[2500, "20 Jul 2026", "paid", "UPI"], [2500, "20 Aug 2026", "paid", "UPI AutoPay"], [2500, "20 Oct 2026", "due", "Reminder sent 17 Oct · WhatsApp"]] },
+    "PKG-0169": { plan: "inst", inst: [[2200, "20 Jul 2026", "paid", "Card"], [2150, "20 Aug 2026", "paid", "Card on file"], [2150, "15 Oct 2026", "failed", "Collection failed · retry 1 of 2 on 18 Oct"]] },
+    "PKG-0181": { plan: "inst", inst: [[3500, "10 Aug 2026", "paid", "UPI"], [3500, "10 Sep 2026", "failed", "Mandate failed · retried 11 Sep"], [3500, "10 Oct 2026", "failed", "Mandate failed · retried 11 Oct"], [3500, "10 Nov 2026", "sched", ""]] },
+    "PKG-0187": { plan: "pps", per: 2500 },
+    "PKG-0162": { plan: "full", moved: { to: "Ayesha Sheikh", rel: "sister", n: 2, on: "12 Oct 2026" } }
+  };
+  function pkx(k) { return PKX[k.id] || { plan: "full" }; }
+  function pkPaidV(k) { var x = pkx(k); return x.plan === "inst" ? x.inst.reduce(function (a, i) { return a + (i[2] === "paid" ? i[0] : 0); }, 0) : x.plan === "pps" ? k.used * x.per : k.price; }
   function pkLiab(k) {
     if (k.st === "refunded" || k.st === "completed") return 0;
     if (k.time) return Math.round(k.price * (12 - k.mUsed) / 12);
+    if (pkx(k).plan === "pps") return 0;  // pay-per-session: nothing is prepaid beyond the visit
     return Math.round(k.price / k.total * (k.total - k.used));
   }
-  var PKS = { active: ["ok", "Active"], expiring: ["warn", "Expiring soon", "clockh"], completed: ["mute", "Completed", "check"], refpend: ["sync", "Refund pending"], refunded: ["perm", "Refunded", "refresh"] };
+  function planCell(k) {
+    var x = pkx(k);
+    if (x.plan === "pps") return ui.cellp(L("Pay per session", "الدفع لكل جلسة", "हर सत्र भुगतान"), fm(cv(x.per)).replace(/<[^>]+>/g, "") + " × " + k.total + " · discount locked");
+    if (x.plan !== "inst") return ui.cellp(L("Full", "كامل", "पूरा"), k.time ? "Annual" : "Paid at sale");
+    var paid = x.inst.filter(function (i) { return i[2] === "paid"; }).length, failed = x.inst.filter(function (i) { return i[2] === "failed"; }).length, nx = x.inst.find(function (i) { return i[2] !== "paid"; });
+    return ui.cellp(L("Instalments ", "أقساط ", "किस्तें ") + paid + "/" + x.inst.length, failed ? '<span class="critc">' + failed + " failed" + (failed >= 2 ? " · bookings blocked" : " · retrying") + "</span>" : nx ? "Next " + nx[1].slice(0, 6) : "All paid");
+  }
+  var PKS = { active: ["ok", "Active"], expiring: ["warn", "Expiring soon", "clockh"], completed: ["mute", "Completed", "check"], refpend: ["sync", "Refund pending"], refunded: ["perm", "Refunded", "refresh"], "default": ["crit", "Payment default", "alertfill"] };
   NB.screen("billing.packages", function (c) {
-    var m = c.m, f = NB.v("blPkF", "all"), list = D.packages;
-    var rows = list.filter(function (k) { return f === "all" || k.st === f || (f === "refund" && /ref/.test(k.st)); });
+    var m = c.m, f = NB.v("blPkF", "all"), list = D.packages, tab = NB.v("blPkTab", "list");
     var liab = list.reduce(function (a, k) { return a + pkLiab(k); }, 0);
     var h = ui.header(L("Packages & memberships", "الباقات والعضويات", "पैकेज और सदस्यता"), "Prepaid sessions and memberships · unused value is a liability until it is used, expires or is refunded",
-      ui.btn(L("Sell package", "بيع باقة", "पैकेज बेचें"), { cls: "pri", act: "toast", arg: "Package sale opens checkout with tax per " + m.name + " rules", icon: "plus" }));
-    h += '<div class="grid g4 kpis">' + ui.kpi(String(list.filter(function (k) { return /active|expiring/.test(k.st); }).length), L("Active", "نشطة", "सक्रिय"), "Packages + memberships", "faint") +
+      ui.btn(L("Sell package", "بيع باقة", "पैकेज बेचें"), { cls: "pri", ov: "pksell", icon: "plus" }));
+    h += '<div class="grid g4 kpis">' + ui.kpi(String(list.filter(function (k) { return /active|expiring|default/.test(k.st); }).length), L("Active", "نشطة", "सक्रिय"), "Packages + memberships", "faint") +
       ui.kpi(NB.money(liab), L("Unearned liability", "الالتزام غير المكتسب", "अनर्जित देनदारी"), "Recognised as sessions are used", "warnc") + ui.kpi("42", L("Sessions redeemed this month", "الجلسات المستخدمة هذا الشهر", "इस माह सत्र उपयोग"), "↑ 8 vs September", "okc") +
-      ui.kpi("1", L("Expiring in 7 days", "تنتهي خلال 7 أيام", "7 दिन में समाप्त"), "Reminder sent with booking link", "faint") + "</div>";
+      ui.kpi(NB.money(2500 + 4500 + 2150), L("Instalments due in 30 days", "أقساط مستحقة خلال 30 يومًا", "30 दिन में देय किस्तें"), "1 overdue · 1 in default", "critc") + "</div>";
+    h += ui.tabs("blPkTab", [["list", L("Packages", "الباقات", "पैकेज"), "layers"], ["inst", L("Instalments & pay-per-session", "الأقساط والدفع لكل جلسة", "किस्तें और हर-सत्र भुगतान"), "calendar"], ["moves", L("Transfers & upgrades", "النقل والترقية", "ट्रांसफ़र और अपग्रेड"), "share"], ["tax", L("Tax split", "توزيع الضريبة", "टैक्स विभाजन"), "receipt"]], "list");
+    if (tab === "inst") return h + pkInstTab(m, list);
+    if (tab === "moves") return h + pkMovesTab(m, list);
+    if (tab === "tax") return h + pkTaxTab(m);
+    var rows = list.filter(function (k) { return f === "all" || k.st === f || (f === "refund" && /ref/.test(k.st)) || (f === "active" && k.st === "default"); });
     h += "<div>" + ui.seg("blPkF", [["all", "All", list.length], ["active", "Active"], ["expiring", "Expiring"], ["completed", "Completed"], ["refund", "Refunds"]], "all") + "</div>";
-    var table = ui.table([{ h: L("Package", "الباقة", "पैकेज") }, { h: L("Patient", "المريض", "मरीज़") }, { h: L("Paid", "المدفوع", "भुगतान"), cls: "r" }, { h: L("Used", "المستخدم", "उपयोग") }, { h: L("Expiry", "الانتهاء", "समाप्ति") }, { h: L("Liability", "الالتزام", "देनदारी"), cls: "r" }, { h: L("Status", "الحالة", "स्थिति") }, { h: "" }],
+    var table = ui.table([{ h: L("Package", "الباقة", "पैकेज") }, { h: L("Patient", "المريض", "मरीज़") }, { h: L("Price", "السعر", "मूल्य"), cls: "r" }, { h: L("Payment plan", "خطة الدفع", "भुगतान योजना") }, { h: L("Used · expiry", "المستخدم · الانتهاء", "उपयोग · समाप्ति") }, { h: L("Liability", "الالتزام", "देनदारी"), cls: "r" }, { h: L("Status", "الحالة", "स्थिति") }, { h: "" }],
       rows.map(function (k) { var P = NB.pat(k.p), s = PKS[k.st], pctU = k.time ? k.mUsed / 12 * 100 : k.used / k.total * 100;
-        var act = /active|expiring/.test(k.st) ? ui.btn("Refund preview", { cls: "sm", ov: "pkrefund", arg: k.id, icon: "refresh" }) : k.st === "refpend" ? ui.btn("View request", { cls: "sm", ov: "pkrefund", arg: k.id }) : "";
-        return { cls: k.st === "expiring" ? "urg" : "", cells: [ui.cellp('<span class="ltr">' + k.id + "</span>", ui.esc(k.plan)), ui.cellp(ui.esc(NB.pname(P)), "Sold " + k.sold), NB.money(k.price),
-          '<div class="stack s4" style="min-width:120px"><span class="small">' + (k.time ? '<span class="num">' + k.used + "</span> visits · " + k.mUsed + "/12 months" : '<span class="num">' + k.used + "/" + k.total + "</span> sessions") + (k.note ? " · " + k.note : "") + "</span>" + ui.bar(pctU, pctU >= 100 ? "ok" : "") + "</div>",
-          '<span class="small ' + (k.st === "expiring" ? "warnc" : "") + '">' + k.exp + "</span>", pkLiab(k) ? NB.money(pkLiab(k)) : '<span class="faint">—</span>', ui.pill(s[0], s[1], s[2]) + (k.cn ? '<div class="tiny faint">' + k.cn + "</div>" : k.rf ? '<div class="tiny faint">' + k.rf + "</div>" : ""), act] }; }), { min: 980 });
-    var cat = ui.card(L("Catalogue", "الكتالوج", "कैटलॉग"), '<div class="lst">' + [["Laser hair reduction · 6", 18000, 14, "cos"], ["Melasma peel series · 4", 10000, 9, "cos"], ["Physiotherapy · 10", 6500, 22, "svc"], ["Diabetes care plan · 12 months", 7200, 31, "svc"], ["Senior care membership", 6000, 48, "svc"]].map(function (p) {
-      var tr = taxOf({ cat: p[3], r: p[1] }, {}); return ui.li('<span class="av">' + ui.icon("layers", "sm") + "</span>", p[0], NB.money(p[1]) + " · " + (tr.rate ? (m.id === "india" ? "GST " : "VAT ") + tr.rate + "%" : tr.lbl) + " · " + p[2] + " sold", ""); }).join("") + "</div>", { icon: "layers" });
+        var act = /active|expiring|default/.test(k.st) ? ui.btn("Refund preview", { cls: "sm", ov: "pkrefund", arg: k.id, icon: "refresh" }) : k.st === "refpend" ? ui.btn("View request", { cls: "sm", ov: "pkrefund", arg: k.id }) : "";
+        return { cls: k.st === "expiring" ? "urg" : k.st === "default" ? "crit" : "", cells: [ui.cellp('<span class="ltr">' + k.id + "</span>", ui.esc(k.plan)), ui.cellp(ui.esc(NB.pname(P)), "Sold " + k.sold), NB.money(k.price),
+          '<button class="bl-plk" data-ov="pkplan" data-arg="' + k.id + '">' + planCell(k) + "</button>",
+          '<div class="stack s4" style="min-width:120px"><span class="small">' + (k.time ? '<span class="num">' + k.used + "</span> visits · " + k.mUsed + "/12 months" : '<span class="num">' + k.used + "/" + k.total + "</span> sessions") + (k.note ? " · " + k.note : "") + "</span>" + ui.bar(pctU, pctU >= 100 ? "ok" : "") + '<span class="tiny ' + (k.st === "expiring" ? "warnc" : "faint") + '">' + L("Expires ", "ينتهي ", "समाप्ति ") + k.exp + "</span></div>", pkLiab(k) ? NB.money(pkLiab(k)) : '<span class="faint">—</span>', ui.pill(s[0], s[1], s[2]) + (k.cn ? '<div class="tiny faint">' + k.cn + "</div>" : k.rf ? '<div class="tiny faint">' + k.rf + "</div>" : ""), act] }; }), { min: 1040 });
+    var cat = ui.card(L("Catalogue", "الكتالوج", "कैटलॉग"), '<div class="lst">' + [["Laser hair reduction · 6", 18000, 21000, 14, "cos"], ["Melasma peel series · 4", 10000, 12000, 9, "cos"], ["Physiotherapy · 10", 6500, 9000, 22, "svc"], ["Diabetes care plan · 12 months", 7200, 7600, 31, "svc"], ["Senior care membership", 6000, 0, 48, "svc"]].map(function (p) {
+      var tr = taxOf({ cat: p[4], r: p[1] }, {}); return ui.li('<span class="av">' + ui.icon("layers", "sm") + "</span>", p[0], (p[2] ? '<span class="bl-strike">' + fm(cv(p[2])) + "</span> → " : "") + NB.money(p[1]) + (p[2] ? " · save " + Math.round(100 * (p[2] - p[1]) / p[2]) + "%" : "") + " · " + (tr.rate ? (m.id === "india" ? "GST " : "VAT ") + tr.rate + "%" : tr.lbl) + " · " + p[3] + " sold", ""); }).join("") + "</div>", { icon: "layers" });
     var rules = ui.card(L("Refund rules", "قواعد الاسترداد", "रिफ़ंड नियम"), '<div class="bl-ck">' + [["One refund per package", "A pending request blocks a second one."], ["Redemption is frozen while a refund is pending", "No session can be used between request and approval."],
-      ["Amount is recalculated at approval", "Used sessions are repriced at the single-session rate, then a 5% processing fee."], ["Requester never approves", "Owner or finance approves; a credit note reverses the tax."]].map(function (r) {
+      ["Used sessions at the full single-session price", "Refund = paid − used × single price. No cancellation or processing fee by default."], ["Shortfall is shown, not hidden", "If the patient paid less than they used (instalments), the preview says “patient owes” and open instalments are cancelled."],
+      ["Requester never approves", "Owner or finance approves; a credit note reverses the tax, refund goes to source."]].map(function (r) {
       return '<div class="ci">' + ui.icon("checkcircle", "sm okc") + '<div class="t"><b>' + r[0] + "</b><small>" + r[1] + "</small></div></div>"; }).join("") + "</div>", { icon: "shieldcheck" });
-    return h + '<div class="bl-nw">' + table + "</div>" + '<div class="grid g2">' + cat + rules + "</div>";
+    return h + '<div class="bl-nw bl-pkt">' + table + "</div>" + '<div class="grid g2">' + cat + rules + "</div>";
   });
+
+  /* ---- Instalments & pay-per-session ---- */
+  function instPill(st) {
+    return st === "paid" ? ui.pill("ok", "Paid") : st === "due" ? ui.pill("warn", "Due in 3 days", "clockh") : st === "failed" ? ui.pill("crit", "Failed", "alertfill") : ui.pill("mute", "Scheduled", "calendar");
+  }
+  function autoName() { return { india: "UPI AutoPay (e-mandate)", uae: "Card on file (tokenised)", ksa: "mada / card on file", qatar: "Card on file (NAPS)" }[mi()]; }
+  function pkInstTab(m, list) {
+    var rows = [];
+    list.forEach(function (k) { var x = pkx(k); if (x.plan !== "inst") return; x.inst.forEach(function (i, n) { if (i[2] === "paid" && n < x.inst.length - 2) return; rows.push({ k: k, i: i, n: n + 1, of: x.inst.length, fails: x.inst.filter(function (z) { return z[2] === "failed"; }).length }); }); });
+    var ord = { failed: 0, due: 1, sched: 2, paid: 3 };
+    rows.sort(function (a, b) { return ord[a.i[2]] - ord[b.i[2]]; });
+    var h = '<div class="grid g4 kpis">' + ui.kpi(NB.money(2500), "Due in 7 days", "1 instalment · reminder sent", "warnc") + ui.kpi(NB.money(2150 + 3500 + 3500), "Overdue", "3 failed collections", "critc") +
+      ui.kpi(NB.money(4500 + 2500 + 2150), "Collected this month", "AutoPay 2 · desk 1", "okc") + ui.kpi("1", "Bookings blocked", "PKG-0181 · 2 failed instalments", "critc") + "</div>";
+    h += '<div class="bl-nw">' + ui.table([{ h: "Package" }, { h: "Patient" }, { h: "Instalment" }, { h: "Due" }, { h: "Amount", cls: "r" }, { h: "Collection" }, { h: "Status" }, { h: "" }], rows.map(function (r) {
+      var P = NB.pat(r.k.p), blocked = r.fails >= 2;
+      var act = r.i[2] === "failed" ? (blocked ? ui.btn("Override block", { cls: "sm", ov: "pkplan", arg: r.k.id, icon: "unlock" }) : ui.btn("Send pay link", { cls: "sm", act: "toast", arg: "Pay link sent to " + NB.pname(P) + " on WhatsApp", icon: "send" }))
+        : r.i[2] === "due" || r.i[2] === "sched" ? ui.btn("Remind now", { cls: "sm ghost", act: "toast", arg: "Reminder sent on WhatsApp (SMS fallback if undelivered)", icon: "bell" }) : "";
+      return { cls: r.i[2] === "failed" ? "crit" : r.i[2] === "due" ? "urg" : "", cells: [ui.cellp('<span class="ltr">' + r.k.id + "</span>", ui.esc(r.k.plan)), ui.esc(NB.pname(P)), '<span class="num">' + r.n + " of " + r.of + "</span>", '<span class="small">' + r.i[1] + "</span>", fm(cv(r.i[0])),
+        ui.cellp(ui.esc(r.i[2] === "paid" ? r.i[3] : autoName()), ui.esc(r.i[2] === "paid" ? "Receipt sent" : r.i[3] || "Reminder 3 days before + on the day")), instPill(r.i[2]) + (blocked && r.i[2] === "failed" ? '<div class="tiny critc">Bookings blocked</div>' : ""), act] };
+    }), { min: 1060 }) + "</div>";
+    var pps = list.filter(function (k) { return pkx(k).plan === "pps"; }).map(function (k) {
+      var x = pkx(k), P = NB.pat(k.p);
+      return ui.li('<span class="av">' + ui.icon("wallet", "sm") + "</span>", ui.esc(NB.pname(P)) + " · " + ui.esc(k.plan), "Session " + (k.used + 1) + " of " + k.total + " at " + fm(cv(x.per)).replace(/<[^>]+>/g, "") + " (list " + fm(cv(k.single)).replace(/<[^>]+>/g, "") + ") · discount locked while all sessions are completed · collected " + fm(cv(pkPaidV(k))).replace(/<[^>]+>/g, "") + " so far", ui.pill("sub", "Per session", "wallet"));
+    }).join("");
+    var rules = '<div class="bl-ck">' + [["Schedule shown before the patient agrees", "2–4 instalments on fixed dates, generated at sale and sent on WhatsApp for approval."], ["Auto-reminder", "WhatsApp 3 days before and on the due date" + (m.id === "india" ? "; RBI pre-debit notice 24 h before each UPI AutoPay debit" : "") + "; SMS fallback if WhatsApp isn't delivered."],
+      ["Retry, then block", "A failed collection retries once next day. After 2 failed instalments new session bookings are blocked; the owner can override with a reason."], ["Clinic credit, not a loan", "No lender, no interest. The patient can pay early from WhatsApp at any time."]].map(function (r) {
+      return '<div class="ci">' + ui.icon("checkcircle", "sm okc") + '<div class="t"><b>' + r[0] + "</b><small>" + r[1] + "</small></div></div>"; }).join("") + "</div>";
+    return h + '<div class="grid g2">' + ui.card("Pay-per-session packages", '<div class="lst">' + pps + "</div>" + '<p class="small faint" style="margin:10px 0 0">Nothing is prepaid, so there is no liability. If the patient stops early the discount is not clawed back.</p>', { icon: "wallet" }) + ui.card("Collection rules", rules, { icon: "shieldcheck" }) + "</div>";
+  }
+
+  /* ---- Transfers, gifting, upgrade / downgrade ---- */
+  var UPG = {
+    "MEM-0041": { up: ["Diabetes care plan plus · 12", 12, 9900], down: ["Diabetes care lite · 2 reviews", 2, 2000] },
+    "PKG-0211": { up: ["Physiotherapy · 15 sessions", 15, 10500], down: ["Physiotherapy · 5 sessions", 5, 4000] },
+    "PKG-0193": { up: ["Laser hair reduction · 10", 10, 27000], down: ["Laser touch-up · 4", 4, 13000] }
+  };
+  function pkMovesTab(m, list) {
+    var tr = [
+      ["PKG-0162", "Fatima Sheikh", "Ayesha Sheikh · sister", "2 sessions", "12 Oct 2026", ui.pill("ok", "Completed"), "OTP by owner 11:02 · new card PKG-0162-T"],
+      ["PKG-0211", "Rakesh Menon", "Latha Menon · wife", "2 sessions", "17 Oct 2026", ui.pill("warn", "Awaiting recipient", "hourglass"), "OTP approved · Latha accepts on her phone"],
+      ["PKG-0193", "Suresh Pillai", "—", "—", "—", ui.pill("mute", "0 of 1 used"), "Transfer still available"]
+    ];
+    var h = ui.card("Transfers & gifts", ui.table([{ h: "Package" }, { h: "From" }, { h: "To (family-linked)" }, { h: "Moved" }, { h: "Date" }, { h: "Status" }, { h: "Audit" }], tr.map(function (r) {
+      return ['<span class="ltr">' + r[0] + "</span>", ui.esc(r[1]), ui.esc(r[2]), r[3], '<span class="small">' + r[4] + "</span>", r[5], '<span class="small faint">' + ui.esc(r[6]) + "</span>"]; }), { min: 860 }) +
+      '<p class="small faint" style="margin:10px 0 0">Max 1 transfer per package · only to a family-linked member or a gift recipient · the owner approves by OTP · expiry never resets · recipient gets their own card' + (m.id === "ksa" ? " (Arabic gift card available)" : "") + ".</p>", { icon: "share" });
+    var pid = NB.v("blUpPk", "MEM-0041"), dir = NB.v("blUpDir", "up"), k = D.packages.find(function (x) { return x.id === pid; }), U = UPG[pid], tgt = U[dir];
+    var paid = pkPaidV(k), unused = k.total - k.used, credit = Math.round(unused / k.total * k.price), open = k.price - paid, net = credit - open, diff = tgt[2] - net;
+    var docs = { india: "GST credit note on the old invoice + new tax invoice", uae: "VAT credit note + new tax invoice", ksa: "ZATCA credit note referencing the original + new e-invoice with QR", qatar: "Credit note + new invoice (no VAT)" }[m.id];
+    var calcH = '<div class="row" style="flex-wrap:wrap;gap:8px">' + ui.seg("blUpPk", Object.keys(UPG).map(function (id) { return [id, id]; }), "MEM-0041") + ui.seg("blUpDir", [["up", "Upgrade"], ["down", "Downgrade"]], "up") + "</div>" +
+      '<p class="small muted" style="margin:10px 0">' + ui.esc(NB.pname(NB.pat(k.p))) + " · " + ui.esc(k.plan) + " → <b>" + ui.esc(tgt[0]) + "</b></p>" +
+      '<div class="bl-sum"><div class="r"><span>Unused sessions</span><span class="num">' + unused + " / " + k.total + "</span></div>" +
+      '<div class="r"><span>Credit = ' + unused + " ÷ " + k.total + " × package price " + fm(cv(k.price)).replace(/<[^>]+>/g, "") + "</span>" + fm(cv(credit), 2) + "</div>" +
+      (open ? '<div class="r sub"><span>Less open instalments (cancelled, netted here)</span><span>−' + fm(cv(open), 2) + "</span></div>" : "") +
+      '<div class="r"><span>New package · ' + tgt[1] + " sessions</span>" + fm(cv(tgt[2]), 2) + "</div>" +
+      '<div class="r tot"><span>' + (diff >= 0 ? "Patient pays the difference" : "Refund due to patient") + "</span>" + fm(cv(Math.abs(diff)), 2) + "</div></div>" +
+      ui.note("info", "Old instance closes as <b>Replaced</b> (history kept for audit); a new instance starts with its own validity. Documents: " + docs + "." + (diff < 0 ? " Downgrade refunds follow the package refund rules (no fee, refund to source)." : "") + " The patient sees this math on WhatsApp and approves before anything is charged.") +
+      '<div class="btns" style="margin-top:12px">' + ui.btn("Send to patient for approval", { cls: "pri", act: "toast", arg: "Sent on WhatsApp · the patient approves with a code", icon: "send" }) + "</div>";
+    return h + '<div class="grid g2">' + ui.card("Upgrade / downgrade · pro-rated", calcH, { icon: "layers" }) +
+      ui.card("How the credit works", '<div class="bl-ck">' + [["Credit = unused ÷ total × package price", "Unused sessions are valued at the package rate, so the patient keeps their discount on what they didn't use."], ["Open instalments are netted", "Unpaid instalments are cancelled and subtracted from the credit, so nobody pays twice or gets credit for money not paid."], ["Downgrade = refund of the difference", "If the new package costs less than the credit, the difference is refunded to source with a credit note."], ["Expiry", "The new package gets its own validity from today; a transfer never resets expiry."]].map(function (r) {
+        return '<div class="ci">' + ui.icon("checkcircle", "sm okc") + '<div class="t"><b>' + r[0] + "</b><small>" + r[1] + "</small></div></div>"; }).join("") + "</div>", { icon: "info" }) + "</div>";
+  }
+
+  /* ---- Per-component tax split (FRD PKG-09, PT-02, WE-01 / WE-02) ---- */
+  function pkTaxTab(m) {
+    var ksa = m.id === "ksa", raw = ksa;
+    // [name, cat, qty, unit list price (tax-inclusive), type]
+    var P = ksa ? { name: "Clean & Bright combo (dental)", price: 1150, comps: [["Scaling & polishing", "svc", 1, 300, "Service"], ["Whitening session", "cos", 1, 900, "Service"], ["Take-home whitening kit", "otc", 1, 250, "Product"]] }
+      : { name: "Acne Clear package (dermatology)", price: 12999, comps: [["Acne treatment session", "svc", 6, 2000, "Service"], ["Chemical peel", "cos", 2, 1500, "Service"], ["Medicated cream", "otc", 1, 800, "Product"]] };
+    var C = function (v) { return raw ? v : cv(v); }, price = C(P.price), sum = P.comps.reduce(function (a, x) { return a + C(x[3]) * x[2]; }, 0), left = price, tot = { tax: 0, net: 0 };
+    // Tax is rounded once on the whole bundle; the rounding difference lands on the last taxed line, so totals match the e-invoice.
+    var exact = P.comps.reduce(function (a, x) { var rt = taxOf({ cat: x[1], r: x[3] }, {}).rate; return a + price * (C(x[3]) * x[2] / sum) * rt / (100 + rt); }, 0), taxLeft = r2(exact);
+    var lastTaxed = P.comps.reduce(function (a, x, i) { return taxOf({ cat: x[1], r: x[3] }, {}).rate ? i : a; }, -1);
+    var rows = P.comps.map(function (x, i) {
+      var list = r2(C(x[3]) * x[2]), share = list / sum, alloc = i === P.comps.length - 1 ? r2(left) : r2(price * share); left = r2(left - alloc);
+      var tr = taxOf({ cat: x[1], r: x[3] }, {}), tax = i === lastTaxed ? r2(taxLeft) : r2(alloc - alloc / (1 + tr.rate / 100)), net = r2(alloc - tax); taxLeft = r2(taxLeft - tax); tot.tax += tax; tot.net += net;
+      return [ui.cellp(ui.esc(x[0]), m.id === "india" ? (x[4] === "Product" ? "HSN 3004" : x[1] === "cos" ? "SAC 999722" : "SAC 999312") : ui.esc(x[4])), ui.pill(x[4] === "Product" ? "sub" : "info", x[4], x[4] === "Product" ? "box" : "steth"), '<span class="num">' + x[2] + "</span>", fm(list, 2), '<span class="num">' + (share * 100).toFixed(1) + "%</span>", fm(alloc, 2),
+        tr.rate ? '<span class="num">' + tr.rate + "%</span>" : '<span class="small faint">' + ui.esc(tr.lbl || "0%") + "</span>", fm(net, 2), fm(tax, 2)];
+    });
+    rows.push({ cls: "sel", cells: ["<b>Package total</b>", "", "", fm(sum, 2), '<span class="num">100%</span>', "<b>" + fm(price, 2) + "</b>", "", "<b>" + fm(r2(tot.net), 2) + "</b>", "<b>" + fm(r2(tot.tax), 2) + "</b>"] });
+    var save = sum - price;
+    var h = ui.card(ui.esc(P.name) + " · " + (ksa ? "VAT-inclusive (KSA)" : m.id === "india" ? "GST-inclusive" : m.id === "uae" ? "VAT-inclusive" : "no VAT"),
+      '<p class="small muted" style="margin:0 0 12px">Bought separately <span class="bl-strike">' + fm(sum) + "</span> → package " + fm(price) + " · you save " + fm(save) + " (" + Math.round(100 * save / sum) + "%) — printed on the receipt too.</p>" +
+      ui.table([{ h: "Component" }, { h: "Type" }, { h: "Qty" }, { h: "List value", cls: "r" }, { h: "Share", cls: "r" }, { h: "Allocated", cls: "r" }, { h: "Tax" }, { h: "Taxable value", cls: "r" }, { h: "Tax amount", cls: "r" }], rows, { min: 980 }) +
+      '<p class="small faint" style="margin:10px 0 0">The bundle price is split across components at the list-price ratio; each line keeps its own tax tag. ' +
+      (m.id === "india" ? "Clinical services stay GST-exempt; the cosmetic peel (18%) and the cream (product, 5%) carry GST on their own lines." : ksa ? "All components carry 15% VAT: ZATCA e-invoice shows net " + fm(r2(tot.net), 2).replace(/<[^>]+>/g, "") + " + VAT " + fm(r2(tot.tax), 2).replace(/<[^>]+>/g, "") + " with QR." : m.id === "uae" ? "Qualifying healthcare is zero-rated; the cosmetic service and the product carry 5% VAT." : "No VAT in Qatar; lines are still split for reporting.") + "</p>", { icon: "receipt" });
+    h += '<div class="grid g2">' + ui.card("On refund or upgrade", '<div class="bl-ck">' + [["Used components at list price", "A used peel is valued at its own list price, not the bundle rate."], ["Tax reversed line by line", "The credit note reverses tax on each returned component at that line's rate."], ["Products handed over are used", "A take-home product counts as consumed once handed over at the desk."]].map(function (r) {
+      return '<div class="ci">' + ui.icon("checkcircle", "sm okc") + '<div class="t"><b>' + r[0] + "</b><small>" + r[1] + "</small></div></div>"; }).join("") + "</div>", { icon: "refresh" }) +
+      ui.card("Price floor", '<p class="small muted" style="margin:0">The owner can override a package price, but never below the floor (' + fm(Math.round(price * 0.85)) + " for this package). Overrides below it are blocked with a clear message.</p>", { icon: "lock" }) + "</div>";
+    return h;
+  }
+
+  /* ---- Overlays: payment plan, sell package, refund preview ---- */
+  NB.overlay("pkplan", function (id) {
+    var k = D.packages.find(function (p) { return p.id === id; }) || D.packages[0], x = pkx(k), P = NB.pat(k.p), ovr = NB.v("blOvr_" + k.id, false);
+    var body = '<div class="row sb">' + ui.cellp(ui.esc(NB.pname(P)) + " · " + ui.esc(k.id), ui.esc(k.plan)) + ui.pill(PKS[k.st][0], PKS[k.st][1], PKS[k.st][2]) + "</div>";
+    if (x.plan === "inst") {
+      var fails = x.inst.filter(function (i) { return i[2] === "failed"; }).length;
+      if (fails >= 2) body += ui.note(ovr ? "ok" : "crit", ovr ? "<b>Owner override active.</b> One session may be booked while the patient settles. Logged with reason." : "<b>Payment default.</b> 2 instalments failed, so new session bookings are blocked. The patient can pay early from WhatsApp, or the owner can override with a reason.");
+      body += ui.table([{ h: "#" }, { h: "Due" }, { h: "Amount", cls: "r" }, { h: "Collection" }, { h: "Status" }], x.inst.map(function (i, n) { return ['<span class="num">' + (n + 1) + "</span>", i[1], fm(cv(i[0])), '<span class="small">' + ui.esc(i[3] || autoName()) + "</span>", instPill(i[2])]; }), { min: 520 }) +
+        '<div class="bl-sum"><div class="r"><span>Paid so far</span>' + fm(cv(pkPaidV(k)), 2) + '</div><div class="r"><span>Still to collect</span>' + fm(cv(k.price - pkPaidV(k)), 2) + "</div></div>" +
+        ui.note("info", "Collected by " + autoName() + ". Reminders on WhatsApp 3 days before and on the day; SMS fallback if WhatsApp isn't delivered.");
+    } else if (x.plan === "pps") body += ui.note("info", "Pay per session: " + fm(cv(x.per)).replace(/<[^>]+>/g, "") + " at each visit instead of " + fm(cv(k.single)).replace(/<[^>]+>/g, "") + ". Discount locked while all " + k.total + " sessions are completed; no clawback if the patient stops early.");
+    else body += ui.note("ok", "Paid in full at sale" + (x.moved ? ". " + x.moved.n + " sessions transferred to " + x.moved.to + " (" + x.moved.rel + ") on " + x.moved.on + "; expiry unchanged." : "."));
+    return { kind: "drawer", title: "Payment plan · " + k.id, body: body, foot: ui.btn("Close", { act: "close", cls: "ghost" }) +
+      (x.plan === "inst" && x.inst.filter(function (i) { return i[2] === "failed"; }).length >= 2 && !ovr ? ui.btn("Owner override (1 session)", { act: "blovr", arg: k.id, icon: "unlock" }) : "") +
+      (x.plan === "inst" ? ui.btn("Send pay link", { cls: "pri", act: "toast", arg: "Pay link sent on WhatsApp", icon: "send" }) : "") };
+  });
+  NB.act("blovr", function (id) { NB.state.ui["blOvr_" + id] = true; NB.toast("Override logged by Dr. Arvind Rao · reason: patient paying at next visit"); });
+
+  NB.overlay("pksell", function () {
+    var m = NB.mkt(), plan = NB.v("blSellPlan", "inst"), n = +NB.v("blSellN", "4"), price = 18000, list = 21000, floor = 15300;
+    var amt = Math.floor(price / n), last = price - amt * (n - 1), days = [0, 30, 60, 90];
+    var dates = ["17 Oct 2026", "16 Nov 2026", "16 Dec 2026", "15 Jan 2027"];
+    var body = ui.field("Package", "Laser hair reduction · 6 sessions", { id: "pks-p", options: ["Laser hair reduction · 6 sessions", "Melasma peel series · 4 sessions", "Physiotherapy · 10 sessions", "Diabetes care plan · 12 months"] }) +
+      '<p class="small muted" style="margin:0">Bought separately <span class="bl-strike">' + fm(cv(list)) + "</span> → package " + fm(cv(price)) + " · save " + Math.round(100 * (list - price) / list) + "% · floor " + fm(cv(floor)) + " (overrides below are blocked)</p>" +
+      '<span class="small muted">How will the patient pay?</span><div class="stack s8">' + ui.radio("blSellPlan", "full", "Full payment now", "Package activates only when the payment succeeds", "inst") +
+      ui.radio("blSellPlan", "inst", "Instalments (2–4)", "Fixed dates, auto-collected by " + autoName() + ", schedule shown before the patient agrees", "inst") +
+      ui.radio("blSellPlan", "pps", "Pay per session", "Session price " + fm(cv(3000)).replace(/<[^>]+>/g, "") + " instead of " + fm(cv(3500)).replace(/<[^>]+>/g, "") + "; discount locked while all sessions are completed", "inst") + "</div>";
+    if (plan === "inst") body += ui.seg("blSellN", [["2", "2 instalments"], ["3", "3 instalments"], ["4", "4 instalments"]], "4") +
+      ui.table([{ h: "#" }, { h: "Day" }, { h: "Date" }, { h: "Amount", cls: "r" }], days.slice(0, n).map(function (d, i) { return ['<span class="num">' + (i + 1) + "</span>", "Day " + d, dates[i], fm(cv(i === n - 1 ? last : amt), 2)]; }), { min: 420 }) +
+      ui.note("info", "This schedule goes to the patient on WhatsApp before they agree. Reminders 3 days before each date" + (m.id === "india" ? "; RBI pre-debit notice 24 h before each AutoPay debit" : "") + ". 2 failed instalments block new bookings (owner can override). Clinic credit — no lender.");
+    return { kind: "drawer", title: L("Sell package", "بيع باقة", "पैकेज बेचें"), body: body,
+      foot: ui.btn("Cancel", { act: "close", cls: "ghost" }) + ui.btn(plan === "full" ? "Take payment" : plan === "inst" ? "Send schedule for approval" : "Create package", { cls: "pri", act: "toast", arg: plan === "inst" ? "Schedule sent on WhatsApp · package activates after the first instalment" : "Package created · digital card sent on WhatsApp", icon: "send" }) };
+  });
+
   NB.overlay("pkrefund", function (id) {
-    var m = NB.mkt(), k = D.packages.find(function (p) { return p.id === id; }) || D.packages[0], P = NB.pat(k.p), req = NB.v("blPkReq", {});
+    var m = NB.mkt(), k = D.packages.find(function (p) { return p.id === id; }) || D.packages[0], P = NB.pat(k.p), req = NB.v("blPkReq", {}), x = pkx(k);
     var pending = k.st === "refpend" || req[k.id];
-    var usedVal = k.time ? Math.round(k.price * k.mUsed / 12) : Math.min(k.price, k.used * k.single), fee = Math.round(k.price * 0.05), net = Math.max(0, k.price - usedVal - fee);
-    var tr = taxOf({ cat: k.cat, r: k.price }, {}), taxBack = cv(net) * tr.rate / 100;
+    // FRD PKG-08 / PR-06: used sessions at the FULL single-session price; no cancellation or processing fee by default; tax reversed.
+    var paid = pkPaidV(k), pps = x.plan === "pps";
+    var usedVal = k.time ? Math.round(k.price * k.mUsed / 12) : pps ? paid : k.used * k.single, net = paid - usedVal, owes = net < 0;
+    var tr = taxOf({ cat: k.cat, r: k.price }, {}), taxBack = owes ? 0 : cv(net) * tr.rate / 100;
+    var openInst = x.plan === "inst" ? x.inst.filter(function (i) { return i[2] !== "paid"; }) : [];
     var body = '<div class="row sb">' + ui.cellp(ui.esc(NB.pname(P)) + " · " + ui.esc(k.id), ui.esc(k.plan)) + ui.pill(PKS[k.st][0], PKS[k.st][1], PKS[k.st][2]) + "</div>";
     if (pending) body += ui.note("warn", "<b>Refund " + (k.rf || "RF-0013") + " is waiting for approval.</b> Redemption is frozen on this package and a second refund cannot be requested. The amount below is recalculated at the moment of approval.");
-    body += '<div class="bl-sum"><div class="r"><span>Package price (taxable value)</span>' + fm(cv(k.price), 2) + "</div>" +
-      '<div class="r sub"><span>' + (k.time ? "Time used · " + k.mUsed + " of 12 months" : "Sessions used · " + k.used + " × single-session rate " + fm(cv(k.single)).replace(/<[^>]+>/g, "")) + "</span><span>−" + fm(cv(usedVal), 2) + "</span></div>" +
-      '<div class="r sub"><span>Processing fee 5%</span><span>−' + fm(cv(fee), 2) + "</span></div>" +
-      '<div class="r"><span>Refundable value</span>' + fm(cv(net), 2) + "</div>" +
-      (tr.rate ? '<div class="r sub"><span>' + (m.id === "india" ? "GST" : "VAT") + " " + tr.rate + "% reversed on credit note</span>" + fm(r2(taxBack), 2) + "</div>" : '<div class="r sub"><span>' + ui.esc(tr.lbl || "No tax") + "</span>" + fm(0, 2) + "</div>") +
-      '<div class="r tot"><span>Refund to patient</span>' + fm(r2(cv(net) + taxBack), 2) + "</div></div>" +
-      '<div class="fgrid">' + ui.field("Reason", "Patient relocating", { id: "pk-r", options: ["Patient relocating", "Medical reason (doctor's note)", "Dissatisfied with results", "Duplicate purchase"] }) + ui.field("Refund to", "Original method (UPI)", { id: "pk-t", options: ["Original method (UPI)", "Patient wallet (credit)"] }) + "</div>" +
+    body += '<div class="bl-sum"><div class="r"><span>' + (x.plan === "full" ? "Package price (taxable value)" : "Paid so far (taxable value)") + "</span>" + fm(cv(paid), 2) + "</div>" +
+      '<div class="r sub"><span>' + (k.time ? "Time used · " + k.mUsed + " of 12 months" : pps ? "Sessions used · " + k.used + " paid per visit (no clawback)" : "Sessions used · " + k.used + " × single-session price " + fm(cv(k.single)).replace(/<[^>]+>/g, "")) + "</span><span>−" + fm(cv(usedVal), 2) + "</span></div>" +
+      '<div class="r sub"><span>Processing fee</span><span>None (clinic policy)</span></div>' +
+      '<div class="r"><span>' + (owes ? "Shortfall" : "Refundable value") + "</span>" + fm(cv(Math.abs(net)), 2) + "</div>" +
+      (owes ? "" : tr.rate ? '<div class="r sub"><span>' + (m.id === "india" ? "GST" : "VAT") + " " + tr.rate + "% reversed on credit note</span>" + fm(r2(taxBack), 2) + "</div>" : '<div class="r sub"><span>' + ui.esc(tr.lbl || "No tax") + "</span>" + fm(0, 2) + "</div>") +
+      '<div class="r tot"><span>' + (owes ? "Patient owes" : "Refund to patient") + "</span>" + fm(r2(cv(Math.abs(net)) + taxBack), 2) + "</div></div>" +
+      (openInst.length ? ui.note(owes ? "warn" : "info", openInst.length + " open instalment" + (openInst.length > 1 ? "s" : "") + " (" + fm(cv(openInst.reduce(function (a, i) { return a + i[0]; }, 0))).replace(/<[^>]+>/g, "") + ") will be cancelled and the " + autoName() + " stopped." + (owes ? " The package closes only when the shortfall is settled or written off by a manager with a reason code." : "")) : "") +
+      '<div class="fgrid">' + ui.field("Reason", "Patient relocating", { id: "pk-r", options: ["Patient relocating", "Medical reason (doctor's note)", "Dissatisfied with results", "Duplicate purchase"] }) + ui.field("Refund to", "Original method (" + m1Label() + ")", { id: "pk-t", options: ["Original method (" + m1Label() + ")", "Patient wallet (credit)"] }) + "</div>" +
       ui.note("info", "Unused liability on this package today: <b>" + NB.money(pkLiab(k)).replace(/<[^>]+>/g, "") + "</b>. The difference between liability and refund is recognised as revenue when the credit note is issued.");
     return { kind: "drawer", title: L("Package refund preview", "معاينة استرداد الباقة", "पैकेज रिफ़ंड पूर्वावलोकन"), body: body,
-      foot: ui.btn("Close", { act: "close", cls: "ghost" }) + ui.btn(pending ? "Refund already requested" : "Request refund (owner approves)", { cls: "pri", act: "blpkrefund", arg: k.id, icon: "send", disabled: !!pending }) };
+      foot: ui.btn("Close", { act: "close", cls: "ghost" }) + ui.btn(pending ? "Refund already requested" : owes ? "Request settlement (owner approves)" : "Request refund (owner approves)", { cls: "pri", act: "blpkrefund", arg: k.id, icon: "send", disabled: !!pending }) };
   });
   NB.act("blpkrefund", function (id) {
     var req = Object.assign({}, NB.v("blPkReq", {})), k = D.packages.find(function (p) { return p.id === id; });
