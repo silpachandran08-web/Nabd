@@ -139,9 +139,9 @@ public class PackageInstanceService {
     }
 
     @Transactional
-    public List<InstanceResponse> list(UUID tenantId) {
+    public List<InstanceResponse> list(UUID tenantId, UUID patientId) {
         tenantContext.set(tenantId);
-        return repo.listInstances(tenantId).stream().map(row -> toResponse(tenantId, row, false)).toList();
+        return repo.listInstances(tenantId, patientId).stream().map(row -> toResponse(tenantId, row, false)).toList();
     }
 
     @Transactional
