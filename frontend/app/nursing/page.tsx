@@ -22,12 +22,14 @@ type QueueEntry = {
   priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
   priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
   source: string; presentingComplaint: string | null; appointmentId: string | null;
+  // NUR-012 (S4 contract): optional until the backend ships them; the UI falls back to patient/staff lookups.
+  ageYears?: number | null; gender?: string | null; doctorName?: string | null; waitMinutes?: number | null; visitType?: string | null;
 };
 type Row = QueueEntry & {
   patientName: string; patientMrn: string; doctorName: string;
   allergies: string[]; chronicConditions: string[];
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
-  dob: string | null; gender: string | null; hasAppointment: boolean;
+  dob: string | null; gender: string | null; hasAppointment: boolean; ageYears: number | null; wait: number;
   // The patient record could not be read (no patients:view, 404, 5xx): allergies are UNKNOWN, not absent.
   flagsUnknown: boolean;
 };
@@ -45,9 +47,10 @@ function flagsFor(r: { allergies: string[]; chronicConditions: string[]; present
 }
 
 // "58 M" from the patient's real dob/gender; either part is simply left out when unknown.
-function ageSex(dob: string | null, gender: string | null): string {
+function ageSex(dob: string | null, gender: string | null, ageYears?: number | null): string {
   const parts: string[] = [];
-  if (dob) {
+  if (ageYears != null) parts.push(String(ageYears));
+  else if (dob) {
     const d = new Date(dob);
     if (!Number.isNaN(d.getTime())) {
       const now = new Date();
@@ -203,6 +206,10 @@ function NursingWorklist() {
   const [prevError, setPrevError] = useState(false);
   const [vitalsAttempted, setVitalsAttempted] = useState(false);
   const [vitalsError, setVitalsError] = useState<string | null>(null);
+  // NUR-012: read-only view of a recorded visit's vitals (GET /clinical/vitals/{queueEntryId}).
+  const [viewRow, setViewRow] = useState<Row | null>(null);
+  const [viewVitals, setViewVitals] = useState<(PreviousVitals & { abnormalFlags?: string[] }) | null>(null);
+  const [viewError, setViewError] = useState(false);
   const [vitalsFlags, setVitalsFlags] = useState<string[] | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
 
@@ -298,10 +305,11 @@ function NursingWorklist() {
         const pRes = await authedFetch(`/patients/${e.patientId}`);
         const p: { name?: string; mrn?: string; dob?: string; gender?: string; allergies?: string[]; chronicConditions?: string[] } | null = pRes?.ok ? await pRes.json() : null;
         return {
-          ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: staffMap.get(e.doctorId) ?? "—",
+          ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
           allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
           lastVitalsAt: null, vitalsOutOfRange: false,
-          dob: p?.dob ?? null, gender: p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
+          dob: p?.dob ?? null, gender: e.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
+          ageYears: e.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
         };
       }));
       // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today —
@@ -381,6 +389,19 @@ function NursingWorklist() {
     setVitalsError(null);
     setVitalsFlags(null);
   }
+
+  async function openViewVitals(r: Row) {
+    setViewRow(r); setViewVitals(null); setViewError(false);
+    try {
+      const res = await authedFetch(`/clinical/vitals/${r.id}`);
+      if (!res?.ok) throw new Error("load");
+      setViewVitals(await res.json());
+    } catch { setViewError(true); }
+  }
+  const canViewVitals = can(PERM.vitalsRead);
+  // Row click / Enter / Space: capture for a waiting visit, read-only view for a recorded one.
+  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureVitals) openVitalsModal(r.id); } else if (canViewVitals) void openViewVitals(r); };
+  const rowActionable = (r: Row) => (r.status === "vitals_pending" ? canCaptureVitals : canViewVitals);
 
   function closeVitalsModal() {
     setVitalsEntryId(null);
@@ -714,10 +735,11 @@ function NursingWorklist() {
                         const hasAllergy = flags.some((f) => f.kind === "danger");
                         const rowClass = hasAllergy ? styles.rowFlagged : r.priority ? styles.rowUrgent : undefined;
                         return (
-                          <tr key={r.id} className={rowClass}>
+                          <tr key={r.id} className={`${rowClass ?? ""} ${rowActionable(r) ? styles.rowClickable : ""}`}
+                            {...(rowActionable(r) ? { tabIndex: 0, onClick: () => openRow(r), onKeyDown: (e: React.KeyboardEvent) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openRow(r); } } } : {})}>
                             <td data-label="Patient" className={styles.patientCell} title={r.patientMrn ? `MRN ${r.patientMrn}` : undefined}>
                               <div><span className={styles.patientName}>{r.patientName}</span>
-                              <span className={styles.mrn} title={r.doctorName !== "—" ? r.doctorName : undefined}>{[ageSex(r.dob, r.gender), `T-${r.tokenNumber}`, r.doctorName !== "—" ? r.doctorName : ""].filter(Boolean).join(" · ")}</span></div>
+                              <span className={styles.mrn} title={r.doctorName !== "—" ? r.doctorName : undefined}>{[ageSex(r.dob, r.gender, r.ageYears), `T-${r.tokenNumber}`, r.doctorName !== "—" ? r.doctorName : "", `${r.wait}m wait`].filter(Boolean).join(" · ")}</span></div>
                             </td>
                             <td data-label="Visit">
                               <span className={styles.visitCell}>
@@ -740,7 +762,8 @@ function NursingWorklist() {
                                 ? <StatusPill tone="warn" label="Waiting" icon="clock" />
                                 : <StatusPill tone={r.vitalsOutOfRange ? "danger" : "ok"} label={r.vitalsOutOfRange ? `${statusLabel(r.status)} · out of range` : statusLabel(r.status)} icon={r.vitalsOutOfRange ? "alert" : "check"} />}
                             </td>
-                            <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={() => openVitalsModal(r.id)}><Icon name="pulse" size={14} />Capture vitals</button>}</td>
+                            <td data-label="" className={styles.actionCell}>{r.status === "vitals_pending" && canCaptureVitals && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); openVitalsModal(r.id); }}><Icon name="pulse" size={14} />Capture vitals</button>}
+                              {r.status !== "vitals_pending" && canViewVitals && <button className={styles.actionBtn} onClick={(e) => { e.stopPropagation(); void openViewVitals(r); }}><Icon name="pulse" size={14} />View vitals</button>}</td>
                           </tr>
                         );
                       })}
@@ -1081,6 +1104,29 @@ function NursingWorklist() {
             </aside>
           )}
           </div>
+        </Dialog>
+      )}
+
+      {viewRow && (
+        <Dialog title={`Vitals — ${viewRow.patientName}`} onClose={() => setViewRow(null)}>
+          <div className={styles.vitalsPatient}>
+            <span className={styles.muted}>T-{viewRow.tokenNumber}{ageSex(viewRow.dob, viewRow.gender, viewRow.ageYears) ? ` · ${ageSex(viewRow.dob, viewRow.gender, viewRow.ageYears)}` : ""}{viewRow.patientMrn ? ` · ${viewRow.patientMrn}` : ""}</span>
+          </div>
+          {viewError ? <div className={styles.formError} role="alert">Couldn&apos;t load vitals. <button type="button" className={styles.smallBtn} onClick={() => void openViewVitals(viewRow)}>Retry</button></div>
+            : !viewVitals ? <Skeleton rows={3} label="Loading vitals" /> : (
+              <>
+                <p className={styles.muted}>Recorded {viewVitals.recordedAt ? `${new Date(viewVitals.recordedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} ${hhmm(viewVitals.recordedAt)}` : "—"}</p>
+                <table className={styles.prevTable}>
+                  <tbody>
+                    {([["Blood pressure (mmHg)", formatBp(viewVitals)], ["Pulse (bpm)", viewVitals.pulseBpm], ["Temp (°C)", viewVitals.tempCelsius], ["SpO2 (%)", viewVitals.spo2Percent],
+                      ["Weight (kg)", viewVitals.weightKg], ["Height (cm)", viewVitals.heightCm], [`Blood sugar (${BLOOD_SUGAR_UNIT})`, viewVitals.bloodSugar], [`Pain (/${PAIN_SCORE_MAX})`, viewVitals.painScore]] as [string, string | number | null | undefined][])
+                      .map(([k, v]) => <tr key={k}><th scope="row">{k}</th><td>{v ?? "—"}</td></tr>)}
+                  </tbody>
+                </table>
+                {(viewVitals.abnormalFlags?.length ?? 0) > 0 && <div className={styles.formError} role="alert">{viewVitals.abnormalFlags!.map((f) => <div key={f} className={styles.flagLine}><Icon name="alert" size={14} />{f}</div>)}</div>}
+              </>
+            )}
+          <div className={styles.modalActions}><button type="button" className={styles.cancelBtn} onClick={() => setViewRow(null)}>Close</button></div>
         </Dialog>
       )}
 
