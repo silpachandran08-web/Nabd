@@ -36,6 +36,8 @@ type CallbackEntry = { appointmentId: string; patientId: string; patientName: st
 type AppointmentOption = { id: string; patientId: string; patientName: string; doctorId: string; doctorName: string; startTime: string };
 // Matches GET /departments/{id}/transfer-targets (DepartmentController) — same shape consult's
 // own transfer picker already uses.
+// REC-021 transfer reasons (S4 contract values); `other` takes a free-text note (<=200 chars).
+const MOVE_REASONS: [string, string][] = [["wrong_department", "Wrong department"], ["doctor_unavailable", "Doctor unavailable"], ["patient_request", "Patient request"], ["other", "Other"]];
 type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
 
 const VISIT_LABEL: Record<string, string> = {
@@ -198,6 +200,8 @@ function ArrivalsPageInner() {
   const [moveTargets, setMoveTargets] = useState<TransferTarget[] | null>(null);
   const [moveDepartmentId, setMoveDepartmentId] = useState("");
   const [moveDoctorId, setMoveDoctorId] = useState("");
+  const [moveReason, setMoveReason] = useState("");
+  const [moveReasonNote, setMoveReasonNote] = useState("");
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moveSubmitting, setMoveSubmitting] = useState(false);
 
@@ -622,7 +626,7 @@ function ArrivalsPageInner() {
     setMoveTargets(null);
     setMoveDepartmentId("");
     setMoveDoctorId("");
-    setMoveError(null);
+    setMoveReason(""); setMoveReasonNote(""); setMoveError(null);
   }
 
   async function selectMoveEntry(entryId: string) {
@@ -630,7 +634,7 @@ function ArrivalsPageInner() {
     setMoveDepartmentId("");
     setMoveDoctorId("");
     setMoveTargets(null);
-    setMoveError(null);
+    setMoveReason(""); setMoveReasonNote(""); setMoveError(null);
     const entry = rows.find((r) => r.id === entryId);
     if (!entry) return;
     const res = await authedFetch(`/departments/${entry.departmentId}/transfer-targets`);
@@ -642,14 +646,21 @@ function ArrivalsPageInner() {
     setMoveTargets(await res.json());
   }
 
+  // The reason is required only when the department changes (same-department = doctor change).
+  const movingDept = moveDepartmentId !== "" && moveDepartmentId !== rows.find((r) => r.id === moveEntryId)?.departmentId;
+  const reasonMissing = movingDept && !moveReason;
   async function submitMove() {
     if (!moveEntryId || !moveDepartmentId || !moveDoctorId) return;
+    if (reasonMissing) { setMoveError("Choose a reason for moving the patient to another department."); return; }
     setMoveSubmitting(true);
     setMoveError(null);
     try {
       const res = await authedFetch(`/queue/${moveEntryId}/transfer`, {
         method: "POST",
-        body: JSON.stringify({ toDepartmentId: moveDepartmentId, doctorId: moveDoctorId }),
+        body: JSON.stringify({
+          toDepartmentId: moveDepartmentId, doctorId: moveDoctorId,
+          ...(moveReason ? { reason: moveReason, ...(moveReason === "other" && moveReasonNote.trim() ? { reasonNote: moveReasonNote.trim() } : {}) } : {}),
+        }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -1295,13 +1306,30 @@ function ArrivalsPageInner() {
                     </select>
                   </div>
                 )}
+                {moveDoctorId && (
+                  <>
+                    <div className={styles.field}>
+                      <label className={styles.label} htmlFor="moveReason">Reason{movingDept ? " (required)" : ""}</label>
+                      <select id="moveReason" className={styles.select} value={moveReason} required={movingDept} onChange={(e) => setMoveReason(e.target.value)}>
+                        <option value="">Select a reason…</option>
+                        {MOVE_REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </div>
+                    {moveReason === "other" && (
+                      <div className={styles.field}>
+                        <label className={styles.label} htmlFor="moveReasonNote">Note</label>
+                        <input id="moveReasonNote" className={styles.input} maxLength={200} value={moveReasonNote} onChange={(e) => setMoveReasonNote(e.target.value)} />
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )
           )}
           {moveError && <div className={styles.formError} role="alert">{moveError}</div>}
           <div className={styles.modalActions}>
             <button type="button" className={styles.cancelBtn} onClick={closeMove}>Cancel</button>
-            <button type="button" className={styles.submitBtn} disabled={moveSubmitting || !moveDepartmentId || !moveDoctorId}
+            <button type="button" className={styles.submitBtn} disabled={moveSubmitting || !moveDepartmentId || !moveDoctorId || reasonMissing}
               onClick={submitMove}>
               {moveSubmitting ? "Moving…" : "Move"}
             </button>

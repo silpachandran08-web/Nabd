@@ -591,3 +591,7 @@
   .flagList { max-width: none; min-inline-size: 0; flex: 1; justify-content: flex-end; }
   .flagList > * { white-space: normal; max-inline-size: 100%; }
 }
+
+.rowClickable { cursor: pointer; }
+.rowClickable:hover td { background-color: var(--nb-surface-2); }
+.rowClickable:focus-visible { outline: 2px solid var(--nb-focus, currentColor); outline-offset: -2px; }
