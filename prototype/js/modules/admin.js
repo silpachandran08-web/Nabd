@@ -37,7 +37,7 @@
     ".ad-a{fill:var(--acc-tint);stroke:none}",
     ".ad-thr{position:absolute;inset-inline:0;border-top:1px solid var(--warn);pointer-events:none}",
     ".ad-thr span{position:absolute;right:0;bottom:2px;font-size:10.5px;line-height:14px;color:var(--warn);background:var(--s1);padding:0 4px;border-radius:4px;white-space:nowrap}",
-    ".ad-dot{position:absolute;width:10px;height:10px;border-radius:99px;background:var(--acc);box-shadow:0 0 0 2px var(--s1);transform:translate(-50%,50%)}",
+    ".ad-dot{position:absolute;width:10px;height:10px;border-radius:99px;background:var(--acc-fill);box-shadow:0 0 0 2px var(--s1);transform:translate(-50%,50%)}",
     ".ad-chx{grid-column:2;display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3);font-variant-numeric:tabular-nums;gap:2px}",
     ".ad-chx.eq span{flex:1;text-align:center;min-width:0;overflow:hidden}",
     ".ad-legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--tx2)}",
@@ -46,11 +46,11 @@
     ".frame.mobile .ad-hb{grid-template-columns:minmax(0,1fr) auto}.frame.mobile .ad-hb .ad-hbt{grid-column:1/-1;order:3;margin-top:-4px}",
     ".ad-hbl{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx2)}",
     ".ad-hbt{height:10px;border-radius:99px;background:var(--s3);overflow:hidden}",
-    ".ad-hbt i{display:block;height:100%;border-radius:99px;background:var(--acc)}",
+    ".ad-hbt i{display:block;height:100%;border-radius:99px;background:var(--acc-fill)}",
     ".ad-hbv{text-align:end;font-weight:600;white-space:nowrap}",
     ".ad-stk{display:flex;height:22px;border-radius:6px;overflow:hidden;gap:2px;background:var(--s1)}",
     ".ad-stk i{display:block;height:100%;min-width:2px}",
-    ".ad-c1{background:var(--acc)}.ad-c2{background:var(--sync)}.ad-c3{background:var(--warn)}.ad-c4{background:var(--mint)}.ad-c5{background:var(--sub)}",
+    ".ad-c1{background:var(--acc-fill)}.ad-c2{background:var(--sync)}.ad-c3{background:var(--warn)}.ad-c4{background:var(--mint)}.ad-c5{background:var(--sub)}",
     ".ad-srow{display:grid;grid-template-columns:minmax(110px,190px) minmax(0,1fr) 64px;gap:12px;align-items:center;font-size:13px}",
     ".frame.mobile .ad-srow{grid-template-columns:minmax(0,1fr) 56px}.frame.mobile .ad-srow .ad-stk{grid-column:1/-1;order:3}",
     ".ad-jstrip{display:flex;flex-wrap:wrap;gap:6px;align-items:center}",
@@ -609,7 +609,7 @@
         (s.min && !s.skip ? ' <span class="faint small num ltr">· ' + (s.min < 1 ? Math.round(s.min * 60) + " s" : Math.round(s.min) + " min") + "</span>" : "") + "</b><small>" + ui.esc(s.who) + "</small>" +
         (s.msg && !s.skip ? '<span class="ad-msg">' + ui.icon("chat", "xs") + ui.esc(s.msg) + "</span>" : "") + "</div></div>";
     }).join("") + "</div>";
-    body += '<div class="ad-legend" style="margin-top:4px"><span><i style="background:var(--acc)"></i>Automatic</span><span><i style="background:var(--ok)"></i>Staff step</span><span><i style="background:var(--s3)"></i>Patient does it</span></div>';
+    body += '<div class="ad-legend" style="margin-top:4px"><span><i style="background:var(--acc-fill)"></i>Automatic</span><span><i style="background:var(--ok)"></i>Staff step</span><span><i style="background:var(--s3)"></i>Patient does it</span></div>';
     return ui.card(L("Patient journey preview", "معاينة رحلة المريض", "मरीज़ यात्रा पूर्वावलोकन"), body, { icon: "map", cls: "hl ad-sticky", right: ui.pill("sync", "Live preview") });
   }
 

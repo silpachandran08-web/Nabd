@@ -11,12 +11,12 @@ window.NB = window.NB || {};
 
   NB.state = {
     role: "map", view: "home", lang: load("lang", "en"), device: "auto", market: load("market", "india"),
-    facType: load("facType", "poly"), facility: 0, overlay: null, ovArg: null, palette: false, toast: null, ui: {}
+    facType: load("facType", "poly"), theme: load("theme", "dark"), facility: 0, overlay: null, ovArg: null, palette: false, toast: null, ui: {}
   };
   NB.v = function (k, d) { return k in NB.state.ui ? NB.state.ui[k] : d; };
   NB.set = function (patch, ui) {
     if (ui) Object.assign(NB.state.ui, patch); else Object.assign(NB.state, patch);
-    ["lang", "market", "facType"].forEach(function (k) { if (!ui && k in patch) save(k, patch[k]); });
+    ["lang", "market", "facType", "theme"].forEach(function (k) { if (!ui && k in patch) save(k, patch[k]); });
     NB.render();
   };
   NB.setUI = function (patch) { NB.set(patch, true); };
@@ -247,6 +247,8 @@ window.NB = window.NB || {};
     h += '<div class="spacer"></div>';
     h += '<div class="grp hide-m"><span class="lbl">Device</span><div class="seg">' + [["auto", "Auto"], ["desktop", "Desktop"], ["tablet", "Tablet"], ["mobile", "Mobile"]].map(function (d) {
       return '<button class="' + (s.device === d[0] ? "on" : "") + '" data-act="device" data-arg="' + d[0] + '">' + d[1] + "</button>"; }).join("") + "</div></div>";
+    h += '<div class="grp"><span class="lbl hide-m">Theme</span><div class="seg">' + [["dark", "Dark"], ["light", "Light"]].map(function (d) {
+      return '<button class="' + (s.theme === d[0] ? "on" : "") + '" data-act="theme" data-arg="' + d[0] + '">' + d[1] + "</button>"; }).join("") + "</div></div>";
     h += '<div class="grp"><span class="lbl hide-m">Language</span><div class="seg">' + [["en", "EN"], ["hi", "हिं"], ["ar", "عربي"]].map(function (d) {
       return '<button class="' + (s.lang === d[0] ? "on" : "") + '" data-act="lang" data-arg="' + d[0] + '" lang="' + d[0] + '">' + d[1] + "</button>"; }).join("") + "</div></div>";
     h += '<button class="btn sm" data-act="palette" title="Jump to any screen (Ctrl K)">' + ui.icon("command", "sm") + "Jump to…</button>";
@@ -335,6 +337,7 @@ window.NB = window.NB || {};
   NB.render = function () {
     var s = NB.state, root = document.getElementById("app"); if (!root) return;
     document.documentElement.lang = s.lang;
+    document.documentElement.setAttribute("data-nb-theme", s.theme === "light" ? "light" : "dark");
     var bar = document.getElementById("pbar"); if (bar) bar.innerHTML = pbar();
     var c = ctx(), dev = deviceOf(), html = "";
     var dir = NB.rtl() ? "rtl" : "ltr";
@@ -416,6 +419,7 @@ window.NB = window.NB || {};
   NB.act("close", function () { NB.close(); });
   NB.act("device", function (a) { NB.set({ device: a }); });
   NB.act("lang", function (a) { NB.set({ lang: a }); });
+  NB.act("theme", function (a) { NB.set({ theme: a }); });
   NB.act("palette", function () { NB.state.ui.palq = ""; NB.set({ palette: true }); });
   NB.act("palette-close", function () { NB.set({ palette: false }); });
   NB.act("switchfac", function (a) { NB.state.facility = +a; NB.state.overlay = null; NB.toast("Switched to " + NB.fac().name); });

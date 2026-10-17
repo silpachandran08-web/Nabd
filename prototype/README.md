@@ -12,7 +12,7 @@ Open `index.html` through any static server, for example:
 cd prototype && python3 -m http.server 8080   # then open http://localhost:8080
 ```
 
-Use the bar at the top to switch **who you are viewing as**, the **market** (India, UAE, Saudi Arabia, Qatar: currency, tax, national ID, exchanges), the **facility model** (solo, clinic, polyclinic, hospital), **device** and **language** (English, Hindi, Arabic with right-to-left layout). `Ctrl K` jumps to any screen. Deep links use the hash, e.g. `#pharmacist.stock`.
+Use the bar at the top to switch **who you are viewing as**, the **theme** (dark or light), the **market** (India, UAE, Saudi Arabia, Qatar: currency, tax, national ID, exchanges), the **facility model** (solo, clinic, polyclinic, hospital), **device** and **language** (English, Hindi, Arabic with right-to-left layout). `Ctrl K` jumps to any screen. Deep links use the hash, e.g. `#pharmacist.stock`.
 
 ## Structure
 

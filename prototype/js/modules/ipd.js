@@ -35,7 +35,7 @@
     ".ip-dose.given{color:var(--ok);background:var(--ok-t);border-color:rgba(52,211,153,.35)}",
     ".ip-dose.due{color:var(--acc);background:var(--acc-tint);border-color:var(--acc-line)}",
     ".ip-dose.over{color:var(--crit);background:var(--crit-t);border-color:rgba(255,77,79,.45)}",
-    ".ip-dose.held{color:var(--tx2);background:var(--perm-t);border-color:rgba(255,255,255,.18);border-style:dashed}",
+    ".ip-dose.held{color:var(--tx2);background:var(--perm-t);border-color:var(--b-str);border-style:dashed}",
     ".ip-mar td{padding:8px 10px}.ip-mar th.now{color:var(--acc)}",
     ".ip-mar td.now{background:var(--acc-tint)}",
     ".ip-scan{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:var(--r-md);border:1px dashed var(--b-str);background:var(--s2)}",
