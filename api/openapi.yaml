@@ -2083,6 +2083,59 @@ paths:
                     visitCount: { type: integer, format: int64 }
                     revenue: { type: number, description: "Sum of invoice totals for the visits in this source" }
                     untaggedCount: { type: integer, format: int64, description: "Report-wide count of untagged visits, repeated on every row" }
+  /reports/packages:
+    get:
+      tags: [Reports]
+      summary: >
+        Packages report (OWN-026) for a period of clinic days (from/to inclusive; else the last `days` days to today; same
+        400 invalid-period rule as /reports/money). salesByDay: every day in the period, zero-filled; count = package
+        instances sold (created) that clinic day, amount = sum of their sale invoices' total (incl. tax); later refunds are
+        not subtracted. redemption: over instances sold in the period (any status), sessionsSold = sum of item
+        quantity_total, sessionsRedeemed = sum of quantity_consumed to date; units are all item types, the same unit as
+        /packages/liability sessionsOwed. expiredWithValue: instances still `active` whose validity_end is in the period and
+        today > validity_end + grace_days (the instance's computed `expired` status) with units left; expiredOn = validity_end;
+        remainingValue = sum of unconsumed units x allocated per-unit price (the liability formula), rounded to 2 dp.
+        Revenue recognition (deferred vs earned) is NOT provided: an accounting decision is pending.
+      x-required-permission: reports:view
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, default: 30 } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  salesByDay:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date: { type: string, format: date }
+                        count: { type: integer }
+                        amount: { type: number }
+                  redemption:
+                    type: object
+                    properties:
+                      sessionsRedeemed: { type: integer, format: int64 }
+                      sessionsSold: { type: integer, format: int64 }
+                  expiredWithValue:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        instanceId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        packageName: { type: string }
+                        expiredOn: { type: string, format: date }
+                        remainingValue: { type: number }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
   /reports/staff-performance:
     get:
       tags: [Reports]

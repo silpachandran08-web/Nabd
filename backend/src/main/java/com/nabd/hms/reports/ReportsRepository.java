@@ -2,6 +2,7 @@ package com.nabd.hms.reports;
 
 import com.nabd.hms.reports.dto.MoneyResponse;
 import com.nabd.hms.reports.dto.OverviewResponse;
+import com.nabd.hms.reports.dto.PackagesReportResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -10,6 +11,7 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -343,6 +345,48 @@ class ReportsRepository {
                 (rs, i) -> new DoctorPunctualityRow(UUID.fromString(rs.getString("doctor_id")), rs.getString("doctor_name"),
                         rs.getLong("delay_count"), rs.getDouble("avg_minutes"), rs.getLong("same_day_repeat_days")),
                 zone.getId(), zone.getId(), tenantId, Timestamp.from(since));
+    }
+
+    // ── OWN-026 packages report ──
+
+    /** Instances created per clinic day in [from, to], zero-filled; amount is the sale invoice's total. */
+    List<PackagesReportResponse.SalesDay> packageSalesByDay(UUID tenantId, LocalDate from, LocalDate to, ZoneId zone) {
+        return jdbc.query("""
+                SELECT d::date AS day, count(pi.id) AS n, COALESCE(SUM(inv.total), 0) AS amount
+                FROM generate_series(?::date, ?::date, interval '1 day') d
+                LEFT JOIN package_instances pi ON pi.tenant_id = ? AND (pi.created_at AT TIME ZONE ?)::date = d::date
+                LEFT JOIN invoices inv ON inv.id = pi.invoice_id
+                GROUP BY d ORDER BY d
+                """, (rs, i) -> new PackagesReportResponse.SalesDay(rs.getDate("day").toLocalDate(), rs.getInt("n"),
+                        rs.getBigDecimal("amount")), Date.valueOf(from), Date.valueOf(to), tenantId, zone.getId());
+    }
+
+    PackagesReportResponse.Redemption packageRedemption(UUID tenantId, Instant start, Instant end) {
+        return jdbc.queryForObject("""
+                SELECT COALESCE(SUM(ii.quantity_consumed), 0) AS redeemed, COALESCE(SUM(ii.quantity_total), 0) AS sold
+                FROM package_instances pi JOIN package_instance_items ii ON ii.instance_id = pi.id
+                WHERE pi.tenant_id = ? AND pi.created_at >= ? AND pi.created_at < ?
+                """, (rs, i) -> new PackagesReportResponse.Redemption(rs.getLong("redeemed"), rs.getLong("sold")),
+                tenantId, Timestamp.from(start), Timestamp.from(end));
+    }
+
+    /** Same "expired" rule as PackageInstanceService.effectiveStatus: still 'active' but today > validity_end + grace. */
+    List<PackagesReportResponse.ExpiredWithValue> expiredPackagesWithValue(UUID tenantId, LocalDate from, LocalDate to, LocalDate today) {
+        return jdbc.query("""
+                SELECT pi.id, p.name AS patient_name, pi.package_name, pi.validity_end,
+                       ROUND(SUM((ii.quantity_total - ii.quantity_consumed) * ii.allocated_price / ii.quantity_total), 2) AS remaining
+                FROM package_instances pi
+                JOIN patients p ON p.id = pi.patient_id
+                JOIN package_instance_items ii ON ii.instance_id = pi.id
+                WHERE pi.tenant_id = ? AND pi.status = 'active' AND pi.validity_end BETWEEN ? AND ?
+                  AND ?::date > pi.validity_end + pi.grace_days
+                GROUP BY pi.id, p.name, pi.package_name, pi.validity_end
+                HAVING SUM(ii.quantity_total - ii.quantity_consumed) > 0
+                ORDER BY pi.validity_end DESC, p.name
+                """, (rs, i) -> new PackagesReportResponse.ExpiredWithValue(rs.getObject("id", UUID.class),
+                        rs.getString("patient_name"), rs.getString("package_name"), rs.getDate("validity_end").toLocalDate(),
+                        rs.getBigDecimal("remaining")),
+                tenantId, Date.valueOf(from), Date.valueOf(to), Date.valueOf(today));
     }
 
     Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
