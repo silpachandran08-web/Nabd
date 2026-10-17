@@ -11,7 +11,7 @@ public final class FollowUpListModels {
     }
 
     public record FollowUpItem(UUID appointmentId, UUID patientId, String patientName, String patientMrn,
-                               Instant startTime, String status) {
+                               Instant startTime, String status, String cancelReason) {
     }
 
     public record PageMeta(String nextCursor, int limit) {

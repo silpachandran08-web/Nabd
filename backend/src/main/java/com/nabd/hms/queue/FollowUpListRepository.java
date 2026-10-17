@@ -24,7 +24,7 @@ class FollowUpListRepository {
     List<FollowUpItem> find(UUID tenantId, UUID doctorId, String status, Instant from, Instant toExclusive,
                             int limit, Instant afterStart, UUID afterId) {
         StringBuilder sql = new StringBuilder("""
-                SELECT a.id, a.patient_id, p.name AS patient_name, p.mrn AS patient_mrn, a.start_time, a.status
+                SELECT a.id, a.patient_id, p.name AS patient_name, p.mrn AS patient_mrn, a.start_time, a.status, a.cancel_reason
                 FROM appointments a
                 JOIN patients p ON p.id = a.patient_id AND p.tenant_id = a.tenant_id
                 WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.is_follow_up = true
@@ -55,6 +55,7 @@ class FollowUpListRepository {
                 rs.getString("patient_name"),
                 rs.getString("patient_mrn"),
                 rs.getTimestamp("start_time").toInstant(),
-                rs.getString("status")), params.toArray());
+                rs.getString("status"),
+                rs.getString("cancel_reason")), params.toArray());
     }
 }

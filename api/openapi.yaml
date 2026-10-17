@@ -1390,6 +1390,7 @@ paths:
                         patientMrn: { type: string }
                         startTime: { type: string, format: date-time }
                         status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+                        cancelReason: { type: string, nullable: true, description: "QA-06: set only when cancelled" }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
   /clinical/patients/{patientId}/allergies:
