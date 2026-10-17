@@ -92,7 +92,8 @@ public class VitalsService {
     }
 
     @Transactional
-    public VitalsResponse record(UUID tenantId, UUID callerStaffId, UUID queueEntryId, VitalsWriteRequest req) {
+    public VitalsResponse record(UUID tenantId, UUID callerStaffId, UUID queueEntryId, VitalsWriteRequest req,
+                                 boolean canCorrect) {
         tenantContext.set(tenantId);
         QueueEntrySnapshot snapshot = repo.findQueueEntrySnapshot(tenantId, queueEntryId).orElseThrow(this::notFound);
 
@@ -113,6 +114,10 @@ public class VitalsService {
         }
 
         VitalsRow previous = repo.findByQueueEntry(tenantId, queueEntryId).orElse(null);
+        if (!canCorrect && previous != null && changesRecordedValue(previous, req)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "vitals-correction-forbidden", "Vitals correction not permitted",
+                    "Correcting an already-recorded vital sign needs the clinical edit permission.");
+        }
         repo.upsert(tenantId, queueEntryId, snapshot.patientId(), req.heightCm(), req.weightKg(),
                 req.bpSystolic(), req.bpDiastolic(), req.pulseBpm(), req.tempCelsius(), req.spo2Percent(),
                 req.bloodSugar(), req.painScore(), callerStaffId);
@@ -151,6 +156,24 @@ public class VitalsService {
         now.put("queueEntryId", queueEntryId.toString());
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), null, "vitals.corrected", "vitals",
                 after.id(), was, now);
+    }
+
+    /** REC-060: true when the request changes a value that is already recorded (null in the request = unchanged;
+     * filling a still-empty field or re-sending the same value is not a correction). */
+    private static boolean changesRecordedValue(VitalsRow v, VitalsWriteRequest r) {
+        return changes(v.heightCm(), r.heightCm()) || changes(v.weightKg(), r.weightKg())
+                || changes(v.bpSystolic(), r.bpSystolic()) || changes(v.bpDiastolic(), r.bpDiastolic())
+                || changes(v.pulseBpm(), r.pulseBpm()) || changes(v.tempCelsius(), r.tempCelsius())
+                || changes(v.spo2Percent(), r.spo2Percent()) || changes(v.bloodSugar(), r.bloodSugar())
+                || changes(v.painScore(), r.painScore());
+    }
+
+    private static boolean changes(Object recorded, Object requested) {
+        if (recorded == null || requested == null) {
+            return false;
+        }
+        return recorded instanceof java.math.BigDecimal b && requested instanceof java.math.BigDecimal a
+                ? b.compareTo(a) != 0 : !recorded.equals(requested);
     }
 
     private static void diff(String field, Object before, Object after, Map<String, Object> was, Map<String, Object> now) {
