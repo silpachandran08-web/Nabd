@@ -1040,7 +1040,7 @@ function ArrivalsPageInner() {
                     {guardian ? (
                       <div className={styles.selectedPatient}>
                         <span>{guardian.name} · {guardian.phone}</span>
-                        <button type="button" className={styles.linkBtn} onClick={() => { registeredRef.current = null; setGuardian(null); setGuardianQuery(""); }}>Change</button>
+                        <button type="button" className={styles.linkBtn} onClick={() => { registeredRef.current = null; setGuardian(null); setGuardianQuery(""); setGuardianConsent(false); setGuardianChannel(""); }}>Change</button>
                       </div>
                     ) : (
                       <>

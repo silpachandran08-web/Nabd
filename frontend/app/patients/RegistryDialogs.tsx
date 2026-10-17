@@ -160,7 +160,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
                 <label className={styles.fieldLabel} htmlFor="reg-guardian">Guardian (required for under-18s)</label>
                 {guardian ? (
                   <>
-                    <button type="button" className={styles.secondaryBtn} onClick={() => { setGuardian(null); setConsent(false); }}>{guardian.name} · change</button>
+                    <button type="button" className={styles.secondaryBtn} onClick={() => { setGuardian(null); setConsent(false); setChannel(""); setGuardianQuery(""); }}>{guardian.name} · change</button>
                     <label className={styles.fieldLabel}>
                       <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> {GUARDIAN_CONSENT_TEXT}
                     </label>
