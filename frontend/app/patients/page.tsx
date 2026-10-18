@@ -957,6 +957,11 @@ function PatientsList() {
                     </div>
                   </div>
 
+                  <div className={styles.section}>
+                    <div className={styles.sectionLabel}>Address and national ID</div>
+                    <div className={styles.muted}>Not available yet. They are saved at registration, but the server does not return them.</div>
+                  </div>
+
                   {drawerPatient.guardianId && (
                     <div className={styles.section}>
                       <div className={styles.sectionLabel}>Guardian / proxy</div>
