@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
+import { usePolling } from "../lib/usePolling";
 import styles from "./schedule.module.css";
 
 // Matches GET /v1/queue (QueueController) — same shape the Arrivals page reads.
@@ -62,9 +63,8 @@ export default function LiveQueueBoard({ doctors, names, authedFetch }: {
 
   useEffect(() => {
     void Promise.resolve().then(load);
-    const timer = setInterval(() => void load(), POLL_MS);
-    return () => clearInterval(timer);
   }, [load]);
+  usePolling(load, POLL_MS);
 
   if (error && !entries) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!entries) return <Skeleton rows={5} label="Loading live queue" />;
