@@ -9,6 +9,23 @@ const ACTION_LABELS: Record<string, string> = {
   "platform_billing.discount_auto_approved": "Discount auto-approved",
   "platform_billing.discount_approved": "Discount approved",
   "platform_billing.discount_rejected": "Discount rejected",
+  // LIVE-08 platform-wide and per-clinic operator events
+  "platform_auth.signed_in": "Operator signed in",
+  "platform_auth.sign_in_failed": "Operator sign-in failed",
+  "platform_auth.mfa_challenged": "MFA challenge sent",
+  "platform_auth.mfa_failed": "MFA check failed",
+  "platform_auth.signed_out": "Operator signed out",
+  "platform_auth.session_revoked": "Operator session revoked",
+  "platform_auth.refresh_reuse_detected": "Refresh token reuse detected",
+  "platform_plan.created": "Plan created",
+  "platform_plan.updated": "Plan updated",
+  "platform_provisioning.job_created": "Provisioning job created",
+  "platform_provisioning.job_approved": "Provisioning job approved",
+  "platform_provisioning.step_run": "Provisioning step run",
+  "platform_tenant.lifecycle_changed": "Clinic status changed",
+  "platform_billing.subscription_created": "Subscription created",
+  "platform_billing.subscription_updated": "Subscription updated",
+  "platform_ticket.status_changed": "Support ticket status changed",
 };
 
 export function actionLabel(action: unknown): string {
