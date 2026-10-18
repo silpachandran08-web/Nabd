@@ -24,6 +24,7 @@ async function open(perms, path, viewport) {
   await s.page.goto(`${APP}${path}`, { waitUntil: 'networkidle' });
   return s;
 }
+const enabledBtn = (p) => p.locator('button:not([disabled])', { hasText: 'Mark reminded' });
 const body = (p) => p.locator('body').innerText();
 const errs = (log) => [...log.pageErrors, ...log.console.filter((x) => !/Failed to load resource|was preloaded using link preload/.test(x))];
 let s;
@@ -32,9 +33,9 @@ try {
   await s.page.getByRole('button', { name: 'Expiring soon' }).click();
   let t = await body(s.page);
   check('1 no "Send reminder" text on packages page', !/send reminder/i.test(t));
-  check('2 button reads Mark reminded (only for the unreminded row)', await s.page.getByRole('button', { name: 'Mark reminded' }).count() === 1);
-  check('3 done row reads "Marked reminded", not "Sent"', /Marked reminded/.test(t) && !/\bSent\b/.test(t));
-  await s.page.getByRole('button', { name: 'Mark reminded' }).click();
+  check('2 enabled Mark reminded button for the unreminded row only', await enabledBtn(s.page).count() === 1);
+  check('3 done row reads "Marked reminded", not "Sent"', /marked reminded/i.test(t) && !/\bsent\b/i.test(t), JSON.stringify(t.slice(0, 400)));
+  await enabledBtn(s.page).click();
   await s.page.getByText('Recorded. No message was sent.').waitFor({ timeout: 5000 }).then(() => check('4 confirmation says Recorded. No message was sent.', true), () => check('4 confirmation', false));
   check('5 request hit send-reminder once', s.log.requests.filter((r) => /send-reminder/.test(r.path)).length === 1);
   check('6 no console errors', errs(s.log).length === 0, errs(s.log).join('|'));
@@ -48,7 +49,7 @@ try {
   remindStatus = 400;
   s = await open(['packages:view', 'packages:edit'], '/packages');
   await s.page.getByRole('button', { name: 'Expiring soon' }).click();
-  await s.page.getByRole('button', { name: 'Mark reminded' }).click();
+  await enabledBtn(s.page).click();
   await s.page.waitForTimeout(800);
   check('8 error: no "No message was sent" confirmation when the call fails', !/Recorded\. No message was sent/.test(await body(s.page)));
   await s.browser.close();
