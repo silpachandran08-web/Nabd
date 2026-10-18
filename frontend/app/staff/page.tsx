@@ -1,5 +1,6 @@
 "use client";
 
+import { decodeJwtPayload } from "../lib/jwt";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Dialog from "../components/ui/Dialog";
@@ -121,15 +122,8 @@ function relativeTime(iso: string): string {
 }
 
 function decodePermissions(token: string): string[] {
-  try {
-    const payload = token.split(".")[1];
-    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
-    const claims = JSON.parse(atob(padded));
-    return Array.isArray(claims.permissions) ? claims.permissions : [];
-  } catch {
-    return [];
-  }
+  const claims = decodeJwtPayload<{ permissions?: unknown }>(token);
+  return Array.isArray(claims?.permissions) ? claims.permissions : [];
 }
 
 export default function StaffAccessPage() {

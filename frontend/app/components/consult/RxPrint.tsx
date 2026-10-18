@@ -173,11 +173,11 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
       <article className={r.sheet} aria-label="Prescription">
         <header className={r.letterhead}>
           <div>
-            <h2 className={r.clinicName}>{header.clinicName}</h2>
+            <h2 className={r.clinicName}><bdi>{header.clinicName}</bdi></h2>
             {header.clinicPhone && <div className={r.muted}>{header.clinicPhone}</div>}
           </div>
           <div className={r.prescriber}>
-            <div className={r.prescriberName}>{header.prescriberName ?? "Prescriber"}</div>
+            <div className={r.prescriberName}><bdi>{header.prescriberName ?? "Prescriber"}</bdi></div>
             {header.professionalRegistrationNo && <div>Reg. No. {header.professionalRegistrationNo}</div>}
           </div>
         </header>
@@ -238,7 +238,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         <footer className={r.signature}>
           <div>
             <div className={r.metaLabel}>Signed electronically by</div>
-            <div className={r.prescriberName}>{header.prescriberName ?? "Prescriber"}</div>
+            <div className={r.prescriberName}><bdi>{header.prescriberName ?? "Prescriber"}</bdi></div>
             {header.professionalRegistrationNo && <div>Reg. No. {header.professionalRegistrationNo}</div>}
           </div>
           <div>

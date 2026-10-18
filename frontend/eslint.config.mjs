@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  { rules: { "no-restricted-globals": ["error", { name: "atob", message: "Use decodeJwtPayload from app/lib/jwt.ts (UTF-8 safe)." }] } },
+  { files: ["app/lib/jwt.ts"], rules: { "no-restricted-globals": "off" } },
 ]);
 
 export default eslintConfig;

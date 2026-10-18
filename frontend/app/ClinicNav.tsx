@@ -336,7 +336,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             aria-expanded={showClinic} aria-label={`Clinic: ${identity.tenantName}`} onClick={toggleClinicMenu}>
             <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
             <div className={styles.clinicText}>
-              <div className={styles.clinicName}>{identity.tenantName}</div>
+              <div className={styles.clinicName}><bdi>{identity.tenantName}</bdi></div>
             </div>
             <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
           </button>
@@ -348,7 +348,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                 <div className={styles.clinicCurrent} role="menuitem" aria-current="true">
                   <Icon name="building" size={14} />
                   <span className={styles.clinicRowText}>
-                    <span>{identity.tenantName}</span>
+                    <span><bdi>{identity.tenantName}</bdi></span>
                     {identity.tenantRegion && <span className={styles.clinicRowSub}>{regionLabel(identity.tenantRegion)}</span>}
                   </span>
                   <span className={styles.clinicRowTag}>Current</span>
@@ -382,7 +382,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         <div className={styles.clinicInfo}>
           <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
           <div className={styles.clinicText}>
-            <div className={styles.clinicName}>{identity.tenantName}</div>
+            <div className={styles.clinicName}><bdi>{identity.tenantName}</bdi></div>
           </div>
         </div>
       ))}
@@ -421,8 +421,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                 <div className={styles.menuIdentityRow}>
                   <div className={styles.identityAvatar}>{initials(identity.staffName)}</div>
                   <div>
-                    <div className={styles.identityName}>{identity.staffName}</div>
-                    <div className={styles.identityRole}>{identity.tenantName}</div>
+                    <div className={styles.identityName}><bdi>{identity.staffName}</bdi></div>
+                    <div className={styles.identityRole}><bdi>{identity.tenantName}</bdi></div>
                   </div>
                 </div>
                 <div className={styles.menuRow}>
@@ -453,7 +453,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           <button type="button" className={styles.identityFooter} onClick={openMenu}>
             <div className={styles.identityAvatar}>{initials(identity.staffName)}</div>
             <div className={styles.identityText}>
-              <div className={styles.identityName}>{identity.staffName}</div>
+              <div className={styles.identityName}><bdi>{identity.staffName}</bdi></div>
               <div className={styles.identityRole}>{identity.roleName}</div>
             </div>
           </button>

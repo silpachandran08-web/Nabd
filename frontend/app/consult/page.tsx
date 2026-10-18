@@ -1,5 +1,6 @@
 "use client";
 
+import { decodeJwtPayload } from "../lib/jwt";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -98,14 +99,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function decodeJwt(token: string): Record<string, unknown> {
-  try {
-    const payload = token.split(".")[1];
-    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
-    return JSON.parse(atob(padded));
-  } catch {
-    return {};
-  }
+  return decodeJwtPayload(token) ?? {};
 }
 
 function toFields(n: Note): NoteFields {
