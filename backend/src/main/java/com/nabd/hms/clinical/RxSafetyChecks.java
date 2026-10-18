@@ -98,7 +98,7 @@ final class RxSafetyChecks {
     }
 
     private static boolean matches(String drugName, List<String> keywords) {
-        String lower = drugName.toLowerCase();
+        String lower = AllergyDrugClasses.normalise(drugName);
         return keywords.stream().anyMatch(lower::contains);
     }
 }

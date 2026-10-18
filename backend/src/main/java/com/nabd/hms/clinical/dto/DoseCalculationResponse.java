@@ -7,5 +7,5 @@ import java.time.Instant;
  * none is returned. weightRecordedAt is when the weight used was recorded (never estimated);
  * null means the date is unknown (weight saved before the date was tracked). */
 public record DoseCalculationResponse(BigDecimal weightKg, BigDecimal mgPerKg, BigDecimal totalDoseMg, String ruleSource,
-                                      Instant weightRecordedAt) {
+                                      Instant weightRecordedAt, boolean weightStale) {
 }

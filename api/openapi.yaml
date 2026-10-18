@@ -1942,6 +1942,7 @@ paths:
         Weight-based dose suggestion (decision support, not a prescription). total = latest recorded weight x the
         clinician-supplied mgPerKg. The rule is a named formula with no per-drug formulary, so no per-dose or daily
         maximum is returned. 400 no-weight-recorded when the patient has no recorded weight (a weight is never estimated).
+        422 adult-patient when the patient is 18 or older (mg/kg dosing is out of scope). weightStale flags an old weight.
       x-required-permission: clinical:view
       parameters:
         - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1949,6 +1950,7 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DoseCalculation" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "422": { description: adult-patient (18 or older), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   # ------------------------------------------------------------ Pharmacy (Hybrid mode)
   /pharmacy/settings:
@@ -2904,6 +2906,7 @@ components:
         totalDoseMg: { type: number }
         ruleSource: { type: string }
         weightRecordedAt: { type: [string, "null"], format: date-time, description: When the weight used was recorded. Null when unknown (weight saved before the date was tracked); never estimated from the visit row time. Clients should treat null as stale. }
+        weightStale: { type: boolean, description: "True when the weight is older than the policy window (30 days under 2 years of age, 90 days otherwise; CSO to confirm) or its date is unknown." }
     PharmacyItem:
       type: object
       properties:
