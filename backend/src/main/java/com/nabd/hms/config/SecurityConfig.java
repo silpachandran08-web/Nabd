@@ -56,9 +56,10 @@ public class SecurityConfig {
             @Value("${app.cors.allowed-origins:http://localhost:3000}") List<String> allowedOrigins) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE")); // PUT: DOC-R7 working hours (and the existing allergy/pregnancy PUTs)
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); // PUT: DOC-R7 working hours and the allergy/pregnancy safety writes (CLN-001)
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id", "X-Step-Up-Token"));
         config.setExposedHeaders(List.of("X-Request-Id"));
+        config.setMaxAge(600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/v1/**", config);
         return source;
