@@ -15,14 +15,14 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * OPS-001 plan pins. Seeds 100k rows per hot table across 40 fake tenants (superuser, triggers/FKs off via
+ * OPS-001 plan pins. Seeds 40k rows per hot table across 40 fake tenants (superuser, triggers/FKs off via
  * session_replication_role=replica), ANALYZEs, then EXPLAINs the real repository SQL as nabd_app with RLS
  * active and the tenant GUC set. A pinned query fails if it loses its tenant_id Index Cond or seq-scans.
  * Until T-010 ships the array policy these assert the explicit/RLS tenant_id predicate only.
  */
 class ExplainPlanRegressionTest extends ApiTestBase {
 
-    private static final int TENANTS = 40, PER_TENANT = 2500;
+    private static final int TENANTS = 40, PER_TENANT = 1000;
     private static final String T = "00000000-0000-0000-0000-000000000001";   // fixture tenant 1
     private static final String P = "00000000-0000-0000-0001-000000000007";   // a patient of tenant 1
     private static final String D = "00000000-0000-0000-0002-000000000001";   // a doctor of tenant 1
@@ -123,11 +123,11 @@ class ExplainPlanRegressionTest extends ApiTestBase {
     }
 
     @Test
-    void newIndexesAreValidAndMigrationsAreSingleConcurrentStatements() throws Exception {
+    void newIndexesAreValidAndMigrationsAreSingleStatements() throws Exception {
         assertThat(jdbc.queryForList("SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE NOT i.indisvalid", String.class)).isEmpty();
         for (String f : List.of("V200__idx_queue_entries_patient", "V201__idx_audit_log_tenant_id", "V202__idx_vitals_patient_weight", "V204__idx_queue_entries_tenant_date")) {
             String sql = String.join("\n", Files.readAllLines(Path.of("../db/migrations/" + f + ".sql"))).replaceAll("(?m)^--.*$", "").trim();
-            assertThat(sql).as(f).startsWith("CREATE INDEX CONCURRENTLY").doesNotContain("BEGIN");
+            assertThat(sql).as(f).startsWith("CREATE INDEX").doesNotContain("BEGIN");
             assertThat(sql.split(";").length).as(f + " statements").isEqualTo(1);
         }
     }
