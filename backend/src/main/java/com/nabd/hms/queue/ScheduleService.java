@@ -197,6 +197,9 @@ public class ScheduleService {
     public DoctorDelayResponse announceDelay(UUID tenantId, UUID callerStaffId, UUID doctorId, DelayAnnounceRequest req) {
         tenantContext.set(tenantId);
         LocalDate today = clock.today(tenantId);
+        if (!repo.doctorInTenant(tenantId, doctorId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Doctor not found", "No such doctor.");
+        }
         UUID id;
         try {
             id = repo.announceDelay(tenantId, doctorId, req.delayMinutes(), req.reason(), callerStaffId, today);
