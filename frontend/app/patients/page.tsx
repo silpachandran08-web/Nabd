@@ -836,7 +836,7 @@ function PatientsList() {
                             <span className={styles.toothStatus}>{(tooth?.status ?? "healthy").replace("_", " ")}</span>
                           )}
                           {tooth && (
-                            <button className={styles.linkBtn} style={{ fontSize: "10px" }} onClick={() => openHistory(tooth.id)}>History</button>
+                            <button className={styles.linkBtn} style={{ fontSize: "12px" }} onClick={() => openHistory(tooth.id)}>History</button>
                           )}
                         </div>
                       );
