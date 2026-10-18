@@ -66,12 +66,18 @@ public class BreakGlassService {
         }
         Instant expiresAt = Instant.now().plus(BreakGlassPolicy.MINUTES, ChronoUnit.MINUTES);
         UUID sessionId = UUID.randomUUID();
-        UUID grantId = repo.insert(tenantId, staffId, req.reasonCode(), req.reasonText(), req.patientId(), expiresAt, sessionId);
+        UUID grantId;
+        try {
+            grantId = repo.insert(tenantId, staffId, req.reasonCode(), req.reasonText(), req.patientId(), expiresAt, sessionId);
+        } catch (org.springframework.dao.DuplicateKeyException e) { // uq_break_glass_one_active: lost the race
+            throw new ApiException(HttpStatus.CONFLICT, "already-active", "Emergency access already active",
+                    "You already have an active emergency access grant.");
+        }
 
         // reasonText is deliberately not in the audit row or the log: free text can carry PHI.
         auditService.record(tenantId, "staff", staffId, staff.name(), "break-glass", ip, "auth.break_glass_activated",
                 "break_glass_grant", grantId, null, Map.of("reasonCode", req.reasonCode(), "expiresAt", expiresAt.toString()));
-        log.warn("BREAK-GLASS activated: grant {} staff {} tenant {} reasonCode {}", grantId, staffId, tenantId, req.reasonCode());
+        log.warn("BREAK-GLASS activated: grant {} staff {} tenant {} reasonCode {}", grantId, staffId, tenantId, req.reasonCode());  // log-phi-ok: reasonCode is a 4-value enum code (validated @Pattern), not free text
 
         Map<String, Object> payload = Map.of("tenantId", tenantId.toString(), "grantId", grantId.toString(),
                 "staffId", staffId.toString(), "reasonCode", req.reasonCode(), "expiresAt", expiresAt.toString(),

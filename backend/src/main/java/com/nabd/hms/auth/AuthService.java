@@ -519,7 +519,8 @@ public class AuthService {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
                     "staff.delegation_expired", "role_delegation", expiredId, null, null);
         }
-        for (Role delegated : repo.findActiveDelegatedRoles(staff.id())) {
+        // PLT-012: the emergency token is base + read scope only; loans are not folded in.
+        for (Role delegated : bg != null ? List.<Role>of() : repo.findActiveDelegatedRoles(staff.id())) {
             for (String p : flattenGrants(delegated.grantsJson())) {
                 if (!permissions.contains(p)) {
                     permissions.add(p);

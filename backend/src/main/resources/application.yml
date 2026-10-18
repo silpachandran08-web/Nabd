@@ -78,6 +78,10 @@ app:
     mfa-challenge-ttl-minutes: 5
     lockout-threshold: 5          # failed attempts before backoff kicks in
     rate-limit-per-ip-per-minute: 20
+  jwt:
+    # Documented env var names (APP_JWT_KEYS_* still win via relaxed binding).
+    keys-file: ${JWT_KEYS_FILE:}
+    keys-json: ${JWT_KEYS_JSON:}
   outbox:
     poll-interval-ms: 2000
     batch-size: 20
