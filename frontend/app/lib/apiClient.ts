@@ -3,8 +3,11 @@
 // detection and revoke the whole session family. Hence refresh is single-flight in a tab (one promise),
 // across tabs (Web Locks, localStorage mutex fallback) and the new pair is announced on BroadcastChannel.
 // React-free so it is unit-tested (tests/unit/apiClient.test.mjs). Never logs a token.
+import { decodeJwtPayload } from "./jwt.ts";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const ACCESS_KEY = "nabd_access_token";
+
 const REFRESH_KEY = "nabd_refresh_token";
 const RETURN_KEY = "nabd_return_to";
 const MUTEX_KEY = "nabd_refresh_mutex";
@@ -12,11 +15,7 @@ const DEFAULT_TTL_S = 15 * 60;
 
 type Claims = { exp?: number; iat?: number };
 function claims(token: string | null): Claims {
-  try {
-    return JSON.parse(atob((token ?? "").split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-  } catch {
-    return {};
-  }
+  return (token ? decodeJwtPayload<Claims>(token) : null) ?? {};
 }
 
 /** True once 80% of the token's lifetime has passed. An unreadable token is left to the reactive 401 path. */
