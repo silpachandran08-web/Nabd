@@ -188,7 +188,7 @@ public class WaitlistService {
             throw new ApiException(HttpStatus.CONFLICT, "slot-on-offer", "Slot is on offer",
                     "This slot is currently offered to another patient on the waitlist.");
         }
-        enforceSessionCapacity(doctorId, slotStart, zone);
+        enforceSessionCapacity(tenantId, doctorId, slotStart, zone);
 
         int slotMinutes = resolveSlotMinutes(tenantId, doctorId, slotStart);
         Instant end = slotStart.plus(slotMinutes, ChronoUnit.MINUTES);
@@ -229,7 +229,7 @@ public class WaitlistService {
     }
 
     /** Same NB-098 rule and advisory lock as AppointmentService.enforceSessionCapacity(). */
-    private void enforceSessionCapacity(UUID doctorId, Instant start, ZoneId zone) {
+    private void enforceSessionCapacity(UUID tenantId, UUID doctorId, Instant start, ZoneId zone) {
         LocalDate date = start.atZone(zone).toLocalDate();
         int dayOfWeek = date.getDayOfWeek().getValue() % 7;
         LocalTime time = start.atZone(zone).toLocalTime();
@@ -238,7 +238,7 @@ public class WaitlistService {
             return;
         }
         queueRepo.lockDoctorDay(doctorId, date);
-        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, date, block.get().startTime(), block.get().endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             throw new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
                     "This session has reached its patient cap (walk-ins and bookings counted together).");
