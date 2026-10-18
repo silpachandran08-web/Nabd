@@ -34,10 +34,10 @@ class ExplainPlanRegressionTest extends ApiTestBase {
         try (Connection c = superuserConnection(); Statement s = c.createStatement()) {
             s.execute("SET session_replication_role = replica");
             String g = "FROM generate_series(1," + TENANTS + ") t, generate_series(1," + PER_TENANT + ") n";
-            s.execute("INSERT INTO queue_entries (tenant_id, patient_id, doctor_id, queue_date, token_number, status, id, encounter_id, department_id) " +
+            s.execute("INSERT INTO queue_entries (tenant_id, patient_id, doctor_id, queue_date, token_number, status, id, encounter_id, department_id, current_stage) " +
                     "SELECT " + tid("t") + ", ('00000000-0000-0000-0001-' || lpad((n % 100)::text,12,'0'))::uuid, " +
                     "('00000000-0000-0000-0002-' || lpad((n % 5 + 1)::text,12,'0'))::uuid, date '2026-01-01' + (n / 50), n, 'completed', " +
-                    "gen_random_uuid(), gen_random_uuid(), gen_random_uuid() " + g);
+                    "gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'done' " + g);
             s.execute("INSERT INTO audit_log (tenant_id, actor_type, actor_name, actor_role, action, entity_type, row_hash) " +
                     "SELECT " + tid("t") + ", 'system', 'x', 'System', 'x.y', 'x', md5(n::text) " + g);
             s.execute("INSERT INTO vitals (tenant_id, queue_entry_id, patient_id, recorded_by, weight_kg, weight_recorded_at) " +
