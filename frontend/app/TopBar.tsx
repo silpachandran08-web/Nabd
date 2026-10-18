@@ -5,11 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import styles from "./topBar.module.css";
 import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./lib/session";
 import { can } from "./lib/permissions";
+import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
 
 const SEARCH_INPUT_ID = "nb-global-search";
 
 // Pathname -> the top bar's primary action button, DESIGN.md's Vitals Worklist ("Capture
-// vitals" next to Synced). Navigation-based (a query param the target page reacts to) rather
+// vitals" next to the connection pill). Navigation-based (a query param the target page reacts to) rather
 // than a cross-component callback registry — the only consumer so far is nursing's own capture-
 // vitals picker, and a URL round trip is simpler and less error-prone than wiring a context
 // just for this one case. Add more pathnames here if other pages want the same treatment.
@@ -25,11 +26,11 @@ const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?
 };
 
 // DESIGN.md's top bar, present on every clinic page: sidebar collapse toggle, global patient
-// search, the current page's primary action, and a sync/connectivity indicator. Left out: the
+// search, the current page's primary action, and a connection indicator. Left out: the
 // wireframe's language switcher and notification bell — no i18n or notifications system exists
-// anywhere in this app, and a control that does nothing isn't a real feature. "Synced"/"Offline"
-// uses the browser's real online/offline events — the app doesn't have, or need, any actual sync
-// queue, so this is a connectivity indicator, not a claim about queued writes.
+// anywhere in this app, and a control that does nothing isn't a real feature. The pill reports
+// what was observed (browser online/offline events, real API failures, slow answers, last good
+// answer — WB-FEF-021). There is no offline write queue, so it never claims queued or synced saves.
 export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boolean; onToggleCollapse: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
   const [hasSession, setHasSession] = useState(false);
   const [query, setQuery] = useState("");
   const [online, setOnline] = useState(true);
+  const [conn, setConn] = useState<{ fails: number; slow: boolean; lastOkAt: number | null }>({ fails: 0, slow: false, lastOkAt: null });
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -46,7 +48,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setOnline(navigator.onLine);
-    const goOnline = () => setOnline(true);
+    const goOnline = () => { setOnline(true); fetch(`${API_BASE}/health`).catch(() => {}); };
     const goOffline = () => setOnline(false);
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
@@ -55,6 +57,18 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
       window.removeEventListener("offline", goOffline);
     };
   }, []);
+
+  useEffect(() => watchApiFetch((e) => setConn((s) => nextConn(s, e))), []);
+
+  const degraded = conn.fails >= FAIL_LIMIT;
+  useEffect(() => {
+    // While degraded nothing else may call the API, so probe; any non-5xx answer (even 404) proves it is reachable.
+    // shortcut: no health endpoint exists today, so the probe GETs /health; switch to the real one when added.
+    if (!degraded || !online) return;
+    const probe = () => { fetch(`${API_BASE}/health`).catch(() => {}); };
+    const t = setInterval(probe, PROBE_MS);
+    return () => clearInterval(t);
+  }, [degraded, online]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -90,6 +104,15 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
 
   // Patient search lands on /patients, so a role without patients:view gets no search box at all.
   const canSearch = can("patients:view");
+  const lastSync = conn.lastOkAt ? new Date(conn.lastOkAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : null;
+  const lastSyncText = lastSync ? `Last sync ${lastSync}` : "No server contact yet";
+  const [pillLabel, pillWarn, pillHint] = !online
+    ? ["Offline", true, "Changes can't be saved until you reconnect."]
+    : degraded
+    ? ["Reconnecting", true, "The server isn't answering. Changes may not be saved."]
+    : conn.slow
+    ? ["Slow connection", true, "The server is answering slowly. Wait for saves to finish."]
+    : ["Online", false, ""];
 
   return (
     <div className={styles.bar}>
@@ -117,9 +140,12 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
           {primaryAction.label}
         </button>
       )}
-      <div className={`${styles.syncPill} ${online ? styles.syncOnline : styles.syncOffline}`}>
+      <div role="status" className={`${styles.syncPill} ${pillWarn ? styles.syncOffline : styles.syncOnline}`}
+        title={[pillHint, lastSyncText].filter(Boolean).join(" ")}>
         <span className={styles.syncDot} />
-        {online ? "Synced" : "Offline"}
+        {pillLabel}
+        <span className={styles.syncTime}>{!pillWarn && lastSync ? `· ${lastSync}` : ""}</span>
+        <span className={styles.srOnly}>{[pillHint, lastSyncText].filter(Boolean).join(" ")}</span>
       </div>
     </div>
   );
