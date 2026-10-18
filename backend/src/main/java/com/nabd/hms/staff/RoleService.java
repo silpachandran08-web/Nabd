@@ -114,6 +114,8 @@ public class RoleService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "delegation-window-too-long", "Window too long",
                     "A delegation can't run longer than 30 days — create a new one if the cover extends past that.");
         }
+        // unknown id (FK would 500) or another tenant's staff (FK would pass) -> 404
+        repo.findActorInfo(tenantId, req.staffId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such staff member."));
         delegationGuard.check(tenantId, callerStaffId, req.staffId(), delegatedRole, stepUpToken);
 
         UUID id = repo.insertDelegation(tenantId, req.staffId(), req.delegatedRoleId(), callerStaffId, req.reason(), req.expiresAt());

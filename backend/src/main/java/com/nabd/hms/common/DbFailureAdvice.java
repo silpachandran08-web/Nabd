@@ -44,7 +44,7 @@ public class DbFailureAdvice {
         p.setProperty("code", code);
         String traceId = MDC.get(RequestCorrelationFilter.MDC_KEY);
         p.setProperty("traceId", traceId != null ? traceId : UUID.randomUUID().toString());
-        log.warn("[{}] {} ({})", p.getProperties().get("traceId"), p.getTitle(), ex.getClass().getSimpleName());
+        log.warn("[{}] {} ({})", p.getProperties().get("traceId"), p.getTitle(), ex.getClass().getSimpleName());  // log-phi-ok: exception class name, not a person's name
         return org.springframework.http.ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header("Retry-After", "2").contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON).body(p);
     }
