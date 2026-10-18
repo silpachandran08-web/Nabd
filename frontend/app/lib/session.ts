@@ -1,3 +1,4 @@
+import { decodeJwtPayload } from "./jwt.ts";
 // The access token's "permissions" claim (SecurityConfig.java: authoritiesClaimName) already
 // carries everything the client needs for nav/redirect — decoding it here avoids a round trip
 // to a /me endpoint that doesn't exist for clinic staff (only /platform/auth/me does).
@@ -16,13 +17,7 @@ type AccessTokenClaims = {
 };
 
 export function decodeAccessToken(token: string): AccessTokenClaims | null {
-  try {
-    const payload = token.split(".")[1];
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
+  return decodeJwtPayload<AccessTokenClaims>(token);
 }
 
 export function getPermissions(): string[] {

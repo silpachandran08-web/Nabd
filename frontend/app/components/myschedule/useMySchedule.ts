@@ -1,5 +1,6 @@
 "use client";
 
+import { decodeJwtPayload } from "../../lib/jwt";
 import { useCallback, useEffect, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -23,12 +24,7 @@ export type DayGrid = {
 };
 
 export function selfIdFromToken(token: string): string {
-  try {
-    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return String(JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "="))).sub ?? "");
-  } catch {
-    return "";
-  }
+  return String(decodeJwtPayload<{ sub?: string }>(token)?.sub ?? "");
 }
 
 export function isoDate(d: Date): string {
