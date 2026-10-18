@@ -28,6 +28,7 @@ type PatientOption = { id: string; name: string; phone: string; mrn: string };
 type GuardianOption = { id: string; name: string; phone: string };
 // GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
 type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
+const DELAY_PRESETS = [10, 15, 30, 45, 60];
 // LIVE-04: each flag is exactly what its control's endpoint needs (see the setGrants effect).
 type Grants = { queueCreate: boolean; queueEdit: boolean; checkout: boolean; vitalsRecord: boolean; patientsView: boolean; patientsCreate: boolean };
 type StaffOption = { id: string; name: string; departmentName?: string | null };
@@ -758,6 +759,10 @@ function ArrivalsPageInner() {
     // REC-023: every active doctor stays on the rail; idle ones sink to the bottom, muted.
     .sort((a, b) => b.waiting - a.waiting);
 
+  const delayMins = Number(delayMinutesInput);
+  const delayValid = delayMinutesInput.trim() !== "" && Number.isInteger(delayMins) && delayMins >= 1;
+  const delayWaiting = doctorQueues.find((d) => d.id === delayFormFor)?.waiting ?? 0;
+
   // Stable close handlers: Dialog re-focuses its first control whenever onClose changes identity.
   const closeWalkin = useCallback(() => setShowModal(false), []);
   const vErrors = vitalsErrors(vitalsForm);
@@ -1229,19 +1234,43 @@ function ArrivalsPageInner() {
         <Dialog title={`Announce delay — ${staff.find((s) => s.id === delayFormFor)?.name ?? ""}`} onClose={closeDelayForm}>
           <form onSubmit={submitDelay}>
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="delayMinutes">Running late by (minutes)</label>
+              <span className={styles.label} id="delayPresetLabel">Running late by</span>
+              <div className={styles.presets} role="group" aria-labelledby="delayPresetLabel">
+                {DELAY_PRESETS.map((m) => (
+                  <button type="button" key={m} className={delayMins === m ? styles.presetActive : styles.preset}
+                    aria-pressed={delayMins === m} onClick={() => setDelayMinutesInput(String(m))}>{m} min</button>
+                ))}
+              </div>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="delayMinutes">Other (minutes)</label>
               <input id="delayMinutes" type="number" min="1" step="1" className={styles.input}
                 value={delayMinutesInput} onChange={(e) => setDelayMinutesInput(e.target.value)} required />
+              {!delayValid && delayMinutesInput !== "" && <span className={styles.formError} role="alert">Enter a whole number of minutes, 1 or more.</span>}
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="delayReason">Reason (optional)</label>
               <input id="delayReason" className={styles.input} value={delayReasonInput}
                 onChange={(e) => setDelayReasonInput(e.target.value)} placeholder="Emergency case running long" />
             </div>
+            <div className={styles.delayPreview} aria-label="Delay preview">
+              <span className={styles.label}>Preview</span>
+              {delayValid ? (
+                <span><StatusPill tone="danger" label="Delayed" icon="clock" /> Running {delayMins}m late{delayReasonInput.trim() ? ` — ${delayReasonInput.trim()}` : ""}</span>
+              ) : (
+                <span className={styles.muted}>Pick or enter the delay to see the notice.</span>
+              )}
+              <span className={styles.muted}>{delayWaiting === 0 ? "No patients are waiting for this doctor." : `${delayWaiting} waiting ${delayWaiting === 1 ? "patient is" : "patients are"} affected.`}</span>
+            </div>
+            <ul className={styles.ladder} aria-label="How the delay is delivered">
+              <li>Queue sidebar: shown to the front desk as soon as you announce.</li>
+              {/* shortcut: no patient-messaging endpoint for delays yet; replace with a real channel ladder (WhatsApp, then SMS) when the backend sends them. */}
+              <li className={styles.muted}>Patient message (WhatsApp, then SMS): not available yet.</li>
+            </ul>
             {delayError && <div className={styles.formError} role="alert">{delayError}</div>}
             <div className={styles.modalActions}>
               <button type="button" className={styles.cancelBtn} onClick={closeDelayForm}>Cancel</button>
-              <button type="submit" className={styles.submitBtn} disabled={delayBusy || !delayMinutesInput}>
+              <button type="submit" className={styles.submitBtn} disabled={delayBusy || !delayValid}>
                 {delayBusy ? "Announcing…" : "Announce delay"}
               </button>
             </div>
