@@ -35,6 +35,38 @@ tags:
   - name: Packages
 
 paths:
+  # ---------------------------------------------------------------- JWKS (PLT-002)
+  /.well-known/jwks.json:
+    servers:
+      - url: /
+    get:
+      tags: [Auth]
+      summary: "Public JWT verification keys: exactly 2 (active + next/previous kid), no private material"
+      security: []
+      x-required-permission: public
+      responses:
+        "200":
+          description: JWKS, Cache-Control public max-age=300
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    minItems: 2
+                    maxItems: 2
+                    items:
+                      type: object
+                      required: [kid, kty, n, e, use, alg]
+                      properties:
+                        kid: { type: string }
+                        kty: { type: string, enum: [RSA] }
+                        n: { type: string }
+                        e: { type: string }
+                        use: { type: string, enum: [sig] }
+                        alg: { type: string, enum: [RS256] }
   # ---------------------------------------------------------------- Auth
   /auth/login:
     post:
