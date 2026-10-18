@@ -267,7 +267,7 @@ class ProvisioningStepRunner {
     }
 
     private static ModuleGrant fullGrant(String module) {
-        return new ModuleGrant(module, true, true, true, true, true, true, true);
+        return new ModuleGrant(module, true, true, true, true, true, true, true, "clinical".equals(module));
     }
 
     private String writeGrantsJson(List<ModuleGrant> grants) {

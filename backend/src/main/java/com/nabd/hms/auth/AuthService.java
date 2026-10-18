@@ -3,8 +3,6 @@ package com.nabd.hms.auth;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
-import com.nabd.hms.auth.dto.BreakGlassResponse;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
@@ -370,42 +368,6 @@ public class AuthService {
         log.info("staff {} completed PIN reset (tenant {})", staff.id(), tenant.id());
     }
 
-    // ── break-glass (NB-048) ─────────────────────────────────────────────
-
-    @Transactional
-    public TokenPairResponse activateBreakGlass(Jwt callerJwt, BreakGlassActivateRequest req, String ip, String device, String userAgent) {
-        UUID staffId = UUID.fromString(callerJwt.getSubject());
-        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
-        tenantContext.set(tenantId);
-        Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
-
-        Instant expiresAt = Instant.now().plus(30, ChronoUnit.MINUTES);
-        UUID grantId = repo.insertBreakGlass(tenantId, staffId, req.reason(), expiresAt);
-        auditService.record(tenantId, "staff", staffId, staff.name(), "break-glass", ip,
-                "auth.break_glass_activated", "break_glass_grant", grantId, null, java.util.Map.of("reason", req.reason(), "expiresAt", expiresAt.toString()));
-        log.warn("BREAK-GLASS activated by staff {} (tenant {}): {}", staffId, tenantId, req.reason());
-        return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
-    }
-
-    @Transactional
-    public void deactivateBreakGlass(Jwt callerJwt, UUID grantId) {
-        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
-        tenantContext.set(tenantId);
-        repo.deactivateBreakGlass(tenantId, grantId);
-        auditService.record(tenantId, "staff", UUID.fromString(callerJwt.getSubject()), "", "", null,
-                "auth.break_glass_deactivated", "break_glass_grant", grantId, null, null);
-    }
-
-    /** Owner-visible "who's elevated right now" — the honest substitute for "notified in real time"
-     * without a push channel: visible the moment anyone with staff:view loads this. */
-    @Transactional
-    public List<BreakGlassResponse> listActiveBreakGlass(UUID tenantId) {
-        tenantContext.set(tenantId);
-        return repo.listActiveBreakGlass(tenantId).stream()
-                .map(r -> new BreakGlassResponse(r.id(), r.staffId(), r.staffName(), r.reason(), r.activatedAt(), r.expiresAt()))
-                .toList();
-    }
-
     // ── idle-timeout unlock (NB-044) ─────────────────────────────────────
     // Client-side lock only — the underlying session/access token is untouched, so draft state in
     // the page (or already-autosaved backend rows) survives the lock exactly as if nothing happened.
@@ -535,6 +497,11 @@ public class AuthService {
     }
 
     private TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent) {
+        return mintTokenPair(staff, familyId, ip, device, userAgent, null);
+    }
+
+    /** PLT-012: bg != null mints the read-only emergency token for that grant (see BreakGlassService). */
+    TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent, BreakGlassSession bg) {
         Role role = repo.findRole(staff.roleId())
                 .orElseThrow(() -> new IllegalStateException("role missing for staff " + staff.id()));
         Tenant tenant = repo.findTenantById(staff.tenantId())
@@ -561,21 +528,19 @@ public class AuthService {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
                     "auth.break_glass_expired", "break_glass_grant", expiredId, null, null);
         }
-        if (repo.hasActiveBreakGlass(staff.id())) {
-            repo.findBuiltInOwnerRole(staff.tenantId()).ifPresent(ownerRole -> {
-                for (String p : flattenGrants(ownerRole.grantsJson())) {
-                    if (!permissions.contains(p)) {
-                        permissions.add(p);
-                    }
+        if (bg != null) {
+            for (String p : BreakGlassPolicy.BREAK_GLASS_GRANTS) {
+                if (!permissions.contains(p)) {
+                    permissions.add(p);
                 }
-            });
+            }
         }
 
-        UUID sessionId = UUID.randomUUID();
+        UUID sessionId = bg != null ? bg.sessionId() : UUID.randomUUID();
         Instant now = Instant.now();
-        Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
+        Instant accessExp = bg != null ? bg.expiresAt() : now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsBuilder = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(accessExp)
@@ -593,12 +558,15 @@ public class AuthService {
                 // Landing only (lib/session landingPathFor): the owner's home is Owner Insights, but
                 // their full grants would otherwise match the nursing rule first. From the staff
                 // member's own role, never a delegated one.
-                .claim("owner", role.builtIn())
-                .build();
+                .claim("owner", role.builtIn());
+        if (bg != null) {
+            claimsBuilder.claim("bg", bg.grantId().toString());
+        }
+        JwtClaimsSet claims = claimsBuilder.build();
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
 
         String rawRefresh = OpaqueTokens.generate();
-        Instant refreshExp = now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
+        Instant refreshExp = bg != null ? bg.expiresAt() : now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
         repo.insertSession(sessionId, staff.tenantId(), staff.id(), familyId,
                 OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent);
 

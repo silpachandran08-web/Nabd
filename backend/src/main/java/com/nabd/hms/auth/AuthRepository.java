@@ -150,43 +150,12 @@ class AuthRepository {
 
     // ── break-glass (NB-048) ─────────────────────────────────────────────
 
-    UUID insertBreakGlass(UUID tenantId, UUID staffId, String reason, Instant expiresAt) {
-        return jdbc.queryForObject(
-                "INSERT INTO break_glass_grants (tenant_id, staff_id, reason, expires_at) VALUES (?,?,?,?) RETURNING id",
-                UUID.class, tenantId, staffId, reason, Timestamp.from(expiresAt));
-    }
-
-    boolean hasActiveBreakGlass(UUID staffId) {
-        Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM break_glass_grants WHERE staff_id = ? AND deactivated_at IS NULL AND expires_at > now()",
-                Integer.class, staffId);
-        return count != null && count > 0;
-    }
-
     /** Same "detect and close on next read" shape as delegation expiry — see AuthService.mintTokenPair. */
     List<UUID> expireStaleBreakGlass(UUID staffId) {
         return jdbc.query(
                 "UPDATE break_glass_grants SET deactivated_at = expires_at, deactivated_reason = 'expired' " +
                         "WHERE staff_id = ? AND deactivated_at IS NULL AND expires_at <= now() RETURNING id",
                 (rs, i) -> UUID.fromString(rs.getString("id")), staffId);
-    }
-
-    void deactivateBreakGlass(UUID tenantId, UUID id) {
-        jdbc.update("UPDATE break_glass_grants SET deactivated_at = now(), deactivated_reason = 'manual' " +
-                "WHERE tenant_id = ? AND id = ? AND deactivated_at IS NULL", tenantId, id);
-    }
-
-    List<com.nabd.hms.auth.AuthModels.BreakGlassRow> listActiveBreakGlass(UUID tenantId) {
-        return jdbc.query(
-                "SELECT g.id, g.staff_id, s.name AS staff_name, g.reason, g.activated_at, g.expires_at " +
-                        "FROM break_glass_grants g JOIN staff s ON s.id = g.staff_id " +
-                        "WHERE g.tenant_id = ? AND g.deactivated_at IS NULL AND g.expires_at > now() " +
-                        "ORDER BY g.activated_at DESC",
-                (rs, i) -> new com.nabd.hms.auth.AuthModels.BreakGlassRow(
-                        UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("staff_id")),
-                        rs.getString("staff_name"), rs.getString("reason"),
-                        rs.getTimestamp("activated_at").toInstant(), rs.getTimestamp("expires_at").toInstant()),
-                tenantId);
     }
 
     Optional<Role> findRole(UUID roleId) {

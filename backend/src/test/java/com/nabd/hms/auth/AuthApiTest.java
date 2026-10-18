@@ -479,66 +479,7 @@ class AuthApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
-    // ---- break-glass (NB-048) ----
-
-    @Test
-    void breakGlassGrantsOwnerPermissionsImmediatelyAndExpiryIsAudited() {
-        SeededTenant tenant = seedTenant();
-        UUID ownerRoleId = seedFullAccessRole(tenant.id()); // built_in Owner — break-glass elevates to this
-        UUID limitedRoleId = seedRole(tenant.id(), "Receptionist", false,
-                new ModuleGrant("queue", true, false, false, false, false, false, false));
-        SeededStaff staff = seedStaff(tenant, limitedRoleId, "bg@a.com", "+919300000007", false);
-        String token = loginAndGetAccessToken(staff);
-        assertThat(permissionsOf(token)).doesNotContain("staff:delete");
-
-        ResponseEntity<Map> activateResp = exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "Patient emergency, need chart access now")), Map.class);
-        assertThat(activateResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String elevatedToken = (String) activateResp.getBody().get("accessToken");
-        assertThat(permissionsOf(elevatedToken)).contains("staff:delete"); // full Owner grant, immediately
-
-        // find the grant id via the owner-visible panel, then force it into the past
-        String ownerToken = loginAndGetAccessToken(seedStaff(tenant, ownerRoleId, "owner8@a.com", "+919300000008", false));
-        ResponseEntity<List> activeResp = exchange("/v1/auth/break-glass/active", HttpMethod.GET, authed(ownerToken), List.class);
-        assertThat(activeResp.getBody()).hasSize(1);
-        String grantId = (String) ((Map<?, ?>) activeResp.getBody().get(0)).get("id");
-
-        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE break_glass_grants SET expires_at = now() - interval '1 minute' WHERE id = ?",
-                UUID.fromString(grantId)));
-        String tokenAfterExpiry = loginAndGetAccessToken(staff);
-        assertThat(permissionsOf(tokenAfterExpiry)).doesNotContain("staff:delete");
-
-        Integer auditRows = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
-                "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'break_glass_grant' AND entity_id = ? AND action IN ('auth.break_glass_activated','auth.break_glass_expired')",
-                Integer.class, UUID.fromString(grantId)));
-        assertThat(auditRows).isEqualTo(2);
-    }
-
-    @Test
-    void breakGlassCanBeDeactivatedManually() {
-        SeededTenant tenant = seedTenant();
-        UUID limitedRoleId = seedRole(tenant.id(), "Receptionist 2", false,
-                new ModuleGrant("queue", true, false, false, false, false, false, false));
-        seedFullAccessRole(tenant.id()); // ensures a built-in Owner role exists to elevate to
-        SeededStaff staff = seedStaff(tenant, limitedRoleId, "bg2@a.com", "+919300000009", false);
-        String token = loginAndGetAccessToken(staff);
-
-        ResponseEntity<Map> activateResp = exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "testing")), Map.class);
-        String elevatedToken = (String) activateResp.getBody().get("accessToken");
-
-        Map<?, ?> claims = decodeClaims(elevatedToken);
-        // grantId isn't in the token; look it up the same way the owner panel would
-        ResponseEntity<List> activeResp = exchange("/v1/auth/break-glass/active", HttpMethod.GET, authed(elevatedToken), List.class);
-        String grantId = (String) ((Map<?, ?>) activeResp.getBody().get(0)).get("id");
-
-        ResponseEntity<Void> deactivateResp = exchange("/v1/auth/break-glass/" + grantId + "/deactivate", HttpMethod.POST,
-                authed(elevatedToken), Void.class);
-        assertThat(deactivateResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-
-        String tokenAfter = loginAndGetAccessToken(staff);
-        assertThat(permissionsOf(tokenAfter)).doesNotContain("staff:delete");
-    }
+    // break-glass (NB-048, reworked by PLT-012): see BreakGlassAuthzTest
 
     // ---- helpers ----
 

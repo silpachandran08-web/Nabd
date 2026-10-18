@@ -208,6 +208,99 @@ paths:
         "204": { description: "Revoked; denied within 60s per NB-032" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  # PLT-012: break-glass = 30-minute, read-only emergency access (never Owner rights)
+  /auth/break-glass/activate:
+    post:
+      tags: [Auth]
+      summary: Start emergency read access (30 minutes)
+      description: Token permissions are the caller's own plus clinical:view and patients:view; the token carries a `bg` claim and every non-GET call (except ending the grant) returns 403. Every Owner is alerted in-app and on WhatsApp.
+      x-required-permission: clinical:breakGlass
+      x-step-up: true
+      parameters:
+        - { name: X-Step-Up-Token, in: header, required: true, description: "Step-up token with purpose break_glass, bound to the caller's session", schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reasonCode, reasonText]
+              properties:
+                reasonCode: { type: string, enum: [unconscious_patient, life_threatening, no_treating_clinician_available, other] }
+                reasonText: { type: string, minLength: 10, maxLength: 500, description: "Stored for the Owner review; never logged" }
+                patientId: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Emergency access granted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grantId: { type: string, format: uuid }
+                  expiresAt: { type: string, format: date-time }
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+        "403": { description: "FORBIDDEN (no clinical:breakGlass) or STEP_UP_REQUIRED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "ALREADY_ACTIVE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /auth/break-glass/{id}/deactivate:
+    post:
+      tags: [Auth]
+      summary: End emergency access early (holder, or staff:edit)
+      x-required-permission: "holder of the grant OR staff:edit"
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Ended (idempotent); the elevated session is revoked" }
+        "403": { description: Not the holder and no staff:edit }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /auth/break-glass/active:
+    get:
+      tags: [Auth]
+      summary: Active emergency-access grants in the tenant
+      x-required-permission: staff:view
+      responses:
+        "200":
+          description: Active grants (reason text is never returned)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        grantId: { type: string, format: uuid }
+                        staffName: { type: string }
+                        reasonCode: { type: string }
+                        activatedAt: { type: string, format: date-time }
+                        expiresAt: { type: string, format: date-time }
+
+  /auth/break-glass/alerts:
+    get:
+      tags: [Auth]
+      summary: The caller's own in-app emergency-access alerts (Owners receive one per activation; no patient data)
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Alerts, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        grantId: { type: string, format: uuid }
+                        message: { type: string }
+                        createdAt: { type: string, format: date-time }
+
   # NB-046 (PIN reset & account recovery): specced, not yet implemented in the backend.
   /auth/pin-reset/request:
     post:
@@ -3066,6 +3159,7 @@ components:
           default: false
           description: On the billing module this also puts the string `billing.discount` in the JWT/session permissions list; POST /v1/billing/checkout/{queueEntryId} and /v1/billing/otc-checkout return 403 (discount-not-permitted) for a non-zero discount without it.
         export: { type: boolean, default: false }
+        breakGlass: { type: boolean, default: false, description: "Only on module clinical: puts clinical:breakGlass in the permissions list (PLT-012)" }
 
     Tenant:
       type: object

@@ -21,6 +21,7 @@ public final class GrantsFlattener {
             // REC-043: the billing module's refund/discount flag also gates discounts at checkout.
             if (g.refundDiscount() && "billing".equals(g.module())) out.add("billing.discount");
             if (g.export()) out.add(g.module() + ":export");
+            if (g.breakGlass() && "clinical".equals(g.module())) out.add("clinical:breakGlass");
         }
         return out;
     }

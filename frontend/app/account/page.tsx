@@ -120,13 +120,13 @@ export default function AccountPage() {
   async function activateBreakGlass(e: React.FormEvent) {
     e.preventDefault();
     setBgError(null);
-    if (!bgReason.trim()) {
-      setBgError("A reason is required.");
+    if (bgReason.trim().length < 10) {
+      setBgError("Please describe the emergency (at least 10 characters).");
       return;
     }
     setBgBusy(true);
     try {
-      const res = await authedFetch("/auth/break-glass/activate", { method: "POST", body: JSON.stringify({ reason: bgReason.trim() }) });
+      const res = await authedFetch("/auth/break-glass/activate", { method: "POST", body: JSON.stringify({ reasonCode: "other", reasonText: bgReason.trim() }) });
       if (!res) return;
       if (!res.ok) {
         const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't activate emergency access." }));
