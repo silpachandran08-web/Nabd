@@ -7,7 +7,6 @@ import { useLatestLoad } from "../../lib/useLatestLoad";
 import type { PatientDetail, QueueEntry } from "../consult/shared";
 import { apiFetch, goLogin } from "../../lib/apiClient";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 // DTOs mirror the backend records exactly (queue/dto/*, clinical/dto/DueConditionResponse).
 export type Appointment = { id: string; patientId: string; doctorId: string; startTime: string; endTime: string; status: string; isFollowUp: boolean };
@@ -57,7 +56,7 @@ export function useMyDay() {
     }
     const get = async (path: string): Promise<Response | null> => {
       try {
-        const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` }, signal });
         if (res.status === 401) {
           localStorage.removeItem("nabd_access_token");
           goLogin();
