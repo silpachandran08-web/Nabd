@@ -10,6 +10,6 @@ class LoggingEmailSender implements EmailSender {
 
     @Override
     public void send(String to, String subject, String body) {
-        log.info("[MOCK EMAIL] would send \"{}\" to {}", subject, to);
+        log.info("[MOCK EMAIL] would send an email");
     }
 }

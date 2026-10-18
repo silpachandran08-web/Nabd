@@ -102,7 +102,7 @@ public class AppointmentService {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
         repo.cancel(tenantId, id, req.reason());
-        log.info("appointment {} cancelled by {}: {}", id, callerStaffId, req.reason());
+        log.info("appointment {} cancelled by {}", id, callerStaffId);
         waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }

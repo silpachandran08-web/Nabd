@@ -78,7 +78,7 @@ public class DepartmentService {
         } catch (DuplicateKeyException e) {
             throw duplicateName();
         }
-        log.info("department {} '{}' created by {} (tenant {})", id, req.name(), callerStaffId, tenantId);
+        log.info("department {} '{}' created by {} (tenant {})", id, req.name(), callerStaffId, tenantId);  // log-phi-ok: department name is org data
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
@@ -126,7 +126,7 @@ public class DepartmentService {
                     current.name() + " has patient visits on record, so it can't be deleted. Deactivate it instead.");
         }
         repo.delete(tenantId, id);
-        log.info("department {} ({}) deleted by {} (tenant {})", id, current.name(), callerStaffId, tenantId);
+        log.info("department {} ({}) deleted by {} (tenant {})", id, current.name(), callerStaffId, tenantId);  // log-phi-ok: department name is org data
     }
 
     @Transactional
@@ -196,7 +196,7 @@ public class DepartmentService {
         }
 
         repo.upsertSelection(tenantId, departmentId, template.id(), writeJson(toggles));
-        log.info("department {} workflow set to template {} by {} (tenant {})", departmentId, req.templateCode(), callerStaffId, tenantId);
+        log.info("department {} workflow set to template {} by {} (tenant {})", departmentId, req.templateCode(), callerStaffId, tenantId);  // log-phi-ok: template code is config
         return getWorkflow(tenantId, departmentId);
     }
 

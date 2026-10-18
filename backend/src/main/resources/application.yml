@@ -37,7 +37,7 @@ logging:
   pattern:
     # [reqId=...] ties every line for one request together and matches the traceId returned in
     # RFC 7807 error bodies (RequestCorrelationFilter + GlobalExceptionHandler share the value)
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [reqId=%X{requestId:-none}] %logger{35} - %msg%n"
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [reqId=%X{requestId:-none}] %logger{35} - %mask%n"
   level:
     root: INFO
     # ponytail: no PHI-redaction scanner on top of this yet (NB-158) — logging code is
@@ -76,7 +76,7 @@ app:
     verify-token: ${WHATSAPP_VERIFY_TOKEN:}   # blank = webhook subscription handshake always fails
     otp-template: ${WHATSAPP_OTP_TEMPLATE:nabd_login_otp}
     otp-language: ${WHATSAPP_OTP_LANGUAGE:en}
-    log-otp: ${WHATSAPP_LOG_OTP:true}          # also print every OTP to the log; set false once WhatsApp delivery works
+    log-otp: ${WHATSAPP_LOG_OTP:false}         # OtpLoggingGuard refuses to boot in prod when true; the sender no longer logs codes
   crypto:
     # base64, 32 bytes (AES-256), Vault/KMS-backed (NB-009) — no default;
     # boot fails fast if unset rather than encrypting MFA secrets with a

@@ -388,7 +388,7 @@ public class AuthService {
         UUID grantId = repo.insertBreakGlass(tenantId, staffId, req.reason(), expiresAt);
         auditService.record(tenantId, "staff", staffId, staff.name(), "break-glass", ip,
                 "auth.break_glass_activated", "break_glass_grant", grantId, null, java.util.Map.of("reason", req.reason(), "expiresAt", expiresAt.toString()));
-        log.warn("BREAK-GLASS activated by staff {} (tenant {}): {}", staffId, tenantId, req.reason());
+        log.warn("BREAK-GLASS activated by staff {} (tenant {}), grant {}", staffId, tenantId, grantId);
         return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
     }
 

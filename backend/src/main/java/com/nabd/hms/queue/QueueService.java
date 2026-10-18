@@ -127,7 +127,7 @@ public class QueueService {
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
         UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
                 null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode(), null, null);
-        log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",
+        log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",  // log-phi-ok: queue token number, not a credential
                 callerStaffId, token, req.doctorId(), req.appointmentId() == null ? "walk-in" : "scheduled", id);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
@@ -213,7 +213,7 @@ public class QueueService {
         tenantContext.set(tenantId);
         repo.findById(tenantId, id).orElseThrow(this::notFound);
         repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null, callerStaffId);
-        log.info("queue entry {} priority set to {} by {} ({})", id, req.priority(), callerStaffId, req.reason());
+        log.info("queue entry {} priority set to {} by {}", id, req.priority(), callerStaffId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
