@@ -49,16 +49,18 @@ public class BillingController {
     @PostMapping("/subscriptions/{tenantId}")
     @PreAuthorize("hasAuthority('billing_revenue:edit')")
     public SubscriptionResponse upsertSubscription(@PathVariable UUID tenantId,
-                                                     @Valid @RequestBody SubscriptionUpsertRequest req) {
-        return billingService.upsert(tenantId, req);
+                                                     @Valid @RequestBody SubscriptionUpsertRequest req,
+                                                     @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return billingService.upsert(tenantId, req, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 
     @PostMapping("/subscriptions/{tenantId}/transitions")
     @PreAuthorize("hasAuthority('billing_revenue:edit')")
     public SubscriptionResponse transition(@PathVariable UUID tenantId,
                                             @Valid @RequestBody SubscriptionTransitionRequest req,
-                                            @AuthenticationPrincipal Jwt jwt) {
-        return billingService.transition(tenantId, req.toStatus(), req.reason(), UUID.fromString(jwt.getSubject()));
+                                            @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return billingService.transition(tenantId, req.toStatus(), req.reason(), UUID.fromString(jwt.getSubject()),
+                RequestMeta.clientIp(http));
     }
 
     @GetMapping("/discounts")

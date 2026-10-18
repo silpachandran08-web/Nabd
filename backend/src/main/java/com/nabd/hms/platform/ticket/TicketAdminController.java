@@ -1,9 +1,13 @@
 package com.nabd.hms.platform.ticket;
 
+import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.platform.ticket.dto.TicketResponse;
 import com.nabd.hms.platform.ticket.dto.TransitionRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,7 +36,8 @@ public class TicketAdminController {
     }
 
     @PostMapping("/{id}/transitions")
-    public TicketResponse transition(@PathVariable UUID id, @Valid @RequestBody TransitionRequest req) {
-        return service.transition(id, req.toStatus());
+    public TicketResponse transition(@PathVariable UUID id, @Valid @RequestBody TransitionRequest req,
+                                     @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return service.transition(id, req.toStatus(), UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 }

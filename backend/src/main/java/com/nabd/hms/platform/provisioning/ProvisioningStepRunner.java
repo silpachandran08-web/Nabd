@@ -263,7 +263,7 @@ class ProvisioningStepRunner {
         if (tenantId == null) {
             throw new IllegalStateException("go_live ran before create_tenant recorded a tenant id");
         }
-        lifecycleService.transition(tenantId, "trialing", job.requestedBy(), "provisioning completed");
+        lifecycleService.transition(tenantId, "trialing", job.requestedBy(), "provisioning completed", null);
     }
 
     private static ModuleGrant fullGrant(String module) {

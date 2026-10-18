@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.provisioning;
 
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.platform.PlatformAudit;
 import com.nabd.hms.platform.provisioning.dto.CreateProvisioningJobRequest;
 import com.nabd.hms.platform.provisioning.dto.ProvisioningJobResponse;
 import com.nabd.hms.platform.provisioning.dto.ProvisioningStepResponse;
@@ -10,7 +11,9 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
@@ -37,13 +40,15 @@ public class ProvisioningService {
 
     private final ProvisioningRepository repo;
     private final ProvisioningStepRunner stepRunner;
+    private final PlatformAudit audit;
 
-    ProvisioningService(ProvisioningRepository repo, ProvisioningStepRunner stepRunner) {
+    ProvisioningService(ProvisioningRepository repo, ProvisioningStepRunner stepRunner, PlatformAudit audit) {
         this.repo = repo;
         this.stepRunner = stepRunner;
+        this.audit = audit;
     }
 
-    public ProvisioningJobResponse createJob(CreateProvisioningJobRequest req, UUID requestedBy) {
+    public ProvisioningJobResponse createJob(CreateProvisioningJobRequest req, UUID requestedBy, String ip) {
         UUID jobId = UUID.randomUUID();
         repo.insertJob(jobId, requestedBy, req.tenantSlug().toLowerCase(), req.tenantName(), req.region(),
                 req.ownerEmail().toLowerCase(), req.ownerName(), req.ownerMobile(), req.brandName(), req.path());
@@ -52,6 +57,13 @@ public class ProvisioningService {
         }
         log.info("provisioning job {} queued for tenant slug {} by operator {} (path {})",
                 jobId, req.tenantSlug(), requestedBy, req.path());
+        // Clinic facts only: the owner's name, email and mobile are personal data and stay out of the audit row.
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("tenantSlug", req.tenantSlug().toLowerCase());
+        after.put("tenantName", req.tenantName());
+        after.put("region", req.region());
+        after.put("path", req.path());
+        audit.record(null, requestedBy, ip, "platform_provisioning.job_created", "provisioning_job", jobId, after);
         return toResponse(jobId);
     }
 
@@ -59,7 +71,7 @@ public class ProvisioningService {
      * Both paths run through the identical step engine below (SSA-01/SCS-01) — this is the only
      * place they differ. Self-serve has no gate, so isGatedAndUnapproved() is always false for it.
      */
-    public ProvisioningJobResponse approve(UUID jobId, UUID approvedBy) {
+    public ProvisioningJobResponse approve(UUID jobId, UUID approvedBy, String ip) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
         if (!"enterprise".equals(job.path())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "not-enterprise-path", "Not an enterprise-path job",
@@ -67,6 +79,7 @@ public class ProvisioningService {
         }
         if (repo.approveJob(jobId, approvedBy)) {
             log.info("provisioning job {} approved by operator {}", jobId, approvedBy);
+            audit.record(null, approvedBy, ip, "platform_provisioning.job_approved", "provisioning_job", jobId, null);
         }
         return toResponse(jobId);
     }
@@ -83,7 +96,7 @@ public class ProvisioningService {
     }
 
     /** Runs the next incomplete step (a queued first attempt, or a retry of the step that last failed). Idempotent once done. */
-    public ProvisioningJobResponse advance(UUID jobId) {
+    public ProvisioningJobResponse advance(UUID jobId, UUID operatorId, String ip) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
         if (job.isGatedAndUnapproved()) {
             return toResponse(jobId); // enterprise job awaiting approval — same no-op idiom as "already done"
@@ -113,6 +126,11 @@ public class ProvisioningService {
                 repo.updateJobStatus(jobId, "failed"); // ordinary/transient failure — stays retryable via advance()
             }
         }
+        // Step name and outcome only — never the reveal-once invite tokens in result.
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("step", next.stepName());
+        after.put("jobStatus", repo.findJob(jobId).map(Job::status).orElse(null));
+        audit.record(null, operatorId, ip, "platform_provisioning.step_run", "provisioning_job", jobId, after);
         return toResponse(jobId, result.staffInviteToken(), result.ownerAccountInviteToken());
     }
 

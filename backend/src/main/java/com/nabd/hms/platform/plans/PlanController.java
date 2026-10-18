@@ -1,11 +1,15 @@
 package com.nabd.hms.platform.plans;
 
+import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.platform.plans.dto.PlanResponse;
 import com.nabd.hms.platform.plans.dto.PlanWriteRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,12 +39,15 @@ public class PlanController {
     }
 
     @PostMapping
-    public ResponseEntity<PlanResponse> create(@Valid @RequestBody PlanWriteRequest req) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(req));
+    public ResponseEntity<PlanResponse> create(@Valid @RequestBody PlanWriteRequest req, @AuthenticationPrincipal Jwt jwt,
+                                               HttpServletRequest http) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.create(req, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http)));
     }
 
     @PatchMapping("/{id}")
-    public PlanResponse update(@PathVariable UUID id, @Valid @RequestBody PlanWriteRequest req) {
-        return service.update(id, req);
+    public PlanResponse update(@PathVariable UUID id, @Valid @RequestBody PlanWriteRequest req,
+                               @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return service.update(id, req, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 }

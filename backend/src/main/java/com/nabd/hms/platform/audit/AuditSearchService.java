@@ -88,7 +88,7 @@ public class AuditSearchService {
             rowsPerTenant.merge(e.tenantId(), 1, Integer::sum);
             sb.append(e.id()).append(',')
                     .append(e.createdAt()).append(',')
-                    .append(e.tenantId()).append(',')
+                    .append(e.tenantId() == null ? "" : e.tenantId()).append(',')
                     .append(csvField(e.tenantName())).append(',')
                     .append(csvField(e.tenantSlug())).append(',')
                     .append(csvField(e.actorType())).append(',')
@@ -106,15 +106,24 @@ public class AuditSearchService {
         OperatorInfo operator = repo.findOperatorInfo(operatorId).orElseThrow(() -> new ApiException(
                 HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found."));
         Map<String, Object> filters = auditedFilters(f);
+        long tenantCount = rowsPerTenant.keySet().stream().filter(java.util.Objects::nonNull).count();
+        if (rowsPerTenant.isEmpty()) {
+            rowsPerTenant.put(null, 0); // nothing disclosed, but the export itself still lands in the platform chain
+        }
         rowsPerTenant.forEach((tenantId, count) -> {
             Map<String, Object> after = new LinkedHashMap<>();
             after.put("format", "csv");
             after.put("filters", filters);
             after.put("rowCount", count);
             after.put("totalRowCount", rows.size());
-            after.put("tenantCount", rowsPerTenant.size());
-            auditService.record(tenantId, "operator", operatorId, operator.name(), operator.role(), ipAddress,
-                    "audit_log.export", "audit_log", null, null, after);
+            after.put("tenantCount", tenantCount);
+            if (tenantId == null) { // platform-scope rows in the file, or an empty export (V126 platform chain)
+                auditService.recordPlatform("operator", operatorId, operator.name(), operator.role(), ipAddress,
+                        "audit_log.export", "audit_log", null, null, after);
+            } else {
+                auditService.record(tenantId, "operator", operatorId, operator.name(), operator.role(), ipAddress,
+                        "audit_log.export", "audit_log", null, null, after);
+            }
         });
         log.info("audit log export by operator {} ({}): {} rows across {} tenants",
                 operatorId, operator.role(), rows.size(), rowsPerTenant.size());

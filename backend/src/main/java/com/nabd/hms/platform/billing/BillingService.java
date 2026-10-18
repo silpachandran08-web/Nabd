@@ -6,11 +6,15 @@ import com.nabd.hms.platform.billing.dto.PageMeta;
 import com.nabd.hms.platform.billing.dto.SubscriptionPage;
 import com.nabd.hms.platform.billing.dto.SubscriptionResponse;
 import com.nabd.hms.platform.billing.dto.SubscriptionUpsertRequest;
+import com.nabd.hms.platform.PlatformAudit;
 import com.nabd.hms.platform.tenant.TenantLifecycleService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -32,10 +36,12 @@ public class BillingService {
 
     private final BillingRepository repo;
     private final TenantLifecycleService lifecycleService;
+    private final PlatformAudit audit;
 
-    BillingService(BillingRepository repo, TenantLifecycleService lifecycleService) {
+    BillingService(BillingRepository repo, TenantLifecycleService lifecycleService, PlatformAudit audit) {
         this.repo = repo;
         this.lifecycleService = lifecycleService;
+        this.audit = audit;
     }
 
     public SubscriptionPage list(int limit, String cursor) {
@@ -52,22 +58,39 @@ public class BillingService {
         return new SubscriptionPage(page.stream().map(this::toResponse).toList(), new PageMeta(nextCursor, limit));
     }
 
-    public SubscriptionResponse upsert(UUID tenantId, SubscriptionUpsertRequest req) {
+    @Transactional
+    public SubscriptionResponse upsert(UUID tenantId, SubscriptionUpsertRequest req, UUID operatorId, String ip) {
         String region = repo.findTenantRegion(tenantId).orElseThrow(this::tenantNotFound);
         if (!repo.planExists(req.planId())) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested plan was not found.");
         }
         String currency = "KSA".equals(region) ? "SAR" : "INR";
+        SubscriptionResponse before = repo.findByTenant(tenantId).map(this::toResponse).orElse(null);
         repo.upsert(tenantId, req.planId(), req.mrrCents(), currency, req.renewalDate());
-        return getForTenant(tenantId);
+        SubscriptionResponse after = getForTenant(tenantId);
+        audit.record(tenantId, operatorId, ip, before == null ? "platform_billing.subscription_created"
+                : "platform_billing.subscription_updated", "subscription", after.id(),
+                before == null ? null : subscriptionTerms(before), subscriptionTerms(after));
+        return after;
     }
 
-    public SubscriptionResponse transition(UUID tenantId, String toStatus, String reason, UUID operatorId) {
+    private static Map<String, Object> subscriptionTerms(SubscriptionResponse s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("planId", s.planId());
+        m.put("planCode", s.planCode());
+        m.put("mrrCents", s.mrrCents());
+        m.put("currency", s.currency());
+        m.put("renewalDate", s.renewalDate());
+        return m;
+    }
+
+    // Audited by TenantLifecycleService.transition (platform_tenant.lifecycle_changed) — one event, not two.
+    public SubscriptionResponse transition(UUID tenantId, String toStatus, String reason, UUID operatorId, String ip) {
         if (!DUNNING_STATES.contains(toStatus)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-dunning-state", "Invalid state",
                     "Billing can only move a tenant between active, overdue and suspended.");
         }
-        lifecycleService.transition(tenantId, toStatus, operatorId, reason);
+        lifecycleService.transition(tenantId, toStatus, operatorId, reason, ip);
         return getForTenant(tenantId);
     }
 

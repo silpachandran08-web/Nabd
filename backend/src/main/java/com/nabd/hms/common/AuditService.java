@@ -52,6 +52,18 @@ public class AuditService {
                 toJson(before), toJson(after));
     }
 
+    /**
+     * LIVE-08: platform-scope event (no tenant: operator sign-in, plans, provisioning jobs). Lands in the
+     * platform chain (tenant_id NULL) through record_platform_audit(), V126. Same PHI/secret policy as record().
+     */
+    @Transactional
+    public void recordPlatform(String actorType, UUID actorId, String actorName, String actorRole, String ipAddress,
+                               String action, String entityType, UUID entityId, Object before, Object after) {
+        jdbc.queryForObject("SELECT record_platform_audit(?,?,?,?,?::inet,?,?,?,?::jsonb,?::jsonb)::text",
+                String.class, actorType, actorId, actorName, actorRole, ipAddress, action, entityType, entityId,
+                toJson(before), toJson(after));
+    }
+
     /** Recomputes this tenant's whole chain and reports the first row whose hash doesn't match, if any. */
     @Transactional
     public AuditVerification verify(UUID tenantId) {

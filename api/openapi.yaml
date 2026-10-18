@@ -2123,6 +2123,18 @@ paths:
   /platform/audit-log:
     get:
       tags: [Platform]
+      description: >
+        LIVE-08 platform operator events. Platform scope (tenantId null) - platform_auth.signed_in (after.mfa),
+        platform_auth.sign_in_failed (after.reason: invalid_credentials | inactive_account | unknown_account; actorId
+        null for unknown_account; never the PIN or typed email), platform_auth.mfa_challenged, platform_auth.mfa_failed,
+        platform_auth.signed_out, platform_auth.session_revoked, platform_auth.refresh_reuse_detected,
+        platform_plan.created, platform_plan.updated (before/after plan terms), platform_provisioning.job_created
+        (no owner contact details), platform_provisioning.job_approved, platform_provisioning.step_run, audit_log.export
+        (when platform rows or no rows are exported). Tenant scope - platform_tenant.lifecycle_changed (fromStatus,
+        toStatus, reason; also written by billing dunning transitions), platform_billing.subscription_created,
+        platform_billing.subscription_updated, platform_billing.discount_requested, platform_billing.discount_auto_approved,
+        platform_billing.discount_approved, platform_billing.discount_rejected, platform_ticket.status_changed (status
+        only), support_access.grant, support_access.revoke, patient.support_view, audit_log.export.
       summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
       x-required-permission: audit_compliance:view
       parameters:
@@ -2161,7 +2173,8 @@ paths:
         prefixed with an apostrophe. Audited as audit_log.export (actor = the operator, entityType audit_log),
         written once into the audit trail of every tenant whose rows the file contains, with filters (the
         actor-name search text is recorded only as actorNameFilter=true), rowCount, totalRowCount and tenantCount.
-        An export matching no rows writes no audit row (no tenant trail to write to).
+        Platform-scope rows (tenantId null) in the file, and an export matching no rows, are recorded once in the
+        platform chain (V126).
       x-required-permission: audit_compliance:view
       parameters:
         - $ref: "#/components/parameters/PlatformAuditTenantId"
@@ -2803,9 +2816,9 @@ components:
       type: object
       properties:
         id: { type: integer, format: int64 }
-        tenantId: { type: string, format: uuid }
-        tenantName: { type: string }
-        tenantSlug: { type: string }
+        tenantId: { type: [string, "null"], format: uuid, description: "null = platform-scope event (no single clinic; V126 platform chain)" }
+        tenantName: { type: [string, "null"] }
+        tenantSlug: { type: [string, "null"] }
         actorType: { type: string, enum: [staff, operator, system] }
         actorId: { type: [string, "null"], format: uuid }
         actorName: { type: string }

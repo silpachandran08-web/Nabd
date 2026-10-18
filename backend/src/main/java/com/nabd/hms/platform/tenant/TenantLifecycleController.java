@@ -1,7 +1,9 @@
 package com.nabd.hms.platform.tenant;
 
+import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.platform.tenant.dto.TenantLifecycleResponse;
 import com.nabd.hms.platform.tenant.dto.TransitionRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,7 +38,8 @@ public class TenantLifecycleController {
     @PostMapping("/transitions")
     @PreAuthorize("hasAuthority('tenant_detail:edit')")
     public TenantLifecycleResponse transition(@PathVariable UUID tenantId, @Valid @RequestBody TransitionRequest req,
-                                                @AuthenticationPrincipal Jwt jwt) {
-        return service.transition(tenantId, req.toStatus(), UUID.fromString(jwt.getSubject()), req.reason());
+                                                @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return service.transition(tenantId, req.toStatus(), UUID.fromString(jwt.getSubject()), req.reason(),
+                RequestMeta.clientIp(http));
     }
 }
