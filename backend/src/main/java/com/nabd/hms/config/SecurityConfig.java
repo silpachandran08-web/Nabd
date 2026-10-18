@@ -120,6 +120,14 @@ public class SecurityConfig {
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .bearerTokenResolver(ownerSelectAwareResolver())
+                        .authenticationEntryPoint((req, res, ex) -> {
+                            String dbCode = com.nabd.hms.common.DbFailureAdvice.classify(ex.getCause());
+                            if (dbCode != null) {
+                                com.nabd.hms.common.DbFailureAdvice.write(res, dbCode);
+                            } else {
+                                new org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint().commence(req, res, ex);
+                            }
+                        })
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
     }

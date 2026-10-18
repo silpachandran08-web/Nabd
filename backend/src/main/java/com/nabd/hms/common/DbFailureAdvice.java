@@ -29,8 +29,8 @@ public class DbFailureAdvice {
     private static final String TYPE_BASE = "https://api.nabd.health/errors/";
 
     @ExceptionHandler({QueryTimeoutException.class, UncategorizedSQLException.class, CannotAcquireLockException.class,
-            DataAccessResourceFailureException.class})
-    public org.springframework.http.ResponseEntity<ProblemDetail> handle(DataAccessException ex) {
+            DataAccessResourceFailureException.class, org.springframework.transaction.CannotCreateTransactionException.class})
+    public org.springframework.http.ResponseEntity<ProblemDetail> handle(RuntimeException ex) {
         String code = classify(ex);
         if (code == null) {
             throw ex; // not ours: stays whatever it was before this advice existed
@@ -49,8 +49,20 @@ public class DbFailureAdvice {
                 .header("Retry-After", "2").contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON).body(p);
     }
 
+    /** Same 503 problem+json as the advice, for failures raised before a controller runs (the JWT decoder). */
+    public static void write(jakarta.servlet.http.HttpServletResponse res, String code) throws java.io.IOException {
+        boolean timeout = code.equals("DB_TIMEOUT");
+        String traceId = MDC.get(RequestCorrelationFilter.MDC_KEY);
+        res.setStatus(503);
+        res.setHeader("Retry-After", "2");
+        res.setContentType("application/problem+json");
+        res.getWriter().write("{\"type\":\"" + TYPE_BASE + (timeout ? "db-timeout" : "db-unavailable") + "\",\"title\":\""
+                + (timeout ? "Database timeout" : "Database unavailable") + "\",\"status\":503,\"code\":\"" + code
+                + "\",\"traceId\":\"" + (traceId != null ? traceId : UUID.randomUUID().toString()) + "\"}");
+    }
+
     /** DB_TIMEOUT for statement_timeout (57014) / lock_timeout (55P03); DB_UNAVAILABLE when no connection could be had. */
-    static String classify(Throwable ex) {
+    public static String classify(Throwable ex) {
         if (ex instanceof QueryTimeoutException || ex instanceof CannotAcquireLockException) {
             return "DB_TIMEOUT";
         }
