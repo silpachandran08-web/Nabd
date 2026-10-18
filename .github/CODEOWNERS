@@ -1,0 +1,6 @@
+# Clinical safety paths need the CSO (team @nabd/clinical-safety; CSO is a member). See docs/clinical-safety/README.md
+/backend/src/main/java/com/nabd/hms/clinical/RxSafetyChecks.java @nabd/clinical-safety
+/backend/src/main/java/com/nabd/hms/clinical/AllergyDrugClasses.java @nabd/clinical-safety
+/backend/src/main/resources/clinical-safety/ @nabd/clinical-safety
+/backend/src/main/java/com/nabd/hms/clinical/cds/ @nabd/clinical-safety
+/docs/clinical-safety/ @nabd/clinical-safety

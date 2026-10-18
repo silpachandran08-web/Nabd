@@ -1,0 +1,16 @@
+name: clin-safety-label
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      # Applies [CLIN-SAFETY] by path (config below); does not check out PR code.
+      - uses: actions/labeler@v5
+        with:
+          configuration-path: .github/clin-safety-labeler.yml
+          sync-labels: false
