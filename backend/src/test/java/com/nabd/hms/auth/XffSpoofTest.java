@@ -43,7 +43,7 @@ class XffSpoofTest extends Plt003Support {
         HttpHeaders xff = new HttpHeaders();
         xff.add("X-Forwarded-For", "1.2.3.4");
         ResponseEntity<Map> bg = activateBreakGlass(token, "xff spoof test reason", xff);
-        assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String auditIp = breakGlassAuditIp(s);
         assertThat(auditIp).isIn("127.0.0.1", "0:0:0:0:0:0:0:1", "::1").isNotEqualTo("1.2.3.4");
     }
@@ -61,7 +61,7 @@ class XffSpoofTest extends Plt003Support {
         HttpHeaders xff = new HttpHeaders();
         xff.add("X-Forwarded-For", "not-an-ip");
         ResponseEntity<Map> bg = activateBreakGlass(token, "xff spoof test reason", xff);
-        assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String auditIp = breakGlassAuditIp(s);
         assertThat(auditIp).isIn("127.0.0.1", "0:0:0:0:0:0:0:1", "::1");
     }

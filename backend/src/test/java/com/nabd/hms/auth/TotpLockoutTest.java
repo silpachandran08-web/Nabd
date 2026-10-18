@@ -43,7 +43,7 @@ class TotpLockoutTest extends Plt003Support {
             verify(challenge(t), "000000");
         }
         assertThat(verify(c, totpCodeAtOffset(0)).getStatusCode()).isEqualTo(HttpStatus.LOCKED);
-        jdbc.update("UPDATE login_attempts SET attempted_at = now() - interval '2 minutes' WHERE staff_id = ?", t.id());
+        new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).update("UPDATE login_attempts SET attempted_at = now() - interval '2 minutes' WHERE staff_id = ?", t.id());
         assertThat(verify(c, totpCodeAtOffset(0)).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 

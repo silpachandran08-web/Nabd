@@ -61,7 +61,7 @@ class LogPhiLeakTest extends ApiTestBase {
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+919812340077")), Void.class).getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
         ResponseEntity<Map> bg = activateBreakGlass(loginAndGetAccessToken(staff), reason, null);
-        assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         assertThat(SENT_SECRETS).hasSize(2); // the OTP and the reset token really went through the real sender
         assertThat(appender.list).isNotEmpty();
