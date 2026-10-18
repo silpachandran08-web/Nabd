@@ -10,6 +10,7 @@ import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/p
 import AccessGate from "../../components/ui/AccessGate";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
+import { apiFetch, goLogin } from "../../lib/apiClient";
 
 // NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
 // /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
@@ -70,16 +71,16 @@ function OtcCheckoutInner() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;

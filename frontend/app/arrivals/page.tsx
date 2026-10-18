@@ -14,6 +14,7 @@ import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
@@ -227,16 +228,16 @@ function ArrivalsPageInner() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;

@@ -14,6 +14,7 @@ import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "../lib/vitals";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
@@ -270,16 +271,16 @@ function NursingWorklist() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;

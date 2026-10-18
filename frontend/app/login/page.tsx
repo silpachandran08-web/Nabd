@@ -6,6 +6,8 @@ import Link from "next/link";
 import styles from "./login.module.css";
 import { decodeAccessToken, landingPathFor } from "../lib/session";
 import { NEW_PIN_PATTERN, lockedMessage, needsPinChange } from "../lib/pinPolicy";
+import { useHasMounted } from "../lib/useHasMounted";
+import { safeReturnTo, storeTokens, takeReturnTo } from "../lib/apiClient";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../lib/loginFetch";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
@@ -45,10 +47,11 @@ export default function LoginPage() {
   const [mobilePhone, setMobilePhone] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPin, setNewPin] = useState("");
+  const mounted = useHasMounted();
+  const signedOut = mounted && !!safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
 
   function handleTokens(pair: TokenPair) {
-    localStorage.setItem("nabd_access_token", pair.accessToken);
-    localStorage.setItem("nabd_refresh_token", pair.refreshToken);
+    storeTokens(pair);
     const claims = decodeAccessToken(pair.accessToken);
     if (needsPinChange(claims)) { // PIN predates the 6-8 digit policy: nothing else works until it is changed
       setNewPin("");
@@ -56,7 +59,8 @@ export default function LoginPage() {
       setView("pinChange");
       return;
     }
-    router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
+    // FEF-002: back to the page the session ended on (validated same-origin path), else the role landing page.
+    router.replace(takeReturnTo() ?? landingPathFor(claims?.permissions ?? [], claims?.owner === true));
   }
 
   async function submitPinChange(e: FormEvent) {
@@ -508,6 +512,7 @@ export default function LoginPage() {
         <h1 className={styles.title}>Sign in to Nabd</h1>
         <p className={styles.subtitle}>Enter your clinic, email and PIN.</p>
         <form onSubmit={submitLogin} noValidate>
+          {signedOut && !formError && <div className={styles.formError} role="status">Signed out. Your draft is saved. Sign in to continue.</div>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
           {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}

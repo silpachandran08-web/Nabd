@@ -9,6 +9,7 @@ import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
 // OWN-024: revenue / untaggedCount are additive (S3 contract); every new field is optional so an older backend still renders.
@@ -125,13 +126,13 @@ export default function ReportsPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, { ...init, headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch(path, { ...init, headers: { Authorization: `Bearer ${token}` } });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;
@@ -220,7 +221,7 @@ export default function ReportsPage() {
     if (!token) return;
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/reports/export?reportType=${reportType}&${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+      res = await apiFetch(`/reports/export?reportType=${reportType}&${qs}`);
     } catch {
       setExportError("Couldn't reach the server. The export wasn't downloaded.");
       return;
