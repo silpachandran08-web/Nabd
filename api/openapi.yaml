@@ -1789,7 +1789,10 @@ paths:
         (400 no-measurement); blood pressure is a pair (400 incomplete-blood-pressure) and systolic must exceed
         diastolic (400 invalid-blood-pressure). Values outside the plausibility bounds below are 400 validation-failed
         and are never altered. A change to an already-recorded value is audited as vitals.corrected with old and new values.
-      x-required-permission: clinical:edit
+        REC-060: recording needs clinical:create or clinical:edit. Changing a value that is already recorded for the visit
+        (a non-null field sent with a different value) needs clinical:edit, else 403 vitals-correction-forbidden; filling a
+        still-empty field or re-sending the same value is not a correction.
+      x-required-permission: "clinical:create or clinical:edit (correcting a recorded value: clinical:edit)"
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -1797,6 +1800,7 @@ paths:
       responses:
         "200": { description: The vitals as stored, content: { application/json: { schema: { $ref: "#/components/schemas/Vitals" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Caller holds neither clinical:create nor clinical:edit, or changes an already-recorded value without clinical:edit (vitals-correction-forbidden)" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /clinical/vitals/patient/{patientId}/previous:

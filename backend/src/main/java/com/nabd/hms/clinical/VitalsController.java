@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -41,10 +42,13 @@ public class VitalsController {
     }
 
     @PatchMapping("/{queueEntryId}")
-    @PreAuthorize("hasAuthority('clinical:edit')")
+    // REC-060: first-time recording needs clinical:create or clinical:edit; changing an already-recorded value needs clinical:edit.
+    @PreAuthorize("hasAuthority('clinical:create') or hasAuthority('clinical:edit')")
     public VitalsResponse record(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                   @Valid @RequestBody VitalsWriteRequest req) {
-        return service.record(tenantId(jwt), staffId(jwt), queueEntryId, req);
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        return service.record(tenantId(jwt), staffId(jwt), queueEntryId, req,
+                permissions != null && permissions.contains("clinical:edit"));
     }
 
     private UUID tenantId(Jwt jwt) {

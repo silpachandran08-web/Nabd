@@ -1,11 +1,14 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.common.GrantsFlattener;
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -98,6 +101,64 @@ class VitalsApiTest extends ApiTestBase {
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(((Number) resp.getBody().get("bpSystolic")).intValue()).isEqualTo(118);
+    }
+
+    private String pendingVisit(String token, UUID doctorId, String phone) {
+        String queueEntryId = checkIn(token, registerPatient(token, "R60", phone), doctorId);
+        moveTo(token, queueEntryId, "waiting", "vitals_pending");
+        return queueEntryId;
+    }
+
+    private ResponseEntity<Map> saveVitals(String token, String queueEntryId, Map<String, Object> body) {
+        return exchange("/v1/clinical/vitals/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, body), Map.class);
+    }
+
+    @Test
+    void createOnlyRoleRecordsFirstVitalsAndMissingFieldsButCannotCorrectARecordedValue() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff admin = seedStaff(tenant, seedFullAccessRole(tenant.id()), "r60-admin@a.com", "+919800060001", false);
+        String adminToken = loginAndGetAccessToken(admin);
+        UUID createOnly = seedRole(tenant.id(), "VitalsCreateOnly", false,
+                new ModuleGrant("clinical", true, true, false, false, false, false, false));
+        String token = loginAndGetAccessToken(seedStaff(tenant, createOnly, "r60-nurse@a.com", "+919800060002", false));
+        String queueEntryId = pendingVisit(adminToken, admin.id(), "+919999960001");
+
+        assertThat(saveVitals(token, queueEntryId, Map.of("pulseBpm", 72, "spo2Percent", 98)).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+        // filling a still-empty field and re-sending an unchanged value are not corrections
+        assertThat(saveVitals(token, queueEntryId, Map.of("pulseBpm", 72, "tempCelsius", 37.0)).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+
+        ResponseEntity<Map> correction = saveVitals(token, queueEntryId, Map.of("pulseBpm", 80));
+        assertThat(correction.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(correction.getBody().get("type")).asString().contains("vitals-correction-forbidden");
+        ResponseEntity<Map> stored = exchange("/v1/clinical/vitals/" + queueEntryId, HttpMethod.GET, authed(token), Map.class);
+        assertThat(((Number) stored.getBody().get("pulseBpm")).intValue()).isEqualTo(72);
+        assertThat(((Number) stored.getBody().get("tempCelsius")).doubleValue()).isEqualTo(37.0);
+    }
+
+    @Test
+    void editRoleRecordsAndCorrectsVitals() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff admin = seedStaff(tenant, seedFullAccessRole(tenant.id()), "r60-admin2@a.com", "+919800060003", false);
+        String adminToken = loginAndGetAccessToken(admin);
+        UUID editOnly = seedRole(tenant.id(), "VitalsEdit", false,
+                new ModuleGrant("clinical", true, false, true, false, false, false, false));
+        String token = loginAndGetAccessToken(seedStaff(tenant, editOnly, "r60-nurse2@a.com", "+919800060004", false));
+        String queueEntryId = pendingVisit(adminToken, admin.id(), "+919999960002");
+
+        assertThat(saveVitals(token, queueEntryId, Map.of("pulseBpm", 72)).getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<Map> corrected = saveVitals(token, queueEntryId, Map.of("pulseBpm", 80));
+        assertThat(corrected.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Number) corrected.getBody().get("pulseBpm")).intValue()).isEqualTo(80);
+    }
+
+    @Test
+    void clinicalCreateFlagIsInTheSessionPermissionsOnlyWithTheGrant() {
+        assertThat(GrantsFlattener.flatten(List.of(new ModuleGrant("clinical", true, true, false, false, false, false, false))))
+                .containsExactly("clinical:view", "clinical:create");
+        assertThat(GrantsFlattener.flatten(List.of(new ModuleGrant("clinical", true, false, true, false, false, false, false))))
+                .containsExactly("clinical:view", "clinical:edit");
     }
 
     @Test
