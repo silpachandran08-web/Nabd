@@ -208,9 +208,9 @@ export default function ReportsPage() {
       const res = await authedFetch(`/packages/instances/${instanceId}/send-reminder`, { method: "POST" });
       if (!res) return;
       const p = res.ok ? null : await res.json().catch(() => null);
-      setReminded((r) => ({ ...r, [instanceId]: res.ok ? "sent" : p?.detail || "Couldn't send the reminder. Try again." }));
+      setReminded((r) => ({ ...r, [instanceId]: res.ok ? "sent" : p?.detail || "Couldn't record the reminder. Try again." }));
     } catch {
-      setReminded((r) => ({ ...r, [instanceId]: "Couldn't reach the server. The reminder wasn't sent." }));
+      setReminded((r) => ({ ...r, [instanceId]: "Couldn't reach the server. The reminder wasn't recorded." }));
     }
   }
 
@@ -554,9 +554,9 @@ export default function ReportsPage() {
                         <td>{e.patientName}</td><td>{e.packageName}</td><td>{shortDate(e.expiredOn)}</td><td>{money(Number(e.remainingValue))}</td>
                         {canEdit && (
                           <td>
-                            {reminded[e.instanceId] === "sent" ? <span className={styles.muted}>Reminder sent</span> : (
+                            {reminded[e.instanceId] === "sent" ? <span className={styles.muted}>Marked reminded. No message was sent.</span> : (
                               <>
-                                <button type="button" className={styles.remindBtn} onClick={() => void remind(e.instanceId)}>Remind</button>
+                                <button type="button" className={styles.remindBtn} onClick={() => void remind(e.instanceId)}>Mark reminded</button>
                                 {reminded[e.instanceId] && <div className={styles.errorState} role="alert">{reminded[e.instanceId]}</div>}
                               </>
                             )}
