@@ -217,8 +217,9 @@ class RoleApiTest extends ApiTestBase {
                 "reason", "nice try", "expiresAt", java.time.Instant.now().plusSeconds(3600).toString())),
                 Map.class);
 
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().get("type")).asString().contains("privilege-escalation");
+        // PLT-014: now judged against the base role and refused as 403 (was 400 privilege-escalation)
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(resp.getBody().get("type")).asString().endsWith("grant-exceeds-base-role");
     }
 
     @Test

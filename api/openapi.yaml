@@ -449,6 +449,43 @@ paths:
       responses:
         "201": { description: "Role", content: { application/json: { schema: { $ref: "#/components/schemas/Role" } } } }
 
+  /roles/delegations:
+    post:
+      tags: [Roles]
+      summary: Create a time-boxed delegation (PLT-014)
+      description: Grantor's grantable set is their permanent role only. Target's sessions are revoked and role.delegation_created is audited.
+      x-required-permission: staff:edit
+      x-step-up: true
+      parameters:
+        - { name: X-Step-Up-Token, in: header, required: false, description: "Required when the delegated role is the built-in Owner", schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [staffId, delegatedRoleId, reason, expiresAt]
+              properties:
+                staffId: { type: string, format: uuid }
+                delegatedRoleId: { type: string, format: uuid }
+                reason: { type: string }
+                expiresAt: { type: string, format: date-time, description: "At most 30 days ahead" }
+      responses:
+        "201": { description: "Delegation created" }
+        "403":
+          description: "Problem type self-delegation, chained-delegation, grant-exceeds-base-role or step-up-required"
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /roles/delegations/{id}:
+    delete:
+      tags: [Roles]
+      summary: Revoke a delegation; target's sessions are revoked and role.delegation_revoked is audited (PLT-014)
+      x-required-permission: staff:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Revoked" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /roles/{id}:
     get:
       tags: [Roles]
