@@ -81,11 +81,19 @@ async function callRefresh(): Promise<boolean> {
   const res = await fetch(`${API_BASE}/auth/refresh`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken }),
   });
-  if (!res.ok) return false;
+  if (res.status === 401 || res.status === 403) { // only this ends the session
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    return false;
+  }
+  if (!res.ok) throw new Error(`refresh failed: ${res.status}`); // 5xx/429: keep tokens, caller sees a failed request
   const pair: Pair = await res.json();
-  if (!pair.accessToken) return false;
+  if (!pair.accessToken) throw new Error("refresh failed: no token");
   storeTokens(pair);
   bc()?.postMessage({ type: "refreshed" });
+  // shortcut: a cross-tab localStorage read right after lock hand-off can lag a few ms; holding the lock 100 ms
+  // lets the next holder see the rotated pair. Upgrade to passing the pair via the lock/IndexedDB if it ever lags more.
+  await new Promise((r) => setTimeout(r, 100));
   return true;
 }
 
@@ -113,8 +121,8 @@ let inflight: Promise<boolean> | null = null;
 export function refreshSession(stale: string | null): Promise<boolean> {
   if (inflight) return inflight;
   const locked = async (): Promise<boolean> => {
-    const now = localStorage.getItem(ACCESS_KEY);
-    if (now && now !== stale && !needsRefresh(now)) return true;
+    const now = localStorage.getItem(ACCESS_KEY); // re-read after the lock: another tab may have refreshed
+    if (now && now !== stale && !needsRefresh(now)) { schedule(); return true; } // adopt its pair
     return callRefresh();
   };
   const run = typeof navigator !== "undefined" && navigator.locks
