@@ -241,8 +241,9 @@ public class PackageInstanceService {
         return out;
     }
 
-    /** No WhatsApp/notification channel exists yet (NB-197) — this records that a reminder went out
-     * (for the ledger and the "already sent" dedupe) rather than actually dispatching one. The tier
+    /** Records that staff marked the package as reminded (ledger + dedupe). NO message is sent: real
+     * dispatch waits for COM-044. The event type stays expiry_warning_sent (DB check constraint); the UI
+     * labels it "Marked as reminded". The tier
      * is computed server-side from the instance's own dates, never trusted from the caller. */
     @Transactional
     public InstanceResponse sendReminder(UUID tenantId, UUID staffId, UUID id) {
@@ -254,7 +255,7 @@ public class PackageInstanceService {
                     "This package isn't within 30 days of expiry.");
         }
         repo.updateLastAlertTier(tenantId, id, tier);
-        repo.insertEvent(tenantId, id, "expiry_warning_sent", tier + "-day template", null, staffId);
+        repo.insertEvent(tenantId, id, "expiry_warning_sent", tier + "-day: recorded only, no message sent", null, staffId);
         return detail(tenantId, id);
     }
 
