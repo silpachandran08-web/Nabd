@@ -156,12 +156,12 @@ class DelayAndCheckInDayApiTest extends ApiTestBase {
         Ctx c = ctx("Asia/Kolkata");
         hoursEveryDay(c);
         String p = patient(c, "Tomorrow Pat");
-        Instant start = Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
+        Instant start = LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(1).atTime(12, 0).atZone(ZoneId.of("Asia/Kolkata")).toInstant();
         ResponseEntity<Map> appt = book(c, p, start);
         assertThat(appt.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<Map> r = checkIn(c, p, appt.getBody().get("id"));
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(r.getStatusCode()).as("appt=" + appt.getBody() + " resp=" + r.getBody()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(r.getBody().get("type")).asString().contains("appointment-not-today");
         assertThat(r.getBody().get("detail")).asString().contains(start.atZone(ZoneId.of("Asia/Kolkata")).toLocalDate().toString());
         assertThat(inTenantTx(c.tenant.id(), () -> jdbc.queryForObject("SELECT count(*) FROM queue_entries", Integer.class))).isZero();
