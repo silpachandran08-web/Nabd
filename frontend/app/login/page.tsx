@@ -296,7 +296,6 @@ export default function LoginPage() {
         <div className={styles.card}>
           <h1 className={styles.title}>Set up two-factor authentication</h1>
           <p className={styles.subtitle}>Your role requires this before you can sign in.</p>
-          {signedOut && !formError && <div className={styles.formError} role="status">Signed out. Your draft is saved. Sign in to continue.</div>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {view === "mfaSetup" && (
             <form onSubmit={submitMfaSetupConfirm} noValidate>
@@ -455,6 +454,7 @@ export default function LoginPage() {
         <h1 className={styles.title}>Sign in to Nabd</h1>
         <p className={styles.subtitle}>Enter your clinic, email and PIN.</p>
         <form onSubmit={submitLogin} noValidate>
+          {signedOut && !formError && <div className={styles.formError} role="status">Signed out. Your draft is saved. Sign in to continue.</div>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
           {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}

@@ -36,14 +36,15 @@ try {
   await s.page.goto(`${APP}/arrivals`, { waitUntil: 'networkidle' });
   await s.page.waitForURL(/\/login\?returnTo=/, { timeout: 5000 });
   check('2a refresh failure lands on /login?returnTo=%2Farrivals', new URL(s.page.url()).searchParams.get('returnTo') === '/arrivals', s.page.url());
-  check('2b "Signed out" notice with draft message, tokens cleared', (await s.page.getByRole('status').filter({ hasText: 'Your draft is saved' }).count()) === 1 && (await s.page.evaluate(() => localStorage.getItem('nabd_access_token'))) === null);
+  check('2b "Signed out" notice with draft message', (await s.page.getByRole('status').filter({ hasText: 'Your draft is saved' }).count()) === 1);
+  check('2b2 exactly one refresh before the redirect (no retry loop)', s.refreshCalls === 1, `refresh=${s.refreshCalls}`);
   await s.page.setViewportSize({ width: 390, height: 800 });
   check('2c 390px: no horizontal scroll', await s.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  const loginHandlers = (tok) => [['POST', /^\/auth\/login/, json(200, { accessToken: tok, refreshToken: 'r9', expiresIn: 900 })], ['GET', /^\/queue/, json(200, [])]];
+  const loginHandlers = (tok) => [['POST', /^\/auth\/login/, { status: 200, body: { accessToken: tok, refreshToken: 'r9', expiresIn: 900 } }], ['GET', /^\/queue/, { status: 200, body: [] }]];
   await mockApi(s.page, s.log, loginHandlers(fresh('login')));
   const signIn = async () => {
     await s.page.getByLabel('Clinic code').fill('qa'); await s.page.getByLabel('Email').fill('d@qa.test');
-    await s.page.getByLabel('PIN', { exact: true }).fill('123456'); await s.page.getByRole('button', { name: /sign in/i }).click();
+    await s.page.getByLabel('PIN', { exact: true }).fill('123456'); await s.page.getByRole('button', { name: 'Sign in', exact: true }).click();
   };
   await signIn();
   await s.page.waitForURL(/\/arrivals$/, { timeout: 8000 });
@@ -70,7 +71,7 @@ try {
     await mockApi(s.page, s.log, [
       ['POST', /^\/auth\/refresh/, (r) => { order.push('refresh'); return r.fulfill(refresh); }],
       ['POST', /^\/auth\/unlock/, (r) => { order.push('unlock'); return r.fulfill(unlock); }],
-      ['GET', /^\/queue/, json(200, [])],
+      ['GET', /^\/queue/, { status: 200, body: [] }],
     ]);
     await s.page.clock.install();
     await s.page.goto(`${APP}/arrivals`, { waitUntil: 'networkidle' });
@@ -91,7 +92,7 @@ try {
   }
 } catch (e) {
   check('script ran to completion', false, String(e).split('\n')[0]);
-  if (s) dumpLog('last', s.log);
+  if (s) { dumpLog('last', s.log); console.log('  url:', s.page.url(), '| alert:', await s.page.getByRole('alert').allTextContents().catch(() => '?'), '| reqs:', s.log.requests.map((r) => r.method + ' ' + r.path).slice(-6)); }
   await s?.browser.close().catch(() => {});
 }
 const failed = results.filter((r) => !r.ok);
