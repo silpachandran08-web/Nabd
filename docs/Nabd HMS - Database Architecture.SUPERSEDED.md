@@ -1,0 +1,1 @@
+`Nabd HMS - Database Architecture.pdf` is superseded (it covers 12 of 86 tables). The current ERD (SVG) and per-table schema doc are generated from the migrated catalog by the `schema-docs` job in `.github/workflows/migrations.yml` and published as the `schema-docs` build artefact on every merge to main. Rules for changing the schema: `docs/architecture/migration-playbook.md`.
