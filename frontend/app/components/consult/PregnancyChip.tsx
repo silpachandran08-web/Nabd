@@ -55,7 +55,11 @@ export default function PregnancyChip({ patient, ctx, canEdit, authedFetch, onSa
       const body: { status: string; expectedDeliveryDate?: string } = { status: choice };
       if (choice === "pregnant" && edd) body.expectedDeliveryDate = edd;
       const res = await authedFetch(`/clinical/patients/${patient!.id}/pregnancy-status`, { method: "PUT", body: JSON.stringify(body) });
-      if (!res || !res.ok) { setErr("Couldn't save. Nothing was recorded."); return; }
+      if (!res || !res.ok) {
+        const p = res ? await res.json().catch(() => null) : null;
+        setErr(`Couldn't save${p?.detail || p?.title ? ` (${p.detail || p.title})` : ""}. Nothing was recorded.`);
+        return;
+      }
       setOpen(false); setChoice(""); setEdd("");
       onSaved();
     } catch {
