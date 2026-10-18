@@ -45,10 +45,12 @@ class OrgHierarchySchemaTest extends ApiTestBase {
 
         SeededOwner owner = seedOwner("legal-entity-owner@a.com");
         UUID legalEntityId = UUID.randomUUID();
-        jdbc.update("INSERT INTO legal_entities (id, owner_id, name, entity_type) VALUES (?,?,?,?)",
+        // OPS-003: legal_entities / tax_registrations are closed to nabd_app (no code path uses them); seed as superuser
+        org.springframework.jdbc.core.JdbcTemplate admin = new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource());
+        admin.update("INSERT INTO legal_entities (id, owner_id, name, entity_type) VALUES (?,?,?,?)",
                 legalEntityId, owner.id(), "Test Clinics Pvt Ltd", "company");
         UUID taxRegId = UUID.randomUUID();
-        jdbc.update("INSERT INTO tax_registrations (id, legal_entity_id, jurisdiction_code, gstin_or_vat_no, registered) VALUES (?,?,?,?,true)",
+        admin.update("INSERT INTO tax_registrations (id, legal_entity_id, jurisdiction_code, gstin_or_vat_no, registered) VALUES (?,?,?,?,true)",
                 taxRegId, legalEntityId, "IN-KL", "32AAAAA0000A1Z5");
         inTenantTx(tenantA.id(), () -> jdbc.update(
                 "INSERT INTO invoice_series (tenant_id, tax_registration_id, prefix, fiscal_year) VALUES (?,?,?,?)",

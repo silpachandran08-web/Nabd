@@ -48,6 +48,10 @@ public abstract class ApiTestBase {
 
     protected static final String APP_ROLE = "nabd_app";
     protected static final String APP_ROLE_PW = "nabd_app";
+    protected static final String MIGRATOR_ROLE = "nabd_migrator";
+    protected static final String MIGRATOR_ROLE_PW = "nabd_migrator";
+    protected static final String REPORTS_ROLE = "nabd_reports";
+    protected static final String REPORTS_ROLE_PW = "nabd_reports";
     protected static final String STAFF_PIN = "1234";
     /** RFC 6238 test-vector-style fixed secret — deterministic so tests can compute the current code. */
     protected static final byte[] TOTP_SECRET = "12345678901234567890".getBytes(StandardCharsets.US_ASCII);
@@ -58,18 +62,25 @@ public abstract class ApiTestBase {
 
     static {
         POSTGRES.start();
-        Flyway.configure()
-                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                .locations("filesystem:../db/migrations")
-                .load()
-                .migrate();
-        bootstrapAppRole();
+        // OPS-003: same topology as production. Roles first (superuser), then Flyway as the table-owning
+        // nabd_migrator, then the app connects as DML-only nabd_app (grants come from V210).
+        bootstrapRoles();
+        com.nabd.hms.common.MigrateMain.migrate(POSTGRES.getJdbcUrl(), MIGRATOR_ROLE, MIGRATOR_ROLE_PW, "filesystem:../db/migrations");
     }
 
     /** Postgres superuser connection — for the rare test that needs to bypass nabd_app's grants
      * entirely (e.g. simulating a direct-DB tamper nabd_app itself is structurally unable to do). */
     protected static Connection superuserConnection() throws SQLException {
         return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+    }
+
+    /** A DataSource for any role of the shared container (OPS-003 tests connect as nabd_migrator / nabd_reports / superuser). */
+    protected static org.springframework.jdbc.datasource.DriverManagerDataSource dataSourceFor(String user, String password) {
+        return new org.springframework.jdbc.datasource.DriverManagerDataSource(POSTGRES.getJdbcUrl(), user, password);
+    }
+
+    protected static org.springframework.jdbc.datasource.DriverManagerDataSource superuserDataSource() {
+        return dataSourceFor(POSTGRES.getUsername(), POSTGRES.getPassword());
     }
 
     /** nabd_app holds no TRUNCATE grant, so a TRUNCATE as nabd_app fails on the privilege check before any
@@ -90,28 +101,16 @@ public abstract class ApiTestBase {
         }
     }
 
-    private static void bootstrapAppRole() {
+    private static void bootstrapRoles() {
         try (Connection c = DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              Statement st = c.createStatement()) {
-            st.execute("CREATE ROLE " + APP_ROLE + " LOGIN PASSWORD '" + APP_ROLE_PW + "'");
-            st.execute("GRANT USAGE ON SCHEMA public TO " + APP_ROLE);
-            st.execute("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO " + APP_ROLE);
-            st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION find_session_by_token_hash(text) TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION find_staff_by_invite_token_hash(text) TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,bigint,int) TO " + APP_ROLE);
-            // V85 (PLT-028): actor-filter overload, the one AuditSearchRepository calls now
-            st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,uuid,text,text,text,bigint,int) TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION record_platform_audit(text,uuid,text,text,inet,text,text,uuid,jsonb,jsonb) TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION claim_outbox_events(int,int) TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION apply_whatsapp_status(text,text,text) TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION apply_whatsapp_template_update(text,text,text,text) TO " + APP_ROLE);
-            st.execute("GRANT EXECUTE ON FUNCTION staff_counts_by_tenant() TO " + APP_ROLE);
-            st.execute("GRANT USAGE ON SCHEMA master TO " + APP_ROLE);
-            st.execute("GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA master TO " + APP_ROLE);
-            st.execute("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA master TO " + APP_ROLE);
-        } catch (SQLException e) {
-            throw new IllegalStateException("failed to bootstrap nabd_app role", e);
+            String sql = java.nio.file.Files.readString(java.nio.file.Path.of("../infra/db/bootstrap-roles.sql"))
+                    .replace(":'migrator_pw'", "'" + MIGRATOR_ROLE_PW + "'")
+                    .replace(":'app_pw'", "'" + APP_ROLE_PW + "'")
+                    .replace(":'reports_pw'", "'" + REPORTS_ROLE_PW + "'");
+            st.execute(sql);
+        } catch (SQLException | java.io.IOException e) {
+            throw new IllegalStateException("failed to bootstrap database roles", e);
         }
     }
 
@@ -120,7 +119,7 @@ public abstract class ApiTestBase {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", () -> APP_ROLE);
         registry.add("spring.datasource.password", () -> APP_ROLE_PW);
-        registry.add("spring.flyway.enabled", () -> "false"); // migrated as superuser above, before grants existed
+        registry.add("spring.flyway.enabled", () -> "false"); // migrated as nabd_migrator above
         registry.add("app.crypto.key", () -> CRYPTO_KEY_B64);
         // tests call OutboxDispatcher.poll() themselves; the background poll would race them for the same rows
         registry.add("app.outbox.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE));

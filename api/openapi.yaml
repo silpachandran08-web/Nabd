@@ -2354,6 +2354,13 @@ components:
       schema: { type: string }
 
   responses:
+    DbUnavailable:
+      description: >-
+        OPS-003. Any endpoint can return this: the database cancelled the request (code DB_TIMEOUT, statement
+        timeout 5 s / lock timeout 3 s) or no connection was free within 3 s (code DB_UNAVAILABLE). Safe to retry.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
     NotFound:
       description: Not found (or out of scope — see per-endpoint note)
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
@@ -2886,6 +2893,7 @@ components:
         detail: { type: string }
         instance: { type: string, format: uri }
         traceId: { type: string }
+        code: { type: string, description: "Stable machine code on 503s (DB_TIMEOUT, DB_UNAVAILABLE); absent elsewhere", example: DB_TIMEOUT }
         errors:
           type: array
           items:
