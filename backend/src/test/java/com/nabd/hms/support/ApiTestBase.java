@@ -58,7 +58,9 @@ public abstract class ApiTestBase {
     protected static final String CRYPTO_KEY_B64 = Base64.getEncoder().encodeToString(new byte[32]);
 
     private static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("nabd_test");
+            new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("nabd_test")
+                    // OPS-003 pools are 20 wide and Spring caches many contexts: the default 100 slots run out
+                    .withCommand("postgres", "-c", "max_connections=600");
 
     static {
         POSTGRES.start();

@@ -62,6 +62,7 @@ class BreakGlassAuthzTest extends ApiTestBase {
         if (sid != null) {
             b.claim("sid", sid);
         }
+        com.nabd.hms.shared.security.TokenType.STEP_UP.stamp(b, com.nabd.hms.shared.security.Audience.STEP_UP);
         return jwtEncoder.encode(JwtEncoderParameters.from(b.build())).getTokenValue();
     }
 

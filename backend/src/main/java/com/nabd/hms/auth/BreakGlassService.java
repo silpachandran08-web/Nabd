@@ -14,7 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
+import com.nabd.hms.shared.security.ChallengeTokenDecoder;
+import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,10 +38,10 @@ public class BreakGlassService {
     private final AuditService auditService;
     private final EventPublisher publisher;
     private final TenantContext tenantContext;
-    private final JwtDecoder jwtDecoder;
+    private final ChallengeTokenDecoder jwtDecoder;
 
     BreakGlassService(BreakGlassRepository repo, AuthRepository authRepo, AuthService authService, AuditService auditService,
-                      EventPublisher publisher, TenantContext tenantContext, JwtDecoder jwtDecoder) {
+                      EventPublisher publisher, TenantContext tenantContext, ChallengeTokenDecoder jwtDecoder) {
         this.repo = repo;
         this.authRepo = authRepo;
         this.authService = authService;
@@ -126,7 +127,7 @@ public class BreakGlassService {
         }
         Jwt t;
         try {
-            t = jwtDecoder.decode(token);
+            t = jwtDecoder.decode(token, TokenType.STEP_UP);
         } catch (JwtException e) {
             throw stepUpRequired();
         }

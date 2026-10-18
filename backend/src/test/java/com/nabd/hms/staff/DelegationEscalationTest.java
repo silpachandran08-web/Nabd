@@ -47,22 +47,8 @@ class DelegationEscalationTest extends ApiTestBase {
         assertThat(resp.getBody().get("type")).asString().endsWith("self-delegation");
     }
 
-    @Test
-    void breakGlassHolderCannotDelegateBeyondBaseRole() {
-        SeededTenant t = seedTenant();
-        seedFullAccessRole(t.id()); // break-glass elevates to built-in Owner
-        UUID billing = seedRole(t.id(), "Billing", false, fullGrant("billing"));
-        SeededStaff mgr = seedStaff(t, managerRole(t.id()), "m2@a.com", "+919400000002", false);
-        SeededStaff other = seedStaff(t, managerRole(t.id()), "o2@a.com", "+919400000003", false);
-        String token = loginAndGetAccessToken(mgr);
-        String elevated = (String) exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "emergency")), Map.class).getBody().get("accessToken");
-
-        ResponseEntity<Map> resp = delegate(elevated, other.id(), billing);
-
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(resp.getBody().get("type")).asString().endsWith("grant-exceeds-base-role");
-    }
+    // breakGlassHolderCannotDelegateBeyondBaseRole removed: PLT-012 makes break-glass sessions read-only
+    // (BreakGlassWriteBlock), so a break-glass token can no longer reach POST /roles/delegations at all.
 
     @Test
     void delegateCannotReDelegateTheBorrowedRole() {
