@@ -1,0 +1,12 @@
+# Extends the default ruleset (AWS keys, private keys, generic tokens) and adds Meta/WhatsApp tokens.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "meta-access-token"
+description = "Meta/WhatsApp Cloud API access token"
+regex = '''\bEAA[A-Za-z0-9]{40,}\b'''
+keywords = ["eaa"]
+
+[allowlist]
+paths = ['''docs/.*\.pdf''']
