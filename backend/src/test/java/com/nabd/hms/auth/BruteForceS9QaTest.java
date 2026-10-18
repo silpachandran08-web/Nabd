@@ -235,7 +235,7 @@ class BruteForceS9QaTest extends ApiTestBase {
         String access = (String) l.getBody().get("accessToken"), refresh = (String) l.getBody().get("refreshToken");
         assertThat(claims(access).get("pinChange")).isEqualTo(true);
         for (String[] ep : new String[][]{{"GET", "/v1/auth/sessions"}, {"GET", "/v1/staff"}, {"POST", "/v1/auth/unlock"}, {"POST", "/v1/auth/mfa/enroll"}, {"GET", "/v1/patients"}}) {
-            ResponseEntity<Map> r = exchange(ep[1], HttpMethod.valueOf(ep[0]), authedJsonBody(access, Map.of("pin", "123456")), Map.class);
+            ResponseEntity<String> r = exchange(ep[1], HttpMethod.valueOf(ep[0]), authedJsonBody(access, Map.of("pin", "123456")), String.class);
             assertThat(r.getStatusCode()).as(ep[1]).isEqualTo(HttpStatus.FORBIDDEN);
         }
         // policy: <6, >8, non digits rejected with 400
@@ -311,12 +311,11 @@ class BruteForceS9QaTest extends ApiTestBase {
         assertThat(good.getStatusCode()).isEqualTo(HttpStatus.OK);
         String ch1 = (String) http.postForEntity(url("/v1/platform/auth/login"), jsonBody(Map.of("email", op.email(), "pin", STAFF_PIN)), Map.class).getBody().get("challengeId");
         assertThat(http.postForEntity(url("/v1/platform/auth/mfa/verify"), jsonBody(Map.of("challengeId", ch1, "code", totpCodeAtOffset(0))), Map.class).getStatusCode()).as("operator replay").isEqualTo(HttpStatus.UNAUTHORIZED);
-        String spare = null;
-        for (int i = 0; i < 5; i++) {
-            Map b = http.postForEntity(url("/v1/platform/auth/login"), jsonBody(Map.of("email", op.email(), "pin", STAFF_PIN)), Map.class).getBody();
-            String ch = (String) b.get("challengeId");
-            if (i == 2) spare = (String) http.postForEntity(url("/v1/platform/auth/login"), jsonBody(Map.of("email", op.email(), "pin", STAFF_PIN)), Map.class).getBody().get("challengeId");
-            http.postForEntity(url("/v1/platform/auth/mfa/verify"), jsonBody(Map.of("challengeId", ch, "code", wrongCode())), Map.class);
+        List<String> chs = new ArrayList<>();
+        for (int i = 0; i < 6; i++) chs.add((String) http.postForEntity(url("/v1/platform/auth/login"), jsonBody(Map.of("email", op.email(), "pin", STAFF_PIN)), Map.class).getBody().get("challengeId"));
+        String spare = chs.get(5);
+        for (int i = 0; i < 4; i++) { // replay failure above + 4 wrong = 5
+            assertThat(http.postForEntity(url("/v1/platform/auth/mfa/verify"), jsonBody(Map.of("challengeId", chs.get(i), "code", wrongCode())), Map.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
         assertThat(http.postForEntity(url("/v1/platform/auth/mfa/verify"), jsonBody(Map.of("challengeId", spare, "code", totpCodeAtOffset(1))), Map.class).getStatusCode())
                 .as("operator locked after repeated wrong TOTP").isEqualTo(HttpStatus.LOCKED);

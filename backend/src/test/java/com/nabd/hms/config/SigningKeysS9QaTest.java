@@ -250,6 +250,7 @@ class SigningKeysS9QaTest extends ApiTestBase {
     @Test
     void ac5_documentedEnvVarNamesActuallyConfigureTheApp() {
         String json = jwks(key(), key());
+        Map<String, Boolean> results = new java.util.HashMap<>();
         for (String envName : List.of("JWT_KEYS_JSON", "APP_JWT_KEYS_JSON")) {
             StandardEnvironment env = new StandardEnvironment();
             env.getPropertySources().addFirst(new SystemEnvironmentPropertySource("qaEnv", Map.of(envName, json)));
@@ -257,8 +258,10 @@ class SigningKeysS9QaTest extends ApiTestBase {
             boolean works;
             try { SigningKeyProvider.from(env); works = true; } catch (IllegalStateException e) { works = false; }
             System.out.println("QA-ENV " + envName + " honoured=" + works);
-            if (envName.equals("JWT_KEYS_JSON")) assertThat(works).as("env var JWT_KEYS_JSON named in runbook + boot error is honoured").isTrue();
+            results.put(envName, works);
         }
+        assertThat(results.get("APP_JWT_KEYS_JSON")).as("control: Spring relaxed-binding name works").isTrue();
+        assertThat(results.get("JWT_KEYS_JSON")).as("env var JWT_KEYS_JSON named in runbook + boot error is honoured").isTrue();
     }
 
     // ---- AC6: rotation overlap ------------------------------------------------------------------------------

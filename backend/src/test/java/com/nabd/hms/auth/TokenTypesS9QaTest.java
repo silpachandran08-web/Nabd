@@ -38,7 +38,7 @@ class TokenTypesS9QaTest extends ApiTestBase {
     // ---- helpers -------------------------------------------------------------------------------
     private String mint(String typ, String aud, UUID sub, UUID tenant, UUID sid, List<String> perms, long ttlSec, String iss, String purpose) {
         Instant now = Instant.now();
-        JwtClaimsSet.Builder b = JwtClaimsSet.builder().issuer(iss).issuedAt(now.minusSeconds(5)).expiresAt(now.plusSeconds(ttlSec))
+        JwtClaimsSet.Builder b = JwtClaimsSet.builder().issuer(iss).issuedAt(ttlSec < 0 ? now.plusSeconds(ttlSec - 60) : now.minusSeconds(5)).expiresAt(now.plusSeconds(ttlSec))
                 .subject(sub.toString());
         if (tenant != null) b.claim("tenantId", tenant.toString());
         if (sid != null) b.claim("sid", sid.toString());

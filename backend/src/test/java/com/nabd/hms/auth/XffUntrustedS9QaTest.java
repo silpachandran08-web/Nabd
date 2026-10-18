@@ -10,8 +10,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 
 import java.util.List;
 import java.util.Map;
@@ -20,13 +18,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** PLT-003 XFF: untrusted peer (default config), per-IP limit lowered to 3 so the limiter is observable. */
 class XffUntrustedS9QaTest extends ApiTestBase {
-
-    @DynamicPropertySource
-    static void lowLimit(DynamicPropertyRegistry r) {
-        r.add("app.auth.rate-limit-per-ip-per-minute", () -> "3");
-    }
-
-    @Value("${app.auth.rate-limit-per-ip-per-minute}") int limit;
 
     private JdbcTemplate su() { return new JdbcTemplate(superuserDataSource()); }
 
@@ -44,22 +35,28 @@ class XffUntrustedS9QaTest extends ApiTestBase {
 
     private static boolean loopback(String ip) { return List.of("127.0.0.1", "0:0:0:0:0:0:0:1", "::1").contains(ip); }
 
+    /** Limiter observability: the suite runs with limit 100000, so fill the peer's last-minute budget and expect 429 despite rotating XFF. */
     @Test
     void ac5_spoofedXffDoesNotChangeStoredIp_andTheLimiterCountsThePeer() {
-        assertThat(limit).as("override of the base-class limit took effect").isEqualTo(3);
         SeededTenant t = seedTenant();
         SeededStaff s = seedStaff(t, seedFullAccessRole(t.id()), "qa-xff@a.com", "+919700000001", false);
-        // wrong-PIN logins with a different spoofed address each time; they all come from one peer
-        int[] codes = new int[8];
-        for (int i = 0; i < codes.length; i++) {
-            codes[i] = post("/v1/auth/login", "1.2.3." + (i + 10), Map.of("tenantSlug", s.slug(), "email", "nobody" + i + "@a.com", "pin", "999999"), null).getStatusCode().value();
-        }
-        System.out.println("QA-XFF statuses with rotating spoofed XFF, limit 3: " + java.util.Arrays.toString(codes));
+        post("/v1/auth/login", "1.2.3.4", Map.of("tenantSlug", s.slug(), "email", "nobody@a.com", "pin", "999999"), null);
         List<String> ips = su().queryForList("SELECT DISTINCT host(ip_address) FROM login_attempts WHERE tenant_id = ?", String.class, t.id());
         assertThat(ips).as("rows were written (positive control)").isNotEmpty();
         assertThat(ips).allMatch(XffUntrustedS9QaTest::loopback);
         assertThat(ips).noneMatch(i -> i.startsWith("1.2.3."));
-        assertThat(java.util.Arrays.stream(codes).boxed()).as("rotating XFF must not evade the per-IP limiter").contains(429);
+        try {
+            su().update("INSERT INTO login_attempts (tenant_id, staff_id, email, ip_address, succeeded) "
+                    + "SELECT ?, NULL, 'qa-ratelimit-fill', ip::inet, false FROM generate_series(1,100001) g, (VALUES ('127.0.0.1'),('::1')) v(ip)", t.id());
+            int[] codes = new int[3];
+            for (int i = 0; i < codes.length; i++) {
+                codes[i] = post("/v1/auth/login", "1.2.3." + (i + 10), Map.of("tenantSlug", s.slug(), "email", "nobody" + i + "@a.com", "pin", "999999"), null).getStatusCode().value();
+            }
+            System.out.println("QA-XFF statuses after filling the peer budget: " + java.util.Arrays.toString(codes));
+            assertThat(java.util.Arrays.stream(codes).boxed()).as("per-IP limiter must trip").allMatch(c -> c == 429);
+        } finally {
+            su().update("DELETE FROM login_attempts WHERE email = 'qa-ratelimit-fill'");
+        }
     }
 
     @Test
@@ -94,14 +91,16 @@ class XffUntrustedS9QaTest extends ApiTestBase {
     @Test
     void ac5_ac6_auditLogIpIsThePeer_forSpoofedAndMalformedHeaders() {
         SeededTenant t = seedTenant();
-        SeededStaff s = seedStaff(t, seedBreakGlassDoctorRole(t.id()), "qa-xff3@a.com", "+919700000003", false);
+        List<SeededStaff> ss = new java.util.ArrayList<>();
         for (String xff : List.of("1.2.3.4", "not-an-ip")) {
+            SeededStaff s = seedStaff(t, seedBreakGlassDoctorRole(t.id()), "qa-xff3-" + ss.size() + "@a.com", "+91970000010" + ss.size(), false);
+            ss.add(s);
             String token = loginAndGetAccessToken(s);
             HttpHeaders extra = new HttpHeaders();
             extra.add("X-Forwarded-For", xff);
             assertThat(activateBreakGlass(token, "qa xff audit check reason", extra).getStatusCode()).as(xff).isEqualTo(HttpStatus.CREATED);
         }
-        List<String> ips = su().queryForList("SELECT host(ip_address) FROM audit_log WHERE actor_id = ? AND action = 'auth.break_glass_activated'", String.class, s.id());
+        List<String> ips = su().queryForList("SELECT host(ip_address) FROM audit_log WHERE actor_id IN (?, ?) AND action = 'auth.break_glass_activated'", String.class, ss.get(0).id(), ss.get(1).id());
         assertThat(ips).hasSize(2).allMatch(XffUntrustedS9QaTest::loopback);
     }
 }
