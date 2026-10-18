@@ -6,6 +6,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -470,5 +471,69 @@ class ReportsApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/reports/daily-money", HttpMethod.GET, authed(token), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    /** OWN-026: sales per clinic day, redemption over instances sold in the period, expired-with-value. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void packagesReportShowsSalesRedemptionAndExpiredValue() {
+        SeededTenant tenant = seedTenant();
+        String token = loginAndGetAccessToken(seedStaff(tenant, seedFullAccessRole(tenant.id()), "pk1@a.com", "+919800070001", false));
+        ResponseEntity<Map> pkg = exchange("/v1/packages", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "name", "Glow Combo", "packageType", "combination", "speciality", "Dermatology", "description", "d",
+                "price", 2400.00, "taxInclusive", false, "validityDays", 90, "validityStarts", "purchase_date", "graceDays", 7,
+                "items", List.of(
+                        Map.of("itemType", "service_session", "name", "Facial", "quantity", 2, "unitListPrice", 1000.00, "taxRatePercent", 18.0),
+                        Map.of("itemType", "take_home_product", "name", "Cream", "quantity", 1, "unitListPrice", 1000.00, "taxRatePercent", 12.0)))),
+                Map.class);
+        String packageId = (String) pkg.getBody().get("id");
+        exchange("/v1/packages/" + packageId + "/activate", HttpMethod.POST, authed(token), Map.class);
+        Map<String, Object> a = sellPackage(token, registerPatient(token, "Lakshmi Iyer", "+919800070011"), packageId);
+        Map<String, Object> b = sellPackage(token, registerPatient(token, "Vikram Shetty", "+919800070012"), packageId);
+        String facial = ((List<Map<String, Object>>) a.get("items")).stream().filter(i -> "Facial".equals(i.get("name")))
+                .findFirst().orElseThrow().get("id").toString();
+        assertThat(exchange("/v1/packages/instances/items/" + facial + "/redeem", HttpMethod.POST, authed(token), Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.OK);
+
+        LocalDate today = LocalDate.parse((String) exchange("/v1/reports/packages", HttpMethod.GET, authed(token), Map.class).getBody().get("to"));
+        UUID bId = UUID.fromString((String) b.get("id"));
+        inTenantTx(tenant.id(), () -> { // B's validity ended 30 days ago; 7 grace days are long gone
+            jdbc.update("UPDATE package_instances SET validity_end = ? WHERE id = ?", java.sql.Date.valueOf(today.minusDays(30)), bId);
+        });
+        double saleTotals = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
+                "SELECT SUM(i.total) FROM invoices i JOIN package_instances pi ON pi.invoice_id = i.id WHERE pi.tenant_id = ?",
+                java.math.BigDecimal.class, tenant.id())).doubleValue();
+
+        ResponseEntity<Map> resp = exchange("/v1/reports/packages?from=" + today.minusDays(40) + "&to=" + today,
+                HttpMethod.GET, authed(token), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        List<Map<String, Object>> sales = (List<Map<String, Object>>) resp.getBody().get("salesByDay");
+        assertThat(sales).hasSize(41);
+        assertThat(sales.get(0)).containsEntry("date", today.minusDays(40).toString()).containsEntry("count", 0);
+        Map<String, Object> last = sales.get(40);
+        assertThat(last).containsEntry("date", today.toString()).containsEntry("count", 2);
+        assertThat(((Number) last.get("amount")).doubleValue()).isEqualTo(saleTotals).isGreaterThan(0);
+        assertThat((Map<String, Object>) resp.getBody().get("redemption"))
+                .containsEntry("sessionsSold", 6).containsEntry("sessionsRedeemed", 1);
+        List<Map<String, Object>> expired = (List<Map<String, Object>>) resp.getBody().get("expiredWithValue");
+        assertThat(expired).singleElement().satisfies(e -> {
+            assertThat(e).containsEntry("instanceId", bId.toString()).containsEntry("patientName", "Vikram Shetty")
+                    .containsEntry("packageName", "Glow Combo").containsEntry("expiredOn", today.minusDays(30).toString());
+            assertThat(((Number) e.get("remainingValue")).doubleValue()).isEqualTo(2400.0);
+        });
+
+        // a period that ends before today sees no sales and no redemption base
+        Map<String, Object> earlier = exchange("/v1/reports/packages?from=" + today.minusDays(5) + "&to=" + today.minusDays(1),
+                HttpMethod.GET, authed(token), Map.class).getBody();
+        assertThat(((List<Map<String, Object>>) earlier.get("salesByDay"))).allSatisfy(d -> assertThat(d).containsEntry("count", 0));
+        assertThat((Map<String, Object>) earlier.get("redemption")).containsEntry("sessionsSold", 0);
+        assertThat((List<?>) earlier.get("expiredWithValue")).isEmpty();
+    }
+
+    private Map<String, Object> sellPackage(String token, String patientId, String packageId) {
+        ResponseEntity<Map> resp = exchange("/v1/packages/sell", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "patientId", patientId, "packageId", packageId, "paymentMethod", "upi")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        return resp.getBody();
     }
 }

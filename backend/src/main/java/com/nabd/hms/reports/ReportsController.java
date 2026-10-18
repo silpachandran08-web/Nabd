@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import com.nabd.hms.reports.dto.MoneyResponse;
 import com.nabd.hms.reports.dto.OverviewResponse;
+import com.nabd.hms.reports.dto.PackagesReportResponse;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.reports.dto.BillingLeakageResponse;
 import com.nabd.hms.reports.dto.DailyMoneyResponse;
@@ -65,6 +66,15 @@ public class ReportsController {
                                                    @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         UUID tenantId = tenantId(jwt);
         return service.sourceBreakdown(tenantId, service.range(tenantId, days, from, to));
+    }
+
+    /** OWN-026 Packages tab. Same period rules as /sources. */
+    @GetMapping("/packages")
+    @PreAuthorize("hasAuthority('reports:view')")
+    public PackagesReportResponse packages(@AuthenticationPrincipal Jwt jwt,
+                                           @RequestParam(defaultValue = "30") int days, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        UUID tenantId = tenantId(jwt);
+        return service.packages(tenantId, service.range(tenantId, days, from, to));
     }
 
     @GetMapping("/staff-performance")
