@@ -1,0 +1,51 @@
+name: migrations
+on:
+  pull_request:
+    paths: ['db/**', 'ci/migration-lint/**', '.github/workflows/migrations.yml']
+  push:
+    branches: [main]
+jobs:
+  migration-lint:          # CI stage 4
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - run: python3 ci/migration-lint/test_lint.py
+      - name: Lint added migrations
+        env:
+          # contract label + reference to the earlier expand release lets MIG-007 pass
+          CONTRACT_REF: ${{ contains(github.event.pull_request.labels.*.name, 'contract') && github.event.pull_request.body || '' }}
+        run: python3 ci/migration-lint/lint.py --base origin/${{ github.base_ref || 'main' }}
+  migrate:
+    needs: migration-lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: ci }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: PGPASSWORD=ci ci/migration-lint/migrate-check.sh   # set SEED_SQL once the OPS-031 snapshot exists
+  schema-docs:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: ci }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          docker run --rm --network host -v "$PWD/db/migrations:/flyway/sql:ro" flyway/flyway:10 \
+            -url=jdbc:postgresql://localhost:5432/postgres -user=postgres -password=ci migrate
+          mkdir -p schema-docs
+          docker run --rm --network host -v "$PWD/schema-docs:/output" schemaspy/schemaspy:6.2.4 \
+            -t pgsql -host localhost -port 5432 -db postgres -u postgres -p ci -s public -o /output
+      - uses: actions/upload-artifact@v4
+        with: { name: schema-docs, path: schema-docs }   # ERD SVGs + per-table pages
