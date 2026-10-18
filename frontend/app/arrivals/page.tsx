@@ -28,7 +28,8 @@ type PatientOption = { id: string; name: string; phone: string; mrn: string };
 type GuardianOption = { id: string; name: string; phone: string };
 // GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
 type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
-type Grants = { queueCreate: boolean; queueEdit: boolean; billingView: boolean; clinicalEdit: boolean; patientsView: boolean };
+// LIVE-04: each flag is exactly what its control's endpoint needs (see the setGrants effect).
+type Grants = { queueCreate: boolean; queueEdit: boolean; checkout: boolean; vitalsRecord: boolean; patientsView: boolean; patientsCreate: boolean };
 type StaffOption = { id: string; name: string; departmentName?: string | null };
 // Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
 type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
@@ -139,7 +140,7 @@ function ArrivalsPageInner() {
   const [, setNow] = useState(() => Date.now());
   // Per-action visibility (REC-014/052/062). Read after mount: the token lives in localStorage, so
   // evaluating can() during SSR/first render would mismatch. Absent until known, never disabled.
-  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, billingView: false, clinicalEdit: false, patientsView: false });
+  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, checkout: false, vitalsRecord: false, patientsView: false, patientsCreate: false });
   // Patient name/MRN lookups are per-row GET /patients/{id}; cache them so the 15s poll only
   // fetches patients it hasn't seen (the N+1 shrinks to the first load).
   const patientCache = useRef(new Map<string, { name: string; mrn: string }>());
@@ -313,7 +314,11 @@ function ArrivalsPageInner() {
   useEffect(() => {
     void Promise.resolve().then(() => setGrants({
       queueCreate: can("queue:create"), queueEdit: can("queue:edit"),
-      billingView: can("billing:view"), clinicalEdit: can("clinical:edit"), patientsView: can("patients:view"),
+      // Checkout opens GET /billing/checkout (billing:view) to bill (POST, billing:create) or take payment (billing:edit).
+      checkout: can("billing:view") && (can("billing:create") || can("billing:edit")),
+      // REC-060: first vitals for a vitals_pending visit need clinical:create or clinical:edit.
+      vitalsRecord: can("clinical:create") || can("clinical:edit"),
+      patientsView: can("patients:view"), patientsCreate: can("patients:create"),
     }));
   }, []);
 
@@ -370,6 +375,7 @@ function ArrivalsPageInner() {
   // once consumed so back/refresh doesn't reopen the dialog. Fresh mount, so fields are already blank.
   useEffect(() => {
     if (searchParams.get("action") !== "walkin") return;
+    if (!can("queue:create") || !can("patients:view")) { router.replace("/arrivals"); return; }
     void Promise.resolve().then(() => {
       setShowModal(true);
       router.replace("/arrivals");
@@ -778,7 +784,7 @@ function ArrivalsPageInner() {
 
   const railRow = railId ? rows.find((r) => r.id === railId) ?? null : null;
   const checkoutRows = rows.filter((r) => bucketOf(r.status) === "checkout_pending");
-  const hasQuickActions = grants.queueCreate || grants.queueEdit || grants.billingView;
+  const hasQuickActions = grants.queueCreate || grants.queueEdit || grants.checkout;
 
   // One contextual set of row actions, shared by the table and the detail rail. Each is absent
   // (not disabled) when the role lacks the permission the endpoint needs.
@@ -792,10 +798,10 @@ function ArrivalsPageInner() {
         {grants.queueEdit && (r.status === "checked_in" || r.status === "waiting") && (
           <button type="button" className={styles.actionBtn} disabled={sendingIds.includes(r.id)} onClick={() => afterClick(() => void sendForVitals(r))}>{sendingIds.includes(r.id) ? "Sending…" : "Send for vitals"}</button>
         )}
-        {grants.clinicalEdit && r.status === "vitals_pending" && (
+        {grants.vitalsRecord && r.status === "vitals_pending" && (
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openVitalsModal(r.id))}>Record vitals</button>
         )}
-        {grants.billingView && b === "checkout_pending" && (
+        {grants.checkout && b === "checkout_pending" && (
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => router.push(`/checkout/${r.id}`))}>Checkout</button>
         )}
       </>
@@ -835,11 +841,11 @@ function ArrivalsPageInner() {
       {!forbidden && hasQuickActions && (
         <div className={styles.quickActions}>
           {/* A token is only ever created as part of check-in, so walk-in and "issue token" are one action. */}
-          {grants.queueCreate && <button type="button" className={styles.primaryAction} onClick={openModal}>Walk-in &amp; token</button>}
+          {grants.queueCreate && grants.patientsView && <button type="button" className={styles.primaryAction} onClick={openModal}>Walk-in &amp; token</button>}
           {grants.queueCreate && <button type="button" className={styles.actionBtn} onClick={openCheckin}>Check in</button>}
           {grants.queueEdit && <button type="button" className={styles.actionBtn} onClick={openMove}>Move queue</button>}
           {grants.queueEdit && <button type="button" className={styles.actionBtn} onClick={() => setShowDelayPicker(true)}>Notify delay</button>}
-          {grants.billingView && <button type="button" className={styles.actionBtn} onClick={() => setShowCheckoutPicker(true)}>Checkout</button>}
+          {grants.checkout && <button type="button" className={styles.actionBtn} onClick={() => setShowCheckoutPicker(true)}>Checkout</button>}
         </div>
       )}
 
@@ -1023,7 +1029,7 @@ function ArrivalsPageInner() {
                   ))}
                 </div>
               )}
-              {!selectedPatient && patientQuery.trim().length >= 2 && searchResults.length === 0 && !newPatientMode && (
+              {grants.patientsCreate && !selectedPatient && patientQuery.trim().length >= 2 && searchResults.length === 0 && !newPatientMode && (
                 <button type="button" className={styles.linkBtn} style={{ marginTop: "8px" }} onClick={() => setNewPatientMode(true)}>
                   No match — register a new patient
                 </button>

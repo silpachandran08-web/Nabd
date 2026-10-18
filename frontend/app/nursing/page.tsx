@@ -112,7 +112,10 @@ type ProcedureOrder = {
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
 type Problem = { title: string; detail: string };
-const PERM = { vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueView: "queue:view", queueEdit: "queue:edit" } as const;
+// REC-060: recording vitals (blank fields go out as null, so the server keeps stored values) needs
+// clinical:create or clinical:edit; the server 403s (vitals-correction-forbidden) a changed recorded value
+// without clinical:edit, and the capture form never pre-fills or offers to change recorded values.
+const PERM = { vitalsCreate: "clinical:create", vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueView: "queue:view", queueEdit: "queue:edit" } as const;
 type Tab = "vitals" | "priority" | "administration" | "procedures" | "activity";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -618,7 +621,7 @@ function NursingWorklist() {
   const recordedCount = recordedRows.filter((r) => r.lastVitalsAt).length;
   const outOfRangeCount = recordedRows.filter((r) => r.vitalsOutOfRange).length;
   const staffName = (id: string | null) => (id ? staff.find((s) => s.id === id)?.name ?? null : null);
-  const canCaptureVitals = allow(PERM.vitalsWrite);
+  const canCaptureVitals = allow(PERM.vitalsCreate) || allow(PERM.vitalsWrite);
   const canCreateOrders = allow(PERM.create);
   const canEditOrders = allow(PERM.edit);
   // Flagging and acknowledging priority call POST /queue/{id}/reorder and /priority/acknowledge (queue:edit);

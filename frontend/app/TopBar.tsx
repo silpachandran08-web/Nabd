@@ -15,11 +15,13 @@ const SEARCH_INPUT_ID = "nb-global-search";
 // just for this one case. Add more pathnames here if other pages want the same treatment.
 // The Receptionist's Queue & Appointments board carries "Register walk-in", which opens the
 // Arrivals page's own walk-in dialog (?action=walkin) — only for those who can check in.
-// permission: every listed grant is required. Capture vitals writes vitals (clinical:edit) for patients
-// picked from the queue (queue:view); without the queue the picker could only claim nobody is waiting.
+// permission: every listed grant is required; "a|b" means either. Capture vitals records first vitals
+// (clinical:create or clinical:edit, REC-060) for patients picked from the queue (queue:view); without the
+// queue the picker could only claim nobody is waiting. The walk-in dialog starts with a patient search
+// (GET /patients, patients:view) before check-in (queue:create), so both are needed (LIVE-04).
 const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?: string | string[] }> = {
-  "/nursing": { label: "Capture vitals", href: "/nursing?action=capture", permission: ["clinical:edit", "queue:view"] },
-  "/schedule": { label: "Register walk-in", href: "/arrivals?action=walkin", permission: "queue:create" },
+  "/nursing": { label: "Capture vitals", href: "/nursing?action=capture", permission: ["clinical:create|clinical:edit", "queue:view"] },
+  "/schedule": { label: "Register walk-in", href: "/arrivals?action=walkin", permission: ["queue:create", "patients:view"] },
 };
 
 // DESIGN.md's top bar, present on every clinic page: sidebar collapse toggle, global patient
@@ -84,7 +86,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     : undefined;
   // The owner's day-close action wins over a page-level shortcut (wireframe PRIMARY.owner).
   const action = ownerAction ?? (pathname ? PRIMARY_ACTIONS[pathname] : undefined);
-  const primaryAction = action && [action.permission ?? []].flat().every(can) ? action : undefined;
+  const primaryAction = action && [action.permission ?? []].flat().every((p) => p.split("|").some(can)) ? action : undefined;
 
   // Patient search lands on /patients, so a role without patients:view gets no search box at all.
   const canSearch = can("patients:view");

@@ -23,7 +23,7 @@ const NAV_ITEMS: { href: string; label: string; short: string; icon: IconName; p
   { href: "/schedule", label: "Queue & Appointments", short: "Queue", icon: "calendar", permission: "queue:view" },
   { href: "/patients", label: "Patients", short: "Patients", icon: "users", permission: "patients:view" },
   // clinical:edit, not clinical:view — reception can be granted clinical:view (e.g. for billing
-  // lookups) without being a clinician; see lib/session.ts's LANDING_RULES for the full reasoning.
+  // lookups) without being a clinician; see lib/session.ts (landingPathFor) for the full reasoning.
   { href: "/consult", label: "Consultation Workspace", short: "Consult", icon: "stethoscope", permission: "clinical:edit" },
   { href: "/pharmacy", label: "Pharmacy", short: "Pharmacy", icon: "syringe", permission: "pharmacy:view" },
   { href: "/billing", label: "Checkout & Billing", short: "Billing", icon: "receipt", permission: "billing:view" },
@@ -79,7 +79,8 @@ type DoctorItem = { label: string; short: string; icon: IconName; href: string; 
 const DOCTOR_ITEMS: DoctorItem[] = [
   { label: "My Day", short: "My Day", icon: "sun", href: MY_DAY_HREF, permission: "clinical:edit", alsoPermission: "queue:view", badgeKey: MY_DAY_HREF },
   { label: "Patients", short: "Patients", icon: "users", href: "/patients", permission: "patients:view" },
-  { label: "Consultation Workspace", short: "Consult", icon: "stethoscope", href: "/consult", permission: "clinical:edit" },
+  // The workspace reads the queue: without queue:view it is a "no access" page (LIVE-04).
+  { label: "Consultation Workspace", short: "Consult", icon: "stethoscope", href: "/consult", permission: "clinical:edit", alsoPermission: "queue:view" },
   // DOC-003: sets are read with clinical:view; the doctor sidebar itself already needs clinical:edit.
   { label: "Prescriptions & Templates", short: "Rx sets", icon: "syringe", href: "/prescriptions", permission: "clinical:view", alsoPermission: "clinical:edit" },
   { label: "Treatment Packages", short: "Packages", icon: "package", href: "/packages", permission: "packages:view" },
