@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { can } from "../lib/permissions";
 import styles from "./schedule.module.css";
+import { hijriLabel } from "../lib/hijri";
 
 type Patient = { id: string; mrn: string; name: string; phone: string };
 type Problem = { type?: string; title?: string; detail?: string };
@@ -233,6 +234,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
         <div className={styles.field}>
           <label className={styles.label} htmlFor="appt-date">Date</label>
           <input id="appt-date" type="date" className={`${styles.input} ${styles.tap}`} value={date} onChange={(e) => setDate(e.target.value)} />
+          {date && <span className={styles.hijri} data-testid="hijri-date">{hijriLabel(date)}</span>}
         </div>
 
         <div className={styles.field}>

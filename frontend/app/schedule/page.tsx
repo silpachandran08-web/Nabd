@@ -12,6 +12,7 @@ import { CancelAppointmentDialog, MoveAppointmentDialog } from "./AppointmentAct
 import LiveQueueBoard from "./LiveQueueBoard";
 import WaitlistPanel from "./WaitlistPanel";
 import Icon from "../components/ui/Icon";
+import { hijriLabel } from "../lib/hijri";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -217,6 +218,7 @@ export default function SchedulePage() {
           onClick={() => shift(mode === "day" ? 1 : 7)} disabled={!current}>›</button>
         <input type="date" aria-label="Pick date" className={styles.tbDate} value={current ?? ""}
           onChange={(e) => e.target.value && setDate(e.target.value)} />
+        {current && <span className={styles.hijri} data-testid="hijri-date">{hijriLabel(current)}</span>}
         <select aria-label="Doctor" className={styles.tbSelect} value={doctorFilter} onChange={(e) => setDoctorFilter(e.target.value)}>
           <option value="all">All doctors</option>
           {day?.doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}

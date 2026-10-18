@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Dialog from "../components/ui/Dialog";
 import styles from "./schedule.module.css";
 import { clinicTime } from "./NewAppointmentDialog";
+import { hijriLabel } from "../lib/hijri";
 
 type Problem = { title: string; detail: string };
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
@@ -162,6 +163,7 @@ export function MoveAppointmentDialog({ target, timezone, initialDate, authedFet
         <div className={styles.field}>
           <label className={styles.label} htmlFor="move-date">New date</label>
           <input id="move-date" type="date" className={styles.input} value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+          {date && <span className={styles.hijri} data-testid="hijri-date">{hijriLabel(date)}</span>}
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="move-time">Available slots</label>
