@@ -187,11 +187,11 @@ class ScheduleRepository {
     // ── delay ladder (NB-100) ────────────────────────────────────────────
 
     private static final String DELAY_SELECT =
-            "SELECT id, doctor_id, delay_minutes, reason, announced_by, announced_at, cleared_by, cleared_at " +
+            "SELECT id, doctor_id, delay_minutes, reason, announced_by, announced_at, cleared_by, cleared_at, clinic_date " +
                     "FROM doctor_delays WHERE doctor_id = ? ";
 
-    Optional<DoctorDelayRow> findActiveDelay(UUID doctorId) {
-        return jdbc.query(DELAY_SELECT + "AND cleared_at IS NULL", delayMapper(), doctorId).stream().findFirst();
+    Optional<DoctorDelayRow> findActiveDelay(UUID doctorId, java.time.LocalDate today) {
+        return jdbc.query(DELAY_SELECT + "AND cleared_at IS NULL AND clinic_date = ?", delayMapper(), doctorId, today).stream().findFirst();
     }
 
     List<DoctorDelayRow> delayHistory(UUID doctorId, int limit) {
@@ -200,11 +200,11 @@ class ScheduleRepository {
 
     /** "Writing the delay then closing and appending to history" — a fresh announcement always
      * closes out any still-active one first, so the unique active-per-doctor index never fires. */
-    UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, UUID announcedBy) {
+    UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, UUID announcedBy, java.time.LocalDate clinicDate) {
         clearActiveDelay(tenantId, doctorId, announcedBy);
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by) VALUES (?,?,?,?,?,?)",
-                id, tenantId, doctorId, delayMinutes, reason, announcedBy);
+        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by, clinic_date) VALUES (?,?,?,?,?,?,?)",
+                id, tenantId, doctorId, delayMinutes, reason, announcedBy, clinicDate);
         return id;
     }
 
@@ -225,7 +225,8 @@ class ScheduleRepository {
                     UUID.fromString(rs.getString("announced_by")),
                     rs.getTimestamp("announced_at").toInstant(),
                     clearedBy == null ? null : UUID.fromString(clearedBy),
-                    clearedAt == null ? null : clearedAt.toInstant());
+                    clearedAt == null ? null : clearedAt.toInstant(),
+                    rs.getObject("clinic_date", java.time.LocalDate.class));
         };
     }
 

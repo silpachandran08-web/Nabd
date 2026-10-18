@@ -1281,6 +1281,37 @@ paths:
       responses:
         "201": { description: "Leave recorded", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorLeave" } } } }
 
+  /doctors/{id}/delay:
+    get:
+      tags: [Queue]
+      summary: "Delay history (latest 20); a delay from an earlier clinic day is listed with active=false (lapsed) (ACC-001)"
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Delays", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DoctorDelay" } } } } }
+    post:
+      tags: [Queue]
+      summary: "Announce a doctor delay, active until cleared or the clinic day ends (ACC-001)"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DelayAnnounceRequest" } } }
+      responses:
+        "201": { description: "Delay announced", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorDelay" } } } }
+        "400": { description: "Problem `validation-failed`: delayMinutes outside 1..240, reason over 200 chars", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `delay-already-active`: a concurrent announcement for the same doctor and clinic day won", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /doctors/{id}/delay/clear:
+    post:
+      tags: [Queue]
+      summary: Clear today's active delay (audited)
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Cleared" }
+        "400": { description: "Problem `no-active-delay` (none, or only a lapsed one from an earlier day)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /doctors/{id}/availability:
     get:
       tags: [Queue]
@@ -1465,7 +1496,7 @@ paths:
       responses:
         "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
         "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch, resolved, or already checked in)" }
-        "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking. Also `appointment-not-today` (scheduled only): the appointment's date in the clinic timezone is not today's clinic date (ACC-001); nothing is created.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue:
     get:
@@ -3540,6 +3571,25 @@ components:
         isFollowUp: { type: boolean }
         cancelReason: { type: [string, "null"], description: "QA-06: the reason given on cancel (\"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
 
+    DelayAnnounceRequest:
+      type: object
+      required: [delayMinutes]
+      properties:
+        delayMinutes: { type: integer, minimum: 1, maximum: 240 }
+        reason: { type: string, maxLength: 200 }
+    DoctorDelay:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        doctorId: { type: string, format: uuid }
+        delayMinutes: { type: integer }
+        reason: { type: string, nullable: true }
+        announcedBy: { type: string, format: uuid }
+        announcedAt: { type: string, format: date-time }
+        clearedBy: { type: string, format: uuid, nullable: true }
+        clearedAt: { type: string, format: date-time, nullable: true }
+        clinicDate: { type: string, format: date, description: "Clinic-timezone day the delay was announced; it lapses at the end of that day" }
+        active: { type: boolean, description: "Uncleared AND clinicDate is today" }
     CheckInRequest:
       type: object
       required: [patientId, doctorId]
