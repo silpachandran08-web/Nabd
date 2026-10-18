@@ -8,6 +8,7 @@ import { can } from "../../lib/permissions";
 import { getIdentity } from "../../lib/session";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import AccessGate from "../../components/ui/AccessGate";
+import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
 
 // NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
@@ -25,7 +26,6 @@ type Problem = { type?: string; title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
-const STATUS_PILL: Record<string, string> = { paid: styles.pillPaid, partial: styles.pillPartial, unpaid: styles.pillUnpaid };
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -216,7 +216,7 @@ function OtcCheckoutInner() {
           <span className={styles.stripName}>Counter sale</span>
           <span className={styles.stripMeta}>Walk-in · no patient record, no queue token</span>
         </div>
-        {invoice && <span className={`${styles.pill} ${STATUS_PILL[invoice.status] ?? styles.pillNeutral}`}>{invoice.status}</span>}
+        {invoice && <BillingStatePill state={invoice.status} />}
       </div>
 
       {invoice ? (
