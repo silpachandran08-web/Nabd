@@ -1,26 +1,26 @@
 package com.nabd.hms.shared.security;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.BadJwtException;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
-import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 
-import java.security.KeyPair;
-import java.security.interfaces.RSAPublicKey;
-
-/** PLT-001: the resource server's decoder. Timestamps + issuer + typ=access with a staff/platform audience. */
+/**
+ * PLT-001: the resource server's decoder. Signature, issuer, header and kid checks come from the
+ * PLT-002 {@code jwtDecoder}; this adds typ=access with a staff/platform audience.
+ */
 @Configuration
 public class AccessTokenDecoderConfig {
 
-    private static final String ISSUER = "https://api.nabd.health"; // same as AuthService.ISSUER
-
     @Bean
-    public JwtDecoder accessTokenDecoder(KeyPair keyPair) {
-        NimbusJwtDecoder d = NimbusJwtDecoder.withPublicKey((RSAPublicKey) keyPair.getPublic()).build();
-        d.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(ISSUER), new JwtTokenTypeValidator(TokenType.ACCESS)));
-        return d;
+    public JwtDecoder accessTokenDecoder(@Qualifier("jwtDecoder") JwtDecoder signed) {
+        JwtTokenTypeValidator access = new JwtTokenTypeValidator(TokenType.ACCESS);
+        return token -> {
+            Jwt jwt = signed.decode(token);
+            if (access.validate(jwt).hasErrors()) throw new BadJwtException("token type not allowed here");
+            return jwt;
+        };
     }
 }

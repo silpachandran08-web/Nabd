@@ -52,7 +52,8 @@ public final class JwtTokenPolicy {
     }
 
     static OAuth2TokenValidatorResult checkAudAndHeader(Jwt jwt) {
-        if (jwt.getAudience() == null || !jwt.getAudience().contains(AUDIENCE)) return fail("wrong or missing aud");
+        // PLT-001 owns the exact per-type audience (TokenType); here we only require one to be present
+        if (jwt.getAudience() == null || jwt.getAudience().isEmpty()) return fail("wrong or missing aud");
         Object typ = jwt.getHeaders().get("typ");
         if (typ == null || !TYPES.contains(typ.toString().toUpperCase(java.util.Locale.ROOT))) return fail("wrong or missing typ");
         if (jwt.getHeaders().get("kid") == null) return fail("missing kid");
