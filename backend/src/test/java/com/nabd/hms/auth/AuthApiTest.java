@@ -392,11 +392,11 @@ class AuthApiTest extends ApiTestBase {
         String setupToken = (String) loginResp.getBody().get("setupToken");
 
         // the setup token authorizes enroll/confirm — nothing else
-        ResponseEntity<Map> enrollResp = exchange("/v1/auth/mfa/enroll", HttpMethod.POST, authed(setupToken), Map.class);
+        ResponseEntity<Map> enrollResp = exchange("/v1/auth/mfa/enroll", HttpMethod.POST, jsonBody(Map.of("setupToken", setupToken)), Map.class);
         assertThat(enrollResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         String secretBase32 = (String) enrollResp.getBody().get("secretBase32");
         ResponseEntity<Map> confirmResp = exchange("/v1/auth/mfa/confirm", HttpMethod.POST,
-                authedJsonBody(setupToken, Map.of("code", totpCodeFor(secretBase32))), Map.class);
+                jsonBody(Map.of("code", totpCodeFor(secretBase32), "setupToken", setupToken)), Map.class);
         assertThat(confirmResp.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // logging in again now goes through the normal MFA challenge, same as any other enrolled staff

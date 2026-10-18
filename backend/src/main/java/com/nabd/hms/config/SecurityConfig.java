@@ -4,6 +4,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -50,6 +55,13 @@ public class SecurityConfig {
         return converter;
     }
 
+    /** PLT-001: owner_select tokens are not access tokens; the owner endpoints read the header themselves. */
+    private static BearerTokenResolver ownerSelectAwareResolver() {
+        DefaultBearerTokenResolver delegate = new DefaultBearerTokenResolver();
+        return req -> List.of("/v1/owners/me/workspaces", "/v1/owners/workspaces/select").contains(req.getRequestURI())
+                ? null : delegate.resolve(req);
+    }
+
     /** Dev default is the Next.js dev server; real deployments set app.cors.allowed-origins to the actual web app origin(s). */
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
@@ -81,6 +93,12 @@ public class SecurityConfig {
                                 "/v1/auth/pin/reset-request",
                                 "/v1/auth/pin/reset-confirm",
                                 "/v1/auth/refresh",
+                                // PLT-001: consume their own challenge token (mfa_setup in the body / owner_select in the
+                                // Authorization header) via ChallengeTokenDecoder; MfaCaller / OwnerController refuse with 401
+                                "/v1/auth/mfa/enroll",
+                                "/v1/auth/mfa/confirm",
+                                "/v1/owners/me/workspaces",
+                                "/v1/owners/workspaces/select",
                                 "/v1/staff/invitations/*/accept",
                                 "/v1/owners/auth/login",
                                 "/v1/owners/invitations/*/accept",
@@ -89,9 +107,18 @@ public class SecurityConfig {
                                 "/v1/platform/auth/refresh",
                                 "/v1/webhooks/whatsapp" // HMAC-signed by Meta, verified in WhatsAppWebhookController
                         ).permitAll()
-                        .anyRequest().authenticated()
+                        // PLT-001: a sid claim (staff/operator access token) or at least one granted authority
+                        .anyRequest().access((authn, ctx) -> {
+                            var a = authn.get();
+                            boolean ok = a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken)
+                                    && ((a instanceof JwtAuthenticationToken j && j.getToken().getClaimAsString("sid") != null)
+                                    || !a.getAuthorities().isEmpty());
+                            return new AuthorizationDecision(ok);
+                        })
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .bearerTokenResolver(ownerSelectAwareResolver())
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
     }
 }

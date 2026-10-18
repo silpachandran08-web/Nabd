@@ -25,7 +25,7 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
     private final JwtDecoder delegate;
     private final SessionLivenessChecker livenessChecker;
 
-    SessionRevocationJwtDecoder(@Qualifier("jwtDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker) {
+    SessionRevocationJwtDecoder(@Qualifier("accessTokenDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker) {
         this.delegate = delegate;
         this.livenessChecker = livenessChecker;
     }
@@ -35,7 +35,10 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
         Jwt jwt = delegate.decode(token);
         String sid = jwt.getClaimAsString("sid");
         String tenantId = jwt.getClaimAsString("tenantId");
-        if (sid != null && tenantId != null && !livenessChecker.isActive(UUID.fromString(tenantId), UUID.fromString(sid))) {
+        if (sid == null) {
+            throw new BadJwtException("access token without sid"); // PLT-001: no pass-through for sid-less tokens
+        }
+        if (tenantId != null && !livenessChecker.isActive(UUID.fromString(tenantId), UUID.fromString(sid))) {
             throw new BadJwtException("session revoked");
         }
         return jwt;
