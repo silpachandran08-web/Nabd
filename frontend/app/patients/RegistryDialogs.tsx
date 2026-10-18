@@ -39,7 +39,7 @@ async function detail(res: Response, fallback: string): Promise<string> {
 export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExisting }: {
   authedFetch: AuthedFetch; onClose: () => void; onRegistered: (id: string) => void; onOpenExisting: (id: string) => void;
 }) {
-  const [form, setForm] = useState({ name: "", phone: "", dob: "", gender: "", address: "" });
+  const [form, setForm] = useState({ name: "", phone: "", dob: "", gender: "", address: "", nationalId: "" });
   const [guardianQuery, setGuardianQuery] = useState("");
   const [guardianResults, setGuardianResults] = useState<{ id: string; name: string; phone: string }[]>([]);
   const [guardian, setGuardian] = useState<{ id: string; name: string } | null>(null);
@@ -81,7 +81,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
     try {
       const body = {
         name: form.name.trim(), phone: form.phone.trim(), dob: form.dob, gender: form.gender,
-        address: form.address.trim() || null, guardianId: minor ? guardian?.id ?? null : null,
+        address: form.address.trim() || null, ...(form.nationalId.trim() ? { nationalId: form.nationalId.trim() } : {}), guardianId: minor ? guardian?.id ?? null : null,
         ...(minor && guardian ? { guardianConsent: { confirmed: true, channel } } : {}),
         ...(confirmed ? { confirmedNotDuplicate: true } : {}),
       };
@@ -155,6 +155,9 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
             </div>
             <label className={styles.fieldLabel} htmlFor="reg-address">Address (optional)</label>
             <input id="reg-address" className={styles.input} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            {/* shortcut: no format check (Aadhaar/Iqama rules are not in the contract), when the clinic region rules are agreed. Write-only: the API never returns it. */}
+            <label className={styles.fieldLabel} htmlFor="reg-national-id">National ID, Aadhaar or Iqama (optional)</label>
+            <input id="reg-national-id" className={styles.input} value={form.nationalId} autoComplete="off" onChange={(e) => setForm({ ...form, nationalId: e.target.value })} />
             {minor && (
               <>
                 <label className={styles.fieldLabel} htmlFor="reg-guardian">Guardian (required for under-18s)</label>

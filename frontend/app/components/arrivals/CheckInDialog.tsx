@@ -19,8 +19,9 @@ export type CheckInResult = { tokenNumber: number; patientName: string; doctorId
 /** Maps a failed response to something the front desk can act on (a bare 500 says nothing). */
 export async function problemMessage(res: Response, fallback: string): Promise<string> {
   if (res.status >= 500) return "The server had a problem and couldn't finish this. Try again in a moment; if it keeps happening, tell your clinic admin.";
-  if (res.status === 403) return "Your role isn't allowed to do this.";
   const p: { title?: string; detail?: string } | null = await res.json().catch(() => null);
+  // S7-B02: a 403 carries the server's reason (e.g. vitals-correction-forbidden); generic only when it has none.
+  if (res.status === 403) return p?.detail || "Your role isn't allowed to do this.";
   return p?.detail || p?.title || fallback;
 }
 

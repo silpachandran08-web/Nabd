@@ -1,5 +1,5 @@
 /* Shared primitives: status pills, loading/empty/error states, dialog. Tokens only. */
-.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 18px; white-space: nowrap; }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap; }
 .pill_ok { background: var(--nb-ok-tint); color: var(--nb-ok-500); }
 .pill_warn { background: var(--nb-warn-tint); color: var(--nb-warn-500); }
 .pill_danger { background: var(--nb-danger-tint); color: var(--nb-danger-500); }

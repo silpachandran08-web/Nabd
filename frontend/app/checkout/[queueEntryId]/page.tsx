@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
 import { formatMoney } from "../../lib/money";
+import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
 import { getIdentity } from "../../lib/session";
 import { can } from "../../lib/permissions";
-import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
+import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
+import TenderRows from "../../components/checkout/TenderRows";
+import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
@@ -29,7 +32,6 @@ type Problem = { type?: string; title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
-const STATUS_PILL: Record<string, string> = { paid: styles.pillPaid, partial: styles.pillPartial, unpaid: styles.pillUnpaid };
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
 // first, checkout_pending/completed always last, with this department's configured (or, if
@@ -77,9 +79,9 @@ export default function CheckoutPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const [method, setMethod] = useState("cash");
-  const [amount, setAmount] = useState("");
+  const [tenders, setTenders] = useState<Tender[]>([{ id: 1, method: "cash", amount: "" }]);
   const [recording, setRecording] = useState(false);
+  const busyLock = useRef(false); // synchronous guard: a double-click must never start a second bill or payment
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([]);
@@ -183,14 +185,15 @@ export default function CheckoutPage() {
   const previewTotal = Math.round(rawTotal);
   const roundOff = round2(previewTotal - rawTotal);
 
-  async function submitCheckout() {
+  // Bills the visit (creates or extends the invoice). Returns the invoice, or null when it failed.
+  async function billVisit(): Promise<Invoice | null> {
     setCreateError(null);
     // An invoice already existing means this is a later billing checkpoint appending to it (or
     // closing out with nothing further to charge) — only the very first billing checkpoint for a
     // visit requires at least one item.
     if (!invoice && items.length === 0) {
       setCreateError("Add at least one charge.");
-      return;
+      return null;
     }
     setCreating(true);
     try {
@@ -201,20 +204,100 @@ export default function CheckoutPage() {
           ...(canDiscount ? { discount: discountNum } : {}),
         }),
       });
-      if (!res) return;
+      if (!res) return null;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
         setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
-        return;
+        return null;
       }
-      setInvoice(await res.json());
+      const inv: Invoice = await res.json();
+      setInvoice(inv);
       setItems([]); // picker resets — a later billing checkpoint starts its "add more" list fresh
       setDiscount("0");
       setShowAddMore(false);
+      return inv;
+    } catch {
+      setCreateError("Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
+      return null;
     } finally {
       setCreating(false);
     }
   }
+
+  async function once(fn: () => Promise<void>) {
+    if (busyLock.current) return;
+    busyLock.current = true;
+    try { await fn(); } finally { busyLock.current = false; }
+  }
+
+  // REC-044 split tender: rows are recorded one at a time and a recorded row is blanked, so a retry
+  // after a failure can only send what has not been recorded yet. Amounts are never adjusted for
+  // the cashier: anything over the balance due stops the run with a message.
+  async function payTenders(start: Invoice) {
+    setPaymentError(null);
+    setRecording(true);
+    let inv = start;
+    try {
+      for (const row of filled(tenders)) {
+        const amt = toMinor(row.amount)!;
+        if (amt > Math.round(inv.balanceDue * 100)) {
+          setPaymentError("That amount is more than the balance due. Adjust it and collect again.");
+          return;
+        }
+        const before = inv.payments.length;
+        let next: Invoice;
+        try {
+          const res = await authedFetch(`/billing/invoices/${inv.id}/payments`, { method: "POST", body: JSON.stringify({ method: row.method, amount: amt / 100 }) });
+          if (!res) return;
+          if (!res.ok) {
+            const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
+            setPaymentError(p.detail || "Couldn't record payment.");
+            return;
+          }
+          next = await res.json();
+        } catch {
+          // Outcome unknown: read the invoice back instead of guessing, so a payment that landed is never re-sent.
+          const r = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+          if (!r?.ok) {
+            setPaymentError("Couldn't confirm whether that payment was recorded. Reload this page and check the Payments list before collecting again.");
+            return;
+          }
+          next = await r.json();
+          if (next.payments.length <= before) {
+            setInvoice(next);
+            setPaymentError("That payment did not go through and nothing was recorded. Try again.");
+            return;
+          }
+        }
+        setInvoice(next);
+        inv = next;
+        setTenders((prev) => prev.map((t) => (t.id === row.id ? { ...t, amount: "" } : t)));
+      }
+    } finally {
+      setRecording(false);
+    }
+  }
+
+  const submitCheckout = () => once(async () => { await billVisit(); });
+
+  // Single-screen "Collect": bill the visit, then take the split payments against the new invoice.
+  const collect = () => once(async () => {
+    setPaymentError(null);
+    if (canPay && !invoice) {
+      const err = tenderError(tenders, previewTotal * 100);
+      if (err) { setPaymentError(err); return; }
+    }
+    const inv = await billVisit();
+    if (inv && canPay && filled(tenders).length > 0) await payTenders(inv);
+  });
+
+  // Invoice already exists: collect the split payments against its balance due.
+  const collectOnInvoice = () => once(async () => {
+    if (!invoice) return;
+    const err = tenderError(tenders, Math.round(invoice.balanceDue * 100));
+    if (err) { setPaymentError(err); return; }
+    await payTenders(invoice);
+  });
 
   async function continueVisit() {
     if (!context) return;
@@ -240,33 +323,6 @@ export default function CheckoutPage() {
       router.push("/arrivals");
     } finally {
       setContinuing(false);
-    }
-  }
-
-  async function submitPayment(e: React.FormEvent) {
-    e.preventDefault();
-    setPaymentError(null);
-    const amt = Number(amount);
-    if (!invoice || !amt || amt <= 0) {
-      setPaymentError("Enter a valid amount.");
-      return;
-    }
-    setRecording(true);
-    try {
-      const res = await authedFetch(`/billing/invoices/${invoice.id}/payments`, {
-        method: "POST",
-        body: JSON.stringify({ method, amount: amt }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
-        setPaymentError(p.detail || "Couldn't record payment.");
-        return;
-      }
-      setInvoice(await res.json());
-      setAmount("");
-    } finally {
-      setRecording(false);
     }
   }
 
@@ -349,10 +405,26 @@ export default function CheckoutPage() {
         </div>
         <p className={styles.muted}>The total is computed from line items and can never be typed over.</p>
         {createError && <div className={styles.errorState}>{createError}</div>}
-        <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || (!invoice && items.length === 0)}>
-          {creating ? (invoice ? "Adding…" : "Generating…") : invoice ? "Add to invoice" : "Checkout"}
-        </button>
+        {canPay && !invoice && (
+          <>
+            <TenderRows rows={tenders} onChange={setTenders} region={region} balanceMinor={previewTotal * 100} disabled={creating || recording} />
+            {paymentError && <div className={styles.errorState}>{paymentError}</div>}
+          </>
+        )}
       </div>
+    </div>
+  );
+  const tenderedMinor = tenderTotalMinor(tenders);
+  // Sticky Collect bar. Balance due = total minus what is typed into the split rows (never negative).
+  const collectBar = (
+    <div className={styles.collectBar}>
+      <div className={styles.collectNums}>
+        <span>Total <b>{formatMoney(previewTotal, context.currency)}</b></span>
+        {canPay && !invoice && <span>Balance due <b data-testid="balance-due">{formatMoney(Math.max(0, previewTotal * 100 - tenderedMinor) / 100, context.currency)}</b></span>}
+      </div>
+      <button className={styles.collectBtn} onClick={invoice ? submitCheckout : collect} disabled={creating || recording || (!invoice && items.length === 0)}>
+        {creating || recording ? "Working…" : invoice ? "Add to invoice" : canPay && tenderedMinor > 0 ? `Collect ${formatMoney(tenderedMinor / 100, context.currency)}` : "Checkout"}
+      </button>
     </div>
   );
 
@@ -364,7 +436,7 @@ export default function CheckoutPage() {
           <span className={styles.stripName}>{context.patientName}</span>
           <span className={styles.stripMeta}>{context.doctorName} · {context.visitType}</span>
         </div>
-        {invoice && <span className={`${styles.pill} ${STATUS_PILL[invoice.status] ?? styles.pillNeutral}`}>{invoice.status}</span>}
+        {invoice && <BillingStatePill state={invoice.status} />}
       </div>
 
       {context.followUpEligible && !invoice && (
@@ -453,25 +525,20 @@ export default function CheckoutPage() {
             )}
 
             {invoice.status !== "paid" && invoice.status !== "void" && canPay && (
-              <form onSubmit={submitPayment}>
-                <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Record payment</h2>
-                <div className={styles.paymentMethods}>
-                  {PAYMENT_METHODS.map((m) => (
-                    <button type="button" key={m} className={method === m ? styles.methodBtnActive : styles.methodBtn} onClick={() => setMethod(m)}>{paymentMethodLabel(m, region)}</button>
-                  ))}
-                </div>
-                <input className={styles.discountInput} style={{ width: "100%", marginBottom: "8px" }} type="number" step="0.01"
-                  placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <>
+                <TenderRows rows={tenders} onChange={setTenders} region={region} balanceMinor={Math.round(invoice.balanceDue * 100)} disabled={creating || recording} />
                 {paymentError && <div className={styles.errorState}>{paymentError}</div>}
-                <button className={styles.recordBtn} type="submit" disabled={recording}>{recording ? "Recording…" : "Record payment"}</button>
-              </form>
+                <button className={styles.recordBtn} onClick={collectOnInvoice} disabled={creating || recording || tenderTotalMinor(tenders) === 0}>
+                  {recording ? "Recording…" : `Collect ${formatMoney(tenderTotalMinor(tenders) / 100, invoice.currency)}`}
+                </button>
+              </>
             )}
           </div>
         </div>
       )}
 
       {!canBill && !invoice && <div className={styles.state}>No invoice has been generated for this visit yet.</div>}
-      {canBill && (!invoice || showAddMore) && picker}
+      {canBill && (!invoice || showAddMore) && <>{picker}{collectBar}</>}
     </main>
   );
 }

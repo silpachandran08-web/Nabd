@@ -9,6 +9,7 @@ import Dialog from "../components/ui/Dialog";
 import ConfirmDialog from "./ConfirmDialog";
 import GuardianReviews from "./GuardianReviews";
 import StatusPill from "../components/ui/StatusPill";
+import BillingStatePill from "../components/ui/BillingStatePill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { decodeAccessToken } from "../lib/session";
@@ -729,7 +730,7 @@ function PatientsList() {
                         {p.followUpDue && <StatusPill tone="warn" label="Follow-up due" />}
                         {/* The registry row carries no consent state, so it can't say consent exists. */}
                         {p.minor && <StatusPill tone="info" icon="user" label="Minor" />}
-                        {billingView && p.balanceDue && <StatusPill tone="urgent" icon="receipt" label="Balance due" />}
+                        {billingView && p.balanceDue && <BillingStatePill state="outstanding" />}
                         {p.allergy && <StatusPill tone="danger" label={`Allergy: ${p.allergy}`} />}
                         {canRegister && p.duplicate && <StatusPill tone="sync" icon="users" label="Duplicate review" />}
                       </span>
@@ -835,7 +836,7 @@ function PatientsList() {
                             <span className={styles.toothStatus}>{(tooth?.status ?? "healthy").replace("_", " ")}</span>
                           )}
                           {tooth && (
-                            <button className={styles.linkBtn} style={{ fontSize: "10px" }} onClick={() => openHistory(tooth.id)}>History</button>
+                            <button className={styles.linkBtn} style={{ fontSize: "12px" }} onClick={() => openHistory(tooth.id)}>History</button>
                           )}
                         </div>
                       );
@@ -939,7 +940,7 @@ function PatientsList() {
                     {billingView && drawerPatient.outstandingBalance !== undefined && (
                       <div className={styles.section}>
                         <div className={styles.sectionLabel}>Outstanding balance</div>
-                        <div className={styles.sectionValue}>{drawerPatient.outstandingBalance.toFixed(2)}</div>
+                        <div className={styles.sectionValue}>{drawerPatient.outstandingBalance.toFixed(2)} <BillingStatePill state={drawerPatient.outstandingBalance > 0 ? "outstanding" : "settled"} /></div>
                       </div>
                     )}
                     <div className={styles.section}>
@@ -954,6 +955,11 @@ function PatientsList() {
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  <div className={styles.section}>
+                    <div className={styles.sectionLabel}>Address and national ID</div>
+                    <div className={styles.muted}>Not available yet. They are saved at registration, but the server does not return them.</div>
                   </div>
 
                   {drawerPatient.guardianId && (

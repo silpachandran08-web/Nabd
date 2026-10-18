@@ -120,7 +120,7 @@
   display: flex;
   align-items: center;
   gap: var(--nb-space-8);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -154,7 +154,7 @@
 }
 
 .gridHead {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -177,7 +177,7 @@
 }
 
 .leaveTag {
-  font-size: 10px;
+  font-size: 12px;
   text-transform: none;
   letter-spacing: 0;
   color: var(--nb-text-tertiary);
@@ -226,7 +226,7 @@ button.slot {
 }
 
 .slotSub {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   opacity: 0.8;
   white-space: nowrap;
@@ -294,7 +294,7 @@ button.slot {
 }
 
 .more {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--nb-text-secondary);
   margin-top: 2px;
 }
@@ -395,7 +395,7 @@ button.slot {
 }
 
 .weekFree {
-  font-size: 10px;
+  font-size: 12px;
   opacity: 0.75;
 }
 
@@ -486,7 +486,7 @@ button.slot {
 }
 
 .resultSub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--nb-text-secondary);
 }
 
@@ -631,7 +631,7 @@ button.slot {
 
 .boardMeta {
   flex-basis: 100%;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--nb-text-secondary);
 }
 
@@ -739,4 +739,15 @@ button.slot {
   .actions { flex-wrap: wrap; }
   .actions > * { flex: 1 1 auto; justify-content: center; }
   .board { grid-auto-columns: 92%; }
+}
+
+/* REC-029: new-appointment dialog */
+.tap { min-height: 44px; }
+.quickPatient { display: flex; flex-direction: column; gap: var(--nb-space-8); border: 1px solid var(--nb-border-subtle); border-radius: var(--nb-radius-md); padding: var(--nb-space-12); margin: 0; min-width: 0; }
+.altRow { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); }
+
+/* REC-032: Hijri date shown next to a date picker */
+.hijri {
+  font-size: 12px;
+  color: var(--nb-text-secondary);
 }
