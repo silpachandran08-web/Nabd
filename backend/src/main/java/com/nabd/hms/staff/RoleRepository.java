@@ -105,6 +105,21 @@ class RoleRepository {
         return jdbc.query(DELEGATION_SELECT + "WHERE d.id = ?", delegationMapper(), id).get(0);
     }
 
+    /** PLT-014: grants of the staff member's own permanent role (staff.role_id) only, never delegated or break-glass. */
+    String findBaseRoleGrants(UUID tenantId, UUID staffId) {
+        return jdbc.queryForObject("SELECT r.grants::text FROM staff s JOIN roles r ON r.id = s.role_id " +
+                "WHERE s.tenant_id = ? AND s.id = ?", String.class, tenantId, staffId);
+    }
+
+    List<UUID> findActiveDelegatedRoleIds(UUID staffId) {
+        return findActiveDelegations(staffId).stream().map(DelegationRow::delegatedRoleId).toList();
+    }
+
+    void revokeSessions(UUID tenantId, UUID staffId, String reason) {
+        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
+                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL", reason, tenantId, staffId);
+    }
+
     void revokeDelegation(UUID tenantId, UUID id) {
         jdbc.update("UPDATE role_delegations SET revoked_at = now(), revoked_reason = 'manual' " +
                 "WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL", tenantId, id);
