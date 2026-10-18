@@ -10,6 +10,7 @@ import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
 import type { IconName } from "../components/ui/Icon";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
+import { usePolling } from "../lib/usePolling";
 import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 
@@ -361,10 +362,7 @@ function ArrivalsPageInner() {
   }, [authedFetch]);
 
   // NB-095: "live-updates without refresh" via polling — full push-based sync is NB-096, separate.
-  useEffect(() => {
-    const id = setInterval(load, POLL_MS);
-    return () => clearInterval(id);
-  }, [load]);
+  usePolling(load, POLL_MS);
 
   // Re-render the "Wait" column once a minute without waiting on the full poll.
   useEffect(() => {

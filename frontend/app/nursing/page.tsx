@@ -11,6 +11,7 @@ import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
+import { usePolling } from "../lib/usePolling";
 import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "../lib/vitals";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
@@ -350,10 +351,7 @@ function NursingWorklist() {
 
   // "updates live with queue state" (NB-142's acceptance bar) — polling, same as /arrivals (NB-095);
   // push-based sync is NB-096, a separate ticket.
-  useEffect(() => {
-    const id = setInterval(load, POLL_MS);
-    return () => clearInterval(id);
-  }, [load]);
+  usePolling(load, POLL_MS);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
