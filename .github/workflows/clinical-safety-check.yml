@@ -1,0 +1,11 @@
+name: clinical-safety-check
+on:
+  pull_request:
+  push:
+    branches: [develop-initial]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/test-check-clinical-safety.py && python3 scripts/check-clinical-safety.py

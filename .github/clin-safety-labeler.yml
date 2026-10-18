@@ -1,0 +1,8 @@
+"[CLIN-SAFETY]":
+  - changed-files:
+      - any-glob-to-any-file:
+          - backend/src/main/java/com/nabd/hms/clinical/RxSafetyChecks.java
+          - backend/src/main/java/com/nabd/hms/clinical/AllergyDrugClasses.java
+          - backend/src/main/resources/clinical-safety/**
+          - backend/src/main/java/com/nabd/hms/clinical/cds/**
+          - docs/clinical-safety/**
