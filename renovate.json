@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovate.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["npm", "maven", "dockerfile"],
+  "timezone": "UTC",
+  "schedule": ["before 6am every weekday"],
+  "labels": ["dependencies"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "schedule": ["at any time"],
+    "groupName": null
+  },
+  "packageRules": [
+    { "matchManagers": ["npm"], "groupName": "frontend npm", "matchFileNames": ["frontend/package.json"] },
+    { "matchManagers": ["maven"], "groupName": "backend maven" },
+    { "matchManagers": ["dockerfile"], "groupName": "docker" },
+    {
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    {
+      "matchPackageNames": ["next", "eslint-config-next"],
+      "groupName": "next",
+      "labels": ["dependencies", "security-review"]
+    },
+    {
+      "matchPackageNames": ["react", "react-dom"],
+      "groupName": "react"
+    }
+  ]
+}

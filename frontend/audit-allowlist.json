@@ -1,0 +1,7 @@
+[
+  {
+    "id": "GHSA-vfj7-8cjw-p6xm",
+    "expires": "2026-12-31",
+    "reason": "braces DoS; dev-only (eslint-config-next toolchain), not in runtime or the build output; no patched release yet. Re-check on expiry."
+  }
+]
