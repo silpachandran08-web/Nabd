@@ -1,8 +1,8 @@
-// Shared E2E helpers (copied from ws/qa/t3/qa-lib.mjs): browser launch, session seeding, API mocking with request log.
+// Shared E2E helpers: browser launch, session seeding, API mocking with request log. Set APP (base URL) and SHOTS (screenshot dir) via env.
 import { chromium } from '/home/claude/ws/qa/node_modules/playwright/index.mjs';
-export const APP = process.env.APP ?? 'http://localhost:3102';
+export const APP = process.env.APP ?? 'http://localhost:3000';
 export const API = 'http://localhost:8080/v1';
-export const SHOTS = '/home/claude/ws/reports/shots-rec2';
+export const SHOTS = process.env.SHOTS ?? '/tmp/e2e-shots';
 
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 export function jwt(claims) {
