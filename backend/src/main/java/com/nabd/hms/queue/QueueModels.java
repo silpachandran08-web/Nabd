@@ -41,9 +41,9 @@ final class QueueModels {
 
     /** NB-100: one entry in a doctor's delay history — active while clearedAt is null. */
     record DoctorDelayRow(UUID id, UUID doctorId, int delayMinutes, String reason, UUID announcedBy, Instant announcedAt,
-                           UUID clearedBy, Instant clearedAt) {
-        boolean active() {
-            return clearedAt == null;
+                           UUID clearedBy, Instant clearedAt, java.time.LocalDate clinicDate) {
+        boolean active(java.time.LocalDate today) {
+            return clearedAt == null && clinicDate.equals(today);
         }
     }
 

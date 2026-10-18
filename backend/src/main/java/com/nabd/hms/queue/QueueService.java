@@ -102,11 +102,16 @@ public class QueueService {
         }
 
         if (req.appointmentId() != null) {
-            appointmentRepo.findById(tenantId, req.appointmentId())
+            var appt = appointmentRepo.findById(tenantId, req.appointmentId())
                     .filter(a -> "scheduled".equals(a.status()))
                     .filter(a -> a.patientId().equals(req.patientId()) && a.doctorId().equals(req.doctorId()))
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
                             "Appointment not found, already resolved, or doesn't match patient/doctor."));
+            LocalDate apptDay = appt.startTime().atZone(clock.zone(tenantId)).toLocalDate();
+            if (!apptDay.equals(today)) {
+                throw new ApiException(HttpStatus.CONFLICT, "appointment-not-today", "Appointment is not for today",
+                        "This appointment is dated " + apptDay + ", not today. Book the patient as a walk-in instead.");
+            }
         }
 
         // serializes both "what's the next token number" and, for walk-ins, the session-capacity
