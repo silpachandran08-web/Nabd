@@ -142,6 +142,7 @@
 }
 
 .tableWrap {
+  position: relative; /* contains the absolutely placed .srOnly header */
   overflow-x: auto;
 }
 

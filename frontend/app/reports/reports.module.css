@@ -267,7 +267,7 @@
   align-items: flex-end;
   justify-content: space-around;
   gap: var(--nb-space-16);
-  height: 150px;
+  height: 180px; /* tallest bar + its labels must fit */
   overflow-x: auto;
   padding-top: var(--nb-space-12);
 }
