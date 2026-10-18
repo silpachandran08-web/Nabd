@@ -658,6 +658,10 @@
     padding-block-end: var(--nb-space-4);
   }
 
+  .actionBtn {
+    min-block-size: 44px; /* S7-B04 */
+  }
+
   .tab,
   .tabActive,
   .quickActions > button {
