@@ -63,6 +63,7 @@ class IndexPlansS9QaTest extends ApiTestBase {
                 assertThat(who.getString(1)).isEqualTo(APP_ROLE);
                 assertThat(who.getBoolean(2)).isFalse();
                 s.execute("SELECT set_config('app.tenant_id', '" + tenant + "', true)");
+                s.execute("SET LOCAL jit = off"); // the local test image has no LLVM
                 for (String st : settings) s.execute(st);
                 StringBuilder sb = new StringBuilder();
                 double ms = -1;
