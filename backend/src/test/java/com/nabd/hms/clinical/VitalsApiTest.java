@@ -3,6 +3,7 @@ package com.nabd.hms.clinical;
 import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
+import com.nabd.hms.support.Hazard;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,13 @@ class VitalsApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", name, "phone", phone, "dob", "1990-01-01", "gender", "male")), Map.class);
         return (String) resp.getBody().get("id");
+    }
+
+    /** Minors cannot be registered without a guardian, so register as an adult then set the dob directly. */
+    private String registerPatient(String token, String name, String phone, String dob, UUID tenantId) {
+        String id = registerPatient(token, name, phone);
+        inTenantTx(tenantId, () -> jdbc.update("UPDATE patients SET dob = ?::date WHERE id = ?::uuid", dob, id));
+        return id;
     }
 
     private String checkIn(String token, String patientId, UUID doctorId) {
@@ -64,7 +72,7 @@ class VitalsApiTest extends ApiTestBase {
         UUID roleId = seedFullAccessRole(tenant.id());
         SeededStaff staff = seedStaff(tenant, roleId, "nurse5@a.com", "+919800010005", false);
         String token = loginAndGetAccessToken(staff);
-        String patientId = registerPatient(token, "V5", "+919999950005");
+        String patientId = registerPatient(token, "V5", "+919999950005", java.time.LocalDate.now().minusYears(5).toString(), tenant.id());
         String queueEntryId = checkIn(token, patientId, staff.id());
         moveTo(token, queueEntryId, "waiting", "vitals_pending");
 
@@ -83,6 +91,53 @@ class VitalsApiTest extends ApiTestBase {
         ResponseEntity<Map> second = exchange("/v1/clinical/patients/" + patientId + "/dose-calculator?mgPerKg=10", HttpMethod.GET, authed(token), Map.class);
         assertThat(second.getBody().get("weightRecordedAt")).isEqualTo(weightAt);
         assertThat(second.getBody().get("ruleSource")).isNotNull();
+        // weight recorded today: fresh, and the rule source string is unchanged
+        assertThat(second.getBody().get("weightStale")).isEqualTo(false);
+        assertThat((String) second.getBody().get("ruleSource")).startsWith("Weight-based mg/kg calculation v1");
+    }
+
+    private ResponseEntity<Map> dose(String token, String patientId) {
+        return exchange("/v1/clinical/patients/" + patientId + "/dose-calculator?mgPerKg=10", HttpMethod.GET, authed(token), Map.class);
+    }
+
+    @Test
+    @Hazard("H-07")
+    void doseCalculatorRefusesAdultsWith422() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "nurse6@a.com", "+919800010006", false);
+        String token = loginAndGetAccessToken(staff);
+        java.time.LocalDate today = java.time.LocalDate.now();
+        String adult = registerPatient(token, "V6", "+919999950006", today.minusYears(18).minusDays(1).toString(), tenant.id());
+        ResponseEntity<Map> r = dose(token, adult);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat((String) r.getBody().get("type")).endsWith("adult-patient");
+        // 17 years and almost 12 months is still a child: not refused for age (no weight yet -> 400)
+        String teen = registerPatient(token, "V6b", "+919999950016", today.minusYears(18).plusDays(2).toString(), tenant.id());
+        assertThat(dose(token, teen).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @Hazard("H-07")
+    void fourteenMonthOldWithA40DayOldWeightIsFlaggedStale() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "nurse7@a.com", "+919800010007", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "V7", "+919999950007", java.time.LocalDate.now().minusMonths(14).toString(), tenant.id());
+        String queueEntryId = checkIn(token, patientId, staff.id());
+        moveTo(token, queueEntryId, "waiting", "vitals_pending");
+        exchange("/v1/clinical/vitals/" + queueEntryId, HttpMethod.PATCH, authedJsonBody(token, Map.of("weightKg", 10.2)), Map.class);
+        assertThat(dose(token, patientId).getBody().get("weightStale")).isEqualTo(false);
+
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE vitals SET weight_recorded_at = now() - interval '40 days' WHERE patient_id = ?::uuid", patientId));
+        ResponseEntity<Map> r = dose(token, patientId);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(r.getBody().get("weightStale")).isEqualTo(true);
+        assertThat(r.getBody().get("weightRecordedAt")).isNotNull();
+
+        // the same 40-day-old weight is still fresh once the child is past 2 years (90-day window)
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE patients SET dob = ?::date WHERE id = ?::uuid",
+                java.time.LocalDate.now().minusYears(3).toString(), patientId));
+        assertThat(dose(token, patientId).getBody().get("weightStale")).isEqualTo(false);
     }
 
     @Test

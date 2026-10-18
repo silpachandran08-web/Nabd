@@ -1164,9 +1164,9 @@ export default function ConsultPage() {
                   ))}
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
 
-                  <div className={styles.previousMeds}>
+                  {!(pat && age(pat.dob) >= 18) && <div className={styles.previousMeds}>
                     <DoseCalculator key={activeEntry.patientId} authedFetch={authedFetch} patientId={activeEntry.patientId} queueEntryId={activeEntry.id} canRecordWeight={can("clinical:edit")} onWeightRecorded={reloadCtx} />
-                  </div>
+                  </div>}
 
                   <div className={styles.previousMeds}>
                     <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>

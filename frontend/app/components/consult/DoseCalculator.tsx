@@ -25,6 +25,7 @@ export default function DoseCalculator({
   const [rate, setRate] = useState("");
   const [result, setResult] = useState<DoseResult | null>(null);
   const [noWeight, setNoWeight] = useState(false);
+  const [adult, setAdult] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -44,7 +45,9 @@ export default function DoseCalculator({
       if (!res.ok) {
         const pr: ProblemWithType = await res.json().catch(() => ({ title: "Error", detail: "Couldn't calculate dose." }));
         setResult(null);
-        if (res.status === 400 && (pr.type?.endsWith("no-weight-recorded") || pr.title === "No weight recorded")) {
+        if (res.status === 422 && pr.type?.endsWith("adult-patient")) {
+          setAdult(true); // mg/kg dosing is out of scope for adults: the helper disappears
+        } else if (res.status === 400 && (pr.type?.endsWith("no-weight-recorded") || pr.title === "No weight recorded")) {
           setNoWeight(true);
         } else {
           setNoWeight(false);
@@ -96,6 +99,9 @@ export default function DoseCalculator({
   }
 
   const age = result ? weightAge(result.weightRecordedAt) : null;
+  // The server decides staleness by age band (CLN-003); the client month check only covers an older server.
+  const stale = result ? (result.weightStale ?? age?.state === "stale") : false;
+  if (adult) return null;
 
   const recordAction = canRecordWeight && !recording && (
     <button type="button" className={s.btn} onClick={() => { setRecording(true); setWeightErr(null); }}>
@@ -130,10 +136,10 @@ export default function DoseCalculator({
 
       {result && (
         <div className={d.result} aria-live="polite">
-          {age?.state === "stale" && (
+          {stale && age && age.state !== "unknown" && (
             <div className={`${s.notice} ${s.noticeWarn}`} role="alert">
               <Icon name="alert" size={16} />
-              <span><strong>Weight is out of date.</strong> It was recorded {fmtDate(age.date)}, more than 3 months ago. Confirm a current weight before relying on this suggestion; the old weight is not used silently.</span>
+              <span><strong>Re-weigh.</strong> The weight was recorded {fmtDate(age.date)} and is out of date for this patient. Record a current weight before relying on this suggestion; the old weight is not used silently.</span>
             </div>
           )}
           {age?.state === "unknown" && (
@@ -145,7 +151,7 @@ export default function DoseCalculator({
           <dl className={d.facts}>
             <div><dt>Suggested total</dt><dd className={d.big}>{result.totalDoseMg} mg</dd></div>
             <div><dt>Calculation</dt><dd>{result.weightKg} kg × {result.mgPerKg} mg/kg</dd></div>
-            <div><dt>Weight recorded</dt><dd>{age?.state === "unknown" || !age ? "Date unknown" : `${fmtDate(age.date)}${age.state === "stale" ? " (out of date)" : ""}`}</dd></div>
+            <div><dt>Weight recorded</dt><dd>{age?.state === "unknown" || !age ? "Date unknown" : `${fmtDate(age.date)}${stale ? " (out of date)" : ""}`}</dd></div>
             <div><dt>Rule source</dt><dd>{result.ruleSource}</dd></div>
             <div><dt>Maximum dose</dt><dd>Not defined by this rule. No per-dose or daily limit is applied or checked here; check the drug reference before prescribing.</dd></div>
           </dl>
@@ -153,7 +159,7 @@ export default function DoseCalculator({
       )}
       {recorded && !recording && !noWeight && <div className={`${s.notice} ${s.noticeOk}`} role="status"><Icon name="check" size={16} /><span>Weight recorded. {result ? "Suggestion refreshed with the new weight." : "Enter a mg/kg rate and calculate."}</span></div>}
 
-      {(noWeight || age?.state === "stale" || age?.state === "unknown") && recordAction}
+      {(noWeight || stale || age?.state === "unknown") && recordAction}
       {recording && (
         <form className={d.record} onSubmit={(e) => { e.preventDefault(); void saveWeight(); }}>
           <label className={d.label}>
