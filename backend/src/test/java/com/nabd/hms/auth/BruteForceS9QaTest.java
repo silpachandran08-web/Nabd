@@ -253,7 +253,7 @@ class BruteForceS9QaTest extends ApiTestBase {
         assertThat(rr.getStatusCode()).isEqualTo(HttpStatus.OK);
         String fresh = (String) rr.getBody().get("accessToken");
         assertThat(claims(fresh).get("pinChange")).isEqualTo(false);
-        assertThat(exchange("/v1/auth/sessions", HttpMethod.GET, authed(fresh), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(exchange("/v1/auth/sessions", HttpMethod.GET, authed(fresh), String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(login(s, STAFF_PIN).getStatusCode()).as("old PIN dead").isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(login(s, "654321").getStatusCode()).isEqualTo(HttpStatus.OK);
     }

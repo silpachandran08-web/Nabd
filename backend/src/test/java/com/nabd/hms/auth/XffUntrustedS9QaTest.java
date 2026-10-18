@@ -93,7 +93,8 @@ class XffUntrustedS9QaTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         List<SeededStaff> ss = new java.util.ArrayList<>();
         for (String xff : List.of("1.2.3.4", "not-an-ip")) {
-            SeededStaff s = seedStaff(t, seedBreakGlassDoctorRole(t.id()), "qa-xff3-" + ss.size() + "@a.com", "+91970000010" + ss.size(), false);
+            SeededTenant tt = seedTenant();
+            SeededStaff s = seedStaff(tt, seedBreakGlassDoctorRole(tt.id()), "qa-xff3-" + ss.size() + "@a.com", "+91970000010" + ss.size(), false);
             ss.add(s);
             String token = loginAndGetAccessToken(s);
             HttpHeaders extra = new HttpHeaders();
