@@ -100,7 +100,9 @@ public class PlatformAuthService {
             signInFailed(operator, ip, "invalid_credentials");
             throw invalidCredentials();
         }
-        repo.recordLoginAttempt(operator.id(), email, ip, true);
+        if (!operator.mfaEnabled()) { // with MFA the success is recorded after the second factor (PLT-003)
+            repo.recordLoginAttempt(operator.id(), email, ip, true);
+        }
         log.info("operator {} authenticated via PIN (role {})", operator.id(), operator.role());
 
         if (operator.mfaEnabled()) {
@@ -133,12 +135,16 @@ public class PlatformAuthService {
         if (operator.mfaSecretEnc() == null) {
             throw mfaFailed();
         }
+        enforceAccountLockout(operator);
         byte[] secret = cipher.decrypt(operator.mfaSecretEnc());
-        if (!totpService.verify(secret, req.code(), Instant.now())) {
+        long step = totpService.matchStep(secret, req.code(), Instant.now());
+        if (step < 0 || !repo.claimTotpStep(operator.id(), step)) { // claim = replay guard
+            repo.recordLoginAttempt(operator.id(), operator.email(), ip, false);
             log.warn("MFA verification failed for operator {}", operator.id());
             audit.record(null, operator.id(), ip, "platform_auth.mfa_failed", "operator", operator.id(), null);
             throw mfaFailed();
         }
+        repo.recordLoginAttempt(operator.id(), operator.email(), ip, true);
         log.info("operator {} completed MFA", operator.id());
         audit.record(null, operator.id(), ip, "platform_auth.signed_in", "operator", operator.id(), Map.of("mfa", true));
         return mintTokenPair(operator, UUID.randomUUID(), ip, device, userAgent);

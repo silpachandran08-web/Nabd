@@ -7,6 +7,6 @@ public record PinResetConfirmRequest(
         @NotBlank String tenantSlug,
         @NotBlank String mobilePhone,
         @NotBlank String token,
-        @NotBlank @Pattern(regexp = "\\d{4,6}") String newPin
+        @NotBlank @Pattern(regexp = "\\d{6,8}") String newPin
 ) {
 }

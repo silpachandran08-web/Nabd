@@ -142,7 +142,7 @@ class AuthRepository {
     /** Atomic check-and-consume, then set the new PIN in the same statement — no read-then-write race. */
     boolean consumePinResetToken(UUID staffId, String tokenHash, String newPinHash) {
         int rows = jdbc.update(
-                "UPDATE staff SET pin_hash = ?, pin_reset_token_hash = NULL, pin_reset_expires_at = NULL " +
+                "UPDATE staff SET pin_hash = ?, pin_policy_version = 2, pin_reset_token_hash = NULL, pin_reset_expires_at = NULL " +
                         "WHERE id = ? AND pin_reset_token_hash = ? AND pin_reset_expires_at > now()",
                 newPinHash, staffId, tokenHash);
         return rows == 1;

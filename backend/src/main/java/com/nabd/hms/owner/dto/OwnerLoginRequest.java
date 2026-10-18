@@ -6,6 +6,6 @@ import jakarta.validation.constraints.Pattern;
 
 public record OwnerLoginRequest(
         @NotBlank @Email String email,
-        @NotBlank @Pattern(regexp = "^[0-9]{4,6}$") String pin
+        @NotBlank @Pattern(regexp = "^[0-9]{4,8}$") String pin
 ) {
 }

@@ -382,6 +382,8 @@ class PatientApiTest extends ApiTestBase {
         assertThat(undoResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         // reversing an already-reversed merge must fail
+        // PLT-003 replay guard allows one use per TOTP step; this is the 4th code for the account in one window
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET mfa_last_used_step = NULL WHERE tenant_id = ?", tenant.id()));
         String stepUp3 = obtainStepUpToken(token);
         ResponseEntity<Map> secondUndo = exchange("/v1/patients/merges/" + mergeId + "/undo", HttpMethod.POST,
                 authedEntityWithHeader(token, "X-Step-Up-Token", stepUp3), Map.class);

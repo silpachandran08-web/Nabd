@@ -369,7 +369,20 @@ public abstract class ApiTestBase {
 
     /** Same RFC 6238 algorithm as TotpService.generate() — kept independent rather than reaching into a package-private method. */
     protected String currentTotpCode() {
-        long counter = Instant.now().getEpochSecond() / 30;
+        // PLT-003 replay guard: one account may not reuse a time-step, so successive codes within a test
+        // walk the accepted drift window (-1, 0, +1); a test needing the same code twice uses totpCodeAtOffset.
+        return totpCodeAtOffset(Math.min(totpCursor++, 2) - 1);
+    }
+
+    private int totpCursor;
+
+    @BeforeEach
+    void resetTotpCursor() {
+        totpCursor = 0;
+    }
+
+    protected String totpCodeAtOffset(int stepOffset) {
+        long counter = Instant.now().getEpochSecond() / 30 + stepOffset;
         try {
             byte[] data = ByteBuffer.allocate(8).putLong(counter).array();
             Mac mac = Mac.getInstance("HmacSHA1");

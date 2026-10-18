@@ -405,7 +405,7 @@ class AuthApiTest extends ApiTestBase {
         assertThat(secondLogin.getBody()).containsKey("challengeId");
         String challengeId = (String) secondLogin.getBody().get("challengeId");
         ResponseEntity<Map> mfaResp = http.postForEntity(url("/v1/auth/mfa/verify"), jsonBody(Map.of(
-                "challengeId", challengeId, "code", totpCodeFor(secretBase32))), Map.class);
+                "challengeId", challengeId, "code", totpCodeFor(secretBase32, 1))), Map.class); // next step: confirm used this one
         assertThat(mfaResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(mfaResp.getBody()).containsKey("accessToken");
     }
@@ -446,7 +446,7 @@ class AuthApiTest extends ApiTestBase {
         assertThat(token).isNotNull();
 
         ResponseEntity<Void> confirmResp = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
-                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", token, "newPin", "9999")), Void.class);
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", token, "newPin", "999999")), Void.class);
         assertThat(confirmResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         ResponseEntity<Map> oldPinLogin = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
@@ -454,7 +454,7 @@ class AuthApiTest extends ApiTestBase {
         assertThat(oldPinLogin.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         ResponseEntity<Map> newPinLogin = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
-                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", "9999")), Map.class);
+                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", "999999")), Map.class);
         assertThat(newPinLogin.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
@@ -475,7 +475,7 @@ class AuthApiTest extends ApiTestBase {
         seedStaff(tenant, roleId, "reset2@a.com", mobile, false);
 
         ResponseEntity<Void> resp = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
-                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", "not-a-real-token", "newPin", "9999")), Void.class);
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", "not-a-real-token", "newPin", "999999")), Void.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
@@ -558,8 +558,12 @@ class AuthApiTest extends ApiTestBase {
     }
 
     private String totpCodeFor(String secretBase32) {
+        return totpCodeFor(secretBase32, 0);
+    }
+
+    private String totpCodeFor(String secretBase32, int stepOffset) {
         byte[] secret = org.bouncycastle.util.encoders.Base32.decode(secretBase32);
-        long counter = java.time.Instant.now().getEpochSecond() / 30;
+        long counter = java.time.Instant.now().getEpochSecond() / 30 + stepOffset;
         return new TotpService().generate(secret, counter);
     }
 
