@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import com.nabd.hms.shared.security.Audience;
+import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
@@ -156,13 +158,13 @@ public class OwnerService {
     private String issuePendingWorkspaceToken(Owner owner) {
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(300);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(owner.id().toString())
-                .claim("purpose", PENDING_WORKSPACE_PURPOSE)
-                .build();
+                .claim("purpose", PENDING_WORKSPACE_PURPOSE);
+        JwtClaimsSet claims = TokenType.OWNER_SELECT.stamp(claimsB, Audience.OWNER_SELECT).build();
         return jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
     }
 

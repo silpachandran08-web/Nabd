@@ -35,6 +35,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import com.nabd.hms.shared.security.Audience;
+import com.nabd.hms.shared.security.ChallengeTokenDecoder;
+import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -67,7 +70,7 @@ public class AuthService {
     private final TotpService totpService;
     private final AesGcmCipher cipher;
     private final JwtEncoder jwtEncoder;
-    private final JwtDecoder jwtDecoder;
+    private final ChallengeTokenDecoder jwtDecoder;
     private final AuthProperties props;
     private final ObjectMapper objectMapper;
     private final WhatsAppOtpSender otpSender;
@@ -75,7 +78,7 @@ public class AuthService {
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
-                TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, JwtDecoder jwtDecoder,
+                TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -144,14 +147,15 @@ public class AuthService {
     private MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
         Instant now = Instant.now();
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staff.id().toString())
                 .claim("purpose", "mfa_setup_required")
-                .claim("tenantId", staff.tenantId().toString())
-                .build();
+                .claim("tenantId", staff.tenantId().toString());
+        TokenType.MFA_SETUP.stamp(claimsB, Audience.MFA);
+        JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
     }
@@ -230,7 +234,7 @@ public class AuthService {
     public TokenPairResponse verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
         Jwt challenge;
         try {
-            challenge = jwtDecoder.decode(req.challengeId());
+            challenge = jwtDecoder.decode(req.challengeId(), TokenType.MFA_PENDING);
         } catch (JwtException e) {
             throw mfaFailed(); // covers expired (5 min TTL) and tampered tokens alike
         }
@@ -278,13 +282,14 @@ public class AuthService {
 
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(300);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staffId.toString())
-                .claim("purpose", "step_up")
-                .build();
+                .claim("purpose", "step_up");
+        TokenType.STEP_UP.stamp(claimsB, Audience.STEP_UP);
+        JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         log.info("staff {} obtained a step-up token", staffId);
         return new StepUpTokenResponse(token, 300);
@@ -522,14 +527,15 @@ public class AuthService {
     private MfaChallengeResponse issueMfaChallenge(Staff staff) {
         Instant now = Instant.now();
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staff.id().toString())
                 .claim("purpose", "mfa_pending")
-                .claim("tenantId", staff.tenantId().toString())
-                .build();
+                .claim("tenantId", staff.tenantId().toString());
+        TokenType.MFA_PENDING.stamp(claimsB, Audience.MFA);
+        JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         return new MfaChallengeResponse(token, "totp", props.mfaChallengeTtlMinutes() * 60L);
     }
@@ -575,7 +581,7 @@ public class AuthService {
         Instant now = Instant.now();
         Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(accessExp)
@@ -593,8 +599,9 @@ public class AuthService {
                 // Landing only (lib/session landingPathFor): the owner's home is Owner Insights, but
                 // their full grants would otherwise match the nursing rule first. From the staff
                 // member's own role, never a delegated one.
-                .claim("owner", role.builtIn())
-                .build();
+                .claim("owner", role.builtIn());
+        TokenType.ACCESS.stamp(claimsB, Audience.STAFF_API);
+        JwtClaimsSet claims = claimsB.build();
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
 
         String rawRefresh = OpaqueTokens.generate();

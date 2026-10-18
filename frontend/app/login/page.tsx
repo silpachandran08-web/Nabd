@@ -178,7 +178,8 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/mfa/enroll`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${setupToken}` },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setupToken }), // PLT-001: challenge tokens travel in the body, never as a bearer
       });
       const body = await res.json();
       if (!res.ok) {
@@ -200,8 +201,8 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/mfa/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${setupRequired.setupToken}` },
-        body: JSON.stringify({ code }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, setupToken: setupRequired.setupToken }),
       });
       const body = await res.json();
       if (!res.ok) {

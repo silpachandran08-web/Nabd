@@ -152,6 +152,57 @@ paths:
           description: Wrong code, expired challenge, or 5th failed attempt (challenge burned)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
+  /auth/mfa/enroll:
+    post:
+      tags: [Auth]
+      summary: Start MFA enrolment (PLT-001) - with the typ=mfa_setup token in the body at first login, or as a signed-in session
+      description: Challenge tokens (mfa_pending, step_up, owner_select) are never accepted as Authorization bearer tokens anywhere; an mfa_setup token is only read from this body.
+      security:
+        - bearerAuth: []
+        - {}
+      x-required-permission: public
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                setupToken: { type: string, description: "typ=mfa_setup token from login; omit when signed in" }
+      responses:
+        "200":
+          description: Secret and otpauth URI
+          content: { application/json: { schema: { type: object } } }
+        "401":
+          description: No valid setup token or access session (token-type-not-allowed)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /auth/mfa/confirm:
+    post:
+      tags: [Auth]
+      summary: Confirm MFA enrolment with a TOTP code (PLT-001) - setupToken in the body or a signed-in session
+      security:
+        - bearerAuth: []
+        - {}
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, pattern: "^[0-9]{6}$" }
+                setupToken: { type: string, description: "typ=mfa_setup token from login; omit when signed in" }
+      responses:
+        "200":
+          description: Recovery codes
+          content: { application/json: { schema: { type: object } } }
+        "401":
+          description: No valid setup token or access session, or wrong code
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
   /auth/refresh:
     post:
       tags: [Auth]
