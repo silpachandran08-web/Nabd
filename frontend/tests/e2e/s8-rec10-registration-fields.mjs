@@ -2,7 +2,7 @@
 // Run: NODE_PATH=/home/claude/ws/qa/node_modules node s8-rec10-registration-fields.mjs   (app on http://localhost:3110)
 import { launch, seedClinic, mockApi, check, results, sleep, dumpLog } from '/home/claude/ws/qa/t3/qa-lib.mjs';
 
-const APP = 'http://localhost:3110';
+const APP = process.env.APP ?? 'http://localhost:3000';
 const SHOTS = '/home/claude/ws/reports/shots-rec10';
 const row = { id: 'p1', mrn: 'MRN-1', name: 'Asha Rao', phone: '+919876543210', age: 30, gender: 'female', minor: false, lastVisit: null, nextAppointment: null,
   nextDoctorName: null, nextDoctorId: null, nextAppointmentId: null, nextAppointmentToday: false, packageSessionsUsed: null, packageSessionsTotal: null,

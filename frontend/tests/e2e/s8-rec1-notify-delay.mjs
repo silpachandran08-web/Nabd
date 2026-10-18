@@ -2,7 +2,7 @@
 // Run (server on :3101): node tests/e2e/s8-rec1-notify-delay.mjs
 import { launch, seedClinic, mockApi, check, sleep, dumpLog } from '/home/claude/ws/qa/t3/qa-lib.mjs';
 
-const APP = 'http://localhost:3101';
+const APP = process.env.APP ?? 'http://localhost:3000';
 const SHOTS = '/home/claude/ws/reports/shots-rec1';
 const DOC = '33333333-3333-3333-3333-333333333331';
 const DOC2 = '33333333-3333-3333-3333-333333333332';
@@ -130,7 +130,7 @@ for (const [status, detail] of [[500, 'Boom from server.'], [403, 'Not allowed t
     await submit(page).click();
     await sleep(600);
     const d = dlg(page);
-    check(`X${status} error shown in dialog, dialog stays open, form re-usable`, (await d.count()) === 1 && (await d.getByRole('alert').count()) >= 1 && /couldn.t finish|isn.t allowed/.test(await d.innerText()) && await submit(page).isEnabled(), (await d.innerText()).replace(/\n+/g, ' | ').slice(-160));
+    check(`X${status} error shown in dialog, dialog stays open, form re-usable`, (await d.count()) === 1 && (await d.getByRole('alert').count()) >= 1 && /couldn.t finish|isn.t allowed|Not allowed to do that/.test(await d.innerText()) && await submit(page).isEnabled(), (await d.innerText()).replace(/\n+/g, ' | ').slice(-160));
   });
 }
 

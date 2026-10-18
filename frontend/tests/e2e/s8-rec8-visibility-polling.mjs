@@ -2,7 +2,7 @@
 // Run: NODE_PATH=/home/claude/ws/qa/node_modules node s8-rec8-visibility-polling.mjs   (APP_URL defaults to http://localhost:3108)
 import { launch, seedClinic, mockApi, check, results, sleep, dumpLog } from '/home/claude/ws/qa/t3/qa-lib.mjs';
 
-const APP = process.env.APP_URL ?? 'http://localhost:3108';
+const APP = process.env.APP ?? 'http://localhost:3000';
 const SHOTS = '/home/claude/ws/reports/shots-rec8';
 const DAY = { date: '2026-10-18', today: true, timezone: 'Asia/Riyadh', holiday: null, doctors: [], sessions: [], counts: { appointments: 0, walkIns: 0, freeSlots: 0 } };
 const PAGES = [

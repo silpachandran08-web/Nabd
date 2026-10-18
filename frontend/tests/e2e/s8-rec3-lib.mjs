@@ -1,6 +1,6 @@
 // T3 shared helpers: browser launch, session seeding, API mocking with request log.
 import { chromium } from "/home/claude/ws/qa/node_modules/playwright/index.mjs";
-export const APP = 'http://localhost:3103';
+export const APP = process.env.APP ?? 'http://localhost:3000';
 export const API = 'http://localhost:8080/v1';
 export const SHOTS = '/home/claude/ws/reports/shots-rec3';
 

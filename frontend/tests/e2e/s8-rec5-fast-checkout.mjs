@@ -153,8 +153,8 @@ try {
     await page.getByLabel('Amount 1').fill('100');
     await page.getByRole('button', { name: /^Collect/ }).click();
     await page.getByText('INV-0001').waitFor();
-    await page.waitForFunction(() => document.body.innerText.toLowerCase().includes('partial'));
-    check('boundary: partial 100 leaves 526 balance due, status partial', (await page.locator('main').innerText()).includes('526') && s.st.posts.payments.length === 1);
+    await page.waitForFunction(() => document.body.innerText.toLowerCase().includes('part-paid'));
+    check('boundary: partial 100 leaves 526 balance due, status part-paid', (await page.locator('main').innerText()).includes('526') && s.st.posts.payments.length === 1);
     await s.browser.close();
   }
 

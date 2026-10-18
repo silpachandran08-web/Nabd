@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { launch, seedClinic, mockApi, check, results, sleep } from '/home/claude/ws/qa/t3/qa-lib.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
-const APP = `http://localhost:${process.env.PORT ?? 3107}`;
+const APP = process.env.APP ?? 'http://localhost:3000';
 const SHOTS = '/home/claude/ws/reports/shots-rec7';
 const SHOT = (p, n) => p.screenshot({ path: `${SHOTS}/${n}.png` });
 
