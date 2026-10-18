@@ -50,6 +50,12 @@ class PlatformAuthRepository {
                 operatorId, email, ip, succeeded);
     }
 
+    /** TOTP replay guard: a time-step is accepted once per operator (atomic). */
+    boolean claimTotpStep(UUID operatorId, long step) {
+        return jdbc.update("UPDATE master.operators SET mfa_last_used_step = ? WHERE id = ? "
+                + "AND (mfa_last_used_step IS NULL OR mfa_last_used_step < ?)", step, operatorId, step) == 1;
+    }
+
     /** Same "failures since last success" window as AuthRepository's staff equivalent. */
     int countFailedAttemptsSinceLastSuccess(UUID operatorId) {
         Integer count = jdbc.queryForObject(

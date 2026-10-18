@@ -46,13 +46,18 @@ public class TotpService {
     }
 
     public boolean verify(byte[] secret, String code, Instant at) {
+        return matchStep(secret, code, at) >= 0;
+    }
+
+    /** The time-step the code matches (for the replay guard), or -1. */
+    public long matchStep(byte[] secret, String code, Instant at) {
         long counter = at.getEpochSecond() / STEP_SECONDS;
         for (long i = -DRIFT_STEPS; i <= DRIFT_STEPS; i++) {
             if (generate(secret, counter + i).equals(code)) {
-                return true;
+                return counter + i;
             }
         }
-        return false;
+        return -1;
     }
 
     String generate(byte[] secret, long counter) {

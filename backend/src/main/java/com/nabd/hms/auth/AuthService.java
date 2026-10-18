@@ -75,11 +75,13 @@ public class AuthService {
     private final ObjectMapper objectMapper;
     private final WhatsAppOtpSender otpSender;
     private final AuditService auditService;
+    private final LoginGuard guard;
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
-                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService) {
+                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
+                LoginGuard guard) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -91,6 +93,7 @@ public class AuthService {
         this.objectMapper = objectMapper;
         this.otpSender = otpSender;
         this.auditService = auditService;
+        this.guard = guard;
     }
 
     // noRollbackFor: recordLoginAttempt() below is the lockout counter's only durable state, and
@@ -119,7 +122,9 @@ public class AuthService {
             repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, false);
             throw invalidCredentials();
         }
-        repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, true);
+        if (!staff.mfaEnabled()) { // with MFA the success is recorded after the second factor, so PIN logins cannot reset TOTP failures
+            repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, true);
+        }
         log.info("staff {} authenticated via PIN (tenant {})", staff.id(), tenant.id());
 
         if (!staff.mfaEnabled() && mfaRequiredByPolicy(staff)) {
@@ -210,10 +215,12 @@ public class AuthService {
         enforceAccountLockout(staff);
 
         if (!repo.consumeWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(req.code()))) {
-            repo.recordLoginAttempt(tenant.id(), staff.id(), staff.email(), ip, false);
+            guard.recordAttempt(tenant.id(), staff.id(), staff.email(), "otp", false);
             throw invalidCredentials();
         }
-        repo.recordLoginAttempt(tenant.id(), staff.id(), staff.email(), ip, true);
+        if (!staff.mfaEnabled()) {
+            guard.recordAttempt(tenant.id(), staff.id(), staff.email(), "otp", true);
+        }
         repo.markMobileVerified(staff.id());
         log.info("staff {} authenticated via WhatsApp OTP, mobile verified (tenant {})", staff.id(), tenant.id());
 
@@ -230,7 +237,7 @@ public class AuthService {
         return String.format("%06d", random.nextInt(1_000_000));
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class) // the failed-attempt row must survive the 401
     public TokenPairResponse verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
         Jwt challenge;
         try {
@@ -251,11 +258,14 @@ public class AuthService {
         if (staff.mfaSecretEnc() == null) {
             throw mfaFailed(); // enrolled=false but flagged enabled — never silently skip the check
         }
+        guard.enforceLockout(staff.id());
         byte[] secret = cipher.decrypt(staff.mfaSecretEnc());
-        if (!totpService.verify(secret, req.code(), Instant.now())) {
+        if (!guard.verifyTotp(staff.id(), secret, req.code())) {
             log.warn("MFA verification failed for staff {}", staff.id());
+            guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "totp", false);
             throw mfaFailed();
         }
+        guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "totp", true);
         log.info("staff {} completed MFA", staff.id());
         return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
     }
@@ -265,7 +275,7 @@ public class AuthService {
      * involved, since the caller's own access token already establishes who they are; the TOTP
      * code is checked directly against their own secret.
      */
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class)
     public StepUpTokenResponse issueStepUpToken(Jwt callerJwt, String code) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
@@ -274,9 +284,11 @@ public class AuthService {
         if (staff.mfaSecretEnc() == null) {
             throw mfaFailed();
         }
+        guard.enforceLockout(staffId);
         byte[] secret = cipher.decrypt(staff.mfaSecretEnc());
-        if (!totpService.verify(secret, code, Instant.now())) {
+        if (!guard.verifyTotp(staffId, secret, code)) {
             log.warn("step-up denied for staff {} — TOTP mismatch", staffId);
+            guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "step_up", false);
             throw mfaFailed();
         }
 
@@ -312,14 +324,16 @@ public class AuthService {
         return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd", staff.email()));
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class)
     public MfaConfirmResponse confirmMfa(Jwt callerJwt, MfaConfirmRequest req) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
         tenantContext.set(tenantId);
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
 
-        if (staff.mfaSecretEnc() == null || !totpService.verify(cipher.decrypt(staff.mfaSecretEnc()), req.code(), Instant.now())) {
+        guard.enforceLockout(staffId);
+        if (staff.mfaSecretEnc() == null || !guard.verifyTotp(staffId, cipher.decrypt(staff.mfaSecretEnc()), req.code())) {
+            guard.recordAttempt(tenantId, staffId, staff.email(), "totp", false);
             throw mfaFailed();
         }
         repo.enableMfa(staffId);
@@ -415,14 +429,17 @@ public class AuthService {
     // Client-side lock only — the underlying session/access token is untouched, so draft state in
     // the page (or already-autosaved backend rows) survives the lock exactly as if nothing happened.
 
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class)
     public void unlock(Jwt callerJwt, UnlockRequest req) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+        guard.enforceLockout(staffId); // 423 before the PIN is even looked at
         if (staff.pinHash() == null || !pinEncoder.matches(req.pin(), staff.pinHash())) {
+            guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "unlock", false);
             throw invalidCredentials();
         }
+        guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "unlock", true);
     }
 
     /** Called from StaffController right after a successful invite-accept — lands the new staff member logged in. */
@@ -499,29 +516,10 @@ public class AuthService {
         }
     }
 
-    // Deliberately does NOT record a new failed attempt for a still-locked hit: doing so (the
-    // previous behavior) re-bases lockedUntil off "now" on every single request during the lock
-    // window, so a client polling faster than the backoff duration renews the lock forever — a
-    // trivial, unauthenticated (no correct PIN needed) permanent lockout of any known email. The
-    // counter should only grow from genuine post-expiry credential checks (see login(), which
-    // records real successes/failures after this gate).
+    // A still-locked hit records nothing (a client polling during the lock would otherwise renew it forever);
+    // see LoginGuard.enforceLockout, shared by every credential factor.
     private void enforceAccountLockout(Staff staff) {
-        int failures = repo.countFailedAttemptsSinceLastSuccess(staff.id());
-        if (failures < props.lockoutThreshold()) {
-            return;
-        }
-        Instant lastFailedAt = repo.lastFailedAttemptAt(staff.id()).orElse(Instant.EPOCH);
-        Instant lockedUntil = lastFailedAt.plus(backoffDuration(failures));
-        if (Instant.now().isBefore(lockedUntil)) {
-            log.warn("account locked: staff {} has {} failed attempts, locked until {}", staff.id(), failures, lockedUntil);
-            throw accountLocked();
-        }
-    }
-
-    private Duration backoffDuration(int failureCount) {
-        int overBy = failureCount - props.lockoutThreshold() + 1; // 1, 2, 3, ...
-        long minutes = Math.min(30, 1L << (overBy - 1)); // 1, 2, 4, 8, 16, 30(cap), ...
-        return Duration.ofMinutes(minutes);
+        guard.enforceLockout(staff.id());
     }
 
     private MfaChallengeResponse issueMfaChallenge(Staff staff) {
@@ -599,7 +597,9 @@ public class AuthService {
                 // Landing only (lib/session landingPathFor): the owner's home is Owner Insights, but
                 // their full grants would otherwise match the nursing rule first. From the staff
                 // member's own role, never a delegated one.
-                .claim("owner", role.builtIn());
+                .claim("owner", role.builtIn())
+                // PLT-003: PinChangeInterceptor refuses everything but pin change/logout while true
+                .claim("pinChange", guard.pinChangeRequired(staff.id()));
         TokenType.ACCESS.stamp(claimsB, Audience.STAFF_API);
         JwtClaimsSet claims = claimsB.build();
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
@@ -626,11 +626,6 @@ public class AuthService {
     private ApiException invalidCredentials() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "invalid-credentials", "Invalid credentials",
                 "Email/mobile or credential is incorrect.");
-    }
-
-    private ApiException accountLocked() {
-        return new ApiException(HttpStatus.LOCKED, "account-locked", "Account locked",
-                "Too many failed attempts. Try again later.");
     }
 
     private ApiException mfaFailed() {

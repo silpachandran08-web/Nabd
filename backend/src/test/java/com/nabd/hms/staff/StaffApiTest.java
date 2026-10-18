@@ -218,16 +218,23 @@ class StaffApiTest extends ApiTestBase {
         String inviteToken = (String) inviteResp.getBody().get("inviteToken");
 
         ResponseEntity<Map> acceptResp = http.postForEntity(url("/v1/staff/invitations/" + inviteToken + "/accept"),
-                jsonBody(Map.of("pin", "5678")), Map.class);
+                jsonBody(Map.of("pin", "567890")), Map.class);
 
         assertThat(acceptResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(acceptResp.getBody()).containsKey("accessToken");
     }
 
     @Test
+    void acceptInviteRejectsPinsShorterThanSixDigits() {
+        ResponseEntity<Map> resp = http.postForEntity(url("/v1/staff/invitations/any-token/accept"),
+                jsonBody(Map.of("pin", "12345")), Map.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
     void acceptInviteWithBogusTokenFails() {
         ResponseEntity<Map> resp = http.postForEntity(url("/v1/staff/invitations/not-a-real-token/accept"),
-                jsonBody(Map.of("pin", "1234")), Map.class);
+                jsonBody(Map.of("pin", "123456")), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.GONE);
     }
 

@@ -28,6 +28,7 @@ public class GlobalExceptionHandler {
         problem.setType(URI.create(TYPE_BASE + ex.typeSlug()));
         problem.setTitle(ex.title());
         problem.setDetail(ex.getMessage());
+        ex.extras().forEach(problem::setProperty);
         return withTraceId(problem);
     }
 

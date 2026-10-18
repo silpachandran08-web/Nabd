@@ -32,6 +32,14 @@ spring:
 
 server:
   port: 8080
+  # PLT-003: the client IP is the TCP peer unless the peer is a trusted proxy. Tomcat's RemoteIpValve only
+  # honours X-Forwarded-For from internal-proxies; empty (the default here) = trust nobody. Set per cell,
+  # e.g. APP_TRUSTED_PROXIES='10\.0\.0\.\d+' (regex).
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      remote-ip-header: X-Forwarded-For
+      internal-proxies: ${APP_TRUSTED_PROXIES:}
 
 logging:
   pattern:

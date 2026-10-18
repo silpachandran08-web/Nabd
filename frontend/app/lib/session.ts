@@ -13,6 +13,7 @@ type AccessTokenClaims = {
   staffName?: string;
   roleName?: string;
   owner?: boolean;
+  pinChange?: boolean;
   exp?: number;
 };
 
