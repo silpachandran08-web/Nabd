@@ -45,6 +45,7 @@ let leaving = false;
 export function goLogin(): void {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
+  void idbPair(null);
   if (leaving) return;
   const here = window.location.pathname + window.location.search;
   if (window.location.pathname.startsWith("/login")) return;
@@ -62,10 +63,36 @@ function bc(): BroadcastChannel | null {
   if (channel || typeof BroadcastChannel === "undefined") return channel;
   channel = new BroadcastChannel("nabd-auth");
   channel.onmessage = (e) => {
-    if (e.data?.type === "refreshed") { schedule(); waiters.forEach((w) => w(true)); }
+    if (e.data?.type === "refreshed") {
+      // The announce carries the pair for a tab waiting on it: its own localStorage read may still lag behind the writer's.
+      const { accessToken: a, refreshToken: r } = e.data as Pair;
+      if (waiters.size && a && r && (claims(a).exp ?? 0) > (claims(localStorage.getItem(ACCESS_KEY)).exp ?? 0)) { localStorage.setItem(ACCESS_KEY, a); localStorage.setItem(REFRESH_KEY, r); }
+      schedule(); waiters.forEach((w) => w(true));
+    }
   };
   (channel as { unref?: () => void }).unref?.(); // Node (unit tests) only; browsers have no unref
   return channel;
+}
+
+// IndexedDB mirror of the last rotated pair. localStorage reads taken right after a cross-tab lock hand-off
+// can still be stale (the tab that rotated has stored, this one has not seen it yet); IndexedDB is
+// transactional, so the lock holder writes it before releasing and the next holder reads the truth.
+// Best effort: without IndexedDB (or on error) the localStorage value is used as before.
+function idbPair(write: Pair | null | undefined): Promise<Pair | null> {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === "undefined") return resolve(null);
+    const open = indexedDB.open("nabd-auth", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("kv");
+    open.onerror = () => resolve(null);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction("kv", "readwrite");
+      const st = tx.objectStore("kv");
+      const req = write === undefined ? st.get("pair") : write ? st.put(write, "pair") : st.delete("pair");
+      tx.oncomplete = () => { db.close(); resolve(write === undefined ? (req.result ?? null) : null); };
+      tx.onerror = tx.onabort = () => { db.close(); resolve(null); };
+    };
+  });
 }
 
 /** Stores a freshly issued pair (login, refresh, PIN change) and arms the proactive refresh. */
@@ -75,17 +102,39 @@ export function storeTokens(pair: Pair): void {
   schedule();
 }
 
+/** After the lock: the newer of localStorage and the IndexedDB mirror, written back to localStorage. Only while a
+ * session exists in localStorage, so a stale mirror can never resurrect a logged-out session. */
+async function freshestRefreshToken(): Promise<string | null> {
+  const mine = localStorage.getItem(REFRESH_KEY);
+  if (!mine) return null;
+  const m = await idbPair(undefined);
+  const exp = (t?: string | null) => claims(t ?? null).exp ?? 0;
+  if (m?.accessToken && m.refreshToken && exp(m.accessToken) > exp(localStorage.getItem(ACCESS_KEY))) {
+    localStorage.setItem(ACCESS_KEY, m.accessToken);
+    localStorage.setItem(REFRESH_KEY, m.refreshToken);
+    return m.refreshToken;
+  }
+  return mine;
+}
+
 async function callRefresh(): Promise<boolean> {
-  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  const refreshToken = localStorage.getItem(REFRESH_KEY); // already synced with the mirror by the lock holder
   if (!refreshToken) return false;
   const res = await fetch(`${API_BASE}/auth/refresh`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken }),
   });
-  if (!res.ok) return false;
+  if (res.status === 401 || res.status === 403) { // only this ends the session
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    await idbPair(null);
+    return false;
+  }
+  if (!res.ok) throw new Error(`refresh failed: ${res.status}`); // 5xx/429: keep tokens, caller sees a failed request
   const pair: Pair = await res.json();
-  if (!pair.accessToken) return false;
+  if (!pair.accessToken) throw new Error("refresh failed: no token");
   storeTokens(pair);
-  bc()?.postMessage({ type: "refreshed" });
+  await idbPair(pair); // before the lock is released, so the next holder never reads the used token
+  bc()?.postMessage({ type: "refreshed", accessToken: pair.accessToken, refreshToken: pair.refreshToken });
   return true;
 }
 
@@ -113,8 +162,9 @@ let inflight: Promise<boolean> | null = null;
 export function refreshSession(stale: string | null): Promise<boolean> {
   if (inflight) return inflight;
   const locked = async (): Promise<boolean> => {
+    if (localStorage.getItem(REFRESH_KEY)) await freshestRefreshToken(); // adopt a pair another tab rotated moments ago
     const now = localStorage.getItem(ACCESS_KEY);
-    if (now && now !== stale && !needsRefresh(now)) return true;
+    if (now && now !== stale && !needsRefresh(now)) { schedule(); return true; } // adopt its pair
     return callRefresh();
   };
   const run = typeof navigator !== "undefined" && navigator.locks
