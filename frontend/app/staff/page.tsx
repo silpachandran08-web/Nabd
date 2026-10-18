@@ -133,7 +133,7 @@ export default function StaffAccessPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesFailed, setRolesFailed] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [breakGlass, setBreakGlass] = useState<{ id: string; staffId: string; staffName: string; reason: string; activatedAt: string; expiresAt: string }[]>([]);
+  const [breakGlass, setBreakGlass] = useState<{ grantId: string; staffName: string; reasonCode: string; activatedAt: string; expiresAt: string }[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -221,7 +221,7 @@ export default function StaffAccessPage() {
       if (departmentsRes?.ok) setDepartments(await departmentsRes.json());
 
       const bgRes = await authedFetch("/auth/break-glass/active");
-      if (bgRes?.ok) setBreakGlass(await bgRes.json());
+      if (bgRes?.ok) setBreakGlass((await bgRes.json()).items ?? []);
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -620,9 +620,9 @@ export default function StaffAccessPage() {
                     <thead><tr><th>Staff</th><th>Reason</th><th>Activated</th><th>Expires</th></tr></thead>
                     <tbody>
                       {breakGlass.map((g) => (
-                        <tr key={g.id}>
+                        <tr key={g.grantId}>
                           <td className={styles.staffName}>{g.staffName}</td>
-                          <td>{g.reason}</td>
+                          <td>{g.reasonCode.replace(/_/g, " ")}</td>
                           <td className={styles.muted}>{new Date(g.activatedAt).toLocaleString()}</td>
                           <td className={styles.muted}>{new Date(g.expiresAt).toLocaleTimeString()}</td>
                         </tr>

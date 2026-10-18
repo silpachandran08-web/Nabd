@@ -1,7 +1,5 @@
 package com.nabd.hms.auth;
 
-import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
-import com.nabd.hms.auth.dto.BreakGlassResponse;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
 import com.nabd.hms.auth.dto.MfaConfirmResponse;
@@ -124,24 +122,6 @@ public class AuthController {
     public ResponseEntity<Void> unlock(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UnlockRequest req) {
         authService.unlock(jwt, req);
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/break-glass/activate")
-    public TokenPairResponse activateBreakGlass(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody BreakGlassActivateRequest req,
-                                                 HttpServletRequest http) {
-        return authService.activateBreakGlass(jwt, req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
-    }
-
-    @PostMapping("/break-glass/{id}/deactivate")
-    public ResponseEntity<Void> deactivateBreakGlass(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        authService.deactivateBreakGlass(jwt, id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/break-glass/active")
-    @PreAuthorize("hasAuthority('staff:view')")
-    public List<BreakGlassResponse> activeBreakGlass(@AuthenticationPrincipal Jwt jwt) {
-        return authService.listActiveBreakGlass(tenantId(jwt));
     }
 
     private UUID tenantId(Jwt jwt) {
