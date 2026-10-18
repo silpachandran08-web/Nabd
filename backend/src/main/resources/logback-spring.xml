@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+  <conversionRule conversionWord="mask" converterClass="com.nabd.hms.common.PhiMaskingConverter"/>
+
+  <!-- local/test: text lines, message masked; pattern comes from logging.pattern.console -->
+  <springProfile name="!prod">
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder><pattern>${CONSOLE_LOG_PATTERN}</pattern></encoder>
+    </appender>
+  </springProfile>
+
+  <!-- prod: JSON, traceId from MDC requestId, message and stack trace masked -->
+  <springProfile name="prod">
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder class="com.nabd.hms.common.PhiJsonEncoder"/>
+    </appender>
+  </springProfile>
+
+  <root level="INFO"><appender-ref ref="CONSOLE"/></root>
+</configuration>

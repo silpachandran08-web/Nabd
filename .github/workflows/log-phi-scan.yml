@@ -1,0 +1,11 @@
+name: log-phi-scan
+on:
+  pull_request:
+    paths: ['backend/**', 'scripts/log-phi-scan.py', '.semgrep/**']
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/tests/test_log_phi_scan.py
+      - run: python3 scripts/log-phi-scan.py backend/src/main/java

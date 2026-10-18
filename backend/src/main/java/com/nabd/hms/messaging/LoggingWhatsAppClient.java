@@ -13,13 +13,13 @@ class LoggingWhatsAppClient implements WhatsAppClient {
 
     @Override
     public String sendTemplate(String toPhone, String templateName, String language, List<String> bodyParams) {
-        log.info("[MOCK WhatsApp] would send template {} ({}) to {} with {}", templateName, language, toPhone, bodyParams);
+        log.info("[MOCK WhatsApp] would send template {} ({})", templateName, language);  // log-phi-ok: template name is config
         return "mock." + UUID.randomUUID();
     }
 
     @Override
     public String sendOtp(String toPhone, String templateName, String language, String code) {
-        log.info("[MOCK WhatsApp OTP] would send an OTP to {} (the code itself is logged by TemplateWhatsAppOtpSender)", toPhone);
+        log.info("[MOCK WhatsApp OTP] would send an OTP");
         return "mock." + UUID.randomUUID();
     }
 
@@ -27,7 +27,7 @@ class LoggingWhatsAppClient implements WhatsAppClient {
     @Override
     public Submission createTemplate(String metaName, String language, String category, String headerText,
                                      String body, List<String> bodyExamples) {
-        log.info("[MOCK WhatsApp] would submit template {} ({}, {})", metaName, language, category);
+        log.info("[MOCK WhatsApp] would submit template {} ({}, {})", metaName, language, category);  // log-phi-ok: template name is config
         return new Submission("mock." + UUID.randomUUID(), "approved");
     }
 

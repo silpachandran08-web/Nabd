@@ -61,7 +61,7 @@ public class TenantLifecycleService {
         after.put("toStatus", toStatus);
         after.put("reason", reason);
         audit.record(tenantId, changedBy, ipAddress, "platform_tenant.lifecycle_changed", "tenant", tenantId, after);
-        log.info("tenant {} transitioned {} -> {} by operator {} ({})", tenantId, fromStatus, toStatus, changedBy, reason);
+        log.info("tenant {} transitioned {} -> {} by operator {}", tenantId, fromStatus, toStatus, changedBy);
         return getLifecycle(tenantId);
     }
 

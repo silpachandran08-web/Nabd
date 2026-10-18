@@ -66,7 +66,7 @@ public class RoleService {
 
         UUID id = UUID.randomUUID();
         repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
-        log.info("role {} '{}' created by {} (tenant {})", id, req.name(), callerStaffId, tenantId);
+        log.info("role {} created by {} (tenant {})", id, callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 

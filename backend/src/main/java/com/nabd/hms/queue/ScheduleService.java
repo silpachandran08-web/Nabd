@@ -196,7 +196,7 @@ public class ScheduleService {
     public DoctorDelayResponse announceDelay(UUID tenantId, UUID callerStaffId, UUID doctorId, DelayAnnounceRequest req) {
         tenantContext.set(tenantId);
         UUID id = repo.announceDelay(tenantId, doctorId, req.delayMinutes(), req.reason(), callerStaffId);
-        log.info("doctor {} delay announced by {}: {} min ({})", doctorId, callerStaffId, req.delayMinutes(), req.reason());
+        log.info("doctor {} delay announced by {}: {} min", doctorId, callerStaffId, req.delayMinutes());
         return toDelayResponse(repo.findActiveDelay(doctorId).orElseThrow());
     }
 

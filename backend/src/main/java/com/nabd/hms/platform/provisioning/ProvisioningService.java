@@ -118,7 +118,7 @@ public class ProvisioningService {
                 log.info("provisioning job {} completed", jobId);
             }
         } catch (Exception e) {
-            log.warn("provisioning job {} step {} failed", jobId, next.stepName(), e);
+            log.warn("provisioning job {} step {} failed", jobId, next.stepName(), e);  // log-phi-ok: workflow step name
             repo.markStepFailed(next.id(), summarize(e));
             if (e instanceof FatalProvisioningException) {
                 rollback(jobId, job);
