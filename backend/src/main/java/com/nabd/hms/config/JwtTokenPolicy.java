@@ -48,7 +48,7 @@ public final class JwtTokenPolicy {
     }
 
     public static OAuth2TokenValidator<Jwt> validator() {
-        return new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(ISSUER), JwtTokenPolicy::checkAudAndHeader);
+        return new DelegatingOAuth2TokenValidator<>(new org.springframework.security.oauth2.jwt.JwtTimestampValidator(java.time.Duration.ofSeconds(5)), new org.springframework.security.oauth2.jwt.JwtIssuerValidator(ISSUER), JwtTokenPolicy::checkAudAndHeader);
     }
 
     static OAuth2TokenValidatorResult checkAudAndHeader(Jwt jwt) {

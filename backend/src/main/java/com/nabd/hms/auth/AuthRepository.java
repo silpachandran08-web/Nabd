@@ -228,7 +228,7 @@ class AuthRepository {
 
     int countAttemptsFromIpSince(String ip, Instant since) {
         Integer count = jdbc.queryForObject(
-                "SELECT count(*) FROM login_attempts WHERE ip_address = ?::inet AND attempted_at > ?",
+                "SELECT login_attempts_count_from_ip(?::inet, ?)",
                 Integer.class, ip, Timestamp.from(since)
         );
         return count == null ? 0 : count;

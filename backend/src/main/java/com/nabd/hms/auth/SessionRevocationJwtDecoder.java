@@ -38,7 +38,19 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
         if (sid == null) {
             throw new BadJwtException("access token without sid"); // PLT-001: no pass-through for sid-less tokens
         }
-        if (tenantId != null && !livenessChecker.isActive(UUID.fromString(tenantId), UUID.fromString(sid))) {
+        boolean active = true;
+        if (tenantId != null) {
+            try {
+                active = livenessChecker.isActive(UUID.fromString(tenantId), UUID.fromString(sid));
+            } catch (RuntimeException e) {
+                if (com.nabd.hms.common.DbFailureAdvice.classify(e) != null) {
+                    // not an invalid token: SecurityConfig's entry point turns this into 503
+                    throw new BadJwtException("session check unavailable", e); // the resource-server filter rethrows AuthenticationServiceException, so it must be this type
+                }
+                throw e;
+            }
+        }
+        if (!active) {
             throw new BadJwtException("session revoked");
         }
         return jwt;
