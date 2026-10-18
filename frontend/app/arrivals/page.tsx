@@ -11,6 +11,7 @@ import type { IconName } from "../components/ui/Icon";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
+import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 
@@ -147,7 +148,7 @@ function ArrivalsPageInner() {
   // fetches patients it hasn't seen (the N+1 shrinks to the first load).
   const patientCache = useRef(new Map<string, { name: string; mrn: string }>());
   // Only the newest load may write the board: a slower, older poll must never put a stale status back.
-  const loadSeq = useRef(0);
+  const newSignal = useLatestLoad();
   const [sendingIds, setSendingIds] = useState<string[]>([]);
   const [railId, setRailId] = useState<string | null>(null);
   const [railPatient, setRailPatient] = useState<{ state: "loading" | "error" | "ready"; data: PatientDetail | null }>({ state: "loading", data: null });
@@ -244,11 +245,11 @@ function ArrivalsPageInner() {
   );
 
   const load = useCallback(async () => {
-    const seq = ++loadSeq.current;
+    const signal = newSignal();
     setError(null);
     try {
       if (!can("queue:view")) { setForbidden(true); return; } // LIVE-09: no requests that can only 403
-      const [queueRes, staffRes] = await Promise.all([authedFetch("/queue"), authedFetch("/staff/roster")]);
+      const [queueRes, staffRes] = await Promise.all([authedFetch("/queue", { signal }), authedFetch("/staff/roster", { signal })]);
       if (!queueRes) return;
       if (queueRes.status === 403) {
         setForbidden(true);
@@ -259,11 +260,13 @@ function ArrivalsPageInner() {
         return;
       }
       const entries: QueueEntry[] = await queueRes.json();
+      if (signal.aborted) return;
       const staffMap = new Map<string, string>();
       let doctorIds: string[] = [];
       setRosterFailed(!staffRes?.ok);
       if (staffRes?.ok) {
         const roster: StaffOption[] = await staffRes.json();
+        if (signal.aborted) return;
         setStaff(roster.map((s) => ({ id: s.id, name: s.name, departmentName: s.departmentName ?? null })));
         roster.forEach((s) => staffMap.set(s.id, s.name));
         doctorIds = roster.map((s) => s.id);
@@ -271,35 +274,38 @@ function ArrivalsPageInner() {
       const withNames = await Promise.all(entries.map(async (e) => {
         const cached = patientCache.current.get(e.patientId);
         if (cached) return { ...e, patientName: cached.name, patientMrn: cached.mrn };
-        const pRes = can("patients:view") ? await authedFetch(`/patients/${e.patientId}`) : null;
+        const pRes = can("patients:view") ? await authedFetch(`/patients/${e.patientId}`, { signal }) : null;
         const p = pRes?.ok ? await pRes.json() : null;
         if (p?.name) patientCache.current.set(e.patientId, { name: p.name, mrn: p.mrn ?? "" });
         return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "" };
       }));
-      if (seq !== loadSeq.current) return;
+      if (signal.aborted) return;
       setRows(withNames);
 
       // NB-101/NB-100: per-doctor wait estimate and any active delay, for the sidebar.
       const estimateEntries = await Promise.all(doctorIds.map(async (id: string) => {
-        const res = await authedFetch(`/queue/wait-estimate?doctorId=${id}`);
+        const res = await authedFetch(`/queue/wait-estimate?doctorId=${id}`, { signal });
         return [id, res?.ok ? (await res.json()).estimatedMinutes : null] as const;
       }));
+      if (signal.aborted) return;
       setWaitEstimates(Object.fromEntries(estimateEntries.filter(([, v]) => v !== null)));
 
       const delayEntries = await Promise.all(doctorIds.map(async (id: string) => {
-        const res = await authedFetch(`/doctors/${id}/delay`);
+        const res = await authedFetch(`/doctors/${id}/delay`, { signal });
         if (!res?.ok) return [id, null] as const;
         const history: { active: boolean; delayMinutes: number; reason: string | null }[] = await res.json();
         const active = history.find((h) => h.active);
         return [id, active ? { delayMinutes: active.delayMinutes, reason: active.reason } : null] as const;
       }));
+      if (signal.aborted) return;
       setDelays(Object.fromEntries(delayEntries));
     } catch {
+      if (signal.aborted) return;
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, [authedFetch, newSignal]);
 
   useEffect(() => {
     void Promise.resolve().then(load);

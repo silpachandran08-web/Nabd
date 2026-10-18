@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 // Live screens: poll every `ms` while the tab is visible; stop while hidden and reload once when it
-// becomes visible again. shortcut: a request already in flight when the tab hides is not aborted, upgrade with per-load sequence + AbortController (FEF-004 race half).
+// becomes visible again.
 export function usePolling(load: () => unknown, ms: number) {
   useEffect(() => {
     let id: ReturnType<typeof setInterval> | undefined;

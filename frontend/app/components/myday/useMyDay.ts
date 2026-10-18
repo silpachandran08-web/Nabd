@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { can } from "../../lib/permissions";
+import { useLatestLoad } from "../../lib/useLatestLoad";
 import type { PatientDetail, QueueEntry } from "../consult/shared";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -46,7 +47,9 @@ export function useMyDay() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const newSignal = useLatestLoad();
   const load = useCallback(async () => {
+    const signal = newSignal();
     setLoading(true);
     setError(null);
     const token = localStorage.getItem("nabd_access_token");
@@ -57,7 +60,7 @@ export function useMyDay() {
     }
     const get = async (path: string): Promise<Response | null> => {
       try {
-        const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` }, signal });
         if (res.status === 401) {
           localStorage.removeItem("nabd_access_token");
           window.location.replace("/login");
@@ -86,9 +89,11 @@ export function useMyDay() {
         part(`/queue/wait-estimate?doctorId=${selfId}`, (j) => j as WaitEstimate),
         wantDue ? part(`/clinical/conditions/due`, (j) => j as DueCondition[]) : Promise.resolve(null),
       ]);
+      if (signal.aborted) return;
       if (!queueRes) { setError("Couldn't reach the server. Check your connection and try again."); return; }
       if (!queueRes.ok) { setError("Couldn't load today's queue. Try again."); return; }
       const entries: QueueEntry[] = await queueRes.json();
+      if (signal.aborted) return;
 
       // Names/flags: one patient read per distinct patient across the queue and today's appointments.
       // Without patients:view (or on a failed read) the row shows its token instead of a name.
@@ -101,6 +106,7 @@ export function useMyDay() {
           details.set(id, r?.ok ? ((await r.json()) as PatientDetail) : null);
         }));
       }
+      if (signal.aborted) return;
       const patientNames: Record<string, string> = {};
       details.forEach((p, id) => { if (p) patientNames[id] = p.name; });
       setData({
@@ -109,11 +115,12 @@ export function useMyDay() {
         appointments, delay, wait, due, patientNames,
       });
     } catch {
+      if (signal.aborted) return;
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [newSignal]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
   return { data, loading, error, reload: load };
