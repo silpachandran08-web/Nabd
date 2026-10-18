@@ -72,7 +72,7 @@
 
 .clinicRegion {
   color: var(--nb-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .identityWrap {
@@ -122,7 +122,7 @@
 }
 
 .menuHeader {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -187,7 +187,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   flex: none;
 }
@@ -207,7 +207,7 @@
 
 .identityRole {
   color: var(--nb-text-tertiary);
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -253,7 +253,7 @@
   border-radius: 9px;
   background: var(--nb-accent-tint);
   color: var(--nb-accent-500);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 18px;
   text-align: center;
@@ -276,7 +276,7 @@
   .clinicText, .linkLabel, .identityText { display: none; }
   .clinicInfo { padding: var(--nb-space-8); justify-content: center; }
   .link { flex-direction: column; gap: 2px; justify-content: center; width: 76px; min-height: 52px; padding: var(--nb-space-4); position: relative; overflow: visible; text-align: center; }
-  .linkShort { display: block; font-size: 10px; line-height: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .linkShort { display: block; font-size: 12px; line-height: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .badge { position: absolute; top: 2px; inset-inline-end: 4px; margin: 0; }
   .identityFooter { justify-content: center; padding-inline: 0; min-height: 44px; }
 }
@@ -291,11 +291,11 @@
   }
   .bottomLink {
     flex: 1; min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    border: none; background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 10px; font-weight: 500; text-decoration: none; cursor: pointer;
+    border: none; background: transparent; color: var(--nb-text-secondary); font: inherit; font-size: 12px; font-weight: 500; text-decoration: none; cursor: pointer;
   }
   .bottomLinkActive { color: var(--nb-accent-500); }
   .bottomIcon { position: relative; display: inline-flex; }
-  .bottomBadge { position: absolute; top: -4px; inset-inline-start: 12px; min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--nb-accent-500); color: var(--nb-on-accent); font-size: 10px; font-weight: 700; line-height: 16px; text-align: center; }
+  .bottomBadge { position: absolute; top: -4px; inset-inline-start: 12px; min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--nb-accent-500); color: var(--nb-on-accent); font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; }
   .moreWrap { flex: 1; display: flex; position: relative; }
   .moreWrap .bottomLink { width: 100%; }
   .moreMenu { position: absolute; bottom: calc(100% + 8px); inset-inline-end: 8px; width: 240px; z-index: 50; padding: var(--nb-space-8); border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0,0,0,.55); }
@@ -318,14 +318,14 @@
 .clinicSwitch:disabled { cursor: progress; }
 .moreButton { width: 100%; border: none; background: transparent; font: inherit; font-size: 14px; text-align: start; cursor: pointer; }
 .clinicRowText { display: flex; flex-direction: column; min-width: 0; }
-.clinicRowSub { color: var(--nb-text-tertiary); font-size: 11px; font-weight: 400; }
-.clinicRowTag { margin-inline-start: auto; color: var(--nb-text-tertiary); font-size: 11px; font-weight: 500; }
+.clinicRowSub { color: var(--nb-text-tertiary); font-size: 12px; font-weight: 400; }
+.clinicRowTag { margin-inline-start: auto; color: var(--nb-text-tertiary); font-size: 12px; font-weight: 500; }
 .clinicLocked { display: flex; align-items: center; gap: var(--nb-space-8); min-height: 44px; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-tertiary); font-size: 13px; text-decoration: none; }
 .clinicLocked:hover { color: var(--nb-text-secondary); }
 .clinicSwitch:hover { color: var(--nb-text-primary); }
 .planChip { display: flex; flex-direction: column; gap: 2px; margin-top: var(--nb-space-8); padding: var(--nb-space-8) var(--nb-space-12); border-radius: var(--nb-radius-md); border: 1px dashed var(--nb-sync-500); background: var(--nb-sync-tint); text-decoration: none; }
 .planName { color: var(--nb-sync-500); font-size: 12px; font-weight: 600; text-transform: capitalize; }
-.planSub { color: var(--nb-text-secondary); font-size: 11px; text-transform: capitalize; }
+.planSub { color: var(--nb-text-secondary); font-size: 12px; text-transform: capitalize; }
 .menuLink { display: block; padding: var(--nb-space-8) var(--nb-space-4); border-top: 1px solid var(--nb-border-subtle); color: var(--nb-text-primary); font-size: 13px; font-weight: 500; text-decoration: none; }
 .menuLink:hover { background: var(--nb-surface-2); border-radius: var(--nb-radius-md); }
 @media (max-width: 1024px) { .clinicChevron, .planChip { display: none; } }

@@ -110,7 +110,7 @@
   border-radius: 999px;
   background: var(--nb-surface-3);
   color: var(--nb-text-secondary);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -154,7 +154,7 @@
 
 .table th {
   text-align: start;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -280,7 +280,7 @@
 
 /* Doctor queues side panel */
 .sideTitle {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -453,7 +453,8 @@
 
 .formError {
   background: var(--nb-danger-tint);
-  color: var(--nb-danger-500);
+  color: var(--nb-text-primary); /* danger-500 on its own tint is 4.27:1; the red stays on the border */
+  border: 1px solid var(--nb-danger-500);
   border-radius: var(--nb-radius-md);
   padding: var(--nb-space-8) var(--nb-space-12);
   font-size: 13px;
@@ -716,7 +717,7 @@
     display: inline-block;
     min-width: 64px;
     margin-inline-end: var(--nb-space-8);
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--nb-text-tertiary);

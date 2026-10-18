@@ -62,7 +62,7 @@
 
 .kbd {
   flex: none;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--nb-text-tertiary);
   background: var(--nb-surface-2);
