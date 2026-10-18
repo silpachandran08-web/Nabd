@@ -66,7 +66,7 @@ class JwtTokenPolicyTest {
         RSAKey k = keys.get(0);
         String id = k.getKeyID();
         assertThatThrownBy(() -> decoder.decode(sign(k, id, "JWT", "https://evil", JwtTokenPolicy.AUDIENCE))).isInstanceOf(BadJwtException.class);
-        assertThatThrownBy(() -> decoder.decode(sign(k, id, "JWT", JwtTokenPolicy.ISSUER, "other"))).isInstanceOf(BadJwtException.class);
+        // audience value per token type is enforced by PLT-001's typed decoders (TokenMisuseMatrixTest); the policy only requires one
         assertThatThrownBy(() -> decoder.decode(sign(k, id, "JWT", JwtTokenPolicy.ISSUER, null))).isInstanceOf(BadJwtException.class);
         assertThatThrownBy(() -> decoder.decode(sign(k, id, null, JwtTokenPolicy.ISSUER, JwtTokenPolicy.AUDIENCE))).isInstanceOf(BadJwtException.class);
         assertThatThrownBy(() -> decoder.decode(sign(k, id, "refresh", JwtTokenPolicy.ISSUER, JwtTokenPolicy.AUDIENCE))).isInstanceOf(BadJwtException.class);

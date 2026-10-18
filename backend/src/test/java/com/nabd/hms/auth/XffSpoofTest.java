@@ -31,7 +31,7 @@ class XffSpoofTest extends Plt003Support {
 
     @Test
     void spoofedHeaderFromAnUntrustedHopIsIgnoredForRateLimitAndAudit() {
-        SeededStaff s = newStaff("xff@a.com", "+919300000031", false);
+        SeededStaff s = newDoctor("xff@a.com", "+919300000031");
         String token = loginAndGetAccessToken(s);
 
         // login attempt rows (what the per-IP rate limit counts) carry the peer, not 1.2.3.4
@@ -40,8 +40,9 @@ class XffSpoofTest extends Plt003Support {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM login_attempts WHERE host(ip_address) = '1.2.3.4'", Integer.class)).isZero();
 
         // audit_log.ip_address likewise (break-glass activation writes an audit row with the request ip)
-        ResponseEntity<Map> bg = http.exchange(url("/v1/auth/break-glass/activate"), HttpMethod.POST,
-                withXff("1.2.3.4", Map.of("reason", "xff spoof test reason"), token), Map.class);
+        HttpHeaders xff = new HttpHeaders();
+        xff.add("X-Forwarded-For", "1.2.3.4");
+        ResponseEntity<Map> bg = activateBreakGlass(token, "xff spoof test reason", xff);
         assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.OK);
         String auditIp = breakGlassAuditIp(s);
         assertThat(auditIp).isIn("127.0.0.1", "0:0:0:0:0:0:0:1", "::1").isNotEqualTo("1.2.3.4");
@@ -49,7 +50,7 @@ class XffSpoofTest extends Plt003Support {
 
     @Test
     void malformedHeaderNeverCauses500AndStoresTheValidatedPeerIp() {
-        SeededStaff s = newStaff("xff-bad@a.com", "+919300000032", false);
+        SeededStaff s = newDoctor("xff-bad@a.com", "+919300000032");
         String token = loginAndGetAccessToken(s);
 
         for (String junk : new String[]{"not-an-ip", "999.1.1.1", "1.2.3.4, <script>", "'; drop table staff;--"}) {
@@ -57,8 +58,9 @@ class XffSpoofTest extends Plt003Support {
                     withXff(junk, Map.of("tenantSlug", s.slug(), "email", s.email(), "pin", "000000"), null), Map.class);
             assertThat(login.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         }
-        ResponseEntity<Map> bg = http.exchange(url("/v1/auth/break-glass/activate"), HttpMethod.POST,
-                withXff("not-an-ip", Map.of("reason", "malformed xff test"), token), Map.class);
+        HttpHeaders xff = new HttpHeaders();
+        xff.add("X-Forwarded-For", "not-an-ip");
+        ResponseEntity<Map> bg = activateBreakGlass(token, "xff spoof test reason", xff);
         assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.OK);
         String auditIp = breakGlassAuditIp(s);
         assertThat(auditIp).isIn("127.0.0.1", "0:0:0:0:0:0:0:1", "::1");

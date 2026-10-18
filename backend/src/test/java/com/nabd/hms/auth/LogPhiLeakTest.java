@@ -51,7 +51,7 @@ class LogPhiLeakTest extends ApiTestBase {
     @Test
     void otpPinResetAndBreakGlassLogNoSecretsPhoneOrReasonText() {
         SeededTenant tenant = seedTenant();
-        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "leak@a.com", "+919812340077", false);
+        SeededStaff staff = seedStaff(tenant, seedBreakGlassDoctorRole(tenant.id()), "leak@a.com", "+919812340077", false);
         String reason = "Unconscious patient with chest pain in bay four";
 
         assertThat(http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
@@ -60,8 +60,7 @@ class LogPhiLeakTest extends ApiTestBase {
         assertThat(http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+919812340077")), Void.class).getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
-        ResponseEntity<Map> bg = exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
-                authedJsonBody(loginAndGetAccessToken(staff), Map.of("reason", reason)), Map.class);
+        ResponseEntity<Map> bg = activateBreakGlass(loginAndGetAccessToken(staff), reason, null);
         assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         assertThat(SENT_SECRETS).hasSize(2); // the OTP and the reset token really went through the real sender

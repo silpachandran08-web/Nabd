@@ -297,6 +297,40 @@ public abstract class ApiTestBase {
                 fullGrant("departments"));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.security.oauth2.jwt.JwtEncoder bgStepUpEncoder;
+
+    /** A doctor-like role that may use break-glass (PLT-012 gate: clinical break-glass grant, not a built-in owner). */
+    protected UUID seedBreakGlassDoctorRole(UUID tenantId) {
+        return seedRole(tenantId, "Doctor", false, new ModuleGrant("queue", true, true, false, false, false, false, false),
+                new ModuleGrant("clinical", false, false, false, false, false, false, false, true));
+    }
+
+    /** POST /auth/break-glass/activate with a freshly minted break_glass step-up token; extra headers (e.g. X-Forwarded-For) optional. */
+    @SuppressWarnings("unchecked")
+    protected ResponseEntity<Map> activateBreakGlass(String accessToken, String reasonText, HttpHeaders extra) {
+        try {
+            Map<String, Object> c = objectMapper.readValue(java.util.Base64.getUrlDecoder().decode(accessToken.split("\\.")[1]), Map.class);
+            java.time.Instant now = java.time.Instant.now();
+            org.springframework.security.oauth2.jwt.JwtClaimsSet.Builder b = org.springframework.security.oauth2.jwt.JwtClaimsSet.builder()
+                    .issuer("https://api.nabd.health").issuedAt(now).expiresAt(now.plusSeconds(300))
+                    .subject((String) c.get("sub")).claim("purpose", "break_glass").claim("sid", c.get("sid"));
+            com.nabd.hms.shared.security.TokenType.STEP_UP.stamp(b, com.nabd.hms.shared.security.Audience.STEP_UP);
+            String stepUp = bgStepUpEncoder.encode(org.springframework.security.oauth2.jwt.JwtEncoderParameters.from(b.build())).getTokenValue();
+            HttpEntity<String> req = authedJsonBodyWithHeader(accessToken, "X-Step-Up-Token", stepUp,
+                    Map.of("reasonCode", "unconscious_patient", "reasonText", reasonText));
+            if (extra != null) {
+                HttpHeaders h = new HttpHeaders();
+                h.putAll(req.getHeaders());
+                h.putAll(extra);
+                req = new HttpEntity<>(req.getBody(), h);
+            }
+            return exchange("/v1/auth/break-glass/activate", HttpMethod.POST, req, Map.class);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     protected UUID seedRole(UUID tenantId, String name, boolean builtIn, ModuleGrant... grants) {
         UUID id = UUID.randomUUID();
         String json = writeJson(List.of(grants));

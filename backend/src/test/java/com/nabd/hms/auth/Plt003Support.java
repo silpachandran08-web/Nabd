@@ -20,6 +20,11 @@ abstract class Plt003Support extends ApiTestBase {
         return seedStaff(tenant, roleId, email, mobile, mfa);
     }
 
+    protected SeededStaff newDoctor(String email, String mobile) {
+        SeededTenant t = seedTenant();
+        return seedStaff(t, seedBreakGlassDoctorRole(t.id()), email, mobile, false);
+    }
+
     protected ResponseEntity<Map> login(SeededStaff s, String pin) {
         return http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
                 "tenantSlug", s.slug(), "email", s.email(), "pin", pin)), Map.class);
@@ -35,7 +40,9 @@ abstract class Plt003Support extends ApiTestBase {
     }
 
     protected int failedAttempts(UUID staffId, String factor) {
-        return jdbc.queryForObject("SELECT count(*) FROM login_attempts WHERE staff_id = ? AND factor = ? AND succeeded = false",
+        // superuser: login_attempts is RLS-forced (OPS-003), the app role sees no rows outside a tenant transaction
+        return new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).queryForObject(
+                "SELECT count(*) FROM login_attempts WHERE staff_id = ? AND factor = ? AND succeeded = false",
                 Integer.class, staffId, factor);
     }
 }
