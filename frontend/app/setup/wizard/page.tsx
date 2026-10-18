@@ -8,6 +8,7 @@ import AccessGate from "../../components/ui/AccessGate";
 import { can } from "../../lib/permissions";
 import { MODE_DESC, ModeChangeDialog, type PharmacyMode } from "../../components/setup/PharmacyPanel";
 import pharmacyStyles from "../../components/setup/pharmacy.module.css";
+import { apiFetch, goLogin } from "../../lib/apiClient";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -59,16 +60,16 @@ function SetupWizard() {
   const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
     const token = localStorage.getItem("nabd_access_token");
     if (!token) {
-      router.replace("/login");
+      goLogin();
       return null;
     }
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await apiFetch(path, {
       ...init,
       headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     });
     if (res.status === 401) {
       localStorage.removeItem("nabd_access_token");
-      router.replace("/login");
+      goLogin();
       return null;
     }
     return res;

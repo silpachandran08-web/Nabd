@@ -39,6 +39,7 @@ import {
 } from "../components/consult/shared";
 import p from "../components/consult/consultParts.module.css";
 import styles from "./consult.module.css";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
@@ -204,16 +205,16 @@ export default function ConsultPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;
@@ -229,7 +230,7 @@ export default function ConsultPage() {
     setForbidden(false);
     const token = localStorage.getItem("nabd_access_token");
     if (!token) {
-      router.replace("/login");
+      goLogin();
       return;
     }
     const self = String(decodeJwt(token).sub ?? "");

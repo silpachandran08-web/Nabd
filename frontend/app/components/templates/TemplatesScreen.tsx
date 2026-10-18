@@ -11,6 +11,7 @@ import { RxSetCard, RxSetDeleteDialog, RxSetEditDialog } from "../consult/RxSetP
 import { useRxSets, type RxSet, type RxSetScope } from "../consult/rxSets";
 import type { AuthedFetch } from "../consult/shared";
 import styles from "./templates.module.css";
+import { apiFetch, goLogin } from "../../lib/apiClient";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 type Tab = "sets" | "formularies" | "documents";
@@ -28,9 +29,9 @@ export default function TemplatesScreen() {
   const router = useRouter();
   const authedFetch = useCallback<AuthedFetch>(async (path, init) => {
     const token = localStorage.getItem("nabd_access_token");
-    if (!token) { router.replace("/login"); return null; }
-    const res = await fetch(`${API_BASE}${path}`, { ...init, headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" } });
-    if (res.status === 401) { localStorage.removeItem("nabd_access_token"); router.replace("/login"); return null; }
+    if (!token) { goLogin(); return null; }
+    const res = await apiFetch(path, { ...init, headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" } });
+    if (res.status === 401) { localStorage.removeItem("nabd_access_token"); goLogin(); return null; }
     return res;
   }, [router]);
 

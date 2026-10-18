@@ -9,6 +9,7 @@ import { ErrorState, Skeleton } from "../components/ui/StateViews";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { formatMoney } from "../lib/money";
 import { getIdentity } from "../lib/session";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // Matches GET/POST/PATCH /v1/packages/** (PackageController) — E14 Treatment Packages.
 type PackageItem = { id: string; itemType: string; name: string; quantity: number; unitListPrice: number; taxRatePercent: number; listValue: number };
@@ -107,16 +108,16 @@ export default function PackagesPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;

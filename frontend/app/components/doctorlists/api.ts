@@ -1,3 +1,4 @@
+import { apiFetch, goLogin } from "../../lib/apiClient";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export type PageMeta = { nextCursor: string | null; limit: number };
@@ -5,9 +6,9 @@ export type PageMeta = { nextCursor: string | null; limit: number };
 /** GET with the session token. Throws "auth" after redirecting on 401, "http" on any other failure. */
 export async function getJson<T>(path: string): Promise<T> {
   const token = localStorage.getItem("nabd_access_token");
-  if (!token) { window.location.replace("/login"); throw new Error("auth"); }
-  const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
-  if (res.status === 401) { localStorage.removeItem("nabd_access_token"); window.location.replace("/login"); throw new Error("auth"); }
+  if (!token) { goLogin(); throw new Error("auth"); }
+  const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status === 401) { localStorage.removeItem("nabd_access_token"); goLogin(); throw new Error("auth"); }
   if (!res.ok) throw new Error("http");
   return (await res.json()) as T;
 }

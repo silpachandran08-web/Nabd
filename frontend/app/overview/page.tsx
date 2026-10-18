@@ -8,6 +8,7 @@ import { getIdentity, getPermissions, isOwner } from "../lib/session";
 import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -93,13 +94,13 @@ export default function OverviewPage() {
     async (path: string) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;

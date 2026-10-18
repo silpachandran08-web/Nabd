@@ -11,6 +11,7 @@ import { can } from "../../lib/permissions";
 import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
+import { apiFetch, goLogin } from "../../lib/apiClient";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
@@ -93,16 +94,16 @@ export default function CheckoutPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;

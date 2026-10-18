@@ -18,6 +18,7 @@ import VitalsCard from "../components/consult/VitalsCard";
 import type { Part } from "../components/consult/clinical";
 import type { Vitals } from "../components/consult/shared";
 import { DEFAULT_START_STATUS, statusBeforeConsult, statusSequence } from "../components/consult/consultFlow";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
@@ -208,16 +209,16 @@ function PatientsList() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;

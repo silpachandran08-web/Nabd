@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./login.module.css";
 import { decodeAccessToken, landingPathFor } from "../lib/session";
+import { useHasMounted } from "../lib/useHasMounted";
+import { safeReturnTo, storeTokens, takeReturnTo } from "../lib/apiClient";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../lib/loginFetch";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
@@ -43,12 +45,14 @@ export default function LoginPage() {
   const [mobilePhone, setMobilePhone] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPin, setNewPin] = useState("");
+  const mounted = useHasMounted();
+  const signedOut = mounted && !!safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
 
   function handleTokens(pair: TokenPair) {
-    localStorage.setItem("nabd_access_token", pair.accessToken);
-    localStorage.setItem("nabd_refresh_token", pair.refreshToken);
+    storeTokens(pair);
     const claims = decodeAccessToken(pair.accessToken);
-    router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
+    // FEF-002: back to the page the session ended on (validated same-origin path), else the role landing page.
+    router.replace(takeReturnTo() ?? landingPathFor(claims?.permissions ?? [], claims?.owner === true));
   }
 
   async function submitLogin(e?: FormEvent) {
@@ -292,6 +296,7 @@ export default function LoginPage() {
         <div className={styles.card}>
           <h1 className={styles.title}>Set up two-factor authentication</h1>
           <p className={styles.subtitle}>Your role requires this before you can sign in.</p>
+          {signedOut && !formError && <div className={styles.formError} role="status">Signed out. Your draft is saved. Sign in to continue.</div>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {view === "mfaSetup" && (
             <form onSubmit={submitMfaSetupConfirm} noValidate>
