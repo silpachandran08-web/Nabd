@@ -1,0 +1,7 @@
+# OPS-003: tables with a tenant_id column that are deliberately NOT under forced tenant RLS. One <schema>.<table> per
+# line, then "# reason". Every entry needs review by Platform & Trust. RlsSelfCheck and RlsSchemaInvariantTest read this.
+public.tenant_lifecycle_events  # operator-plane audit of tenant status changes; written/read only by platform-console endpoints, no clinic session reaches it
+master.support_tickets          # operator plane (master schema): platform-console endpoints only, no tenant context
+master.support_access_grants    # operator plane: grants clinics give to support, managed by operators
+master.subscriptions            # operator plane: billing
+master.discount_requests        # operator plane: commercial approvals

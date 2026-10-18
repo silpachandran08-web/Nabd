@@ -39,13 +39,13 @@ class OwnerRepository {
      * empirically (a mixed-case seeded email failed to match its own lowercased lookup without this).
      */
     Optional<Owner> findByEmail(String email) {
-        return jdbc.query("SELECT id, name, email, pin_hash, status FROM owners WHERE email = ?::citext",
+        return jdbc.query("SELECT * FROM owner_auth_lookup(p_email => ?::citext)",
                 ownerMapper(), email
         ).stream().findFirst();
     }
 
     Optional<Owner> findById(UUID id) {
-        return jdbc.query("SELECT id, name, email, pin_hash, status FROM owners WHERE id = ?",
+        return jdbc.query("SELECT * FROM owner_auth_lookup(p_id => ?)",
                 ownerMapper(), id
         ).stream().findFirst();
     }
@@ -62,8 +62,7 @@ class OwnerRepository {
     }
 
     Optional<Owner> findByInviteTokenHash(String tokenHash) {
-        return jdbc.query("SELECT id, name, email, pin_hash, status FROM owners " +
-                        "WHERE invite_token_hash = ? AND invite_expires_at > now()",
+        return jdbc.query("SELECT * FROM owner_auth_lookup(p_invite_token_hash => ?)",
                 ownerMapper(), tokenHash
         ).stream().findFirst();
     }

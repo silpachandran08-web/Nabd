@@ -1,0 +1,33 @@
+# OPS-003: "prod-config" job. Boots the database exactly like production: split roles from infra/db/bootstrap-roles.sql,
+# Flyway as nabd_migrator (MigrateMain, the same entry point as the migrate job), then the whole API suite as the
+# DML-only nabd_app. The Testcontainers base class (ApiTestBase) does the same three steps against a throwaway Postgres 16.
+# Make "prod-config" a required status check on main (branch protection setting, not expressible in this repo).
+name: prod-config
+on:
+  pull_request:
+  push:
+    branches: [main, develop-initial]
+jobs:
+  prod-config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Role bootstrap and migrations apply on an empty Postgres 16 (migrator, not superuser)
+        run: |
+          docker run -d --name pg -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=nabd -p 5433:5432 postgres:16-alpine
+          for i in $(seq 30); do docker exec pg pg_isready -U postgres -d nabd && break; sleep 1; done
+          docker exec -i pg psql -v ON_ERROR_STOP=1 -U postgres -d nabd -v migrator_pw=ci_m -v app_pw=ci_a -v reports_pw=ci_r < infra/db/bootstrap-roles.sql
+          cd backend && mvn -B -q -DskipTests package
+          MIGRATE_DB_URL=jdbc:postgresql://localhost:5433/nabd MIGRATE_DB_USER=nabd_migrator MIGRATE_DB_PASSWORD=ci_m \
+            MIGRATE_LOCATIONS=filesystem:../db/migrations \
+            java -cp target/hms-backend-0.1.0.jar -Dloader.main=com.nabd.hms.common.MigrateMain \
+            org.springframework.boot.loader.launch.PropertiesLauncher
+      - name: API suite as nabd_app (RlsSelfCheck runs at every context boot)
+        working-directory: backend
+        run: mvn -B test

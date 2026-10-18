@@ -5,7 +5,16 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/nabd}
     username: ${DB_USER:nabd_app}
     password: ${DB_PASSWORD:nabd_app}
+    hikari:
+      # OPS-003: fixed pool, fail fast. A request that cannot get a connection in 3 s is a 503 (DbFailureAdvice), not a 30 s queue.
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_POOL_SIZE:20}
+      connection-timeout: 3000
+      max-lifetime: 1800000
+      leak-detection-threshold: 10000
   flyway:
+    # OPS-003: the API runs as nabd_app (DML only) and never migrates; the separate migrate job runs MigrateMain as nabd_migrator.
+    enabled: false
     # migrations live at repo root (db/migrations), shared with any future
     # non-Java tooling — not duplicated into src/main/resources
     locations: filesystem:../db/migrations
