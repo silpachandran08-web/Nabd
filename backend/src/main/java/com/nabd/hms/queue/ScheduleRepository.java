@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -201,11 +202,21 @@ class ScheduleRepository {
     /** "Writing the delay then closing and appending to history" — a fresh announcement always
      * closes out any still-active one first, so the unique active-per-doctor index never fires. */
     UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, UUID announcedBy, java.time.LocalDate clinicDate) {
+        // A concurrent announcement for the same doctor loses (409); sequential ones still supersede.
+        // Also lost if another announcement was inserted after this transaction began (shortcut: requests staggered beyond a txn are indistinguishable from fast sequential supersedes, which must stay 201).
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(hashtext(?))", Boolean.class, "doctor-delay:" + doctorId))
+                || Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM doctor_delays WHERE doctor_id = ? AND cleared_at IS NULL AND announced_at >= transaction_timestamp())", Boolean.class, doctorId))) {
+            throw new DuplicateKeyException("delay announcement in flight");
+        }
         clearActiveDelay(tenantId, doctorId, announcedBy);
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by, clinic_date) VALUES (?,?,?,?,?,?,?)",
+        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by, clinic_date, announced_at) VALUES (?,?,?,?,?,?,?, clock_timestamp())",
                 id, tenantId, doctorId, delayMinutes, reason, announcedBy, clinicDate);
         return id;
+    }
+
+    boolean doctorInTenant(UUID tenantId, UUID doctorId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM staff WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, doctorId));
     }
 
     void clearActiveDelay(UUID tenantId, UUID doctorId, UUID clearedBy) {

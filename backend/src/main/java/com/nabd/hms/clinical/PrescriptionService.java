@@ -96,6 +96,10 @@ public class PrescriptionService {
     @Transactional
     public DoseCalculationResponse calculateDose(UUID tenantId, UUID patientId, BigDecimal mgPerKg) {
         tenantContext.set(tenantId);
+        if (mgPerKg == null || mgPerKg.signum() <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Invalid dose rate",
+                    "mgPerKg must be a positive number.");
+        }
         LocalDate dob = vitalsRepo.findPatientDob(tenantId, patientId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Patient not found", "No such patient."));
         java.time.ZoneId zone = clock.zone(tenantId);
