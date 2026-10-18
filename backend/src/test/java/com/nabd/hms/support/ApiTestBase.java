@@ -102,6 +102,7 @@ public abstract class ApiTestBase {
             st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,bigint,int) TO " + APP_ROLE);
             // V85 (PLT-028): actor-filter overload, the one AuditSearchRepository calls now
             st.execute("GRANT EXECUTE ON FUNCTION search_audit_log(uuid,text,text,timestamptz,timestamptz,uuid,text,text,text,bigint,int) TO " + APP_ROLE);
+            st.execute("GRANT EXECUTE ON FUNCTION record_platform_audit(text,uuid,text,text,inet,text,text,uuid,jsonb,jsonb) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION claim_outbox_events(int,int) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION apply_whatsapp_status(text,text,text) TO " + APP_ROLE);
             st.execute("GRANT EXECUTE ON FUNCTION apply_whatsapp_template_update(text,text,text,text) TO " + APP_ROLE);

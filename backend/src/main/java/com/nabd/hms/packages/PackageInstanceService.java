@@ -262,7 +262,8 @@ public class PackageInstanceService {
         if (row.validityEnd() == null) {
             return 0;
         }
-        int daysLeft = (int) today.until(row.validityEnd()).getDays();
+        // Whole days, not Period.getDays() (only the day-of-month part: 2 months 3 days -> 3).
+        long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(today, row.validityEnd());
         return ALERT_TIERS.stream().filter(t -> daysLeft <= t).findFirst().orElse(0);
     }
 

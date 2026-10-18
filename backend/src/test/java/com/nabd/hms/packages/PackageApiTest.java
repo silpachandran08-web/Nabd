@@ -311,6 +311,29 @@ class PackageApiTest extends ApiTestBase {
     }
 
     @Test
+    void sendReminderUsesWholeDaysToExpiry() {
+        SeededTenant tenant = seedTenant();
+        SeededStaff staff = seedStaff(tenant, seedFullAccessRole(tenant.id()), "pkg-remind@a.com", "+919500000099", false);
+        String token = loginAndGetAccessToken(staff);
+        String patientId = registerPatient(token, "Reminder Test Patient");
+        String packageId = createPackage(token, 2400.00, 30, "purchase_date");
+        activate(token, packageId);
+        String instanceId = (String) sell(token, patientId, packageId).get("id");
+        String base = "/v1/packages/instances/" + instanceId;
+
+        // ~2 months out: Period.getDays() would read only the day part (a few days) and wrongly allow it.
+        exchange(base + "/extend", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "newValidityEnd", LocalDate.now(ZoneOffset.UTC).plusDays(65).toString(), "reason", "Test far expiry")), Map.class);
+        ResponseEntity<Map> far = exchange(base + "/send-reminder", HttpMethod.POST, authed(token), Map.class);
+        assertThat(far.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(far.getBody().get("type")).asString().contains("not-expiring-soon");
+
+        exchange(base + "/extend", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "newValidityEnd", LocalDate.now(ZoneOffset.UTC).plusDays(10).toString(), "reason", "Test near expiry")), Map.class);
+        assertThat(exchange(base + "/send-reminder", HttpMethod.POST, authed(token), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
     void expiringSoonAndLiabilityReflectActiveInstances() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());

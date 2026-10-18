@@ -74,51 +74,50 @@ export function getIdentity(): Identity | null {
   };
 }
 
-// First matching permission wins — each role's actual home worklist (DESIGN.md's per-role
-// "Today" screen), so login lands staff where their role works instead of everyone hitting
-// the owner-facing Setup screen (NB-060-070's bug: handleTokens always did router.replace("/setup")).
+// clinical:edit, not clinical:view, marks a doctor: every real write in the consult workspace (notes,
+// prescriptions, allergies, vitals corrections) is gated on clinical:edit on the backend — clinical:view
+// is just read access to clinical history, which reception can reasonably be granted too (e.g. for
+// billing lookups) without being a clinician.
 //
-// Ordered most-exclusive-permission-first, not by role "importance": queue:view is the one
-// nearly every clinic-facing role needs just to see the day's arrivals (reception, nurses,
-// often doctors too), so it has to be checked last among these or it silently wins over a much
-// more specific signal — a Nurse role with both queue:view and nursing:view was landing on
-// /arrivals instead of /nursing for exactly this reason.
-//
-// clinical:edit, not clinical:view: every real write in the consult workspace (notes,
-// prescriptions, allergies, vitals) is gated on clinical:edit on the backend — clinical:view is
-// just read access to clinical history, which reception can reasonably be granted too (e.g. for
-// billing lookups) without being a clinician. Landing a receptionist with that grant on /consult
-// instead of /arrivals was exactly this mistake.
-const LANDING_RULES: [permission: string, path: string][] = [
-  ["clinical:edit", "/consult"],
-  ["queue:view", "/arrivals"],
-  ["pharmacy:view", "/pharmacy"],
-  ["reports:view", "/reports"],
-  ["setup:view", "/setup"],
+// LIVE-04: login lands on the first sidebar destination the role can actually open, so it never lands
+// on a page the nav hides or that answers "no access". Each list mirrors ClinicNav's OWNER_ITEMS /
+// DOCTOR_ITEMS / NAV_ITEMS (same order, same grants, plus each page's own gate); keep them in step.
+type Destination = [href: string, ...permissions: string[]];
+const OWNER_LANDING: Destination[] = [
+  ["/overview", "reports:view"], ["/schedule", "queue:view"], ["/billing", "billing:view"], ["/packages", "packages:view"],
+  ["/reports", "reports:view"], ["/staff", "staff:view"], ["/setup", "setup:view"],
+];
+// /my-day and /consult both read the queue (AccessGate / forbidden state without queue:view).
+const DOCTOR_LANDING: Destination[] = [
+  ["/my-day", "clinical:edit", "queue:view"], ["/patients", "patients:view"], ["/consult", "clinical:edit", "queue:view"],
+  ["/prescriptions", "clinical:view", "clinical:edit"], ["/packages", "packages:view"], ["/schedule", "queue:view"],
+  ["/my-schedule", "clinical:edit", "queue:view"], ["/encounters", "clinical:view"], ["/follow-ups", "queue:view"],
+];
+// NAV_ITEMS without /consult: a clinical:edit role gets the doctor list instead.
+const STAFF_LANDING: Destination[] = [
+  ["/arrivals", "queue:view"], ["/schedule", "queue:view"], ["/patients", "patients:view"], ["/pharmacy", "pharmacy:view"],
+  ["/billing", "billing:view"], ["/packages", "packages:view"], ["/staff", "staff:view"], ["/reports", "reports:view"],
+  ["/setup", "setup:view"],
 ];
 
 /** A nursing role: one that can open the nursing worklist. /nursing is gated on nursing:view (AccessGate,
  * and every GET under /v1/nursing), so nursing:create/edit alone cannot use it: landing or navigating
- * such a role there is a "no access" dead end. Checked before LANDING_RULES because clinical:edit and
+ * such a role there is a "no access" dead end. Checked before the doctor list because clinical:edit and
  * queue:view are held by nurses and doctors alike; nursing:view is the signal only nursing roles carry. */
 export function hasNursingGrant(permissions: string[]): boolean {
   return permissions.includes("nursing:view");
 }
 
-// The clinic owner holds every grant, so the rules below would land them on /nursing. Their home
-// is the Overview ("Today at a glance", DESIGN.md's owner home) — the same page the owner portal
-// (owner/workspaces) opens after picking a clinic. "owner" comes from the staff member's own built-in role (AuthService.mintTokenPair);
-// tokens minted before that claim existed simply fall through to the rules.
+// The clinic owner holds every grant; their sidebar (and home) is the Owner list, led by the Overview.
+// "owner" comes from the staff member's own built-in role (AuthService.mintTokenPair); tokens minted
+// before that claim existed simply fall through. Same role selection as ClinicNav's render.
 export function landingPathFor(permissions: string[], owner = false): string {
-  if (owner && permissions.includes("reports:view")) return "/overview";
-  if (!owner && hasNursingGrant(permissions)) return "/nursing";
-  // DOC-002: a doctor (clinical:edit) lands on My Day, whose reads all demand queue:view; a
-  // clinical:edit role without queue:view keeps the /consult fallback below.
-  if (permissions.includes("clinical:edit") && permissions.includes("queue:view")) return "/my-day";
-  for (const [permission, path] of LANDING_RULES) {
-    if (permissions.includes(permission)) return path;
-  }
-  return "/account";
+  const first = (list: Destination[]) => list.find(([, ...need]) => need.every((p) => permissions.includes(p)))?.[0];
+  const ownerHome = owner ? first(OWNER_LANDING) : undefined;
+  if (ownerHome) return ownerHome;
+  if (hasNursingGrant(permissions)) return "/nursing";
+  if (!owner && permissions.includes("clinical:edit")) return first(DOCTOR_LANDING) ?? "/account";
+  return first(STAFF_LANDING) ?? "/account";
 }
 
 // Routes with their own identity/nav (platform console, owner's cross-clinic login) or no

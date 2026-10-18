@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../../login/login.module.css";
 import { API_BASE } from "../surfaces";
-import { storePlatformSession } from "../platformApi";
+import { SESSION_EXPIRED_MESSAGE, storePlatformSession } from "../platformApi";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
 
 // Matches POST /v1/platform/auth/login's oneOf response and RFC 7807 Problem errors.
@@ -27,6 +27,13 @@ export default function PlatformLoginPage() {
   const [loading, setLoading] = useState(false);
   const [slow, setSlow] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+
+  // PLT-008: platformFetch sends a 401'd operator here with ?expired=1. Read after mount (no
+  // useSearchParams, which would need a Suspense boundary). This page never calls the authed fetch, so no loop.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (new URLSearchParams(window.location.search).get("expired") === "1") setFormError(SESSION_EXPIRED_MESSAGE);
+  }, []);
 
   function handleTokens(pair: TokenPair) {
     storePlatformSession(pair);

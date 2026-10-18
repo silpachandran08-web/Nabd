@@ -267,7 +267,7 @@
   align-items: flex-end;
   justify-content: space-around;
   gap: var(--nb-space-16);
-  height: 150px;
+  height: 180px; /* tallest bar + its labels must fit */
   overflow-x: auto;
   padding-top: var(--nb-space-12);
 }
@@ -339,6 +339,26 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* OWN-026: redemption meter and 44px Remind target */
+.meter {
+  height: 14px;
+  border-radius: 3px;
+  background: var(--nb-surface-3);
+  overflow: hidden;
+  margin-block: var(--nb-space-8);
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  background: var(--rp-series-1);
+}
+
+.remindBtn {
+  composes: exportBtn;
+  min-height: 44px;
 }
 
 @media (max-width: 900px) {

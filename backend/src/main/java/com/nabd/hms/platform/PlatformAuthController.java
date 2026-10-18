@@ -56,8 +56,8 @@ public class PlatformAuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt) {
-        service.logout(sessionId(jwt));
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        service.logout(operatorId(jwt), sessionId(jwt), RequestMeta.clientIp(http));
         return ResponseEntity.noContent().build();
     }
 
@@ -67,8 +67,9 @@ public class PlatformAuthController {
     }
 
     @DeleteMapping("/sessions/{id}")
-    public ResponseEntity<Void> revokeSession(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        service.revokeSession(operatorId(jwt), id);
+    public ResponseEntity<Void> revokeSession(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                                              HttpServletRequest http) {
+        service.revokeSession(operatorId(jwt), id, RequestMeta.clientIp(http));
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 

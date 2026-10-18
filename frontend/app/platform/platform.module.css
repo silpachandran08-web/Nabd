@@ -27,25 +27,6 @@
   margin: 0;
 }
 
-.logout {
-  height: 36px;
-  padding: 0 var(--nb-space-16);
-  border: 1px solid var(--nb-border-default);
-  border-radius: var(--nb-radius-md);
-  background: var(--nb-surface-2);
-  color: var(--nb-text-primary);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color var(--nb-dur-base) var(--nb-ease-standard);
-}
-
-.logout:hover {
-  border-color: var(--nb-border-strong);
-}
-
 .card {
   background: var(--nb-surface-1);
   border: 1px solid var(--nb-border-subtle);

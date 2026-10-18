@@ -8,6 +8,7 @@ import com.nabd.hms.auth.dto.SessionResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.common.AesGcmCipher;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.config.AuthProperties;
 import com.nabd.hms.platform.dto.OperatorLoginRequest;
@@ -29,6 +30,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.PlatformAuthModels.Operator;
@@ -54,9 +56,14 @@ public class PlatformAuthService {
     private final JwtEncoder jwtEncoder;
     private final JwtDecoder jwtDecoder;
     private final AuthProperties props;
+    private final PlatformAudit audit;
+    private final AuditService auditService;
 
     PlatformAuthService(PlatformAuthRepository repo, PasswordEncoder pinEncoder, TotpService totpService,
-                         AesGcmCipher cipher, JwtEncoder jwtEncoder, JwtDecoder jwtDecoder, AuthProperties props) {
+                         AesGcmCipher cipher, JwtEncoder jwtEncoder, JwtDecoder jwtDecoder, AuthProperties props,
+                         PlatformAudit audit, AuditService auditService) {
+        this.audit = audit;
+        this.auditService = auditService;
         this.repo = repo;
         this.pinEncoder = pinEncoder;
         this.totpService = totpService;
@@ -76,6 +83,13 @@ public class PlatformAuthService {
         Operator operator = repo.findByEmail(email).orElse(null);
         if (operator == null || !"active".equals(operator.status())) {
             repo.recordLoginAttempt(operator == null ? null : operator.id(), email, ip, false);
+            if (operator == null) {
+                // No email in the row: the typed value may be anything; master.login_attempts keeps it for forensics.
+                auditService.recordPlatform("operator", null, "unknown operator", "unknown", ip,
+                        "platform_auth.sign_in_failed", "operator", null, null, Map.of("reason", "unknown_account"));
+            } else {
+                signInFailed(operator, ip, "inactive_account");
+            }
             throw invalidCredentials();
         }
 
@@ -83,18 +97,27 @@ public class PlatformAuthService {
 
         if (operator.pinHash() == null || !pinEncoder.matches(req.pin(), operator.pinHash())) {
             repo.recordLoginAttempt(operator.id(), email, ip, false);
+            signInFailed(operator, ip, "invalid_credentials");
             throw invalidCredentials();
         }
         repo.recordLoginAttempt(operator.id(), email, ip, true);
         log.info("operator {} authenticated via PIN (role {})", operator.id(), operator.role());
 
         if (operator.mfaEnabled()) {
+            audit.record(null, operator.id(), ip, "platform_auth.mfa_challenged", "operator", operator.id(), null);
             return issueMfaChallenge(operator);
         }
+        audit.record(null, operator.id(), ip, "platform_auth.signed_in", "operator", operator.id(), Map.of("mfa", false));
         return mintTokenPair(operator, UUID.randomUUID(), ip, device, userAgent);
     }
 
-    @Transactional
+    private void signInFailed(Operator operator, String ip, String reason) {
+        audit.record(null, operator.id(), ip, "platform_auth.sign_in_failed", "operator", operator.id(),
+                Map.of("reason", reason));
+    }
+
+    // noRollbackFor: the mfa_failed audit row must survive the ApiException thrown right after it.
+    @Transactional(noRollbackFor = ApiException.class)
     public TokenPairResponse verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
         Jwt challenge;
         try {
@@ -113,9 +136,11 @@ public class PlatformAuthService {
         byte[] secret = cipher.decrypt(operator.mfaSecretEnc());
         if (!totpService.verify(secret, req.code(), Instant.now())) {
             log.warn("MFA verification failed for operator {}", operator.id());
+            audit.record(null, operator.id(), ip, "platform_auth.mfa_failed", "operator", operator.id(), null);
             throw mfaFailed();
         }
         log.info("operator {} completed MFA", operator.id());
+        audit.record(null, operator.id(), ip, "platform_auth.signed_in", "operator", operator.id(), Map.of("mfa", true));
         return mintTokenPair(operator, UUID.randomUUID(), ip, device, userAgent);
     }
 
@@ -130,6 +155,8 @@ public class PlatformAuthService {
             log.warn("refresh-token reuse detected — revoking session family {} (operator {})",
                     session.familyId(), session.operatorId());
             repo.revokeFamily(session.familyId(), "reuse_detected");
+            audit.record(null, session.operatorId(), ip, "platform_auth.refresh_reuse_detected", "operator_session",
+                    session.familyId(), null);
             throw invalidRefresh();
         }
         if (session.expiresAt().isBefore(Instant.now())) {
@@ -147,8 +174,9 @@ public class PlatformAuthService {
     }
 
     @Transactional
-    public void logout(UUID sessionId) {
+    public void logout(UUID operatorId, UUID sessionId, String ip) {
         repo.revokeSession(sessionId, "logout");
+        audit.record(null, operatorId, ip, "platform_auth.signed_out", "operator_session", sessionId, null);
         log.info("operator logged out, session {}", sessionId);
     }
 
@@ -167,10 +195,11 @@ public class PlatformAuthService {
 
     /** staffId-equivalent ownership check applies here too — DELETE only ever revokes the caller's own session. */
     @Transactional
-    public void revokeSession(UUID operatorId, UUID sessionId) {
+    public void revokeSession(UUID operatorId, UUID sessionId, String ip) {
         if (!repo.revokeSessionOwnedBy(operatorId, sessionId, "admin_revoke")) {
             throw notFound();
         }
+        audit.record(null, operatorId, ip, "platform_auth.session_revoked", "operator_session", sessionId, null);
         log.info("operator {} revoked their own session {}", operatorId, sessionId);
     }
 

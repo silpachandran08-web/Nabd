@@ -2,6 +2,7 @@ package com.nabd.hms.platform.ticket;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.platform.PlatformAudit;
 import com.nabd.hms.platform.ticket.dto.RaiseTicketRequest;
 import com.nabd.hms.platform.ticket.dto.TicketResponse;
 import org.slf4j.Logger;
@@ -48,10 +49,12 @@ public class TicketService {
 
     private final TicketRepository repo;
     private final TenantContext tenantContext;
+    private final PlatformAudit audit;
 
-    TicketService(TicketRepository repo, TenantContext tenantContext) {
+    TicketService(TicketRepository repo, TenantContext tenantContext, PlatformAudit audit) {
         this.repo = repo;
         this.tenantContext = tenantContext;
+        this.audit = audit;
     }
 
     @Transactional
@@ -84,7 +87,8 @@ public class TicketService {
         return repo.listAll().stream().map(this::toResponse).toList();
     }
 
-    public TicketResponse transition(UUID id, String toStatus) {
+    @Transactional
+    public TicketResponse transition(UUID id, String toStatus, UUID operatorId, String ip) {
         Ticket ticket = repo.findById(id).orElseThrow(() ->
                 new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested ticket was not found."));
         Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(ticket.status(), Set.of());
@@ -95,6 +99,9 @@ public class TicketService {
         Instant resolvedAt = toStatus.equals("resolved") ? Instant.now() : ticket.resolvedAt();
         repo.updateStatus(id, toStatus, resolvedAt);
         log.info("ticket {} transitioned {} -> {}", id, ticket.status(), toStatus);
+        // Status only: subject/description are staff free text and stay out of the audit row.
+        audit.record(ticket.tenantId(), operatorId, ip, "platform_ticket.status_changed", "support_ticket", id,
+                Map.of("fromStatus", ticket.status(), "toStatus", toStatus));
         return toResponse(repo.findById(id).orElseThrow());
     }
 

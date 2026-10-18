@@ -1,16 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./platform.module.css";
 import Icon from "../components/ui/Icon";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
-import { platformLogout, usePlatformFetch } from "./platformApi";
+import { usePlatformFetch } from "./platformApi";
 import { groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
 
 export default function PlatformHomePage() {
-  const router = useRouter();
   const fetchAuthed = usePlatformFetch();
   const [profile, setProfile] = useState<OperatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,11 +39,6 @@ export default function PlatformHomePage() {
     void Promise.resolve().then(load);
   }, [load]);
 
-  async function logout() {
-    await platformLogout();
-    router.replace("/platform/login");
-  }
-
   if (loading) {
     return (
       <main className={styles.page}>
@@ -74,7 +67,6 @@ export default function PlatformHomePage() {
             Signed in as {profile.name} · {ROLE_LABELS[profile.role] ?? profile.role}
           </p>
         </div>
-        <button className={styles.logout} onClick={logout}>Log out</button>
       </div>
 
       <div className={styles.card}>

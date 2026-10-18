@@ -110,6 +110,17 @@ class DayCloseRepository {
         return n == null ? 0 : n;
     }
 
+    record Voided(int count, BigDecimal total) {
+    }
+
+    /** OWN-019: invoices voided through the Sprint 3 void flow within the day, by voided_at. */
+    Voided voided(UUID tenantId, Instant dayStart, Instant dayEnd) {
+        return jdbc.queryForObject("""
+                SELECT count(*) AS n, COALESCE(SUM(total), 0) AS amount FROM invoices
+                WHERE tenant_id = ? AND status = 'void' AND voided_at >= ? AND voided_at < ?
+                """, (rs, i) -> new Voided(rs.getInt("n"), rs.getBigDecimal("amount")), tenantId, ts(dayStart), ts(dayEnd));
+    }
+
     Optional<CloseRow> findClose(UUID tenantId, LocalDate day) {
         return jdbc.query("""
                 SELECT c.id, c.status, c.expected_cash, c.counted_cash, c.variance, c.note, cb.name AS closed_by_name,

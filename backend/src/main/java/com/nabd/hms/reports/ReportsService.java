@@ -2,6 +2,7 @@ package com.nabd.hms.reports;
 
 import com.nabd.hms.reports.dto.MoneyResponse;
 import com.nabd.hms.reports.dto.OverviewResponse;
+import com.nabd.hms.reports.dto.PackagesReportResponse;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -134,6 +135,18 @@ public class ReportsService {
                 repo.taxBilledBetween(tenantId, start, end), bookings[1], bookings[0],
                 includesToday ? repo.waitingNow(tenantId, today) : null,
                 repo.tenderBetween(tenantId, start, end), repo.topServicesBetween(tenantId, start, end, 5));
+    }
+
+    /** OWN-026 Reports → Packages for a period of clinic days (inclusive). No revenue recognition split. */
+    @Transactional
+    public PackagesReportResponse packages(UUID tenantId, Range r) {
+        tenantContext.set(tenantId);
+        ZoneId zone = clock.zone(tenantId);
+        Instant start = r.from().atStartOfDay(zone).toInstant();
+        Instant end = r.to().plusDays(1).atStartOfDay(zone).toInstant();
+        return new PackagesReportResponse(r.from(), r.to(), repo.packageSalesByDay(tenantId, r.from(), r.to(), zone),
+                repo.packageRedemption(tenantId, start, end),
+                repo.expiredPackagesWithValue(tenantId, r.from(), r.to(), LocalDate.now(zone)));
     }
 
     @Transactional

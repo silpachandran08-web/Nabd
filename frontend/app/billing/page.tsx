@@ -21,6 +21,8 @@ type Summary = {
   unbilled: { queueEntryId: string; token: number; patientName: string; doctorName: string | null; endedAt: string }[];
   taxBands: { ratePercent: number; taxable: number; tax: number }[];
   splitPaymentBills: number;
+  // OWN-019 (S7 contract): invoices voided that day; optional so an older backend still renders "—".
+  voidedCount?: number | null; voidedTotal?: number | null;
   close: {
     status: "closed" | "reopened"; expectedCash: number; countedCash: number; variance: number; note: string | null;
     closedByName: string; closedAt: string; reopenedByName: string | null; reopenedAt: string | null; reopenReason: string | null;
@@ -239,15 +241,24 @@ export default function BillingPage() {
             )}
           </section>
 
-          <section className={styles.card} aria-label="Outstanding and unbilled">
-            <div className={styles.cardHead}>Outstanding &amp; unbilled</div>
+          <section className={styles.card} aria-label="Outstanding and cancelled">
+            <div className={styles.cardHead}>Outstanding &amp; cancelled</div>
             <div className={styles.line}>
               <span>Outstanding balances<div className={styles.lineSub}>{plural(s.outstanding.patients, "patient", "patients")} · acknowledged at close</div></span>
               <span className={Number(s.outstanding.amount) > 0 ? styles.amtWarn : styles.amt}>{money.format(Number(s.outstanding.amount))}</span>
             </div>
             <div className={styles.line}>
-              <span>Cancelled bills<div className={styles.lineSub}>bills can&apos;t be cancelled in Nabd yet</div></span>
-              <span className={styles.amtMuted}>—</span>
+              {typeof s.voidedCount === "number" ? (
+                <>
+                  <span>Cancelled bills<div className={styles.lineSub}>{plural(s.voidedCount, "bill", "bills")} voided · retained in audit, never deleted</div></span>
+                  <span className={styles.amtMuted}>{money.format(Number(s.voidedTotal ?? 0))}</span>
+                </>
+              ) : (
+                <>
+                  <span>Cancelled bills<div className={styles.lineSub}>not reported by this server yet</div></span>
+                  <span className={styles.amtMuted}>—</span>
+                </>
+              )}
             </div>
             <div className={styles.line}>
               <span>Unbilled consultations<div className={styles.lineSub}>blocks day close</div></span>

@@ -48,7 +48,7 @@ class AuditSearchRepository {
     private RowMapper<AuditEntry> mapper() {
         return (rs, i) -> new AuditEntry(
                 rs.getLong("id"),
-                UUID.fromString(rs.getString("tenant_id")),
+                rs.getString("tenant_id") == null ? null : UUID.fromString(rs.getString("tenant_id")), // null = platform-scope row (V126)
                 rs.getString("tenant_name"),
                 rs.getString("tenant_slug"),
                 rs.getString("actor_type"),

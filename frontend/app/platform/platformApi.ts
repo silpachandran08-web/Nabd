@@ -2,80 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { API_BASE, type OperatorProfile } from "./surfaces";
+import { type OperatorProfile } from "./surfaces";
+import { platformFetch, platformLoginPath } from "./platformSession";
 
-// One place for the operator-console's authed fetch + 401 handling (PLT-037). It used to be
-// copy-pasted into billing, plans, provisioning, access, support and audit, and only some copies
-// cleared the session on 401. A 401 now tries POST /platform/auth/refresh once (single-flight, so
-// parallel requests share one refresh) and replays the request; only if that fails is the session
-// cleared and the operator sent to login.
-// Location: kept beside the operator console (app/platform/) rather than app/lib/, which holds the
-// clinic session (lib/session.ts). Every consumer lives under app/platform/, the two sessions use
-// different tokens and refresh endpoints, and colocating keeps a clinic page from importing it by mistake.
-// Token storage keys appear only in this file; login, logout and the nav go through the helpers below.
-
-const ACCESS_KEY = "nabd_platform_access_token";
-const REFRESH_KEY = "nabd_platform_refresh_token";
+// Authed fetch + session helpers live in platformSession.ts (no React there, so it is unit-tested).
+export {
+  clearPlatformSession, hasPlatformSession, platformLogout, SESSION_EXPIRED_MESSAGE, storePlatformSession,
+} from "./platformSession";
 
 export type Problem = { title?: string; detail?: string };
-
-let refreshing: Promise<boolean> | null = null;
-
-function refreshSession(): Promise<boolean> {
-  if (refreshing) return refreshing;
-  refreshing = (async () => {
-    const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (!refreshToken) return false;
-    try {
-      const res = await fetch(`${API_BASE}/platform/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
-      });
-      if (!res.ok) return false;
-      const pair: { accessToken?: string; refreshToken?: string } = await res.json();
-      if (!pair.accessToken) return false;
-      localStorage.setItem(ACCESS_KEY, pair.accessToken);
-      if (pair.refreshToken) localStorage.setItem(REFRESH_KEY, pair.refreshToken);
-      return true;
-    } catch {
-      return false;
-    } finally {
-      // Let the next 401 (minutes later) trigger a fresh refresh.
-      setTimeout(() => { refreshing = null; }, 0);
-    }
-  })();
-  return refreshing;
-}
-
-export function clearPlatformSession() {
-  localStorage.removeItem(ACCESS_KEY);
-  localStorage.removeItem(REFRESH_KEY);
-}
-
-export function hasPlatformSession(): boolean {
-  return !!localStorage.getItem(ACCESS_KEY);
-}
-
-/** Login and MFA verify hand their token pair here, so the storage keys live in this file only. */
-export function storePlatformSession(pair: { accessToken: string; refreshToken: string }) {
-  localStorage.setItem(ACCESS_KEY, pair.accessToken);
-  localStorage.setItem(REFRESH_KEY, pair.refreshToken);
-}
-
-/** Ends the server session (best effort) and clears the local one. The caller routes to login. */
-export async function platformLogout(): Promise<void> {
-  const token = localStorage.getItem(ACCESS_KEY);
-  if (token) await send("/platform/auth/logout", { method: "POST" }, token).catch(() => {});
-  clearPlatformSession();
-}
-
-function send(path: string, init: RequestInit | undefined, token: string) {
-  const headers = new Headers(init?.headers);
-  headers.set("Authorization", `Bearer ${token}`);
-  if (typeof init?.body === "string" && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  return fetch(`${API_BASE}${path}`, { ...init, headers });
-}
 
 /** Returns an authed fetch. Resolves to null when the session is gone (the operator is already being
  * redirected to login); callers treat null as "stop quietly", same contract the old copies had. */
@@ -83,22 +18,8 @@ export function usePlatformFetch() {
   const router = useRouter();
   return useCallback(
     async (path: string, init?: RequestInit): Promise<Response | null> => {
-      const token = localStorage.getItem(ACCESS_KEY);
-      if (!token) {
-        router.replace("/platform/login");
-        return null;
-      }
-      let res = await send(path, init, token);
-      if (res.status === 401) {
-        if (await refreshSession()) {
-          res = await send(path, init, localStorage.getItem(ACCESS_KEY) ?? "");
-        }
-        if (res.status === 401) {
-          clearPlatformSession();
-          router.replace("/platform/login");
-          return null;
-        }
-      }
+      const res = await platformFetch(path, init);
+      if (!res) router.replace(platformLoginPath());
       return res;
     },
     [router]

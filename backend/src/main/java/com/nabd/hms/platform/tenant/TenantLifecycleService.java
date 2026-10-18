@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.tenant;
 
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.platform.PlatformAudit;
 import com.nabd.hms.platform.tenant.dto.LifecycleEventResponse;
 import com.nabd.hms.platform.tenant.dto.TenantLifecycleResponse;
 import org.slf4j.Logger;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -36,13 +38,16 @@ public class TenantLifecycleService {
     );
 
     private final TenantLifecycleRepository repo;
+    private final PlatformAudit audit;
 
-    TenantLifecycleService(TenantLifecycleRepository repo) {
+    TenantLifecycleService(TenantLifecycleRepository repo, PlatformAudit audit) {
         this.repo = repo;
+        this.audit = audit;
     }
 
     @Transactional
-    public TenantLifecycleResponse transition(UUID tenantId, String toStatus, UUID changedBy, String reason) {
+    public TenantLifecycleResponse transition(UUID tenantId, String toStatus, UUID changedBy, String reason,
+                                              String ipAddress) {
         String fromStatus = repo.findTenantStatus(tenantId).orElseThrow(this::notFound);
         Set<String> allowed = ALLOWED_TRANSITIONS.getOrDefault(fromStatus, Set.of());
         if (!allowed.contains(toStatus)) {
@@ -51,6 +56,11 @@ public class TenantLifecycleService {
         }
         repo.updateTenantStatus(tenantId, toStatus);
         repo.insertEvent(tenantId, fromStatus, toStatus, changedBy, reason);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("fromStatus", fromStatus);
+        after.put("toStatus", toStatus);
+        after.put("reason", reason);
+        audit.record(tenantId, changedBy, ipAddress, "platform_tenant.lifecycle_changed", "tenant", tenantId, after);
         log.info("tenant {} transitioned {} -> {} by operator {} ({})", tenantId, fromStatus, toStatus, changedBy, reason);
         return getLifecycle(tenantId);
     }

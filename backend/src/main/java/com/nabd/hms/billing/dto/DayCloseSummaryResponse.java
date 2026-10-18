@@ -24,7 +24,9 @@ public record DayCloseSummaryResponse(
         List<Unbilled> unbilled,
         List<TaxBand> taxBands,
         int splitPaymentBills,
-        Close close                  // null until the day is closed at least once
+        Close close,                 // null until the day is closed at least once
+        int voidedCount,             // OWN-019: invoices whose voided_at falls in this day (whenever they were raised)
+        BigDecimal voidedTotal       // sum of those invoices' total
 ) {
     public record Totals(BigDecimal billed, int bills, BigDecimal collected, int payments, BigDecimal tax) {
     }

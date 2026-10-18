@@ -1789,7 +1789,10 @@ paths:
         (400 no-measurement); blood pressure is a pair (400 incomplete-blood-pressure) and systolic must exceed
         diastolic (400 invalid-blood-pressure). Values outside the plausibility bounds below are 400 validation-failed
         and are never altered. A change to an already-recorded value is audited as vitals.corrected with old and new values.
-      x-required-permission: clinical:edit
+        REC-060: recording needs clinical:create or clinical:edit. Changing a value that is already recorded for the visit
+        (a non-null field sent with a different value) needs clinical:edit, else 403 vitals-correction-forbidden; filling a
+        still-empty field or re-sending the same value is not a correction.
+      x-required-permission: "clinical:create or clinical:edit (correcting a recorded value: clinical:edit)"
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -1797,6 +1800,7 @@ paths:
       responses:
         "200": { description: The vitals as stored, content: { application/json: { schema: { $ref: "#/components/schemas/Vitals" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Caller holds neither clinical:create nor clinical:edit, or changes an already-recorded value without clinical:edit (vitals-correction-forbidden)" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /clinical/vitals/patient/{patientId}/previous:
@@ -1924,6 +1928,31 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: Forbidden }
         "409": { description: Conflict }
+  /billing/day-close:
+    get:
+      tags: [Billing]
+      summary: >
+        Day-close summary for one clinic day (default today). Only the OWN-019 fields are spelled out here; the rest of
+        the body (totals, methods, outstanding, pendingCheckouts, unbilled, taxBands, splitPaymentBills, close) is unchanged.
+        voidedCount / voidedTotal count invoices whose voided_at (Sprint 3 void flow) falls within that clinic day,
+        whenever the invoice was raised; voidedTotal sums their total. Voided bills are already excluded from totals.billed.
+        Payment-gateway failures are not recorded anywhere, so there is no failed field.
+      x-required-permission: billing:view
+      parameters:
+        - { name: date, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date: { type: string, format: date }
+                  voidedCount: { type: integer, description: "Invoices voided on this clinic day (by voided_at)" }
+                  voidedTotal: { type: number, description: "Sum of those invoices' total" }
+                additionalProperties: true
+        "403": { description: Forbidden }
   /billing/invoices/{id}/void:
     post:
       tags: [Billing]
@@ -2058,6 +2087,59 @@ paths:
                     visitCount: { type: integer, format: int64 }
                     revenue: { type: number, description: "Sum of invoice totals for the visits in this source" }
                     untaggedCount: { type: integer, format: int64, description: "Report-wide count of untagged visits, repeated on every row" }
+  /reports/packages:
+    get:
+      tags: [Reports]
+      summary: >
+        Packages report (OWN-026) for a period of clinic days (from/to inclusive; else the last `days` days to today; same
+        400 invalid-period rule as /reports/money). salesByDay: every day in the period, zero-filled; count = package
+        instances sold (created) that clinic day, amount = sum of their sale invoices' total (incl. tax); later refunds are
+        not subtracted. redemption: over instances sold in the period (any status), sessionsSold = sum of item
+        quantity_total, sessionsRedeemed = sum of quantity_consumed to date; units are all item types, the same unit as
+        /packages/liability sessionsOwed. expiredWithValue: instances still `active` whose validity_end is in the period and
+        today > validity_end + grace_days (the instance's computed `expired` status) with units left; expiredOn = validity_end;
+        remainingValue = sum of unconsumed units x allocated per-unit price (the liability formula), rounded to 2 dp.
+        Revenue recognition (deferred vs earned) is NOT provided: an accounting decision is pending.
+      x-required-permission: reports:view
+      parameters:
+        - { name: days, in: query, required: false, schema: { type: integer, default: 30 } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  from: { type: string, format: date }
+                  to: { type: string, format: date }
+                  salesByDay:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date: { type: string, format: date }
+                        count: { type: integer }
+                        amount: { type: number }
+                  redemption:
+                    type: object
+                    properties:
+                      sessionsRedeemed: { type: integer, format: int64 }
+                      sessionsSold: { type: integer, format: int64 }
+                  expiredWithValue:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        instanceId: { type: string, format: uuid }
+                        patientName: { type: string }
+                        packageName: { type: string }
+                        expiredOn: { type: string, format: date }
+                        remainingValue: { type: number }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
   /reports/staff-performance:
     get:
       tags: [Reports]
@@ -2123,6 +2205,18 @@ paths:
   /platform/audit-log:
     get:
       tags: [Platform]
+      description: >
+        LIVE-08 platform operator events. Platform scope (tenantId null) - platform_auth.signed_in (after.mfa),
+        platform_auth.sign_in_failed (after.reason: invalid_credentials | inactive_account | unknown_account; actorId
+        null for unknown_account; never the PIN or typed email), platform_auth.mfa_challenged, platform_auth.mfa_failed,
+        platform_auth.signed_out, platform_auth.session_revoked, platform_auth.refresh_reuse_detected,
+        platform_plan.created, platform_plan.updated (before/after plan terms), platform_provisioning.job_created
+        (no owner contact details), platform_provisioning.job_approved, platform_provisioning.step_run, audit_log.export
+        (when platform rows or no rows are exported). Tenant scope - platform_tenant.lifecycle_changed (fromStatus,
+        toStatus, reason; also written by billing dunning transitions), platform_billing.subscription_created,
+        platform_billing.subscription_updated, platform_billing.discount_requested, platform_billing.discount_auto_approved,
+        platform_billing.discount_approved, platform_billing.discount_rejected, platform_ticket.status_changed (status
+        only), support_access.grant, support_access.revoke, patient.support_view, audit_log.export.
       summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
       x-required-permission: audit_compliance:view
       parameters:
@@ -2161,7 +2255,8 @@ paths:
         prefixed with an apostrophe. Audited as audit_log.export (actor = the operator, entityType audit_log),
         written once into the audit trail of every tenant whose rows the file contains, with filters (the
         actor-name search text is recorded only as actorNameFilter=true), rowCount, totalRowCount and tenantCount.
-        An export matching no rows writes no audit row (no tenant trail to write to).
+        Platform-scope rows (tenantId null) in the file, and an export matching no rows, are recorded once in the
+        platform chain (V126).
       x-required-permission: audit_compliance:view
       parameters:
         - $ref: "#/components/parameters/PlatformAuditTenantId"
@@ -2803,9 +2898,9 @@ components:
       type: object
       properties:
         id: { type: integer, format: int64 }
-        tenantId: { type: string, format: uuid }
-        tenantName: { type: string }
-        tenantSlug: { type: string }
+        tenantId: { type: [string, "null"], format: uuid, description: "null = platform-scope event (no single clinic; V126 platform chain)" }
+        tenantName: { type: [string, "null"] }
+        tenantSlug: { type: [string, "null"] }
         actorType: { type: string, enum: [staff, operator, system] }
         actorId: { type: [string, "null"], format: uuid }
         actorName: { type: string }

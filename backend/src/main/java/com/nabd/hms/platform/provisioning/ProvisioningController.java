@@ -1,7 +1,9 @@
 package com.nabd.hms.platform.provisioning;
 
+import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.platform.provisioning.dto.CreateProvisioningJobRequest;
 import com.nabd.hms.platform.provisioning.dto.ProvisioningJobResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,8 +38,8 @@ public class ProvisioningController {
 
     @PostMapping
     public ResponseEntity<ProvisioningJobResponse> create(@Valid @RequestBody CreateProvisioningJobRequest req,
-                                                            @AuthenticationPrincipal Jwt jwt) {
-        ProvisioningJobResponse job = service.createJob(req, UUID.fromString(jwt.getSubject()));
+                                                            @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        ProvisioningJobResponse job = service.createJob(req, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
         return ResponseEntity.status(HttpStatus.CREATED).body(job);
     }
 
@@ -52,12 +54,12 @@ public class ProvisioningController {
     }
 
     @PostMapping("/{id}/advance")
-    public ProvisioningJobResponse advance(@PathVariable UUID id) {
-        return service.advance(id);
+    public ProvisioningJobResponse advance(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return service.advance(id, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 
     @PostMapping("/{id}/approve")
-    public ProvisioningJobResponse approve(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return service.approve(id, UUID.fromString(jwt.getSubject()));
+    public ProvisioningJobResponse approve(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
+        return service.approve(id, UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
     }
 }

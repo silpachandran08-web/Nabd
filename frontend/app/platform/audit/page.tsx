@@ -7,6 +7,7 @@ import Icon from "../../components/ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { usePlatformFetch } from "../platformApi";
+import { actionLabel } from "./actionLabel";
 
 // Matches GET /v1/platform/audit-log (AuditSearchController) — cross-tenant by default. Filters
 // the controller accepts and search_audit_log (V16) applies: tenantId, action and entityType (exact
@@ -15,14 +16,14 @@ import { usePlatformFetch } from "../platformApi";
 type AuditEntry = {
   id: number;
   tenantId: string;
-  tenantName: string;
-  tenantSlug: string;
+  tenantName: string | null;
+  tenantSlug: string | null;
   actorType: string;
-  actorName: string;
+  actorName: string | null;
   ipAddress?: string | null;
-  actorRole: string;
+  actorRole: string | null;
   action: string;
-  entityType: string;
+  entityType: string | null;
   entityId: string | null;
   before: unknown;
   after: unknown;
@@ -46,6 +47,11 @@ function show(value: unknown): string {
   } catch {
     return "—";
   }
+}
+
+function when(iso: unknown): string {
+  const d = new Date(typeof iso === "string" ? iso : NaN);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
 function pretty(value: unknown): string {
@@ -92,7 +98,7 @@ function exportCsv(rows: AuditEntry[]) {
       [
         r.createdAt, r.tenantName, r.tenantSlug, r.actorName, r.actorRole, r.action, r.entityType, r.entityId ?? "",
         r.before == null ? "" : show(r.before), r.after == null ? "" : show(r.after),
-      ].map((v) => csvCell(String(v))).join(",")
+      ].map((v) => csvCell(String(v ?? ""))).join(",")
     );
   }
   const url = URL.createObjectURL(new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
@@ -156,8 +162,9 @@ export default function AuditLogPage() {
           return;
         }
         const body: AuditPage = await res.json();
-        setRows((prev) => (append ? [...prev, ...body.data] : body.data));
-        setNextCursor(body.page.nextCursor);
+        const data = Array.isArray(body?.data) ? body.data : [];
+        setRows((prev) => (append ? [...prev, ...data] : data));
+        setNextCursor(body?.page?.nextCursor ?? null);
       } catch {
         fail("Couldn't reach the server. Check your connection and try again.");
       } finally {
@@ -283,13 +290,16 @@ export default function AuditLogPage() {
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.id}>
-                      <td className={styles.when}>{new Date(r.createdAt).toLocaleString()}</td>
+                      <td className={styles.when}>{when(r.createdAt)}</td>
                       <td>
-                        <span className={styles.tenantName}>{r.tenantName}</span>
+                        <span className={styles.tenantName}>{r.tenantName ?? "Platform"}</span>
                         <span className={styles.tenantSlug}>{r.tenantSlug}</span>
                       </td>
-                      <td>{r.actorName} <span className={styles.muted}>({r.actorRole})</span></td>
-                      <td className={styles.action}>{r.action}</td>
+                      <td>{r.actorName ?? "—"}{r.actorRole && <span className={styles.muted}> ({r.actorRole})</span>}</td>
+                      <td>
+                        {actionLabel(r.action)}
+                        {actionLabel(r.action) !== r.action && r.action && <span className={styles.tenantSlug}>{r.action}</span>}
+                      </td>
                       <td>
                         {r.entityType}
                         {r.entityId && <span className={styles.tenantSlug}>{r.entityId}</span>}
@@ -322,14 +332,14 @@ export default function AuditLogPage() {
       </div>
 
       {viewing && (
-        <Dialog title={`${viewing.action} — before and after`} size="drawer" onClose={() => setViewing(null)}>
+        <Dialog title={`${actionLabel(viewing.action)} — before and after`} size="drawer" onClose={() => setViewing(null)}>
           <div className={styles.drawer}>
             <dl className={styles.metaGrid}>
-              <dt>When</dt><dd>{new Date(viewing.createdAt).toLocaleString()}</dd>
-              <dt>Clinic</dt><dd>{viewing.tenantName} ({viewing.tenantSlug})</dd>
-              <dt>Actor</dt><dd>{viewing.actorName} ({viewing.actorRole}{viewing.actorType ? `, ${viewing.actorType}` : ""})</dd>
+              <dt>When</dt><dd>{when(viewing.createdAt)}</dd>
+              <dt>Clinic</dt><dd>{viewing.tenantName ? `${viewing.tenantName} (${viewing.tenantSlug ?? "—"})` : "Platform"}</dd>
+              <dt>Actor</dt><dd>{viewing.actorName ?? "—"} ({[viewing.actorRole, viewing.actorType].filter(Boolean).join(", ") || "—"})</dd>
               {viewing.ipAddress && <><dt>IP address</dt><dd>{viewing.ipAddress}</dd></>}
-              <dt>Entity</dt><dd>{viewing.entityType}{viewing.entityId ? ` · ${viewing.entityId}` : ""}</dd>
+              <dt>Entity</dt><dd>{viewing.entityType ?? "—"}{viewing.entityId ? ` · ${viewing.entityId}` : ""}</dd>
             </dl>
             {changes.length === 0 ? (
               <p className={styles.muted}>No field changes recorded for this entry.</p>
