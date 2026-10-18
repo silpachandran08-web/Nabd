@@ -47,23 +47,6 @@
   cursor: pointer;
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.pillNeutral { background: var(--nb-surface-3); color: var(--nb-text-secondary); }
-.pillAccent { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillPaid { background: var(--nb-accent-tint); color: var(--nb-accent-500); }
-.pillPartial { background: var(--nb-warn-tint); color: var(--nb-warn-500); }
-.pillUnpaid { background: var(--nb-danger-tint); color: var(--nb-danger-500); }
 
 .banner {
   background: var(--nb-accent-tint);

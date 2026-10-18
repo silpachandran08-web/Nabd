@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
 import { formatMoney } from "../../lib/money";
+import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
 import { getIdentity } from "../../lib/session";
 import { can } from "../../lib/permissions";
@@ -29,7 +30,6 @@ type Problem = { type?: string; title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
-const STATUS_PILL: Record<string, string> = { paid: styles.pillPaid, partial: styles.pillPartial, unpaid: styles.pillUnpaid };
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
 // first, checkout_pending/completed always last, with this department's configured (or, if
@@ -364,7 +364,7 @@ export default function CheckoutPage() {
           <span className={styles.stripName}>{context.patientName}</span>
           <span className={styles.stripMeta}>{context.doctorName} · {context.visitType}</span>
         </div>
-        {invoice && <span className={`${styles.pill} ${STATUS_PILL[invoice.status] ?? styles.pillNeutral}`}>{invoice.status}</span>}
+        {invoice && <BillingStatePill state={invoice.status} />}
       </div>
 
       {context.followUpEligible && !invoice && (
