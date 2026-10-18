@@ -122,7 +122,7 @@ public class QueueService {
         }
 
         UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
-        int token = repo.nextTokenNumber(req.doctorId(), today);
+        int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
         UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
@@ -190,7 +190,7 @@ public class QueueService {
 
         LocalDate today = clock.today(tenantId);
         repo.lockDoctorDay(req.doctorId(), today);
-        int token = repo.nextTokenNumber(req.doctorId(), today);
+        int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
         // though this is a brand-new queue_entries row with its own status/practitioner/department.
         UUID newId = repo.insert(tenantId, null, current.patientId(), req.doctorId(), req.toDepartmentId(),
@@ -260,7 +260,7 @@ public class QueueService {
             return;
         }
 
-        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, today, block.get().startTime(), block.get().endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, today, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached (walk-in check-in): doctor {} on {} ({}/{})",
                     doctorId, today, occupancy, block.get().maxPatients());

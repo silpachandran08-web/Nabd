@@ -184,7 +184,7 @@ public class AppointmentService {
         }
 
         queueRepo.lockDoctorDay(doctorId, date);
-        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, date, block.get().startTime(), block.get().endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.get().maxPatients());
             throw sessionFull();

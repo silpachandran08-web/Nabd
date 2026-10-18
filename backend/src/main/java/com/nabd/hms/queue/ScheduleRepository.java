@@ -166,21 +166,21 @@ class ScheduleRepository {
      * against. Both sides are read in the clinic's zone (explicit AT TIME ZONE, never the DB session's
      * zone) because blockStart/blockEnd are the clinic's wall-clock times.
      */
-    int countSessionOccupancy(UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
+    int countSessionOccupancy(UUID tenantId, UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
         Instant rangeStart = date.atTime(blockStart).atZone(zone).toInstant();
         Instant rangeEnd = date.atTime(blockEnd).atZone(zone).toInstant();
         Integer count = jdbc.queryForObject(
                 "SELECT " +
                         // QA-04: a seen booking (completed) still used its place, as a completed walk-in does
-                        "(SELECT count(*) FROM appointments a WHERE a.doctor_id = ? AND a.status IN ('scheduled','completed') " +
+                        "(SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.status IN ('scheduled','completed') " +
                         "  AND a.start_time >= ? AND a.start_time < ?) " +
                         "+ " +
-                        "(SELECT count(*) FROM queue_entries q WHERE q.doctor_id = ? AND q.queue_date = ? " +
+                        "(SELECT count(*) FROM queue_entries q WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " +
                         "  AND q.appointment_id IS NULL AND q.status != 'no_show' " +
                         "  AND (q.created_at AT TIME ZONE ?)::time >= ? AND (q.created_at AT TIME ZONE ?)::time < ?)",
                 Integer.class,
-                doctorId, Timestamp.from(rangeStart), Timestamp.from(rangeEnd),
-                doctorId, Date.valueOf(date), zone.getId(), Time.valueOf(blockStart), zone.getId(), Time.valueOf(blockEnd));
+                tenantId, doctorId, Timestamp.from(rangeStart), Timestamp.from(rangeEnd),
+                tenantId, doctorId, Date.valueOf(date), zone.getId(), Time.valueOf(blockStart), zone.getId(), Time.valueOf(blockEnd));
         return count == null ? 0 : count;
     }
 
