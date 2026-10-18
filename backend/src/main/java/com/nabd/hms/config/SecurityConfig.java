@@ -87,6 +87,7 @@ public class SecurityConfig {
                                 "/v1/platform/auth/login",
                                 "/v1/platform/auth/mfa/verify",
                                 "/v1/platform/auth/refresh",
+                                "/.well-known/jwks.json",
                                 "/v1/webhooks/whatsapp" // HMAC-signed by Meta, verified in WhatsAppWebhookController
                         ).permitAll()
                         .anyRequest().authenticated()
