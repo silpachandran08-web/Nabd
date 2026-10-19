@@ -6,8 +6,8 @@ import { ArrivalsPage, ConsultPage, CheckoutPage } from './pages.mjs';
 
 // Synthetic only. Phones use the reserved test range of tools/synthetic-data (national number starting 0000: never assignable).
 export const TENANTS = [
-  { key: 'IN', region: 'IN', name: 'Synthetic Clinic IN', currency: 'INR', patient: 'Asha Verma', phone: '+910000000101', walkIn: 'Kavya Iyer' },
-  { key: 'KSA', region: 'KSA', name: 'Synthetic Clinic KSA', currency: 'SAR', patient: 'Noura Al-Harbi', phone: '+9660000000101', walkIn: 'Reem Al-Qahtani' },
+  { key: 'IN', region: 'IN', name: 'Synthetic Clinic IN', timezone: 'Asia/Kolkata', currency: 'INR', patient: 'Asha Verma', phone: '+910000000101', walkIn: 'Kavya Iyer' },
+  { key: 'KSA', region: 'KSA', name: 'Synthetic Clinic KSA', timezone: 'Asia/Riyadh', currency: 'SAR', patient: 'Noura Al-Harbi', phone: '+9660000000101', walkIn: 'Reem Al-Qahtani' },
 ];
 export const PROJECTS = [
   { key: 'desktop', viewport: { width: 1280, height: 900 } },
@@ -17,6 +17,12 @@ const SELF = '11111111-1111-1111-1111-111111111111'; // the mock JWT's staff id 
 const json = (r, status, body) => r.fulfill({ status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body) });
 
 // ---- mock back ends (stateful where the journey writes) ------------------------------------------
+// Shell boot of a healthy clinic: tenants.timezone is configured (FEF-011 warns `[clinic-timezone-fallback]` when it
+// is not). Smoke roles lack setup:view, so /setup/profile is 403 and the zone comes from /schedule/day, as on the API.
+const clinicMocks = (t) => [
+  ['GET', /^\/setup\/profile$/, { status: 403, body: { type: 'forbidden', title: 'Forbidden', detail: 'Missing setup:view.' } }],
+  ['GET', /^\/schedule\/day(\?.*)?$/, { body: { timezone: t.timezone } }],
+];
 function arrivalsMocks(t) {
   const st = { checkIns: 0 };
   return { st, h: [
@@ -49,6 +55,8 @@ function consultMocks(t, { allergy = null } = {}) {
     ['PATCH', /^\/clinical\/notes\/e1$/, (r, req) => { st.note = { ...(st.note ?? {}), ...JSON.parse(req.postData()), id: 'n1', status: 'draft', signedAt: null, updatedAt: new Date().toISOString() }; return json(r, 200, st.note); }],
     ['POST', /^\/clinical\/notes\/e1\/sign$/, (r) => { st.signs++; st.note = { ...st.note, status: 'signed', signedAt: new Date().toISOString() }; return json(r, 200, st.note); }],
     ['PATCH', /^\/queue\/e1\/status$/, (r, req) => { st.moved = JSON.parse(req.postData()).status; return json(r, 200, { ...entry, status: st.moved }); }],
+    // CLN-005: the smoke doctor is a registered clinician with an in-date licence (the preview seed marks it the same way)
+    ['GET', /^\/clinical\/prescriptions\/e1\/signing-authority$/, { body: { canSign: true, reason: null } }],
     ['GET', /^\/clinical\/prescriptions\/e1$/, { status: 404, body: { title: 'Not found', detail: 'No prescription yet.' } }],
     ['PATCH', /^\/clinical\/prescriptions\/e1$/, (r, req) => { st.rxSaves++; const items = JSON.parse(req.postData()).items.map((i, n) => ({ ...i, id: `i${n}`, warnings: warn(i.drugName) }));
       return json(r, 200, { id: 'rx1', status: 'draft', signedAt: null, items, unresolvedWarnings: items.reduce((k, i) => k + i.warnings.length, 0) }); }],
@@ -77,7 +85,7 @@ function checkoutMocks(t) {
 
 /** Per-journey data: mock fixtures, or the preview seed's slot for this case and attempt. */
 function data(journey, tenant, project, attempt, mock) {
-  if (TARGET === 'mock') return mock;
+  if (TARGET === 'mock') return { ...mock, h: [...clinicMocks(tenant), ...mock.h] };
   const f = previewFixtures(tenant.key);
   if (!f) throw new Error(`SMOKE_FIXTURES has no tenant ${tenant.key}`);
   return { ...f, ...(f.slots?.[`${journey}:${project}:${attempt}`] ?? {}), h: [] };

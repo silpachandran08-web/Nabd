@@ -101,6 +101,10 @@ class Loader(unittest.TestCase):
         self.assertIn("'KSA'", stmts); self.assertNotIn("'AE', 'active'", stmts)   # AE/SA/QA run in the KSA region
         self.assertEqual(stmts, self.load.sql(DATA, self.pins, hasher=lambda p: "HASHED")[0])   # stable ids: re-run is a no-op
         self.assertEqual(set(ids["IN"]["staff"]), set(synth.ROLE_KEYS))
+        # CLN-005: the seeded doctor can sign (registered clinician); nobody else is marked a clinician
+        self.assertEqual(stmts.count(", true, 'SYN-"), 4)
+        self.assertEqual(stmts.count("'SYN-IN-DOCTOR'"), 1)
+        self.assertEqual(stmts.count(", false, NULL)"), 4 * (len(synth.ROLE_KEYS) - 1))
 
     def test_grants_follow_roles_json(self):
         rec = {g["module"]: g for g in self.load.grants("receptionist")}
