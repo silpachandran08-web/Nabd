@@ -20,6 +20,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** CLN-006: only the visit doctor (or a clinical:approve holder) signs or amends a note; signer stored and audited. */
 class NoteSigningAuthorityApiTest extends ApiTestBase {
 
+    // CLN-005 via CLN-006: signing/amending a note needs a registered clinician; every staff member seeded here is one.
+    @Override
+    protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
+                                    boolean emailVerified, boolean mobileVerified) {
+        return com.nabd.hms.support.ClinicianFixture.licensed(
+                super.seedStaff(tenant, roleId, email, mobilePhone, mfaEnabled, emailVerified, mobileVerified));
+    }
+
     private record Visit(SeededTenant tenant, String ownerToken, SeededStaff doctor, String doctorToken,
                          String nurseToken, String otherDoctorToken, String queueEntryId) {
     }
@@ -183,6 +191,34 @@ class NoteSigningAuthorityApiTest extends ApiTestBase {
                 authed(v.nurseToken()), List.class);
         assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(list.getBody()).hasSize(3);
+    }
+
+    @Test
+    void unlicensedOrExpiredVisitDoctorCannotSignOrAmendAndTheLicenceIsAudited() {
+        Visit v = seedVisit("09");
+        JdbcTemplate su = new JdbcTemplate(superuserDataSource());
+        su.update("UPDATE staff SET is_clinician = false WHERE id = ?", v.doctor().id());
+        ResponseEntity<Map> unlicensed = sign(v.doctorToken(), v.queueEntryId());
+        assertThat(unlicensed.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(unlicensed.getBody().get("type")).asString().contains("not-licensed-clinician");
+
+        su.update("UPDATE staff SET is_clinician = true, licence_expires_on = current_date - 1 WHERE id = ?", v.doctor().id());
+        ResponseEntity<Map> expired = sign(v.doctorToken(), v.queueEntryId());
+        assertThat(expired.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(expired.getBody().get("type")).asString().contains("licence-expired");
+
+        su.update("UPDATE staff SET licence_expires_on = NULL WHERE id = ?", v.doctor().id());
+        ResponseEntity<Map> signed = sign(v.doctorToken(), v.queueEntryId());
+        assertThat(signed.getStatusCode()).isEqualTo(HttpStatus.OK);
+        String regNo = su.queryForObject("SELECT professional_registration_no FROM staff WHERE id = ?", String.class, v.doctor().id());
+        assertThat(inTenantTx(v.tenant().id(), () -> jdbc.queryForObject(
+                "SELECT after ->> 'licenceNo' FROM audit_log WHERE tenant_id = ? AND action = 'clinical_note.signed' AND entity_id = ?::uuid",
+                String.class, v.tenant().id(), signed.getBody().get("id")))).isEqualTo(regNo);
+
+        su.update("UPDATE staff SET is_clinician = false WHERE id = ?", v.doctor().id());
+        ResponseEntity<Map> amend = amend(v.doctorToken(), v.queueEntryId(), Map.of("reason", "Unlicensed amend"));
+        assertThat(amend.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(amend.getBody().get("type")).asString().contains("not-licensed-clinician");
     }
 
     @Test
