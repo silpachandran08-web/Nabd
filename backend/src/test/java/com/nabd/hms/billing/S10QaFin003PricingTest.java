@@ -108,7 +108,7 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
     void freeTextChargeIsAllowedOnlyWithDiscountRightAndNeedsNameAndPrice() {
         Env e = env();
         Map<String, Object> ghost = line("GHOST", 1);
-        ghost.putAll(Map.of("chargeName", "Ghost", "category", "Service", "unitPrice", 75, "taxRatePercent", 0));
+        ghost.putAll(Map.of("chargeName", "Ghost", "category", "Service", "unitPrice", 75, "taxRatePercent", 0, "override", Map.of("reasonCode", "other")));
         ResponseEntity<Map> ok = checkout(e.token(), atCheckout(e), List.of(ghost));
         assertThat(ok.getStatusCode().is2xxSuccessful()).as(String.valueOf(ok.getBody())).isTrue();
         assertThat(firstLine(ok).get("tier")).isEqualTo("custom");
@@ -119,7 +119,6 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
 
     // context: "Free-text charges are allowed only with billing.discount and a reason."
     @Test
-    @Tag("known-defect-FIN-003")
     void freeTextChargeWithoutAReasonIsRefusedWith422ReasonRequired() {
         Env e = env();
         Map<String, Object> ghost = line("GHOST", 1);
@@ -175,7 +174,7 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
         String doctor = tokenFor(e, "Doctor", false, false, false, false, true);
         String owner = e.token();
         Map<String, Object> free = line("GHOST", 1);
-        free.putAll(Map.of("chargeName", "Ghost", "category", "Service", "unitPrice", 10, "taxRatePercent", 0));
+        free.putAll(Map.of("chargeName", "Ghost", "category", "Service", "unitPrice", 10, "taxRatePercent", 0, "override", Map.of("reasonCode", "other")));
         Map<String, Map<String, Object>> attempts = new java.util.LinkedHashMap<>();
         attempts.put("override", body("lineItems", List.of(withOverride("CONS", 1, 1, "goodwill"))));
         attempts.put("free-text", body("lineItems", List.of(free)));
@@ -200,7 +199,6 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
 
     // QA-12 hole named in the engineer notes: a catalogue row flagged doctor_override lets any caller set the price
     @Test
-    @Tag("known-defect-FIN-003")
     void receptionistCannotSetThePriceOfADoctorOverrideChargeEither() {
         Env e = env();
         inTenantTx(e.tenant().id(), () -> jdbc.update("UPDATE charge_catalogue SET doctor_override = true WHERE code = 'XRAY'"));

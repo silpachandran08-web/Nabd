@@ -403,7 +403,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(toBilling.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> interim = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation fee",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "CONSULT", "chargeName", "Consultation fee",
                         "category", "Consultation", "quantity", 1, "unitPrice", 500.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(interim.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -462,7 +462,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(toBilling.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> firstBill = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "FILLING", "chargeName", "Tooth filling",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "FILLING", "chargeName", "Tooth filling",
                         "category", "Procedure", "quantity", 1, "unitPrice", 2000.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(firstBill.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -474,7 +474,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(queueStatus(tenant.id(), entryId)).isEqualTo("checkout_pending");
 
         ResponseEntity<Map> secondBill = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "XRAY", "chargeName", "Dental X-ray",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "XRAY", "chargeName", "Dental X-ray",
                         "category", "Procedure", "quantity", 1, "unitPrice", 300.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(secondBill.getStatusCode()).isEqualTo(HttpStatus.OK);

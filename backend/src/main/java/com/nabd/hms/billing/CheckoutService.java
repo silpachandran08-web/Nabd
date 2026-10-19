@@ -396,7 +396,7 @@ public class CheckoutService {
                         li.unitPrice(), li.taxRatePercent(), li.lineTotal(), li.listUnitPrice(), li.tier(), li.overrideReasonCode()))
                 .toList();
         List<PaymentResponse> payments = repo.findPayments(tenantId, row.id()).stream()
-                .map(p -> new PaymentResponse(p.id(), p.method(), p.amount(), p.recordedAt()))
+                .map(p -> new PaymentResponse(p.id(), p.method(), p.amount(), p.recordedAt(), p.idempotencyKey()))
                 .toList();
         String patientName = row.patientId() == null ? "Walk-in customer"
                 : repo.findPatientName(tenantId, row.patientId()).orElse("Unknown patient");

@@ -30,8 +30,8 @@ class DayCloseApiTest extends ApiTestBase {
     private String bill(String token, String queueEntryId) {
         ResponseEntity<Map> inv = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
                 "lineItems", List.of(
-                        Map.of("chargeCode", "CONS", "chargeName", "Consultation", "category", "Consultation", "quantity", 1, "unitPrice", 800, "taxRatePercent", 0),
-                        Map.of("chargeCode", "COS", "chargeName", "Cosmetic", "category", "Service", "quantity", 1, "unitPrice", 200, "taxRatePercent", 18)))),
+                        Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "CONS", "chargeName", "Consultation", "category", "Consultation", "quantity", 1, "unitPrice", 800, "taxRatePercent", 0),
+                        Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "COS", "chargeName", "Cosmetic", "category", "Service", "quantity", 1, "unitPrice", 200, "taxRatePercent", 18)))),
                 Map.class);
         assertThat(inv.getStatusCode().is2xxSuccessful()).isTrue();
         return (String) inv.getBody().get("id");

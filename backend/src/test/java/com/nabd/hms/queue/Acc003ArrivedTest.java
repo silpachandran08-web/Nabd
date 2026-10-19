@@ -248,7 +248,7 @@ class Acc003ArrivedTest extends ApiTestBase {
         }
         // ACC-002: the last leg completes only through checkout
         assertThat(exchange("/v1/billing/checkout/" + leg2, HttpMethod.POST, authedJsonBody(c.token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         last = sql("SELECT status FROM queue_entries WHERE id = ?", UUID.fromString(leg2));
         assertThat(last).isEqualTo("completed");

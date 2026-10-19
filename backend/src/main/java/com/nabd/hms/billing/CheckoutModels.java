@@ -34,7 +34,7 @@ final class CheckoutModels {
                         BigDecimal listUnitPrice, String tier, String overrideReasonCode) {
     }
 
-    record PaymentRow(UUID id, String method, BigDecimal amount, Instant recordedAt) {
+    record PaymentRow(UUID id, String method, BigDecimal amount, Instant recordedAt, String idempotencyKey) {
     }
 
     /** FIN-003: a fully server-resolved line (price provenance included). */

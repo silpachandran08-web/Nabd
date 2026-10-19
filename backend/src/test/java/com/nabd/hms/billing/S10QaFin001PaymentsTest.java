@@ -4,7 +4,6 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -403,7 +402,6 @@ class S10QaFin001PaymentsTest extends S10QaBillingSupport {
 
     // FEF-008 depends on this: the invoice read-back must echo each payment's Idempotency-Key so a client can tell whether its payment landed
     @Test
-    @Tag("known-defect-FEF-008")
     void invoiceReadBackEchoesIdempotencyKeyOnEachPayment() {
         Env e = env();
         String inv = invoiceOf(e, "SVC");

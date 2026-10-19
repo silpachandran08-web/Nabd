@@ -112,7 +112,7 @@ class QueueCasApiTest extends ApiTestBase {
         assertThat(dbStatus(id)).isEqualTo("checkout_pending");
 
         ResponseEntity<Map> co = exchange("/v1/billing/checkout/" + id, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
         assertThat(co.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(dbStatus(id)).isEqualTo("completed");

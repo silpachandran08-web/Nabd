@@ -63,7 +63,7 @@ class PaymentIntegrityApiTest extends ApiTestBase {
     }
 
     private static Map<String, Object> line(int price) {
-        return Map.of("chargeCode", "X", "chargeName", "Service", "category", "Service", "quantity", 1,
+        return Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "Service", "category", "Service", "quantity", 1,
                 "unitPrice", price, "taxRatePercent", 0);
     }
 

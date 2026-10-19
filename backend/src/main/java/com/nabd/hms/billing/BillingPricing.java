@@ -52,7 +52,7 @@ class BillingPricing {
             }
             boolean followUp = followUpEligible && "Consultation".equals(c.category()) && c.followUpAmount() != null;
             BigDecimal list = followUp ? c.followUpAmount() : c.baseAmount();
-            if (c.doctorOverride() && li.unitPrice() != null) {
+            if (c.doctorOverride() && canDiscount && li.unitPrice() != null) {
                 list = li.unitPrice(); // the flag means "the doctor sets this price"
             }
             String tier = followUp ? "follow_up" : "normal";
@@ -83,8 +83,7 @@ class BillingPricing {
                     "A charge that is not in the price list needs a name and a unit price.");
         }
         var o = li.override();
-        // shortcut: free text needs billing.discount but the reason is optional (recorded when sent); make it required once all clients send one.
-        String reason = o == null || o.reasonCode() == null || o.reasonCode().isBlank() ? null : requireReason(o.reasonCode());
+        String reason = trusted ? null : requireReason(o == null ? null : o.reasonCode());
         return new LineItemInput(li.chargeCode(), li.chargeName(), li.category() == null || li.category().isBlank() ? "Service" : li.category(),
                 li.quantity(), li.unitPrice(), li.taxRatePercent() == null ? BigDecimal.ZERO : li.taxRatePercent(), null,
                 li.unitPrice(), "custom", reason, o == null ? null : o.note(), trusted ? null : staffId);
