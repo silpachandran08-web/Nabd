@@ -1,0 +1,153 @@
+# OPS-036: one disposable preview per PR = one namespace. Rendered by deploy.sh with envsubst
+# (${NS} ${PR} ${SHA} ${HOST} ${CREATED_AT} ${EXPIRES_AT} ${IMAGE_CORE} ${IMAGE_MIGRATE} ${IMAGE_WEB}).
+# Namespace-per-PR on a shared non-prod cluster (DEC-21 may pick app-per-preview instead: the same pieces map 1:1).
+# Ephemeral: Postgres on emptyDir (no PVC, no backups), everything dies with the namespace (reaper: preview.py reap).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${NS}
+  labels: { nabd.io/preview: "true", nabd.io/pr: "${PR}", nabd.io/cost-center: previews, nabd.io/env: non-prod }
+  annotations: { nabd.io/created-at: "${CREATED_AT}", nabd.io/expires-at: "${EXPIRES_AT}", nabd.io/sha: "${SHA}" }
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata: { name: preview-cap, namespace: "${NS}" }
+spec:
+  hard: { requests.cpu: "2", requests.memory: 4Gi, limits.cpu: "4", limits.memory: 6Gi, persistentvolumeclaims: "0", services.loadbalancer: "0" }
+---
+# No route out of the namespace except DNS: a preview can never reach prod networks, prod databases or a secret manager.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: isolate, namespace: "${NS}" }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{ podSelector: {} }]
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } } }]
+  egress:
+    - to: [{ podSelector: {} }]
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }, podSelector: { matchLabels: { k8s-app: kube-dns } } }]
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: preview, namespace: "${NS}" }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: postgres, namespace: "${NS}" }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      serviceAccountName: preview
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_DB, value: nabd }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: preview-secrets, key: db-admin-password } } }
+          ports: [{ containerPort: 5432 }]
+          resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { cpu: "1", memory: 1Gi } }
+          readinessProbe: { exec: { command: [pg_isready, -U, postgres] }, periodSeconds: 3 }
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+      volumes: [{ name: data, emptyDir: {} }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres, namespace: "${NS}" }
+spec: { selector: { app: postgres }, ports: [{ port: 5432 }] }
+---
+# Comms stub: Core's WhatsApp client points here and has no access token, so nothing can leave the namespace.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: comms-stub, namespace: "${NS}" }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: comms-stub } }
+  template:
+    metadata: { labels: { app: comms-stub } }
+    spec:
+      serviceAccountName: preview
+      containers:
+        - name: stub
+          image: hashicorp/http-echo:1.0
+          args: ["-listen=:8080", "-text={\"messages\":[{\"id\":\"preview-stub\"}]}"]
+          ports: [{ containerPort: 8080 }]
+          resources: { requests: { cpu: 10m, memory: 16Mi }, limits: { cpu: 100m, memory: 64Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: comms-stub, namespace: "${NS}" }
+spec: { selector: { app: comms-stub }, ports: [{ port: 80, targetPort: 8080 }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: core, namespace: "${NS}" }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: core } }
+  template:
+    metadata: { labels: { app: core } }
+    spec:
+      serviceAccountName: preview
+      containers:
+        - name: core
+          image: ${IMAGE_CORE}
+          ports: [{ name: http, containerPort: 8080 }, { name: management, containerPort: 8081 }]
+          env:
+            - { name: DB_URL, value: "jdbc:postgresql://postgres:5432/nabd" }
+            - { name: DB_USER, value: nabd_app }
+            - { name: DB_POOL_SIZE, value: "5" }
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: preview-secrets, key: db-app-password } } }
+            - { name: APP_CRYPTO_KEY, valueFrom: { secretKeyRef: { name: preview-secrets, key: app-crypto-key } } }
+            - { name: APP_CORS_ALLOWED_ORIGINS, value: "https://${HOST}" }
+            - { name: FRONTEND_BASE_URL, value: "https://${HOST}" }
+            - { name: WHATSAPP_API_BASE_URL, value: "http://comms-stub/v21.0" }
+          resources: { requests: { cpu: 500m, memory: 768Mi }, limits: { cpu: "2", memory: 1536Mi } }
+          readinessProbe: { tcpSocket: { port: http }, periodSeconds: 5, failureThreshold: 60 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: core, namespace: "${NS}" }
+spec: { selector: { app: core }, ports: [{ port: 80, targetPort: http }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web, namespace: "${NS}" }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      serviceAccountName: preview
+      containers:
+        - name: web
+          image: ${IMAGE_WEB}   # built with NEXT_PUBLIC_API_BASE_URL=https://${HOST}/v1 (infra/preview/web.Dockerfile)
+          ports: [{ containerPort: 3000 }]
+          resources: { requests: { cpu: 250m, memory: 256Mi }, limits: { cpu: "1", memory: 768Mi } }
+          readinessProbe: { httpGet: { path: /login, port: 3000 }, periodSeconds: 5 }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: web, namespace: "${NS}" }
+spec: { selector: { app: web }, ports: [{ port: 80, targetPort: 3000 }] }
+---
+# Edge: one host per PR, /v1 to Core, everything else to the staff web app.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: edge, namespace: "${NS}" }
+spec:
+  ingressClassName: nginx
+  tls: [{ hosts: ["${HOST}"] }]
+  rules:
+    - host: ${HOST}
+      http:
+        paths:
+          - { path: /v1, pathType: Prefix, backend: { service: { name: core, port: { number: 80 } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 80 } } } }

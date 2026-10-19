@@ -1,0 +1,113 @@
+# FEF-049: stage 7 browser smoke. J1 walk-in < 45 s, J5 sign < 2 s, J6 allergy warning < 500 ms, J9 checkout < 60 s,
+# in Chromium, IN + KSA tenants, desktop + 390px, 4 shards (budget 8 min), axe critical/serious fails the step,
+# one retry: fail-then-pass is reported flaky; 3 flaky runs in 5 days auto-quarantine the case with its owner.
+# Called by preview.yml (OPS-036) with the preview URLs and the seed artifact. Harness: frontend/tests/e2e/smoke/.
+name: e2e-smoke
+on:
+  workflow_call:
+    inputs:
+      app_url: { type: string, required: true }
+      api_url: { type: string, required: true }        # ends in /v1
+      seed_artifact: { type: string, default: preview-seed }   # logins.json + fixtures.json written by the seed loader
+  workflow_dispatch: {}                                # runs the self-check only (no preview needed)
+permissions:
+  contents: read
+env:
+  NODE_VERSION: "22"
+  PLAYWRIGHT_VERSION: "1.64.1"
+  AXE_VERSION: "4.10.2"
+
+jobs:
+  smoke:
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix: { shard: [1, 2, 3, 4] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: Playwright Chromium + axe-core (kept out of the app's lockfile)
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e" && cd "$RUNNER_TEMP/e2e" && npm init -y >/dev/null
+          npm i --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" "axe-core@$AXE_VERSION"
+          npx playwright install --with-deps chromium
+      - name: restore flaky history (quarantine list)
+        uses: actions/cache/restore@v4
+        with: { path: smoke-state, key: "smoke-flaky-${{ github.run_id }}", restore-keys: smoke-flaky- }
+      - uses: actions/download-artifact@v4
+        with: { name: "${{ inputs.seed_artifact }}", path: seed }
+      - name: "shard ${{ matrix.shard }}/4"
+        env:
+          APP: ${{ inputs.app_url }}
+          SMOKE_API: ${{ inputs.api_url }}
+          SMOKE_TARGET: preview
+          SMOKE_LOGINS: seed/logins.json
+          SMOKE_FIXTURES: seed/fixtures.json
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/e2e/node_modules/playwright/index.mjs
+          PW_CHROMIUM: ""
+          AXE_CORE_PATH: ${{ runner.temp }}/e2e/node_modules/axe-core/axe.min.js
+        run: |
+          [ -f smoke-state/quarantine.json ] && export SMOKE_QUARANTINE=smoke-state/quarantine.json
+          node frontend/tests/e2e/smoke/run-smoke.mjs --shard=${{ matrix.shard }}/4 --retries=1 --out=smoke-results
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: "smoke-results-${{ matrix.shard }}", path: smoke-results, retention-days: 14 }
+
+  report:
+    needs: smoke
+    if: always() && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - uses: actions/download-artifact@v4
+        with: { pattern: smoke-results-*, merge-multiple: true, path: smoke-results }
+      - uses: actions/cache/restore@v4
+        with: { path: smoke-state, key: "smoke-flaky-${{ github.run_id }}", restore-keys: smoke-flaky- }
+      - name: flaky detection, quarantine and gate
+        id: gate
+        run: |
+          mkdir -p smoke-state
+          set +e; node frontend/tests/e2e/smoke/flaky.mjs --results=smoke-results --history=smoke-state/flaky-history.json --out=smoke-state; rc=$?; set -e
+          cat smoke-state/report.md >> "$GITHUB_STEP_SUMMARY"
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+      - name: save flaky history
+        if: always()
+        uses: actions/cache/save@v4
+        with: { path: smoke-state, key: "smoke-flaky-${{ github.run_id }}" }
+      - name: block on failures that are not quarantined
+        run: exit ${{ steps.gate.outputs.rc }}
+
+  # Proves the suite can fail: J9 against a stack whose checkout write is broken must fail, and pass when it is not.
+  selfcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - name: Playwright Chromium + axe-core
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e" && cd "$RUNNER_TEMP/e2e" && npm init -y >/dev/null
+          npm i --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" "axe-core@$AXE_VERSION"
+          npx playwright install --with-deps chromium
+      - name: build and start the staff web app
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund && npx next build
+          (npx next start -p 3000 &) ; for i in $(seq 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 1; done
+      - name: J9 must fail on a broken stack and pass on a healthy one
+        env:
+          APP: http://localhost:3000
+          SMOKE_TARGET: mock
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/e2e/node_modules/playwright/index.mjs
+          PW_CHROMIUM: ""
+          AXE_CORE_PATH: ${{ runner.temp }}/e2e/node_modules/axe-core/axe.min.js
+        run: |
+          if node frontend/tests/e2e/smoke/run-smoke.mjs --only=J9 --break --retries=0 --out=selfcheck; then echo "smoke MISSED the broken checkout"; exit 1; fi
+          node frontend/tests/e2e/smoke/run-smoke.mjs --only=J9 --retries=0 --out=selfcheck-ok

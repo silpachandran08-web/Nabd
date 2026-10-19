@@ -1,0 +1,14 @@
+{
+  "_source": "RBAC Matrix sheet of 'Nabd HMS - Implementation Task Plan v2.xlsx'. Y = granted; N, '-' and P (plan-dependent pharmacy) are not granted. Compliance & Audit has no backend module key yet, so it is left out. Owner mirrors provisioning (ProvisioningRepository.insertBuiltInOwnerRole: every module, every flag). Used by the smoke harness (mock sign-in) and by tools/synthetic-data (preview seed).",
+  "owner": { "name": "Owner", "builtIn": true, "full": ["staff", "patients", "queue", "setup", "clinical", "billing", "specialty_dental", "reports", "pharmacy", "packages", "nursing", "departments"] },
+  "doctor": { "name": "Doctor", "grants": {
+    "patients": ["view", "create", "edit"], "queue": ["view", "edit"], "clinical": ["view", "create", "edit", "delete"],
+    "billing": ["view"], "packages": ["view", "create", "edit"], "reports": ["view"] } },
+  "receptionist": { "name": "Receptionist", "grants": {
+    "patients": ["view", "create", "edit"], "queue": ["view", "create", "edit"], "billing": ["view", "create", "edit", "approve"], "packages": ["view", "create"] } },
+  "nurse": { "name": "Nurse", "grants": {
+    "patients": ["view", "edit"], "queue": ["view", "edit"], "clinical": ["view", "create", "edit"], "packages": ["view", "edit"] } },
+  "front_desk_vitals": { "name": "Front Desk + Vitals", "grants": {
+    "patients": ["view", "create", "edit"], "queue": ["view", "create", "edit"], "clinical": ["view", "create"],
+    "billing": ["view", "create", "edit", "approve"], "packages": ["view", "create"] } }
+}
