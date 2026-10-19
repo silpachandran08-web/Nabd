@@ -13,8 +13,10 @@ import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
-import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
+import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, type CheckInResult } from "../components/arrivals/CheckInDialog";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { api, ApiError, errorText, intentKeys, problemMessage } from "../lib/api";
+import type { CreatedPatient, DuplicateCandidate, QueueEntry as CheckedInEntry } from "../../packages/api-client/types.ts";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
@@ -35,8 +37,6 @@ const DELAY_PRESETS = [10, 15, 30, 45, 60];
 // LIVE-04: each flag is exactly what its control's endpoint needs (see the setGrants effect).
 type Grants = { queueCreate: boolean; queueEdit: boolean; checkout: boolean; vitalsRecord: boolean; patientsView: boolean; patientsCreate: boolean };
 type StaffOption = { id: string; name: string; departmentName?: string | null };
-// Matches DuplicateCandidatesResponse/PatientMatchCandidateResponse (PatientService.register's 409 body).
-type DuplicateCandidate = { patientId: string; name: string; phone: string; matchScore: number };
 // NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
 type CallbackEntry = { appointmentId: string; patientId: string; patientName: string; doctorId: string; startTime: string; status: string };
 // A today's-schedule appointment not yet checked in — the "Check in" quick action's picker.
@@ -57,7 +57,6 @@ const VISIT_TYPE_LABEL: Record<string, string> = {
   appointment: "Appointment", follow_up: "Follow-up", walk_in: "Walk-in", transfer: "Transfer",
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const POLL_MS = 15_000;
 // NB-143: a small fixed reason-code catalogue for this one call site — not NB-011's generic
 // shared reason-code service (doesn't exist), same "skip the generic service" trick used all
@@ -191,6 +190,8 @@ function ArrivalsPageInner() {
   const [presentingComplaint, setPresentingComplaint] = useState("");
   const [paymentMode, setPaymentMode] = useState("cash");
   const [modalError, setModalError] = useState<string | null>(null);
+  const [fieldErrs, setFieldErrs] = useState<Record<string, string>>({}); // Problem+JSON errors[] by field -> aria-invalid on the matching input
+  const keys = useRef(intentKeys()); // Idempotency-Key per register / check-in intent, reused on a user retry of the same request
   const [submitting, setSubmitting] = useState(false);
 
   const [waitEstimates, setWaitEstimates] = useState<Record<string, number>>({});
@@ -454,6 +455,7 @@ function ArrivalsPageInner() {
   // chose "Different person" — the server then files the record under duplicate review.
   async function registerAndCheckIn(confirmedNotDuplicate: boolean) {
     setModalError(null);
+    setFieldErrs({});
     if (!doctorId) {
       setModalError("Pick a doctor.");
       return;
@@ -475,55 +477,47 @@ function ArrivalsPageInner() {
           setModalError("Confirm the guardian's consent and how it was given.");
           return;
         }
-        const res = await authedFetch("/patients", {
-          method: "POST",
-          body: JSON.stringify({
-            name: newName, phone: newPhone, dob: newDob, gender: newGender,
-            guardianId: minor ? guardian?.id ?? null : null,
-            ...(minor ? { guardianConsent: { confirmed: true, channel: guardianChannel } } : {}),
-            ...(confirmedNotDuplicate ? { confirmedNotDuplicate: true } : {}),
-          }),
-        });
-        if (!res) return;
-        if (res.status === 409) {
-          const body: { candidates: DuplicateCandidate[] } = await res.json().catch(() => ({ candidates: [] }));
-          setDuplicateCandidates([...body.candidates].sort((x, y) => y.matchScore - x.matchScore));
-          setModalError(body.candidates.length > 0
-            ? "Possible existing records found. Review the matches below — use an existing patient, or confirm this is a different person."
-            : "A similar patient already exists — search for them above instead of registering again.");
+        const regBody = {
+          name: newName, phone: newPhone, dob: newDob, gender: newGender,
+          guardianId: minor ? guardian?.id ?? null : null,
+          ...(minor ? { guardianConsent: { confirmed: true, channel: guardianChannel } } : {}),
+          ...(confirmedNotDuplicate ? { confirmedNotDuplicate: true } : {}),
+        };
+        try {
+          patientId = (await api.post<CreatedPatient>("/patients", regBody, { idempotencyKey: keys.current.get("register", regBody) })).id;
+          keys.current.done("register");
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 409) {
+            const candidates = (e.problem.candidates as DuplicateCandidate[] | undefined) ?? [];
+            setDuplicateCandidates([...candidates].sort((x, y) => y.matchScore - x.matchScore));
+            setModalError(candidates.length > 0
+              ? "Possible existing records found. Review the matches below — use an existing patient, or confirm this is a different person."
+              : "A similar patient already exists — search for them above instead of registering again.");
+            return;
+          }
+          if (e instanceof ApiError && e.errors.length > 0) setFieldErrs(e.fieldErrors());
+          setModalError(errorText(e, "Couldn't register patient."));
           return;
         }
-        if (!res.ok) {
-          setModalError(await problemMessage(res, "Couldn't register patient."));
-          return;
-        }
-        patientId = (await res.json()).id;
         patientName = newName;
         registeredRef.current = { id: patientId as string, name: newName };
       }
 
-      const ciRes = await authedFetch("/queue/check-in", {
-        method: "POST",
-        body: JSON.stringify({
-          patientId, doctorId,
-          presentingComplaint: presentingComplaint.trim() || null,
-          paymentMode,
-        }),
-      });
-      if (!ciRes) return;
-      if (!ciRes.ok) {
-        setModalError(await problemMessage(ciRes, "Couldn't check in."));
+      const ciBody = { patientId, doctorId, presentingComplaint: presentingComplaint.trim() || null, paymentMode };
+      let entry: CheckedInEntry;
+      try {
+        entry = await api.post<CheckedInEntry>("/queue/check-in", ciBody, { idempotencyKey: keys.current.get("checkin", ciBody) });
+      } catch (e) {
+        setModalError(errorText(e, "Couldn't check in."));
         return;
       }
-      const entry: { id?: string; tokenNumber: number } = await ciRes.json();
+      keys.current.done("checkin");
       setShowModal(false);
       setCheckInResult({
         tokenNumber: entry.tokenNumber, patientName, doctorId,
         doctorName: staff.find((s) => s.id === doctorId)?.name ?? "", entryId: entry.id,
       });
       void load();
-    } catch {
-      setModalError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -1050,23 +1044,27 @@ function ArrivalsPageInner() {
               <>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newName">Name</label>
-                  <input id="newName" className={styles.input} value={newName} onChange={(e) => { registeredRef.current = null; setNewName(e.target.value); }} />
+                  <input id="newName" className={styles.input} value={newName} onChange={(e) => { registeredRef.current = null; setFieldErrs({}); setNewName(e.target.value); }} aria-invalid={fieldErrs.name ? true : undefined} aria-describedby={fieldErrs.name ? "newName-err" : undefined} />
+                  {fieldErrs.name && <div id="newName-err" className={styles.formError}>{fieldErrs.name}</div>}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newPhone">Phone</label>
-                  <input id="newPhone" className={styles.input} inputMode="tel" value={newPhone} onChange={(e) => { registeredRef.current = null; setNewPhone(e.target.value); }} />
+                  <input id="newPhone" className={styles.input} inputMode="tel" value={newPhone} onChange={(e) => { registeredRef.current = null; setFieldErrs({}); setNewPhone(e.target.value); }} aria-invalid={fieldErrs.phone ? true : undefined} aria-describedby={fieldErrs.phone ? "newPhone-err" : undefined} />
+                  {fieldErrs.phone && <div id="newPhone-err" className={styles.formError}>{fieldErrs.phone}</div>}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newDob">Date of birth</label>
-                  <input id="newDob" type="date" className={styles.input} value={newDob} max={new Date().toLocaleDateString("en-CA")} onChange={(e) => { registeredRef.current = null; setNewDob(e.target.value); }} />
+                  <input id="newDob" type="date" className={styles.input} value={newDob} max={new Date().toLocaleDateString("en-CA")} onChange={(e) => { registeredRef.current = null; setFieldErrs({}); setNewDob(e.target.value); }} aria-invalid={fieldErrs.dob ? true : undefined} aria-describedby={fieldErrs.dob ? "newDob-err" : undefined} />
+                  {fieldErrs.dob && <div id="newDob-err" className={styles.formError}>{fieldErrs.dob}</div>}
                 </div>
                 <div className={styles.field}>
                   <label className={styles.label} htmlFor="newGender">Gender</label>
-                  <select id="newGender" className={styles.select} value={newGender} onChange={(e) => { registeredRef.current = null; setNewGender(e.target.value); }}>
+                  <select id="newGender" className={styles.select} value={newGender} onChange={(e) => { registeredRef.current = null; setFieldErrs({}); setNewGender(e.target.value); }} aria-invalid={fieldErrs.gender ? true : undefined} aria-describedby={fieldErrs.gender ? "newGender-err" : undefined}>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                     <option value="other">Other</option>
                   </select>
+                  {fieldErrs.gender && <div id="newGender-err" className={styles.formError}>{fieldErrs.gender}</div>}
                 </div>
                 {minor && (
                   <div className={styles.field}>
@@ -1154,7 +1152,7 @@ function ArrivalsPageInner() {
         </Dialog>
       )}
 
-      {checkInResult && <CheckInResultDialog result={checkInResult} authedFetch={authedFetch} onClose={closeResult} />}
+      {checkInResult && <CheckInResultDialog result={checkInResult} onClose={closeResult} />}
 
       {checkinTarget && (
         <CheckInDialog
@@ -1163,7 +1161,6 @@ function ArrivalsPageInner() {
             nextAppointmentId: checkinTarget.id, nextDoctorId: checkinTarget.doctorId,
             nextDoctorName: checkinTarget.doctorName, nextAppointment: checkinTarget.startTime,
           }}
-          authedFetch={authedFetch}
           onClose={closeCheckinTarget}
           onCheckedIn={() => void load()}
           onDone={closeCheckinTarget}

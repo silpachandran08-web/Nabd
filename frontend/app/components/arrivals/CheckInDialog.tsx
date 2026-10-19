@@ -1,64 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Dialog from "../ui/Dialog";
 import { Skeleton } from "../ui/StateViews";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../checkout/paymentMethods";
 import { getIdentity } from "../../lib/session";
+import { api, errorText, intentKeys } from "../../lib/api";
+import type { QueueEntry, StaffOption, WaitEstimate } from "../../../packages/api-client/types.ts";
 import styles from "./checkin.module.css";
 
 // One check-in overlay shared by Arrivals and Patients (REC-041, REC-017): confirm -> POST
 // /v1/queue/check-in -> result slip with token, queue position, estimated wait and print.
 
-export type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-
-type QueueEntryLite = { id?: string; doctorId?: string; tokenNumber: number; priority?: boolean; status?: string; createdAt?: string };
 
 export type CheckInResult = { tokenNumber: number; patientName: string; doctorId: string; doctorName: string; entryId?: string };
-
-/** Maps a failed response to something the front desk can act on (a bare 500 says nothing). */
-export async function problemMessage(res: Response, fallback: string): Promise<string> {
-  if (res.status >= 500) return "The server had a problem and couldn't finish this. Try again in a moment; if it keeps happening, tell your clinic admin.";
-  const p: { title?: string; detail?: string } | null = await res.json().catch(() => null);
-  // S7-B02: a 403 carries the server's reason (e.g. vitals-correction-forbidden); generic only when it has none.
-  if (res.status === 403) return p?.detail || "Your role isn't allowed to do this.";
-  return p?.detail || p?.title || fallback;
-}
 
 const WAITING = ["checked_in", "waiting", "billing_pending", "vitals_pending", "vitals_done"];
 
 /** Token slip shown after any successful check-in. Position and wait are best-effort reads. */
-export function CheckInResultDialog({ result, authedFetch, onClose }: { result: CheckInResult; authedFetch: AuthedFetch; onClose: () => void }) {
+export function CheckInResultDialog({ result, onClose }: { result: CheckInResult; onClose: () => void }) {
   const [position, setPosition] = useState<number | null | undefined>(undefined);
   const [waitMin, setWaitMin] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve().then(async () => {
-      try {
-        const [qRes, wRes] = await Promise.all([
-          authedFetch("/queue"),
-          authedFetch(`/queue/wait-estimate?doctorId=${encodeURIComponent(result.doctorId)}`),
-        ]);
-        if (cancelled) return;
-        if (qRes?.ok) {
-          const list: QueueEntryLite[] = await qRes.json();
-          const ahead = list
-            .filter((e) => e.doctorId === result.doctorId && WAITING.includes(e.status ?? "waiting"))
-            .sort((a, b) => Number(!!b.priority) - Number(!!a.priority) || new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
-          const idx = ahead.findIndex((e) => (result.entryId ? e.id === result.entryId : e.tokenNumber === result.tokenNumber));
-          if (!cancelled) setPosition(idx >= 0 ? idx + 1 : null);
-        } else setPosition(null);
-        if (wRes?.ok) {
-          const w: { estimatedMinutes?: number } = await wRes.json();
-          if (!cancelled) setWaitMin(typeof w.estimatedMinutes === "number" ? w.estimatedMinutes : null);
-        } else setWaitMin(null);
-      } catch {
-        if (!cancelled) { setPosition(null); setWaitMin(null); }
-      }
+      // Best-effort reads: each one that fails leaves its fact as "—".
+      const [list, wait] = await Promise.all([
+        api.get<QueueEntry[]>("/queue").catch(() => null),
+        api.get<WaitEstimate>(`/queue/wait-estimate?doctorId=${encodeURIComponent(result.doctorId)}`).catch(() => null),
+      ]);
+      if (cancelled) return;
+      if (list) {
+        const ahead = list
+          .filter((e) => e.doctorId === result.doctorId && WAITING.includes(e.status ?? "waiting"))
+          .sort((a, b) => Number(!!b.priority) - Number(!!a.priority) || new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+        const idx = ahead.findIndex((e) => (result.entryId ? e.id === result.entryId : e.tokenNumber === result.tokenNumber));
+        setPosition(idx >= 0 ? idx + 1 : null);
+      } else setPosition(null);
+      setWaitMin(typeof wait?.estimatedMinutes === "number" ? wait.estimatedMinutes : null);
     });
     return () => { cancelled = true; };
-  }, [authedFetch, result]);
+  }, [result]);
 
   const loading = position === undefined || waitMin === undefined;
   return (
@@ -119,12 +102,12 @@ export type CheckInPatient = {
  * otherwise it's a walk-in for the chosen doctor. `onCheckedIn` fires on success (refresh the
  * list); `onDone` fires when the token slip is dismissed (close the dialog).
  */
-export function CheckInDialog({ patient, authedFetch, onClose, onDone, onCheckedIn }: {
-  patient: CheckInPatient; authedFetch: AuthedFetch; onClose: () => void;
+export function CheckInDialog({ patient, onClose, onDone, onCheckedIn }: {
+  patient: CheckInPatient; onClose: () => void;
   onDone: (token: number) => void; onCheckedIn?: (token: number) => void;
 }) {
   const booked = !!(patient.nextAppointmentToday && patient.nextAppointmentId && patient.nextDoctorId);
-  const [doctors, setDoctors] = useState<{ id: string; name: string }[] | null>(null);
+  const [doctors, setDoctors] = useState<StaffOption[] | null>(null);
   const [doctorId, setDoctorId] = useState(patient.nextDoctorId ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -132,18 +115,17 @@ export function CheckInDialog({ patient, authedFetch, onClose, onDone, onChecked
   const [complaint, setComplaint] = useState("");
   const [paymentMode, setPaymentMode] = useState("cash");
   const [region] = useState(() => getIdentity()?.tenantRegion);
+  const keys = useRef(intentKeys()); // one Idempotency-Key per check-in intent, reused when the same request is re-sent
 
   useEffect(() => {
     if (booked) return;
     let cancelled = false;
     void Promise.resolve().then(async () => {
-      const res = await authedFetch("/staff/roster");
-      if (cancelled || !res) return;
-      const list: { id: string; name: string }[] = res.ok ? await res.json() : [];
+      const list = await api.get<StaffOption[]>("/staff/roster").catch(() => []);
       if (!cancelled) setDoctors(list);
     });
     return () => { cancelled = true; };
-  }, [booked, authedFetch]);
+  }, [booked]);
 
   const finish = useCallback(() => { if (result) onDone(result.tokenNumber); }, [result, onDone]);
 
@@ -156,25 +138,20 @@ export function CheckInDialog({ patient, authedFetch, onClose, onDone, onChecked
       const body = booked
         ? { patientId: patient.id, doctorId: patient.nextDoctorId, appointmentId: patient.nextAppointmentId, ...intake }
         : { patientId: patient.id, doctorId, ...intake };
-      const res = await authedFetch("/queue/check-in", { method: "POST", body: JSON.stringify(body) });
-      if (!res) return;
-      if (!res.ok) {
-        setError(await problemMessage(res, "Couldn't check the patient in."));
-        return;
-      }
-      const entry: QueueEntryLite = await res.json();
+      const entry = await api.post<QueueEntry>("/queue/check-in", body, { idempotencyKey: keys.current.get("checkin", body) });
+      keys.current.done("checkin");
       const dId = (booked ? patient.nextDoctorId : doctorId) ?? "";
       const dName = booked ? patient.nextDoctorName ?? "" : doctors?.find((d) => d.id === dId)?.name ?? "";
       setResult({ tokenNumber: entry.tokenNumber, patientName: patient.name, doctorId: dId, doctorName: dName, entryId: entry.id });
       onCheckedIn?.(entry.tokenNumber);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      setError(errorText(e, "Couldn't check the patient in."));
     } finally {
       setSaving(false);
     }
   }
 
-  if (result) return <CheckInResultDialog result={result} authedFetch={authedFetch} onClose={finish} />;
+  if (result) return <CheckInResultDialog result={result} onClose={finish} />;
 
   const time = patient.nextAppointment
     ? new Date(patient.nextAppointment).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";

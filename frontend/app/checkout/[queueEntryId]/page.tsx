@@ -11,27 +11,8 @@ import { can } from "../../lib/permissions";
 import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
-import { apiFetch, goLogin } from "../../lib/apiClient";
-
-// Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
-type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
-type PrescribedItem = { drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null };
-type CheckoutContext = {
-  queueEntryId: string; patientName: string; doctorName: string; visitType: string;
-  followUpEligible: boolean; currency: string; charges: Charge[]; pendingProcedures: Charge[];
-  prescribedItems: PrescribedItem[]; departmentId: string; queueStatus: string;
-};
-type FlowStep = { stepType: string };
-type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
-type Payment = { id: string; method: string; amount: number; recordedAt: string };
-type Invoice = {
-  id: string; invoiceNumber: string; patientName: string; doctorName: string; currency: string;
-  subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
-  balanceDue: number; status: string; lineItems: LineItem[]; payments: Payment[];
-};
-type Problem = { type?: string; title: string; detail: string };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+import { api, ApiError, errorText, intentKeys } from "../../lib/api";
+import type { Charge, CheckoutContext, FlowStep, Invoice, LineItem } from "../../../packages/api-client/types.ts";
 
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
@@ -56,6 +37,7 @@ function resolveSequence(steps: FlowStep[]): string[] {
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -90,42 +72,13 @@ export default function CheckoutPage() {
   const [continueError, setContinueError] = useState<string | null>(null);
   const [showAddMore, setShowAddMore] = useState(false);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  const keys = useRef(intentKeys()); // Idempotency-Key per user intent: reused on a retry of the same bill/payment/step
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const ctxRes = await authedFetch(`/billing/checkout/${queueEntryId}`);
-      if (!ctxRes) return;
-      if (ctxRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!ctxRes.ok) {
-        setError("Couldn't load checkout details. Try again.");
-        return;
-      }
-      const ctx: CheckoutContext = await ctxRes.json();
+      const ctx = await api.get<CheckoutContext>(`/billing/checkout/${queueEntryId}`);
       setContext(ctx);
       if (ctx.pendingProcedures.length > 0) {
         setItems(ctx.pendingProcedures.map((c) => ({
@@ -133,20 +86,17 @@ export default function CheckoutPage() {
           unitPrice: c.baseAmount, taxRatePercent: c.taxRatePercent,
         })));
       }
-
-      const flowRes = await authedFetch(`/departments/${ctx.departmentId}/flow`);
-      if (flowRes?.ok) setFlowSteps(await flowRes.json());
-
-      const invRes = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`);
-      if (invRes?.status === 200) {
-        setInvoice(await invRes.json());
-      }
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      // Best-effort reads: a failure leaves the defaults (no flow steps / no invoice yet).
+      setFlowSteps(await api.get<FlowStep[]>(`/departments/${ctx.departmentId}/flow`).catch(() => []));
+      const inv = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+      if (inv) setInvoice(inv);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      else setError(e instanceof ApiError ? "Couldn't load checkout details. Try again." : "Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, queueEntryId]);
+  }, [queueEntryId]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -198,27 +148,20 @@ export default function CheckoutPage() {
     }
     setCreating(true);
     try {
-      const res = await authedFetch(`/billing/checkout/${queueEntryId}`, {
-        method: "POST",
-        body: JSON.stringify({
-          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          ...(canDiscount ? { discount: discountNum } : {}),
-        }),
-      });
-      if (!res) return null;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
-        setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
-        return null;
-      }
-      const inv: Invoice = await res.json();
+      const body = {
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
+        ...(canDiscount ? { discount: discountNum } : {}),
+      };
+      const inv = await api.post<Invoice>(`/billing/checkout/${queueEntryId}`, body, { idempotencyKey: keys.current.get("bill", body) });
+      keys.current.done("bill");
       setInvoice(inv);
       setItems([]); // picker resets — a later billing checkpoint starts its "add more" list fresh
       setDiscount("0");
       setShowAddMore(false);
       return inv;
-    } catch {
-      setCreateError("Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
+    } catch (e) {
+      // A server answer is a refusal; no answer (or a timeout) leaves the outcome unknown.
+      setCreateError(e instanceof ApiError ? stockErrorMessage(e.problem, "Couldn't generate the invoice.") : "Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
       return null;
     } finally {
       setCreating(false);
@@ -248,27 +191,27 @@ export default function CheckoutPage() {
         const before = inv.payments.length;
         let next: Invoice;
         try {
-          const res = await authedFetch(`/billing/invoices/${inv.id}/payments`, { method: "POST", body: JSON.stringify({ method: row.method, amount: amt / 100 }) });
-          if (!res) return;
-          if (!res.ok) {
-            const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
-            setPaymentError(p.detail || "Couldn't record payment.");
+          const body = { method: row.method, amount: amt / 100 };
+          next = await api.post<Invoice>(`/billing/invoices/${inv.id}/payments`, body, { idempotencyKey: keys.current.get(`pay:${inv.id}`, body) });
+          keys.current.done(`pay:${inv.id}`);
+        } catch (e) {
+          if (e instanceof ApiError) {
+            setPaymentError(e.detail || "Couldn't record payment.");
             return;
           }
-          next = await res.json();
-        } catch {
           // Outcome unknown: read the invoice back instead of guessing, so a payment that landed is never re-sent.
-          const r = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
-          if (!r?.ok) {
+          const r = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+          if (!r) {
             setPaymentError("Couldn't confirm whether that payment was recorded. Reload this page and check the Payments list before collecting again.");
             return;
           }
-          next = await r.json();
+          next = r;
           if (next.payments.length <= before) {
             setInvoice(next);
             setPaymentError("That payment did not go through and nothing was recorded. Try again.");
             return;
           }
+          keys.current.done(`pay:${inv.id}`);
         }
         setInvoice(next);
         inv = next;
@@ -311,17 +254,10 @@ export default function CheckoutPage() {
         setContinueError("This visit has no next step to continue to.");
         return;
       }
-      const res = await authedFetch(`/queue/${queueEntryId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: next }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't continue the visit." }));
-        setContinueError(p.detail || "Couldn't continue the visit.");
-        return;
-      }
+      await api.patch(`/queue/${queueEntryId}/status`, { status: next }, { idempotencyKey: keys.current.get("advance", next) });
       router.push("/arrivals");
+    } catch (e) {
+      setContinueError(errorText(e, "Couldn't continue the visit."));
     } finally {
       setContinuing(false);
     }

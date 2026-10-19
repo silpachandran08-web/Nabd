@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
 import { formatMoney } from "../../lib/money";
@@ -10,23 +10,10 @@ import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/p
 import AccessGate from "../../components/ui/AccessGate";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
-import { apiFetch, goLogin } from "../../lib/apiClient";
+import { api, ApiError, errorText, intentKeys } from "../../lib/api";
+import type { Charge, Invoice, LineItem, OtcContext } from "../../../packages/api-client/types.ts";
 
-// NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
-// /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
-type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
-type OtcContext = { currency: string; charges: Charge[] };
-type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
-type Payment = { id: string; method: string; amount: number; recordedAt: string };
-type Invoice = {
-  id: string; invoiceNumber: string; patientName: string; currency: string;
-  subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
-  balanceDue: number; status: string; lineItems: LineItem[]; payments: Payment[];
-};
-type Problem = { type?: string; title: string; detail: string };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
+// NB-186: a counter sale — no patient record, no queue token (GET /billing/otc-charges, POST /billing/otc-checkout).
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -67,54 +54,22 @@ function OtcCheckoutInner() {
   const [recording, setRecording] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  const keys = useRef(intentKeys()); // Idempotency-Key per user intent: reused when the same sale/payment is re-sent
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await authedFetch("/billing/otc-charges");
-      if (!res) return;
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (res.status === 409) {
-        // PHA-010: 409 otc-not-available (pharmacy mode is external) - show the server detail.
-        const p: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
-        setError(p.detail || "Counter sales aren't available for this pharmacy mode.");
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load charges. Try again.");
-        return;
-      }
-      setContext(await res.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setContext(await api.get<OtcContext>("/billing/otc-charges"));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      // PHA-010: 409 otc-not-available (pharmacy mode is external) - show the server detail.
+      else if (e instanceof ApiError && e.status === 409) setError(e.detail || "Counter sales aren't available for this pharmacy mode.");
+      else setError(e instanceof ApiError ? "Couldn't load charges. Try again." : "Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -156,20 +111,14 @@ function OtcCheckoutInner() {
     }
     setCreating(true);
     try {
-      const res = await authedFetch("/billing/otc-checkout", {
-        method: "POST",
-        body: JSON.stringify({
-          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          ...(canDiscount ? { discount: discountNum } : {}),
-        }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
-        setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
-        return;
-      }
-      setInvoice(await res.json());
+      const body = {
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
+        ...(canDiscount ? { discount: discountNum } : {}),
+      };
+      setInvoice(await api.post<Invoice>("/billing/otc-checkout", body, { idempotencyKey: keys.current.get("sale", body) }));
+      keys.current.done("sale");
+    } catch (e) {
+      setCreateError(e instanceof ApiError ? stockErrorMessage(e.problem, "Couldn't generate the invoice.") : errorText(e, ""));
     } finally {
       setCreating(false);
     }
@@ -185,18 +134,12 @@ function OtcCheckoutInner() {
     }
     setRecording(true);
     try {
-      const res = await authedFetch(`/billing/invoices/${invoice.id}/payments`, {
-        method: "POST",
-        body: JSON.stringify({ method, amount: amt }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
-        setPaymentError(p.detail || "Couldn't record payment.");
-        return;
-      }
-      setInvoice(await res.json());
+      const body = { method, amount: amt };
+      setInvoice(await api.post<Invoice>(`/billing/invoices/${invoice.id}/payments`, body, { idempotencyKey: keys.current.get(`pay:${invoice.id}`, body) }));
+      keys.current.done(`pay:${invoice.id}`);
       setAmount("");
+    } catch (e) {
+      setPaymentError(e instanceof ApiError ? e.detail || "Couldn't record payment." : errorText(e, ""));
     } finally {
       setRecording(false);
     }
