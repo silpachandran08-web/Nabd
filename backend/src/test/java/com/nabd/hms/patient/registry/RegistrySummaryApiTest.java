@@ -99,7 +99,7 @@ class RegistrySummaryApiTest extends ApiTestBase {
             jdbc.update("""
                     INSERT INTO appointments (tenant_id, patient_id, doctor_id, start_time, end_time, status)
                     SELECT ?, id, ?, st, st + interval '30 minutes', CASE WHEN random() < 0.2 THEN 'completed' ELSE 'scheduled' END
-                    FROM (SELECT id, now() + (1 + random() * 30) * interval '1 day' AS st FROM patients WHERE random() < 0.2) z""", tenantId, staffId);
+                    FROM (SELECT id, now() + row_number() OVER (ORDER BY id) * interval '30 minutes' AS st FROM patients WHERE random() < 0.2) z""", tenantId, staffId);
             jdbc.update("""
                     INSERT INTO chronic_conditions (tenant_id, patient_id, condition, status, review_due_date, recorded_by)
                     SELECT ?, id, 'Cond', CASE WHEN random() < 0.3 THEN 'resolved' ELSE 'active' END, current_date + (random() * 60 - 30)::int, ?

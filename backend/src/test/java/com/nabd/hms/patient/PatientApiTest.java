@@ -302,9 +302,13 @@ class PatientApiTest extends ApiTestBase {
         ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "patientId", patientId, "doctorId", doc.id().toString())), Map.class);
         String queueEntryId = (String) checkIn.getBody().get("id");
-        for (String next : new String[]{"waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending", "completed"}) {
+        for (String next : new String[]{"waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending"}) {
             exchange("/v1/queue/" + queueEntryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", next)), Map.class);
         }
+        // ACC-002: 'completed' is reached only through checkout, never a PATCH
+        exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         ResponseEntity<Map> visited = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class);
         assertThat(visited.getBody().get("lastVisitAt")).isNotNull();

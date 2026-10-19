@@ -128,7 +128,7 @@ class Acc003ArrivedTest extends ApiTestBase {
         Ctx c = ctx();
         String p = patient(c);
         for (int i = 0; i < 50; i++) {
-            UUID a = appt(c, p, noonToday(i), "scheduled");
+            UUID a = appt(c, p, noonToday(15 * i - 720), "scheduled"); // ACC-004: one doctor, so slots must not overlap
             List<HttpStatus> s = race(c, p, a, 2);
             assertThat(s).as("rep " + i).containsExactlyInAnyOrder(HttpStatus.CREATED, HttpStatus.CONFLICT);
             assertThat(sql("SELECT count(*) FROM queue_entries WHERE appointment_id = ?", a)).isEqualTo("1");
@@ -201,13 +201,13 @@ class Acc003ArrivedTest extends ApiTestBase {
         assertThat(sql("SELECT status FROM appointments WHERE id = ?", a)).isEqualTo("arrived");
         assertThat(sql("SELECT count(*) FROM appointments WHERE doctor_id = ?", c.doctor.id())).isEqualTo("1");
 
-        // an arrived appointment still occupies its slot (uq_appointments_doctor_slot covers arrived)
+        // an arrived appointment still occupies its slot (ACC-004 ex_appointments_doctor_overlap covers arrived)
         try {
             appt(c, p, start, "scheduled");
             org.junit.jupiter.api.Assertions.fail("slot of an arrived appointment was re-offered");
         } catch (IllegalStateException e) {
             assertThat(e.getCause()).isInstanceOf(SQLException.class);
-            assertThat(((SQLException) e.getCause()).getSQLState()).isEqualTo("23505");
+            assertThat(((SQLException) e.getCause()).getSQLState()).isEqualTo("23P01"); // exclusion_violation: ACC-004 replaced the unique slot index
         }
         // a still-scheduled appointment can be cancelled as before
         UUID other = appt(c, p, noonToday(30), "scheduled");
@@ -243,10 +243,14 @@ class Acc003ArrivedTest extends ApiTestBase {
 
         String leg2 = (String) ((Map) tr.getBody().get("newLeg")).get("id");
         String last = null;
-        for (String s : List.of("in_consult", "billing_pending", "checkout_pending", "completed")) {
+        for (String s : List.of("in_consult", "billing_pending", "checkout_pending")) {
             patchStatus(c, leg2, s); // illegal steps for this flow are 400s and change nothing
-            last = sql("SELECT status FROM queue_entries WHERE id = ?", UUID.fromString(leg2));
         }
+        // ACC-002: the last leg completes only through checkout
+        assertThat(exchange("/v1/billing/checkout/" + leg2, HttpMethod.POST, authedJsonBody(c.token, Map.of(
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        last = sql("SELECT status FROM queue_entries WHERE id = ?", UUID.fromString(leg2));
         assertThat(last).isEqualTo("completed");
         assertThat(sql("SELECT status FROM appointments WHERE id = ?", a)).isEqualTo("completed");
     }

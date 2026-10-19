@@ -177,7 +177,7 @@ class DelayAndCheckInDayApiTest extends ApiTestBase {
         assertThat(LocalDate.now(ZoneId.of(tz))).isNotEqualTo(LocalDate.now(ZoneId.of("UTC")));
         hoursEveryDay(c);
         String p = patient(c, "Zone Pat");
-        ResponseEntity<Map> appt = book(c, p, Instant.now().plus(5, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES));
+        ResponseEntity<Map> appt = book(c, p, nextQuarterHour());
         assertThat(appt.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(checkIn(c, p, appt.getBody().get("id")).getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
@@ -187,7 +187,12 @@ class DelayAndCheckInDayApiTest extends ApiTestBase {
         Ctx c = ctx("Asia/Dubai");
         hoursEveryDay(c);
         String p = patient(c, "Today Pat");
-        ResponseEntity<Map> appt = book(c, p, Instant.now().plus(5, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES));
+        ResponseEntity<Map> appt = book(c, p, nextQuarterHour());
         assertThat(checkIn(c, p, appt.getBody().get("id")).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+
+    /** ACC-004: bookings must sit on the 15-minute grid (hours start 00:00; every tz used here is on a quarter-hour offset). */
+    private static Instant nextQuarterHour() {
+        return Instant.ofEpochSecond((Instant.now().getEpochSecond() + 60 + 899) / 900 * 900);
     }
 }

@@ -37,6 +37,10 @@ class PatientRegistryApiTest extends ApiTestBase {
         SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "reg1@a.com", "+919800067001", false);
         String token = loginAndGetAccessToken(owner);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        // ACC-004: bookings must fall inside working hours; tomorrow 10:00 UTC
+        exchange("/v1/doctors/" + owner.id() + "/working-hours", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "dayOfWeek", today.plusDays(1).getDayOfWeek().getValue() % 7,
+                "startTime", "00:00:00", "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
 
         String inQueue = register(token, "Ananya Rao", "+919811177001", "1990-01-01", null);
         Map<String, Object> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
