@@ -176,7 +176,7 @@ public class StaffService {
                 Map.of("roleId", roleId, "scope", scope, "fieldGrants", fieldGrants));
         // ponytail: 'role_changed' is not in sessions.revoked_reason's CHECK yet (PLT-007 adds it); admin_revoke until then
         staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
-        eventPublisher.publish(tenantId, "iam.staff_role.changed.v1", Map.of("tenantId", tenantId.toString(),
+        eventPublisher.publish(tenantId, StaffRoleChangedHandler.TYPE, Map.of("tenantId", tenantId.toString(),
                 "staffId", id.toString(), "fromRoleId", before.roleId().toString(), "toRoleId", roleId.toString(),
                 "scopeChanged", scopeChanged));
     }
