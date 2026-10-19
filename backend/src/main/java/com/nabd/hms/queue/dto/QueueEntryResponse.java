@@ -11,5 +11,6 @@ public record QueueEntryResponse(UUID id, UUID appointmentId, UUID patientId, UU
                                   UUID priorityAcknowledgedBy, Instant priorityAcknowledgedAt, String source,
                                   String presentingComplaint, String paymentMode, Instant createdAt,
                                   String transferReason, String transferReasonNote,
-                                  Integer ageYears, String gender, String doctorName, int waitMinutes, String visitType) {
+                                  Integer ageYears, String gender, String doctorName, int waitMinutes, String visitType,
+                                  String appointmentStatus) {
 }

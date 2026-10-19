@@ -91,8 +91,14 @@ class AppointmentRepository {
     }
 
     void markTerminal(UUID tenantId, UUID id, String status) {
-        jdbc.update("UPDATE appointments SET status = ? WHERE tenant_id = ? AND id = ? AND status = 'scheduled'",
+        jdbc.update("UPDATE appointments SET status = ? WHERE tenant_id = ? AND id = ? AND status IN ('scheduled','arrived')",
                 status, tenantId, id);
+    }
+
+    /** ACC-003: the atomic scheduled -> arrived flip; 0 rows means someone else already checked it in (or it moved on). */
+    int markArrived(UUID tenantId, UUID id) {
+        return jdbc.update("UPDATE appointments SET status = 'arrived', arrived_at = now() WHERE tenant_id = ? AND id = ? AND status = 'scheduled'",
+                tenantId, id);
     }
 
     private RowMapper<AppointmentRow> mapper() {

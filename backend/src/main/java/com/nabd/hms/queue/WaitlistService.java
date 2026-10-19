@@ -237,7 +237,7 @@ public class WaitlistService {
         if (block.isEmpty() || block.get().maxPatients() == null) {
             return;
         }
-        queueRepo.lockDoctorDay(doctorId, date);
+        queueRepo.lockDoctorDay(tenantId, doctorId, date);
         int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             throw new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",

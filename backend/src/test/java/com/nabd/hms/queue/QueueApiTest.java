@@ -203,7 +203,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, body), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, body), Map.class)
-                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT); // ACC-003: was 404
     }
 
     /** QA-04: two front desks racing for the last slot — the per-doctor-day advisory lock lets exactly one in. */
