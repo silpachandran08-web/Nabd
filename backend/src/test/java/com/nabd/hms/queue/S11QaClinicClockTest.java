@@ -3,7 +3,6 @@ package com.nabd.hms.queue;
 import com.nabd.hms.support.ApiTestBase;
 import com.nabd.hms.support.MutableClock;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -102,7 +101,6 @@ class S11QaClinicClockTest extends ApiTestBase {
     // degrades to UTC", which already disagrees with the UI's region default. Found instead: zone() throws an NPE
     // (List.of(null).stream().findFirst()), so every clinic-day endpoint answers 500 for such a tenant.
     @Test
-    @Tag("known-defect-PLT-028")
     void nullTimezoneTenantGetsAClinicDayInsteadOfA500() {
         Clinic c = clinic(null, "KSA");
         clock.set(java.time.Instant.parse("2026-03-10T22:30:00Z"));

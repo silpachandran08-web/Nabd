@@ -20,11 +20,13 @@ public class ResilientHttpClient {
 
     private final IntegrationProperties props;
     private final ExternalCallGuard guard;
+    private final Clock clock;
     private final Map<String, CircuitBreaker> breakers = new ConcurrentHashMap<>();
 
-    public ResilientHttpClient(IntegrationProperties props, ExternalCallGuard guard) {
+    public ResilientHttpClient(IntegrationProperties props, ExternalCallGuard guard, Clock clock) {
         this.props = props;
         this.guard = guard;
+        this.clock = clock;
     }
 
     public RestClient.Builder builder(String provider) {
@@ -58,6 +60,6 @@ public class ResilientHttpClient {
 
     private CircuitBreaker breaker(String provider) {
         return breakers.computeIfAbsent(provider, p -> new CircuitBreaker(p, props.circuitFailureThreshold(),
-                props.circuitOpenSeconds(), Clock.systemUTC()));
+                props.circuitOpenSeconds(), clock));
     }
 }

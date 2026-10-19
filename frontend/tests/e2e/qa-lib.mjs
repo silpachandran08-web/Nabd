@@ -54,6 +54,8 @@ export async function mockApi(page, log, handlers) {
     }
     // FEF-005 idle lock reads the clinic idle policy on every page; default to "no policy row" unless a script mocks it.
     if (req.method() === 'GET' && /^\/setup\/policies/.test(path)) return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: '[]' });
+    // FEF-011 shell boot loads the clinic zone (/setup/profile, or the bare /schedule/day on 403); default to the token's IN clinic.
+    if (req.method() === 'GET' && /^\/setup\/profile$|^\/schedule\/day$/.test(path)) return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: JSON.stringify({ timezone: 'Asia/Kolkata', region: 'IN' }) });
     log.unmatched.push(`${req.method()} ${path}`);
     return route.fulfill({ headers: CORS, status: 404, contentType: 'application/problem+json', body: JSON.stringify({ type: 'not-found', title: 'Not found', detail: 'The requested resource was not found.' }) });
   });
