@@ -111,6 +111,23 @@ jobs:
       - if: needs.changes.outputs.backend == 'true'
         uses: actions/upload-artifact@v4
         with: { name: jacoco, path: backend/target/site/jacoco }
+      # OPS-032: coverage comment + gates (ci/quality-gates.json; gates stay report-only until enabled_from is set)
+      - if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request'
+        name: JaCoCo summary comment and coverage gates
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          git fetch -q origin ${{ github.base_ref }} --depth=200
+          base=$(git merge-base HEAD origin/${{ github.base_ref }})
+          python3 scripts/ci/quality.py summary backend/target/site/jacoco/jacoco.xml "$base" | tee cov.md >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file cov.md || true
+          python3 scripts/ci/quality.py gate backend/target/site/jacoco/jacoco.xml "$base"
+      - if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request' && vars.PIT_BLOCKED == 'true'
+        name: PIT drop gate (nightly mutation score fell more than 2 points)
+        run: |
+          git fetch -q origin ${{ github.base_ref }} --depth=200
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qE '^backend/src/main/java/com/nabd/hms/(clinical|billing|auth)/'; then
+            echo "Blocked: nightly PIT score dropped by more than 2 points; restore mutation tests (see docs/ops/ci.md)"; exit 1
+          fi
 
   stage6-build-and-scan:
     needs: [changes, stage1-static, stage2-unit, stage3-integration]

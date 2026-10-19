@@ -1,0 +1,46 @@
+# OPS-032: nightly mutation testing on safety and billing rule classes. Incremental via a restored history file.
+name: pit-nightly
+on:
+  schedule: [{ cron: "17 1 * * *" }]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17", cache: maven }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: restore PIT history and last-green score
+        uses: actions/cache/restore@v4
+        with: { path: pit-state, key: "pit-state-${{ github.run_id }}", restore-keys: "pit-state-" }
+      - name: PIT (incremental)
+        working-directory: backend
+        run: mvn -B -q -Ppit -Dpit.history="$GITHUB_WORKSPACE/pit-state/pit-history.bin" test-compile org.pitest:pitest-maven:mutationCoverage -DtimeoutConstant=8000
+      - name: score, thresholds, drop vs last green
+        id: score
+        run: |
+          mkdir -p pit-state
+          ok=true
+          python3 scripts/ci/quality.py pit backend/target/pit-reports/mutations.xml > score.json || ok=false
+          cat score.json >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci/quality.py pit-drop score.json pit-state/state.json || { ok=false; echo dropped=true >> "$GITHUB_OUTPUT"; }
+          echo ok=$ok >> "$GITHUB_OUTPUT"
+          if [ "$ok" = true ]; then python3 -c "import json;json.dump({'last_green':json.load(open('score.json'))},open('pit-state/state.json','w'))"; fi
+      - uses: actions/cache/save@v4
+        if: always()
+        with: { path: pit-state, key: "pit-state-${{ github.run_id }}" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: pit-report, path: "backend/target/pit-reports\nscore.json" }
+      # Needs external action: secrets.VARS_TOKEN (a token allowed to write repository variables). PRs read vars.PIT_BLOCKED.
+      - name: publish blocked/unblocked flag for PRs
+        if: always()
+        env: { GH_TOKEN: "${{ secrets.VARS_TOKEN }}" }
+        run: gh variable set PIT_BLOCKED --body "${{ steps.score.outputs.dropped == 'true' && 'true' || 'false' }}" --repo "$GITHUB_REPOSITORY"
+      - if: steps.score.outputs.ok != 'true'
+        run: echo "PIT gate failed"; exit 1
