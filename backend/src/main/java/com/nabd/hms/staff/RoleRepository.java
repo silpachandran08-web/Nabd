@@ -28,6 +28,13 @@ class RoleRepository {
                 roleMapper(), tenantId);
     }
 
+    /** CLN-005: the caller's permanent role is the built-in Owner (same test as GrantAuthority.isOwner). */
+    boolean isBuiltInOwner(UUID tenantId, UUID staffId) {
+        Boolean owner = jdbc.query("SELECT r.built_in AND r.name = 'Owner' AS owner FROM staff s JOIN roles r ON r.id = s.role_id " +
+                "WHERE s.tenant_id = ? AND s.id = ?", (rs, i) -> rs.getBoolean("owner"), tenantId, staffId).stream().findFirst().orElse(false);
+        return owner;
+    }
+
     Optional<RoleRow> findById(UUID tenantId, UUID id) {
         return jdbc.query(
                 "SELECT id, tenant_id, name, built_in, grants::text AS grants_json, mfa_required FROM roles WHERE tenant_id = ? AND id = ?",

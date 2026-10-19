@@ -205,8 +205,9 @@ class ProvisioningJobApiTest extends ApiTestBase {
 
         assertThat(modules).containsExactlyInAnyOrder("staff", "patients", "queue", "setup", "clinical",
                 "billing", "specialty_dental", "reports", "pharmacy", "packages", "nursing", "departments");
-        assertThat(grants).allMatch(g -> g.view() && g.create() && g.edit() && g.delete()
-                && g.approve() && g.refundDiscount() && g.export());
+        // CLN-005: every module is full except Clinical Records, which follows the RBAC Matrix (see Cln005RbacMatrixTest).
+        assertThat(grants).filteredOn(g -> !"clinical".equals(g.module())).allMatch(g -> g.view() && g.create() && g.edit()
+                && g.delete() && g.approve() && g.refundDiscount() && g.export());
     }
 
     @Test

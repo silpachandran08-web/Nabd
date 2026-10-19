@@ -3,7 +3,7 @@ package com.nabd.hms.clinical.documents;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nabd.hms.clinical.PrescriptionService;
+import com.nabd.hms.clinical.ClinicalAuthority;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
@@ -45,9 +45,11 @@ public class ClinicalDocumentService {
     private final AuditService auditService;
     private final TenantContext tenantContext;
     private final ObjectMapper objectMapper;
+    private final ClinicalAuthority clinicalAuthority;
 
     ClinicalDocumentService(ClinicalDocumentRepository repo, AuditService auditService, TenantContext tenantContext,
-                            ObjectMapper objectMapper) {
+                            ObjectMapper objectMapper, ClinicalAuthority clinicalAuthority) {
+        this.clinicalAuthority = clinicalAuthority;
         this.repo = repo;
         this.auditService = auditService;
         this.tenantContext = tenantContext;
@@ -112,10 +114,14 @@ public class ClinicalDocumentService {
     public DocumentResponse issue(UUID tenantId, UUID staffId, boolean callerCanApprove, String ip, UUID id) {
         tenantContext.set(tenantId);
         DocumentRow row = repo.lock(tenantId, id).orElseThrow(this::notFound);
-        // Same gate as signing a prescription (V1-007): the document prints under the visit doctor's name.
-        if (!PrescriptionService.mayActAsVisitDoctor(row.doctorId(), staffId, callerCanApprove)) {
+        // Same gate as signing a prescription (V1-007 + CLN-005 licence rule): it prints under the visit doctor's name.
+        String refusal = clinicalAuthority.refusal(tenantId, row.doctorId(), staffId, callerCanApprove);
+        if (ClinicalAuthority.NOT_PRESCRIBER.equals(refusal)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "not-prescriber", "Prescriber only",
                     "Only the doctor on this visit, or a clinician with approval rights, can issue this document.");
+        }
+        if (refusal != null) {
+            throw ClinicalAuthority.forbidden(refusal, "issue this document");
         }
         if ("issued".equals(row.status())) {
             throw issued();

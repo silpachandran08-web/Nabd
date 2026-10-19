@@ -1,0 +1,12 @@
+# CLN-005 expectations per matrix role. licensed = is_clinician + registration number on file.
+# Cells: 200, a Problem type slug (403 with that code), or 403 (refused by the security layer, no CLN-005 code).
+# signOther = sign another doctor's visit; signOwn = sign a visit where the caller is the doctor; decideOwn = record a
+# severe-allergy decision on the caller's own visit.
+role,licensed,signOther,signOwn,decideOwn
+Owner / Manager,false,not-licensed-clinician,not-licensed-clinician,403
+Owner / Manager,true,not-prescriber,not-prescriber,403
+Doctor,true,not-prescriber,200,200
+Doctor,false,not-prescriber,not-licensed-clinician,not-licensed-clinician
+Nurse,false,not-prescriber,not-licensed-clinician,not-licensed-clinician
+Receptionist,false,403,403,403
+Custom (Front Desk + Vitals),false,403,403,403

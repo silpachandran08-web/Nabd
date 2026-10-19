@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -79,9 +80,17 @@ public class PrescriptionService {
 
     private final ClinicClock clock;
     private final ObjectMapper objectMapper;
+    private final ClinicalAuthority clinicalAuthority;
+    private final EventPublisher eventPublisher;
+
+    /** CLN-005: published on every successful sign (pharmacy worklist, comms, clinical-intelligence consume it). */
+    public static final String SIGNED_EVENT = "clinical.prescription.signed.v1";
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
-                         AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper) {
+                         AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
+                         ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher) {
+        this.clinicalAuthority = clinicalAuthority;
+        this.eventPublisher = eventPublisher;
         this.clock = clock;
         this.objectMapper = objectMapper;
         this.repo = repo;
@@ -115,6 +124,18 @@ public class PrescriptionService {
         BigDecimal totalDoseMg = weightKg.multiply(mgPerKg).setScale(2, RoundingMode.HALF_UP);
         return new DoseCalculationResponse(weightKg, mgPerKg, totalDoseMg, DOSE_RULE_SOURCE, reading.recordedAt(),
                 DoseWeightPolicy.isStale(reading.recordedAt(), dob, today, zone));
+    }
+
+    /** CLN-005: what the consult screen needs to show or hide Sign. reason is null when the caller may sign. */
+    @Transactional
+    public Map<String, Object> signingAuthority(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove) {
+        tenantContext.set(tenantId);
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        String reason = clinicalAuthority.refusal(tenantId, owner.doctorId(), callerStaffId, callerCanApprove);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("canSign", reason == null);
+        out.put("reason", reason);
+        return out;
     }
 
     @Transactional
@@ -177,6 +198,9 @@ public class PrescriptionService {
                         if (!mayDecide) {
                             throw notPrescriber("record a warning decision on");
                         }
+                        // CLN-005: an override decision carries the same licence rule as signing.
+                        clinicalAuthority.require(tenantId, owner.doctorId(), callerStaffId, callerCanApprove,
+                                "record a warning decision on this prescription");
                         StoredDecision fresh = new StoredDecision(d.kind(), requested.reasonCode(), note, d.matched(), d.severity(),
                                 callerStaffId.toString(), actor.name(), Instant.now().toString());
                         decisions.add(fresh);
@@ -389,10 +413,10 @@ public class PrescriptionService {
                                       String ipAddress) {
         tenantContext.set(tenantId);
         QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
-        // V1-007: only the visit's doctor, or a holder of the explicit clinical:approve grant, may sign.
-        if (!mayDecide(owner, callerStaffId, callerCanApprove)) {
-            throw notPrescriber("sign");
-        }
+        // V1-007 + CLN-005: the visit's doctor or a clinical:approve holder, who is also a registered clinician with an
+        // in-date licence and clinical:edit (ClinicalAuthority). Checked before anything else, including "already signed".
+        ClinicalAuthority.Licence licence = clinicalAuthority.require(tenantId, owner.doctorId(), callerStaffId, callerCanApprove,
+                "sign this prescription");
         // V1-004: same lock order as upsert (register, then the prescription row). Warnings are evaluated and the
         // status flipped while holding the row lock, so a concurrent save cannot slip an unresolved line in between.
         allergyRepo.lockRegister(tenantId, owner.patientId());
@@ -417,7 +441,7 @@ public class PrescriptionService {
         // DOC-R3: capture the allergy statement the gate above just checked (still under the register lock) and store
         // it with the status flip, so the printout shows what the prescriber signed against, not the register at print time.
         StoredAllergySnapshot snapshot = captureAllergySnapshot(tenantId, owner.patientId());
-        if (repo.sign(tenantId, row.id(), toJson(snapshot)) == 0) {
+        if (repo.sign(tenantId, row.id(), toJson(snapshot), callerStaffId, licence.registrationNo()) == 0) {
             // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
             return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
         }
@@ -439,8 +463,15 @@ public class PrescriptionService {
         }).toList();
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "prescription.signed", "prescription", row.id(), null, Map.of("queueEntryId", queueEntryId.toString(), "items", finalItems,
-                        "signedByVisitDoctor", owner.doctorId().equals(callerStaffId),
+                        "signedByVisitDoctor", owner.doctorId().equals(callerStaffId), "licenceNo", licence.registrationNo(),
                         "allergySnapshotState", snapshot.state(), "allergySnapshotActiveCount", snapshot.allergies().size()));
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("tenantId", tenantId.toString());
+        event.put("prescriptionId", row.id().toString());
+        event.put("queueEntryId", queueEntryId.toString());
+        event.put("signedBy", callerStaffId.toString());
+        event.put("dictionaryVersion", null); // free-text pad: no coded drug dictionary exists yet (NB-010)
+        eventPublisher.publish(tenantId, SIGNED_EVENT, event);
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 
@@ -504,7 +535,8 @@ public class PrescriptionService {
                 })
                 .toList();
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
-                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat);
+                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat,
+                p.signedBy(), p.signedByRegistrationNo());
     }
 
     // ── DOC-R3: allergy statement snapshotted at signing ─────────────────

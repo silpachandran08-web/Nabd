@@ -53,9 +53,21 @@ public class PrescriptionController {
 
     @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/prescriptions/{queueEntryId}/sign")
-    @PreAuthorize("hasAuthority('clinical:edit')")
+    // CLN-005: approve-only callers (the Owner preset) reach the service so they get not-licensed-clinician, not a bare 403;
+    // ClinicalAuthority still requires clinical:edit to sign.
+    @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve')")
     public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
         return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
+    }
+
+    /** CLN-005: whether the caller may sign this visit's prescription; reason is the 403 code sign would return. */
+    @GetMapping("/prescriptions/{queueEntryId}/signing-authority")
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public java.util.Map<String, Object> signingAuthority(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
+        if (jwt.hasClaim("bg")) {
+            return java.util.Map.of("canSign", false, "reason", ClinicalAuthority.BREAK_GLASS);
+        }
+        return service.signingAuthority(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
     }
 
     @GetMapping("/patients/{patientId}/prescriptions")

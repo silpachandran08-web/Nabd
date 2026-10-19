@@ -13,5 +13,7 @@ import java.util.UUID;
 public record PrescriptionResponse(UUID id, UUID queueEntryId, UUID patientId, UUID doctorId, String status,
                                     Instant createdAt, Instant signedAt, List<PrescriptionItemResponse> items,
                                     int unresolvedWarnings, PrescriptionAllergySnapshotResponse allergySnapshot,
-                                    List<PrescriptionWarningResponse> warnings) {
+                                    List<PrescriptionWarningResponse> warnings,
+                                    // CLN-005: stored signer and the registration number signed under; null on a draft
+                                    UUID signedBy, String signedByRegistrationNo) {
 }

@@ -191,7 +191,7 @@ class ProvisioningStepRunner {
         }
         String grantsJson = writeGrantsJson(List.of(
                 fullGrant("staff"), fullGrant("patients"), fullGrant("queue"), fullGrant("setup"),
-                fullGrant("clinical"), fullGrant("billing"), fullGrant("specialty_dental"),
+                OWNER_CLINICAL, fullGrant("billing"), fullGrant("specialty_dental"),
                 fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing"),
                 fullGrant("departments")));
         repo.insertBuiltInOwnerRole(tenantId, grantsJson);
@@ -265,6 +265,10 @@ class ProvisioningStepRunner {
         }
         lifecycleService.transition(tenantId, "trialing", job.requestedBy(), "provisioning completed", null);
     }
+
+    /** CLN-005 / RBAC Matrix "Owner / Manager - Clinical Records": View Y, Create N, Edit N, Delete Y, Approve Y, - , Export Y.
+     * Break-glass stays as before. An owner who practises signs only as a registered clinician (ClinicalAuthority). */
+    static final ModuleGrant OWNER_CLINICAL = new ModuleGrant("clinical", true, false, false, true, true, false, true, true);
 
     private static ModuleGrant fullGrant(String module) {
         return new ModuleGrant(module, true, true, true, true, true, true, true, "clinical".equals(module));

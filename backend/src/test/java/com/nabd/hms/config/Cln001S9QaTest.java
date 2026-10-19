@@ -18,6 +18,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Independent QA (S9) for CLN-001: CORS preflight for PUT, and the pregnancy / NKA writes behind it. */
 class Cln001S9QaTest extends ApiTestBase {
 
+    // CLN-005: signing needs a registered clinician. Every staff member these tests seed is one, so they keep testing what
+    // they were written for; the licence refusals themselves are covered in ClinicalLicenceApiTest.
+    @Override
+    protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
+                                    boolean emailVerified, boolean mobileVerified) {
+        return com.nabd.hms.support.ClinicianFixture.licensed(
+                super.seedStaff(tenant, roleId, email, mobilePhone, mfaEnabled, emailVerified, mobileVerified));
+    }
+
     private static final String STAFF = "http://localhost:3000";
     private static final AtomicInteger SEQ = new AtomicInteger(5000);
     private static final String ANY_ID = "00000000-0000-0000-0000-000000000009";

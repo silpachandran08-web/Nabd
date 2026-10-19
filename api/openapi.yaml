@@ -654,6 +654,54 @@ paths:
         "403": { description: "GRANT_EXCEEDS_CALLER (type grant-exceeds-caller) or OWNER_ROLE_RESTRICTED (type owner-role-restricted): the role, scope or field grants are richer than the caller holds (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /staff/{id}/clinical-licence:
+    get:
+      tags: [Staff]
+      summary: CLN-005. Whether this staff member is a registered clinician who may sign, and their licence dates. The registration number itself is on the staff record (hasRegistrationNo says whether one is on file).
+      x-required-permission: staff:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Staff]
+      summary: CLN-005. Mark (or unmark) a staff member as a registered clinician and record the licence expiry date (null = none recorded). isClinician true needs a registration number on file (400 registration-no-required). Audited (staff.clinical_licence_updated, the number is never in the audit row).
+      x-required-permission: staff:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isClinician]
+              properties:
+                isClinician: { type: boolean }
+                licenceExpiresOn: { type: [string, "null"], format: date }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /staff/{id}/clinical-licence/override:
+    post:
+      tags: [Staff]
+      summary: CLN-005. The clinic Owner lets an expired licence keep signing until `until` (in the future, at most 30 days ahead, else 400 invalid-override-window). Owner only (403 owner-only). Audited (staff.licence_override_granted).
+      x-required-permission: staff:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [until]
+              properties:
+                until: { type: string, format: date-time }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden. owner-only (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
   /staff/{id}/suspend:
     post:
       tags: [Staff]
@@ -2017,14 +2065,33 @@ paths:
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
-      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
+      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). CLN-005 - the caller must also be a registered clinician (staff isClinician + a registration number on file, else 403 not-licensed-clinician) with an in-date licence or an owner's unexpired override (else 403 licence-expired) and hold clinical:edit (else not-prescriber; an approve-only caller is let past the permission check so it gets the specific code). A break-glass session is refused with 403 break-glass-cannot-sign and an audit row (prescription.sign_refused). The signer and the registration number signed under are stored (signedBy, signedByRegistrationNo) and clinical.prescription.signed.v1 is published. Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
       x-required-permission: clinical:edit
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Signed, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { description: "Forbidden. 403 not-prescriber: caller is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Forbidden (problem+json). not-prescriber, not-licensed-clinician, licence-expired or break-glass-cannot-sign, see summary", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/prescriptions/{queueEntryId}/signing-authority:
+    get:
+      tags: [Clinical]
+      summary: CLN-005. Whether the caller may sign this visit's prescription right now. reason is the 403 code sign would return (not-prescriber, not-licensed-clinician, licence-expired, break-glass-cannot-sign), null when canSign. The consult screen uses it to show or hide Sign.
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canSign, reason]
+                properties:
+                  canSign: { type: boolean }
+                  reason: { type: [string, "null"], enum: [not-prescriber, not-licensed-clinician, licence-expired, break-glass-cannot-sign, null] }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /clinical/visits/{queueEntryId}/documents:
     get:
@@ -2084,13 +2151,13 @@ paths:
   /clinical/documents/{id}/issue:
     post:
       tags: [Clinical]
-      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
+      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; CLN-005 - the same licence rule applies (403 not-licensed-clinician, licence-expired; a break-glass session gets break-glass-cannot-sign with an audit row). Creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
       x-required-permission: clinical:edit
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Issued, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { description: "Forbidden. not-prescriber: caller is neither the visit's doctor nor holds clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Forbidden (problem+json). not-prescriber, not-licensed-clinician, licence-expired or break-glass-cannot-sign", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
@@ -3265,6 +3332,15 @@ components:
         prescriberId: { type: [string, "null"], format: uuid, description: "Who signed (the visit's doctor or a clinical:approve holder)" }
         prescriberName: { type: [string, "null"] }
         professionalRegistrationNo: { type: [string, "null"], description: "From the staff record; null when not set" }
+    StaffClinicalLicence:
+      type: object
+      required: [staffId, isClinician, hasRegistrationNo]
+      properties:
+        staffId: { type: string, format: uuid }
+        isClinician: { type: boolean }
+        hasRegistrationNo: { type: boolean }
+        licenceExpiresOn: { type: [string, "null"], format: date }
+        licenceOverrideUntil: { type: [string, "null"], format: date-time }
     Prescription:
       type: object
       properties:
@@ -3275,6 +3351,8 @@ components:
         status: { type: string }
         createdAt: { type: string, format: date-time }
         signedAt: { type: [string, "null"], format: date-time }
+        signedBy: { type: [string, "null"], format: uuid, description: "CLN-005: staff id of the signer; null on a draft" }
+        signedByRegistrationNo: { type: [string, "null"], description: "CLN-005: the registration number the signer signed under" }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
         warnings:

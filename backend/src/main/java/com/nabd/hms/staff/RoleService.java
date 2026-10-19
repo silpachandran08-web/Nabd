@@ -95,6 +95,11 @@ public class RoleService {
     /** "Attempted edit of a built-in role, or a grant beyond the editor's own permissions... blocked" — api/openapi.yaml. */
     private void requireNoPrivilegeEscalation(UUID tenantId, UUID callerStaffId, List<ModuleGrant> requestedGrants,
                                                List<String> callerPermissions) {
+        // CLN-005: the Owner preset lacks clinical create/edit (RBAC Matrix) but must still be able to build a Doctor
+        // role; GrantAuthority already treats the built-in Owner as holding every grant for assignment.
+        if (repo.isBuiltInOwner(tenantId, callerStaffId)) {
+            return;
+        }
         if (GrantAuthority.exceeds(GrantsFlattener.flatten(requestedGrants), callerPermissions)) {
             log.warn("privilege escalation blocked: staff {} (tenant {}) requested grants beyond their own permissions",
                     callerStaffId, tenantId);

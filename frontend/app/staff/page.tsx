@@ -477,8 +477,7 @@ export default function StaffAccessPage() {
       }
       const saved: Staff = await res.json();
       setStaff((prev) => prev.map((x) => (x.id === saved.id ? { ...x, professionalRegistrationNo: saved.professionalRegistrationNo ?? null } : x)));
-      setRegEdit(null);
-      return null;
+      return null; // the dialog closes itself once the clinician status (CLN-005) is saved too
     } catch {
       return "Couldn't reach the server. The registration number was not saved.";
     }
@@ -660,8 +659,8 @@ export default function StaffAccessPage() {
       )}
 
       {regEdit && canEditRoles && (
-        <RegistrationNoDialog staffName={regEdit.name} current={regEdit.professionalRegistrationNo ?? null}
-          onSave={(v) => saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)} />
+        <RegistrationNoDialog staffId={regEdit.id} staffName={regEdit.name} current={regEdit.professionalRegistrationNo ?? null}
+          onSave={(v) => saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)} authedFetch={authedFetch} />
       )}
 
       {inviteOpen && canInvite && (
