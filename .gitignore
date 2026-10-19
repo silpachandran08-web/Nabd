@@ -8,3 +8,4 @@ target/
 .env.dev
 .vercel
 perf/out/
+__pycache__/
