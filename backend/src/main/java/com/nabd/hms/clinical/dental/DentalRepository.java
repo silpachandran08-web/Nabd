@@ -1,10 +1,13 @@
 package com.nabd.hms.clinical.dental;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,9 +19,11 @@ import static com.nabd.hms.clinical.dental.DentalModels.ToothRow;
 class DentalRepository {
 
     private final JdbcTemplate jdbc;
+    private final ObjectMapper objectMapper;
 
-    DentalRepository(JdbcTemplate jdbc) {
+    DentalRepository(JdbcTemplate jdbc, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
+        this.objectMapper = objectMapper;
     }
 
     /** NB-122: full chart, one row per tooth ever annotated (unannotated teeth are implicitly healthy),
@@ -79,18 +84,37 @@ class DentalRepository {
                 tenantId, staffId).stream().findFirst();
     }
 
-    /** NB-127: the tooth's full timeline. dental_chart_entries.id is stable across updates (only
-     * inserted once, then ON CONFLICT DO UPDATE), so filtering audit_log by entity_id gives every
-     * change ever made to this one row — no separate history table needed. */
-    List<HistoryEntryRow> findHistory(UUID tenantId, UUID entityId) {
-        return jdbc.query("SELECT actor_name, actor_role, action, before::text AS before_text, " +
-                        "  after::text AS after_text, created_at " +
-                        "FROM audit_log WHERE tenant_id = ? AND entity_type = 'dental_chart_entries' AND entity_id = ? " +
-                        "ORDER BY created_at",
+    /** CLN-006 (MF-52): one append-only row per chart change, written in the same transaction as the change. */
+    void insertEvent(UUID tenantId, UUID patientId, UUID entryId, int toothNumber, String event,
+                     Map<String, Object> before, Map<String, Object> after, UUID actorId) {
+        jdbc.update("INSERT INTO dental_chart_events (tenant_id, patient_id, entry_id, tooth_number, event, before, after, actor_id) " +
+                        "VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?)",
+                tenantId, patientId, entryId, toothNumber, event, json(before), json(after), actorId);
+    }
+
+    /** NB-127 / CLN-006: the tooth's full timeline, from dental_chart_events (never from audit_log). entry_id is
+     * stable across updates (inserted once, then ON CONFLICT DO UPDATE). Actor name/role are read at query time. */
+    List<HistoryEntryRow> findHistory(UUID tenantId, UUID entryId) {
+        return jdbc.query("SELECT COALESCE(s.name, '') AS actor_name, COALESCE(r.name, '') AS actor_role, " +
+                        // the response keeps NB-127's action vocabulary, so the API contract does not change
+                        "  CASE WHEN ev.event = 'supernumerary_removed' THEN 'dental_chart.delete' " +
+                        "       WHEN ev.before IS NULL THEN 'dental_chart.create' ELSE 'dental_chart.update' END AS action, " +
+                        "  ev.before::text AS before_text, ev.after::text AS after_text, ev.occurred_at " +
+                        "FROM dental_chart_events ev LEFT JOIN staff s ON s.tenant_id = ev.tenant_id AND s.id = ev.actor_id " +
+                        "LEFT JOIN roles r ON r.id = s.role_id " +
+                        "WHERE ev.tenant_id = ? AND ev.entry_id = ? ORDER BY ev.occurred_at, ev.id",
                 (rs, i) -> new HistoryEntryRow(rs.getString("actor_name"), rs.getString("actor_role"),
                         rs.getString("action"), rs.getString("before_text"), rs.getString("after_text"),
-                        rs.getTimestamp("created_at").toInstant()),
-                tenantId, entityId);
+                        rs.getTimestamp("occurred_at").toInstant()),
+                tenantId, entryId);
+    }
+
+    private String json(Map<String, Object> m) {
+        try {
+            return m == null ? null : objectMapper.writeValueAsString(m);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("dental chart snapshot is not serializable", e);
+        }
     }
 
     private RowMapper<ToothRow> mapper() {

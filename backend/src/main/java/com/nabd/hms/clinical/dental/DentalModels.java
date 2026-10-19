@@ -16,7 +16,7 @@ final class DentalModels {
     record ActorInfo(String name, String role) {
     }
 
-    /** One audit_log row for a tooth's history (NB-127) — before/after are raw jsonb text, left
+    /** One dental_chart_events row for a tooth's history (NB-127, CLN-006) — before/after are raw jsonb text, left
      * unparsed here since the frontend only needs to display them, not act on their structure. */
     record HistoryEntryRow(String actorName, String actorRole, String action, String before, String after,
                             Instant occurredAt) {

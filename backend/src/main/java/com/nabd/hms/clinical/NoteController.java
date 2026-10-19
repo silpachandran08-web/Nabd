@@ -44,18 +44,20 @@ public class NoteController {
         return service.upsert(tenantId(jwt), queueEntryId, req);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/{queueEntryId}/sign")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public NoteResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.sign(tenantId(jwt), queueEntryId);
+        return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/{queueEntryId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
     public NoteAmendmentResponse amend(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                         @Valid @RequestBody NoteAmendmentRequest req) {
-        return service.amend(tenantId(jwt), staffId(jwt), queueEntryId, req);
+        return service.amend(tenantId(jwt), staffId(jwt), canApprove(jwt), queueEntryId, req);
     }
 
     @GetMapping("/{queueEntryId}/amendments")
@@ -66,6 +68,11 @@ public class NoteController {
 
     private UUID tenantId(Jwt jwt) {
         return UUID.fromString(jwt.getClaimAsString("tenantId"));
+    }
+
+    private static boolean canApprove(Jwt jwt) {
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        return permissions != null && permissions.contains(PrescriptionService.PERMISSION_CLINICAL_APPROVE);
     }
 
     private UUID staffId(Jwt jwt) {
