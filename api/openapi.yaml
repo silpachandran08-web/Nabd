@@ -2200,21 +2200,31 @@ paths:
         "200": { description: The invoice (lineItems show the price actually charged), content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: Forbidden }
-        "409": { description: otc-not-available, item-inactive, insufficient-stock or day-closed }
+        "409": { description: "otc-not-available, item-inactive, insufficient-stock or day-closed" }
   /billing/checkout/{queueEntryId}:
     post:
       tags: [Billing]
       summary: >
-        Bill a visit at a billing checkpoint. Catalogue lines are priced server-side exactly as in otc-checkout (QA-OI-2); a
-        Consultation line uses the catalogue followUpAmount instead of baseAmount when the patient had a completed visit with the
-        same doctor in the last 14 days (the same rule as `followUpEligible` in the checkout context). Not gated by pharmacy mode.
+        Bill a visit at a billing checkpoint (FIN-003). The client sends `lineItems: [{ chargeCode, quantity, override?: { unitPrice,
+        reasonCode, note? } }]` and optionally `discounts: [{ kind: amount|percent, value, reasonCode, note? }]`; the server resolves name,
+        category, price and tax from charge_catalogue and ignores any client chargeName/category/unitPrice/taxRatePercent on a catalogue line.
+        A Consultation uses followUpAmount when the patient had a completed visit with the same doctor in the last 14 days; the client
+        cannot choose the tier. Each line in the response carries `unitPrice` (charged), `listUnitPrice` (catalogue), `tier`
+        (normal|follow_up|custom) and `overrideReason`. An override, a free-text line (a chargeCode that is not an active catalogue row,
+        which then needs chargeName + unitPrice) or any discount needs the billing.discount grant (403 discount-not-permitted); an
+        override or discount also needs a reason code (422 reason-required, 422 invalid-reason; goodwill, staff, price_match, waiver,
+        pricing_error, other). Without billing.discount an unknown code is 422 unknown-charge. Each discount is a row in invoice_discounts and
+        invoices.discount is their sum across checkpoints; more than the remaining subtotal is 422 discount-exceeds-subtotal. The legacy scalar
+        `discount` still works and is booked with reason `unspecified`. Every override and discount writes an audit row. Not gated by pharmacy mode.
+        Not done here: Idempotency-Key, an `emergency` tier (no catalogue column), the billing.invoice.issued.v1 event (no consumer yet).
       x-required-permission: billing:create
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { description: Forbidden }
+        "403": { description: "Forbidden (including discount-not-permitted)" }
         "409": { description: Conflict }
+        "422": { description: "unknown-charge, reason-required, invalid-reason or discount-exceeds-subtotal" }
   /billing/day-close:
     get:
       tags: [Billing]

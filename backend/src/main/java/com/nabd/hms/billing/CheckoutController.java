@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -49,9 +48,8 @@ public class CheckoutController {
     @PostMapping("/checkout/{queueEntryId}")
     @PreAuthorize("hasAuthority('billing:create')")
     public InvoiceResponse checkout(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
-                                     @Valid @RequestBody CheckoutRequest req) {
-        requireDiscountPermission(jwt, req);
-        return service.checkout(tenantId(jwt), queueEntryId, staffId(jwt), req);
+                                     @Valid @RequestBody CheckoutRequest req, jakarta.servlet.http.HttpServletRequest http) {
+        return service.checkout(tenantId(jwt), queueEntryId, staffId(jwt), canDiscount(jwt), RequestMeta.clientIp(http), req);
     }
 
     @GetMapping("/otc-charges")
@@ -62,9 +60,9 @@ public class CheckoutController {
 
     @PostMapping("/otc-checkout")
     @PreAuthorize("hasAuthority('billing:create')")
-    public InvoiceResponse otcCheckout(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req) {
-        requireDiscountPermission(jwt, req);
-        return service.otcCheckout(tenantId(jwt), staffId(jwt), req);
+    public InvoiceResponse otcCheckout(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req,
+                                        jakarta.servlet.http.HttpServletRequest http) {
+        return service.otcCheckout(tenantId(jwt), staffId(jwt), canDiscount(jwt), RequestMeta.clientIp(http), req);
     }
 
     @GetMapping("/invoices/{id}")
@@ -93,14 +91,10 @@ public class CheckoutController {
         return service.voidInvoice(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
-    /** REC-043: any non-zero discount needs billing.discount (the billing module's refund/discount grant). */
-    private void requireDiscountPermission(Jwt jwt, CheckoutRequest req) {
-        if (req.discountOrZero().compareTo(BigDecimal.ZERO) <= 0) return;
+    /** REC-043 / FIN-003: the billing.discount grant gates every price-bearing change; CheckoutService enforces it per field. */
+    private boolean canDiscount(Jwt jwt) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
-        if (permissions == null || !permissions.contains("billing.discount")) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "discount-not-permitted", "Discount not permitted",
-                    "Your role cannot apply a discount at checkout.");
-        }
+        return permissions != null && permissions.contains("billing.discount");
     }
 
     private UUID tenantId(Jwt jwt) {

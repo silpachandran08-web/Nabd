@@ -14,7 +14,7 @@ final class CheckoutModels {
     }
 
     /** V3-004 / QA-OI-2: the authoritative catalogue row behind a charge code (stocked = pharmacy item). */
-    record PharmacyChargeRow(String name, String category, BigDecimal baseAmount, BigDecimal followUpAmount, BigDecimal taxRatePercent,
+    record PharmacyChargeRow(UUID id, String name, String category, BigDecimal baseAmount, BigDecimal followUpAmount, BigDecimal taxRatePercent,
                               boolean active, boolean doctorOverride, boolean stocked) {
     }
 
@@ -30,14 +30,17 @@ final class CheckoutModels {
     }
 
     record LineItemRow(String chargeCode, String chargeName, String category, int quantity,
-                        BigDecimal unitPrice, BigDecimal taxRatePercent, BigDecimal lineTotal) {
+                        BigDecimal unitPrice, BigDecimal taxRatePercent, BigDecimal lineTotal,
+                        BigDecimal listUnitPrice, String tier, String overrideReasonCode) {
     }
 
     record PaymentRow(UUID id, String method, BigDecimal amount, Instant recordedAt) {
     }
 
+    /** FIN-003: a fully server-resolved line (price provenance included). */
     record LineItemInput(String chargeCode, String chargeName, String category, int quantity,
-                          BigDecimal unitPrice, BigDecimal taxRatePercent) {
+                          BigDecimal unitPrice, BigDecimal taxRatePercent, UUID catalogueId, BigDecimal listUnitPrice,
+                          String tier, String overrideReasonCode, String overrideNote, UUID overriddenBy) {
     }
 
     /** NB-179: what a signed-but-not-yet-billed prescription still needs dispensed. */

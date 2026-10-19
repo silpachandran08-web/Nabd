@@ -132,9 +132,11 @@ class CheckoutRepository {
             BigDecimal lineTotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
-                            "quantity, unit_price, tax_rate_percent, line_total, display_order) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                            "quantity, unit_price, tax_rate_percent, line_total, display_order, charge_catalogue_id, list_unit_price, " +
+                            "tier, override_reason_code, override_note, overridden_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
-                    item.unitPrice(), item.taxRatePercent(), lineTotal, order++);
+                    item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
+                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy());
         }
     }
 
@@ -145,9 +147,8 @@ class CheckoutRepository {
         return (max == null ? -1 : max) + 1;
     }
 
-    /** Recomputes and overwrites an existing invoice's totals — used when a billing checkpoint
-     * appends more line items to an invoice created at an earlier one; the latest discount
-     * replaces (not adds to) whatever discount was applied before. */
+    /** Recomputes and overwrites an existing invoice's totals. FIN-003: {@code discount} is the SUM of the
+     * invoice_discounts ledger (earlier checkpoints plus this one), never a replacement. */
     void updateInvoiceTotals(UUID tenantId, UUID invoiceId, BigDecimal subtotal, BigDecimal discount,
                               BigDecimal tax, BigDecimal roundOff, BigDecimal total) {
         jdbc.update("UPDATE invoices SET subtotal = ?, discount = ?, tax = ?, round_off = ?, total = ? " +
@@ -158,12 +159,24 @@ class CheckoutRepository {
     /** V3-004: the catalogue row for a stocked (pharmacy) code, active or not; empty for any non-pharmacy code. */
     Optional<PharmacyChargeRow> findCatalogueCharge(UUID tenantId, String chargeCode) {
         return jdbc.query(
-                "SELECT name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
+                "SELECT id, name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
                         "stock_qty IS NOT NULL AS stocked FROM charge_catalogue WHERE tenant_id = ? AND code = ?",
-                (rs, i) -> new PharmacyChargeRow(rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
+                (rs, i) -> new PharmacyChargeRow(UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
                         rs.getBigDecimal("follow_up_amount"), rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active"),
                         rs.getBoolean("doctor_override"), rs.getBoolean("stocked")),
                 tenantId, chargeCode).stream().findFirst();
+    }
+
+    void insertDiscounts(UUID tenantId, UUID invoiceId, List<BillingPricing.DiscountInput> discounts, UUID staffId) {
+        for (var d : discounts) {
+            jdbc.update("INSERT INTO invoice_discounts (tenant_id, invoice_id, kind, value, amount, reason_code, note, applied_by) " +
+                    "VALUES (?,?,?,?,?,?,?,?)", tenantId, invoiceId, d.kind(), d.value(), d.amount(), d.reasonCode(), d.note(), staffId);
+        }
+    }
+
+    BigDecimal sumDiscounts(UUID tenantId, UUID invoiceId) {
+        return jdbc.queryForObject("SELECT COALESCE(SUM(amount), 0) FROM invoice_discounts WHERE tenant_id = ? AND invoice_id = ?",
+                BigDecimal.class, tenantId, invoiceId);
     }
 
     Optional<String> findPharmacyMode(UUID tenantId) {
@@ -251,11 +264,12 @@ class CheckoutRepository {
 
     List<LineItemRow> findLineItems(UUID tenantId, UUID invoiceId) {
         return jdbc.query(
-                "SELECT charge_code, charge_name, category, quantity, unit_price, tax_rate_percent, line_total " +
-                        "FROM invoice_line_items WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order",
+                "SELECT charge_code, charge_name, category, quantity, unit_price, tax_rate_percent, line_total, " +
+                        "list_unit_price, tier, override_reason_code FROM invoice_line_items WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order",
                 (rs, i) -> new LineItemRow(rs.getString("charge_code"), rs.getString("charge_name"), rs.getString("category"),
                         rs.getInt("quantity"), rs.getBigDecimal("unit_price"), rs.getBigDecimal("tax_rate_percent"),
-                        rs.getBigDecimal("line_total")),
+                        rs.getBigDecimal("line_total"), rs.getBigDecimal("list_unit_price"), rs.getString("tier"),
+                        rs.getString("override_reason_code")),
                 tenantId, invoiceId);
     }
 

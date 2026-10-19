@@ -245,7 +245,7 @@ class CheckoutApiTest extends ApiTestBase {
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)),
                 "discount", 500)), Map.class);
 
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(resp.getBody().get("type")).asString().contains("discount-exceeds-subtotal");
     }
 
