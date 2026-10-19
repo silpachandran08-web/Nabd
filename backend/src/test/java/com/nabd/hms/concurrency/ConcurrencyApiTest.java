@@ -172,7 +172,6 @@ class ConcurrencyApiTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-audit-chain-fork")
     void fiftyParallelAuditedWritesKeepAnUnforkedChain() {
         Ctx c = setup();
         UUID tenantId = c.tenant().id();

@@ -259,7 +259,6 @@ class S10QaOps041ConcurrencyTest extends ApiTestBase {
     // ---- AC5: audit chain ----
 
     @Test
-    @Tag("known-defect-audit-chain-fork")
     void ac5_fiftyParallelAuditedWritesViaTheService_noFork() {
         Ctx c = ctx();
         UUID tid = c.t.id();
@@ -285,7 +284,6 @@ class S10QaOps041ConcurrencyTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-audit-chain-fork")
     void ac5_parallelWritesInTwoTenantsKeepIndependentChains() {
         Ctx a = ctx(), b = ctx();
         List<Callable<Boolean>> work = new ArrayList<>();
