@@ -15069,6 +15069,9 @@ components:
         expiresIn:
           type: integer
           format: int64
+        refreshExpiresIn:
+          type: integer
+          format: int64
         refreshToken:
           type: string
     ToothHistoryEntryResponse:

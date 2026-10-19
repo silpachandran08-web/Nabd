@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import ClinicNav from "./ClinicNav";
 import TopBar from "./TopBar";
+import "./lib/bffShim"; // FEF-009: cookie-mode fetch routing, before any screen calls Core
 
 const COLLAPSE_KEY = "nabd_sidebar_collapsed";
 

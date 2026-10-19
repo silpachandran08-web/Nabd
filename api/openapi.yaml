@@ -3364,6 +3364,7 @@ components:
         accessToken: { type: string }
         refreshToken: { type: string }
         expiresIn: { type: integer, example: 900 }
+        refreshExpiresIn: { type: integer, example: 2592000, description: "FEF-009: seconds until the refresh token (session) expires; the BFF uses it as the refresh cookie's Max-Age" }
 
     PendingWorkspaceToken:
       type: object
