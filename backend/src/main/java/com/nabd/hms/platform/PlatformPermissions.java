@@ -47,6 +47,7 @@ final class PlatformPermissions {
     private static final Map<String, Set<String>> ACTION_ROLES = Map.of(
             "billing_revenue:edit", Set.of("super_admin", "billing"),
             "billing_revenue:approve", Set.of("super_admin"),
+            "safety_content:edit", Set.of("super_admin"), // CLN-004: upload / record CSO approval / activate the safety dictionary
             "tenant_detail:edit", Set.of("super_admin") // V3-001: suspend / offboard / reactivate a clinic; shortcut: implementation excluded until the role spec says otherwise
     );
 

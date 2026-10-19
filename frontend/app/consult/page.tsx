@@ -25,6 +25,7 @@ import MedicinesList from "../components/consult/MedicinesList";
 import PackageSessionCard from "../components/consult/PackageSessionCard";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
+import { useSafetyDictionarySource } from "../components/consult/safetyDictionary";
 import RxPad from "../components/consult/RxPad";
 import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
@@ -218,6 +219,7 @@ export default function ConsultPage() {
   );
 
   const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, activeEntry?.patientId ?? null, activeEntry?.id ?? null);
+  const rxSource = useSafetyDictionarySource(authedFetch);
 
   const load = useCallback(async (which: "mine" | "all" = "mine") => {
     setLoading(true);
@@ -1155,6 +1157,7 @@ export default function ConsultPage() {
                         onOverride={mayDecideRx ? (warning) => { setOverrideError(null); setOverride({ index: i, warning }); } : undefined}
                         onChangeMedicine={() => focusDrug(i)}
                         onRemove={rxItems.length > 1 ? () => removeRxItem(i) : undefined}
+                        source={rxSource}
                       />
                     </div>
                   ))}

@@ -2026,6 +2026,95 @@ paths:
         "403": { description: "Forbidden. 403 not-prescriber: caller is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /clinical/safety-dictionary:
+    get:
+      tags: [Clinical]
+      summary: "CLN-004. The safety dictionary version active for the caller's tenant region (shown under Rx warnings as 'Source - <source> <label>'). No PHI. source is 'Nabd CSO dictionary' when a CSO approval is recorded for the version, else 'Nabd baseline dictionary (no CSO approval recorded)' (the v0 seed of the pre-CLN-004 code lists)."
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryActive" } } } }
+        "503": { description: "No active dictionary for the region (safety-dictionary-unavailable, problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /safety-dictionaries/{region}/versions:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    parameters: [{ name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }]
+    get:
+      tags: [Clinical]
+      summary: "CLN-004. All versions of a region's dictionary, newest first (operator)."
+      x-required-permission: safety_content:edit
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryVersion" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [Clinical]
+      summary: "CLN-004. Upload a draft dictionary version (JSON bundle). Validated (terms and stems at least 4 characters except the stem 'cef'; known classes; matchKind on pregnancyRisk/controlled; labels.controlled.en). Re-uploading content identical to an existing version returns that version (created=false). diffSummary compares with the active version. Audited (safety_dictionary.uploaded, platform chain)."
+      x-required-permission: safety_content:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryBundle" } } }
+      responses:
+        "201": { description: Draft created (or the identical existing version), content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryUpload" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Operator lacks safety_content:edit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "BUNDLE_INVALID; errors[] lists every problem (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /safety-dictionaries/{region}/versions/{versionId}/approve:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-004. Record the CSO approval (reference to the signed approval record and the approver's name) for a version. Once per version; a draft becomes 'approved', a retired version keeps its status (so it can be rolled back to). Audited."
+      x-required-permission: safety_content:edit
+      parameters:
+        - { name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csoApprovalRef, approvedBy]
+              properties:
+                csoApprovalRef: { type: string, maxLength: 200 }
+                approvedBy: { type: string, maxLength: 200 }
+      responses:
+        "200": { description: Approved, content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryVersion" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "ALREADY_APPROVED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /safety-dictionaries/{region}/versions/{versionId}/activate:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-004. Activate an approved version, or roll back to an earlier approved one (same call). csoApprovalRef must equal the recorded approval. The previous active version is retired in the same transaction; every pod reloads within app.safety-dictionary.refresh-ms (default 60 s). Audited (safety_dictionary.activated with previousVersion and reason)."
+      x-required-permission: safety_content:edit
+      parameters:
+        - { name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csoApprovalRef, reason]
+              properties:
+                csoApprovalRef: { type: string, maxLength: 200 }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  region: { type: string }
+                  activeVersion: { type: integer }
+                  previousVersion: { type: [integer, "null"] }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_APPROVED (no matching CSO approval record) or ALREADY_ACTIVE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /clinical/visits/{queueEntryId}/documents:
     get:
       tags: [Clinical]
@@ -3294,6 +3383,71 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/PrescriptionAllergySnapshot" }
             - { type: "null" }
+        safetyDictionaryVersion:
+          type: [string, "null"]
+          description: "CLN-004. Safety dictionary version active when the prescription was signed (e.g. 'IN v1'); null for a draft or a prescription signed before V1211."
+    SafetyDictionaryActive:
+      type: object
+      properties:
+        region: { type: string, enum: [IN, SA, AE, QA] }
+        version: { type: integer }
+        label: { type: string, description: "e.g. 'IN v1'" }
+        approvedBy: { type: [string, "null"] }
+        approvedAt: { type: [string, "null"], format: date-time }
+        source: { type: string }
+        controlledLabel: { type: object, additionalProperties: { type: string }, description: "Controlled-substance warning label per language (en always; ar/hi when supplied by the CSO)" }
+    SafetyDictionaryVersion:
+      type: object
+      properties:
+        versionId: { type: string, format: uuid }
+        region: { type: string }
+        version: { type: integer }
+        status: { type: string, enum: [draft, approved, active, retired] }
+        checksum: { type: string }
+        csoApprovalRef: { type: [string, "null"] }
+        approvedBy: { type: [string, "null"] }
+        approvedAt: { type: [string, "null"], format: date-time }
+        activatedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    SafetyDictionaryUpload:
+      type: object
+      properties:
+        versionId: { type: string, format: uuid }
+        region: { type: string }
+        version: { type: integer }
+        status: { type: string }
+        checksum: { type: string }
+        created: { type: boolean }
+        diffSummary: { type: object, description: "comparedTo, added/removed counts per kind, addedEntries/removedEntries (up to 200 each)" }
+    SafetyDictionaryItem:
+      type: object
+      required: [value]
+      properties:
+        classId: { type: [string, "null"], description: "terms and stems only" }
+        value: { type: string, minLength: 3, maxLength: 100 }
+        lang: { type: [string, "null"], description: "e.g. en, ar, hi" }
+        matchKind: { type: [string, "null"], enum: [term, stem, null], description: "pregnancyRisk and controlled only (required there)" }
+    SafetyDictionaryBundle:
+      type: object
+      required: [classes, labels]
+      properties:
+        classes:
+          type: array
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: string }
+              crossReactsTo: { type: array, items: { type: string }, description: "one direction only" }
+        terms: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" }, description: "whole words" }
+        stems: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" }, description: "fragments matched anywhere in a word" }
+        exclusions: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" }, description: "not-the-stem words blanked before stem matching" }
+        pregnancyRisk: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" } }
+        controlled: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" } }
+        labels:
+          type: object
+          properties:
+            controlled: { type: object, additionalProperties: { type: string }, description: "lang -> label; en required" }
     PrescriptionAllergySnapshot:
       type: object
       required: [state, allergies]

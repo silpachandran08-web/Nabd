@@ -79,9 +79,12 @@ public class PrescriptionService {
 
     private final ClinicClock clock;
     private final ObjectMapper objectMapper;
+    private final SafetyDictionaryService dictionaries;
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
-                         AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper) {
+                         AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
+                         SafetyDictionaryService dictionaries) {
+        this.dictionaries = dictionaries;
         this.clock = clock;
         this.objectMapper = objectMapper;
         this.repo = repo;
@@ -149,7 +152,7 @@ public class PrescriptionService {
 
         List<AllergyRow> allergies = allergyRepo.findActiveByPatient(tenantId, owner.patientId());
         PrescriptionRepository.PatientProfile profile = repo.findPatientProfile(tenantId, owner.patientId()).orElse(null);
-        String region = repo.findTenantRegion(tenantId).orElse("IN");
+        SafetyDictionary dict = dictionaryFor(tenantId);
         LocalDate today = clock.today(tenantId);
         List<PrescriptionItemRow> existing = repo.findItems(tenantId, prescriptionId);
         ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
@@ -158,7 +161,7 @@ public class PrescriptionService {
         List<StoredDecision> kept = new ArrayList<>();
         for (PrescriptionItemRequest item : items) {
             List<StoredDecision> decisions = new ArrayList<>();
-            for (Detected d : detectLine(item.drugName(), item.brandName(), allergies, profile, region, today)) {
+            for (Detected d : detectLine(item.drugName(), item.brandName(), allergies, profile, dict, today)) {
                 if (!d.requiresDecision()) {
                     continue;
                 }
@@ -400,7 +403,9 @@ public class PrescriptionService {
         if ("signed".equals(row.status())) {
             return toResponse(tenantId, row); // idempotent: already signed, nothing more to record
         }
-        PrescriptionResponse current = toResponse(tenantId, row);
+        // CLN-004: one dictionary snapshot for the gate below and for the version stamped on the signed row.
+        SafetyDictionary dict = dictionaryFor(tenantId);
+        PrescriptionResponse current = toResponse(tenantId, row, dict);
         if (current.items().isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "empty-prescription", "Nothing to sign",
                     "Add at least one medicine before signing.");
@@ -417,7 +422,7 @@ public class PrescriptionService {
         // DOC-R3: capture the allergy statement the gate above just checked (still under the register lock) and store
         // it with the status flip, so the printout shows what the prescriber signed against, not the register at print time.
         StoredAllergySnapshot snapshot = captureAllergySnapshot(tenantId, owner.patientId());
-        if (repo.sign(tenantId, row.id(), toJson(snapshot)) == 0) {
+        if (repo.sign(tenantId, row.id(), toJson(snapshot), dict.label()) == 0) {
             // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
             return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
         }
@@ -440,7 +445,8 @@ public class PrescriptionService {
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "prescription.signed", "prescription", row.id(), null, Map.of("queueEntryId", queueEntryId.toString(), "items", finalItems,
                         "signedByVisitDoctor", owner.doctorId().equals(callerStaffId),
-                        "allergySnapshotState", snapshot.state(), "allergySnapshotActiveCount", snapshot.allergies().size()));
+                        "allergySnapshotState", snapshot.state(), "allergySnapshotActiveCount", snapshot.allergies().size(),
+                        "safetyDictionaryVersion", dict.label()));
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 
@@ -461,10 +467,17 @@ public class PrescriptionService {
                         + " this prescription.");
     }
 
+    private SafetyDictionary dictionaryFor(UUID tenantId) {
+        return dictionaries.forTenantRegion(repo.findTenantRegion(tenantId).orElse("IN"));
+    }
+
     private PrescriptionResponse toResponse(UUID tenantId, PrescriptionRow p) {
+        return toResponse(tenantId, p, dictionaryFor(tenantId));
+    }
+
+    private PrescriptionResponse toResponse(UUID tenantId, PrescriptionRow p, SafetyDictionary dict) {
         List<AllergyRow> allergies = allergyRepo.findActiveByPatient(tenantId, p.patientId());
         PrescriptionRepository.PatientProfile profile = repo.findPatientProfile(tenantId, p.patientId()).orElse(null);
-        String region = repo.findTenantRegion(tenantId).orElse("IN");
         LocalDate today = clock.today(tenantId);
         int[] unresolved = {0};
         int[] itemNo = {0};
@@ -476,7 +489,7 @@ public class PrescriptionService {
                     String allergyWarning = null;
                     String pregnancyWarning = null;
                     String controlledWarning = null;
-                    for (Detected d : detectLine(i.drugName(), i.brandName(), allergies, profile, region, today)) {
+                    for (Detected d : detectLine(i.drugName(), i.brandName(), allergies, profile, dict, today)) {
                         StoredDecision held = !d.requiresDecision() ? null : stored.stream()
                                 .filter(s -> s.kind().equals(d.kind()) && sameMatch(s.matched(), d.matched())
                                         && RxSafetyChecks.reasonLabel(d.kind(), s.reasonCode()) != null)
@@ -504,7 +517,8 @@ public class PrescriptionService {
                 })
                 .toList();
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
-                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat);
+                p.createdAt(), p.signedAt(), items, unresolved[0], readAllergySnapshot(p.allergySnapshotJson()), flat,
+                p.safetyDictionaryVersion());
     }
 
     // ── DOC-R3: allergy statement snapshotted at signing ─────────────────
@@ -568,21 +582,21 @@ public class PrescriptionService {
     };
 
     private List<Detected> detect(String drugName, List<AllergyRow> allergies, PrescriptionRepository.PatientProfile profile,
-                                  String region, LocalDate today) {
+                                  SafetyDictionary dict, LocalDate today) {
         List<Detected> found = new ArrayList<>();
-        findMatch(allergies, drugName).ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
+        findMatch(dict, allergies, drugName).ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
                 a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
-        String preg = profile == null ? null : RxSafetyChecks.pregnancyWarning(drugName, profile.gender(), profile.dob(), today);
+        String preg = profile == null ? null : RxSafetyChecks.pregnancyWarning(dict, drugName, profile.gender(), profile.dob(), today);
         // DOC-021: a recorded pregnant/lactating status escalates (severity, wording and a fresh decision: `matched`
         // differs from the generic one, so an earlier generic override does not carry over). Never weakens: any other
         // status falls through to the unchanged rule above.
-        String recorded = profile == null ? null : RxSafetyChecks.recordedStatusWarning(drugName, profile.pregnancyStatus());
+        String recorded = profile == null ? null : RxSafetyChecks.recordedStatusWarning(dict, drugName, profile.pregnancyStatus());
         if (recorded != null) {
             found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "severe", recorded, profile.pregnancyStatus(), true));
         } else if (preg != null) {
             found.add(new Detected(RxSafetyChecks.KIND_PREGNANCY, "caution", preg, "pregnancy/lactation", true));
         }
-        String controlled = RxSafetyChecks.controlledSubstanceWarning(drugName, region);
+        String controlled = RxSafetyChecks.controlledSubstanceWarning(dict, drugName);
         if (controlled != null) {
             found.add(new Detected(RxSafetyChecks.KIND_CONTROLLED, "caution", controlled, "controlled substance", true));
         }
@@ -592,10 +606,10 @@ public class PrescriptionService {
     /** DOC-033: the safety checks run on the generic text AND the brand text. A brand can never hide a conflict the
      * generic would show, nor the other way round. A finding already raised by the generic is not duplicated. */
     private List<Detected> detectLine(String drugName, String brandName, List<AllergyRow> allergies,
-                                      PrescriptionRepository.PatientProfile profile, String region, LocalDate today) {
-        List<Detected> found = new ArrayList<>(detect(drugName, allergies, profile, region, today));
+                                      PrescriptionRepository.PatientProfile profile, SafetyDictionary dict, LocalDate today) {
+        List<Detected> found = new ArrayList<>(detect(drugName, allergies, profile, dict, today));
         if (brandName != null && !brandName.isBlank() && !brandName.trim().equalsIgnoreCase(drugName.trim())) {
-            for (Detected d : detect(brandName, allergies, profile, region, today)) {
+            for (Detected d : detect(brandName, allergies, profile, dict, today)) {
                 boolean dup = found.stream().anyMatch(f -> f.kind().equals(d.kind()) && sameMatch(f.matched(), d.matched()));
                 if (!dup) {
                     found.add(d);
@@ -628,8 +642,8 @@ public class PrescriptionService {
     }
 
     /** The most severe matching allergy wins (severe, then moderate, then mild). */
-    private Optional<AllergyRow> findMatch(List<AllergyRow> allergies, String drugName) {
-        return allergies.stream().filter(a -> RxSafetyChecks.allergyMatches(drugName, a.substance()))
+    private Optional<AllergyRow> findMatch(SafetyDictionary dict, List<AllergyRow> allergies, String drugName) {
+        return allergies.stream().filter(a -> RxSafetyChecks.allergyMatches(dict, drugName, a.substance()))
                 .min(Comparator.comparingInt(a -> switch (a.severity()) {
                     case "severe" -> 0;
                     case "moderate" -> 1;

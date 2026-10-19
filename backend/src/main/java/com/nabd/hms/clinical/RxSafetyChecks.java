@@ -4,7 +4,6 @@ import com.nabd.hms.clinical.dto.RxReasonOption;
 
 import java.time.LocalDate;
 import java.time.Period;
-import java.time.ZoneOffset;
 import java.util.List;
 
 /**
@@ -12,21 +11,12 @@ import java.util.List;
  * case-insensitive substring match against the free-text drug name, not a real drug database
  * (this app has no source for one, same limitation the allergy check already documents). Short,
  * illustrative lists of well-known examples, not a certified regulatory or clinical reference.
+ * CLN-004: the lists themselves moved unchanged into the region's {@link SafetyDictionary}; the rules stay here.
  */
 final class RxSafetyChecks {
 
     private RxSafetyChecks() {
     }
-
-    private static final List<String> PREGNANCY_RISK_DRUGS = List.of(
-            "isotretinoin", "warfarin", "methotrexate", "misoprostol", "thalidomide",
-            "valproate", "valproic", "tetracycline", "doxycycline", "lisinopril", "enalapril");
-
-    private static final List<String> INDIA_SCHEDULE_H1_DRUGS = List.of(
-            "tramadol", "alprazolam", "diazepam", "codeine", "buprenorphine", "zolpidem");
-
-    private static final List<String> KSA_CONTROLLED_DRUGS = List.of(
-            "tramadol", "alprazolam", "diazepam", "codeine", "morphine", "fentanyl");
 
     static final String KIND_ALLERGY = "allergy";
     static final String KIND_PREGNANCY = "pregnancy";
@@ -56,12 +46,12 @@ final class RxSafetyChecks {
     /** True when the drug name contains the recorded substance, or the substance and the drug share a drug class
      * (see {@link AllergyDrugClasses}: penicillins, cephalosporins, sulfonamide antibiotics, NSAIDs and others,
      * with spelling variants and brand names). Name-based only; it leans towards a needless warning over a miss. */
-    static boolean allergyMatches(String drugName, String substance) {
-        return AllergyDrugClasses.matches(drugName, substance);
+    static boolean allergyMatches(SafetyDictionary dict, String drugName, String substance) {
+        return AllergyDrugClasses.matches(dict, drugName, substance);
     }
 
     /** NB-113: fires for any patient of childbearing potential — female, roughly 12-55 — regardless of specialty. */
-    static String pregnancyWarning(String drugName, String gender, LocalDate dob, LocalDate today) {
+    static String pregnancyWarning(SafetyDictionary dict, String drugName, String gender, LocalDate dob, LocalDate today) {
         if (!"female".equals(gender)) {
             return null;
         }
@@ -69,7 +59,7 @@ final class RxSafetyChecks {
         if (age < 12 || age > 55) {
             return null;
         }
-        return matches(drugName, PREGNANCY_RISK_DRUGS)
+        return matches(drugName, dict.pregnancyRisk())
                 ? "Caution: avoid in pregnancy/lactation for patients of childbearing potential"
                 : null;
     }
@@ -77,8 +67,8 @@ final class RxSafetyChecks {
     /** DOC-021: escalation when a clinician has RECORDED the patient as pregnant or lactating. It applies to any
      * patient the status is recorded for (no sex/age gate) and only ever adds to {@link #pregnancyWarning}; any
      * other status (not_pregnant, unknown, not documented) returns null so the caller behaves exactly as before. */
-    static String recordedStatusWarning(String drugName, String pregnancyStatus) {
-        if (!matches(drugName, PREGNANCY_RISK_DRUGS)) {
+    static String recordedStatusWarning(SafetyDictionary dict, String drugName, String pregnancyStatus) {
+        if (!matches(drugName, dict.pregnancyRisk())) {
             return null;
         }
         if ("pregnant".equals(pregnancyStatus)) {
@@ -90,15 +80,16 @@ final class RxSafetyChecks {
         return null;
     }
 
-    /** NB-111: correct rule set by tenant region — India Schedule H1 vs KSA SFDA controlled list. */
-    static String controlledSubstanceWarning(String drugName, String region) {
-        List<String> list = "KSA".equals(region) ? KSA_CONTROLLED_DRUGS : INDIA_SCHEDULE_H1_DRUGS;
-        String label = "KSA".equals(region) ? "SFDA-controlled substance" : "Schedule H1 controlled substance";
-        return matches(drugName, list) ? label + " — additional documentation required" : null;
+    /** NB-111: correct rule set by tenant region (India Schedule H1 vs KSA SFDA list): the region's dictionary
+     * carries both the list and the English label. */
+    static String controlledSubstanceWarning(SafetyDictionary dict, String drugName) {
+        return matches(drugName, dict.controlled()) ? dict.controlledLabel().get("en") + " — additional documentation required" : null;
     }
 
-    private static boolean matches(String drugName, List<String> keywords) {
+    /** Stems: substring of the normalised name (the pre-CLN-004 rule); terms: whole words, as for allergy classes. */
+    private static boolean matches(String drugName, SafetyDictionary.Terms list) {
         String lower = AllergyDrugClasses.normalise(drugName);
-        return keywords.stream().anyMatch(lower::contains);
+        return list.stems().stream().map(AllergyDrugClasses::normalise).anyMatch(lower::contains)
+                || (!list.terms().isEmpty() && AllergyDrugClasses.containsWholeWord(lower, list.terms()));
     }
 }
