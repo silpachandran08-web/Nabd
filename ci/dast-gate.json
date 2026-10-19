@@ -1,0 +1,4 @@
+{
+  "_note": "OPS-037. Schemathesis is report only until schemathesis_blocking_from (YYYY-MM-DD, first day of S4): then any 5xx or schema non-conformance fails the PR. ZAP High and token-in-URL fail from day one.",
+  "schemathesis_blocking_from": null
+}
