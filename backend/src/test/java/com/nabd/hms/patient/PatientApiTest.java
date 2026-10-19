@@ -529,7 +529,7 @@ class PatientApiTest extends ApiTestBase {
                 "SELECT national_id_enc FROM patients WHERE id = ?", byte[].class, patientId));
         assertThat(address).isEqualTo("12 Test Street");
         assertThat(nationalIdEnc).isNotNull();
-        assertThat(new String(cipher.decrypt(nationalIdEnc), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("123456789012");
+        assertThat(new String(cipher.decrypt(nationalIdEnc, com.nabd.hms.common.FieldCipher.Aad.of(tenant.id(), "patients", "national_id_enc", patientId)), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("123456789012");
         assertThat(exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody().get("guardianId")).isNull();
     }
 
@@ -553,7 +553,7 @@ class PatientApiTest extends ApiTestBase {
                 "SELECT address, national_id_enc, guardian_id FROM patients WHERE id = ?", patientId));
         assertThat(row.get("guardian_id")).isNull();
         assertThat(row.get("address")).isEqualTo("34 Test Lane");
-        assertThat(new String(cipher.decrypt((byte[]) row.get("national_id_enc")), java.nio.charset.StandardCharsets.UTF_8))
+        assertThat(new String(cipher.decrypt((byte[]) row.get("national_id_enc"), com.nabd.hms.common.FieldCipher.Aad.of(tenant.id(), "patients", "national_id_enc", patientId)), java.nio.charset.StandardCharsets.UTF_8))
                 .isEqualTo("555566667777");
         // append-only consents: the grant row stays, a later withdrawn row supersedes it; the API view must show no guardian
         Map<?, ?> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody();

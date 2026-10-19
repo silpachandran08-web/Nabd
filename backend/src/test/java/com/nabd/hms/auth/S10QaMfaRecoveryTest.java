@@ -268,7 +268,7 @@ class S10QaMfaRecoveryTest extends ApiTestBase {
         // secret swapped: pending cleared, new secret is the active one
         Map<String, Object> row = staffRow(s);
         assertThat(row.get("mfa_pending_secret_enc")).isNull();
-        assertThat(cipher.decrypt((byte[]) row.get("mfa_secret_enc"))).isEqualTo((byte[]) r[1]);
+        assertThat(cipher.decrypt((byte[]) row.get("mfa_secret_enc"), com.nabd.hms.common.FieldCipher.Aad.of(s.tenantId(), "staff", "mfa_secret", s.id()))).isEqualTo((byte[]) r[1]);
         // and now the OLD authenticator is dead, the NEW one signs in
         forgetLastStep(s);
         assertThat(verifyTotp(challenge(s), totp(TOTP_SECRET, 0)).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

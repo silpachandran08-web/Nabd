@@ -6,7 +6,7 @@ import com.nabd.hms.auth.dto.MfaVerifyRequest;
 import com.nabd.hms.auth.dto.RefreshRequest;
 import com.nabd.hms.auth.dto.SessionResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.OpaqueTokens;
@@ -55,7 +55,7 @@ public class PlatformAuthService {
     private final PlatformAuthRepository repo;
     private final PasswordEncoder pinEncoder;
     private final TotpService totpService;
-    private final AesGcmCipher cipher;
+    private final FieldCipher cipher;
     private final JwtEncoder jwtEncoder;
     private final ChallengeTokenDecoder jwtDecoder;
     private final AuthProperties props;
@@ -63,7 +63,7 @@ public class PlatformAuthService {
     private final AuditService auditService;
 
     PlatformAuthService(PlatformAuthRepository repo, PasswordEncoder pinEncoder, TotpService totpService,
-                         AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder, AuthProperties props,
+                         FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder, AuthProperties props,
                          PlatformAudit audit, AuditService auditService) {
         this.audit = audit;
         this.auditService = auditService;
@@ -139,7 +139,8 @@ public class PlatformAuthService {
             throw mfaFailed();
         }
         enforceAccountLockout(operator);
-        byte[] secret = cipher.decrypt(operator.mfaSecretEnc());
+        byte[] secret = cipher.tryDecrypt(operator.mfaSecretEnc(),
+                FieldCipher.Aad.of("platform", "master.operators", "mfa_secret", operator.id())).orElseThrow(this::mfaFailed);
         long step = totpService.matchStep(secret, req.code(), Instant.now());
         if (step < 0 || !repo.claimTotpStep(operator.id(), step)) { // claim = replay guard
             repo.recordLoginAttempt(operator.id(), operator.email(), ip, false);

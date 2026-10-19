@@ -130,7 +130,9 @@ app:
     otp-language: ${WHATSAPP_OTP_LANGUAGE:en}
     log-otp: ${WHATSAPP_LOG_OTP:false}         # OtpLoggingGuard refuses to boot in prod when true; the sender no longer logs codes
   crypto:
-    # base64, 32 bytes (AES-256), Vault/KMS-backed (NB-009) — no default;
-    # boot fails fast if unset rather than encrypting MFA secrets with a
-    # throwaway key.
-    key: ${APP_CRYPTO_KEY}
+    # base64, 32 bytes (AES-256) each, no code defaults (FieldCipher refuses to boot without a key).
+    # PLT-044: legacy key: reads pre-PLT-044 values and, outside prod with no keyring, doubles as kid 1.
+    key: ${APP_CRYPTO_KEY:}
+    # PLT-044: "kid:base64,kid:base64" (kid 1-255) + the kid new writes use. Required under the prod profile.
+    keyring: ${APP_CRYPTO_KEYRING:}
+    active-kid: ${APP_CRYPTO_ACTIVE_KID:}

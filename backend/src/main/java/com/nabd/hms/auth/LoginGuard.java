@@ -68,6 +68,7 @@ public class LoginGuard {
 
     /** Valid code AND its time-step is newer than the last one accepted for this account (atomic claim). */
     boolean verifyTotp(UUID staffId, byte[] secret, String code) {
+        if (secret == null) return false; // PLT-044: secret did not decrypt for this row (FieldCipher logged it)
         long step = totp.matchStep(secret, code, Instant.now());
         return step >= 0 && jdbc.update("UPDATE staff SET mfa_last_used_step = ? WHERE id = ? "
                 + "AND (mfa_last_used_step IS NULL OR mfa_last_used_step < ?)", step, staffId, step) == 1;
