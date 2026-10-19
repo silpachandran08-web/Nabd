@@ -13,7 +13,7 @@ final class AuthModels {
 
     record Staff(UUID id, UUID tenantId, UUID roleId, String email, String name, String mobilePhone,
                  String pinHash, String status, String scope, boolean emailVerified, boolean mobileVerified,
-                 boolean mfaEnabled, byte[] mfaSecretEnc) {
+                 boolean mfaEnabled, byte[] mfaSecretEnc, byte[] mfaPendingSecretEnc, boolean mfaResetRequired) {
     }
 
     /** builtIn = the clinic's one built-in role, the Owner (custom roles are never built-in, see RoleRepository). */

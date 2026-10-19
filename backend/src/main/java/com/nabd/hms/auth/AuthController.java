@@ -97,8 +97,15 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/enroll")
-    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt, @RequestBody(required = false) MfaEnrollRequest req) {
-        return authService.enrollMfa(mfaCaller.resolve(jwt, req == null ? null : req.setupToken()));
+    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt, @RequestBody(required = false) MfaEnrollRequest req,
+                                        @org.springframework.web.bind.annotation.RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
+        return authService.enrollMfa(mfaCaller.resolve(jwt, req == null ? null : req.setupToken()),
+                req == null ? null : req.currentCode(), stepUpToken);
+    }
+
+    @PostMapping("/mfa/recovery-verify")
+    public com.nabd.hms.auth.dto.RecoveryVerifyResponse recoveryVerify(@Valid @RequestBody com.nabd.hms.auth.dto.RecoveryVerifyRequest req, HttpServletRequest http) {
+        return authService.recoveryVerify(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
     }
 
     @PostMapping("/mfa/confirm")

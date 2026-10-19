@@ -14,6 +14,8 @@ import com.nabd.hms.auth.dto.PinResetConfirmRequest;
 import com.nabd.hms.auth.dto.PinResetRequestRequest;
 import com.nabd.hms.auth.dto.RefreshRequest;
 import com.nabd.hms.auth.dto.SessionResponse;
+import com.nabd.hms.auth.dto.RecoveryVerifyRequest;
+import com.nabd.hms.auth.dto.RecoveryVerifyResponse;
 import com.nabd.hms.auth.dto.StepUpTokenResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.auth.dto.OtpRequestRequest;
@@ -22,6 +24,7 @@ import com.nabd.hms.auth.dto.UnlockRequest;
 import com.nabd.hms.common.AesGcmCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.OpaqueTokens;
@@ -74,12 +77,13 @@ public class AuthService {
     private final WhatsAppOtpSender otpSender;
     private final AuditService auditService;
     private final LoginGuard guard;
+    private final StepUpVerifier stepUpVerifier;
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
-                LoginGuard guard) {
+                LoginGuard guard, StepUpVerifier stepUpVerifier) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -92,6 +96,7 @@ public class AuthService {
         this.otpSender = otpSender;
         this.auditService = auditService;
         this.guard = guard;
+        this.stepUpVerifier = stepUpVerifier;
     }
 
     // noRollbackFor: recordLoginAttempt() below is the lockout counter's only durable state, and
@@ -143,6 +148,9 @@ public class AuthService {
      * per-role flag instead, set deliberately by whoever builds the role (see roles.mfa_required).
      */
     private boolean mfaRequiredByPolicy(Staff staff) {
+        if (staff.mfaResetRequired()) { // PLT-004: an owner reset forces enrolment at next sign-in
+            return true;
+        }
         Role role = repo.findRole(staff.roleId()).orElseThrow(() -> new IllegalStateException("role missing"));
         return role.mfaRequired();
     }
@@ -310,11 +318,27 @@ public class AuthService {
     // mfa_setup_required token issued above (policy forced this staff member to enroll before
     // getting a real session) — both carry sub+tenantId, which is all enroll/confirm need.
 
-    @Transactional
-    public MfaEnrollResponse enrollMfa(Jwt callerJwt) {
+    /** PLT-004: with MFA already on, re-enrolment needs the current TOTP or a step-up token; the active secret is untouched until confirm. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public MfaEnrollResponse enrollMfa(Jwt callerJwt, String currentCode, String stepUpToken) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+        if (staff.mfaEnabled()) {
+            if (stepUpToken != null && !stepUpToken.isBlank()) {
+                stepUpVerifier.require(stepUpToken, staffId);
+            } else {
+                guard.enforceLockout(staffId);
+                if (currentCode == null || staff.mfaSecretEnc() == null
+                        || !guard.verifyTotp(staffId, cipher.decrypt(staff.mfaSecretEnc()), currentCode)) {
+                    if (currentCode != null) {
+                        guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "totp", false);
+                    }
+                    throw new ApiException(HttpStatus.FORBIDDEN, "step-up-required", "Step-up verification required",
+                            "Re-enrolling an authenticator needs your current code or a step-up token.");
+                }
+            }
+        }
 
         byte[] secret = totpService.generateSecret();
         repo.setPendingMfaSecret(staffId, cipher.encrypt(secret));
@@ -330,11 +354,12 @@ public class AuthService {
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
 
         guard.enforceLockout(staffId);
-        if (staff.mfaSecretEnc() == null || !guard.verifyTotp(staffId, cipher.decrypt(staff.mfaSecretEnc()), req.code())) {
+        if (staff.mfaPendingSecretEnc() == null || !guard.verifyTotp(staffId, cipher.decrypt(staff.mfaPendingSecretEnc()), req.code())) {
             guard.recordAttempt(tenantId, staffId, staff.email(), "totp", false);
             throw mfaFailed();
         }
-        repo.enableMfa(staffId);
+        repo.confirmPendingMfa(staffId);
+        repo.revokeUnusedRecoveryCodes(staffId);
         List<String> codes = new java.util.ArrayList<>();
         for (int i = 0; i < 8; i++) {
             String code = OpaqueTokens.generate().substring(0, 10).toUpperCase(java.util.Locale.ROOT);
@@ -343,6 +368,40 @@ public class AuthService {
         }
         log.info("staff {} completed MFA enrollment, {} recovery codes issued", staffId, codes.size());
         return new MfaConfirmResponse(codes);
+    }
+
+    /** PLT-004: completes an MFA challenge with a single-use recovery code instead of a TOTP. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public RecoveryVerifyResponse recoveryVerify(RecoveryVerifyRequest req, String ip, String device, String userAgent) {
+        Jwt challenge;
+        try {
+            challenge = jwtDecoder.decode(req.challengeToken(), TokenType.MFA_PENDING);
+        } catch (JwtException e) {
+            throw challengeInvalid();
+        }
+        if (!"mfa_pending".equals(challenge.getClaimAsString("purpose"))) {
+            throw challengeInvalid();
+        }
+        tenantContext.set(UUID.fromString(challenge.getClaimAsString("tenantId")));
+        Staff staff = repo.findStaffById(UUID.fromString(challenge.getSubject())).orElseThrow(this::challengeInvalid);
+        guard.enforceLockout(staff.id());
+        String hash = OpaqueTokens.sha256Hex(req.recoveryCode().trim().toUpperCase(java.util.Locale.ROOT));
+        if (!repo.consumeRecoveryCode(staff.id(), hash)) {
+            guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "recovery", false);
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "recovery-code-invalid", "Recovery code invalid",
+                    "That recovery code is not valid.");
+        }
+        guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "recovery", true);
+        String roleName = repo.findRole(staff.roleId()).map(Role::name).orElse("Staff");
+        auditService.record(staff.tenantId(), "staff", staff.id(), staff.name(), roleName, ip,
+                "auth.recovery_code_used", "staff", staff.id(), null, null);
+        TokenPairResponse t = mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+        return new RecoveryVerifyResponse(t.accessToken(), t.refreshToken(), t.expiresIn(), repo.countLiveRecoveryCodes(staff.id()));
+    }
+
+    private ApiException challengeInvalid() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "challenge-invalid", "Challenge invalid",
+                "The sign-in challenge is invalid or has expired.");
     }
 
     // ── PIN reset (NB-046) ───────────────────────────────────────────────

@@ -58,7 +58,7 @@ class AuthRepository {
 
     private static final String STAFF_COLUMNS =
             "id, tenant_id, role_id, email, name, mobile_phone, pin_hash, status, scope, " +
-                    "email_verified, mobile_verified, mfa_enabled, mfa_secret_enc ";
+                    "email_verified, mobile_verified, mfa_enabled, mfa_secret_enc, mfa_pending_secret_enc, mfa_reset_required ";
 
     Optional<Staff> findStaffByEmail(UUID tenantId, String email) {
         return jdbc.query("SELECT " + STAFF_COLUMNS + "FROM staff WHERE tenant_id = ? AND email = ?::citext",
@@ -110,13 +110,25 @@ class AuthRepository {
 
     // ── MFA enrollment (NB-042) ──────────────────────────────────────────
 
-    /** Stores the secret but does NOT flip mfa_enabled — that only happens once confirm() verifies a real code. */
+    /** PLT-004: parks the new secret beside the active one; mfa_secret_enc / mfa_enabled only change in confirmPendingMfa. */
     void setPendingMfaSecret(UUID staffId, byte[] encryptedSecret) {
-        jdbc.update("UPDATE staff SET mfa_secret_enc = ? WHERE id = ?", encryptedSecret, staffId);
+        jdbc.update("UPDATE staff SET mfa_pending_secret_enc = ?, mfa_pending_created_at = now() WHERE id = ?", encryptedSecret, staffId);
     }
 
-    void enableMfa(UUID staffId) {
-        jdbc.update("UPDATE staff SET mfa_enabled = true WHERE id = ?", staffId);
+    /** Pending becomes active, MFA on, a pending admin reset is satisfied. */
+    void confirmPendingMfa(UUID staffId) {
+        jdbc.update("UPDATE staff SET mfa_secret_enc = mfa_pending_secret_enc, mfa_pending_secret_enc = NULL, "
+                + "mfa_pending_created_at = NULL, mfa_enabled = true, mfa_reset_required = false WHERE id = ?", staffId);
+    }
+
+    /** Old unused codes stop working when a new set is issued. */
+    void revokeUnusedRecoveryCodes(UUID staffId) {
+        jdbc.update("UPDATE mfa_recovery_codes SET revoked_at = now() WHERE staff_id = ? AND used_at IS NULL AND revoked_at IS NULL", staffId);
+    }
+
+    int countLiveRecoveryCodes(UUID staffId) {
+        return jdbc.queryForObject("SELECT count(*) FROM mfa_recovery_codes WHERE staff_id = ? AND used_at IS NULL AND revoked_at IS NULL",
+                Integer.class, staffId);
     }
 
     void insertRecoveryCode(UUID tenantId, UUID staffId, String codeHash) {
@@ -127,7 +139,7 @@ class AuthRepository {
     /** Atomic check-and-consume — same shape as consumeWhatsAppOtp, so a code can never be used twice. */
     boolean consumeRecoveryCode(UUID staffId, String codeHash) {
         int rows = jdbc.update(
-                "UPDATE mfa_recovery_codes SET used_at = now() WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL",
+                "UPDATE mfa_recovery_codes SET used_at = now() WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL AND revoked_at IS NULL",
                 staffId, codeHash);
         return rows == 1;
     }
@@ -315,7 +327,9 @@ class AuthRepository {
                 rs.getBoolean("email_verified"),
                 rs.getBoolean("mobile_verified"),
                 rs.getBoolean("mfa_enabled"),
-                rs.getBytes("mfa_secret_enc"));
+                rs.getBytes("mfa_secret_enc"),
+                rs.getBytes("mfa_pending_secret_enc"),
+                rs.getBoolean("mfa_reset_required"));
     }
 
     private RowMapper<Role> roleMapper() {
