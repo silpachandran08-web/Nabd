@@ -46,9 +46,9 @@ public class StaffController {
     @GetMapping
     @PreAuthorize("hasAuthority('staff:view')")
     public StaffPage list(@AuthenticationPrincipal Jwt jwt,
-                           @RequestParam(defaultValue = "20") int limit,
+                           @RequestParam(required = false) Integer limit,
                            @RequestParam(required = false) String cursor) {
-        return staffService.list(tenantId(jwt), limit, cursor);
+        return staffService.list(tenantId(jwt), com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     /** Queue/consult doctor pickers need id+name only — gated on queue:view (not staff:view) so

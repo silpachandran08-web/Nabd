@@ -30,9 +30,9 @@ public class FollowUpListController {
                              @RequestParam(required = false) String status,
                              @RequestParam(required = false) LocalDate from,
                              @RequestParam(required = false) LocalDate to,
-                             @RequestParam(defaultValue = "20") int limit,
+                             @RequestParam(required = false) Integer limit,
                              @RequestParam(required = false) String cursor) {
         return service.list(UUID.fromString(jwt.getClaimAsString("tenantId")), UUID.fromString(jwt.getSubject()),
-                status, from, to, limit, cursor);
+                status, from, to, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 }

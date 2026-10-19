@@ -177,7 +177,7 @@ export default function AuditLogPage() {
 
   useEffect(() => {
     void Promise.resolve().then(async () => {
-      const tenantsRes = await fetchAuthed("/platform/tenants?limit=200");
+      const tenantsRes = await fetchAuthed("/platform/tenants?limit=100");
       if (tenantsRes?.ok) {
         const body: { data: TenantOption[] } = await tenantsRes.json();
         setTenants(body.data);

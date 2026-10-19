@@ -73,10 +73,12 @@ class FleetApiTest extends ApiTestBase {
         SeededTenant t3 = seedTenant();
         String token = superAdminToken();
 
-        ResponseEntity<Map> resp = exchange("/v1/platform/tenants?limit=1000", HttpMethod.GET, authed(token), Map.class);
-        List<Map<String, Object>> rows = (List<Map<String, Object>>) resp.getBody().get("data");
-        Set<String> ids = rows.stream().map(r -> (String) r.get("id")).collect(java.util.stream.Collectors.toSet());
-        assertThat(ids).contains(t1.id().toString(), t2.id().toString(), t3.id().toString());
+        // PLT-027: limit is capped at 100 (1000 is a 400), so walk the cursor
+        assertThat(exchange("/v1/platform/tenants?limit=1000", HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(findTenantRow(token, t1.id())).isNotNull();
+        assertThat(findTenantRow(token, t2.id())).isNotNull();
+        assertThat(findTenantRow(token, t3.id())).isNotNull();
     }
 
     /** Backs the Fleet page's KPI tiles — same clinics_fleet:view gate as the list itself. */
@@ -146,7 +148,7 @@ class FleetApiTest extends ApiTestBase {
     private Map<String, Object> findTenantRow(String token, UUID tenantId) {
         String cursor = null;
         do {
-            ResponseEntity<Map> resp = exchange("/v1/platform/tenants?limit=200" + (cursor == null ? "" : "&cursor=" + cursor),
+            ResponseEntity<Map> resp = exchange("/v1/platform/tenants?limit=100" + (cursor == null ? "" : "&cursor=" + cursor),
                     HttpMethod.GET, authed(token), Map.class);
             assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
             for (Map<String, Object> r : (List<Map<String, Object>>) resp.getBody().get("data")) {

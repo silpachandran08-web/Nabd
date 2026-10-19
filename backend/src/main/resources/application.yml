@@ -1,6 +1,9 @@
 spring:
   application:
     name: hms-backend
+  mvc:
+    problemdetails:
+      enabled: true
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/nabd}
     username: ${DB_USER:nabd_app}

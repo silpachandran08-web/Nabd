@@ -143,9 +143,9 @@ class PatientRegistryApiTest extends ApiTestBase {
         Map<String, Object> one = exchange("/v1/patients/registry?q=Divya&limit=4", HttpMethod.GET, authed(token), Map.class).getBody();
         assertThat(one).containsEntry("matchedTotal", 1).containsEntry("hasMore", false);
 
-        // limit is clamped like the encounters list (1..200), a foreign/garbled cursor is a 400
-        Map<String, Object> clamped = exchange("/v1/patients/registry?limit=0", HttpMethod.GET, authed(token), Map.class).getBody();
-        assertThat((List<?>) clamped.get("rows")).hasSize(1);
+        // PLT-027: an out-of-range limit is a 400 (was clamped), a foreign/garbled cursor is a 400
+        assertThat(exchange("/v1/patients/registry?limit=0", HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(exchange("/v1/patients/registry?cursor=not-a-cursor", HttpMethod.GET, authed(token), Map.class).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
         String encounterStyleCursor = new com.nabd.hms.common.Cursor(java.time.Instant.now(), UUID.randomUUID()).encode();
