@@ -51,9 +51,26 @@ springdoc:
   swagger-ui:
     enabled: false
 
+# OPS-025: actuator lives on its own port, never routed by the ingress. Readiness = DB + outbox dispatcher freshness.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-components: always
+      group:
+        readiness:
+          include: readinessState,db,outbox
+
 server:
   port: 8080
-  # OPS-053: on SIGTERM finish in-flight requests (up to 25s) before exit, so a rolling restart drops none
+  # OPS-053/OPS-025: on SIGTERM finish in-flight requests (phase timeout above, 25s) before exit, so a rolling restart drops none
   shutdown: graceful
   # PLT-003: the client IP is the TCP peer unless the peer is a trusted proxy. Tomcat's RemoteIpValve only
   # honours X-Forwarded-For from internal-proxies; empty (the default here) = trust nobody. Set per cell,

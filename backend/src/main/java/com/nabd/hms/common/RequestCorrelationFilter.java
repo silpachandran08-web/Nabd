@@ -44,7 +44,23 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
         }
     }
 
+    // OPS-025: W3C trace id wins so the id in Problem+JSON and logs is the trace id seen in the tracing backend.
+    private static final java.util.regex.Pattern TRACEPARENT =
+            java.util.regex.Pattern.compile("^00-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$");
+
     private String resolveRequestId(HttpServletRequest request) {
+        // the OpenTelemetry agent (when attached) has already started the server span and put its trace id in the MDC
+        String agentTrace = MDC.get("trace_id");
+        if (agentTrace != null && agentTrace.matches("[0-9a-f]{32}")) {
+            return agentTrace;
+        }
+        String tp = request.getHeader("traceparent");
+        if (tp != null) {
+            var m = TRACEPARENT.matcher(tp);
+            if (m.matches() && !m.group(1).equals("0".repeat(32))) {
+                return m.group(1);
+            }
+        }
         String incoming = request.getHeader(HEADER);
         if (incoming != null) {
             try {

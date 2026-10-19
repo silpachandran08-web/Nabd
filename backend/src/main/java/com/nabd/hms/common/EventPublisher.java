@@ -27,6 +27,7 @@ public class EventPublisher {
         this.objectMapper = objectMapper;
     }
 
+    @io.opentelemetry.instrumentation.annotations.WithSpan("outbox.publish")
     @Transactional
     public void publish(UUID tenantId, String eventType, Object payload) {
         tenantContext.set(tenantId);
