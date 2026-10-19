@@ -13,6 +13,7 @@ import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
+import { moveBody, moveErrorMessage } from "../lib/queueMove";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 import { apiFetch, goLogin } from "../lib/apiClient";
 
@@ -719,18 +720,18 @@ function ArrivalsPageInner() {
     const showStatus = (status: string) => setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status } : r)));
     try {
       if (row.status === "checked_in") {
-        const toWaiting = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "waiting" }) });
+        const toWaiting = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: moveBody("waiting", "checked_in") });
         if (!toWaiting) return;
         if (!toWaiting.ok) {
-          setActionError(await problemMessage(toWaiting, "Couldn't send the patient for vitals."));
+          setActionError(await moveErrorMessage(toWaiting, "Couldn't send the patient for vitals."));
           return;
         }
         showStatus("waiting");
       }
-      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "vitals_pending" }) });
+      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: moveBody("vitals_pending", "waiting") });
       if (!res) return;
       if (!res.ok) {
-        setActionError(await problemMessage(res, "Couldn't send the patient for vitals."));
+        setActionError(await moveErrorMessage(res, "Couldn't send the patient for vitals."));
         return;
       }
       showStatus("vitals_pending");

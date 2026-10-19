@@ -19,6 +19,7 @@ import type { Part } from "../components/consult/clinical";
 import type { Vitals } from "../components/consult/shared";
 import { DEFAULT_START_STATUS, statusBeforeConsult, statusSequence } from "../components/consult/consultFlow";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { moveBody, moveErrorMessage } from "../lib/queueMove";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
@@ -401,11 +402,10 @@ function PatientsList() {
     setStarting(true);
     setStartError(null);
     try {
-      const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
+      const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: moveBody("in_consult", entry.status) });
       if (!res) return;
       if (!res.ok) {
-        const p: { detail?: string; title?: string } | null = await res.json().catch(() => null);
-        setStartError(p?.detail || p?.title || "Couldn't start the consultation.");
+        setStartError(await moveErrorMessage(res, "Couldn't start the consultation."));
         return;
       }
       router.push(`/consult?entry=${encodeURIComponent(entry.id)}`);

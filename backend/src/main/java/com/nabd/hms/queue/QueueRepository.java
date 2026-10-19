@@ -126,8 +126,9 @@ class QueueRepository {
                 mapper(), tenantId, Date.valueOf(date));
     }
 
-    void updateStatus(UUID tenantId, UUID id, String status) {
-        jdbc.update("UPDATE queue_entries SET status = ? WHERE tenant_id = ? AND id = ?", status, tenantId, id);
+    /** Compare-and-set (ACC-002): returns 0 when the row is no longer in {@code expected}. */
+    int updateStatus(UUID tenantId, UUID id, String expected, String status) {
+        return jdbc.update("UPDATE queue_entries SET status = ? WHERE tenant_id = ? AND id = ? AND status = ?", status, tenantId, id, expected);
     }
 
     /** NB-143: (re-)flagging resets any earlier acknowledgement — a fresh flag needs a fresh

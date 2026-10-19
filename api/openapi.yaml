@@ -1529,11 +1529,15 @@ paths:
             schema:
               type: object
               required: [status]
-              properties: { status: { type: string, enum: [waiting, vitals_pending, vitals_done, in_consult, checkout_pending, completed, no_show] } }
+              properties:
+                status: { type: string, enum: [waiting, vitals_pending, vitals_done, in_consult, checkout_pending, no_show], description: "completed is not accepted here: only billing checkout completes a visit" }
+                expectedStatus: { type: string, description: "The status the caller's screen shows (compare-and-set). Omitted only by legacy clients; the server then guards against the row it just read." }
       responses:
         "200": { description: "Updated", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
-        "400": { description: "Illegal transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "Illegal transition (type illegal-transition), e.g. no_show from in_consult", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "status=completed (type completion-reserved-for-billing)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Stale screen (type stale-status): the visit is no longer in expectedStatus; the Problem carries currentStatus", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue/{id}/transfer:
     post:

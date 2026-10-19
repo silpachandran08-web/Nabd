@@ -37,8 +37,8 @@ public class QueueService {
     /**
      * NB-355: the linear order is no longer fixed in code — DepartmentService.resolveStatusSequence()
      * is the single source of truth for a department's configured (or default) pipeline shape;
-     * this is a pure lookup over whatever sequence it returns. no_show is reachable from anywhere
-     * before the terminal checkout_pending step, matching the original NB-094 rule. transferred_out
+     * this is a pure lookup over whatever sequence it returns. no_show is reachable only before
+     * in_consult (ACC-002). "completed" is never a PATCH target: billing's VisitCommands owns it. transferred_out
      * is a second terminal alongside checkout_pending, reachable only from in_consult — a doctor's
      * end-of-consult choice between billing this leg or moving the patient into another
      * department's queue.
@@ -52,7 +52,8 @@ public class QueueService {
         if ("in_consult".equals(current)) {
             next = union(next, "transferred_out");
         }
-        if (!"checkout_pending".equals(current)) {
+        int consult = sequence.indexOf("in_consult");
+        if (i >= 0 && (consult < 0 ? !"checkout_pending".equals(current) : i < consult)) { // ACC-002: no_show only before in_consult
             next = union(next, "no_show");
         }
         return next;
@@ -73,10 +74,13 @@ public class QueueService {
 
     private final ClinicClock clock;
     private final com.nabd.hms.common.AuditService auditService;
+    private final com.nabd.hms.common.EventPublisher events;
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
                  ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext, ClinicClock clock,
-                 com.nabd.hms.common.AuditService auditService) {
+                 com.nabd.hms.common.AuditService auditService,
+                 com.nabd.hms.common.EventPublisher events) {
+        this.events = events;
         this.auditService = auditService;
         this.clock = clock;
         this.repo = repo;
@@ -146,23 +150,58 @@ public class QueueService {
 
     @Transactional
     public QueueEntryResponse updateStatus(UUID tenantId, UUID callerStaffId, UUID id, QueueStatusUpdateRequest req) {
+        if ("completed".equals(req.status())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "completion-reserved-for-billing", "Completion is reserved for billing",
+                    "A visit is completed only by a successful checkout.");
+        }
+        return move(tenantId, callerStaffId, id, req.expectedStatus(), req.status());
+    }
+
+    /** Billing's only way to reach 'completed' (see VisitCommands); same CAS and legality as any move. */
+    QueueEntryResponse move(UUID tenantId, UUID callerStaffId, UUID id, String expectedStatus, String nextStatus) {
         tenantContext.set(tenantId);
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
-        requireLegalTransition(tenantId, current, req.status(), callerStaffId, id);
-
-        repo.updateStatus(tenantId, id, req.status());
-        log.info("queue entry {} moved {} -> {} by {}", id, current.status(), req.status(), callerStaffId);
-        if (current.appointmentId() != null && ("completed".equals(req.status()) || "no_show".equals(req.status()))) {
-            appointmentService.markTerminal(tenantId, current.appointmentId(), req.status());
+        if (expectedStatus != null && !expectedStatus.equals(current.status())) {
+            throw stale(current.status());
+        }
+        requireLegalTransition(tenantId, current, nextStatus, callerStaffId, id);
+        casStatus(tenantId, callerStaffId, current, nextStatus);
+        if (current.appointmentId() != null && ("completed".equals(nextStatus) || "no_show".equals(nextStatus))) {
+            appointmentService.markTerminal(tenantId, current.appointmentId(), nextStatus);
         }
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** The one status write: WHERE status = the row we validated against, so a concurrent move makes this 0 rows -> 409. */
+    private void casStatus(UUID tenantId, UUID callerStaffId, QueueEntryRow current, String nextStatus) {
+        if (repo.updateStatus(tenantId, current.id(), current.status(), nextStatus) == 0) {
+            throw stale(repo.findById(tenantId, current.id()).map(QueueEntryRow::status).orElseThrow(this::notFound));
+        }
+        log.info("queue entry {} moved {} -> {} by {}", current.id(), current.status(), nextStatus, callerStaffId);
+        String role = (String) repo.actor(tenantId, callerStaffId).get("role");
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("tenantId", tenantId);
+        payload.put("queueEntryId", current.id());
+        payload.put("encounterId", current.encounterId());
+        payload.put("doctorId", current.doctorId());
+        payload.put("clinicDate", current.queueDate());
+        payload.put("fromStatus", current.status());
+        payload.put("toStatus", nextStatus);
+        payload.put("occurredAt", Instant.now());
+        payload.put("actorRole", role);
+        events.publish(tenantId, "visit.queue_entry.status_changed.v1", payload);
+    }
+
+    private ApiException stale(String currentStatus) {
+        return new ApiException(HttpStatus.CONFLICT, "stale-status", "Visit already moved",
+                "This visit is no longer at the stage your screen shows.", java.util.Map.of("currentStatus", currentStatus));
     }
 
     private void requireLegalTransition(UUID tenantId, QueueEntryRow current, String nextStatus, UUID callerStaffId, UUID id) {
         List<String> sequence = departmentService.resolveStatusSequence(tenantId, current.departmentId());
         Set<String> allowed = allowedNextStatuses(current.status(), sequence);
         if (!allowed.contains(nextStatus)) {
-            log.warn("illegal queue transition blocked by {}: entry {} {} -> {}", callerStaffId, id, current.status(), nextStatus);
+            log.warn("illegal queue transition blocked by {}: entry {} {} -> {}", callerStaffId, id, current.status(), nextStatus); // ids only, no PHI
             throw new ApiException(HttpStatus.BAD_REQUEST, "illegal-transition", "Illegal queue transition",
                     "Cannot move from " + current.status() + " to " + nextStatus + ".");
         }
@@ -189,7 +228,7 @@ public class QueueService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "transfer-reason-required", "Transfer reason required",
                     "A reason is required when moving a patient to another department.");
         }
-        repo.updateStatus(tenantId, id, "transferred_out");
+        casStatus(tenantId, callerStaffId, current, "transferred_out");
         log.info("queue entry {} transferred_out by {} (patient {} -> department {})",
                 id, callerStaffId, current.patientId(), req.toDepartmentId());
 

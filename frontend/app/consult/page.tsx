@@ -41,6 +41,7 @@ import {
 import p from "../components/consult/consultParts.module.css";
 import styles from "./consult.module.css";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { moveBody, moveErrorMessage } from "../lib/queueMove";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
@@ -434,11 +435,10 @@ export default function ConsultPage() {
     setStarting(true);
     setPreviewError(null);
     try {
-      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
+      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: moveBody("in_consult", row.status) });
       if (!res) return;
       if (!res.ok) {
-        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't start the consultation." }));
-        setPreviewError(pr.detail || "Couldn't start the consultation.");
+        setPreviewError(await moveErrorMessage(res, "Couldn't start the consultation."));
         return;
       }
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: "in_consult" } : r)));
@@ -783,7 +783,7 @@ export default function ConsultPage() {
         const signed: Partial<Note> | null = await signRes.json().catch(() => null);
         setSignedAt(typeof signed?.signedAt === "string" ? signed.signedAt : new Date().toISOString());
       }
-      const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
+      const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: moveBody("checkout_pending", activeEntry.status) });
       if (!statusRes?.ok) {
         const pr: Problem | null = await statusRes?.json().catch(() => null);
         setShellError(`Note signed, but couldn't move the patient to checkout${pr?.detail ? ` (${pr.detail})` : ""}. Use “Retry checkout handoff”.`);
