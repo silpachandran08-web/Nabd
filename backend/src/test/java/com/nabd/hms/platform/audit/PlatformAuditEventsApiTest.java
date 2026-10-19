@@ -40,7 +40,7 @@ class PlatformAuditEventsApiTest extends ApiTestBase {
     void unknownAccountSignInFailureIsAuditedWithoutTheTypedEmail() {
         String email = "nobody-" + UUID.randomUUID() + "@nabd.health";
         http.postForEntity(url("/v1/platform/auth/login"), jsonBody(Map.of("email", email, "pin", "123456")), Map.class);
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT after::text AS after, actor_id FROM search_audit_log("
+        List<Map<String, Object>> rows = su().queryForList("SELECT after::text AS after, actor_id FROM search_audit_log("
                 + "NULL, 'platform_auth.sign_in_failed', NULL, now() - interval '1 minute', NULL, NULL, NULL, NULL, NULL, NULL, 1000)");
         assertThat(rows).anyMatch(r -> r.get("actor_id") == null && r.get("after").toString().contains("unknown_account"));
         assertThat(rows).noneMatch(r -> r.get("after").toString().contains(email));
@@ -140,11 +140,16 @@ class PlatformAuditEventsApiTest extends ApiTestBase {
     }
 
     private Map<String, Object> single(UUID operatorId, String action) {
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT tenant_id, actor_type, actor_role, entity_id, "
+        List<Map<String, Object>> rows = su().queryForList("SELECT tenant_id, actor_type, actor_role, entity_id, "
                 + "before::text AS before, after::text AS after FROM search_audit_log("
                 + "NULL, ?, NULL, NULL, NULL, ?::uuid, NULL, NULL, NULL, NULL, 10)", action, operatorId);
         assertThat(rows).as(action).hasSize(1);
         return rows.get(0);
+    }
+
+    /** PLT-056: nabd_app holds no EXECUTE on search_audit_log any more, so the test reads it as superuser. */
+    private static org.springframework.jdbc.core.JdbcTemplate su() {
+        return new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource());
     }
 
     /** As superuser: the app role cannot see platform rows directly (RLS), only through search_audit_log. */

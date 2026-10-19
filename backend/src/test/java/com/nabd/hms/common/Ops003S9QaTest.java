@@ -233,8 +233,10 @@ class Ops003S9QaTest extends ApiTestBase {
         JdbcTemplate su = su();
         Map<String, Object> r = su.queryForMap("SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolreplication FROM pg_roles WHERE rolname = 'nabd_app'");
         assertThat(r.values()).containsOnly(false);
-        assertThat(su.queryForObject("SELECT count(*) FROM pg_auth_members WHERE member = (SELECT oid FROM pg_roles WHERE rolname = 'nabd_app')", Integer.class))
-                .as("nabd_app is a member of no role").isZero();
+        // PLT-056: the only membership allowed is NOINHERIT nabd_platform (NOBYPASSRLS; EXECUTE on search_audit_log only)
+        assertThat(su.queryForObject("SELECT count(*) FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid WHERE m.member = (SELECT oid FROM pg_roles WHERE rolname = 'nabd_app') "
+                + "AND NOT (r.rolname = 'nabd_platform' AND NOT m.inherit_option AND NOT r.rolbypassrls AND NOT r.rolsuper)", Integer.class))
+                .as("nabd_app is a member of no role but NOINHERIT nabd_platform").isZero();
         assertThat(su.queryForObject("SELECT count(*) FROM pg_class WHERE relowner = (SELECT oid FROM pg_roles WHERE rolname = 'nabd_app')", Integer.class)).isZero();
         assertThat(su.queryForObject("SELECT count(*) FROM pg_proc WHERE proowner = (SELECT oid FROM pg_roles WHERE rolname = 'nabd_app')", Integer.class)).isZero();
         assertThat(su.queryForObject("SELECT count(*) FROM pg_namespace WHERE nspowner = (SELECT oid FROM pg_roles WHERE rolname = 'nabd_app')", Integer.class)).isZero();

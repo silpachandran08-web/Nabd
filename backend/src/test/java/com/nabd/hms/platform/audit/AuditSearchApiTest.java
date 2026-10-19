@@ -68,7 +68,9 @@ class AuditSearchApiTest extends ApiTestBase {
                 "patient.update", "patient", entityId, Map.of("name", "old"), Map.of("name", "new"));
 
         String token = complianceToken();
-        ResponseEntity<Map> resp = exchange("/v1/platform/audit-log?tenantId=" + tenant.id(), HttpMethod.GET, authed(token), Map.class);
+        // PLT-056: values only on request, with a reason (compliance_dpo)
+        ResponseEntity<Map> resp = exchange("/v1/platform/audit-log?includeValues=true&reason=DSAR-review&tenantId=" + tenant.id(),
+                HttpMethod.GET, authed(token), Map.class);
         Map<String, Object> row = ((List<Map<String, Object>>) resp.getBody().get("data")).get(0);
         assertThat(row.get("after")).isInstanceOf(Map.class);
         assertThat(((Map<String, Object>) row.get("after")).get("name")).isEqualTo("new");
@@ -91,14 +93,15 @@ class AuditSearchApiTest extends ApiTestBase {
         }
 
         String token = complianceToken();
-        ResponseEntity<Map> page1 = exchange("/v1/platform/audit-log?tenantId=" + tenant.id() + "&limit=2",
+        // PLT-056: each search adds an operator.audit_search row to this tenant's trail, so page by action
+        ResponseEntity<Map> page1 = exchange("/v1/platform/audit-log?action=patient.create&tenantId=" + tenant.id() + "&limit=2",
                 HttpMethod.GET, authed(token), Map.class);
         List<Map<String, Object>> firstRows = (List<Map<String, Object>>) page1.getBody().get("data");
         assertThat(firstRows).hasSize(2);
         String cursor = (String) ((Map<String, Object>) page1.getBody().get("page")).get("nextCursor");
         assertThat(cursor).isNotNull();
 
-        ResponseEntity<Map> page2 = exchange("/v1/platform/audit-log?tenantId=" + tenant.id() + "&limit=2&cursor=" + cursor,
+        ResponseEntity<Map> page2 = exchange("/v1/platform/audit-log?action=patient.create&tenantId=" + tenant.id() + "&limit=2&cursor=" + cursor,
                 HttpMethod.GET, authed(token), Map.class);
         List<Map<String, Object>> secondRows = (List<Map<String, Object>>) page2.getBody().get("data");
         assertThat(secondRows).hasSize(1);
@@ -118,7 +121,7 @@ class AuditSearchApiTest extends ApiTestBase {
                 "patient.create", "patient", UUID.randomUUID(), null, Map.of("x", 1));
         String token = complianceToken();
         Instant now = Instant.now();
-        String base = "/v1/platform/audit-log?tenantId=" + tenant.id();
+        String base = "/v1/platform/audit-log?action=patient.create&tenantId=" + tenant.id(); // PLT-056: skip the searches' own rows
 
         assertThat(rows(token, base + "&createdAfter=" + now.plus(1, ChronoUnit.HOURS))).isEmpty();
         assertThat(rows(token, base + "&createdBefore=" + now.minus(1, ChronoUnit.HOURS))).isEmpty();
@@ -153,7 +156,7 @@ class AuditSearchApiTest extends ApiTestBase {
         assertThat(byId).hasSize(1);
         assertThat(byId.get(0).get("actorId")).isEqualTo(staffActor.toString());
 
-        List<Map<String, Object>> byType = rows(token, base + "&actorType=operator");
+        List<Map<String, Object>> byType = rows(token, base + "&actorType=operator&action=support_access.grant"); // PLT-056: not the searches' own rows
         assertThat(byType).hasSize(1);
         assertThat(byType.get(0).get("actorId")).isEqualTo(operatorActor.toString());
 
@@ -166,7 +169,8 @@ class AuditSearchApiTest extends ApiTestBase {
         assertThat(byName.get(0).get("actorId")).isEqualTo(staffActor.toString());
 
         assertThat(rows(token, base + "&actorName=_")).isEmpty(); // a literal "_" is not a LIKE wildcard
-        assertThat(rows(token, base)).hasSize(3); // filters are additive; none given = everything
+        // filters are additive; none given = everything (PLT-056: ignoring the operator.audit_search rows these searches wrote)
+        assertThat(rows(token, base)).filteredOn(r -> !"operator.audit_search".equals(r.get("action"))).hasSize(3);
     }
 
     @Test
@@ -264,7 +268,7 @@ class AuditSearchApiTest extends ApiTestBase {
     }
 
     @Test
-    void sreAndSuperAdminMayExport() {
+    void superAdminMayExportButSreNoLonger() { // PLT-056: sre lost audit_compliance:view
         SeededTenant tenant = seedTenant();
         auditService.record(tenant.id(), "system", null, "Nabd System", "System", null,
                 "patient.create", "patient", UUID.randomUUID(), null, Map.of("x", 1));
@@ -272,7 +276,7 @@ class AuditSearchApiTest extends ApiTestBase {
             SeededOperator op = seedOperator("ax-" + UUID.randomUUID() + "@nabd.health", role, false);
             ResponseEntity<String> resp = exchange("/v1/platform/audit-log/export?tenantId=" + tenant.id(),
                     HttpMethod.GET, authed(platformLoginAndGetAccessToken(op)), String.class);
-            assertThat(resp.getStatusCode()).as(role).isEqualTo(HttpStatus.OK);
+            assertThat(resp.getStatusCode()).as(role).isEqualTo(role.equals("sre") ? HttpStatus.FORBIDDEN : HttpStatus.OK);
         }
     }
 

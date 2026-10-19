@@ -2618,6 +2618,36 @@ paths:
                   byStatus: { type: object, additionalProperties: { type: integer } }
                   regions: { type: array, items: { type: string } }
         "403": { description: "Forbidden: no clinics_fleet:view (sre)" }
+  # ------------------------------------------------- Platform console: support access (PLT-056)
+  /platform/support-access/grants:
+    post:
+      tags: [Platform]
+      summary: >
+        Request a support grant for one tenant, one support ticket of that tenant and one scope, for 1-60 minutes
+        (default 60). Errors 400 with code TICKET_REQUIRED, SCOPE_INVALID, DURATION_OUT_OF_RANGE, TICKET_INVALID
+        (ticket missing or of another tenant). A config_only grant never opens patient records (403 scope-not-permitted).
+      x-required-permission: support_access:request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, ticketId, scope, reason]
+              properties:
+                tenantId: { type: string, format: uuid }
+                ticketId: { type: string, format: uuid }
+                scope: { type: string, enum: [config_only, redacted_patient_view] }
+                reason: { type: string, maxLength: 500 }
+                minutes: { type: integer, minimum: 1, maximum: 60, default: 60 }
+      responses:
+        "201":
+          description: The grant (id, tenantId, ticketId, scope, operatorId, operatorName, operatorRole, reason, grantedAt, expiresAt, revokedAt, active)
+          content:
+            application/json:
+              schema: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no support_access:request (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:
@@ -2636,6 +2666,12 @@ paths:
         only), support_access.grant, support_access.revoke, patient.support_view, audit_log.export.
       summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
       x-required-permission: audit_compliance:view
+      x-plt-056: >
+        super_admin and compliance_dpo only (sre no longer holds audit_compliance:view). Every search and export writes
+        a master.operator_audit_log row (operator, action audit_log.search|audit_log.export, target tenant, filters,
+        row count, reason, ip) and, with a tenantId filter, an operator.audit_search event in that tenant's audit_log.
+        before/after are null (CSV columns empty) unless includeValues=true is sent by compliance_dpo with a reason:
+        another role gets 403 values-not-permitted, a missing reason 400 reason-required (code REASON_REQUIRED).
       parameters:
         - $ref: "#/components/parameters/PlatformAuditTenantId"
         - $ref: "#/components/parameters/PlatformAuditAction"
@@ -2648,8 +2684,11 @@ paths:
         - $ref: "#/components/parameters/PlatformAuditActorName"
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+          description: PLT-056. Outside 1..100 is 400 limit-out-of-range (code LIMIT_OUT_OF_RANGE).
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/PlatformAuditIncludeValues"
+        - $ref: "#/components/parameters/PlatformAuditReason"
       responses:
         "200":
           description: Page of audit entries
@@ -2675,6 +2714,12 @@ paths:
         Platform-scope rows (tenantId null) in the file, and an export matching no rows, are recorded once in the
         platform chain (V126).
       x-required-permission: audit_compliance:view
+      x-plt-056: >
+        super_admin and compliance_dpo only (sre no longer holds audit_compliance:view). Every search and export writes
+        a master.operator_audit_log row (operator, action audit_log.search|audit_log.export, target tenant, filters,
+        row count, reason, ip) and, with a tenantId filter, an operator.audit_search event in that tenant's audit_log.
+        before/after are null (CSV columns empty) unless includeValues=true is sent by compliance_dpo with a reason:
+        another role gets 403 values-not-permitted, a missing reason 400 reason-required (code REASON_REQUIRED).
       parameters:
         - $ref: "#/components/parameters/PlatformAuditTenantId"
         - $ref: "#/components/parameters/PlatformAuditAction"
@@ -2685,6 +2730,8 @@ paths:
         - $ref: "#/components/parameters/PlatformAuditActorType"
         - $ref: "#/components/parameters/PlatformAuditActorRole"
         - $ref: "#/components/parameters/PlatformAuditActorName"
+        - $ref: "#/components/parameters/PlatformAuditIncludeValues"
+        - $ref: "#/components/parameters/PlatformAuditReason"
       responses:
         "200":
           description: >
@@ -2708,6 +2755,16 @@ components:
         tenant/role headers.
 
   parameters:
+    PlatformAuditIncludeValues:
+      name: includeValues
+      in: query
+      description: PLT-056. true returns before/after; compliance_dpo only, needs reason.
+      schema: { type: boolean, default: false }
+    PlatformAuditReason:
+      name: reason
+      in: query
+      description: PLT-056. Why the values are needed (1-500 chars); stored in master.operator_audit_log.reason.
+      schema: { type: string, maxLength: 500 }
     IdempotencyKey:
       name: Idempotency-Key
       in: header

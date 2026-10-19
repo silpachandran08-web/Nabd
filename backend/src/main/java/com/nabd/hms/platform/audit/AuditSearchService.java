@@ -48,8 +48,16 @@ public class AuditSearchService {
         this.auditService = auditService;
     }
 
-    public AuditLogPage search(AuditFilter filter, int limit, String cursor) {
+    /** PLT-056: every search is clamped (default 50, 1..100), written to master.operator_audit_log and, with a
+     * tenant filter, to that tenant's audit_log as operator.audit_search. before/after only for compliance_dpo
+     * with includeValues and a reason; everyone else gets them as null. */
+    @Transactional
+    public AuditLogPage search(AuditFilter filter, Integer rawLimit, String cursor, ValueAccess values,
+                               UUID operatorId, String ipAddress) {
+        int limit = clampLimit(rawLimit);
         AuditFilter f = normalize(filter);
+        OperatorInfo operator = operator(operatorId);
+        boolean withValues = values.check(operator);
         Long afterId = cursor == null ? null : decodeCursor(cursor);
         List<AuditEntry> rows = repo.search(f, afterId, limit + 1);
 
@@ -59,7 +67,61 @@ public class AuditSearchService {
         // unlike fleet/tickets' (createdAt, UUID) pairs. No need for that composite cursor shape here.
         String nextCursor = hasMore ? String.valueOf(page.get(page.size() - 1).id()) : null;
 
-        return new AuditLogPage(page.stream().map(this::toResponse).toList(), new PageMeta(nextCursor, limit));
+        recordOperatorAccess("audit_log.search", f, page.size(), values, withValues, operatorId, operator, ipAddress);
+        return new AuditLogPage(page.stream().map(e -> toResponse(e, withValues)).toList(), new PageMeta(nextCursor, limit));
+    }
+
+    /** includeValues + reason as sent; check() enforces the DPO-only, reason-required rule. */
+    public record ValueAccess(boolean include, String reason) {
+        boolean check(OperatorInfo operator) {
+            if (!include) return false;
+            if (!"compliance_dpo".equals(operator.role())) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "values-not-permitted", "Values not permitted",
+                        "Only the compliance DPO may see before/after values.", Map.of("code", "VALUES_NOT_PERMITTED"));
+            }
+            if (reason == null || reason.isBlank() || reason.length() > 500) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
+                        "State a reason (1-500 characters) to see before/after values.", Map.of("code", "REASON_REQUIRED"));
+            }
+            return true;
+        }
+    }
+
+    static final int SEARCH_DEFAULT_LIMIT = 50;
+
+    static int clampLimit(Integer raw) {
+        if (raw == null) return SEARCH_DEFAULT_LIMIT;
+        if (raw < 1 || raw > com.nabd.hms.common.PageRequest.MAX) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "limit-out-of-range", "Limit out of range",
+                    "limit must be between 1 and " + com.nabd.hms.common.PageRequest.MAX + ".",
+                    Map.of("code", "LIMIT_OUT_OF_RANGE"));
+        }
+        return raw;
+    }
+
+    private void recordOperatorAccess(String action, AuditFilter f, int rowCount, ValueAccess values,
+                                      boolean withValues, UUID operatorId, OperatorInfo operator, String ipAddress) {
+        Map<String, Object> params = auditedFilters(f);
+        params.put("includeValues", withValues);
+        String reason = withValues ? values.reason().trim() : null;
+        try {
+            repo.insertOperatorAudit(operatorId, action, f.tenantId(), objectMapper.writeValueAsString(params),
+                    rowCount, reason, ipAddress);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new IllegalStateException(e);
+        }
+        if (f.tenantId() != null && repo.tenantExists(f.tenantId())) {
+            Map<String, Object> after = new LinkedHashMap<>(params);
+            after.put("operatorAction", action);
+            after.put("rowCount", rowCount);
+            auditService.record(f.tenantId(), "operator", operatorId, operator.name(), operator.role(), ipAddress,
+                    "operator.audit_search", "audit_log", null, null, after);
+        }
+    }
+
+    private OperatorInfo operator(UUID operatorId) {
+        return repo.findOperatorInfo(operatorId).orElseThrow(() -> new ApiException(
+                HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found."));
     }
 
     /**
@@ -73,8 +135,10 @@ public class AuditSearchService {
      * chain to land in; it is logged only (see the PLT-028 report note on a platform-level ledger).
      */
     @Transactional
-    public String exportCsv(AuditFilter filter, UUID operatorId, String ipAddress) {
+    public String exportCsv(AuditFilter filter, ValueAccess values, UUID operatorId, String ipAddress) {
         AuditFilter f = normalize(filter);
+        OperatorInfo operator = operator(operatorId);
+        boolean withValues = values.check(operator);
         List<AuditEntry> rows = repo.search(f, null, EXPORT_MAX_ROWS + 1);
         if (rows.size() > EXPORT_MAX_ROWS) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "export-too-large", "Export too large",
@@ -99,13 +163,12 @@ public class AuditSearchService {
                     .append(csvField(e.action())).append(',')
                     .append(csvField(e.entityType())).append(',')
                     .append(e.entityId() == null ? "" : e.entityId()).append(',')
-                    .append(csvField(e.before())).append(',')
-                    .append(csvField(e.after())).append('\n');
+                    .append(withValues ? csvField(e.before()) : "").append(',')
+                    .append(withValues ? csvField(e.after()) : "").append('\n');
         }
 
-        OperatorInfo operator = repo.findOperatorInfo(operatorId).orElseThrow(() -> new ApiException(
-                HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found."));
         Map<String, Object> filters = auditedFilters(f);
+        recordOperatorAccess("audit_log.export", f, rows.size(), values, withValues, operatorId, operator, ipAddress);
         long tenantCount = rowsPerTenant.keySet().stream().filter(java.util.Objects::nonNull).count();
         if (rowsPerTenant.isEmpty()) {
             rowsPerTenant.put(null, 0); // nothing disclosed, but the export itself still lands in the platform chain
@@ -188,10 +251,10 @@ public class AuditSearchService {
         }
     }
 
-    private AuditEntryResponse toResponse(AuditEntry e) {
+    private AuditEntryResponse toResponse(AuditEntry e, boolean withValues) {
         return new AuditEntryResponse(e.id(), e.tenantId(), e.tenantName(), e.tenantSlug(), e.actorType(),
                 e.actorId(), e.actorName(), e.actorRole(), e.ipAddress(), e.action(), e.entityType(), e.entityId(),
-                parseJson(e.before()), parseJson(e.after()), e.createdAt());
+                withValues ? parseJson(e.before()) : null, withValues ? parseJson(e.after()) : null, e.createdAt());
     }
 
     private JsonNode parseJson(String raw) {

@@ -6,6 +6,8 @@ import java.util.UUID;
 public record GrantResponse(
         UUID id,
         UUID tenantId,
+        UUID ticketId,
+        String scope,
         UUID operatorId,
         String operatorName,
         String operatorRole,

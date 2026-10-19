@@ -6254,6 +6254,17 @@ paths:
         required: false
         schema:
           type: string
+      - in: query
+        name: includeValues
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: reason
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -6332,6 +6343,17 @@ paths:
           type: string
       - in: query
         name: actorName
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: includeValues
+        required: false
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: reason
         required: false
         schema:
           type: string
@@ -7189,7 +7211,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - platform
-      x-required-permission: support_access:view
+      x-required-permission: support_access:request
   /v1/platform/support-access/grants/{id}/patients/{patientId}:
     get:
       operationId: SupportAccessController_viewPatient
@@ -12274,7 +12296,12 @@ components:
         revokedAt:
           type: string
           format: date-time
+        scope:
+          type: string
         tenantId:
+          type: string
+          format: uuid
+        ticketId:
           type: string
           format: uuid
     GuardianConsent:
@@ -14317,11 +14344,19 @@ components:
     RequestGrantRequest:
       type: object
       properties:
+        minutes:
+          type: integer
+          format: int32
         reason:
           type: string
           maxLength: 500
           minLength: 0
+        scope:
+          type: string
         tenantId:
+          type: string
+          format: uuid
+        ticketId:
           type: string
           format: uuid
       required:

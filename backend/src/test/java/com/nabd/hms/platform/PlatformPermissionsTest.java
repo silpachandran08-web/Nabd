@@ -25,8 +25,9 @@ class PlatformPermissionsTest {
         assertThat(PlatformPermissions.forRole("support_engineer"))
                 .doesNotContain("billing_revenue:view", "pricing_packaging:view", "onboarding_provisioning:view")
                 .contains("command_centre:view", "clinics_fleet:view", "tenant_detail:view",
-                        "support_tickets:view", "platform_health:view", "support_access:view")
-                .hasSize(6);
+                        "support_tickets:view", "platform_health:view", "support_access:view",
+                        "support_access:request") // PLT-056
+                .hasSize(7);
     }
 
     @Test
@@ -59,7 +60,7 @@ class PlatformPermissionsTest {
     void sreSeesOperationalSurfacesNotCommercialOnes() {
         assertThat(PlatformPermissions.forRole("sre"))
                 .containsExactlyInAnyOrder("command_centre:view", "provisioning_jobs:view", "territories:view",
-                        "messaging_operations:view", "platform_health:view", "audit_compliance:view");
+                        "messaging_operations:view", "platform_health:view"); // PLT-056: audit_compliance:view removed
     }
 
     @Test

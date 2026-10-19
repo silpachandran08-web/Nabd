@@ -6,7 +6,7 @@ import Dialog from "../../components/ui/Dialog";
 import Icon from "../../components/ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
-import { usePlatformFetch } from "../platformApi";
+import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
 import { actionLabel } from "./actionLabel";
 
 // Matches GET /v1/platform/audit-log (AuditSearchController) — cross-tenant by default. Filters
@@ -111,6 +111,10 @@ function exportCsv(rows: AuditEntry[]) {
 
 export default function AuditLogPage() {
   const fetchAuthed = usePlatformFetch();
+  // PLT-056: before/after come back only for compliance_dpo, on request, with a reason (audited server-side).
+  const isDpo = useOperatorAccess().profile?.role === "compliance_dpo";
+  const [valuesReason, setValuesReason] = useState("");
+  const [valuesOn, setValuesOn] = useState(false);
   const [rows, setRows] = useState<AuditEntry[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
@@ -130,7 +134,7 @@ export default function AuditLogPage() {
   const searched = useRef<URLSearchParams>(new URLSearchParams());
 
   const fetchPage = useCallback(
-    async (cursor: string | null, append: boolean) => {
+    async (cursor: string | null, append: boolean, reason: string | null = null) => {
       if (append) setLoadingMore(true);
       else setLoading(true);
       setMoreError(null);
@@ -143,6 +147,10 @@ export default function AuditLogPage() {
         // Operator-local day boundaries, sent as instants.
         if (fromDate) filters.set("createdAfter", new Date(`${fromDate}T00:00:00`).toISOString());
         if (toDate) filters.set("createdBefore", new Date(`${toDate}T23:59:59.999`).toISOString());
+        if (reason) {
+          filters.set("includeValues", "true");
+          filters.set("reason", reason);
+        }
         searched.current = filters;
       }
       // A failed append keeps the loaded rows and offers a retry of that page only.
@@ -158,9 +166,10 @@ export default function AuditLogPage() {
           return;
         }
         if (!res.ok) {
-          fail(append ? "Couldn't load more entries. Try again." : "Couldn't load the audit log. Try again.");
+          fail(await problemDetail(res, append ? "Couldn't load more entries. Try again." : "Couldn't load the audit log. Try again."));
           return;
         }
+        setValuesOn(searched.current.get("includeValues") === "true");
         const body: AuditPage = await res.json();
         const data = Array.isArray(body?.data) ? body.data : [];
         setRows((prev) => (append ? [...prev, ...data] : data));
@@ -195,7 +204,17 @@ export default function AuditLogPage() {
       return;
     }
     setFilterError(null);
-    fetchPage(null, false);
+    fetchPage(null, false, valuesOn ? valuesReason.trim() : null);
+  }
+
+  function showValues(e: React.FormEvent) {
+    e.preventDefault();
+    if (!valuesReason.trim()) {
+      setFilterError("Enter a reason to see before and after values.");
+      return;
+    }
+    setFilterError(null);
+    fetchPage(null, false, valuesReason.trim());
   }
 
   const changes = viewing ? changesOf(viewing.before, viewing.after) : [];
@@ -205,7 +224,7 @@ export default function AuditLogPage() {
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Audit &amp; Compliance</h1>
-          <p className={styles.subtitle}>Immutable, append-only and cross-tenant — every platform action, with before and after values.</p>
+          <p className={styles.subtitle}>Immutable, append-only and cross-tenant — every platform action. Every search is itself audited; 50 entries per page.</p>
         </div>
         {!loading && !error && !forbidden && <span className={styles.count}>{rows.length} loaded</span>}
       </div>
@@ -258,9 +277,25 @@ export default function AuditLogPage() {
           {filterError && <div className={styles.filterError} role="alert">{filterError}</div>}
         </form>
       )}
+      {!forbidden && isDpo && (
+        <form className={styles.filterCard} onSubmit={showValues}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="valuesReason">Reason to see before/after values</label>
+            <input
+              id="valuesReason"
+              className={styles.input}
+              value={valuesReason}
+              maxLength={500}
+              onChange={(e) => setValuesReason(e.target.value)}
+              placeholder="e.g. DSAR or incident reference"
+            />
+          </div>
+          <button className={styles.submit} type="submit">{valuesOn ? "Search again with values" : "Show values"}</button>
+        </form>
+      )}
       {!forbidden && rows.length > 0 && !loading && (
         <p className={styles.exportHint}>
-          Export is built in your browser from the {rows.length} rows loaded here (use Load more to include more). It is not yet recorded as its own audit event, so handle the file as confidential.
+          Export is built in your browser from the {rows.length} rows loaded here (use Load more to include more). Each search that loaded them was audited; handle the file as confidential.
         </p>
       )}
 
@@ -305,7 +340,7 @@ export default function AuditLogPage() {
                         {r.entityId && <span className={styles.tenantSlug}>{r.entityId}</span>}
                       </td>
                       <td>
-                        <span className={styles.diff}>{changeSummary(r)}</span>
+                        <span className={styles.diff}>{valuesOn ? changeSummary(r) : "Values hidden"}</span>
                         {(r.before != null || r.after != null) && (
                           <button type="button" className={styles.linkBtn} onClick={() => setViewing(r)}>View diff</button>
                         )}

@@ -7,6 +7,8 @@
 --   nabd_app       the API: DML only, owns nothing, NOBYPASSRLS, short role-level timeouts.
 --   nabd_reports   read-only, 60 s statements.
 --   nabd_definer   NOLOGIN, BYPASSRLS: owns SECURITY DEFINER functions (see V210); migrator is a member.
+--   nabd_platform  NOLOGIN: the only role allowed to run search_audit_log (PLT-056, V1410). nabd_app is a
+--                  NOINHERIT member, so it holds no EXECUTE itself and must SET ROLE explicitly (operator console only).
 -- Table/sequence/function grants are applied by V210 (and default privileges), not here, so they follow the schema.
 DO $$
 BEGIN
@@ -21,6 +23,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nabd_definer') THEN
     CREATE ROLE nabd_definer NOLOGIN NOSUPERUSER BYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nabd_platform') THEN
+    CREATE ROLE nabd_platform NOLOGIN NOSUPERUSER NOBYPASSRLS;
   END IF;
 END $$;
 
@@ -37,6 +42,7 @@ ALTER ROLE nabd_reports SET lock_timeout = '3s';
 ALTER ROLE nabd_reports SET idle_in_transaction_session_timeout = '60s';
 
 GRANT nabd_definer TO nabd_migrator;
+GRANT nabd_platform TO nabd_app WITH INHERIT FALSE, SET TRUE;  -- PG16+ syntax
 
 DO $$
 BEGIN
@@ -45,7 +51,7 @@ BEGIN
 END $$;
 
 GRANT USAGE, CREATE ON SCHEMA public TO nabd_migrator, nabd_definer;  -- CREATE: a role must have it to own functions in the schema
-GRANT USAGE ON SCHEMA public TO nabd_app, nabd_reports;
+GRANT USAGE ON SCHEMA public TO nabd_app, nabd_reports, nabd_platform;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'master') THEN  -- present once the migrations have run once
     GRANT USAGE, CREATE ON SCHEMA master TO nabd_migrator, nabd_definer;
