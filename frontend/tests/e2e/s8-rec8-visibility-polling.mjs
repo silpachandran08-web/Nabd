@@ -1,6 +1,6 @@
 // WB-FEF-004: live screens (Arrivals, Nursing, Live Queue board) stop polling in hidden tabs and reload once on return.
 // Run: NODE_PATH=/home/claude/ws/qa/node_modules node s8-rec8-visibility-polling.mjs   (APP_URL defaults to http://localhost:3108)
-import { launch, seedClinic, mockApi, check, results, sleep, dumpLog } from '/home/claude/ws/qa/t3/qa-lib.mjs';
+import { launch, seedClinic, mockApi, check, results, sleep, dumpLog } from './qa-lib.mjs';
 
 const APP = process.env.APP ?? 'http://localhost:3000';
 const SHOTS = '/home/claude/ws/reports/shots-rec8';

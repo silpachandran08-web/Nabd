@@ -1,6 +1,6 @@
 // REC-020: Notify delay dialog with presets, preview and delivery ladder.
 // Run (server on :3101): node tests/e2e/s8-rec1-notify-delay.mjs
-import { launch, seedClinic, mockApi, check, sleep, dumpLog } from '/home/claude/ws/qa/t3/qa-lib.mjs';
+import { launch, seedClinic, mockApi, check, sleep, dumpLog } from './qa-lib.mjs';
 
 const APP = process.env.APP ?? 'http://localhost:3000';
 const SHOTS = '/home/claude/ws/reports/shots-rec1';
@@ -147,6 +147,6 @@ await run('M', EDIT, { viewport: { width: 390, height: 844 } }, async (page, log
   check('M3 no console/page errors (390)', noConsoleErrors(log), JSON.stringify([...log.console, ...log.pageErrors]));
 });
 
-const failed = (await import('/home/claude/ws/qa/t3/qa-lib.mjs')).results.filter((r) => !r.ok);
+const failed = (await import('./qa-lib.mjs')).results.filter((r) => !r.ok);
 console.log(`\n${failed.length === 0 ? 'ALL PASS' : failed.length + ' FAILED'}`);
 process.exit(failed.length ? 1 : 0);

@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launch, seedClinic, mockApi, check, results, sleep } from '/home/claude/ws/qa/t3/qa-lib.mjs';
+import { launch, seedClinic, mockApi, check, results, sleep } from './qa-lib.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const APP = process.env.APP ?? 'http://localhost:3000';

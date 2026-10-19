@@ -215,6 +215,10 @@ export default function CheckoutPage() {
         } catch (e) {
           if (e instanceof ApiError) {
             setPaymentError(e.detail || "Couldn't record payment.");
+            if (e.status === 422) { // FIN-001: overpayment names the balance; refresh the one shown
+              const r = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+              if (r) setInvoice(r);
+            }
             return;
           }
           // Outcome unknown: read the invoice back instead of guessing, so a payment that landed is never re-sent.

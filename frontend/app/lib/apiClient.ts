@@ -187,8 +187,8 @@ function schedule(): void {
   const start = iat ?? exp - DEFAULT_TTL_S;
   const wait = Math.max(0, (start + 0.8 * (exp - start)) * 1000 - Date.now());
   timer = setTimeout(() => {
-    const t = localStorage.getItem(ACCESS_KEY);
-    if (t) void refreshSession(t).then((ok) => { if (!ok) goLogin(); }).catch(() => { /* offline: next request retries */ });
+    // The token this timer was set for, not whatever storage holds now: if another tab already rotated it, that is "adopt", not "stale".
+    if (localStorage.getItem(ACCESS_KEY)) void refreshSession(token).then((ok) => { if (!ok) goLogin(); }).catch(() => { /* offline: next request retries */ });
   }, Math.min(wait, 2 ** 31 - 1));
   (timer as { unref?: () => void }).unref?.();
 }
