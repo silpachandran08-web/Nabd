@@ -61,7 +61,8 @@ try {
   await signIn(s);
   check('1a signed in through /api/auth/login and landed on /arrivals', new URL(s.page.url()).pathname === '/arrivals');
   check('1b the browser never called Core directly', toCore.length === 0, toCore.slice(0, 3).join(' '));
-  check('1c the queue reached Core with the cookie token, via the BFF', core.calls.some((c) => c.path.startsWith('/queue') && c.auth === `Bearer ${core.at}`));
+  for (let i = 0; i < 50 && !core.calls.some((c) => c.path.startsWith('/queue')); i++) await new Promise((r) => setTimeout(r, 100));
+  check('1c the queue reached Core with the cookie token, via the BFF', core.calls.some((c) => c.path.startsWith('/queue') && c.auth === `Bearer ${core.at}`), core.calls.filter((c) => c.path.startsWith('/queue')).map((c) => String(c.auth).slice(0, 60)).join(' | '));
   check('1d Core never sees browser cookies or the CSRF header', core.calls.every((c) => !c.cookie && !c.csrf));
 
   // 2 XSS simulation: an injected script reads everything it can reach
@@ -98,14 +99,15 @@ try {
     matrix.push([method, ...r, f.status, (await f.json()).code]);
   }
   check('4a missing / wrong token / foreign Origin -> 403 CSRF_FAILED on POST, PUT, PATCH, DELETE', matrix.every(([, s1, c1, s2, c2, s3, c3]) => s1 === 403 && c1 === 'CSRF_FAILED' && s2 === 403 && c2 === 'CSRF_FAILED' && s3 === 403 && c3 === 'CSRF_FAILED'), JSON.stringify(matrix));
-  check('4b Core was not called for any refused request', core.calls.length === before, `${core.calls.length - before} calls`);
+  const leakedCalls = core.calls.slice(before).filter((c) => c.method !== 'GET'); // the arrivals screen keeps polling with GET meanwhile
+  check('4b Core was not called for any refused request', leakedCalls.length === 0, leakedCalls.map((c) => c.method + ' ' + c.path).join(','));
 
   // 5 expired access cookie: one refresh for a burst, new cookies, data in the same response
   const oldRt = rt.value;
-  await s.context.addCookies([{ name: '__Host-nabd_at', value: mintAt(nowS() - 60), url: APP, httpOnly: true, secure: true, sameSite: 'Strict' }]);
+  await s.context.clearCookies({ name: '__Host-nabd_at' }); // expired: the browser dropped it at Max-Age=900
   const r0 = core.refreshes;
   const burst = await s.page.evaluate(() => Promise.all(Array.from({ length: 5 }, () => fetch('/api/v1/queue').then(async (r) => [r.status, await r.json(), r.headers.get('cache-control')]))));
-  check('5a expired access cookie: 5 parallel /api/v1/queue calls -> exactly one refresh at Core', core.refreshes - r0 === 1, `refreshes=${core.refreshes - r0}`);
+  check('5a expired (dropped) access cookie: 5 parallel /api/v1/queue calls -> exactly one refresh at Core', core.refreshes - r0 === 1, `refreshes=${core.refreshes - r0}`);
   check('5b every call returned the data in the same response, Cache-Control no-store', burst.every(([st, b, cc]) => st === 200 && Array.isArray(b) && cc === 'no-store'), JSON.stringify(burst));
   const c2 = await jar(s.context);
   check('5c new cookies set (rotated refresh token, fresh access token)', c2['__Host-nabd_rt']?.value !== oldRt && c2['__Host-nabd_rt']?.value === core.rt && c2['__Host-nabd_at']?.value === core.at);
@@ -133,16 +135,18 @@ try {
   check('7f zero console errors through sign-in, refresh and sign-out', errs(s.log).length === 0, errs(s.log).join('|'));
   await s.browser.close();
 
-  // 8 boundary: refresh refused -> 401 SESSION_EXPIRED, cookies cleared, user sent to /login?returnTo
+  // 8 boundary: refresh refused -> 401 SESSION_EXPIRED, cookies cleared, the screen sends the user to /login?returnTo
   s = await launch();
   await signIn(s);
+  const expired = [];
+  // read the BFF's answer before the page navigates away (a plain response listener loses the body on redirect)
+  await s.page.route('**/api/v1/queue**', async (route) => { const r = await route.fetch(); if (r.status() === 401) expired.push((await r.json().catch(() => ({}))).code); await route.fulfill({ response: r }); });
   core.refuseRefresh = true;
-  await s.context.addCookies([{ name: '__Host-nabd_at', value: mintAt(nowS() - 60), url: APP, httpOnly: true, secure: true, sameSite: 'Strict' }]);
-  const dead = await s.page.evaluate(() => fetch('/api/v1/queue').then(async (r) => [r.status, (await r.json()).code]));
-  check('8a refresh refused -> 401 SESSION_EXPIRED', dead[0] === 401 && dead[1] === 'SESSION_EXPIRED', JSON.stringify(dead));
-  check('8b session cookies cleared by the BFF', !(await jar(s.context))['__Host-nabd_rt']);
-  await s.page.goto(`${APP}/arrivals`, { waitUntil: 'networkidle' });
+  await s.context.clearCookies({ name: '__Host-nabd_at' }); // expired: the browser dropped it at Max-Age=900
+  await s.page.reload(); // the screen's own queue load meets the dead session
   await s.page.waitForURL(/\/login\?returnTo=/, { timeout: 8000 });
+  check('8a refresh refused -> the BFF answered 401 SESSION_EXPIRED', expired.includes('SESSION_EXPIRED'), expired.join(','));
+  check('8b session cookies cleared by the BFF', !(await jar(s.context))['__Host-nabd_rt'] && !(await jar(s.context))['__Host-nabd_at']);
   check('8c the screen sends the user to /login?returnTo=/arrivals', new URL(s.page.url()).searchParams.get('returnTo') === '/arrivals', s.page.url());
   check('8d zero console errors', errs(s.log).length === 0, errs(s.log).join('|'));
   core.refuseRefresh = false;
