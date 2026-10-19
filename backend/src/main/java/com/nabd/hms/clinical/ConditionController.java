@@ -32,6 +32,7 @@ public class ConditionController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("conditions")
     @GetMapping("/patients/{patientId}/conditions")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -56,6 +57,7 @@ public class ConditionController {
     }
 
     /** NB-077's clinic-wide "chronic review due" list — derived from review_due_date, not a manual flag. */
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("conditions_due_list")
     @GetMapping("/conditions/due")
     @PreAuthorize("hasAuthority('clinical:view')")

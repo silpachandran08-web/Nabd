@@ -33,6 +33,7 @@ public class NoteController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("note")
     @GetMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -65,6 +66,7 @@ public class NoteController {
         return service.amend(tenantId(jwt), staffId(jwt), canApprove(jwt), queueEntryId, req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("note_amendments")
     @GetMapping("/{queueEntryId}/amendments")
     @PreAuthorize("hasAuthority('clinical:view')")

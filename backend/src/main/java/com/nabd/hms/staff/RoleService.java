@@ -76,9 +76,9 @@ public class RoleService {
     }
 
     @Transactional
-    public RoleResponse create(UUID tenantId, UUID callerStaffId, RoleWriteRequest req, List<String> callerPermissions) {
+    public RoleResponse create(UUID tenantId, UUID callerStaffId, RoleWriteRequest req) {
         tenantContext.set(tenantId);
-        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
+        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants());
         requireMfaInvariant(req);
 
         UUID id = UUID.randomUUID();
@@ -88,13 +88,13 @@ public class RoleService {
     }
 
     @Transactional
-    public RoleResponse update(UUID tenantId, UUID callerStaffId, UUID id, RoleWriteRequest req, List<String> callerPermissions) {
+    public RoleResponse update(UUID tenantId, UUID callerStaffId, UUID id, RoleWriteRequest req) {
         tenantContext.set(tenantId);
         RoleRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
         if (current.builtIn()) {
             throw builtInImmutable();
         }
-        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
+        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants());
         requireMfaInvariant(req);
 
         repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()),
@@ -133,13 +133,14 @@ public class RoleService {
     }
 
     /** "Attempted edit of a built-in role, or a grant beyond the editor's own permissions... blocked" — api/openapi.yaml. */
-    private void requireNoPrivilegeEscalation(UUID tenantId, UUID callerStaffId, List<ModuleGrant> requestedGrants,
-                                               List<String> callerPermissions) {
+    private void requireNoPrivilegeEscalation(UUID tenantId, UUID callerStaffId, List<ModuleGrant> requestedGrants) {
         // PLT-016: the Owner holds every grant (as in GrantAuthority), even though its MF-52 preset lacks clinical:create/edit/approve
         if (repo.isOwner(tenantId, callerStaffId)) {
             return;
         }
-        if (GrantAuthority.exceeds(GrantsFlattener.flatten(requestedGrants), callerPermissions)) {
+        // PLT-015: judged on the permanent role, never token grants (a delegation loan must not be baked into a role)
+        List<String> permanent = GrantsFlattener.flatten(readGrants(repo.findBaseRoleGrants(tenantId, callerStaffId)));
+        if (GrantAuthority.exceeds(GrantsFlattener.flatten(requestedGrants), permanent)) {
             log.warn("privilege escalation blocked: staff {} (tenant {}) requested grants beyond their own permissions",
                     callerStaffId, tenantId);
             throw new ApiException(HttpStatus.BAD_REQUEST, "privilege-escalation", "Grant exceeds your own permissions",

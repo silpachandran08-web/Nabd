@@ -38,6 +38,7 @@ public class DentalController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("dental_chart")
     @GetMapping
     @PreAuthorize("hasAuthority('specialty_dental:view')")
@@ -81,6 +82,7 @@ public class DentalController {
         service.removeSupernumerary(tenantId(jwt), patientId, id, staffId(jwt), RequestMeta.clientIp(http));
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("dental_history")
     @GetMapping("/entries/{id}/history")
     @PreAuthorize("hasAuthority('specialty_dental:view')")

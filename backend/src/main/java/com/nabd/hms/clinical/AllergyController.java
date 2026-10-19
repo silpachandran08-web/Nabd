@@ -39,6 +39,7 @@ public class AllergyController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("allergies")
     @GetMapping("/patients/{patientId}/allergies")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -73,6 +74,7 @@ public class AllergyController {
         service.deactivate(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("allergy_history")
     @GetMapping("/patients/{patientId}/allergies/history")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -82,6 +84,7 @@ public class AllergyController {
         return service.history(scope.tenantId(), patientId);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("allergy_status")
     @GetMapping("/patients/{patientId}/allergies/status")
     @PreAuthorize("hasAuthority('clinical:view')")

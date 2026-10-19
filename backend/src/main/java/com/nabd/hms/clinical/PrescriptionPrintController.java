@@ -23,6 +23,7 @@ public class PrescriptionPrintController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("prescription_print")
     @GetMapping("/prescriptions/{queueEntryId}/print-header")
     @PreAuthorize("hasAuthority('clinical:view')")
