@@ -24,7 +24,7 @@ function billing(o = {}) {
       if (o.delay) await new Promise((x) => setTimeout(x, o.delay));
       if (o.checkout500) return r.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"title":"Error","detail":"Invoice service unavailable"}' });
       st.invoice = { id: 'inv-1', invoiceNumber: 'INV-0001', patientName: 'Asha Verma', doctorName: 'Dr Rao', currency: 'INR', subtotal: 620, discount: 0, tax: 6, roundOff: 0, total: 626,
-        lineItems: JSON.parse(req.postData()).lineItems.map((l) => ({ ...l, lineTotal: l.unitPrice * l.quantity })), payments: [] };
+        lineItems: JSON.parse(req.postData()).lineItems.map((l) => { const c = CHARGES.find((x) => x.code === l.chargeCode); return { chargeCode: c.code, chargeName: c.name, category: c.category, quantity: l.quantity, unitPrice: c.baseAmount, taxRatePercent: c.taxRatePercent, lineTotal: c.baseAmount * l.quantity }; }), payments: [] }; // FIN-003: the client sends codes only; the server fills in the catalogue price
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mk()) });
     }],
     ['POST', /^\/billing\/invoices\/inv-1\/payments$/, async (r, req) => {

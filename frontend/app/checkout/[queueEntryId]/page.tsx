@@ -12,6 +12,7 @@ import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
 import { apiFetch, goLogin } from "../../lib/apiClient";
+import { PRICE_REASONS, reasonLabel } from "../../components/checkout/priceReasons";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
@@ -22,7 +23,11 @@ type CheckoutContext = {
   prescribedItems: PrescribedItem[]; departmentId: string; queueStatus: string;
 };
 type FlowStep = { stepType: string };
-type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
+type LineItem = {
+  chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number;
+  listUnitPrice?: number | null; overrideReason?: string | null; // from the server (FIN-003)
+  override?: { unitPrice: number; reasonCode: string }; // picked here, sent as the override
+};
 type Payment = { id: string; method: string; amount: number; recordedAt: string };
 type Invoice = {
   id: string; invoiceNumber: string; patientName: string; doctorName: string; currency: string;
@@ -77,6 +82,10 @@ export default function CheckoutPage() {
   const [items, setItems] = useState<LineItem[]>([]);
   const [category, setCategory] = useState("All");
   const [discount, setDiscount] = useState("0");
+  const [discountReason, setDiscountReason] = useState("");
+  const [editing, setEditing] = useState<string | null>(null); // chargeCode whose override editor is open
+  const [ovPrice, setOvPrice] = useState("");
+  const [ovReason, setOvReason] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -169,6 +178,13 @@ export default function CheckoutPage() {
     });
   }
 
+  function applyOverride(code: string) {
+    const price = Number(ovPrice);
+    if (ovPrice === "" || !Number.isFinite(price) || price < 0 || !ovReason) return;
+    setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, unitPrice: price, override: { unitPrice: price, reasonCode: ovReason } } : i)));
+    setEditing(null);
+  }
+
   function setQty(code: string, qty: number) {
     const stock = context?.charges.find((c) => c.code === code)?.stockQty;
     if (stock != null && qty > stock) return; // PHA-011: cap at stock
@@ -196,25 +212,31 @@ export default function CheckoutPage() {
       setCreateError("Add at least one charge.");
       return null;
     }
+    if (discountNum > 0 && !discountReason) {
+      setCreateError("Pick a reason for the discount.");
+      return null;
+    }
     setCreating(true);
     try {
       const res = await authedFetch(`/billing/checkout/${queueEntryId}`, {
         method: "POST",
         body: JSON.stringify({
-          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          ...(canDiscount ? { discount: discountNum } : {}),
+          // codes only: the server prices every line from the catalogue (FIN-003)
+          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, quantity: i.quantity, ...(canDiscount && i.override ? { override: i.override } : {}) })),
+          ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
         }),
       });
       if (!res) return null;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
-        setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
+        setCreateError(stockErrorMessage(p, p.detail || "Couldn't generate the invoice."));
         return null;
       }
       const inv: Invoice = await res.json();
       setInvoice(inv);
       setItems([]); // picker resets — a later billing checkpoint starts its "add more" list fresh
       setDiscount("0");
+      setDiscountReason("");
       setShowAddMore(false);
       return inv;
     } catch {
@@ -380,7 +402,24 @@ export default function CheckoutPage() {
                       <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity + 1)}>+</button>
                     </span>
                   </td>
-                  <td>{formatMoney(i.unitPrice, context.currency)}</td>
+                  <td>
+                    {formatMoney(i.unitPrice, context.currency)}
+                    {i.override && <div className={styles.muted}>Override: {reasonLabel(i.override.reasonCode)}</div>}
+                    {canDiscount && editing !== i.chargeCode && (
+                      <button type="button" className={styles.removeBtn} onClick={() => { setEditing(i.chargeCode); setOvPrice(String(i.unitPrice)); setOvReason(i.override?.reasonCode ?? ""); }}>Override price</button>
+                    )}
+                    {canDiscount && editing === i.chargeCode && (
+                      <div>
+                        <input aria-label="Override unit price" className={styles.discountInput} type="number" step="0.01" min="0" value={ovPrice} onChange={(e) => setOvPrice(e.target.value)} />
+                        <select aria-label="Override reason" className={styles.discountInput} value={ovReason} onChange={(e) => setOvReason(e.target.value)}>
+                          <option value="">Reason…</option>
+                          {PRICE_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                        </select>
+                        <button type="button" className={styles.removeBtn} disabled={!ovReason || ovPrice === ""} onClick={() => applyOverride(i.chargeCode)}>Apply</button>
+                        <button type="button" className={styles.removeBtn} onClick={() => setEditing(null)}>Cancel</button>
+                      </div>
+                    )}
+                  </td>
                   <td>{i.taxRatePercent}%</td>
                   <td>{formatMoney(i.unitPrice * i.quantity, context.currency)}</td>
                   <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
@@ -397,7 +436,16 @@ export default function CheckoutPage() {
           {canDiscount && (
             <div className={styles.totalsRow}>
               <span>Discount</span>
-              <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+              <input aria-label="Discount amount" className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            </div>
+          )}
+          {canDiscount && Number(discount) > 0 && (
+            <div className={styles.totalsRow}>
+              <span>Discount reason</span>
+              <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}>
+                <option value="">Reason…</option>
+                {PRICE_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+              </select>
             </div>
           )}
           <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
@@ -465,7 +513,12 @@ export default function CheckoutPage() {
                   <tr key={li.chargeCode}>
                     <td>{li.chargeName}<div className={styles.muted}>{li.category}</div></td>
                     <td>{li.quantity}</td>
-                    <td>{formatMoney(li.unitPrice, invoice.currency)}</td>
+                    <td>
+                      {formatMoney(li.unitPrice, invoice.currency)}
+                      {li.overrideReason && li.listUnitPrice != null && (
+                        <div className={styles.muted}>List {formatMoney(li.listUnitPrice, invoice.currency)} · {reasonLabel(li.overrideReason)}</div>
+                      )}
+                    </td>
                     <td>{li.taxRatePercent}</td>
                     <td>{formatMoney(li.lineTotal ?? li.unitPrice * li.quantity, invoice.currency)}</td>
                   </tr>
