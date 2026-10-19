@@ -90,9 +90,12 @@ public class StaffService {
     @Transactional
     public StaffInviteResponse invite(UUID tenantId, UUID invitedBy, StaffInviteRequest req) {
         tenantContext.set(tenantId);
-        StaffRow caller = staffRepo.findById(tenantId, invitedBy).orElseThrow(this::notFound);
-        grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound),
-                req.scopeOrDefault(), null);
+        // invitedBy == null is the provisioning bootstrap (system issues the first Owner invite); no caller to bound
+        if (invitedBy != null) {
+            StaffRow caller = staffRepo.findById(tenantId, invitedBy).orElseThrow(this::notFound);
+            grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound),
+                    req.scopeOrDefault(), null);
+        }
 
         UUID id = UUID.randomUUID();
         String rawToken = OpaqueTokens.generate();

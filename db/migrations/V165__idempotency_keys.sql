@@ -22,7 +22,7 @@ CREATE INDEX idx_idempotency_keys_expires ON idempotency_keys (expires_at);
 ALTER TABLE idempotency_keys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE idempotency_keys FORCE ROW LEVEL SECURITY;
 CREATE POLICY t_select ON idempotency_keys FOR SELECT
-  USING (tenant_id = ANY (string_to_array(current_setting('app.visible_tenant_ids', true), ',')::uuid[]));
+  USING (tenant_id = current_setting('app.tenant_id', true)::uuid);  -- own tenant only: replay bodies may hold PHI, never widen (PLT-018)
 CREATE POLICY t_insert ON idempotency_keys FOR INSERT WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid);
 CREATE POLICY t_update ON idempotency_keys FOR UPDATE
   USING (tenant_id = current_setting('app.tenant_id', true)::uuid) WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid);
