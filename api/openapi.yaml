@@ -1051,6 +1051,7 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/PatientPage" }
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Patients]
       summary: Register a patient
       x-required-permission: patients:create
@@ -1355,6 +1356,7 @@ paths:
                   data: { type: array, items: { $ref: "#/components/schemas/Appointment" } }
                   page: { $ref: "#/components/schemas/PageMeta" }
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Queue]
       summary: "Book a slot — concurrency-safe: a DB constraint, not an app-level check, prevents double-booking (NB-067)"
       x-required-permission: queue:create
@@ -1487,6 +1489,7 @@ paths:
 
   /queue/check-in:
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Queue]
       summary: "Issues a token — scheduled (appointmentId given) or walk-in (patientId + doctorId only) (NB-068)"
       x-required-permission: queue:create
@@ -1941,7 +1944,7 @@ paths:
       tags: [Clinical]
       summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
       x-required-permission: clinical:edit
-      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Signed, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -2188,6 +2191,7 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { currency: { type: string }, charges: { type: array, items: { $ref: "#/components/schemas/BillingCharge" } } } } } } }
   /billing/otc-checkout:
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Billing]
       summary: >
         Counter sale (standalone invoice, no patient/queue entry). 409 `otc-not-available` when the pharmacy mode is `external`
@@ -2209,7 +2213,7 @@ paths:
         Consultation line uses the catalogue followUpAmount instead of baseAmount when the patient had a completed visit with the
         same doctor in the last 14 days (the same rule as `followUpEligible` in the checkout context). Not gated by pharmacy mode.
       x-required-permission: billing:create
-      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
@@ -2578,6 +2582,19 @@ components:
         tenant/role headers.
 
   parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        PLT-026. A UUID (the web client sends a UUIDv7) that is new for each user action and reused unchanged when that action is
+        retried. Same key + same request replays the stored 2xx response with `Idempotent-Replayed: true` (no second side effect);
+        same key + different request: 422 `IDEMPOTENCY_KEY_REUSED`; the first attempt still running: 409 `IDEMPOTENCY_IN_PROGRESS`;
+        header missing or not a UUID: 400 `IDEMPOTENCY_KEY_REQUIRED`. Scoped to (tenant, staff member); only 2xx responses are kept
+        (a 4xx/5xx releases the key so the retry runs again); stored responses are encrypted and purged after 24 h.
+        Also required on POST /billing/invoices/{id}/payments, POST /packages/instances/items/{itemId}/book,
+        POST /packages/instances/{id}/refund and POST /packages/refunds/{id}/approve.
+      schema: { type: string, format: uuid }
     PlatformAuditTenantId:
       name: tenantId
       in: query

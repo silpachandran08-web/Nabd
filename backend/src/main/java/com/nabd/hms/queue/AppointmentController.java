@@ -45,6 +45,7 @@ public class AppointmentController {
         return service.list(tenantId(jwt), doctorId, patientId, date, limit, cursor);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping
     @PreAuthorize("hasAuthority('queue:create')")
     public ResponseEntity<AppointmentResponse> book(@AuthenticationPrincipal Jwt jwt,

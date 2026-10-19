@@ -111,6 +111,7 @@ public class PackageController {
         return instanceService.detail(tenantId(jwt), id);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/instances/items/{itemId}/book")
     @PreAuthorize("hasAuthority('packages:edit')")
     public InstanceResponse book(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID itemId) {
@@ -147,6 +148,7 @@ public class PackageController {
         return instanceService.refundPreview(tenantId(jwt), id);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/instances/{id}/refund")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('packages:edit')")
@@ -160,6 +162,7 @@ public class PackageController {
         return instanceService.listRefunds(tenantId(jwt));
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/refunds/{id}/approve")
     @PreAuthorize("hasAuthority('packages:approve')")
     public RefundResponse approveRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

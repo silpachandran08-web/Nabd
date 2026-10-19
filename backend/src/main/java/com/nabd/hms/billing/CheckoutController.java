@@ -46,6 +46,7 @@ public class CheckoutController {
         return service.getExistingInvoice(tenantId(jwt), queueEntryId);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/checkout/{queueEntryId}")
     @PreAuthorize("hasAuthority('billing:create')")
     public InvoiceResponse checkout(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
@@ -60,6 +61,7 @@ public class CheckoutController {
         return service.getOtcCharges(tenantId(jwt));
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/otc-checkout")
     @PreAuthorize("hasAuthority('billing:create')")
     public InvoiceResponse otcCheckout(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckoutRequest req) {
@@ -73,6 +75,7 @@ public class CheckoutController {
         return service.getInvoice(tenantId(jwt), id);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/invoices/{id}/payments")
     @PreAuthorize("hasAuthority('billing:edit')")
     public InvoiceResponse recordPayment(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,

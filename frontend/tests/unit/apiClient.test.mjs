@@ -109,3 +109,31 @@ test("unlockMessage maps the three outcomes", () => {
   assert.equal(mod.unlockMessage(429, "30", false), "Too many attempts, wait 30 s");
   assert.equal(mod.unlockMessage(429, null, false), "Too many attempts, wait 1 s");
 });
+
+// PLT-026: Idempotency-Key per POST action.
+test("uuidv7 is a version-7 UUID with a sortable timestamp prefix", () => {
+  const a = mod.uuidv7(1_700_000_000_000), b = mod.uuidv7(1_700_000_001_000);
+  assert.match(a, /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.ok(a.slice(0, 13) < b.slice(0, 13));
+  assert.notEqual(mod.uuidv7(), mod.uuidv7());
+});
+
+test("apiFetch adds one Idempotency-Key to a POST (same on the 401 replay), keeps a caller's, skips GET", async () => {
+  const seen = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith("/auth/refresh")) return new Response(JSON.stringify({ accessToken: jwt(now() + 900, now()) + ".s1", refreshToken: "r1" }), { status: 200 });
+    const h = new Headers(init?.headers);
+    seen.push({ m: init?.method ?? "GET", key: h.get("Idempotency-Key") });
+    return new Response("{}", { status: h.get("Authorization")?.endsWith(".s1") ? 200 : 401 });
+  };
+  await mod.apiFetch("/billing/invoices/1/payments", { method: "POST", body: "{}" }); // OLD token 401s, replays after refresh
+  assert.equal(seen.length, 2);
+  assert.match(seen[0].key, /^[0-9a-f-]{36}$/);
+  assert.equal(seen[1].key, seen[0].key);
+  seen.length = 0;
+  await mod.apiFetch("/x", { method: "POST", headers: { "Idempotency-Key": "mine" } });
+  assert.equal(seen[0].key, "mine");
+  seen.length = 0;
+  await mod.apiFetch("/x");
+  assert.equal(seen[0].key, null);
+});

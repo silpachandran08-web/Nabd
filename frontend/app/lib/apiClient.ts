@@ -195,6 +195,16 @@ if (typeof window !== "undefined") {
   window.addEventListener("storage", (e) => { if (e.key === ACCESS_KEY) schedule(); });
 }
 
+/** RFC 9562 UUIDv7: 48-bit ms timestamp, then random. */
+export function uuidv7(nowMs = Date.now()): string {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  for (let i = 0; i < 6; i++) b[i] = Math.floor(nowMs / 2 ** (8 * (5 - i))) & 0xff;
+  b[6] = (b[6] & 0x0f) | 0x70;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 // ---- fetch ---------------------------------------------------------------------------------------
 function send(path: string, init: RequestInit | undefined, token: string | null): Promise<Response> {
   const headers = new Headers(init?.headers);
@@ -206,6 +216,13 @@ function send(path: string, init: RequestInit | undefined, token: string | null)
  * a 401, then replays the request. A 401 that survives refresh is returned (tokens already cleared) so
  * the caller's existing 401 branch runs goLogin(). Network errors reject, as plain fetch does. */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  // PLT-026: one key per user action, kept across the 401 replay below. A caller that retries after a network
+  // error passes its own Idempotency-Key header so the server sees the same action.
+  if (init?.method?.toUpperCase() === "POST" && !new Headers(init.headers).has("Idempotency-Key")) {
+    const headers = new Headers(init.headers);
+    headers.set("Idempotency-Key", uuidv7());
+    init = { ...init, headers };
+  }
   let token = localStorage.getItem(ACCESS_KEY);
   if (token && needsRefresh(token)) {
     try { if (await refreshSession(token)) token = localStorage.getItem(ACCESS_KEY); } catch { /* try the old token */ }

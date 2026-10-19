@@ -379,12 +379,14 @@ public abstract class ApiTestBase {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(accessToken);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString()); // PLT-026: required by @Idempotent endpoints, ignored elsewhere
         return new HttpEntity<>(writeJson(body), headers);
     }
 
     protected HttpEntity<Void> authed(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString()); // PLT-026: body-less POSTs (sign, approve, book)
         return new HttpEntity<>(headers);
     }
 
@@ -392,6 +394,7 @@ public abstract class ApiTestBase {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(accessToken);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
         if (headerValue != null) {
             headers.set(headerName, headerValue);
         }

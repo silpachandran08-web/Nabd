@@ -51,6 +51,7 @@ public class PrescriptionController {
         return service.upsert(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req.items());
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/prescriptions/{queueEntryId}/sign")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
