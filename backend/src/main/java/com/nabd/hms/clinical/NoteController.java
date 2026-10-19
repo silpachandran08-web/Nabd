@@ -31,6 +31,7 @@ public class NoteController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("note")
     @GetMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public NoteResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
@@ -58,6 +59,7 @@ public class NoteController {
         return service.amend(tenantId(jwt), staffId(jwt), queueEntryId, req);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("note_amendments")
     @GetMapping("/{queueEntryId}/amendments")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<NoteAmendmentResponse> listAmendments(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {

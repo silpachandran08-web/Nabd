@@ -24,6 +24,7 @@ public class EncounterListController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("encounter_list")
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
     public EncounterListPage list(@AuthenticationPrincipal Jwt jwt,

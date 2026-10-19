@@ -30,6 +30,7 @@ public class ConditionController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("conditions")
     @GetMapping("/patients/{patientId}/conditions")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<ConditionResponse> list(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
@@ -51,6 +52,7 @@ public class ConditionController {
     }
 
     /** NB-077's clinic-wide "chronic review due" list — derived from review_due_date, not a manual flag. */
+    @com.nabd.hms.shared.phiread.PhiRead("conditions_due_list")
     @GetMapping("/conditions/due")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<DueConditionResponse> due(@AuthenticationPrincipal Jwt jwt) {

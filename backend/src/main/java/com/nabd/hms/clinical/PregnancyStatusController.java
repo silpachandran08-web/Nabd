@@ -30,6 +30,7 @@ public class PregnancyStatusController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("pregnancy_status")
     @GetMapping("/patients/{patientId}/pregnancy-status")
     @PreAuthorize("hasAuthority('clinical:view')")
     public PregnancyStatusResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
@@ -43,6 +44,7 @@ public class PregnancyStatusController {
         return service.record(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("pregnancy_status_history")
     @GetMapping("/patients/{patientId}/pregnancy-status/history")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<PregnancyEventResponse> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {

@@ -28,12 +28,14 @@ public class VitalsController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("vitals")
     @GetMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public VitalsResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
         return service.get(tenantId(jwt), queueEntryId);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("vitals_previous")
     @GetMapping("/patient/{patientId}/previous")
     @PreAuthorize("hasAuthority('clinical:view')")
     public VitalsHistoryResponse previous(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,

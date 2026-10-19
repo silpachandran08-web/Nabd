@@ -425,6 +425,32 @@ paths:
                         message: { type: string }
                         createdAt: { type: string, format: date-time }
 
+  /phi-read/alerts:
+    get:
+      tags: [Auth]
+      summary: PLT-039 Owner's in-app read-volume alerts (one actor read more distinct patients in an hour than the limit; no patient data)
+      x-required-permission: owner
+      responses:
+        "200":
+          description: Alerts for the caller's clinic, newest first (max 50)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        actorId: { type: string, format: uuid }
+                        distinctPatients: { type: integer }
+                        windowMinutes: { type: integer }
+                        createdAt: { type: string, format: date-time }
+        "403":
+          description: Caller is not the clinic Owner
+
   # NB-046 (PIN reset & account recovery): specced, not yet implemented in the backend.
   /auth/pin-reset/request:
     post:

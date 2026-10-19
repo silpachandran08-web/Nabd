@@ -38,6 +38,7 @@ public class PrescriptionController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("prescription")
     @GetMapping("/prescriptions/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public PrescriptionResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
@@ -58,12 +59,14 @@ public class PrescriptionController {
         return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("prescription_history")
     @GetMapping("/patients/{patientId}/prescriptions")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<PrescriptionResponse> previousForPatient(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
         return service.previousForPatient(tenantId(jwt), patientId);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("dose_calculation")
     @GetMapping("/patients/{patientId}/dose-calculator")
     @PreAuthorize("hasAuthority('clinical:view')")
     public DoseCalculationResponse calculateDose(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
