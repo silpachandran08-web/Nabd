@@ -144,11 +144,19 @@ class S11QaLicensedSigningTest extends ApiTestBase {
 
     /** AC1 names the code: the provisioned Owner (preset, no registration) must get 403 not-licensed-clinician. */
     @Test
-    @Tag("known-defect-CLN-005")
     void ownerPresetRefusalCarriesTheNotLicensedClinicianCode() {
         Clinic c = clinic("Paracetamol");
         String oTok = loginAndGetAccessToken(staff(c.t(), preset(c.t(), "owner")));
         assert403(sign(oTok, c.entry()), "not-licensed-clinician");
+    }
+
+    /** FIX-L: a licensed Owner preset (view-only clinical grant) still cannot sign; the refusal is not-prescriber. */
+    @Test
+    void licensedOwnerPresetWithoutClinicalEditIsNotPrescriberAndNothingIsSigned() {
+        Clinic c = clinic("Paracetamol");
+        String oTok = loginAndGetAccessToken(ClinicianFixture.licensed(staff(c.t(), preset(c.t(), "owner"))));
+        assert403(sign(oTok, c.entry()), "not-prescriber");
+        assertThat(rx(c.entry()).get("status")).isEqualTo("draft");
     }
 
     // ── AC2 ──────────────────────────────────────────────────────────────

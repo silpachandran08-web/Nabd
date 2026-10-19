@@ -45,11 +45,12 @@ class CheckoutServerPricingApiTest extends ApiTestBase {
     void externalModeBlocksCounterSalesButHybridAndInHouseAllowThem() {
         SeededTenant tenant = seedTenant();
         String token = token(tenant, "otc1@a.com", "+919710000001");
+        catalogue(tenant, "SVC", "Service", 100, null, 0, false); // H-04: the counter bills price-list items only
 
         // default (no pharmacy_settings row) is external
         for (ResponseEntity<Map> r : List.of(
                 exchange("/v1/billing/otc-charges", HttpMethod.GET, authed(token), Map.class),
-                otc(token, line("FREE", "Free text", 100, 0)))) {
+                otc(token, line("SVC", "Svc", 100, 0)))) {
             assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
             assertThat(r.getBody().get("type")).asString().contains("otc-not-available");
         }
@@ -58,10 +59,10 @@ class CheckoutServerPricingApiTest extends ApiTestBase {
 
         setMode(tenant, "hybrid");
         assertThat(exchange("/v1/billing/otc-charges", HttpMethod.GET, authed(token), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(otc(token, line("FREE", "Free text", 100, 0)).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(otc(token, line("SVC", "Svc", 100, 0)).getStatusCode()).isEqualTo(HttpStatus.OK);
         setMode(tenant, "in_house");
         assertThat(exchange("/v1/billing/otc-charges", HttpMethod.GET, authed(token), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(otc(token, line("FREE", "Free text", 100, 0)).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(otc(token, line("SVC", "Svc", 100, 0)).getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
@@ -95,12 +96,15 @@ class CheckoutServerPricingApiTest extends ApiTestBase {
     }
 
     @Test
-    void lineWithoutCatalogueEntryKeepsClientValuesButNegativePriceAndBlankNameAreRejected() {
+    void lineWithoutCatalogueEntryIsRefusedAtTheCounterAndNegativePriceAndBlankNameAreRejected() {
         SeededTenant tenant = seedTenant();
         String token = token(tenant, "otc4@a.com", "+919710000004");
         setMode(tenant, "hybrid");
 
-        assertThat(((Number) otc(token, line("ADHOC", "Ad hoc", 75, 0)).getBody().get("subtotal")).doubleValue()).isEqualTo(150.00);
+        // H-04 (PHL-001): free text at the counter could carry an Rx-only drug's name past the gate, so it is refused
+        ResponseEntity<Map> adhoc = otc(token, line("ADHOC", "Ad hoc", 75, 0));
+        assertThat(adhoc.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(adhoc.getBody().get("type")).asString().contains("free-text-not-allowed");
         assertThat(otc(token, line("ADHOC", "Ad hoc", -5, 0)).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(otc(token, line("ADHOC", " ", 5, 0)).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }

@@ -319,8 +319,10 @@ class CheckoutApiTest extends ApiTestBase {
         assertThat(charges.getBody().get("currency")).isEqualTo("INR");
 
         // NB-186: a counter sale — no patient record, no queue token, just an invoice.
+        // H-04: the counter bills price-list items only (free text is refused), so X is in the catalogue.
+        inTenantTx(tenant.id(), () -> jdbc.update("INSERT INTO charge_catalogue (tenant_id, code, name, category, base_amount) VALUES (?, 'X', 'X', 'Service', 100)", tenant.id()));
         ResponseEntity<Map> resp = exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100.00, "taxRatePercent", 0)),
                 "discount", 0)), Map.class);
 

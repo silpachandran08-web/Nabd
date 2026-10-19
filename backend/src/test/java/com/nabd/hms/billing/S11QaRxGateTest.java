@@ -3,7 +3,7 @@ package com.nabd.hms.billing;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
 import com.nabd.hms.support.ClinicianFixture;
-import org.junit.jupiter.api.Tag;
+import com.nabd.hms.support.Hazard;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * of the same tenant and patient with quantity left. Item names here are test fixtures, not a clinical list. */
 @SuppressWarnings({"unchecked", "rawtypes"})
 @ExtendWith(OutputCaptureExtension.class)
+@Hazard("H-04")
 class S11QaRxGateTest extends ApiTestBase {
 
     private static final AtomicInteger SEQ = new AtomicInteger((int) (System.nanoTime() % 300_000) + 500_000);
@@ -196,7 +197,6 @@ class S11QaRxGateTest extends ApiTestBase {
     /** Engineer-reported bypass: the Rx-only catalogue item typed in as a free-text line (new code, same name) is sold
      * over the counter with no prescription. The story asks that the counter refuse ANY prescription-only line. */
     @Test
-    @Tag("known-defect-PHL-001")
     void rxOnlyItemTypedAsAFreeTextLineIsRefused() {
         Ctx c = ctx();
         String name = "Qa rx freetext " + Integer.toString(SEQ.incrementAndGet(), 36);

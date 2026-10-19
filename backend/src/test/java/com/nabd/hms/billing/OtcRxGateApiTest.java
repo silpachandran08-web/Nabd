@@ -1,6 +1,7 @@
 package com.nabd.hms.billing;
 
 import com.nabd.hms.support.ApiTestBase;
+import com.nabd.hms.support.Hazard;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** PHL-001 (hazard H-04): prescription-only lines need a signed prescription line of the same patient with quantity left. */
+@Hazard("H-04")
 class OtcRxGateApiTest extends ApiTestBase {
 
     private static final AtomicInteger SEQ = new AtomicInteger((int) (System.nanoTime() % 400_000));
@@ -40,7 +42,8 @@ class OtcRxGateApiTest extends ApiTestBase {
     private Ctx ctx() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
-        SeededStaff staff = seedStaff(tenant, roleId, "rxg" + SEQ.incrementAndGet() + "@a.com", phone(), false);
+        // CLN-005: signing the fixture prescriptions needs a registered clinician
+        SeededStaff staff = com.nabd.hms.support.ClinicianFixture.licensed(seedStaff(tenant, roleId, "rxg" + SEQ.incrementAndGet() + "@a.com", phone(), false));
         String token = loginAndGetAccessToken(staff);
         exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         return new Ctx(tenant, staff, token);
@@ -349,5 +352,38 @@ class OtcRxGateApiTest extends ApiTestBase {
                 .isPositive();
         assertThat(su().queryForObject("SELECT COALESCE(SUM(quantity), 0) FROM invoice_line_items WHERE tenant_id = ? AND is_rx",
                 Integer.class, c.tenant().id())).isLessThanOrEqualTo(150);
+    }
+
+    /** H-04: free text at the counter could carry an Rx-only drug's name past the is_rx gate, so the counter refuses it. */
+    @Test
+    void otcFreeTextLineIs422AndWritesNothing() {
+        Ctx c = ctx();
+        int before = invoices(c.tenant().id());
+        Map<String, Object> l = new HashMap<>(Map.of("chargeCode", "FT-" + SEQ.incrementAndGet(), "chargeName", "Typed in", "category", "Pharmacy",
+                "quantity", 1, "unitPrice", 12, "taxRatePercent", 0, "override", Map.of("reasonCode", "other")));
+        assertProblem(otc(c, List.of(l)), "free-text-not-allowed");
+        assertThat(invoices(c.tenant().id())).isEqualTo(before);
+    }
+
+    /** H-04: an inactive, unstocked Rx-only code must not fall through to an ungated free-text line at visit checkout;
+     * a free-text line with its own new code is still allowed there (FIN-003, with a reason). */
+    @Test
+    void visitCheckoutRefusesAnInactiveRxCodeAsFreeTextButKeepsPlainFreeText() {
+        Ctx c = ctx();
+        String code = "RXOFF" + SEQ.incrementAndGet();
+        inTenantTx(c.tenant().id(), () -> jdbc.update("INSERT INTO charge_catalogue (tenant_id, code, name, category, base_amount, is_rx, active) " +
+                "VALUES (?, ?, 'Off rx', 'Pharmacy', 10, true, false)", c.tenant().id(), code));
+        String qe = checkIn(c, patient(c, phone()));
+        toCheckout(c, qe);
+        Map<String, Object> l = new HashMap<>(Map.of("chargeCode", code, "chargeName", "Off rx", "category", "Pharmacy",
+                "quantity", 1, "unitPrice", 10, "taxRatePercent", 0, "override", Map.of("reasonCode", "other")));
+        ResponseEntity<Map> r = exchange("/v1/billing/checkout/" + qe, HttpMethod.POST, authedJsonBody(c.token(), Map.of("lineItems", List.of(l))), Map.class);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat((String) r.getBody().get("type")).endsWith("/item-inactive");
+
+        l.put("chargeCode", "FT-" + SEQ.incrementAndGet());
+        l.put("chargeName", "Dressing");
+        ResponseEntity<Map> ok = exchange("/v1/billing/checkout/" + qe, HttpMethod.POST, authedJsonBody(c.token(), Map.of("lineItems", List.of(l))), Map.class);
+        assertThat(ok.getStatusCode()).as("%s", ok.getBody()).isEqualTo(HttpStatus.OK);
     }
 }

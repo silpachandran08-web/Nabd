@@ -167,7 +167,6 @@ class Ac5H04(unittest.TestCase):
     def test_h04_is_in_the_hazard_log(self):
         self.assertIn("H-04", pathlib.Path(sr.LOG).read_text())
 
-    @unittest.expectedFailure  # known-defect-CLN-007: PHL-001's OTC gate tests are not tagged @Hazard("H-04")
     def test_report_lists_the_otc_gate_tests_as_h04_verifying_tests(self):
         ids = self.h04_tests()
         self.assertTrue(any("OtcRxGateApiTest" in i or "S11QaRxGateTest" in i for i in ids), ids)

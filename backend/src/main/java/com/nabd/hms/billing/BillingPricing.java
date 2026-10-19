@@ -44,7 +44,7 @@ class BillingPricing {
                 : repo.findCatalogueCharges(tenantId, lines.stream().map(LineItemRequest::chargeCode).distinct().toList());
         for (LineItemRequest li : lines) {
             PharmacyChargeRow c = catalogue.get(li.chargeCode());
-            if (c != null && c.stocked() && !c.active()) {
+            if (c != null && (c.stocked() || c.isRx()) && !c.active()) { // H-04: an inactive Rx code must not fall through to free text
                 throw new ApiException(HttpStatus.CONFLICT, "item-inactive", "Item no longer sold",
                         c.name() + " has been deactivated and can't be billed. Remove it from the bill.");
             }
