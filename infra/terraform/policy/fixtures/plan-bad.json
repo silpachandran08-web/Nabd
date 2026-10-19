@@ -1,0 +1,110 @@
+{
+ "resource_changes": [
+  {
+   "address": "module.cell.module.aws[0].aws_db_instance.this",
+   "mode": "managed",
+   "type": "aws_db_instance",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "publicly_accessible": true,
+     "storage_encrypted": false,
+     "backup_retention_period": 7,
+     "deletion_protection": false,
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "phi"
+     }
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_s3_bucket.this[\"data\"]",
+   "mode": "managed",
+   "type": "aws_s3_bucket",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "tags": {
+      "cell": "in"
+     }
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_s3_bucket_public_access_block.this[\"data\"]",
+   "mode": "managed",
+   "type": "aws_s3_bucket_public_access_block",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "block_public_acls": true,
+     "block_public_policy": true,
+     "ignore_public_acls": true,
+     "restrict_public_buckets": false
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_s3_bucket.dr",
+   "mode": "managed",
+   "type": "aws_s3_bucket",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "backup"
+     }
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_security_group.db",
+   "mode": "managed",
+   "type": "aws_security_group",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "ingress": [
+      {
+       "cidr_blocks": [
+        "0.0.0.0/0"
+       ]
+      }
+     ],
+     "tags": null
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_internet_gateway.this",
+   "mode": "managed",
+   "type": "aws_internet_gateway",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "network"
+     }
+    }
+   }
+  }
+ ]
+}
