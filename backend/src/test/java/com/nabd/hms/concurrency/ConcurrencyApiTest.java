@@ -79,7 +79,6 @@ class ConcurrencyApiTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-T-035")
     void doubleCheckInOfOneAppointmentMintsOneToken() {
         Ctx c = setup();
         allDayWorkingHours(c);
@@ -98,7 +97,6 @@ class ConcurrencyApiTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-T-030")
     void concurrentPaymentsKeepPaidEqualToSumOfPayments() {
         Ctx c = setup();
         String patientId = registerPatient(c.token());
@@ -132,7 +130,6 @@ class ConcurrencyApiTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-T-036")
     void overlappingBookingsForOneDoctorAllowExactlyOne() {
         Ctx c = setup();
         allDayWorkingHours(c);
@@ -161,7 +158,6 @@ class ConcurrencyApiTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-T-034")
     void tenConcurrentStatusTransitionsFromOneStateSucceedOnce() {
         Ctx c = setup();
         String patientId = registerPatient(c.token());
