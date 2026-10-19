@@ -9,4 +9,4 @@ Doctor,true,not-prescriber,200,200
 Doctor,false,not-prescriber,not-licensed-clinician,not-licensed-clinician
 Nurse,false,not-prescriber,not-licensed-clinician,not-licensed-clinician
 Receptionist,false,403,403,403
-Custom (Front Desk + Vitals),false,403,403,403
+Custom (Front Desk + Vitals),false,not-licensed-clinician,not-licensed-clinician,403

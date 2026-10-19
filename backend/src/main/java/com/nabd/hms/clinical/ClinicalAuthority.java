@@ -18,6 +18,8 @@ import java.util.UUID;
  * CLN-005 (T-058, QA-17, hazard H-05): who may put their name on a prescription, record a requiresDecision warning
  * decision, or issue a clinical document. In order, the caller must
  * (1) be the visit's doctor or hold clinical:approve           -> else 403 not-prescriber
+ *     (a caller with neither clinical:edit nor clinical:approve, e.g. the Owner preset, skips (1): unlicensed gives
+ *     not-licensed-clinician, licensed gives not-prescriber)
  * (2) be a registered clinician: staff.is_clinician AND a professional_registration_no on file
  *                                                                -> else 403 not-licensed-clinician
  * (3) hold an in-date licence (licence_expires_on null or >= today in the clinic's zone), or an owner's override
@@ -51,7 +53,8 @@ public class ClinicalAuthority {
 
     /** Null when the caller may sign; otherwise the refusal code. Caller must have set the tenant context. */
     public String refusal(UUID tenantId, UUID visitDoctorId, UUID callerStaffId, boolean callerCanApprove) {
-        if (!PrescriptionService.mayActAsVisitDoctor(visitDoctorId, callerStaffId, callerCanApprove)) {
+        boolean prescriberRole = callerCanApprove || callerHas("clinical:edit");
+        if (prescriberRole && !PrescriptionService.mayActAsVisitDoctor(visitDoctorId, callerStaffId, callerCanApprove)) {
             return NOT_PRESCRIBER;
         }
         StaffLicence l = jdbc.query("SELECT is_clinician, professional_registration_no, licence_expires_on, licence_override_until " +
@@ -61,6 +64,9 @@ public class ClinicalAuthority {
                 tenantId, callerStaffId).stream().findFirst().orElse(null);
         if (l == null || !l.isClinician() || l.registrationNo() == null || l.registrationNo().isBlank()) {
             return NOT_LICENSED;
+        }
+        if (!prescriberRole) {
+            return NOT_PRESCRIBER; // a licensed caller with no clinical edit/approve grant at all
         }
         boolean expired = l.expiresOn() != null && l.expiresOn().isBefore(clock.today(tenantId));
         if (expired && (l.overrideUntil() == null || !l.overrideUntil().isAfter(clock.now()))) {

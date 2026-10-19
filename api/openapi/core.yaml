@@ -2974,7 +2974,8 @@ paths:
           description: Error (RFC 7807)
       tags:
       - clinical
-      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve')"
+      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve',\
+        \ 'clinical:view')"
   /v1/clinical/prescriptions/{queueEntryId}/signing-authority:
     get:
       operationId: PrescriptionController_signingAuthority

@@ -59,9 +59,9 @@ public class PrescriptionController {
 
     @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/prescriptions/{queueEntryId}/sign")
-    // CLN-005: approve-only callers (the Owner preset) reach the service so they get not-licensed-clinician, not a bare 403;
-    // ClinicalAuthority still requires clinical:edit to sign.
-    @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve')")
+    // CLN-005: callers without clinical:edit (the Owner preset has view only) reach the service so they get
+    // not-licensed-clinician / not-prescriber, not a bare 403; ClinicalAuthority still requires clinical:edit to sign.
+    @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve', 'clinical:view')")
     public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
         return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
     }
