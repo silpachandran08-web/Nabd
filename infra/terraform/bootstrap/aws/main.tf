@@ -91,7 +91,11 @@ locals {
   roles = {
     plan  = { subjects = ["repo:${var.github_repo}:*"], policy = "arn:aws:iam::aws:policy/ReadOnlyAccess" }
     apply = { subjects = ["repo:${var.github_repo}:environment:infra-staging", "repo:${var.github_repo}:environment:infra-prod"], policy = "arn:aws:iam::aws:policy/AdministratorAccess" }
+    # OPS-054: PITR lag publisher (scheduled, main only) and the quarterly restore drill (GitHub environment restore-drill).
+    monitor = { subjects = ["repo:${var.github_repo}:ref:refs/heads/main"], policy = null }
+    drill   = { subjects = ["repo:${var.github_repo}:environment:restore-drill"], policy = null }
   }
+  state_roles = { for k, v in local.roles : k => v if contains(["plan", "apply"], k) }
 }
 
 resource "aws_iam_role" "ci" {
@@ -115,14 +119,14 @@ resource "aws_iam_role" "ci" {
 
 # shortcut: apply uses AdministratorAccess; scope it to the cell's services once the resource set settles (before prod-in, S4).
 resource "aws_iam_role_policy_attachment" "ci" {
-  for_each   = local.roles
+  for_each   = local.state_roles
   role       = aws_iam_role.ci[each.key].name
   policy_arn = each.value.policy
 }
 
 # Both roles take the state lock; only apply may write state (ReadOnlyAccess covers neither DynamoDB writes nor KMS decrypt).
 resource "aws_iam_role_policy" "state" {
-  for_each = local.roles
+  for_each = local.state_roles
   name     = "terraform-state"
   role     = aws_iam_role.ci[each.key].id
   policy = jsonencode({
@@ -136,7 +140,37 @@ resource "aws_iam_role_policy" "state" {
   })
 }
 
+resource "aws_iam_role_policy" "monitor" {
+  name = "pitr-lag"
+  role = aws_iam_role.ci["monitor"].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Effect = "Allow", Action = ["rds:DescribeDBInstances"], Resource = "*" },
+      { Effect = "Allow", Action = ["cloudwatch:PutMetricData"], Resource = "*", Condition = { StringEquals = { "cloudwatch:namespace" = "Nabd/Backup" } } },
+    ]
+  })
+}
+
+# Drill: may restore any cell DB, but only into, and only delete, instances named nabd-drill-*.
+resource "aws_iam_role_policy" "drill" {
+  name = "restore-drill"
+  role = aws_iam_role.ci["drill"].id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { Effect = "Allow", Action = ["rds:DescribeDBInstances"], Resource = "*" },
+      { Effect = "Allow", Action = ["rds:RestoreDBInstanceToPointInTime"], Resource = "*" },
+      { Effect = "Allow", Action = ["rds:AddTagsToResource"], Resource = "arn:aws:rds:*:${local.account}:db:nabd-drill-*" },
+      { Effect = "Allow", Action = ["rds:DeleteDBInstance"], Resource = "arn:aws:rds:*:${local.account}:db:nabd-drill-*" },
+      { Effect = "Allow", Action = ["kms:CreateGrant", "kms:DescribeKey"], Resource = "*", Condition = { StringLike = { "kms:ViaService" = "rds.*.amazonaws.com" } } },
+    ]
+  })
+}
+
 output "state_bucket" { value = aws_s3_bucket.state.id }
 output "lock_table" { value = aws_dynamodb_table.lock.name }
 output "plan_role_arn" { value = aws_iam_role.ci["plan"].arn }
 output "apply_role_arn" { value = aws_iam_role.ci["apply"].arn }
+output "monitor_role_arn" { value = aws_iam_role.ci["monitor"].arn }
+output "drill_role_arn" { value = aws_iam_role.ci["drill"].arn }
