@@ -80,11 +80,11 @@ class PatientRepository {
     /** NB-074. Deprecated for display (LIVE-03): timestamp of the latest *completed* entry — a different
      * definition from findLastVisit(); kept only because the consult SafetyStrip still reads lastVisitAt. */
     Optional<Instant> findLastVisitAt(UUID tenantId, UUID patientId) {
-        // OPS-004: queue_date, not updated_at (backfill triggers rewrote it). shortcut: day precision (UTC midnight), no stage timestamps exist.
+        // OPS-004: queue_date, not updated_at (backfill triggers rewrote it). shortcut: day precision (clinic-zone midnight), no stage timestamps exist.
         return jdbc.query("SELECT max(queue_date) AS last_visit FROM queue_entries " +
                         "WHERE tenant_id = ? AND patient_id = ? AND status = 'completed'",
                 (rs, i) -> rs.getDate("last_visit"), tenantId, patientId)
-                .stream().filter(java.util.Objects::nonNull).map(d -> d.toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant()).findFirst();
+                .stream().filter(java.util.Objects::nonNull).map(d -> ClinicClock.startOf(d.toLocalDate(), clock.zone(tenantId))).findFirst();
     }
 
     /** NB-107/108: real signal now that patient_allergies exists (com.nabd.hms.clinical owns writes
@@ -118,9 +118,10 @@ class PatientRepository {
 
     java.util.Map<UUID, Instant> findLastVisitAts(UUID tenantId, List<UUID> patientIds) {
         java.util.Map<UUID, Instant> out = new java.util.HashMap<>();
+        java.time.ZoneId zone = clock.zone(tenantId);
         jdbc.query("SELECT patient_id, max(queue_date) AS last_visit FROM queue_entries " +
                         "WHERE tenant_id = ? AND patient_id IN (" + marks(patientIds) + ") AND status = 'completed' GROUP BY patient_id",
-                rs -> { out.put(UUID.fromString(rs.getString("patient_id")), rs.getDate("last_visit").toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant()); },
+                rs -> { out.put(UUID.fromString(rs.getString("patient_id")), ClinicClock.startOf(rs.getDate("last_visit").toLocalDate(), zone)); },
                 withTenant(tenantId, patientIds));
         return out;
     }
