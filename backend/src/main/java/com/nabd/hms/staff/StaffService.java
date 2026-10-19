@@ -3,6 +3,7 @@ package com.nabd.hms.staff;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.Cursor;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.TenantContext;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.nabd.hms.staff.StaffRoleModels.RoleRow;
 import static com.nabd.hms.staff.StaffRoleModels.StaffRow;
 
 @Service
@@ -44,15 +46,20 @@ public class StaffService {
     private final PasswordEncoder pinEncoder;
     private final StepUpVerifier stepUpVerifier;
     private final AuditService auditService;
+    private final GrantAuthority grantAuthority;
+    private final EventPublisher eventPublisher;
 
     StaffService(StaffRepository staffRepo, RoleRepository roleRepo, TenantContext tenantContext,
-                 PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService) {
+                 PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService,
+                 GrantAuthority grantAuthority, EventPublisher eventPublisher) {
         this.staffRepo = staffRepo;
         this.roleRepo = roleRepo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.stepUpVerifier = stepUpVerifier;
         this.auditService = auditService;
+        this.grantAuthority = grantAuthority;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -82,9 +89,9 @@ public class StaffService {
     @Transactional
     public StaffInviteResponse invite(UUID tenantId, UUID invitedBy, StaffInviteRequest req) {
         tenantContext.set(tenantId);
-        if (roleRepo.findById(tenantId, req.roleId()).isEmpty()) {
-            throw notFound();
-        }
+        StaffRow caller = staffRepo.findById(tenantId, invitedBy).orElseThrow(this::notFound);
+        grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound),
+                req.scopeOrDefault(), null);
 
         UUID id = UUID.randomUUID();
         String rawToken = OpaqueTokens.generate();
@@ -112,9 +119,17 @@ public class StaffService {
         tenantContext.set(tenantId);
         StaffRow current = staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
 
-        if (req.roleId() != null && roleRepo.findById(tenantId, req.roleId()).isEmpty()) {
-            throw notFound();
+        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElseThrow(this::notFound);
+        RoleRow newRole = req.roleId() == null ? null : roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound);
+        boolean roleChanged = newRole != null && !newRole.id().equals(current.roleId());
+        boolean scopeChanged = req.scope() != null && !req.scope().equals(current.scope());
+        boolean fieldsChanged = req.fieldGrants() != null
+                && !new java.util.HashSet<>(req.fieldGrants()).equals(new java.util.HashSet<>(current.fieldGrants()));
+        if (roleChanged) { // moving someone off the Owner role needs Owner too; then the new role must fit the caller
+            grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, current.roleId()).orElseThrow(), null, null);
+            grantAuthority.requireAssignable(tenantId, caller, newRole, null, null);
         }
+        grantAuthority.requireAssignable(tenantId, caller, null, scopeChanged ? req.scope() : null, fieldsChanged ? req.fieldGrants() : null);
 
         UUID roleId = req.roleId() != null ? req.roleId() : current.roleId();
         String scope = req.scope() != null ? req.scope() : current.scope();
@@ -123,6 +138,10 @@ public class StaffService {
 
         staffRepo.update(tenantId, id, roleId, scope, fieldGrants, departmentId);
         log.info("staff {} updated by {} (role {}, scope {})", id, callerStaffId, roleId, scope);
+
+        if (roleChanged || scopeChanged || fieldsChanged) {
+            auditRoleChange(tenantId, caller, id, current, roleId, scope, fieldGrants, scopeChanged, ipAddress);
+        }
 
         // DOC-N1: the registration number is printed on prescriptions, so a change is audited. The audit row records
         // that it was set / changed / cleared, not the number itself, and the number is never written to the log.
@@ -133,16 +152,29 @@ public class StaffService {
             if (!java.util.Objects.equals(previous, normalised)) {
                 staffRepo.updateProfessionalRegistrationNo(tenantId, id, normalised);
                 String change = previous == null ? "set" : normalised == null ? "cleared" : "changed";
-                StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
-                String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+                String callerRole = roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
                 Map<String, Object> detail = new LinkedHashMap<>();
                 detail.put("field", "professionalRegistrationNo");
                 detail.put("change", change);
-                auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,
+                auditService.record(tenantId, "staff", callerStaffId, caller.name(), callerRole,
                         ipAddress, "staff.registration_no_" + change, "staff", id, null, detail);
             }
         }
         return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+    }
+
+    /** PLT-015: before/after audit, sessions killed so the new grants apply on the next request, event published. */
+    private void auditRoleChange(UUID tenantId, StaffRow caller, UUID id, StaffRow before, UUID roleId, String scope,
+                                 List<String> fieldGrants, boolean scopeChanged, String ipAddress) {
+        String callerRole = roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+        auditService.record(tenantId, "staff", caller.id(), caller.name(), callerRole, ipAddress, "staff.role_changed", "staff", id,
+                Map.of("roleId", before.roleId(), "scope", before.scope(), "fieldGrants", before.fieldGrants()),
+                Map.of("roleId", roleId, "scope", scope, "fieldGrants", fieldGrants));
+        // ponytail: 'role_changed' is not in sessions.revoked_reason's CHECK yet (PLT-007 adds it); admin_revoke until then
+        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        eventPublisher.publish(tenantId, "iam.staff_role.changed.v1", Map.of("tenantId", tenantId.toString(),
+                "staffId", id.toString(), "fromRoleId", before.roleId().toString(), "toRoleId", roleId.toString(),
+                "scopeChanged", scopeChanged));
     }
 
     @Transactional

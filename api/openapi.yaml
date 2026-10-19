@@ -569,6 +569,7 @@ paths:
             schema: { $ref: "#/components/schemas/StaffInviteRequest" }
       responses:
         "201": { $ref: "#/components/responses/StaffCreated" }
+        "403": { description: "GRANT_EXCEEDS_CALLER (type grant-exceeds-caller) or OWNER_ROLE_RESTRICTED (type owner-role-restricted): the role, scope or field grants are richer than the caller holds (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Email already on this tenant, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /staff/roster:
@@ -609,6 +610,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/StaffPatch" } } }
       responses:
         "200": { description: "Staff", content: { application/json: { schema: { $ref: "#/components/schemas/Staff" } } } }
+        "403": { description: "GRANT_EXCEEDS_CALLER (type grant-exceeds-caller) or OWNER_ROLE_RESTRICTED (type owner-role-restricted): the role, scope or field grants are richer than the caller holds (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /staff/{id}/suspend:
