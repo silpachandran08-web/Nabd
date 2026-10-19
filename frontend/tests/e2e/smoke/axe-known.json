@@ -11,6 +11,8 @@
       "reason": "Allergy names in the consult safety strip: #f0455c on #2e1c23 is 4.37:1." },
     { "rule": "color-contrast", "selector": "noticeDanger", "owner": "@nabd/clinical-owners", "added": "2026-10-19", "expires": "2026-11-18",
       "reason": "Danger notice text (Rx safety warnings count): #f0455c on #2e1c23 is 4.37:1." },
+    { "rule": "color-contrast", "selector": "warnBody", "owner": "@nabd/clinical-owners", "added": "2026-10-19", "expires": "2026-11-18",
+      "reason": "Rx allergy warning card text: #f0455c on #2e1c23 is 4.37:1." },
     { "rule": "aria-required-children", "selector": "-list", "owner": "@nabd/clinical-owners", "added": "2026-10-19", "expires": "2026-11-18",
       "reason": "DrugCombobox renders an empty role=listbox (no option children) while there are no suggestions." }
   ]

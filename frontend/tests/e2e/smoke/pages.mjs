@@ -8,7 +8,7 @@ export class ArrivalsPage {
     const p = this.page;
     await p.getByRole('button', { name: 'Walk-in & token' }).click();
     const d = p.getByRole('dialog', { name: 'Register walk-in' });
-    await d.getByLabel('Patient').fill(name);
+    await d.getByLabel('Patient').fill(phone); // search by phone first, as reception does: a new number has no match
     await d.getByRole('button', { name: /No match — register a new patient/ }).click();
     await d.getByLabel('Name', { exact: true }).fill(name);
     await d.getByLabel('Phone', { exact: true }).fill(phone);

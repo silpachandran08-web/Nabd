@@ -92,7 +92,10 @@ export const JOURNEYS = [
       await arr.open(); await axe('arrivals');
       const who = TARGET === 'mock' ? tenant.walkIn : `${tenant.walkIn} ${Date.now().toString(36)}${attempt}`; // preview: never collide with the seed
       const ms = await (async () => { const t0 = performance.now();
-        await arr.registerWalkIn({ name: who, phone: d.walkInPhone ?? '+910000099001', dob: '1988-07-15' }, d.doctor?.name ?? d.doctor);
+        // preview: a fresh test-range number per run, or the duplicate-patient check (rightly) stops the walk-in
+        const phone = TARGET === 'mock' ? '+910000099001' : `${d.walkInPhonePrefix}${String(Date.now() % 1e6).padStart(6, '0')}`;
+        const dob = TARGET === 'mock' ? '1988-07-15' : new Date(Date.UTC(1950 + (Date.now() % 50), 0, 1 + (Date.now() % 360))).toISOString().slice(0, 10); // a fresh dob keeps the duplicate check quiet
+        await arr.registerWalkIn({ name: who, phone, dob }, d.doctor?.name ?? d.doctor);
         const tok = await arr.token(); if (!/^#\d+$/.test(tok)) throw new Error(`token slip shows "${tok}"`);
         return Math.round(performance.now() - t0); })();
       await axe('token slip');

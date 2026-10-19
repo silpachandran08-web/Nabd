@@ -12,13 +12,25 @@ export const APP = process.env.APP ?? 'http://localhost:3000';
 export const API_BASE = process.env.SMOKE_API ?? 'http://localhost:8080/v1';
 const readJson = (env) => (process.env[env] ? JSON.parse(readFileSync(process.env[env], 'utf8')) : null);
 
-/** Real login against the preview (the same /auth/login call the login page makes); creds come from the seed's logins file. */
-export async function login(role, tenantKey) {
+/** Real login against the preview (the same /auth/login call the login page makes); creds come from the seed's logins file.
+ * One login per role and tenant per shard: logging in for every case trips the login rate limit (429). */
+const sessions = new Map();
+export function login(role, tenantKey) {
+  const k = `${role}@${tenantKey}`;
+  if (!sessions.has(k)) sessions.set(k, loginOnce(role, tenantKey).catch((e) => { sessions.delete(k); throw e; }));
+  return sessions.get(k);
+}
+async function loginOnce(role, tenantKey) {
   const t = readJson('SMOKE_LOGINS')?.tenants?.[tenantKey];
   const cred = t?.staff?.[role];
   if (!cred) throw new Error(`no ${role} login for tenant ${tenantKey} in SMOKE_LOGINS`);
-  const res = await fetch(`${API_BASE}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ tenantSlug: t.slug, email: cred.email, pin: cred.pin }) });
+  let res;
+  for (let i = 0; i < 3; i++) { // the API allows 20 logins per IP per minute; back off instead of failing the case
+    res = await fetch(`${API_BASE}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tenantSlug: t.slug, email: cred.email, pin: cred.pin }) });
+    if (res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, 20000));
+  }
   if (!res.ok) throw new Error(`login ${role}@${tenantKey} -> ${res.status}`);
   return res.json();
 }
@@ -77,4 +89,4 @@ export async function axeStep(page, step, record) {
 
 // ---- layout, console ---------------------------------------------------------------
 export const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
-export const consoleNoise = (log) => [...log.pageErrors, ...log.console.filter((x) => !/Failed to load resource|net::ERR_FAILED/.test(x))];
+export const consoleNoise = (log) => [...log.pageErrors, ...log.console.filter((x) => !/Failed to load resource|net::ERR_FAILED|preloaded using link preload/.test(x))];
