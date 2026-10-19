@@ -22,7 +22,7 @@ def call(*args):
 class Repo:
     """Throwaway repo: N controls, the first `tested` mapped to passing tests T<i>, plus hazard log and sign-off."""
 
-    def __init__(self, n=67, tested=67, signed=True, extra_passing=("ClinicalReadScopeTest", "PhiReadAuditTest")):
+    def __init__(self, n=67, tested=67, signed=True, extra_passing=("ClinicalReadScopeApiTest", "PhiReadAuditTest")):
         self.root = pathlib.Path(tempfile.mkdtemp())
         self.junit = self.root / "surefire"
         (self.root / "backend/src/test/java/fx").mkdir(parents=True)
@@ -119,7 +119,7 @@ class Pack(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertEqual([c["status"] for c in p["criteria"]], ["PASS"] * 8)
         for link in ("https://example.invalid/k6", "https://example.invalid/run/1", "https://example.invalid/defects",
-                     sr.SIGNOFF, "ClinicalReadScopeTest", "PhiReadAuditTest"):
+                     sr.SIGNOFF, "ClinicalReadScopeApiTest", "PhiReadAuditTest"):
             self.assertIn(link, md)
         self.assertEqual(md.count("\n## "), 8)
 

@@ -48,8 +48,10 @@ def sql(data, pins, hasher=pin_hash):
             ids[t["key"]]["staff"][s["role"]] = str(sid)
             r = synth.ROLES[s["role"]]
             out.append(f"INSERT INTO roles (id, tenant_id, name, built_in, grants) VALUES ({q(rid)}, {q(tid)}, {q(r['name'])}, {str(bool(r.get('builtIn'))).lower()}, {q(json.dumps(grants(s['role'])))}::jsonb) ON CONFLICT DO NOTHING;")
-            out.append("INSERT INTO staff (id, tenant_id, role_id, email, name, mobile_phone, pin_hash, status, email_verified, mobile_verified, mfa_enabled) "
-                       f"VALUES ({q(sid)}, {q(tid)}, {q(rid)}, {q(s['email'])}, {q(s['name'])}, {q(s['phone'])}, {q(hasher(pins[(t['key'], s['role'])]))}, 'active', true, true, false) "
+            # CLN-005: only a registered clinician may sign (J5/J6); the doctor gets a clearly synthetic registration number
+            reg = f"SYN-{t['key']}-DOCTOR" if s["role"] == "doctor" else None
+            out.append("INSERT INTO staff (id, tenant_id, role_id, email, name, mobile_phone, pin_hash, status, email_verified, mobile_verified, mfa_enabled, is_clinician, professional_registration_no) "
+                       f"VALUES ({q(sid)}, {q(tid)}, {q(rid)}, {q(s['email'])}, {q(s['name'])}, {q(s['phone'])}, {q(hasher(pins[(t['key'], s['role'])]))}, 'active', true, true, false, {str(reg is not None).lower()}, {q(reg) if reg else 'NULL'}) "
                        f"ON CONFLICT (id) DO UPDATE SET pin_hash = EXCLUDED.pin_hash;")
     out.append("COMMIT;")
     return "\n".join(out), ids

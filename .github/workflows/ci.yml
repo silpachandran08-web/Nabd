@@ -201,6 +201,11 @@ jobs:
     if: github.event_name == 'pull_request' && vars.PREVIEW_ENABLED == 'true'
     uses: ./.github/workflows/preview.yml
     secrets: inherit
+    permissions:           # a called workflow can only narrow these; exactly what preview.yml requests
+      contents: read
+      packages: write      # GHCR preview images
+      id-token: write      # OIDC login to the preview cluster
+      pull-requests: write # URL + logins comment
   stage7-preview-e2e:
     needs: preview
     if: always() && github.event_name == 'pull_request'

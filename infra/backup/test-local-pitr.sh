@@ -25,7 +25,8 @@ for _ in $(seq 60); do q "$S" -c 'select 1' >/dev/null 2>&1 && break; sleep 1; d
 
 echo "== schema: roles + all migrations"
 q "$S" -v migrator_pw="$PW" -v app_pw="$PW" -v reports_pw="$PW" -f "$REPO/infra/db/bootstrap-roles.sql" >/dev/null
-for f in $(ls "$REPO"/db/migrations/V*__*.sql | sort -V); do q "$S" -f "$f" >/dev/null 2>"$WORK/err" || { cat "$WORK/err"; fail "migration $f"; }; done
+# -1: one transaction per migration, as Flyway runs them (V1380 takes LOCK TABLE, legal only inside a transaction)
+for f in $(ls "$REPO"/db/migrations/V*__*.sql | sort -V); do q "$S" -1 -f "$f" >/dev/null 2>"$WORK/err" || { cat "$WORK/err"; fail "migration $f"; }; done
 echo "applied $(ls "$REPO"/db/migrations/V*__*.sql | wc -l) migrations"
 
 T1=$(q "$S" -c "INSERT INTO tenants(slug,name,region) VALUES ('drill-a','Drill A','IN') RETURNING id")

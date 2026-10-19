@@ -6,7 +6,10 @@
 # DAST_ROLE_TOKENS = JSON {"owner": "...", "receptionist": "...", "doctor": "...", "nurse": "..."} minted for the seeded preview tenant.
 name: dast
 on:
-  deployment_status:
+  deployment_status:     # external preview providers; GITHUB_TOKEN-created deployments never trigger workflows
+  workflow_run:          # OPS-036 previews: ci.yml stage 7 (preview.yml) deploys to https://pr-<n>.<PREVIEW_DOMAIN>
+    workflows: [ci]
+    types: [completed]
   schedule:
     - cron: "17 1 * * *"
   workflow_dispatch:
@@ -20,7 +23,11 @@ env:
 
 jobs:
   target:
-    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'review'))
+    if: >-
+      (github.event_name != 'deployment_status' && github.event_name != 'workflow_run') ||
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'review')) ||
+      (github.event_name == 'workflow_run' && vars.PREVIEW_ENABLED == 'true' && github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.pull_requests[0].number)
     runs-on: ubuntu-latest
     timeout-minutes: 1
     outputs:
@@ -32,6 +39,8 @@ jobs:
           EVENT: ${{ github.event_name }}
           DEPLOY_URL: ${{ github.event.deployment_status.environment_url }}
           SHA: ${{ github.event.deployment.sha }}
+          RUN_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          PREVIEW_DOMAIN: ${{ vars.PREVIEW_DOMAIN }}
           IN_WEB: ${{ inputs.web_url }}
           IN_API: ${{ inputs.api_url }}
           API_TEMPLATE: ${{ vars.PREVIEW_API_URL_TEMPLATE }}
@@ -40,6 +49,7 @@ jobs:
         run: |
           case "$EVENT" in
             deployment_status) web="$DEPLOY_URL"; api="${API_TEMPLATE//\{sha\}/${SHA:0:7}}" ;;
+            workflow_run) web="https://pr-$RUN_PR.$PREVIEW_DOMAIN"; api="$web" ;;   # same host as infra/preview/deploy.sh
             workflow_dispatch) web="$IN_WEB"; api="$IN_API" ;;
             *) web="$STAGING_WEB"; api="$STAGING_API" ;;
           esac

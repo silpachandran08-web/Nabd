@@ -9,7 +9,7 @@
 | 4 | Check-in p95 < 300 ms | `k6.checkin_p95_ms` + report link (OPS-046) |
 | 5 | Security Controls >= 60% verified | `docs/security/controls.yaml` + JUnit results |
 | 6 | Hazard log v1 signed by the CSO | `docs/clinical-safety/signoff/hazard-log-v1.json` (CLN-007) |
-| 7 | Clinical reads of a withdrawn-consent patient return 404 | JUnit `ClinicalReadScopeTest` (IDC-001) |
+| 7 | Clinical reads of a withdrawn-consent patient return 404 | JUnit `ClinicalReadScopeApiTest` (IDC-001) |
 | 8 | Every clinical GET writes a read-log row | JUnit `PhiReadAuditTest` (PLT-039) |
 
 Evidence file (commit it as `docs/gates/evidence/phase0-<rc>.json` so the pack is reproducible from a commit SHA):
