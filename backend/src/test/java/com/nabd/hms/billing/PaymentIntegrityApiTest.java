@@ -79,7 +79,8 @@ class PaymentIntegrityApiTest extends ApiTestBase {
         HttpHeaders h = new HttpHeaders();
         h.setBearerAuth(c.token());
         h.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
-        if (key != null) h.set("Idempotency-Key", key);
+        // PLT-026: payments require a UUID Idempotency-Key; callers that do not care get a fresh one per call
+        h.set("Idempotency-Key", key != null ? key : java.util.UUID.randomUUID().toString());
         return exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
                 new HttpEntity<>("{\"method\":\"cash\",\"amount\":" + amount + "}", h), Map.class);
     }
@@ -207,12 +208,14 @@ class PaymentIntegrityApiTest extends ApiTestBase {
         Ctx c = ctx("06");
         String inv = invoice(c, 500, "P6", "+919999960006");
         String other = invoice(c, 500, "P6c", "+919999961006");
-        assertThat(pay(c, inv, 100, "key-1").getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        ResponseEntity<Map> replay = pay(c, inv, 100, "key-1");
+        String key = java.util.UUID.randomUUID().toString();
+        assertThat(pay(c, inv, 100, key).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        ResponseEntity<Map> replay = pay(c, inv, 100, key);
         assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(((Number) replay.getBody().get("paid")).doubleValue()).isEqualTo(100.0);
         assertThat(paymentRows(c.tenant().id(), inv)).isEqualTo(1);
-        assertThat(pay(c, other, 100, "key-1").getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        // PLT-026 filter: same key on a different request is 422 IDEMPOTENCY_KEY_REUSED (was FIN-001 service 409)
+        assertThat(pay(c, other, 100, key).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(paymentRows(c.tenant().id(), other)).isZero();
     }
 

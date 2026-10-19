@@ -69,7 +69,7 @@ class IdempotencyApiTest extends ApiTestBase {
     }
 
     @Test
-    void paymentRetryReturnsOriginal200BodyAndLeavesOnePaymentRow() {
+    void paymentRetryReturnsOriginal201BodyAndLeavesOnePaymentRow() {
         SeededTenant t = seedTenant();
         SeededStaff staff = seedStaff(t, seedFullAccessRole(t.id()), "i2@a.com", "+919800000002", false);
         String token = loginAndGetAccessToken(staff);
@@ -90,7 +90,7 @@ class IdempotencyApiTest extends ApiTestBase {
         ResponseEntity<Map> first = post(path, token, key, pay);
         ResponseEntity<Map> retry = post(path, token, key, pay);
 
-        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(retry.getStatusCode()).isEqualTo(first.getStatusCode());
         assertThat(retry.getHeaders().getFirst("Idempotent-Replayed")).isEqualTo("true");
         assertThat(retry.getBody()).isEqualTo(first.getBody());
