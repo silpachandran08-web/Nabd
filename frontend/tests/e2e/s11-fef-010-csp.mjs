@@ -1,7 +1,11 @@
 // FEF-010: nonce CSP in ENFORCE mode blocks injected script, reports it, refuses foreign framing; first-party pages run clean.
 // Run against `NABD_CSP_MODE=enforce next start` with its stdout in SERVER_LOG:
 //   NODE_PATH=/home/claude/ws/qa/node_modules APP=http://localhost:3506 SERVER_LOG=/path/next.log node tests/e2e/s11-fef-010-csp.mjs
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import https from 'node:https';
+import http from 'node:http';
 import { chromium } from '/home/claude/ws/qa/node_modules/playwright/index.mjs';
 import { launch, seedClinic, mockApi, check, results, sleep, dumpLog, APP } from './qa-lib.mjs';
 
@@ -50,10 +54,22 @@ for (const [tag, url, seed, viewport] of [['clinic /patients', '/patients', true
 }
 
 // 3. Stored XSS: payload in a patient name. React renders it as text; an injected inline handler is blocked by CSP and reported.
+// Chromium registers Reporting-Endpoints only on HTTPS responses, so this case goes through a throwaway TLS front
+// (self-signed cert generated now, never stored) on HTTPS_PORT. --short-reporting-delay flushes the report batch promptly (as WPT does).
+const HTTPS_PORT = Number(process.env.HTTPS_PORT ?? 4506);
+const certDir = mkdtempSync(tmpdir() + '/fef010-');
+execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=localhost', '-days', '1', '-keyout', certDir + '/k.pem', '-out', certDir + '/c.pem'], { stdio: 'ignore' });
+const target = new URL(APP);
+const front = https.createServer({ key: readFileSync(certDir + '/k.pem'), cert: readFileSync(certDir + '/c.pem') }, (req, res) => {
+  const up = http.request({ host: target.hostname, port: target.port, path: req.url, method: req.method, headers: req.headers }, (r) => { res.writeHead(r.statusCode, r.headers); r.pipe(res); });
+  up.on('error', () => { res.writeHead(502); res.end(); });
+  req.pipe(up);
+});
+await new Promise((r) => front.listen(HTTPS_PORT, r));
+const SECURE_APP = `https://localhost:${HTTPS_PORT}`;
 {
-  // --short-reporting-delay: Chromium batches Reporting API deliveries (~1 min); WPT uses this flag to flush them promptly.
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--short-reporting-delay'] });
-  const page = await (await browser.newContext()).newPage();
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--short-reporting-delay', '--ignore-certificate-errors'] });
+  const page = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
   const s = { browser, page, log: { requests: [], console: [], pageErrors: [], unmatched: [] } };
   let dialogs = 0;
   try {
@@ -61,7 +77,7 @@ for (const [tag, url, seed, viewport] of [['clinic /patients', '/patients', true
     await watch(s.page);
     await seedClinic(s.page, ['patients:view']);
     await mockApi(s.page, s.log, api(XSS));
-    await s.page.goto(APP + '/patients?q=secret-query'); await sleep(1500);
+    await s.page.goto(SECURE_APP + '/patients?q=secret-query'); await sleep(1500);
     check('stored payload shown as text, not markup', await s.page.getByText('<script>alert(1)</script>', { exact: false }).count() > 0);
     // Simulate a sink that bypasses React escaping (the attack CSP exists for).
     await s.page.evaluate((p) => { const d = document.createElement('div'); d.innerHTML = p; document.body.appendChild(d); }, XSS);
@@ -74,7 +90,7 @@ for (const [tag, url, seed, viewport] of [['clinic /patients', '/patients', true
     for (let i = 0; i < 90 && !line; i++) { line = serverLog().split('\n').find((l) => l.includes('"csp.violation"') && l.includes('/patients')); if (!line) await sleep(1000); }
     check('report received by /api/csp-report', !!line, line ?? 'no report within 90 s');
     check('report has no query string or payload', !!line && !line.includes('secret-query') && !line.includes('alert') && !line.includes('__xss'), line ?? '');
-  } finally { dumpLog('xss', s.log); await s.browser.close(); }
+  } finally { dumpLog('xss', s.log); await s.browser.close(); front.close(); }
 }
 
 // 3b. Control: same injection with CSP bypassed DOES run, so the check above can tell blocked from inert.
