@@ -1,0 +1,47 @@
+name: security-headers
+# FEF-010 / CI stage 7: header assertions + OWASP ZAP baseline against a production build of staff-web.
+on:
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/security-headers.yml"]
+  push:
+    branches: [develop-initial, main]
+
+permissions:
+  contents: read
+
+jobs:
+  headers:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx next build
+      - name: Start preview (enforce mode)
+        run: |
+          NABD_CSP_MODE=enforce npx next start -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS -o /dev/null http://localhost:3000/login && break; sleep 1; done
+      - name: Header assertions per route group
+        run: node scripts/check-security-headers.mjs http://localhost:3000 --enforce
+      - name: ZAP baseline (fails on any High finding)
+        working-directory: .
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm --network host -v "$PWD/zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:3000/login -J zap.json -I || true
+          test -s zap/zap.json
+          high=$(jq '[.site[].alerts[] | select(.riskcode == "3")] | length' zap/zap.json)
+          echo "ZAP high findings: $high"
+          test "$high" -eq 0
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: zap-report, path: zap/ }
