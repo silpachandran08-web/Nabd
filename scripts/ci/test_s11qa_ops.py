@@ -658,7 +658,7 @@ class Ops048(unittest.TestCase):
 
     def test_ac3_pack_shows_every_criterion_with_status_and_evidence_links(self):
         sb = GateSandbox()
-        sb.junit({"ClinicalReadScopeTest": True, "PhiReadAuditTest": True}, "c")
+        sb.junit({"ClinicalReadScopeApiTest": True, "PhiReadAuditTest": True}, "c")
         r, p, md = self.pack(sb, junits=("base", "c"))
         st = {c["id"]: c["status"] for c in p["criteria"]}
         self.assertEqual(sorted(st), list(range(1, 9)))
@@ -682,7 +682,6 @@ class Ops048(unittest.TestCase):
         r, p, md = self.pack(GateSandbox(), evidence={})
         self.assertEqual(r.returncode, 1); self.assertEqual(p["result"], "FAIL"); self.assertIn("stays blocked", md)
 
-    @unittest.expectedFailure  # QA-5 defect D3 (OPS-048 x IDC-001): criterion 7 looks for a test class that does not exist
     def test_ac3_consent_404_criterion_reads_the_merged_idc001_test(self):
         """IDC-001 merged as ClinicalReadScopeApiTest; the pack only accepts results of ClinicalReadScopeTest, so criterion 7
         stays red even when every consent-404 test passes."""

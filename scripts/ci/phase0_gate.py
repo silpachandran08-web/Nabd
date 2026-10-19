@@ -19,7 +19,7 @@ CONTROLS = "docs/security/controls.yaml"
 RECORD = "docs/gates/phase0.md"
 THRESHOLD = 60.0
 EXPECTED_CONTROLS = 67
-CONSENT_404_TESTS = ["ClinicalReadScopeTest"]  # IDC-001 spec
+CONSENT_404_TESTS = ["ClinicalReadScopeApiTest"]  # IDC-001 as merged (backend/src/test/.../clinical/ClinicalReadScopeApiTest.java)
 READ_LOG_TESTS = ["PhiReadAuditTest"]  # PLT-039 spec
 P95_LIMIT_MS = 300
 
