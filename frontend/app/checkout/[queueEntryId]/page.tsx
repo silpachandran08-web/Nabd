@@ -12,6 +12,7 @@ import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
 import { apiFetch, goLogin } from "../../lib/apiClient";
+import { moveBody, moveErrorMessage } from "../../lib/queueMove";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
@@ -313,12 +314,11 @@ export default function CheckoutPage() {
       }
       const res = await authedFetch(`/queue/${queueEntryId}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status: next }),
+        body: moveBody(next, context.queueStatus),
       });
       if (!res) return;
       if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't continue the visit." }));
-        setContinueError(p.detail || "Couldn't continue the visit.");
+        setContinueError(await moveErrorMessage(res, "Couldn't continue the visit."));
         return;
       }
       router.push("/arrivals");
