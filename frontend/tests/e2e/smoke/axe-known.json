@@ -1,0 +1,17 @@
+{
+  "_policy": "FEF-049: pre-existing critical/serious axe findings that do not block stage 7 until `expires` (max 30 days from `added`). Each needs an owner and a fix; an expired entry blocks again. Never add a finding your own change introduced.",
+  "entries": [
+    { "rule": "color-contrast", "selector": "pill_sync", "owner": "@nabd/engineering", "added": "2026-10-19", "expires": "2026-11-18",
+      "reason": "Sync status pill on the consult today list: #a78bfa on #293a4f is 4.25:1 (needs 4.5:1). Token --nb-sync-500/--nb-sync-tint, found by the first smoke run." },
+    { "rule": "color-contrast", "selector": "pill_danger", "owner": "@nabd/engineering", "added": "2026-10-19", "expires": "2026-11-18",
+      "reason": "Danger pill (Allergy flag): #f0455c on #313038 is 3.54:1. Token --nb-danger-500 on --nb-danger-tint." },
+    { "rule": "color-contrast", "selector": "safetyLabel", "owner": "@nabd/clinical-owners", "added": "2026-10-19", "expires": "2026-11-18",
+      "reason": "Allergy label in the consult safety strip: #f0455c on #2e1c23 is 4.37:1." },
+    { "rule": "color-contrast", "selector": "safetyValue", "owner": "@nabd/clinical-owners", "added": "2026-10-19", "expires": "2026-11-18",
+      "reason": "Allergy names in the consult safety strip: #f0455c on #2e1c23 is 4.37:1." },
+    { "rule": "color-contrast", "selector": "noticeDanger", "owner": "@nabd/clinical-owners", "added": "2026-10-19", "expires": "2026-11-18",
+      "reason": "Danger notice text (Rx safety warnings count): #f0455c on #2e1c23 is 4.37:1." },
+    { "rule": "aria-required-children", "selector": "-list", "owner": "@nabd/clinical-owners", "added": "2026-10-19", "expires": "2026-11-18",
+      "reason": "DrugCombobox renders an empty role=listbox (no option children) while there are no suggestions." }
+  ]
+}

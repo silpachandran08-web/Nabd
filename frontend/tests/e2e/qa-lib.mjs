@@ -1,5 +1,6 @@
 // Shared E2E helpers: browser launch, session seeding, API mocking with request log. Set APP (base URL) and SHOTS (screenshot dir) via env.
-import { chromium } from '/home/claude/ws/qa/node_modules/playwright/index.mjs';
+// FEF-049: CI overrides the Playwright module and browser (PLAYWRIGHT_MODULE, PW_CHROMIUM=''); defaults are the sandbox paths.
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? '/home/claude/ws/qa/node_modules/playwright/index.mjs');
 export const APP = process.env.APP ?? 'http://localhost:3000';
 export const API = 'http://localhost:8080/v1';
 export const SHOTS = process.env.SHOTS ?? '/tmp/e2e-shots';
@@ -14,7 +15,7 @@ export function clinicToken(permissions, extra = {}) {
 }
 
 export async function launch(opts = {}) {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const browser = await chromium.launch({ executablePath: (process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium') || undefined });
   const context = await browser.newContext({ viewport: opts.viewport ?? { width: 1280, height: 900 }, timezoneId: opts.timezoneId ?? 'Asia/Riyadh' });
   const page = await context.newPage();
   const log = { requests: [], console: [], pageErrors: [], unmatched: [] };
