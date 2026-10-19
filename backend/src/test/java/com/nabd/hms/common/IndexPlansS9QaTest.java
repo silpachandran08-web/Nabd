@@ -87,7 +87,7 @@ class IndexPlansS9QaTest extends ApiTestBase {
         return tail.get((int) Math.ceil(tail.size() * 0.95) - 1);
     }
 
-    private static final String LAST_VISIT = "SELECT max(updated_at) FROM queue_entries WHERE tenant_id = '" + T + "' AND patient_id = '" + P + "' AND status = 'completed'";
+    private static final String LAST_VISIT = "SELECT max(queue_date) FROM queue_entries WHERE tenant_id = '" + T + "' AND patient_id = '" + P + "' AND status = 'completed'";
     private static final String AUDIT_HEAD = "SELECT row_hash FROM audit_log WHERE tenant_id = '%s' ORDER BY id DESC LIMIT 1 FOR UPDATE";
     private static final String WEIGHT = "SELECT weight_kg, weight_recorded_at FROM vitals WHERE tenant_id = '" + T + "' AND patient_id = '" + P +
             "' AND weight_kg IS NOT NULL ORDER BY weight_recorded_at DESC NULLS LAST, recorded_at DESC LIMIT 1";
