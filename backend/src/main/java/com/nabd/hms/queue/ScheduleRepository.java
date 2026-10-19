@@ -155,7 +155,7 @@ class ScheduleRepository {
     List<Instant> bookedStartTimes(UUID doctorId, Instant dayStart, Instant dayEnd) {
         return jdbc.query(
                 "SELECT start_time FROM appointments " +
-                        "WHERE doctor_id = ? AND status = 'scheduled' AND start_time >= ? AND start_time < ?",
+                        "WHERE doctor_id = ? AND status IN ('scheduled','arrived') AND start_time >= ? AND start_time < ?",
                 (rs, i) -> rs.getTimestamp("start_time").toInstant(), doctorId,
                 Timestamp.from(dayStart), Timestamp.from(dayEnd));
     }
@@ -173,7 +173,7 @@ class ScheduleRepository {
         Integer count = jdbc.queryForObject(
                 "SELECT " +
                         // QA-04: a seen booking (completed) still used its place, as a completed walk-in does
-                        "(SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.status IN ('scheduled','completed') " +
+                        "(SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.status IN ('scheduled','arrived','completed') " +
                         "  AND a.start_time >= ? AND a.start_time < ?) " +
                         "+ " +
                         "(SELECT count(*) FROM queue_entries q WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " +

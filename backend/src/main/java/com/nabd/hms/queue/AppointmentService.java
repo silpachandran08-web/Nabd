@@ -143,9 +143,16 @@ public class AppointmentService {
     }
 
     private AppointmentRow requireScheduled(UUID tenantId, UUID id) {
-        return repo.findById(tenantId, id)
-                .filter(a -> "scheduled".equals(a.status()))
-                .orElseThrow(this::notFound);
+        AppointmentRow a = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        if ("arrived".equals(a.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "appointment-arrived", "Appointment already arrived",
+                    "The patient has checked in; the appointment can no longer be cancelled or rescheduled.",
+                    java.util.Map.of("code", "APPOINTMENT_ARRIVED"));
+        }
+        if (!"scheduled".equals(a.status())) {
+            throw notFound();
+        }
+        return a;
     }
 
     private int resolveSlotMinutes(UUID tenantId, UUID doctorId, Instant start) {
@@ -183,7 +190,7 @@ public class AppointmentService {
             return;
         }
 
-        queueRepo.lockDoctorDay(doctorId, date);
+        queueRepo.lockDoctorDay(tenantId, doctorId, date);
         int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.get().maxPatients());
