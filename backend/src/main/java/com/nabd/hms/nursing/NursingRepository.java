@@ -140,10 +140,11 @@ class NursingRepository {
                 (rs, i) -> mapVaccine(rs), tenantId, id).stream().findFirst();
     }
 
-    List<VaccineRecordRow> listVaccineRecords(UUID tenantId, Instant from, Instant to) {
+    List<VaccineRecordRow> listVaccineRecords(com.nabd.hms.clinical.ReadScope scope, Instant from, Instant to) {
         return jdbc.query("SELECT " + VACCINE_COLS + " FROM vaccine_records WHERE tenant_id = ? " +
-                        "AND administered_at >= ? AND administered_at < ? ORDER BY administered_at DESC",
-                (rs, i) -> mapVaccine(rs), tenantId, java.sql.Timestamp.from(from), java.sql.Timestamp.from(to));
+                        "AND administered_at >= ? AND administered_at < ? " +
+                        scope.gate("vaccine_records.patient_id", "vaccine_records.tenant_id") + "ORDER BY administered_at DESC",
+                (rs, i) -> mapVaccine(rs), scope.tenantId(), java.sql.Timestamp.from(from), java.sql.Timestamp.from(to));
     }
 
     Optional<NursingModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {

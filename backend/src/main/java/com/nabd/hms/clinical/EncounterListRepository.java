@@ -28,7 +28,7 @@ class EncounterListRepository {
      * amendments, the prescription's status and line count, and clinical documents by status.
      * Filters on queue_date (the clinic's calendar day). Selects no clinical free text.
      */
-    List<EncounterListItem> find(UUID tenantId, UUID doctorId, String state, LocalDate from, LocalDate to,
+    List<EncounterListItem> find(ReadScope scope, String state, LocalDate from, LocalDate to,
                                  int limit, Instant afterOccurredAt, UUID afterId) {
         StringBuilder sql = new StringBuilder("""
                 SELECT q.id, q.patient_id, p.name AS patient_name, p.mrn AS patient_mrn, q.queue_date,
@@ -44,8 +44,8 @@ class EncounterListRepository {
                 LEFT JOIN clinical_notes n ON n.queue_entry_id = q.id AND n.tenant_id = q.tenant_id
                 LEFT JOIN prescriptions rx ON rx.queue_entry_id = q.id AND rx.tenant_id = q.tenant_id
                 WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.status IN ('in_consult', 'checkout_pending', 'completed')
-                """);
-        List<Object> params = new ArrayList<>(List.of(tenantId, doctorId));
+                """).append(scope.gate("q.patient_id", "q.tenant_id"));
+        List<Object> params = new ArrayList<>(List.of(scope.tenantId(), scope.staffId()));
         if (from != null) {
             sql.append("AND q.queue_date >= ? ");
             params.add(Date.valueOf(from));

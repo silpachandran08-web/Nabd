@@ -40,8 +40,12 @@ class PatientRepository {
     // ::uuid casts are required, not decoration: a bare "? IS NULL" gives Postgres zero type
     // context to prepare the statement with, and it fails at parse time with "could not determine
     // data type of parameter" — found by actually running this query, not by inspection.
+    // IDC-001: queue_entries.doctor_id counts too (same rule as clinical ReadScope.gate), so a walk-in without an
+    // appointment is not hidden from the doctor who saw her. VALUES(...) keeps the two binds every caller passes.
     private static final String SCOPE_GATE =
-            "AND (?::uuid IS NULL OR EXISTS (SELECT 1 FROM appointments a WHERE a.patient_id = patients.id AND a.doctor_id = ?::uuid)) ";
+            "AND (?::uuid IS NULL OR EXISTS (SELECT 1 FROM (VALUES (?::uuid)) sd(id) WHERE " +
+                    "EXISTS (SELECT 1 FROM appointments a WHERE a.tenant_id = patients.tenant_id AND a.doctor_id = sd.id AND a.patient_id = patients.id) " +
+                    "OR EXISTS (SELECT 1 FROM queue_entries sq WHERE sq.tenant_id = patients.tenant_id AND sq.doctor_id = sd.id AND sq.patient_id = patients.id))) ";
 
     private final JdbcTemplate jdbc;
 

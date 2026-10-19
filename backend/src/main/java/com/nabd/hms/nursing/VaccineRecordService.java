@@ -1,5 +1,6 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.clinical.ReadScope;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.ClinicClock;
@@ -58,11 +59,12 @@ public class VaccineRecordService {
     }
 
     @Transactional
-    public List<VaccineRecordResponse> listToday(UUID tenantId) {
+    public List<VaccineRecordResponse> listToday(ReadScope scope) {
+        UUID tenantId = scope.tenantId();
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
         LocalDate today = clock.today(tenantId);
-        return repo.listVaccineRecords(tenantId, ClinicClock.startOf(today, zone), ClinicClock.startOf(today.plusDays(1), zone))
+        return repo.listVaccineRecords(scope, ClinicClock.startOf(today, zone), ClinicClock.startOf(today.plusDays(1), zone))
                 .stream().map(r -> toResponse(tenantId, r)).toList();
     }
 

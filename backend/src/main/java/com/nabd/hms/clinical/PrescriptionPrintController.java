@@ -16,14 +16,18 @@ import java.util.UUID;
 public class PrescriptionPrintController {
 
     private final PrescriptionPrintService service;
+    private final ClinicalReadScope scopes;
 
-    PrescriptionPrintController(PrescriptionPrintService service) {
+    PrescriptionPrintController(PrescriptionPrintService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
     @GetMapping("/prescriptions/{queueEntryId}/print-header")
     @PreAuthorize("hasAuthority('clinical:view')")
     public PrescriptionPrintHeaderResponse header(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.header(UUID.fromString(jwt.getClaimAsString("tenantId")), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return service.header(scope.tenantId(), queueEntryId);
     }
 }

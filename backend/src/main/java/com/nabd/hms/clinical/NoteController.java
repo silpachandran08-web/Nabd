@@ -26,15 +26,19 @@ import java.util.UUID;
 public class NoteController {
 
     private final NoteService service;
+    private final ClinicalReadScope scopes;
 
-    NoteController(NoteService service) {
+    NoteController(NoteService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
     @GetMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public NoteResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.get(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return FieldGrantMasker.note(scope, service.get(scope.tenantId(), queueEntryId));
     }
 
     @PatchMapping("/{queueEntryId}")
@@ -61,7 +65,9 @@ public class NoteController {
     @GetMapping("/{queueEntryId}/amendments")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<NoteAmendmentResponse> listAmendments(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.listAmendments(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return FieldGrantMasker.amendments(scope, service.listAmendments(scope.tenantId(), queueEntryId));
     }
 
     private UUID tenantId(Jwt jwt) {

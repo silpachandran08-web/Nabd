@@ -33,6 +33,7 @@ public class NoteTemplateController {
     }
 
     @GetMapping
+    @com.nabd.hms.clinical.ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<TemplateResponse> list(@AuthenticationPrincipal Jwt jwt) {
         return service.list(tenantId(jwt), staffId(jwt));

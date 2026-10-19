@@ -10,7 +10,7 @@ import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
-import { useClinicalContext } from "../components/consult/clinical";
+import { isPatientNotFound, useClinicalContext } from "../components/consult/clinical";
 import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
 import ConsultTimer from "../components/consult/ConsultTimer";
@@ -150,6 +150,8 @@ export default function ConsultPage() {
   const [completing, setCompleting] = useState(false);
   const [closeAck, setCloseAck] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  // IDC-001: the server answered patient-not-found for this visit (consent withdrawn / out of scope).
+  const [unavailable, setUnavailable] = useState(false);
   // undefined = not known (still checking, or the lookup failed): never shown as "Not set" (T1-BUG-2).
   const [followUpLabel, setFollowUpLabel] = useState<string | null | undefined>(undefined);
   const [preview, setPreview] = useState<Row | null>(null);
@@ -217,7 +219,7 @@ export default function ConsultPage() {
     [router]
   );
 
-  const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, activeEntry?.patientId ?? null, activeEntry?.id ?? null);
+  const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, unavailable ? null : activeEntry?.patientId ?? null, activeEntry?.id ?? null);
 
   const load = useCallback(async (which: "mine" | "all" = "mine") => {
     setLoading(true);
@@ -481,6 +483,7 @@ export default function ConsultPage() {
     setConflict(null);
     setNotice(null);
     setShellError(null);
+    setUnavailable(false);
     setCloseAck(false);
     setFollowUpLabel(undefined);
     setShowDental(false);
@@ -516,6 +519,12 @@ export default function ConsultPage() {
           if (stale()) return;
           if (aRes?.ok) setAmendments(await aRes.json());
         }
+      } else if (nRes && await isPatientNotFound(nRes)) {
+        if (stale()) return;
+        // No patient details, no further reads, no retry: the answer will not change on its own.
+        setActivePatient(null);
+        setUnavailable(true);
+        return;
       } else if (nRes && nRes.status !== 404) {
         noteLoadRef.current = "error";
         setNoteLoad("error");
@@ -865,6 +874,22 @@ export default function ConsultPage() {
       )}
     </>
   );
+
+  if (activeEntry && unavailable) {
+    return (
+      <main className={`${styles.page} ${styles.pageWide}`}>
+        <div className={styles.strip}>
+          <div className={styles.stripIdentity}>
+            <button className={styles.backBtn} onClick={closeShell}>Queue</button>
+          </div>
+        </div>
+        <div className={`${p.notice} ${p.noticeInfo}`} role="alert">
+          <Icon name="info" size={16} />
+          <span>Record not available.</span>
+        </div>
+      </main>
+    );
+  }
 
   if (activeEntry) {
     const pat = activePatient;

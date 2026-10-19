@@ -23,22 +23,28 @@ import java.util.UUID;
 public class VitalsController {
 
     private final VitalsService service;
+    private final ClinicalReadScope scopes;
 
-    VitalsController(VitalsService service) {
+    VitalsController(VitalsService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
     @GetMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public VitalsResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.get(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return service.get(scope.tenantId(), queueEntryId);
     }
 
     @GetMapping("/patient/{patientId}/previous")
     @PreAuthorize("hasAuthority('clinical:view')")
     public VitalsHistoryResponse previous(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
                                            @RequestParam(defaultValue = "5") int limit) {
-        return service.previous(tenantId(jwt), patientId, Math.max(1, Math.min(limit, 20)));
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.previous(scope.tenantId(), patientId, Math.max(1, Math.min(limit, 20)));
     }
 
     @PatchMapping("/{queueEntryId}")
