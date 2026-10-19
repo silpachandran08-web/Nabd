@@ -6,8 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -21,6 +19,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * one tenant's staff can never see the other's data, even though both hold validly-signed JWTs.
  */
 class CrossTenantIsolationApiTest extends ApiTestBase {
+
+    @org.springframework.beans.factory.annotation.Autowired
+    com.nabd.hms.common.ClinicClock clinicClock;
 
     @Test
     void patientRegisteredInOneTenantIsInvisibleToAnother() {
@@ -93,14 +94,16 @@ class CrossTenantIsolationApiTest extends ApiTestBase {
         String tokenA = loginAndGetAccessToken(staffA);
         String tokenB = loginAndGetAccessToken(staffB);
 
-        LocalDate today = LocalDate.now(ZoneOffset.UTC);
-        int pgDay = today.getDayOfWeek().getValue() % 7;
+        // tomorrow 10:00 on the clinic's wall clock: on the 15-minute grid, inside the hours below, never in the past near midnight
+        java.time.ZoneId zone = clinicClock.zone(tenantA.id());
+        LocalDate tomorrow = clinicClock.today(zone).plusDays(1);
+        int pgDay = tomorrow.getDayOfWeek().getValue() % 7;
         exchange("/v1/doctors/" + staffA.id() + "/working-hours", HttpMethod.POST, authedJsonBody(tokenA, Map.of(
                 "dayOfWeek", pgDay, "startTime", "00:00:00", "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
         ResponseEntity<Map> patientResp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(tokenA, Map.of(
                 "name", "A Patient", "phone", "+919888900003", "dob", "1990-01-01", "gender", "male")), Map.class);
         String patientId = (String) patientResp.getBody().get("id");
-        java.time.Instant slot = java.time.Instant.now().plus(3, ChronoUnit.HOURS).truncatedTo(ChronoUnit.HOURS);
+        java.time.Instant slot = tomorrow.atTime(10, 0).atZone(zone).toInstant();
 
         ResponseEntity<Map> booked = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(tokenA, Map.of(
                 "doctorId", staffA.id().toString(), "patientId", patientId, "startTime", slot.toString())), Map.class);
