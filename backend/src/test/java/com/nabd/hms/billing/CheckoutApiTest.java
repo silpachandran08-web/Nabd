@@ -51,7 +51,7 @@ class CheckoutApiTest extends ApiTestBase {
 
         // 2 x 500.00 @ 18% tax = 1000 subtotal, 180 tax, no discount -> total 1180 (whole rupee already)
         ResponseEntity<Map> resp = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "CONSULT", "chargeName", "Consultation",
                         "category", "Consultation", "quantity", 2, "unitPrice", 500.00, "taxRatePercent", 18.00)),
                 "discount", 0)), Map.class);
 
@@ -80,7 +80,7 @@ class CheckoutApiTest extends ApiTestBase {
 
         // 333.33 subtotal, 0% tax, no discount -> raw total 333.33, rounds to 333, round-off -0.33
         ResponseEntity<Map> resp = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 333.33, "taxRatePercent", 0)),
                 "discount", 0)), Map.class);
 
@@ -98,7 +98,7 @@ class CheckoutApiTest extends ApiTestBase {
         String queueEntryId = checkIn(token, patientId, staff.id()); // still "checked_in", not checkout_pending
 
         ResponseEntity<Map> resp = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -112,7 +112,7 @@ class CheckoutApiTest extends ApiTestBase {
         SeededStaff staff = seedStaff(tenant, roleId, "recep4@a.com", "+919700000004", false);
         String token = loginAndGetAccessToken(staff);
         String queueEntryId = checkoutPendingEntry(token, staff.id(), "C4", "+919999930004");
-        Map<String, Object> body = Map.of("lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X",
+        Map<String, Object> body = Map.of("lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X",
                 "category", "Service", "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)));
 
         exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, body), Map.class);
@@ -158,7 +158,7 @@ class CheckoutApiTest extends ApiTestBase {
         moveTo(token, queueEntryId, "waiting", "billing_pending");
 
         ResponseEntity<Map> first = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "CONSULT", "chargeName", "Consultation",
                         "category", "Consultation", "quantity", 1, "unitPrice", 200.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -169,7 +169,7 @@ class CheckoutApiTest extends ApiTestBase {
         moveTo(token, queueEntryId, "checkout_pending");
 
         ResponseEntity<Map> second = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "MED", "chargeName", "Medicine",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "MED", "chargeName", "Medicine",
                         "category", "Pharmacy", "quantity", 1, "unitPrice", 50.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -197,7 +197,7 @@ class CheckoutApiTest extends ApiTestBase {
         moveTo(token, queueEntryId, "waiting", "billing_pending");
 
         exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "CONSULT", "chargeName", "Consultation",
                         "category", "Consultation", "quantity", 1, "unitPrice", 200.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         moveTo(token, queueEntryId, "checkout_pending");
@@ -226,7 +226,7 @@ class CheckoutApiTest extends ApiTestBase {
                 UUID.fromString(queueEntryId)));
 
         ResponseEntity<Map> resp = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -242,7 +242,7 @@ class CheckoutApiTest extends ApiTestBase {
         String queueEntryId = checkoutPendingEntry(token, staff.id(), "C5", "+919999930005");
 
         ResponseEntity<Map> resp = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)),
                 "discount", 500)), Map.class);
 
@@ -258,7 +258,7 @@ class CheckoutApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         String queueEntryId = checkoutPendingEntry(token, staff.id(), "C6", "+919999930006");
         ResponseEntity<Map> invoice = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 1000, "taxRatePercent", 0)))), Map.class);
         String invoiceId = (String) invoice.getBody().get("id");
 
@@ -287,7 +287,7 @@ class CheckoutApiTest extends ApiTestBase {
         String firstEntry = checkIn(token, patientId, staff.id());
         moveTo(token, firstEntry, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         exchange("/v1/billing/checkout/" + firstEntry, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         String secondEntry = checkIn(token, patientId, staff.id());
@@ -311,7 +311,7 @@ class CheckoutApiTest extends ApiTestBase {
 
         // NB-186: a counter sale — no patient record, no queue token, just an invoice.
         ResponseEntity<Map> resp = exchange("/v1/billing/otc-checkout", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100.00, "taxRatePercent", 0)),
                 "discount", 0)), Map.class);
 

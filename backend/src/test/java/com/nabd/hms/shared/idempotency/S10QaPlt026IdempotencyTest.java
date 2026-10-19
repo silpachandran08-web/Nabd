@@ -238,7 +238,7 @@ class S10QaPlt026IdempotencyTest extends ApiTestBase {
         Map<String, Object> checkIn = Map.of("patientId", someId, "doctorId", c.staff().id().toString());
         Map<String, Object> patient = Map.of("name", "X Y", "phone", phone(), "dob", "1990-01-01", "gender", "male");
         Map<String, Object> payment = Map.of("method", "cash", "amount", 1);
-        Map<String, Object> bill = Map.of("lineItems", List.of(Map.of("chargeCode", "C", "quantity", 1)));
+        Map<String, Object> bill = Map.of("lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "C", "quantity", 1)));
         Map<String, Map.Entry<String, Object>> targets = new java.util.LinkedHashMap<>();
         targets.put("check-in", Map.entry("/v1/queue/check-in", checkIn));
         targets.put("register", Map.entry("/v1/patients", patient));

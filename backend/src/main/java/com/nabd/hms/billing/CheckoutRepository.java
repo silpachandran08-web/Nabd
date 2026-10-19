@@ -275,9 +275,9 @@ class CheckoutRepository {
 
     List<PaymentRow> findPayments(UUID tenantId, UUID invoiceId) {
         return jdbc.query(
-                "SELECT id, method, amount, recorded_at FROM invoice_payments WHERE tenant_id = ? AND invoice_id = ? ORDER BY recorded_at",
+                "SELECT id, method, amount, recorded_at, idempotency_key FROM invoice_payments WHERE tenant_id = ? AND invoice_id = ? ORDER BY recorded_at",
                 (rs, i) -> new PaymentRow(UUID.fromString(rs.getString("id")), rs.getString("method"),
-                        rs.getBigDecimal("amount"), rs.getTimestamp("recorded_at").toInstant()),
+                        rs.getBigDecimal("amount"), rs.getTimestamp("recorded_at").toInstant(), rs.getString("idempotency_key")),
                 tenantId, invoiceId);
     }
 

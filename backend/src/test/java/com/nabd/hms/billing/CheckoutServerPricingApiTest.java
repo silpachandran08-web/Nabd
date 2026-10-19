@@ -36,7 +36,9 @@ class CheckoutServerPricingApiTest extends ApiTestBase {
     }
 
     private Map<String, Object> line(String code, String name, double price, double tax) {
-        return Map.of("chargeCode", code, "chargeName", name, "category", "Client", "quantity", 2, "unitPrice", price, "taxRatePercent", tax);
+        Map<String, Object> l = new java.util.HashMap<>(Map.of("chargeCode", code, "chargeName", name, "category", "Client", "quantity", 2, "unitPrice", price, "taxRatePercent", tax));
+        if (code.equals("ADHOC") || code.equals("FREE")) l.put("override", Map.of("reasonCode", "other")); // FIN-003: free text needs a reason
+        return l;
     }
 
     @Test

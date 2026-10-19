@@ -44,7 +44,7 @@ class ReportsApiTest extends ApiTestBase {
 
     private String checkoutAndPay(String token, String queueEntryId, double amount) {
         ResponseEntity<Map> invoice = exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", amount, "taxRatePercent", 0)))), Map.class);
         String invoiceId = (String) invoice.getBody().get("id");
         exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
@@ -107,7 +107,7 @@ class ReportsApiTest extends ApiTestBase {
         String e1 = checkIn(token, registerPatient(token, "Mt One", "+919999968101"), owner.id(), null);
         moveTo(token, e1, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         ResponseEntity<Map> inv = exchange("/v1/billing/checkout/" + e1, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 500, "taxRatePercent", 0)))), Map.class);
         String invoiceId = (String) inv.getBody().get("id");
         pay(token, invoiceId, "cash", 200);
@@ -143,7 +143,7 @@ class ReportsApiTest extends ApiTestBase {
         String a = checkIn(token, registerPatient(token, "Ov A", "+919999969001"), owner.id(), null);
         moveTo(token, a, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         ResponseEntity<Map> inv = exchange("/v1/billing/checkout/" + a, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 500, "taxRatePercent", 0)))), Map.class);
         exchange("/v1/billing/invoices/" + inv.getBody().get("id") + "/payments", HttpMethod.POST,
                 authedJsonBody(token, Map.of("method", "upi", "amount", 200)), Map.class);
@@ -253,7 +253,7 @@ class ReportsApiTest extends ApiTestBase {
         String e = checkIn(token, registerPatient(token, "S2a", "+919999970133"), owner.id(), null);
         moveTo(token, e, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         ResponseEntity<Map> invoice = exchange("/v1/billing/checkout/" + e, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "discount", 10, "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "discount", 10, "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 200, "taxRatePercent", 0)))), Map.class);
         exchange("/v1/billing/invoices/" + invoice.getBody().get("id") + "/payments", HttpMethod.POST,
                 authedJsonBody(token, Map.of("method", "cash", "amount", 190)), Map.class);
@@ -399,7 +399,7 @@ class ReportsApiTest extends ApiTestBase {
         moveTo(token, leakedEntry, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         // checkout without adding LEAK-1's charge to the invoice — this is the leak
         exchange("/v1/billing/checkout/" + leakedEntry, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         String billedPatient = registerPatient(token, "R7b", "+919999970112");
@@ -407,7 +407,7 @@ class ReportsApiTest extends ApiTestBase {
         orderAndCompleteProcedure(token, billedEntry, "OK-1");
         moveTo(token, billedEntry, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         exchange("/v1/billing/checkout/" + billedEntry, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "OK-1", "chargeName", "Billed procedure", "category", "Procedure",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "OK-1", "chargeName", "Billed procedure", "category", "Procedure",
                         "quantity", 1, "unitPrice", 250, "taxRatePercent", 0)))), Map.class);
 
         ResponseEntity<Map> resp = exchange("/v1/reports/billing-leakage?thresholdAmount=0", HttpMethod.GET, authed(token), Map.class);
@@ -429,7 +429,7 @@ class ReportsApiTest extends ApiTestBase {
         orderAndCompleteProcedure(token, entry, "LEAK-2");
         moveTo(token, entry, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         exchange("/v1/billing/checkout/" + entry, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         ResponseEntity<Map> resp = exchange("/v1/reports/billing-leakage?thresholdAmount=100", HttpMethod.GET, authed(token), Map.class);

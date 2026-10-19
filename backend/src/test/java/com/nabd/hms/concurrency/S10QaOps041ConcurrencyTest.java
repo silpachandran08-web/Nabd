@@ -142,7 +142,7 @@ class S10QaOps041ConcurrencyTest extends ApiTestBase {
         for (String s : List.of("waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending"))
             exchange("/v1/queue/" + entry + "/status", HttpMethod.PATCH, authedJsonBody(c.token, Map.of("status", s)), Map.class);
         var inv = exchange("/v1/billing/checkout/" + entry, HttpMethod.POST, authedJsonBody(c.token, Map.of("lineItems", List.of(
-                Map.of("chargeCode", "S10Q", "chargeName", "Consultation", "category", "Service", "quantity", 1, "unitPrice", total, "taxRatePercent", 0)))), Map.class);
+                Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "S10Q", "chargeName", "Consultation", "category", "Service", "quantity", 1, "unitPrice", total, "taxRatePercent", 0)))), Map.class);
         assertThat(inv.getStatusCode()).as("checkout " + inv.getBody()).isEqualTo(HttpStatus.OK);
         return (String) inv.getBody().get("id");
     }

@@ -125,6 +125,7 @@ class Fin003ServerPricingApiTest extends ApiTestBase {
         assertThat(type(denied)).contains("unknown-charge");
 
         ghost.put("unitPrice", 75);
+        ghost.put("override", Map.of("reasonCode", "other")); // FIN-003 (QA-12): free text needs a reason
         ResponseEntity<Map> ok = post(e.ownerToken(), pending(e), Map.of("lineItems", List.of(ghost)));
         assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(firstLine(ok).get("tier")).isEqualTo("custom");

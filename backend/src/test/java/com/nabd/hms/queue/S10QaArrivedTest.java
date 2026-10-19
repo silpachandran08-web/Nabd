@@ -242,7 +242,7 @@ class S10QaArrivedTest extends ApiTestBase {
         }
         assertThat(sql("SELECT status FROM queue_entries WHERE id = ?", UUID.fromString(leg2))).isEqualTo("checkout_pending");
         assertThat(exchange("/v1/billing/checkout/" + leg2, HttpMethod.POST, authedJsonBody(c.token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service", "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class)
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service", "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(sql("SELECT status FROM queue_entries WHERE id = ?", UUID.fromString(leg2))).isEqualTo("completed");
         assertThat(sql("SELECT status FROM appointments WHERE id = ?", a)).isEqualTo("completed");

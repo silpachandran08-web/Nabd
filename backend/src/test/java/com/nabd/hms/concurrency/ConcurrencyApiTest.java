@@ -109,7 +109,7 @@ class ConcurrencyApiTest extends ApiTestBase {
             exchange("/v1/queue/" + entry + "/status", HttpMethod.PATCH, authedJsonBody(c.token(), Map.of("status", s)), Map.class);
         }
         ResponseEntity<Map> inv = exchange("/v1/billing/checkout/" + entry, HttpMethod.POST, authedJsonBody(c.token(), Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 500, "taxRatePercent", 0)))), Map.class);
         assertThat(inv.getStatusCode()).isEqualTo(HttpStatus.OK);
         String invoiceId = (String) inv.getBody().get("id");

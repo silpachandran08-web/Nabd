@@ -49,7 +49,7 @@ class TimelineApiTest extends ApiTestBase {
         exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
         moveTo(token, queueEntryId, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         ResponseEntity<Map> timeline = exchange("/v1/clinical/patients/" + patientId + "/timeline", HttpMethod.GET, authed(token), Map.class);
@@ -90,7 +90,7 @@ class TimelineApiTest extends ApiTestBase {
                     "diagnosis", "Visit " + i)), Map.class);
             moveTo(token, queueEntryId, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
             exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                    "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                    "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                             "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
         }
 
