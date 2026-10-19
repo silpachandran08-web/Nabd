@@ -40,6 +40,18 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return withTraceId(problem);
     }
 
+    /** Constraint failures a service did not translate to a named Problem: 500 with the trace id, never a guessed 409. */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ProblemDetail handleIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
+        String traceId = MDC.get(RequestCorrelationFilter.MDC_KEY);
+        log.error("[{}] unmapped integrity violation: {}", traceId, ex.getMostSpecificCause().getClass().getSimpleName(), ex);
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+        problem.setType(URI.create(TYPE_BASE + "internal-error"));
+        problem.setTitle("Unexpected error");
+        problem.setDetail("The request could not be saved. Quote the trace id to support.");
+        return withTraceId(problem);
+    }
+
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpHeaders headers,
                                                                   HttpStatusCode status, WebRequest request) {

@@ -60,7 +60,7 @@ await scenario('02-conflict', {
   extra: (() => { let n = 0; return [
     ['GET', /^\/doctors\/[^/]+\/availability/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(++n === 1 ? S : S.filter((s) => s !== S[2])) })],
     ['POST', /^\/appointments$/, (() => { let k = 0; return (r) => (++k === 1
-      ? r.fulfill({ status: 409, contentType: 'application/problem+json', body: JSON.stringify(problem('slot-unavailable', 409).body) })
+      ? r.fulfill({ status: 409, contentType: 'application/problem+json', body: JSON.stringify(problem('slot-taken', 409).body) })
       : r.fulfill({ status: 201, contentType: 'application/json', body: '{"id":"a2"}' })); })()],
   ]; })(),
 }, async (page, log) => {
@@ -84,8 +84,8 @@ await scenario('02-conflict', {
   check('02 rebooking at the alternative succeeds', JSON.parse(posts(log, '/appointments')[1].body).startTime === S[1]);
 });
 
-for (const [slug, status, re] of [['session-full', 409, /session is full/], ['slot-in-past', 400, /already passed/], ['clinic-holiday', 400, /closed/], ['internal', 500, /went wrong on our side/], ['forbidden', 403, /permission/]]) {
-  await scenario(`03-${slug}`, { extra: [['POST', /^\/appointments$/, problem(slug, status, slug === 'clinic-holiday' ? 'The clinic is closed on 2026-10-19.' : RAW)]] }, async (page) => {
+for (const [slug, status, re] of [['session-full', 409, /session is full/], ['in-past', 400, /already passed/], ['clinic-closed', 400, /closed/], ['doctor-on-leave', 400, /on leave/], ['outside-hours', 400, /doesn.t work/], ['off-grid', 400, /isn.t a bookable/], ['internal', 500, /went wrong on our side/], ['forbidden', 403, /permission/]]) {
+  await scenario(`03-${slug}`, { extra: [['POST', /^\/appointments$/, problem(slug, status, slug === 'clinic-closed' ? 'The clinic is closed on 2026-10-19.' : RAW)]] }, async (page) => {
     const d = await openDialog(page);
     await pickAli(d);
     await d.locator('#appt-time').selectOption({ label: '09:00' });

@@ -170,8 +170,7 @@ class QueueApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         addWorkingHours(token, staff.id(), 2);
         String booked = registerPatientWithDob(token, "CapB", "+919999910110");
-        java.time.Instant slot = java.time.Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES)
-                .truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        java.time.Instant slot = nextQuarterHour(); // ACC-004: bookings must sit on the 15-minute grid
         ResponseEntity<Map> appt = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "doctorId", staff.id().toString(), "patientId", booked, "startTime", slot.toString())), Map.class);
         assertThat(appt.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -193,8 +192,7 @@ class QueueApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         addWorkingHours(token, staff.id(), 1);
         String patient = registerPatientWithDob(token, "CapA", "+919999910120");
-        java.time.Instant slot = java.time.Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES)
-                .truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        java.time.Instant slot = nextQuarterHour(); // ACC-004: bookings must sit on the 15-minute grid
         ResponseEntity<Map> appt = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "doctorId", staff.id().toString(), "patientId", patient, "startTime", slot.toString())), Map.class);
         Map<String, Object> body = Map.of("appointmentId", appt.getBody().get("id"), "patientId", patient,
@@ -769,5 +767,12 @@ class QueueApiTest extends ApiTestBase {
         assertThat(((Number) row.get("waitMinutes")).intValue()).isEqualTo(12);
         assertThat(row.get("tokenNumber")).isEqualTo(1);
         assertThat(row.get("visitType")).isEqualTo("walk_in");
+    }
+
+    /** First 15-minute boundary at least 5 minutes ahead (hours in addWorkingHours run 00:00-23:45 UTC). */
+    private static java.time.Instant nextQuarterHour() {
+        long q = 15 * 60;
+        long t = java.time.Instant.now().plusSeconds(5 * 60).getEpochSecond();
+        return java.time.Instant.ofEpochSecond((t + q - 1) / q * q);
     }
 }

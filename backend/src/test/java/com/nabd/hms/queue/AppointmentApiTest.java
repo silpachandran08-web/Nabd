@@ -81,7 +81,7 @@ class AppointmentApiTest extends ApiTestBase {
         ResponseEntity<Map> second = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "doctorId", staff.id().toString(), "patientId", patientB, "startTime", slot)), Map.class);
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(second.getBody().get("type")).asString().contains("slot-unavailable");
+        assertThat(second.getBody().get("type")).asString().contains("slot-taken");
     }
 
     @Test

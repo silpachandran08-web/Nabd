@@ -135,7 +135,7 @@ class ScheduleApiTest extends ApiTestBase {
                 "patientId", patientId, "doctorId", doctor.id().toString(),
                 "startTime", today.atTime(10, 0).toInstant(ZoneOffset.UTC).toString())), Map.class);
         assertThat(booking.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(booking.getBody().get("type")).asString().contains("clinic-holiday");
+        assertThat(booking.getBody().get("type")).asString().contains("clinic-closed");
     }
 
     // NB-091: "blocking a doctor warns about affected package sessions restricted to that doctor" —

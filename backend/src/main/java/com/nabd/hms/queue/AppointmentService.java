@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +34,6 @@ import static com.nabd.hms.queue.QueueModels.WorkingHoursRow;
 public class AppointmentService {
 
     private static final Logger log = LoggerFactory.getLogger(AppointmentService.class);
-    private static final int DEFAULT_SLOT_MINUTES = 15;
 
     private final AppointmentRepository repo;
     private final ScheduleRepository scheduleRepo;
@@ -44,9 +42,12 @@ public class AppointmentService {
     private final TenantContext tenantContext;
 
     private final ClinicClock clock;
+    private final SlotValidator slotValidator;
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
-                        WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock) {
+                        WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
+                        SlotValidator slotValidator) {
+        this.slotValidator = slotValidator;
         this.clock = clock;
         this.repo = repo;
         this.scheduleRepo = scheduleRepo;
@@ -55,14 +56,13 @@ public class AppointmentService {
         this.tenantContext = tenantContext;
     }
 
-    /** The 409 on conflict comes from the DB unique index, not a check-then-insert — see V4 migration. */
+    /** The 409 on conflict comes from the DB exclusion constraint, not a check-then-insert — see V312 migration. */
     @Transactional
     public AppointmentResponse book(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req) {
         tenantContext.set(tenantId);
         requirePatientAndDoctor(tenantId, req.patientId(), req.doctorId());
-        requireNotHoliday(tenantId, req.startTime());
+        int slotMinutes = slotValidator.validate(tenantId, req.doctorId(), req.startTime(), Instant.now());
         enforceSessionCapacity(tenantId, req.doctorId(), req.startTime());
-        int slotMinutes = resolveSlotMinutes(tenantId, req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
             UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end, req.isFollowUpOrDefault());
@@ -71,7 +71,7 @@ public class AppointmentService {
             return toResponse(repo.findById(tenantId, id).orElseThrow());
         } catch (DataIntegrityViolationException e) {
             log.warn("booking conflict: doctor {} already booked at {}", req.doctorId(), req.startTime());
-            throw slotUnavailable();
+            throw SlotValidator.slotTakenOrRethrow(e);
         }
     }
 
@@ -111,11 +111,10 @@ public class AppointmentService {
     public AppointmentResponse reschedule(UUID tenantId, UUID callerStaffId, UUID id, RescheduleRequest req) {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
-        requireNotHoliday(tenantId, req.newStartTime());
+        int slotMinutes = slotValidator.validate(tenantId, current.doctorId(), req.newStartTime(), Instant.now());
 
         repo.cancel(tenantId, id, "rescheduled");
         enforceSessionCapacity(tenantId, current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot
-        int slotMinutes = resolveSlotMinutes(tenantId, current.doctorId(), req.newStartTime());
         Instant newEnd = req.newStartTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
             UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp());
@@ -125,7 +124,7 @@ public class AppointmentService {
         } catch (DataIntegrityViolationException e) {
             // rolls back the cancel too — no reason to leave the old slot released if the new one failed
             log.warn("reschedule conflict: doctor {} already booked at {}", current.doctorId(), req.newStartTime());
-            throw slotUnavailable();
+            throw SlotValidator.slotTakenOrRethrow(e);
         }
     }
 
@@ -153,24 +152,6 @@ public class AppointmentService {
             throw notFound();
         }
         return a;
-    }
-
-    private int resolveSlotMinutes(UUID tenantId, UUID doctorId, Instant start) {
-        ZonedDateTime local = start.atZone(clock.zone(tenantId));
-        int dayOfWeek = local.getDayOfWeek().getValue() % 7;
-        LocalTime time = local.toLocalTime();
-        return scheduleRepo.findBlockCovering(doctorId, dayOfWeek, time)
-                .map(WorkingHoursRow::slotMinutes)
-                .orElse(DEFAULT_SLOT_MINUTES);
-    }
-
-    /** NB-092: shared by book() and reschedule() — both routes to booking a slot go through here. */
-    private void requireNotHoliday(UUID tenantId, Instant start) {
-        LocalDate date = start.atZone(clock.zone(tenantId)).toLocalDate();
-        if (scheduleRepo.isClinicHoliday(tenantId, date)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "clinic-holiday", "Clinic closed",
-                    "The clinic is closed on " + date + ".");
-        }
     }
 
     /**
@@ -223,13 +204,8 @@ public class AppointmentService {
         return new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
     }
 
-    private ApiException slotUnavailable() {
-        return new ApiException(HttpStatus.CONFLICT, "slot-unavailable", "Slot no longer available",
-                "This doctor already has an appointment at that time.");
-    }
-
     private ApiException sessionFull() {
         return new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
-                "This session has reached its patient cap (walk-ins and bookings counted together).");
+                "This session has reached its patient cap (walk-ins and bookings counted together).", java.util.Map.of("code", "SESSION_FULL"));
     }
 }
