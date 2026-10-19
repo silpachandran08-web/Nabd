@@ -24,7 +24,7 @@ BEGIN
     WHERE n.nspname IN ('public', 'master') AND c.relkind IN ('r', 'p', 'S', 'v', 'm')
       AND pg_get_userbyid(c.relowner) <> 'nabd_migrator'
       AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')
-      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'a' AND c.relkind = 'S')  -- identity/serial sequences follow their table
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype IN ('a', 'i') AND c.relkind = 'S')  -- serial (a) and identity (i) sequences follow their table
   LOOP
     EXECUTE format('ALTER %s %I.%I OWNER TO nabd_migrator', r.kind, r.nspname, r.relname);
   END LOOP;
