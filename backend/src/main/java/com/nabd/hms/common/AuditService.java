@@ -10,7 +10,7 @@ import java.util.UUID;
 /**
  * NB-238 / SYS-13: append-only audit trail for every PHI and financial action. record() is the
  * one write path every module should call — the append-only guarantee and the per-tenant hash
- * chain both live in V14__audit_log.sql (triggers, not application code), so nothing here can
+ * chain both live in V14__audit_log.sql, chain head per tenant in V1380 (triggers, not application code), so nothing here can
  * accidentally weaken them. See that migration's header for the two tamper defenses.
  *
  * <p>PHI policy (V3-013), one place: audit_log is the access-controlled, hash-chained store for before/after of
