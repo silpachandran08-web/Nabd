@@ -80,7 +80,7 @@ class ExplainPlanRegressionTest extends ApiTestBase {
 
     @Test
     void findLastVisitAtUsesPatientIndex() throws Exception {
-        assertIndexed("SELECT max(updated_at) FROM queue_entries WHERE tenant_id = '" + T + "' AND patient_id = '" + P + "' AND status = 'completed'",
+        assertIndexed("SELECT max(queue_date) FROM queue_entries WHERE tenant_id = '" + T + "' AND patient_id = '" + P + "' AND status = 'completed'",
                 "idx_queue_entries"); // S9 merge: with OPS-003's array policy the row estimate collapses to 1, so the planner ties among tenant-prefixed indexes; pin "indexed, tenant Index Cond, no seq scan" until the estimate is fixed
     }
 
