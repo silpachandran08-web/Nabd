@@ -69,6 +69,7 @@ public class PrescriptionController {
     @GetMapping("/prescriptions/{queueEntryId}/signing-authority")
     @PreAuthorize("hasAuthority('clinical:view')")
     public java.util.Map<String, Object> signingAuthority(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
+        scopes.requireVisit(scopes.resolve(jwt), queueEntryId);
         if (jwt.hasClaim("bg")) {
             return java.util.Map.of("canSign", false, "reason", ClinicalAuthority.BREAK_GLASS);
         }

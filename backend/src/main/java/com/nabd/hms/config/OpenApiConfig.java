@@ -38,6 +38,7 @@ public class OpenApiConfig {
             "/v1/auth/mfa/verify", "/v1/auth/mfa/recovery-verify", "/v1/auth/pin/reset-request", "/v1/auth/pin/reset-confirm", "/v1/auth/refresh",
             "/v1/auth/mfa/enroll", "/v1/auth/mfa/confirm", "/v1/owners/me/workspaces", "/v1/owners/workspaces/select",
             "/v1/staff/invitations/*/accept", "/v1/owners/auth/login", "/v1/owners/invitations/*/accept",
+            "/v1/owners/auth/mfa/*", "/v1/platform/auth/mfa/enroll", "/v1/platform/auth/mfa/confirm", // PLT-005: challenge/setup token in the body
             "/v1/platform/auth/login", "/v1/platform/auth/mfa/verify", "/v1/platform/auth/refresh",
             "/.well-known/jwks.json", "/v1/webhooks/whatsapp");
 

@@ -39,12 +39,14 @@ public class SafetyDictionaryController {
     }
 
     @GetMapping("/v1/clinical/safety-dictionary")
+    @ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view')")
     public Map<String, Object> getActiveSafetyDictionary(@AuthenticationPrincipal Jwt jwt) {
         return service.activeForTenant(UUID.fromString(jwt.getClaimAsString("tenantId")));
     }
 
     @GetMapping("/internal/v1/safety-dictionaries/{region}/versions")
+    @ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('safety_content:edit')")
     public List<Map<String, Object>> listSafetyDictionaryVersions(@PathVariable String region) {
         return service.versions(region);

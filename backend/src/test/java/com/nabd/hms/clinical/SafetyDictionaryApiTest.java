@@ -98,7 +98,9 @@ class SafetyDictionaryApiTest extends ApiTestBase {
 
     private Visit visit(SeededTenant tenant, String tag, String gender, LocalDate dob) {
         UUID roleId = seedFullAccessRole(tenant.id());
-        SeededStaff doc = seedStaff(tenant, roleId, "doc-" + tag + "@cln004.test", "+9198001" + tag, false);
+        // CLN-005: the visit's doctor signs, so a registered clinician
+        SeededStaff doc = com.nabd.hms.support.ClinicianFixture.licensed(
+                seedStaff(tenant, roleId, "doc-" + tag + "@cln004.test", "+9198001" + tag, false));
         String token = loginAndGetAccessToken(doc);
         ResponseEntity<Map> reg = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "P" + tag, "phone", "+9199991" + tag, "dob", dob.toString(), "gender", gender)), Map.class);

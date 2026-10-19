@@ -193,8 +193,9 @@ class S10QaOps034SpecTest extends ApiTestBase {
         return r.getStatusCode().value();
     }
 
+    /** CLN-004 added operator (platform-token) endpoints under /internal/v1, like /v1/platform. */
     private static boolean staffScoped(String path) {
-        return !(path.startsWith("/v1/platform") || path.startsWith("/v1/owners") || path.startsWith("/v1/owner") || path.startsWith("/v1/webhooks") || path.startsWith("/.well-known"));
+        return !(path.startsWith("/v1/platform") || path.startsWith("/internal/") || path.startsWith("/v1/owners") || path.startsWith("/v1/owner") || path.startsWith("/v1/webhooks") || path.startsWith("/.well-known"));
     }
 
     @Test

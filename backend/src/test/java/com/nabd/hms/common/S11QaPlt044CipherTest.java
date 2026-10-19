@@ -190,7 +190,6 @@ class S11QaPlt044CipherTest extends ApiTestBase {
     }
 
     @Test
-    @org.junit.jupiter.api.Tag("known-defect-PLT-044") // OwnerService.verifyMfa uses cipher.decrypt (throws) not tryDecrypt: 500
     void ownerMfaSecretCopiedFromAnotherOwnerFailsClosedWithoutA500() {
         SeededOwner a = seedOwner("qa44a-" + uniq() + "@qa.test");
         SeededOwner b = seedOwner("qa44b-" + uniq() + "@qa.test");

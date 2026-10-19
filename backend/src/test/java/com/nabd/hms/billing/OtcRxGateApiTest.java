@@ -40,7 +40,9 @@ class OtcRxGateApiTest extends ApiTestBase {
     private Ctx ctx() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
-        SeededStaff staff = seedStaff(tenant, roleId, "rxg" + SEQ.incrementAndGet() + "@a.com", phone(), false);
+        // CLN-005: the prescriber signs, so seed a registered clinician
+        SeededStaff staff = com.nabd.hms.support.ClinicianFixture.licensed(
+                seedStaff(tenant, roleId, "rxg" + SEQ.incrementAndGet() + "@a.com", phone(), false));
         String token = loginAndGetAccessToken(staff);
         exchange("/v1/pharmacy/settings", HttpMethod.PATCH, authedJsonBody(token, Map.of("mode", "hybrid", "reason", "Test setup")), Map.class);
         return new Ctx(tenant, staff, token);

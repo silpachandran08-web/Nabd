@@ -147,7 +147,8 @@ public class OwnerService {
         Owner owner = ownerFrom(req.challengeToken(), TokenType.MFA_PENDING, OWNER_MFA_PENDING);
         enforceAccountLockout(owner);
         OwnerRepository.MfaState mfa = repo.mfaState(owner.id());
-        long step = mfa.secretEnc() == null ? -1 : totp.matchStep(cipher.decrypt(mfa.secretEnc(), mfaAad(owner)), req.code(), Instant.now(clock));
+        // a blob bound to another row fails closed as an MFA failure (401), like staff/operator MFA
+        long step = mfa.secretEnc() == null ? -1 : cipher.tryDecrypt(mfa.secretEnc(), mfaAad(owner)).map(k -> totp.matchStep(k, req.code(), Instant.now(clock))).orElse(-1L);
         if (step < 0 || !repo.claimTotpStep(owner.id(), step)) {
             repo.recordLoginAttempt(owner.id(), owner.email(), ip, false);
             log.warn("MFA verification failed for owner {}", owner.id());
@@ -186,7 +187,7 @@ public class OwnerService {
         Owner owner = ownerFrom(req.setupToken(), TokenType.MFA_SETUP, OWNER_MFA_SETUP);
         enforceAccountLockout(owner);
         byte[] pending = repo.mfaState(owner.id()).pendingSecretEnc();
-        long step = pending == null ? -1 : totp.matchStep(cipher.decrypt(pending, mfaAad(owner)), req.code(), Instant.now(clock));
+        long step = pending == null ? -1 : cipher.tryDecrypt(pending, mfaAad(owner)).map(k -> totp.matchStep(k, req.code(), Instant.now(clock))).orElse(-1L);
         if (step < 0 || !repo.claimTotpStep(owner.id(), step)) {
             repo.recordLoginAttempt(owner.id(), owner.email(), ip, false);
             throw mfaFailed();

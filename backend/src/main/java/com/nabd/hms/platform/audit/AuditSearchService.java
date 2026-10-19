@@ -92,9 +92,10 @@ public class AuditSearchService {
     static int clampLimit(Integer raw) {
         if (raw == null) return SEARCH_DEFAULT_LIMIT;
         if (raw < 1 || raw > com.nabd.hms.common.PageRequest.MAX) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "limit-out-of-range", "Limit out of range",
-                    "limit must be between 1 and " + com.nabd.hms.common.PageRequest.MAX + ".",
-                    Map.of("code", "LIMIT_OUT_OF_RANGE"));
+            // PLT-027 validation shape (field-named), keeping PLT-056's code
+            String msg = "must be between 1 and " + com.nabd.hms.common.PageRequest.MAX;
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Validation failed", "limit: " + msg,
+                    Map.of("errors", java.util.List.of(Map.of("field", "limit", "message", msg)), "code", "LIMIT_OUT_OF_RANGE"));
         }
         return raw;
     }

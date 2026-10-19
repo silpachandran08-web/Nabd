@@ -32,9 +32,5 @@ CREATE TRIGGER trg_dental_chart_events_no_delete BEFORE DELETE ON dental_chart_e
 CREATE TRIGGER trg_dental_chart_events_no_truncate BEFORE TRUNCATE ON dental_chart_events
   FOR EACH STATEMENT EXECUTE FUNCTION dental_chart_events_immutable();
 
--- ADR-07: reads over the visible tenant set, writes only to the session tenant. enforce_tenant_rls keeps the
--- visible arm because this seed policy mentions visible_tenant_ids, then replaces it with per-command policies.
-ALTER TABLE dental_chart_events ENABLE ROW LEVEL SECURITY;
-CREATE POLICY seed_visible ON dental_chart_events
-  USING (tenant_id = ANY (string_to_array(current_setting('app.visible_tenant_ids', true), ',')::uuid[]));
+-- Own-tenant RLS, the same as dental_chart_entries (V21): the history is not readable wider than the chart itself.
 SELECT enforce_tenant_rls('dental_chart_events');

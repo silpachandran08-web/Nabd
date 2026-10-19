@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -51,7 +52,12 @@ class OpenApiReflectionTest {
         Map<String, Map<String, Object>> paths = (Map<String, Map<String, Object>>)
                 ((Map<String, Object>) new org.yaml.snakeyaml.Yaml().load(Files.readString(Path.of(file)))).get("paths");
         Set<String> ops = new TreeSet<>();
-        paths.forEach((p, item) -> item.keySet().stream().filter(VERBS::contains).forEach(v -> ops.add(v + " " + prefix + p)));
+        paths.forEach((p, item) -> {
+            // CLN-004: a path-level servers override (the internal operator server) replaces the /v1 base
+            List<Map<String, Object>> servers = (List<Map<String, Object>>) item.get("servers");
+            String base = servers == null ? prefix : java.net.URI.create((String) servers.get(0).get("url")).getPath().replaceAll("/$", "");
+            item.keySet().stream().filter(VERBS::contains).forEach(v -> ops.add(v + " " + base + p));
+        });
         return ops;
     }
 
