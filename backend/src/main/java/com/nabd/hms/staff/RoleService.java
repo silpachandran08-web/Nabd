@@ -95,8 +95,7 @@ public class RoleService {
     /** "Attempted edit of a built-in role, or a grant beyond the editor's own permissions... blocked" — api/openapi.yaml. */
     private void requireNoPrivilegeEscalation(UUID tenantId, UUID callerStaffId, List<ModuleGrant> requestedGrants,
                                                List<String> callerPermissions) {
-        List<String> requested = GrantsFlattener.flatten(requestedGrants);
-        if (!callerPermissions.containsAll(requested)) {
+        if (GrantAuthority.exceeds(GrantsFlattener.flatten(requestedGrants), callerPermissions)) {
             log.warn("privilege escalation blocked: staff {} (tenant {}) requested grants beyond their own permissions",
                     callerStaffId, tenantId);
             throw new ApiException(HttpStatus.BAD_REQUEST, "privilege-escalation", "Grant exceeds your own permissions",
