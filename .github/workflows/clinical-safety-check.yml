@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 scripts/test-check-clinical-safety.py && python3 scripts/check-clinical-safety.py
+      - run: pip install -q pyyaml && python3 scripts/test-check-clinical-safety.py && python3 scripts/check-clinical-safety.py && python3 scripts/ci/test_safety_report.py

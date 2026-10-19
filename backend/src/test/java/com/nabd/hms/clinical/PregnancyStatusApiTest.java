@@ -1,6 +1,7 @@
 package com.nabd.hms.clinical;
 
 import com.nabd.hms.support.ApiTestBase;
+import com.nabd.hms.support.Hazard;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -13,6 +14,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** DOC-021. NOT EXECUTED in the authoring environment (no Docker / Testcontainers). */
+@Hazard("H-09")
 class PregnancyStatusApiTest extends ApiTestBase {
 
     private String registerPatient(String token, String phone) {

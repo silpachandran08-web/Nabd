@@ -1,0 +1,9 @@
+{
+  "_how": "CLN-007.4. The CSO fills every field in a PR that only the CSO approves (CODEOWNERS @nabd/clinical-safety). hazard_log_sha256 = sha256sum docs/clinical-safety/hazard-log.csv at the reviewed commit; any later edit to the log voids this sign-off and the release gate fails until re-signed. approval_ref = link to the signed record (signed PDF in the DMS, or the CSO's PR approval URL). Engineers never fill these fields.",
+  "version": "v1",
+  "scope": "Each hazard's controls and residual risk reviewed by the CSO",
+  "cso_name": "",
+  "approved_on": "",
+  "approval_ref": "",
+  "hazard_log_sha256": ""
+}

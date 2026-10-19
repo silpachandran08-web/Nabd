@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="fx.OtcGateApiTest" tests="4">
+<testcase name="otcCheckoutRefusesRxItem" classname="fx.OtcGateApiTest" time="0.2"/>
+<testcase name="rxLineNeedsSignedPrescriptionItem(int)[1]" classname="fx.OtcGateApiTest" time="0.1"/>
+<testcase name="rxLineNeedsSignedPrescriptionItem(int)[2]" classname="fx.OtcGateApiTest" time="0.1"><failure message="boom"/></testcase>
+<testcase name="untagged" classname="fx.OtcGateApiTest" time="0.1"/>
+</testsuite>
