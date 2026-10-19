@@ -134,6 +134,9 @@ public class SetupService {
     @Transactional
     public PolicyResponse updatePolicy(UUID tenantId, UUID callerStaffId, String policyKey, PolicyWriteRequest req) {
         tenantContext.set(tenantId);
+        if ("session.idle_lock_minutes".equals(policyKey) && !req.value().matches("^(?:[2-9]|[12][0-9]|30)$")) { // FEF-005
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "out-of-range", "Out of range", "Idle lock must be a whole number of minutes from 2 to 30");
+        }
         repo.updatePolicy(tenantId, policyKey, req.value());
         log.info("policy {} updated for tenant {} by {}", policyKey, tenantId, callerStaffId);
         return repo.listPolicies(tenantId).stream()

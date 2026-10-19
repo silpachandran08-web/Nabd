@@ -4,6 +4,7 @@
 // across tabs (Web Locks, localStorage mutex fallback) and the new pair is announced on BroadcastChannel.
 // React-free so it is unit-tested (tests/unit/apiClient.test.mjs). Never logs a token.
 import { decodeJwtPayload } from "./jwt.ts";
+import { clearLocalSessionData } from "./idleLock.ts";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const ACCESS_KEY = "nabd_access_token";
@@ -46,6 +47,7 @@ export function goLogin(): void {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
   void idbPair(null);
+  void clearLocalSessionData();
   if (leaving) return;
   const here = window.location.pathname + window.location.search;
   if (window.location.pathname.startsWith("/login")) return;
