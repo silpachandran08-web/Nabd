@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./packages.module.css";
 import { can } from "../lib/permissions";
@@ -416,7 +416,15 @@ export default function PackagesPage() {
     const p = await res.json();
     setDeciding({ refund: r, current: p.refundAmount, owed: p.amountOwed, changed: p.refundAmount !== r.refundAmount });
   }
-  async function approveRefund() {
+  const decideLock = useRef(false); // synchronous guard (as in checkout): a double-click must never send a second decision
+  async function decide(fn: () => Promise<void>) {
+    if (decideLock.current) return;
+    decideLock.current = true;
+    try { await fn(); } catch {
+      setActionError("Could not reach the server. Check your connection and try again."); // fetch rejects on network failure
+    } finally { decideLock.current = false; }
+  }
+  const approveRefund = () => decide(async () => {
     if (!deciding) return;
     setActionError(null);
     const res = await authedFetch(`/packages/refunds/${deciding.refund.id}/approve`, {
@@ -431,8 +439,8 @@ export default function PackagesPage() {
     }
     if (res?.ok) setDeciding(null);
     await afterInstanceAction(res);
-  }
-  async function rejectRefund() {
+  });
+  const rejectRefund = () => decide(async () => {
     if (!deciding) return;
     if (!rejectReason.trim()) { setActionError("Give a reason to reject."); return; }
     setActionError(null);
@@ -441,7 +449,7 @@ export default function PackagesPage() {
     });
     if (res?.ok) setDeciding(null);
     await afterInstanceAction(res);
-  }
+  });
 
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   async function sendReminder(instanceId: string) {
