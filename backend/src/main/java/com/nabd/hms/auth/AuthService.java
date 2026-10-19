@@ -48,6 +48,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -80,10 +81,13 @@ public class AuthService {
     private final StepUpVerifier stepUpVerifier;
     private final SecureRandom random = new SecureRandom();
 
+    private final Clock clock;
+
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
-                LoginGuard guard, StepUpVerifier stepUpVerifier) {
+                LoginGuard guard, StepUpVerifier stepUpVerifier, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -156,7 +160,7 @@ public class AuthService {
     }
 
     private MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -197,7 +201,7 @@ public class AuthService {
         }
 
         String code = generateOtpCode();
-        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), Instant.now().plus(5, ChronoUnit.MINUTES));
+        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), Instant.now(clock).plus(5, ChronoUnit.MINUTES));
         otpSender.send(staff.mobilePhone(), code); // the number on file, not whatever format was typed
         log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
@@ -298,7 +302,7 @@ public class AuthService {
             throw mfaFailed();
         }
 
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plusSeconds(300);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -423,7 +427,7 @@ public class AuthService {
             return;
         }
         String token = OpaqueTokens.generate();
-        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), Instant.now().plus(15, ChronoUnit.MINUTES));
+        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), Instant.now(clock).plus(15, ChronoUnit.MINUTES));
         otpSender.send(staff.mobilePhone(), token);
         log.info("PIN reset token issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
@@ -489,7 +493,7 @@ public class AuthService {
             repo.revokeFamily(session.familyId(), "reuse_detected");
             throw invalidRefresh();
         }
-        if (session.expiresAt().isBefore(Instant.now())) {
+        if (session.expiresAt().isBefore(Instant.now(clock))) {
             throw invalidRefresh();
         }
 
@@ -531,7 +535,7 @@ public class AuthService {
     // ---- internals ----
 
     private void enforceIpRateLimit(String ip) {
-        int recent = repo.countAttemptsFromIpSince(ip, Instant.now().minus(1, ChronoUnit.MINUTES));
+        int recent = repo.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
         if (recent >= props.rateLimitPerIpPerMinute()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate-limited", "Too many attempts", "Try again shortly.");
         }
@@ -544,7 +548,7 @@ public class AuthService {
     }
 
     private MfaChallengeResponse issueMfaChallenge(Staff staff) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -601,7 +605,7 @@ public class AuthService {
         }
 
         UUID sessionId = bg != null ? bg.sessionId() : UUID.randomUUID();
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant accessExp = bg != null ? bg.expiresAt() : now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()

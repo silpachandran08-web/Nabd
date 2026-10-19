@@ -103,7 +103,7 @@ public class PrescriptionService {
         LocalDate dob = vitalsRepo.findPatientDob(tenantId, patientId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Patient not found", "No such patient."));
         java.time.ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         if (DoseWeightPolicy.isAdult(dob, today)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "adult-patient", "Adult patient",
                     "Weight-based mg/kg dosing is for patients under 18; use the drug reference for adult doses.");
@@ -178,7 +178,7 @@ public class PrescriptionService {
                             throw notPrescriber("record a warning decision on");
                         }
                         StoredDecision fresh = new StoredDecision(d.kind(), requested.reasonCode(), note, d.matched(), d.severity(),
-                                callerStaffId.toString(), actor.name(), Instant.now().toString());
+                                callerStaffId.toString(), actor.name(), clock.now().toString());
                         decisions.add(fresh);
                         auditDecision(tenantId, callerStaffId, actor, ipAddress, prescriptionId, item, fresh, "made");
                     }

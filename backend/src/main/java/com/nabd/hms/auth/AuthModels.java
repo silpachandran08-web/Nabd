@@ -23,8 +23,5 @@ final class AuthModels {
     record SessionRow(UUID id, UUID tenantId, UUID staffId, UUID familyId, String tokenHash,
                        Instant expiresAt, Instant revokedAt, String revokedReason,
                        String deviceLabel, String ipAddress, Instant lastSeenAt) {
-        boolean active() {
-            return revokedAt == null && expiresAt.isAfter(Instant.now());
-        }
     }
 }

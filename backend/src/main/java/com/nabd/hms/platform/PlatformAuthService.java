@@ -29,6 +29,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -62,9 +63,12 @@ public class PlatformAuthService {
     private final PlatformAudit audit;
     private final AuditService auditService;
 
+    private final Clock clock;
+
     PlatformAuthService(PlatformAuthRepository repo, PasswordEncoder pinEncoder, TotpService totpService,
                          AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder, AuthProperties props,
-                         PlatformAudit audit, AuditService auditService) {
+                         PlatformAudit audit, AuditService auditService, Clock clock) {
+        this.clock = clock;
         this.audit = audit;
         this.auditService = auditService;
         this.repo = repo;
@@ -140,7 +144,7 @@ public class PlatformAuthService {
         }
         enforceAccountLockout(operator);
         byte[] secret = cipher.decrypt(operator.mfaSecretEnc());
-        long step = totpService.matchStep(secret, req.code(), Instant.now());
+        long step = totpService.matchStep(secret, req.code(), Instant.now(clock));
         if (step < 0 || !repo.claimTotpStep(operator.id(), step)) { // claim = replay guard
             repo.recordLoginAttempt(operator.id(), operator.email(), ip, false);
             log.warn("MFA verification failed for operator {}", operator.id());
@@ -168,7 +172,7 @@ public class PlatformAuthService {
                     session.familyId(), null);
             throw invalidRefresh();
         }
-        if (session.expiresAt().isBefore(Instant.now())) {
+        if (session.expiresAt().isBefore(Instant.now(clock))) {
             throw invalidRefresh();
         }
 
@@ -215,7 +219,7 @@ public class PlatformAuthService {
     // ---- internals ----
 
     private void enforceIpRateLimit(String ip) {
-        int recent = repo.countAttemptsFromIpSince(ip, Instant.now().minus(1, ChronoUnit.MINUTES));
+        int recent = repo.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
         if (recent >= props.rateLimitPerIpPerMinute()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate-limited", "Too many attempts", "Try again shortly.");
         }
@@ -230,7 +234,7 @@ public class PlatformAuthService {
         }
         Instant lastFailedAt = repo.lastFailedAttemptAt(operator.id()).orElse(Instant.EPOCH);
         Instant lockedUntil = lastFailedAt.plus(backoffDuration(failures));
-        if (Instant.now().isBefore(lockedUntil)) {
+        if (Instant.now(clock).isBefore(lockedUntil)) {
             log.warn("account locked: operator {} has {} failed attempts, locked until {}", operator.id(), failures, lockedUntil);
             throw accountLocked();
         }
@@ -243,7 +247,7 @@ public class PlatformAuthService {
     }
 
     private MfaChallengeResponse issueMfaChallenge(Operator operator) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -259,7 +263,7 @@ public class PlatformAuthService {
 
     private TokenPairResponse mintTokenPair(Operator operator, UUID familyId, String ip, String device, String userAgent) {
         UUID sessionId = UUID.randomUUID();
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()

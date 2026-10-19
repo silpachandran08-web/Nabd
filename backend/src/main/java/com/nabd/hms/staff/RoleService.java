@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -45,8 +46,11 @@ public class RoleService {
 
     static final String DELEGATION_EVENT = "iam.delegation.changed.v1";
 
+    private final Clock clock;
+
     RoleService(RoleRepository repo, TenantContext tenantContext, ObjectMapper objectMapper, AuditService auditService,
-                DelegationGuard delegationGuard, EventPublisher eventPublisher) {
+                DelegationGuard delegationGuard, EventPublisher eventPublisher, Clock clock) {
+        this.clock = clock;
         this.delegationGuard = delegationGuard;
         this.eventPublisher = eventPublisher;
         this.repo = repo;
@@ -109,7 +113,7 @@ public class RoleService {
     public DelegationResponse createDelegation(UUID tenantId, UUID callerStaffId, DelegationRequest req, String stepUpToken) {
         tenantContext.set(tenantId);
         RoleRow delegatedRole = repo.findById(tenantId, req.delegatedRoleId()).orElseThrow(this::notFound);
-        if (req.expiresAt().isAfter(Instant.now().plus(MAX_DELEGATION_WINDOW))) {
+        if (req.expiresAt().isAfter(Instant.now(clock).plus(MAX_DELEGATION_WINDOW))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "delegation-window-too-long", "Window too long",
                     "A delegation can't run longer than 30 days — create a new one if the cover extends past that.");
         }
@@ -153,7 +157,7 @@ public class RoleService {
 
     private DelegationResponse toDelegationResponse(DelegationRow row) {
         return new DelegationResponse(row.id(), row.staffId(), row.delegatedRoleId(), row.delegatedRoleName(),
-                row.grantedBy(), row.reason(), row.startsAt(), row.expiresAt(), row.active(), row.revokedAt(), row.revokedReason());
+                row.grantedBy(), row.reason(), row.startsAt(), row.expiresAt(), row.active(Instant.now(clock)), row.revokedAt(), row.revokedReason());
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {

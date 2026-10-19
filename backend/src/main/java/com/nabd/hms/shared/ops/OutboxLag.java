@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -21,20 +22,23 @@ public class OutboxLag {
 
     public static final long MAX_AGE_SECONDS = 120;
 
-    private final AtomicReference<Instant> lastPoll = new AtomicReference<>(Instant.now());
+    private final Clock clock;
+    private final AtomicReference<Instant> lastPoll;
     private final Counter claimed;
     private final Counter failed;
 
-    public OutboxLag(MeterRegistry registry) {
+    public OutboxLag(MeterRegistry registry, Clock clock) {
+        this.clock = clock;
+        lastPoll = new AtomicReference<>(Instant.now(clock));
         claimed = registry.counter("outbox.events.claimed");
         failed = registry.counter("outbox.events.failed");
-        Gauge.builder("outbox.last.poll.age", this, l -> l.ageSeconds(Instant.now())).baseUnit("seconds").register(registry);
+        Gauge.builder("outbox.last.poll.age", this, l -> l.ageSeconds(Instant.now(clock))).baseUnit("seconds").register(registry);
     }
 
     public void polled(int claimedCount, int failedCount) {
         claimed.increment(claimedCount);
         failed.increment(failedCount);
-        lastPoll.set(Instant.now());
+        lastPoll.set(Instant.now(clock));
     }
 
     /** For tests that need a stale dispatcher. */

@@ -95,7 +95,7 @@ public class WaitlistService {
     void onSlotFreed(UUID tenantId, UUID doctorId, Instant freedSlotStart) {
         expireAndCascade(tenantId, doctorId);
         repo.findOldestWaiting(tenantId, doctorId).ifPresent(entry -> {
-            Instant expiresAt = Instant.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
+            Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
             repo.offer(tenantId, entry.id(), freedSlotStart, expiresAt);
             log.info("waitlist entry {} (patient {}) offered freed slot {} for doctor {}, expires {}",
                     entry.id(), entry.patientId(), freedSlotStart, doctorId, expiresAt);
@@ -108,7 +108,7 @@ public class WaitlistService {
             repo.markExpired(tenantId, stale.id());
             log.info("waitlist offer {} expired unaccepted (patient {}, slot {})", stale.id(), stale.patientId(), stale.offeredSlotStart());
             repo.findOldestWaiting(tenantId, doctorId).ifPresent(next -> {
-                Instant expiresAt = Instant.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
+                Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
                 repo.offer(tenantId, next.id(), stale.offeredSlotStart(), expiresAt);
                 log.info("waitlist entry {} (patient {}) re-offered slot {} for doctor {}, expires {}",
                         next.id(), next.patientId(), stale.offeredSlotStart(), doctorId, expiresAt);
@@ -177,7 +177,7 @@ public class WaitlistService {
         }
         UUID doctorId = entry.doctorId();
         ZoneId zone = clock.zone(tenantId);
-        int slotMinutes = slotValidator.validate(tenantId, doctorId, slotStart, Instant.now());
+        int slotMinutes = slotValidator.validate(tenantId, doctorId, slotStart, clock.now());
         if (repo.isSlotOnLiveOffer(tenantId, doctorId, slotStart, entry.id())) {
             throw new ApiException(HttpStatus.CONFLICT, "slot-on-offer", "Slot is on offer",
                     "This slot is currently offered to another patient on the waitlist.");
@@ -201,7 +201,7 @@ public class WaitlistService {
             // the slot this entry was holding is free again: offer it on, exactly as an expiry would
             Instant releasedSlot = entry.offeredSlotStart();
             repo.findOldestWaiting(tenantId, doctorId).ifPresent(next -> {
-                Instant expiresAt = Instant.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
+                Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
                 repo.offer(tenantId, next.id(), releasedSlot, expiresAt);
                 log.info("waitlist entry {} (patient {}) offered released slot {} for doctor {}, expires {}",
                         next.id(), next.patientId(), releasedSlot, doctorId, expiresAt);

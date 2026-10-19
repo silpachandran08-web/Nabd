@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -39,7 +40,10 @@ public class SupportAccessService {
     private final AuditService auditService;
     private final TenantContext tenantContext;
 
-    SupportAccessService(SupportAccessRepository repo, AuditService auditService, TenantContext tenantContext) {
+    private final Clock clock;
+
+    SupportAccessService(SupportAccessRepository repo, AuditService auditService, TenantContext tenantContext, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.auditService = auditService;
         this.tenantContext = tenantContext;
@@ -48,8 +52,8 @@ public class SupportAccessService {
     @Transactional
     public GrantResponse requestGrant(UUID tenantId, UUID operatorId, String reason, String ipAddress) {
         OperatorInfo operator = operatorInfo(operatorId);
-        Grant grant = new Grant(UUID.randomUUID(), tenantId, operatorId, reason, Instant.now(),
-                Instant.now().plus(GRANT_DURATION), null);
+        Grant grant = new Grant(UUID.randomUUID(), tenantId, operatorId, reason, Instant.now(clock),
+                Instant.now(clock).plus(GRANT_DURATION), null);
         repo.insert(grant);
         auditService.record(tenantId, "operator", operatorId, operator.name(), operator.role(), ipAddress,
                 "support_access.grant", "tenant", tenantId, null, Map.of("reason", reason));
@@ -86,7 +90,7 @@ public class SupportAccessService {
             throw new ApiException(HttpStatus.FORBIDDEN, "not-your-grant", "Not your grant",
                     "This support access grant belongs to a different operator.");
         }
-        if (!grant.isActive(Instant.now())) {
+        if (!grant.isActive(Instant.now(clock))) {
             throw new ApiException(HttpStatus.FORBIDDEN, "grant-not-active", "Grant not active",
                     "This support access grant has expired or been revoked.");
         }
@@ -109,7 +113,7 @@ public class SupportAccessService {
 
     private GrantResponse toResponse(Grant g, OperatorInfo operator) {
         return new GrantResponse(g.id(), g.tenantId(), g.operatorId(), operator.name(), operator.role(),
-                g.reason(), g.grantedAt(), g.expiresAt(), g.revokedAt(), g.isActive(Instant.now()));
+                g.reason(), g.grantedAt(), g.expiresAt(), g.revokedAt(), g.isActive(Instant.now(clock)));
     }
 
     private static ApiException notFound() {

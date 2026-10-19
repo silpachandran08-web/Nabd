@@ -3,6 +3,7 @@ package com.nabd.hms.common;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,10 @@ class OutboxEventProcessor {
     private final TenantContext tenantContext;
     private final Map<String, OutboxEventHandler> handlersByType;
 
-    OutboxEventProcessor(OutboxRepository repo, TenantContext tenantContext, List<OutboxEventHandler> handlers) {
+    private final Clock clock;
+
+    OutboxEventProcessor(OutboxRepository repo, TenantContext tenantContext, List<OutboxEventHandler> handlers, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.handlersByType = handlers.stream().collect(Collectors.toMap(OutboxEventHandler::eventType, Function.identity()));
@@ -50,7 +54,7 @@ class OutboxEventProcessor {
         if (event.attempts() >= MAX_ATTEMPTS) {
             repo.markDead(event.id(), summarize(cause));
         } else {
-            repo.markFailed(event.id(), summarize(cause), Instant.now().plusSeconds(backoffSeconds(event.attempts())));
+            repo.markFailed(event.id(), summarize(cause), Instant.now(clock).plusSeconds(backoffSeconds(event.attempts())));
         }
     }
 

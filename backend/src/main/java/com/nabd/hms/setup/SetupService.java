@@ -32,6 +32,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -54,7 +55,10 @@ public class SetupService {
     private final SetupRepository repo;
     private final TenantContext tenantContext;
 
-    SetupService(SetupRepository repo, TenantContext tenantContext) {
+    private final Clock clock;
+
+    SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -205,7 +209,7 @@ public class SetupService {
         tenantContext.set(tenantId);
         YearMonth month;
         try {
-            month = monthParam == null ? YearMonth.now() : YearMonth.parse(monthParam);
+            month = monthParam == null ? YearMonth.now(clock) : YearMonth.parse(monthParam);
         } catch (DateTimeParseException e) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-month", "Invalid month", "Month must be in ISO-8601 format such as 2026-07");
         }

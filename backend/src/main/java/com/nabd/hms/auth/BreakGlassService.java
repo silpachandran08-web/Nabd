@@ -20,6 +20,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -40,8 +41,11 @@ public class BreakGlassService {
     private final TenantContext tenantContext;
     private final ChallengeTokenDecoder jwtDecoder;
 
+    private final Clock clock;
+
     BreakGlassService(BreakGlassRepository repo, AuthRepository authRepo, AuthService authService, AuditService auditService,
-                      EventPublisher publisher, TenantContext tenantContext, ChallengeTokenDecoder jwtDecoder) {
+                      EventPublisher publisher, TenantContext tenantContext, ChallengeTokenDecoder jwtDecoder, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.authRepo = authRepo;
         this.authService = authService;
@@ -64,7 +68,7 @@ public class BreakGlassService {
             throw new ApiException(HttpStatus.CONFLICT, "already-active", "Emergency access already active",
                     "You already have an active emergency access grant.");
         }
-        Instant expiresAt = Instant.now().plus(BreakGlassPolicy.MINUTES, ChronoUnit.MINUTES);
+        Instant expiresAt = Instant.now(clock).plus(BreakGlassPolicy.MINUTES, ChronoUnit.MINUTES);
         UUID sessionId = UUID.randomUUID();
         UUID grantId;
         try {
@@ -81,7 +85,7 @@ public class BreakGlassService {
 
         Map<String, Object> payload = Map.of("tenantId", tenantId.toString(), "grantId", grantId.toString(),
                 "staffId", staffId.toString(), "reasonCode", req.reasonCode(), "expiresAt", expiresAt.toString(),
-                "activatedAt", Instant.now().toString());
+                "activatedAt", Instant.now(clock).toString());
         publisher.publish(tenantId, BreakGlassPolicy.ACTIVATED_EVENT, payload);
         publisher.publish(tenantId, BreakGlassPolicy.OWNER_WHATSAPP_EVENT, payload);
 

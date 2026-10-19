@@ -43,7 +43,7 @@ public class DayCloseService {
     public DayCloseSummaryResponse summary(UUID tenantId, LocalDate date) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         LocalDate day = date != null ? date : today;
         Instant start = day.atStartOfDay(zone).toInstant();
         Instant end = day.plusDays(1).atStartOfDay(zone).toInstant();
@@ -64,7 +64,7 @@ public class DayCloseService {
     public DayCloseSummaryResponse close(UUID tenantId, UUID staffId, DayCloseRequest req) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         if (repo.isClosed(tenantId, today)) {
             throw new ApiException(HttpStatus.CONFLICT, "day-already-closed", "Day already closed",
                     "Today is already closed. Unlock it first to change anything.");
