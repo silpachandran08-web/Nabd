@@ -16,7 +16,7 @@ class MailConfigTest {
         ObjectProvider<JavaMailSender> neverCalled = new StubProvider(() -> {
             throw new AssertionError("a blank host must never look up a JavaMailSender bean");
         });
-        EmailSender sender = config.emailSender(neverCalled, "", "user@example.com");
+        EmailSender sender = config.emailSender(neverCalled, "", "user@example.com", new com.nabd.hms.shared.integration.ExternalCallGuard(new org.springframework.mock.env.MockEnvironment()));
         assertThat(sender).isInstanceOf(LoggingEmailSender.class);
     }
 
@@ -24,7 +24,7 @@ class MailConfigTest {
     void usesSmtpWhenHostIsConfigured() {
         JavaMailSender mailSender = new JavaMailSenderImpl();
         ObjectProvider<JavaMailSender> provider = new StubProvider(() -> mailSender);
-        EmailSender sender = config.emailSender(provider, "smtp.gmail.com", "user@example.com");
+        EmailSender sender = config.emailSender(provider, "smtp.gmail.com", "user@example.com", new com.nabd.hms.shared.integration.ExternalCallGuard(new org.springframework.mock.env.MockEnvironment()));
         assertThat(sender).isInstanceOf(SmtpEmailSender.class);
     }
 

@@ -5,7 +5,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -14,11 +16,14 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * NB-007: runHandler and recordFailure are deliberately two separate @Transactional methods,
- * called only from OutboxDispatcher (never from each other — a self-call would silently skip
- * @Transactional, same pitfall ProvisioningStepRunner's javadoc warns about). A failed handler's
- * own writes roll back with runHandler's transaction; the retry/backoff bookkeeping in
- * recordFailure commits regardless, in its own transaction.
+ * NB-007: runHandler and recordFailure are deliberately two separate transactions, called only from
+ * OutboxDispatcher. A failed handler's own writes roll back with runHandler's transaction; the retry/backoff
+ * bookkeeping in recordFailure commits regardless, in its own transaction.
+ *
+ * <p>OPS-012: a handler that {@link OutboxEventHandler#callsExternalProvider() calls a provider} runs with no
+ * transaction open (it opens its own short ones); only markDone runs in a short transaction after it. Others keep
+ * running inside one transaction with markDone. A handler can ask for a specific retry delay by throwing
+ * {@link OutboxRetryLaterException}.
  *
  * <p>OPS-014: every completion is fenced (see OutboxRepository). A fenced-out completion means this worker's
  * lease expired and another worker owns the event now: it is logged as outbox_fencing_rejected_total and counted,
@@ -38,24 +43,64 @@ class OutboxEventProcessor {
     private final TenantContext tenantContext;
     private final Map<String, OutboxEventHandler> handlersByType;
     private final Counter fencingRejected;
+    private final TransactionTemplate tx;
 
-    OutboxEventProcessor(OutboxRepository repo, TenantContext tenantContext, List<OutboxEventHandler> handlers, MeterRegistry meters) {
+    OutboxEventProcessor(OutboxRepository repo, TenantContext tenantContext, List<OutboxEventHandler> handlers, MeterRegistry meters,
+                         PlatformTransactionManager txManager) {
         this.repo = repo;
+        this.tx = new TransactionTemplate(txManager);
         this.tenantContext = tenantContext;
         this.fencingRejected = meters.counter("outbox.fencing.rejected");
         this.handlersByType = handlers.stream().collect(Collectors.toMap(OutboxEventHandler::eventType, Function.identity()));
     }
 
-    @Transactional(rollbackFor = Exception.class)
     void runHandler(OutboxEvent event) throws Exception {
-        tenantContext.set(event.tenantId());
         OutboxEventHandler handler = handlersByType.get(event.eventType());
         if (handler == null) {
             throw new IllegalStateException("no OutboxEventHandler registered for event type '" + event.eventType() + "'");
         }
-        handler.handle(event);
+        if (handler.callsExternalProvider()) {
+            handler.handle(event);
+            inTenantTx(event, () -> markDone(event));
+        } else {
+            inTenantTx(event, () -> {
+                handler.handle(event);
+                markDone(event);
+            });
+        }
+    }
+
+    private void markDone(OutboxEvent event) {
         if (repo.markDone(event) == 0) {
             fenced(event, "markDone");
+        }
+    }
+
+    private interface Work {
+        void run() throws Exception;
+    }
+
+    /** Rolls back on any exception (checked ones too) and rethrows it unwrapped. */
+    private void inTenantTx(OutboxEvent event, Work work) throws Exception {
+        try {
+            tx.executeWithoutResult(status -> {
+                tenantContext.set(event.tenantId());
+                try {
+                    work.run();
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new Checked(e);
+                }
+            });
+        } catch (Checked c) {
+            throw (Exception) c.getCause();
+        }
+    }
+
+    private static final class Checked extends RuntimeException {
+        Checked(Exception cause) {
+            super(cause);
         }
     }
 
@@ -64,7 +109,8 @@ class OutboxEventProcessor {
         tenantContext.set(event.tenantId());
         int updated = event.attempts() >= MAX_ATTEMPTS
                 ? repo.markDead(event, summarize(cause))
-                : repo.markFailed(event, summarize(cause), Instant.now().plusSeconds(backoffSeconds(event.attempts())));
+                : repo.markFailed(event, summarize(cause), Instant.now().plusSeconds(cause instanceof OutboxRetryLaterException later
+                        ? later.delaySeconds() : backoffSeconds(event.attempts())));
         if (updated == 0) {
             fenced(event, event.attempts() >= MAX_ATTEMPTS ? "markDead" : "markFailed");
         }

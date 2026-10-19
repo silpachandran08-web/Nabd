@@ -2,16 +2,20 @@ package com.nabd.hms.messaging;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.UUID;
 
 /** NB-190 template library. Submission to Meta is synchronous so a rule Meta enforces up front (bad
- * name, duplicate, policy) comes straight back to the clinic; the review verdict arrives later by webhook. */
+ * name, duplicate, policy) comes straight back to the clinic; the review verdict arrives later by webhook.
+ * OPS-012: create/resubmit are read-check tx, Meta call with no transaction open, write tx — never one
+ * transaction around the HTTP call. */
 @Service
 public class WhatsAppTemplateService {
 
@@ -26,20 +30,32 @@ public class WhatsAppTemplateService {
     private final WhatsAppTemplateRepository repo;
     private final WhatsAppClient client;
     private final TenantContext tenantContext;
+    private final TransactionTemplate tx;
 
-    WhatsAppTemplateService(WhatsAppTemplateRepository repo, WhatsAppClient client, TenantContext tenantContext) {
+    WhatsAppTemplateService(WhatsAppTemplateRepository repo, WhatsAppClient client, TenantContext tenantContext,
+                            PlatformTransactionManager txManager) {
         this.repo = repo;
         this.client = client;
         this.tenantContext = tenantContext;
+        this.tx = new TransactionTemplate(txManager);
     }
 
-    @Transactional(readOnly = true)
+    private <T> T inTenantTx(UUID tenantId, java.util.function.Supplier<T> work) {
+        return tx.execute(status -> {
+            tenantContext.set(tenantId);
+            return work.get();
+        });
+    }
+
+    private ApiException duplicate(TemplateRequest req) {
+        return new ApiException(HttpStatus.CONFLICT, "duplicate-whatsapp-template", "Template already exists",
+                "A template called " + req.name() + " already exists in " + req.language() + ".");
+    }
+
     public List<TemplateResponse> list(UUID tenantId) {
-        tenantContext.set(tenantId);
-        return repo.list(tenantId).stream().map(WhatsAppTemplateService::toResponse).toList();
+        return inTenantTx(tenantId, () -> repo.list(tenantId).stream().map(WhatsAppTemplateService::toResponse).toList());
     }
 
-    @Transactional
     public TemplateResponse create(UUID tenantId, TemplateRequest req) {
         TemplateRules.checkName(req.name(), req.language());
         if (!"UTILITY".equals(req.category()) && !"MARKETING".equals(req.category())) {
@@ -48,40 +64,46 @@ public class WhatsAppTemplateService {
         }
         String body = req.body() == null ? null : req.body().strip();
         int paramCount = TemplateRules.checkBody(body, req.examples());
-        tenantContext.set(tenantId);
-        if (repo.findByName(tenantId, req.name(), req.language()).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "duplicate-whatsapp-template", "Template already exists",
-                    "A template called " + req.name() + " already exists in " + req.language() + ".");
-        }
-        WhatsAppTemplateRepository.Clinic clinic = repo.clinic(tenantId);
+        WhatsAppTemplateRepository.Clinic clinic = inTenantTx(tenantId, () -> {
+            if (repo.findByName(tenantId, req.name(), req.language()).isPresent()) {
+                throw duplicate(req);
+            }
+            return repo.clinic(tenantId);
+        });
         String header = header(clinic);
         String metaName = clinic.slug().toLowerCase().replaceAll("[^a-z0-9_]", "_") + "_" + req.name();
         WhatsAppClient.Submission submission = submitToMeta(() ->
                 client.createTemplate(metaName, req.language(), req.category(), header, body, req.examples()));
-        UUID id = repo.insert(tenantId, req.name(), metaName, req.language(), req.category(), header, body, paramCount,
-                statusOf(submission.status()), submission.metaTemplateId());
-        return toResponse(repo.find(tenantId, id).orElseThrow());
+        try {
+            return inTenantTx(tenantId, () -> {
+                UUID id = repo.insert(tenantId, req.name(), metaName, req.language(), req.category(), header, body, paramCount,
+                        statusOf(submission.status()), submission.metaTemplateId());
+                return toResponse(repo.find(tenantId, id).orElseThrow());
+            });
+        } catch (DuplicateKeyException raced) { // a concurrent create of the same name won between the check and here
+            throw duplicate(req);
+        }
     }
 
     /** The fix path for a rejected template: new text goes back to Meta for review. */
-    @Transactional
     public TemplateResponse resubmit(UUID tenantId, UUID id, TemplateRequest req) {
-        tenantContext.set(tenantId);
-        WhatsAppTemplateRepository.Template t = repo.find(tenantId, id).orElseThrow(() ->
-                new ApiException(HttpStatus.NOT_FOUND, "whatsapp-template-not-found", "Template not found", null));
+        WhatsAppTemplateRepository.Template t = inTenantTx(tenantId, () -> repo.find(tenantId, id).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "whatsapp-template-not-found", "Template not found", null)));
         if (!"rejected".equals(t.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "whatsapp-template-not-editable", "Template can't be edited",
                     "Only a rejected template can be edited and resubmitted; this one is " + t.status() + ".");
         }
         String body = req.body() == null ? null : req.body().strip();
         int paramCount = TemplateRules.checkBody(body, req.examples());
-        String header = header(repo.clinic(tenantId));
+        String header = header(inTenantTx(tenantId, () -> repo.clinic(tenantId)));
         submitToMeta(() -> {
             client.editTemplate(t.metaTemplateId(), header, body, req.examples());
             return null;
         });
-        repo.resubmitted(tenantId, id, header, body, paramCount);
-        return toResponse(repo.find(tenantId, id).orElseThrow());
+        return inTenantTx(tenantId, () -> {
+            repo.resubmitted(tenantId, id, header, body, paramCount);
+            return toResponse(repo.find(tenantId, id).orElseThrow());
+        });
     }
 
     private static String header(WhatsAppTemplateRepository.Clinic clinic) {

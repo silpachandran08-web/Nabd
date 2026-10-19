@@ -29,6 +29,7 @@ public final class SlowWhatsAppStub {
     public final Map<String, AtomicInteger> sendsByMarker = new ConcurrentHashMap<>();
     public final AtomicLong latencyMs = new AtomicLong(0);
     public final AtomicInteger requests = new AtomicInteger();
+    public final AtomicInteger status = new AtomicInteger(200);
 
     private SlowWhatsAppStub(HttpServer server) {
         this.server = server;
@@ -41,14 +42,27 @@ public final class SlowWhatsAppStub {
             s.createContext("/", ex -> {
                 stub.requests.incrementAndGet();
                 byte[] in = ex.getRequestBody().readAllBytes();
+                if (stub.status.get() == 200) { // counted on arrival: the provider has the send even if the caller times out
+                    JsonNode body = stub.json.readTree(in.length == 0 ? "{}".getBytes() : in);
+                    String marker = body.path("template").path("components").path(0).path("parameters").path(0).path("text").asText("");
+                    stub.sendsByMarker.computeIfAbsent(marker, k -> new AtomicInteger()).incrementAndGet();
+                }
                 try {
                     Thread.sleep(stub.latencyMs.get());
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
-                JsonNode body = stub.json.readTree(in.length == 0 ? "{}".getBytes() : in);
-                String marker = body.path("template").path("components").path(0).path("parameters").path(0).path("text").asText("");
-                stub.sendsByMarker.computeIfAbsent(marker, k -> new AtomicInteger()).incrementAndGet();
+                if (stub.status.get() != 200) {
+                    byte[] err = "{\"error\":{\"message\":\"stub failure\"}}".getBytes(StandardCharsets.UTF_8);
+                    try {
+                        ex.sendResponseHeaders(stub.status.get(), err.length);
+                        ex.getResponseBody().write(err);
+                    } catch (IOException clientGone) {
+                        // caller gave up
+                    }
+                    ex.close();
+                    return;
+                }
                 byte[] out = ("{\"messages\":[{\"id\":\"wamid.stub-" + UUID.randomUUID() + "\"}]}").getBytes(StandardCharsets.UTF_8);
                 ex.getResponseHeaders().add("Content-Type", "application/json");
                 try {
@@ -74,10 +88,18 @@ public final class SlowWhatsAppStub {
     public void reset(long latency) {
         sendsByMarker.clear();
         requests.set(0);
+        status.set(200);
         latencyMs.set(latency);
     }
 
-    public int maxSendsPerMarker() {
-        return sendsByMarker.values().stream().mapToInt(AtomicInteger::get).max().orElse(0);
+    /** Sends whose marker starts with {@code prefix} (a slow request from an earlier test can land after reset). */
+    public Map<String, Integer> sendsWithPrefix(String prefix) {
+        Map<String, Integer> out = new java.util.HashMap<>();
+        sendsByMarker.forEach((k, v) -> {
+            if (k.startsWith(prefix)) {
+                out.put(k, v.get());
+            }
+        });
+        return out;
     }
 }

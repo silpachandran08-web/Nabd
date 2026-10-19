@@ -1,28 +1,27 @@
 package com.nabd.hms.messaging;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.nabd.hms.shared.integration.ResilientHttpClient;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
 
-/** Meta WhatsApp Cloud API — POST {base}/{phone-number-id}/messages. */
+/** Meta WhatsApp Cloud API — POST {base}/{phone-number-id}/messages. OPS-012: built on ResilientHttpClient
+ * (provider "meta-whatsapp"), so every call is timeout-bounded, circuit-broken and refused inside a DB transaction. */
 class MetaWhatsAppClient implements WhatsAppClient {
 
     private final RestClient http;
     private final String phoneNumberId;
     private final String businessAccountId;
 
-    MetaWhatsAppClient(WhatsAppProperties props) {
-        SimpleClientHttpRequestFactory timeouts = new SimpleClientHttpRequestFactory();
-        timeouts.setConnectTimeout(5000);
-        timeouts.setReadTimeout(10000);
-        this.http = RestClient.builder()
+    static final String PROVIDER = "meta-whatsapp";
+
+    MetaWhatsAppClient(WhatsAppProperties props, ResilientHttpClient integration) {
+        this.http = integration.builder(PROVIDER)
                 .baseUrl(props.apiBaseUrl())
                 .defaultHeader("Authorization", "Bearer " + props.accessToken())
-                .requestFactory(timeouts)
                 .build();
         this.phoneNumberId = props.phoneNumberId();
         this.businessAccountId = props.businessAccountId();

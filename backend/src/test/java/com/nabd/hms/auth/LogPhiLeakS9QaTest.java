@@ -35,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LogPhiLeakS9QaTest extends ApiTestBase {
 
     static final List<String> SECRETS = new CopyOnWriteArrayList<>();
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.OutboxDispatcher dispatcher; // OPS-012: OTPs are sent by the outbox, after the request
     private ListAppender<ILoggingEvent> appender;
     private Logger root;
 
@@ -60,6 +62,7 @@ class LogPhiLeakS9QaTest extends ApiTestBase {
         String access = loginAndGetAccessToken(s); // before the PIN is changed below
         http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099")), Void.class);
+        dispatcher.poll();
         String otp = SECRETS.get(0);
         ResponseEntity<Map> v = http.exchange(url("/v1/auth/otp/verify"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099", "code", otp)), Map.class);
@@ -68,6 +71,7 @@ class LogPhiLeakS9QaTest extends ApiTestBase {
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099", "code", "000000")), Map.class);
         http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099")), Void.class);
+        dispatcher.poll();
         String token = SECRETS.get(SECRETS.size() - 1);
         ResponseEntity<Void> rc = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099", "token", token, "newPin", "482913")), Void.class);

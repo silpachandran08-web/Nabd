@@ -29,7 +29,6 @@ import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.TenantContext;
-import com.nabd.hms.common.WhatsAppOtpSender;
 import com.nabd.hms.config.AuthProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +73,7 @@ public class AuthService {
     private final ChallengeTokenDecoder jwtDecoder;
     private final AuthProperties props;
     private final ObjectMapper objectMapper;
-    private final WhatsAppOtpSender otpSender;
+    private final OtpOutbox otpOutbox;
     private final AuditService auditService;
     private final LoginGuard guard;
     private final StepUpVerifier stepUpVerifier;
@@ -82,7 +81,7 @@ public class AuthService {
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
-                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
+                AuthProperties props, ObjectMapper objectMapper, OtpOutbox otpOutbox, AuditService auditService,
                 LoginGuard guard, StepUpVerifier stepUpVerifier) {
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -93,7 +92,7 @@ public class AuthService {
         this.jwtDecoder = jwtDecoder;
         this.props = props;
         this.objectMapper = objectMapper;
-        this.otpSender = otpSender;
+        this.otpOutbox = otpOutbox;
         this.auditService = auditService;
         this.guard = guard;
         this.stepUpVerifier = stepUpVerifier;
@@ -197,8 +196,9 @@ public class AuthService {
         }
 
         String code = generateOtpCode();
-        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), Instant.now().plus(5, ChronoUnit.MINUTES));
-        otpSender.send(staff.mobilePhone(), code); // the number on file, not whatever format was typed
+        Instant expiresAt = Instant.now().plus(5, ChronoUnit.MINUTES);
+        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), expiresAt);
+        otpOutbox.queue(tenant.id(), staff.id(), "login", code, expiresAt); // OPS-012: sent by the outbox, to the number on file
         log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
 
@@ -423,8 +423,9 @@ public class AuthService {
             return;
         }
         String token = OpaqueTokens.generate();
-        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), Instant.now().plus(15, ChronoUnit.MINUTES));
-        otpSender.send(staff.mobilePhone(), token);
+        Instant expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES);
+        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), expiresAt);
+        otpOutbox.queue(tenant.id(), staff.id(), "pin_reset", token, expiresAt); // OPS-012: sent by the outbox
         log.info("PIN reset token issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
 

@@ -117,12 +117,23 @@ app:
     poll-interval-ms: 2000
     batch-size: 20
     lease-seconds: 60
-    # OPS-014: slowest handler's connect + read timeout (Meta: 5 s + 10 s). 20 x 15 s > 60 s, so the lease is
+    # OPS-014: at least the slowest handler's connect + read timeout (Meta 2 s + 5 s, app.integration below, with
+    # headroom). 20 x 15 s > 60 s, so the lease is
     # renewed before each event; OutboxProperties refuses to boot a config where a batch can outlive its lease.
     per-event-timeout-ms: 15000
     extend-lease-per-event: true
     purge-cron: "0 23 * * * *"   # hourly: done rows after 7 days, dead after 90
     metrics-interval-ms: 15000
+  # OPS-012: every outbound HTTP call goes through shared.integration.ResilientHttpClient. Defaults: connect 2 s,
+  # read 5 s. Per-provider overrides: app.integration.providers.<name>.connect-timeout-ms / read-timeout-ms
+  # (providers today: meta-whatsapp, on the defaults). Keep connect + read of the slowest provider at or below
+  # app.outbox.per-event-timeout-ms. The breaker opens after 5 consecutive failures (IO, timeout, 429, 5xx) for 30 s.
+  integration:
+    connect-timeout-ms: 2000
+    read-timeout-ms: 5000
+    circuit-failure-threshold: 5
+    circuit-open-seconds: 30
+    providers: {}
   whatsapp:
     # Meta WhatsApp Cloud API. Blank access token = LoggingWhatsAppClient (logs, never sends) —
     # every local/test run, same as spring.mail.host above.

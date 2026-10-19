@@ -30,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LogPhiLeakTest extends ApiTestBase {
 
     static final List<String> SENT_SECRETS = new CopyOnWriteArrayList<>();
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.OutboxDispatcher dispatcher; // OPS-012: OTPs are sent by the outbox, after the request
 
     private ListAppender<ILoggingEvent> appender;
     private Logger root;
@@ -60,6 +62,7 @@ class LogPhiLeakTest extends ApiTestBase {
         assertThat(http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+919812340077")), Void.class).getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
+        dispatcher.poll(); // the sends (and their log lines) happen here now
         ResponseEntity<Map> bg = activateBreakGlass(loginAndGetAccessToken(staff), reason, null);
         assertThat(bg.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 

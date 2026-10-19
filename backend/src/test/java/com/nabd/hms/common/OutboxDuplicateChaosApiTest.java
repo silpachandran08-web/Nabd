@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -37,16 +38,7 @@ class OutboxDuplicateChaosApiTest extends SlowProviderTestBase {
 
     private SeededTenant queueMessages(int n) {
         SeededTenant t = seedTenant();
-        inTenantTx(t.id(), () -> {
-            for (int i = 0; i < n; i++) {
-                var id = jdbc.queryForObject("""
-                        INSERT INTO whatsapp_messages (tenant_id, to_phone, template_name, language, params)
-                        VALUES (?, '+919800000000', 'appointment_reminder', 'en', jsonb_build_array(?::text)) RETURNING id
-                        """, java.util.UUID.class, t.id(), "m-" + i);
-                jdbc.update("INSERT INTO outbox_events (tenant_id, event_type, payload) VALUES (?, 'whatsapp.send', jsonb_build_object('messageId', ?::text))",
-                        t.id(), id.toString());
-            }
-        });
+        queueWhatsApp(t, n, "m-");
         return t;
     }
 
@@ -80,8 +72,9 @@ class OutboxDuplicateChaosApiTest extends SlowProviderTestBase {
     }
 
     private void assertEachMessageSentExactlyOnce(SeededTenant t) {
-        assertThat(STUB.sendsByMarker).hasSize(MESSAGES);
-        assertThat(STUB.maxSendsPerMarker()).as("duplicate deliveries at the provider").isEqualTo(1);
+        Map<String, Integer> sends = STUB.sendsWithPrefix("m-");
+        assertThat(sends).hasSize(MESSAGES);
+        assertThat(sends.values()).as("duplicate deliveries at the provider").containsOnly(1);
         assertThat(inTenantTx(t.id(), () -> jdbc.queryForObject(
                 "SELECT count(*) FROM whatsapp_messages WHERE tenant_id = ? AND status = 'sent' AND wamid IS NOT NULL", Integer.class, t.id())))
                 .isEqualTo(MESSAGES);
