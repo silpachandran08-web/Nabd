@@ -139,7 +139,7 @@ public class QueueService {
         UUID id;
         try {
             id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
-                    null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode(), null, null);
+                    null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode(), null, null, clock.now());
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             if (req.appointmentId() != null && String.valueOf(e.getMessage()).contains("uq_queue_entries_appointment")) {
                 throw new ApiException(HttpStatus.CONFLICT, "already-checked-in", "Already checked in",
@@ -208,7 +208,7 @@ public class QueueService {
         payload.put("clinicDate", current.queueDate());
         payload.put("fromStatus", current.status());
         payload.put("toStatus", nextStatus);
-        payload.put("occurredAt", Instant.now());
+        payload.put("occurredAt", clock.now());
         payload.put("actorRole", role);
         events.publish(tenantId, "visit.queue_entry.status_changed.v1", payload);
     }
@@ -259,7 +259,7 @@ public class QueueService {
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
         // though this is a brand-new queue_entries row with its own status/practitioner/department.
         UUID newId = repo.insert(tenantId, null, current.patientId(), req.doctorId(), req.toDepartmentId(),
-                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null, req.reason(), blankToNull(req.reasonNote()));
+                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null, req.reason(), blankToNull(req.reasonNote()), clock.now());
         log.info("queue entry {} opened by transfer from {} (doctor {}, department {})",
                 newId, id, req.doctorId(), req.toDepartmentId());
 
@@ -317,7 +317,7 @@ public class QueueService {
     /** NB-098 — same session cap AppointmentService.book() enforces, applied to the walk-in path. */
     private void enforceSessionCapacity(UUID tenantId, UUID doctorId, LocalDate today) {
         ZoneId zone = clock.zone(tenantId);
-        LocalTime now = Instant.now().atZone(zone).toLocalTime(); // the clinic's clock, same as the block times
+        LocalTime now = clock.now().atZone(zone).toLocalTime(); // the clinic's clock, same as the block times
         int dayOfWeek = today.getDayOfWeek().getValue() % 7;
 
         Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, now);

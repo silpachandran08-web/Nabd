@@ -90,7 +90,7 @@ public class PatientService {
                     "filter must be one of " + String.join(", ", REGISTRY_FILTERS) + ".");
         }
         java.time.ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         List<PatientRegistryResponse.Row> all = repo.registry(tenantId, scopedToDoctorId, today,
                 today.atStartOfDay(zone).toInstant(), REGISTRY_CAP).stream().map(r -> {
             boolean archived = !"active".equals(r.status());
@@ -387,7 +387,7 @@ public class PatientService {
                     "Only an adult patient who still has a guardian on file has a guardian review.");
         }
         java.util.Map<String, Object> changes = new java.util.LinkedHashMap<>();
-        changes.put("guardian_review_kept_at", java.sql.Timestamp.from(java.time.Instant.now()));
+        changes.put("guardian_review_kept_at", java.sql.Timestamp.from(clock.now()));
         changes.put("guardian_review_kept_by", callerStaffId);
         repo.update(tenantId, id, changes);
         audit(tenantId, callerStaffId, "patient.guardian_review_kept", id, null, Map.of("guardianId", before.guardianId().toString()));

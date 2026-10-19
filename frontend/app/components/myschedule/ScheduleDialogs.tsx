@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 import styles from "./mySchedule.module.css";
 import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
-import { WEEKDAYS, hhmm, isoDate, type LeaveInput, type WorkingHours, type WorkingHoursInput } from "./useMySchedule";
+import { WEEKDAYS, hhmm, type LeaveInput, type WorkingHours, type WorkingHoursInput } from "./useMySchedule";
+import { clinicToday } from "../../lib/clinicTime";
 
 const toMin = (t: string) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
 
@@ -70,7 +71,7 @@ export function LeaveDialog({ onClose, onSave }: {
   onClose: () => void;
   onSave: (i: LeaveInput) => Promise<{ error: string } | { affected: string[] }>;
 }) {
-  const today = isoDate(new Date());
+  const today = clinicToday();
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const [reason, setReason] = useState("");

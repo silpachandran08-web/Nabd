@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,7 +30,10 @@ public class AuditSearchController {
 
     private final AuditSearchService service;
 
-    AuditSearchController(AuditSearchService service) {
+    private final Clock clock;
+
+    AuditSearchController(AuditSearchService service, Clock clock) {
+        this.clock = clock;
         this.service = service;
     }
 
@@ -71,7 +75,7 @@ public class AuditSearchController {
                 actorId, actorType, actorRole, actorName), new AuditSearchService.ValueAccess(includeValues, reason),
                 UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
         // Cross-tenant export: there is no single clinic zone, so the filename carries the UTC date, labelled as such.
-        String utcDate = Instant.now().toString().substring(0, 10);
+        String utcDate = Instant.now(clock).toString().substring(0, 10);
         return ResponseEntity.ok()
                 .contentType(MediaType.valueOf("text/csv"))
                 .header(HttpHeaders.CONTENT_DISPOSITION,

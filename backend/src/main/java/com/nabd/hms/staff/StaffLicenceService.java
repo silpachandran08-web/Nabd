@@ -33,9 +33,11 @@ class StaffLicenceService {
     private final RoleRepository roleRepo;
     private final AuditService auditService;
     private final TenantContext tenantContext;
+    private final java.time.Clock clock;
 
     StaffLicenceService(JdbcTemplate jdbc, StaffRepository staffRepo, RoleRepository roleRepo, AuditService auditService,
-                        TenantContext tenantContext) {
+                        TenantContext tenantContext, java.time.Clock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
         this.staffRepo = staffRepo;
         this.roleRepo = roleRepo;
@@ -74,7 +76,7 @@ class StaffLicenceService {
                     "Only the clinic owner can let an expired licence keep signing.");
         }
         LicenceResponse before = read(tenantId, id);
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         if (!until.isAfter(now) || until.isAfter(now.plus(MAX_OVERRIDE))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-override-window", "Invalid override window",
                     "An override must end in the future and within " + MAX_OVERRIDE.toDays() + " days.");

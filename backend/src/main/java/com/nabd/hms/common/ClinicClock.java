@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -29,9 +30,16 @@ public class ClinicClock {
     private static final ZoneId UTC = ZoneId.of("UTC"); // id "UTC", not "Z" — it is passed to SQL AT TIME ZONE
 
     private final JdbcTemplate jdbc;
+    private final Clock clock;
 
-    ClinicClock(JdbcTemplate jdbc) {
+    ClinicClock(JdbcTemplate jdbc, Clock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
+    }
+
+    /** The current instant from the injected Clock (PLT-028), so tests can freeze it. */
+    public Instant now() {
+        return clock.instant();
     }
 
     /** tenants carries no RLS (V6), so this works before or after TenantContext.set. */
@@ -43,7 +51,11 @@ public class ClinicClock {
     }
 
     public LocalDate today(UUID tenantId) {
-        return LocalDate.now(zone(tenantId));
+        return today(zone(tenantId));
+    }
+
+    public LocalDate today(ZoneId zone) {
+        return LocalDate.now(clock.withZone(zone));
     }
 
     /** The instant a clinic day starts — the lower bound of a "that day" timestamptz range. */

@@ -9,6 +9,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -45,8 +46,11 @@ class OutboxEventProcessor {
     private final Counter fencingRejected;
     private final TransactionTemplate tx;
 
+    private final Clock clock;
+
     OutboxEventProcessor(OutboxRepository repo, TenantContext tenantContext, List<OutboxEventHandler> handlers, MeterRegistry meters,
-                         PlatformTransactionManager txManager) {
+                         PlatformTransactionManager txManager, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tx = new TransactionTemplate(txManager);
         this.tenantContext = tenantContext;
@@ -109,7 +113,7 @@ class OutboxEventProcessor {
         tenantContext.set(event.tenantId());
         int updated = event.attempts() >= MAX_ATTEMPTS
                 ? repo.markDead(event, summarize(cause))
-                : repo.markFailed(event, summarize(cause), Instant.now().plusSeconds(cause instanceof OutboxRetryLaterException later
+                : repo.markFailed(event, summarize(cause), Instant.now(clock).plusSeconds(cause instanceof OutboxRetryLaterException later
                         ? later.delaySeconds() : backoffSeconds(event.attempts())));
         if (updated == 0) {
             fenced(event, event.attempts() >= MAX_ATTEMPTS ? "markDead" : "markFailed");

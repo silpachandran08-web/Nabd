@@ -63,7 +63,7 @@ public class ClinicalAuthority {
             return NOT_LICENSED;
         }
         boolean expired = l.expiresOn() != null && l.expiresOn().isBefore(clock.today(tenantId));
-        if (expired && (l.overrideUntil() == null || !l.overrideUntil().isAfter(Instant.now()))) {
+        if (expired && (l.overrideUntil() == null || !l.overrideUntil().isAfter(clock.now()))) {
             return LICENCE_EXPIRED;
         }
         if (!callerHas("clinical:edit")) {

@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -51,7 +52,10 @@ public class TicketService {
     private final TenantContext tenantContext;
     private final PlatformAudit audit;
 
-    TicketService(TicketRepository repo, TenantContext tenantContext, PlatformAudit audit) {
+    private final Clock clock;
+
+    TicketService(TicketRepository repo, TenantContext tenantContext, PlatformAudit audit, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.audit = audit;
@@ -65,7 +69,7 @@ public class TicketService {
         String priority = req.priorityOrDefault();
         Ticket ticket = new Ticket(UUID.randomUUID(), tenantId, null, null, "staff", raiser.staffId(), raiser.name(),
                 raiser.email(), raiser.role(), req.subject(), req.description(), priority, "open",
-                Instant.now().plus(SLA_BY_PRIORITY.get(priority)), null, null);
+                Instant.now(clock).plus(SLA_BY_PRIORITY.get(priority)), null, null);
         repo.insert(ticket);
         log.info("ticket {} raised for tenant {} by staff {} ({}), priority {}",
                 ticket.id(), tenantId, staffId, raiser.role(), priority);
@@ -77,7 +81,7 @@ public class TicketService {
         String effectivePriority = priority == null ? "normal" : priority;
         Ticket ticket = new Ticket(UUID.randomUUID(), tenantId, null, null, "system", null, "Nabd System", null,
                 "System", subject, description, effectivePriority, "open",
-                Instant.now().plus(SLA_BY_PRIORITY.get(effectivePriority)), null, null);
+                Instant.now(clock).plus(SLA_BY_PRIORITY.get(effectivePriority)), null, null);
         repo.insert(ticket);
         log.info("ticket {} raised for tenant {} by system, priority {}", ticket.id(), tenantId, effectivePriority);
         return toResponse(repo.findById(ticket.id()).orElseThrow());
@@ -96,7 +100,7 @@ public class TicketService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-ticket-transition", "Invalid ticket transition",
                     "A ticket in " + ticket.status() + " cannot move to " + toStatus + ".");
         }
-        Instant resolvedAt = toStatus.equals("resolved") ? Instant.now() : ticket.resolvedAt();
+        Instant resolvedAt = toStatus.equals("resolved") ? Instant.now(clock) : ticket.resolvedAt();
         repo.updateStatus(id, toStatus, resolvedAt);
         log.info("ticket {} transitioned {} -> {}", id, ticket.status(), toStatus);
         // Status only: subject/description are staff free text and stay out of the audit row.
@@ -106,7 +110,7 @@ public class TicketService {
     }
 
     private TicketResponse toResponse(Ticket t) {
-        boolean breached = Set.of("open", "in_progress").contains(t.status()) && t.slaDueAt().isBefore(Instant.now());
+        boolean breached = Set.of("open", "in_progress").contains(t.status()) && t.slaDueAt().isBefore(Instant.now(clock));
         return new TicketResponse(t.id(), t.tenantId(), t.tenantName(), t.tenantSlug(), t.source(), t.raisedByName(),
                 t.raisedByEmail(), t.raisedByRole(), t.subject(), t.description(), t.priority(), t.status(),
                 t.slaDueAt(), breached, t.resolvedAt(), t.createdAt());

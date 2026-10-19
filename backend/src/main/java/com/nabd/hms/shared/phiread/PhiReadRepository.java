@@ -14,8 +14,10 @@ class PhiReadRepository {
     }
 
     private final JdbcTemplate jdbc;
+    private final java.time.Clock clock;
 
-    PhiReadRepository(JdbcTemplate jdbc) {
+    PhiReadRepository(JdbcTemplate jdbc, java.time.Clock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
     }
 
@@ -75,6 +77,7 @@ class PhiReadRepository {
     }
 
     void ensurePartitions() {
-        jdbc.queryForObject("SELECT phi_read_log_ensure_partitions((now() AT TIME ZONE 'UTC')::date, 2)", Integer.class);
+        // partitions are UTC days; the injected Clock is UTC (ClockConfig), so this is today's UTC date
+        jdbc.queryForObject("SELECT phi_read_log_ensure_partitions(?, 2)", Integer.class, java.sql.Date.valueOf(java.time.LocalDate.now(clock)));
     }
 }

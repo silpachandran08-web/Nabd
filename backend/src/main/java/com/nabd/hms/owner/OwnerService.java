@@ -40,6 +40,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -82,9 +83,13 @@ public class OwnerService {
     private final ChallengeTokenDecoder challengeDecoder;
     private final AuditService auditService;
 
+    private final Clock clock;
+
     OwnerService(OwnerRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                  JwtEncoder jwtEncoder, AuthProperties props, AuthService authService, MfaPolicy mfaPolicy,
-                 TotpService totp, FieldCipher cipher, ChallengeTokenDecoder challengeDecoder, AuditService auditService) {
+                 TotpService totp, FieldCipher cipher, ChallengeTokenDecoder challengeDecoder, AuditService auditService,
+                 Clock clock) {
+        this.clock = clock;
         this.mfaPolicy = mfaPolicy;
         this.totp = totp;
         this.cipher = cipher;
@@ -142,7 +147,7 @@ public class OwnerService {
         Owner owner = ownerFrom(req.challengeToken(), TokenType.MFA_PENDING, OWNER_MFA_PENDING);
         enforceAccountLockout(owner);
         OwnerRepository.MfaState mfa = repo.mfaState(owner.id());
-        long step = mfa.secretEnc() == null ? -1 : totp.matchStep(cipher.decrypt(mfa.secretEnc(), mfaAad(owner)), req.code(), Instant.now());
+        long step = mfa.secretEnc() == null ? -1 : totp.matchStep(cipher.decrypt(mfa.secretEnc(), mfaAad(owner)), req.code(), Instant.now(clock));
         if (step < 0 || !repo.claimTotpStep(owner.id(), step)) {
             repo.recordLoginAttempt(owner.id(), owner.email(), ip, false);
             log.warn("MFA verification failed for owner {}", owner.id());
@@ -181,7 +186,7 @@ public class OwnerService {
         Owner owner = ownerFrom(req.setupToken(), TokenType.MFA_SETUP, OWNER_MFA_SETUP);
         enforceAccountLockout(owner);
         byte[] pending = repo.mfaState(owner.id()).pendingSecretEnc();
-        long step = pending == null ? -1 : totp.matchStep(cipher.decrypt(pending, mfaAad(owner)), req.code(), Instant.now());
+        long step = pending == null ? -1 : totp.matchStep(cipher.decrypt(pending, mfaAad(owner)), req.code(), Instant.now(clock));
         if (step < 0 || !repo.claimTotpStep(owner.id(), step)) {
             repo.recordLoginAttempt(owner.id(), owner.email(), ip, false);
             throw mfaFailed();
@@ -220,7 +225,7 @@ public class OwnerService {
     }
 
     private String ownerChallengeToken(Owner owner, TokenType type, String purpose) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
@@ -253,7 +258,7 @@ public class OwnerService {
             return Optional.empty();
         }
         String rawToken = OpaqueTokens.generate();
-        repo.setInviteToken(ownerId, OpaqueTokens.sha256Hex(rawToken), Instant.now().plus(72, ChronoUnit.HOURS));
+        repo.setInviteToken(ownerId, OpaqueTokens.sha256Hex(rawToken), Instant.now(clock).plus(72, ChronoUnit.HOURS));
         log.info("owner {} invited to set their account PIN", ownerId);
         return Optional.of(rawToken);
     }
@@ -304,7 +309,7 @@ public class OwnerService {
     }
 
     private String issuePendingWorkspaceToken(Owner owner) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plusSeconds(300);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -317,7 +322,7 @@ public class OwnerService {
     }
 
     private void enforceIpRateLimit(String ip) {
-        int recent = repo.countAttemptsFromIpSince(ip, Instant.now().minus(1, ChronoUnit.MINUTES));
+        int recent = repo.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
         if (recent >= props.rateLimitPerIpPerMinute()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate-limited", "Too many attempts", "Try again shortly.");
         }
@@ -333,7 +338,7 @@ public class OwnerService {
         }
         Instant lastFailedAt = repo.lastFailedAttemptAt(owner.id()).orElse(Instant.EPOCH);
         Instant lockedUntil = lastFailedAt.plus(backoffDuration(failures));
-        if (Instant.now().isBefore(lockedUntil)) {
+        if (Instant.now(clock).isBefore(lockedUntil)) {
             log.warn("account locked: owner {} has {} failed attempts, locked until {}", owner.id(), failures, lockedUntil);
             throw accountLocked();
         }

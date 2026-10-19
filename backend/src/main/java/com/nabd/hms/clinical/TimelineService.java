@@ -36,7 +36,7 @@ public class TimelineService {
     public EncounterPage get(UUID tenantId, UUID patientId, int limit, String cursor) {
         tenantContext.set(tenantId);
         java.time.ZoneId zone = clock.zone(tenantId);
-        Instant since = java.time.LocalDate.now(zone).minusYears(5).atStartOfDay(zone).toInstant();
+        Instant since = clock.today(zone).minusYears(5).atStartOfDay(zone).toInstant();
         Cursor after = cursor == null ? null : Cursor.decode(cursor);
         List<EncounterRow> rows = repo.findForPatient(tenantId, patientId, since, limit + 1,
                 after == null ? null : after.createdAt(), after == null ? null : after.id());

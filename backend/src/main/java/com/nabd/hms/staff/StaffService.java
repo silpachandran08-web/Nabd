@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
@@ -50,9 +51,12 @@ public class StaffService {
     private final GrantAuthority grantAuthority;
     private final EventPublisher eventPublisher;
 
+    private final Clock clock;
+
     StaffService(StaffRepository staffRepo, RoleRepository roleRepo, TenantContext tenantContext,
                  PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService,
-                 GrantAuthority grantAuthority, EventPublisher eventPublisher) {
+                 GrantAuthority grantAuthority, EventPublisher eventPublisher, Clock clock) {
+        this.clock = clock;
         this.staffRepo = staffRepo;
         this.roleRepo = roleRepo;
         this.tenantContext = tenantContext;
@@ -99,7 +103,7 @@ public class StaffService {
 
         UUID id = UUID.randomUUID();
         String rawToken = OpaqueTokens.generate();
-        Instant expiresAt = Instant.now().plus(72, ChronoUnit.HOURS);
+        Instant expiresAt = Instant.now(clock).plus(72, ChronoUnit.HOURS);
         try {
             staffRepo.insertInvite(id, tenantId, req.roleId(), req.email().toLowerCase(), req.name(),
                     req.mobilePhone(), req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy, req.departmentId());

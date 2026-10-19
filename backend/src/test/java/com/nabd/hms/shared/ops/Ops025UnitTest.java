@@ -21,8 +21,8 @@ class Ops025UnitTest {
 
     @Test
     void outboxIndicatorUpAtBoundaryDownBeyond() {
-        OutboxLag lag = new OutboxLag(new SimpleMeterRegistry());
-        OutboxHealthIndicator ind = new OutboxHealthIndicator(lag);
+        OutboxLag lag = new OutboxLag(new SimpleMeterRegistry(), java.time.Clock.systemUTC());
+        OutboxHealthIndicator ind = new OutboxHealthIndicator(lag, java.time.Clock.systemUTC());
         lag.polledAt(Instant.now().minusSeconds(100));
         assertThat(ind.health().getStatus()).isEqualTo(Status.UP);
         lag.polledAt(Instant.now().minusSeconds(OutboxLag.MAX_AGE_SECONDS + 2));
@@ -34,7 +34,7 @@ class Ops025UnitTest {
     @Test
     void outboxMetricsHaveNoLabels() {
         var reg = new SimpleMeterRegistry();
-        OutboxLag lag = new OutboxLag(reg);
+        OutboxLag lag = new OutboxLag(reg, java.time.Clock.systemUTC());
         lag.polled(5, 2);
         assertThat(reg.get("outbox.events.claimed").counter().count()).isEqualTo(5);
         assertThat(reg.get("outbox.events.failed").counter().count()).isEqualTo(2);

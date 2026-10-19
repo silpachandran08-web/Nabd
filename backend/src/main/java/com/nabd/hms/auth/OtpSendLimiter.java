@@ -43,8 +43,10 @@ public class OtpSendLimiter {
     private final EventPublisher events;
     private final int defaultTenantCap;
     private final byte[] pepper;
+    private final java.time.Clock clock;
 
-    OtpSendLimiter(OtpCounterRepository repo, EventPublisher events, Environment env) {
+    OtpSendLimiter(OtpCounterRepository repo, EventPublisher events, Environment env, java.time.Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.events = events;
         this.defaultTenantCap = env.getProperty("app.auth.otp.tenant-hourly-cap", Integer.class, 200);
@@ -69,7 +71,7 @@ public class OtpSendLimiter {
     /** Runs inside the caller's tenant transaction. Records the send when it returns SEND. */
     Decision tryConsume(UUID tenantId, String e164Digits) {
         byte[] h = phoneHmac(e164Digits);
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant bucket = Instant.ofEpochSecond(now.getEpochSecond() / BUCKET_SECONDS * BUCKET_SECONDS);
         repo.lockWindow(tenantId, h, bucket);
         Map<String, Object> use = repo.numberUsage(tenantId, h, now.minus(Duration.ofMinutes(15)));

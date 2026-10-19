@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -35,12 +34,6 @@ public class PhiReadRecorder {
     record Read(UUID tenantId, UUID actorId, UUID sessionId, boolean clinician, UUID breakGlassGrantId, String purpose,
                 String resourceType, UUID resourceId, String endpoint, String ip, String requestId, List<UUID> patientIds,
                 UUID queueEntryLookup, boolean list, long readAtMillis) {
-        Read(UUID tenantId, UUID actorId, UUID sessionId, boolean clinician, UUID breakGlassGrantId, String purpose,
-             String resourceType, UUID resourceId, String endpoint, String ip, String requestId, List<UUID> patientIds,
-             UUID queueEntryLookup, boolean list) {
-            this(tenantId, actorId, sessionId, clinician, breakGlassGrantId, purpose, resourceType, resourceId, endpoint, ip,
-                    requestId, patientIds, queueEntryLookup, list, Instant.now().toEpochMilli());
-        }
     }
 
     private static final Logger log = LoggerFactory.getLogger(PhiReadRecorder.class);

@@ -167,7 +167,7 @@ public class ScheduleService {
         Instant dayEnd = date.plusDays(1).atStartOfDay(zone).toInstant();
         Set<Instant> booked = new HashSet<>(repo.bookedStartTimes(doctorId, dayStart, dayEnd));
 
-        Instant now = Instant.now();
+        Instant now = clock.now();
         List<Instant> slots = new ArrayList<>();
         for (WorkingHoursRow wh : hours) {
             Instant slotStart = date.atTime(wh.startTime()).atZone(zone).toInstant();

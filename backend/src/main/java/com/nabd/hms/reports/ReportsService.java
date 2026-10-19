@@ -73,7 +73,7 @@ public class ReportsService {
     public OverviewResponse overview(UUID tenantId) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         Instant dayStart = today.atStartOfDay(zone).toInstant();
         Instant dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant();
         int checkoutPending = repo.checkoutPendingOn(tenantId, today);
@@ -94,7 +94,7 @@ public class ReportsService {
     public DailyMoneyResponse dailyMoney(UUID tenantId) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         Instant dayStart = today.atStartOfDay(zone).toInstant();
         Instant dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant();
         return new DailyMoneyResponse(repo.billedOn(tenantId, dayStart, dayEnd), repo.collectedOn(tenantId, dayStart, dayEnd),
@@ -124,12 +124,12 @@ public class ReportsService {
     public MoneyResponse money(UUID tenantId, Range r) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         Instant start = r.from().atStartOfDay(zone).toInstant();
         Instant end = r.to().plusDays(1).atStartOfDay(zone).toInstant();
         boolean includesToday = !today.isBefore(r.from()) && !today.isAfter(r.to());
         boolean ksa = "KSA".equals(repo.region(tenantId).orElse("IN"));
-        int[] bookings = repo.bookingsAndNoShows(tenantId, start, end, Instant.now());
+        int[] bookings = repo.bookingsAndNoShows(tenantId, start, end, clock.now());
         return new MoneyResponse(r.from(), r.to(), includesToday, ksa ? "SAR" : "INR", ksa ? "VAT" : "GST",
                 repo.collectedOn(tenantId, start, end), repo.invoiceCountOn(tenantId, start, end),
                 repo.taxBilledBetween(tenantId, start, end), bookings[1], bookings[0],
@@ -146,7 +146,7 @@ public class ReportsService {
         Instant end = r.to().plusDays(1).atStartOfDay(zone).toInstant();
         return new PackagesReportResponse(r.from(), r.to(), repo.packageSalesByDay(tenantId, r.from(), r.to(), zone),
                 repo.packageRedemption(tenantId, start, end),
-                repo.expiredPackagesWithValue(tenantId, r.from(), r.to(), LocalDate.now(zone)));
+                repo.expiredPackagesWithValue(tenantId, r.from(), r.to(), clock.today(zone)));
     }
 
     @Transactional
@@ -198,7 +198,7 @@ public class ReportsService {
     public NoShowRiskResponse noShowRisk(UUID tenantId) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         LocalDate since = today.minusDays(NO_SHOW_LOOKBACK_DAYS);
         List<NoShowRiskRow> rows = repo.noShowRiskToday(tenantId, today, since, NO_SHOW_RISK_THRESHOLD);
         return new NoShowRiskResponse(NO_SHOW_RULE, rows.stream()
@@ -212,7 +212,7 @@ public class ReportsService {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
         BigDecimal threshold = thresholdAmount == null ? BigDecimal.ZERO : thresholdAmount;
-        Instant since = LocalDate.now(zone).minusDays(LEAKAGE_LOOKBACK_DAYS).atStartOfDay(zone).toInstant();
+        Instant since = clock.today(zone).minusDays(LEAKAGE_LOOKBACK_DAYS).atStartOfDay(zone).toInstant();
         String rule = "Checked-out procedures whose charge never appears on that visit's invoice, amount >= "
                 + threshold + " (last " + LEAKAGE_LOOKBACK_DAYS + " days)";
         List<LeakageRow> rows = repo.billingLeakage(tenantId, since, threshold);
@@ -228,7 +228,7 @@ public class ReportsService {
     public DoctorPunctualityResponse doctorPunctuality(UUID tenantId) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
-        Instant since = LocalDate.now(zone).minusDays(PUNCTUALITY_LOOKBACK_DAYS).atStartOfDay(zone).toInstant();
+        Instant since = clock.today(zone).minusDays(PUNCTUALITY_LOOKBACK_DAYS).atStartOfDay(zone).toInstant();
         List<DoctorPunctualityRow> rows = repo.doctorPunctuality(tenantId, since, zone);
         return new DoctorPunctualityResponse(PUNCTUALITY_ACCESS_NOTE, rows.stream()
                 .map(r -> new DoctorPunctualityResponse.Entry(r.doctorId(), r.doctorName(), r.delayCount(),

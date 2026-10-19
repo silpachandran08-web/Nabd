@@ -5,6 +5,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -59,13 +61,13 @@ class QueueRepository {
      * transfer() — propagating one visit's identity across however many department legs it takes. */
     UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
                 UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status,
-                String presentingComplaint, String paymentMode, String transferReason, String transferReasonNote) {
+                String presentingComplaint, String paymentMode, String transferReason, String transferReasonNote, Instant createdAt) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
-                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode, transfer_reason, transfer_reason_note) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode, transfer_reason, transfer_reason_note, created_at) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", // PLT-028: created_at from the injected clock, so session-time checks see the same "now"
                 id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId, encounterId,
-                Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode, transferReason, transferReasonNote);
+                Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode, transferReason, transferReasonNote, Timestamp.from(createdAt));
         return id;
     }
 

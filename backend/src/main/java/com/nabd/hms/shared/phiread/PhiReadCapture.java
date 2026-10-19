@@ -40,7 +40,10 @@ class PhiReadCapture implements ResponseBodyAdvice<Object> {
     private final PhiReadRecorder recorder;
     private final Timer captureTimer;
 
-    PhiReadCapture(PhiReadRecorder recorder, MeterRegistry meters) {
+    private final java.time.Clock clock;
+
+    PhiReadCapture(PhiReadRecorder recorder, MeterRegistry meters, java.time.Clock clock) {
+        this.clock = clock;
         this.recorder = recorder;
         this.captureTimer = Timer.builder("nabd.phi_read.capture").description("PHI read capture time on the request thread")
                 .publishPercentiles(0.95).register(meters);
@@ -85,7 +88,7 @@ class PhiReadCapture implements ResponseBodyAdvice<Object> {
                 queueEntryId != null ? queueEntryId : uuid(vars.get("id")),
                 (String) http.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE), RequestMeta.clientIp(http),
                 MDC.get(RequestCorrelationFilter.MDC_KEY), List.copyOf(patients), patients.isEmpty() ? queueEntryId : null,
-                ann.value().endsWith("_list")));
+                ann.value().endsWith("_list"), java.time.Instant.now(clock).toEpochMilli()));
     }
 
     /** The body's own {key} component, else that component of each element of the body (or of its first list component). */

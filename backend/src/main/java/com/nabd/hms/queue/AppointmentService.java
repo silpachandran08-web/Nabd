@@ -61,7 +61,7 @@ public class AppointmentService {
     public AppointmentResponse book(UUID tenantId, UUID callerStaffId, AppointmentWriteRequest req) {
         tenantContext.set(tenantId);
         requirePatientAndDoctor(tenantId, req.patientId(), req.doctorId());
-        int slotMinutes = slotValidator.validate(tenantId, req.doctorId(), req.startTime(), Instant.now());
+        int slotMinutes = slotValidator.validate(tenantId, req.doctorId(), req.startTime(), clock.now());
         enforceSessionCapacity(tenantId, req.doctorId(), req.startTime());
         Instant end = req.startTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {
@@ -111,7 +111,7 @@ public class AppointmentService {
     public AppointmentResponse reschedule(UUID tenantId, UUID callerStaffId, UUID id, RescheduleRequest req) {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
-        int slotMinutes = slotValidator.validate(tenantId, current.doctorId(), req.newStartTime(), Instant.now());
+        int slotMinutes = slotValidator.validate(tenantId, current.doctorId(), req.newStartTime(), clock.now());
 
         repo.cancel(tenantId, id, "rescheduled");
         enforceSessionCapacity(tenantId, current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot

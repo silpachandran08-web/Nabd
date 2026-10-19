@@ -47,6 +47,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -82,10 +83,13 @@ public class AuthService {
     private final OtpSendLimiter otpLimiter;
     private final SecureRandom random = new SecureRandom();
 
+    private final Clock clock;
+
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, OtpOutbox otpOutbox, AuditService auditService,
-                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy, OtpSendLimiter otpLimiter) {
+                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy, OtpSendLimiter otpLimiter, Clock clock) {
+        this.clock = clock;
         this.mfaPolicy = mfaPolicy;
         this.otpLimiter = otpLimiter;
         this.repo = repo;
@@ -165,7 +169,7 @@ public class AuthService {
     }
 
     private MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -202,7 +206,7 @@ public class AuthService {
             return; // PLT-006: same 202 as a real send, so the response does not reveal which numbers exist
         }
         String code = generateOtpCode();
-        Instant expiresAt = Instant.now().plus(5, ChronoUnit.MINUTES);
+        Instant expiresAt = Instant.now(clock).plus(5, ChronoUnit.MINUTES);
         repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), expiresAt);
         otpOutbox.queue(tenant.id(), staff.id(), "login", code, expiresAt); // OPS-012: sent by the outbox, to the number on file
         log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
@@ -304,7 +308,7 @@ public class AuthService {
             throw mfaFailed();
         }
 
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plusSeconds(300);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -429,7 +433,7 @@ public class AuthService {
             return;
         }
         String token = OpaqueTokens.generate();
-        Instant expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES);
+        Instant expiresAt = Instant.now(clock).plus(15, ChronoUnit.MINUTES);
         repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), expiresAt);
         otpOutbox.queue(tenant.id(), staff.id(), "pin_reset", token, expiresAt); // OPS-012: sent by the outbox
         log.info("PIN reset token issued to staff {} (tenant {})", staff.id(), tenant.id());
@@ -508,7 +512,7 @@ public class AuthService {
             repo.revokeFamily(session.familyId(), "reuse_detected");
             throw invalidRefresh();
         }
-        if (session.expiresAt().isBefore(Instant.now())) {
+        if (session.expiresAt().isBefore(Instant.now(clock))) {
             throw invalidRefresh();
         }
 
@@ -557,7 +561,7 @@ public class AuthService {
     // ---- internals ----
 
     private void enforceIpRateLimit(String ip) {
-        int recent = repo.countAttemptsFromIpSince(ip, Instant.now().minus(1, ChronoUnit.MINUTES));
+        int recent = repo.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
         if (recent >= props.rateLimitPerIpPerMinute()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate-limited", "Too many attempts", "Try again shortly.");
         }
@@ -570,7 +574,7 @@ public class AuthService {
     }
 
     private MfaChallengeResponse issueMfaChallenge(Staff staff) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -627,7 +631,7 @@ public class AuthService {
         }
 
         UUID sessionId = bg != null ? bg.sessionId() : UUID.randomUUID();
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant accessExp = bg != null ? bg.expiresAt() : now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
