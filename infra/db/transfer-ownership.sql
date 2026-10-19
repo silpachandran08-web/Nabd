@@ -4,6 +4,9 @@
 --        (it applies V210+ grants and FORCE ROW LEVEL SECURITY)  4) point the API at nabd_app (DB_USER / DB_PASSWORD).
 --   psql -v ON_ERROR_STOP=1 -d nabd -f infra/db/transfer-ownership.sql
 -- Skips objects owned by an extension. Safe to re-run.
+-- Neon: the owner login is not a superuser, so it must be allowed to SET ROLE nabd_migrator to hand objects to it.
+GRANT nabd_migrator TO CURRENT_USER;
+
 DO $$
 DECLARE r record;
 BEGIN
@@ -28,3 +31,5 @@ BEGIN
     EXECUTE format('ALTER %s %s OWNER TO nabd_migrator', r.kind, r.sig);
   END LOOP;
 END $$;
+
+REVOKE nabd_migrator FROM CURRENT_USER;  -- the old owner must not keep the migrator's rights
