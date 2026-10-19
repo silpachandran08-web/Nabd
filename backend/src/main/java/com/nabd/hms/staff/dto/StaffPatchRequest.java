@@ -12,6 +12,8 @@ public record StaffPatchRequest(
         List<String> fieldGrants,
         UUID departmentId,
         /** DOC-N1: null = leave unchanged; an empty string clears it; otherwise 1-40 of letters, digits, space . / - */
-        @Pattern(regexp = "|[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}") String professionalRegistrationNo
+        @Pattern(regexp = "|[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}") String professionalRegistrationNo,
+        /** PLT-016: null = unchanged (but recording a new registration number sets it); true needs a registration number. */
+        Boolean clinician
 ) {
 }

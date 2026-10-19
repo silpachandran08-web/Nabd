@@ -50,15 +50,14 @@ class ScheduleBoardRepository {
                 .stream().findFirst();
     }
 
-    /** The schedule's columns: active staff who have working hours on any weekday or hold a Doctor
-     * role (same ILIKE 'doctor' rule as DepartmentRepository's transfer roster). */
+    /** The schedule's columns: active staff who have working hours on any weekday or are clinicians
+     * (PLT-016: staff.is_clinician, same rule as DepartmentRepository's transfer roster). */
     List<DoctorRow> doctors(UUID tenantId) {
         return jdbc.query("""
                 SELECT s.id, s.name, d.name AS department FROM staff s
-                JOIN roles r ON r.id = s.role_id
                 LEFT JOIN departments d ON d.id = s.department_id
                 WHERE s.tenant_id = ? AND s.status = 'active'
-                  AND (r.name ILIKE 'doctor' OR EXISTS (SELECT 1 FROM doctor_working_hours w WHERE w.doctor_id = s.id))
+                  AND (s.is_clinician OR EXISTS (SELECT 1 FROM doctor_working_hours w WHERE w.doctor_id = s.id))
                 ORDER BY s.name
                 """, (rs, i) -> new DoctorRow(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("department")),
                 tenantId);

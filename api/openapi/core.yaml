@@ -8551,6 +8551,44 @@ paths:
       tags:
       - staff
       x-required-permission: staff:edit
+  /v1/roles/{id}/reset-to-preset:
+    post:
+      operationId: RoleController_resetToPreset
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RoleResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - staff
+      x-required-permission: staff:edit
   /v1/schedule/day:
     get:
       operationId: ScheduleBoardController_day
@@ -10036,6 +10074,39 @@ paths:
       tags:
       - staff
       x-required-permission: staff:create
+  /v1/staff/clinician-review:
+    get:
+      operationId: StaffController_clinicianReview
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClinicianReviewEntry"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - staff
+      x-required-permission: staff:view
   /v1/staff/invitations/{token}/accept:
     post:
       operationId: StaffController_acceptInvite
@@ -11288,6 +11359,20 @@ components:
           type: string
         status:
           type: string
+    ClinicianReviewEntry:
+      type: object
+      properties:
+        clinician:
+          type: boolean
+        name:
+          type: string
+        reason:
+          type: string
+        roleName:
+          type: string
+        staffId:
+          type: string
+          format: uuid
     Close:
       type: object
       properties:
@@ -14366,6 +14451,11 @@ components:
           type: boolean
         name:
           type: string
+        presetCode:
+          type: string
+        presetVersion:
+          type: integer
+          format: int32
     RoleWriteRequest:
       type: object
       properties:
@@ -14629,6 +14719,8 @@ components:
     StaffPatchRequest:
       type: object
       properties:
+        clinician:
+          type: boolean
         departmentId:
           type: string
           format: uuid
@@ -14679,6 +14771,8 @@ components:
     StaffResponse:
       type: object
       properties:
+        clinician:
+          type: boolean
         departmentId:
           type: string
           format: uuid

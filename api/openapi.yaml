@@ -616,7 +616,7 @@ paths:
   /staff/roster:
     get:
       tags: [Staff]
-      summary: Active doctors (role named "Doctor") for queue/consult pickers — id, name and department name only
+      summary: Active clinicians (staff.clinician, PLT-016; never a role name) for queue/consult pickers — id, name and department name only
       x-required-permission: queue:view
       responses:
         "200":
@@ -632,6 +632,28 @@ paths:
                     id: { type: string, format: uuid }
                     name: { type: string }
                     departmentName: { type: [string, "null"], description: "REC-023: name of the doctor's department (staff.department_id); null when none is assigned" }
+
+  /staff/clinician-review:
+    get:
+      tags: [Staff]
+      summary: "PLT-016: staff the clinician backfill could not decide (registration number without a doctor-named role, or the reverse), for the owner to confirm with PATCH /staff/{id} clinician"
+      x-required-permission: staff:view
+      responses:
+        "200":
+          description: Unconfirmed rows ordered by name (a PATCH that sends clinician resolves the row)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [staffId, name, roleName, reason, clinician]
+                  properties:
+                    staffId: { type: string, format: uuid }
+                    name: { type: string }
+                    roleName: { type: string }
+                    reason: { type: string, enum: [registration_without_doctor_role, doctor_role_without_registration] }
+                    clinician: { type: boolean, description: "Current value, as the backfill set it" }
 
   /staff/{id}:
     get:
@@ -651,6 +673,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/StaffPatch" } } }
       responses:
         "200": { description: "Staff", content: { application/json: { schema: { $ref: "#/components/schemas/Staff" } } } }
+        "400": { description: "clinician-needs-registration: clinician=true without a registration number (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: "GRANT_EXCEEDS_CALLER (type grant-exceeds-caller) or OWNER_ROLE_RESTRICTED (type owner-role-restricted): the role, scope or field grants are richer than the caller holds (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -790,6 +813,23 @@ paths:
         "400":
           description: Attempted edit of a built-in role, or a grant beyond the editor's own permissions (privilege escalation blocked)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /roles/{id}/reset-to-preset:
+    post:
+      tags: [Roles]
+      summary: "PLT-016: reset a preset role to its current definition (grants and presetVersion); Owner only; audited (role.reset_to_preset)"
+      x-required-permission: staff:edit
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: "Role", content: { application/json: { schema: { $ref: "#/components/schemas/Role" } } } }
+        "403": { description: "OWNER_ONLY (type owner-only): the caller is not the Owner (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_A_PRESET (type not-a-preset): a custom role (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   # ------------------------------------------------------------ Tenants
   /tenants/{id}:
@@ -3439,6 +3479,9 @@ components:
           type: [string, "null"]
           pattern: "^$|^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$"
           description: "DOC-N1. Omitted/null = unchanged; empty string = clear; otherwise 1-40 characters of letters, digits, space . / -. Audited (the audit row records set/changed/cleared, not the value). Requires staff:edit."
+        clinician:
+          type: [boolean, "null"]
+          description: "PLT-016. Omitted/null = unchanged, except that recording a new registration number sets it. true needs a registration number (400 clinician-needs-registration). Audited (staff.clinician_set / staff.clinician_cleared)."
 
     Staff:
       type: object
@@ -3470,6 +3513,7 @@ components:
           readOnly: true
           items: { type: string, enum: [pin, whatsapp_otp, authenticator] }
           description: "OWN-034. Factors this staff row can use: pin (PIN set), whatsapp_otp (mobile on file), authenticator (MFA enrolled). Empty for invite_pending and owner_account."
+        clinician: { type: boolean, description: "PLT-016 (staff.is_clinician): drives doctor pickers, schedules and queue assignment instead of role names" }
 
     RoleWrite:
       type: object
@@ -3488,6 +3532,8 @@ components:
           properties:
             id: { type: string, format: uuid }
             builtIn: { type: boolean }
+            presetCode: { type: [string, "null"], enum: [owner, owner_doctor, doctor, nurse, receptionist, frontdesk_vitals, null], description: "PLT-016: null for a custom role" }
+            presetVersion: { type: [integer, "null"], description: "PLT-016: preset definition version the grants were last set from" }
 
     ModuleGrant:
       type: object

@@ -63,6 +63,14 @@ public class RoleController {
         return service.update(tenantId(jwt), staffId(jwt), id, req, permissions(jwt));
     }
 
+    /** PLT-016: Owner only (checked in RoleService); 409 NOT_A_PRESET for a custom role. */
+    @PostMapping("/{id}/reset-to-preset")
+    @PreAuthorize("hasAuthority('staff:edit')")
+    @com.nabd.hms.shared.idempotency.Idempotent
+    public RoleResponse resetToPreset(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.resetToPreset(tenantId(jwt), staffId(jwt), id);
+    }
+
     @PostMapping("/delegations")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('staff:edit')")

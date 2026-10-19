@@ -59,6 +59,13 @@ public class StaffController {
         return staffService.roster(tenantId(jwt));
     }
 
+    /** PLT-016: staff the clinician backfill could not decide; the owner confirms each with PATCH clinician. */
+    @GetMapping("/clinician-review")
+    @PreAuthorize("hasAuthority('staff:view')")
+    public List<com.nabd.hms.staff.dto.ClinicianReviewEntry> clinicianReview(@AuthenticationPrincipal Jwt jwt) {
+        return staffService.clinicianReview(tenantId(jwt));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('staff:create')")
     public ResponseEntity<StaffInviteResponse> invite(@AuthenticationPrincipal Jwt jwt,

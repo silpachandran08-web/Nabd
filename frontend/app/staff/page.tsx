@@ -11,6 +11,7 @@ import PermissionMatrix from "../components/staff/PermissionMatrix";
 import RegistrationNoDialog from "../components/staff/RegistrationNoDialog";
 import styles from "./staff.module.css";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { isOwner } from "../lib/session";
 
 // Matches GET /v1/staff (StaffController) and GET /v1/roles (RoleController).
 type Staff = {
@@ -26,13 +27,20 @@ type Staff = {
   // OWN-034 (read-only, derived server-side from stored credentials). Optional: absent on an older backend.
   loginMethod?: string;
   loginFactors?: string[];
+  clinician?: boolean; // PLT-016: drives doctor pickers instead of role names
 };
 type StaffPage = { data: Staff[]; page: { nextCursor: string | null; limit: number } };
 type ModuleGrant = {
   module: string; view: boolean; create: boolean; edit: boolean; delete: boolean;
   approve: boolean; refundDiscount: boolean; export: boolean;
 };
-type Role = { id: string; name: string; builtIn: boolean; grants: ModuleGrant[]; mfaRequired: boolean };
+type Role = { id: string; name: string; builtIn: boolean; grants: ModuleGrant[]; mfaRequired: boolean; presetCode?: string | null; presetVersion?: number | null };
+// PLT-016: rows the clinician backfill could not decide (GET /v1/staff/clinician-review).
+type ClinicianReview = { staffId: string; name: string; roleName: string; reason: string; clinician: boolean };
+const REVIEW_REASON: Record<string, string> = {
+  registration_without_doctor_role: "Has a registration number but no doctor role",
+  doctor_role_without_registration: "Doctor role but no registration number",
+};
 type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 // GlobalExceptionHandler serializes RFC 7807 ProblemDetail — the machine-readable
 // error code lives in `type` (a "…/errors/<slug>" URI), not `title` (human text).
@@ -168,6 +176,11 @@ export default function StaffAccessPage() {
   const [stepUpError, setStepUpError] = useState<string | null>(null);
   const [suspending, setSuspending] = useState<string | null>(null);
   const [regEdit, setRegEdit] = useState<Staff | null>(null);
+  const [review, setReview] = useState<ClinicianReview[]>([]);
+  const [reviewFailed, setReviewFailed] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [roleNotice, setRoleNotice] = useState<string | null>(null);
+  const [owner, setOwner] = useState(false);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -201,6 +214,7 @@ export default function StaffAccessPage() {
         return;
       }
       setPermissions(decodePermissions(token));
+      setOwner(isOwner());
 
       const staffRes = await authedFetch("/staff?limit=50");
       if (!staffRes) return;
@@ -219,6 +233,10 @@ export default function StaffAccessPage() {
       const rolesRes = await authedFetch("/roles");
       if (rolesRes?.ok) setRoles(await rolesRes.json());
       setRolesFailed(!!rolesRes && !rolesRes.ok);
+
+      const reviewRes = await authedFetch("/staff/clinician-review");
+      if (reviewRes?.ok) setReview(await reviewRes.json());
+      setReviewFailed(!!reviewRes && !reviewRes.ok);
 
       const departmentsRes = await authedFetch("/departments");
       if (departmentsRes?.ok) setDepartments(await departmentsRes.json());
@@ -476,11 +494,57 @@ export default function StaffAccessPage() {
         return body.detail || "Couldn't save the registration number.";
       }
       const saved: Staff = await res.json();
-      setStaff((prev) => prev.map((x) => (x.id === saved.id ? { ...x, professionalRegistrationNo: saved.professionalRegistrationNo ?? null } : x)));
+      setStaff((prev) => prev.map((x) => (x.id === saved.id ? { ...x, professionalRegistrationNo: saved.professionalRegistrationNo ?? null, clinician: saved.clinician } : x)));
       setRegEdit(null);
       return null;
     } catch {
       return "Couldn't reach the server. The registration number was not saved.";
+    }
+  }
+
+  // PLT-016: the Clinician flag (needs a registration number; the server refuses it otherwise).
+  async function setClinician(staffId: string, value: boolean) {
+    setBusyId(staffId);
+    setRoleNotice(null);
+    try {
+      const res = await authedFetch(`/staff/${staffId}`, { method: "PATCH", body: JSON.stringify({ clinician: value }) });
+      if (!res) return;
+      if (!res.ok) {
+        const body: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
+        setRoleNotice(body.detail || "Couldn't change the clinician flag.");
+        return;
+      }
+      const saved: Staff = await res.json();
+      setStaff((prev) => prev.map((x) => (x.id === saved.id ? { ...x, clinician: saved.clinician } : x)));
+      setReview((prev) => prev.filter((r) => r.staffId !== staffId));
+    } catch {
+      setRoleNotice("Couldn't reach the server. The clinician flag was not changed.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // PLT-016: Owner only; grants go back to the current preset definition (audited server-side).
+  async function resetToPreset(role: Role) {
+    setBusyId(role.id);
+    setRoleNotice(null);
+    try {
+      const res = await authedFetch(`/roles/${role.id}/reset-to-preset`, {
+        method: "POST", body: "{}", headers: { "Idempotency-Key": crypto.randomUUID() },
+      });
+      if (!res) return;
+      if (!res.ok) {
+        const body: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
+        setRoleNotice(body.detail || "Couldn't reset the role.");
+        return;
+      }
+      const saved: Role = await res.json();
+      setRoles((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
+      setRoleNotice(`${saved.name} is back to its preset.`);
+    } catch {
+      setRoleNotice("Couldn't reach the server. The role was not reset.");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -557,6 +621,7 @@ export default function StaffAccessPage() {
                     <td>
                       <span className={styles.staffName}>{s.name}</span>
                       <span className={styles.staffEmail}>{s.email}</span>
+                      {s.clinician && <span className={`${styles.pill} ${styles.pillCustom}`}>Clinician</span>}
                     </td>
                     <td><span className={`${styles.pill} ${styles.pillRole}`}>{roleName(s.roleId)}</span></td>
                     <td><StatusPill tone={STATUS_PILL[s.status].tone} label={STATUS_PILL[s.status].label} /></td>
@@ -569,6 +634,12 @@ export default function StaffAccessPage() {
                       {canEditRoles && (
                         <button className={styles.actionBtn} onClick={() => setRegEdit(s)}>
                           {s.professionalRegistrationNo ? "Reg. no." : "Add reg. no."}
+                        </button>
+                      )}
+                      {canEditRoles && (s.professionalRegistrationNo || s.clinician) && (
+                        <button className={styles.actionBtn} aria-pressed={!!s.clinician} disabled={busyId === s.id}
+                          onClick={() => setClinician(s.id, !s.clinician)}>
+                          {s.clinician ? "Clinician: on" : "Clinician: off"}
                         </button>
                       )}
                       {canResetMfa && s.status === "active" && (
@@ -617,11 +688,14 @@ export default function StaffAccessPage() {
                             {roleUserCount(r.id)}{nextCursor ? "+" : ""} user{roleUserCount(r.id) === 1 && !nextCursor ? "" : "s"}
                           </span>
                         </button>
-                        <span className={`${styles.pill} ${r.builtIn ? styles.pillBuiltIn : styles.pillCustom}`}>{r.builtIn ? "Built-in" : "Custom"}</span>
+                        <span className={`${styles.pill} ${r.builtIn || r.presetCode ? styles.pillBuiltIn : styles.pillCustom}`}>{r.builtIn ? "Built-in" : r.presetCode ? "Preset" : "Custom"}</span>
                         <button className={styles.actionBtn} onClick={() => openRole(r, canEditRoles)}>
                           {r.builtIn || !canEditRoles ? "View" : "Edit"}
                         </button>
                         {canInvite && <button className={styles.actionBtn} onClick={() => openCloneRole(r)}>Clone</button>}
+                        {owner && canEditRoles && r.presetCode && !r.builtIn && (
+                          <button className={styles.actionBtn} disabled={busyId === r.id} onClick={() => resetToPreset(r)}>Reset to preset</button>
+                        )}
                       </li>
                     );
                   })}
@@ -631,6 +705,40 @@ export default function StaffAccessPage() {
             </aside>
             {selectedRole && <PermissionMatrix roleName={selectedRole.name} grants={selectedRole.grants} modules={MODULES} />}
           </div>
+          {roleNotice && <div className={styles.formError} role="status">{roleNotice}</div>}
+
+          {reviewFailed && <div className={styles.formError} role="alert">Couldn&apos;t load the clinicians to confirm. Reload to try again.</div>}
+          {review.length > 0 && (
+            <>
+              <div className={styles.sectionHeader}>
+                <h2 className={styles.sectionTitle}>Confirm clinicians</h2>
+              </div>
+              <div className={styles.card}>
+                <div className={styles.tableWrap}>
+                  <table className={styles.table} aria-label="Clinicians to confirm">
+                    <thead><tr><th>Staff</th><th>Role</th><th>Why</th><th></th></tr></thead>
+                    <tbody>
+                      {review.map((r) => (
+                        <tr key={r.staffId}>
+                          <td className={styles.staffName}>{r.name}</td>
+                          <td>{r.roleName}</td>
+                          <td className={styles.muted}>{REVIEW_REASON[r.reason] ?? r.reason}</td>
+                          <td>
+                            {canEditRoles && (
+                              <>
+                                <button className={styles.actionBtn} disabled={busyId === r.staffId} onClick={() => setClinician(r.staffId, true)}>Clinician</button>
+                                <button className={styles.actionBtn} disabled={busyId === r.staffId} onClick={() => setClinician(r.staffId, false)}>Not a clinician</button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
 
           {breakGlass.length > 0 && (
             <>

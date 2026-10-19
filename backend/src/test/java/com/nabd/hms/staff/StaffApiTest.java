@@ -31,9 +31,8 @@ class StaffApiTest extends ApiTestBase {
      * The bug this catches: arrivals/nursing doctor pickers used to call GET /v1/staff (gated on
      * staff:view, an HR-data permission), so a Reception/Nursing role that only holds queue:view
      * got a 403 and an empty dropdown. /roster is the narrow id+name fix for exactly that role —
-     * and it's filtered to staff whose role is named "Doctor" (the only signal this schema has;
-     * roles are free-text tenant-defined objects, not a fixed type), so the receptionist calling
-     * it never sees themselves or any other non-doctor staff in the result.
+     * and it's filtered to clinicians (PLT-016: staff.is_clinician, never a role name), so the
+     * receptionist calling it never sees themselves or any other non-doctor staff in the result.
      */
     @Test
     void rosterIsUsableByAQueueViewOnlyRoleAndOnlyReturnsDoctorsWithIdAndName() {
@@ -42,6 +41,7 @@ class StaffApiTest extends ApiTestBase {
         UUID doctorRole = seedRole(tenant.id(), "Doctor", false, fullGrant("queue"), fullGrant("patients"));
         SeededStaff reception = seedStaff(tenant, receptionRole, "reception@a.com", "+919100000020", false);
         SeededStaff doctor = seedStaff(tenant, doctorRole, "doctor@a.com", "+919100000030", false);
+        markClinician(tenant, doctor); // PLT-016
         String token = loginAndGetAccessToken(reception);
 
         ResponseEntity<List> resp = exchange("/v1/staff/roster", HttpMethod.GET, authed(token), List.class);
@@ -63,6 +63,7 @@ class StaffApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(owner);
         UUID doctorRole = seedRole(tenant.id(), "Doctor", false, fullGrant("queue"));
         SeededStaff doctor = seedStaff(tenant, doctorRole, "doctor-dept@a.com", "+919100000026", false);
+        markClinician(tenant, doctor); // PLT-016
         String dentalId = (String) exchange("/v1/departments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Dental", "active", true)), Map.class).getBody().get("id");
         inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ?::uuid WHERE id = ?", dentalId, doctor.id()));
@@ -80,7 +81,7 @@ class StaffApiTest extends ApiTestBase {
         SeededStaff owner = seedStaff(tenant, ownerRole, "owner-roster@a.com", "+919100000021", false);
         String token = loginAndGetAccessToken(owner);
         UUID doctorRole = seedRole(tenant.id(), "Doctor", false, fullGrant("queue"), fullGrant("patients"));
-        seedStaff(tenant, doctorRole, "doctor-active@a.com", "+919100000024", false);
+        markClinician(tenant, seedStaff(tenant, doctorRole, "doctor-active@a.com", "+919100000024", false)); // PLT-016
         exchange("/v1/staff", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "email", "not-active-yet@a.com", "name", "Not Active Yet", "mobilePhone", "+919100000022",
                 "roleId", doctorRole.toString())), Map.class);
@@ -364,5 +365,9 @@ class StaffApiTest extends ApiTestBase {
                 "{\"challengeId\":\"unused\",\"code\":\"" + currentTotpCode() + "\"}", headers);
         ResponseEntity<Map> resp = http.postForEntity(url("/v1/auth/mfa/verify"), req, Map.class);
         return (String) resp.getBody().get("stepUpToken");
+    }
+
+    private void markClinician(SeededTenant tenant, SeededStaff staff) {
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET is_clinician = true WHERE id = ?", staff.id()));
     }
 }
