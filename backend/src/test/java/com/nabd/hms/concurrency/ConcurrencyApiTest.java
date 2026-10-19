@@ -191,7 +191,6 @@ class ConcurrencyApiTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-refund-approve-race")
     void twoApproversOfOneRefundIssueOneCreditNote() {
         Ctx c = setup();
         UUID roleId = c.roleId();

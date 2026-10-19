@@ -31,10 +31,12 @@ class PackageReminderS9QaTest extends ApiTestBase {
                 "patientId", patientId, "packageId", packageId, "paymentMethod", "upi")), Map.class).getBody().get("id");
     }
 
+    /** FIN-004: extend refuses moving the end earlier, so set the boundary directly (test setup only). */
     private void expireIn(String token, String instanceId, int days) {
-        ResponseEntity<Map> r = exchange("/v1/packages/instances/" + instanceId + "/extend", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "newValidityEnd", LocalDate.now(ZoneOffset.UTC).plusDays(days).toString(), "reason", "qa boundary")), Map.class);
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        int n = new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).update(
+                "UPDATE package_instances SET validity_end = ? WHERE id = ?::uuid",
+                java.sql.Date.valueOf(LocalDate.now(ZoneOffset.UTC).plusDays(days)), instanceId);
+        assertThat(n).isEqualTo(1);
     }
 
     private List<Map<String, Object>> events(UUID tenantId, String instanceId) {

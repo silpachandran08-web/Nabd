@@ -165,8 +165,17 @@ public class PackageController {
     @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/refunds/{id}/approve")
     @PreAuthorize("hasAuthority('packages:approve')")
-    public RefundResponse approveRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return instanceService.approveRefund(tenantId(jwt), staffId(jwt), id);
+    public RefundResponse approveRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                        @RequestBody(required = false) com.nabd.hms.packages.dto.ApproveRefundRequest req) {
+        return instanceService.approveRefund(tenantId(jwt), staffId(jwt), id, req == null ? null : req.expectedAmount());
+    }
+
+    @com.nabd.hms.shared.idempotency.Idempotent
+    @PostMapping("/refunds/{id}/reject")
+    @PreAuthorize("hasAuthority('packages:approve')")
+    public RefundResponse rejectRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                       @Valid @RequestBody com.nabd.hms.packages.dto.RejectRefundRequest req) {
+        return instanceService.rejectRefund(tenantId(jwt), staffId(jwt), id, req.reason());
     }
 
     @GetMapping("/liability")
