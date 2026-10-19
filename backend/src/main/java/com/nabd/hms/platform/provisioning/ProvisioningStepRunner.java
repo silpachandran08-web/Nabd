@@ -1,7 +1,6 @@
 package com.nabd.hms.platform.provisioning;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nabd.hms.common.EmailSender;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WabaProvisioningGateway;
@@ -17,10 +16,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static com.nabd.hms.platform.provisioning.ProvisioningModels.Email;
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.Job;
 import static com.nabd.hms.platform.provisioning.ProvisioningModels.StepResult;
 
@@ -43,14 +44,13 @@ class ProvisioningStepRunner {
     private final ObjectMapper objectMapper;
     private final TenantLifecycleService lifecycleService;
     private final StaffService staffService;
-    private final EmailSender emailSender;
     private final String frontendBaseUrl;
     private final OwnerService ownerService;
 
     ProvisioningStepRunner(ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
-                            EmailSender emailSender, @Value("${app.frontend-base-url}") String frontendBaseUrl,
+                            @Value("${app.frontend-base-url}") String frontendBaseUrl,
                             OwnerService ownerService) {
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -58,7 +58,6 @@ class ProvisioningStepRunner {
         this.objectMapper = objectMapper;
         this.lifecycleService = lifecycleService;
         this.staffService = staffService;
-        this.emailSender = emailSender;
         this.frontendBaseUrl = frontendBaseUrl;
         this.ownerService = ownerService;
     }
@@ -209,51 +208,38 @@ class ProvisioningStepRunner {
         }
         tenantContext.set(tenantId);
         String ownerAccountInviteToken = ownerService.invite(job.createdOwnerId()).orElse(null);
+        List<Email> emails = new ArrayList<>(); // OPS-012: sent by ProvisioningService after this transaction commits
         if (ownerAccountInviteToken != null) {
             String accountLink = frontendBaseUrl + "/owner/accept-invite/" + ownerAccountInviteToken;
-            try {
-                emailSender.send(job.ownerEmail(), "Set up your Nabd owner account",
-                        "Hi " + job.ownerName() + ",\n\n" +
-                                "Set a PIN for your Nabd owner account — this is separate from any one clinic's " +
-                                "login and lets you switch between every clinic you own from one place, as you " +
-                                "add more.\n\n" +
-                                "Set your PIN here (link expires in 72 hours):\n" + accountLink + "\n\n" +
-                                "If you weren't expecting this, you can ignore this email.");
-            } catch (Exception e) {
-                log.warn("owner account invite email failed to send for tenant {} — falling back to manual relay",
-                        job.tenantSlug(), e);
-            }
+            emails.add(new Email(job.ownerEmail(), "Set up your Nabd owner account",
+                    "Hi " + job.ownerName() + ",\n\n" +
+                            "Set a PIN for your Nabd owner account — this is separate from any one clinic's " +
+                            "login and lets you switch between every clinic you own from one place, as you " +
+                            "add more.\n\n" +
+                            "Set your PIN here (link expires in 72 hours):\n" + accountLink + "\n\n" +
+                            "If you weren't expecting this, you can ignore this email.", "owner account invite"));
         }
 
         if (repo.hasOwnerStaff(tenantId)) {
             // retry after a later step failed — this clinic's own staff invite already went out and
             // was already revealed once, but the owner-account invite above still needed evaluating
             // (a second clinic for an already-activated owner correctly sends nothing at all).
-            return new StepResult(null, ownerAccountInviteToken);
+            return new StepResult(null, ownerAccountInviteToken, emails);
         }
         UUID roleId = repo.findBuiltInRoleId(tenantId)
                 .orElseThrow(() -> new IllegalStateException("verify_invite_owner ran before seed_masters created the Owner role"));
         StaffInviteResponse invite = staffService.invite(tenantId, null,
                 new StaffInviteRequest(job.ownerEmail(), job.ownerName(), job.ownerMobile(), roleId, "all_clinic_patients", null));
         String link = frontendBaseUrl + "/accept-invite/" + invite.inviteToken();
-        try {
-            emailSender.send(job.ownerEmail(), "You're invited to " + job.tenantName() + " on Nabd",
-                    "Hi " + job.ownerName() + ",\n\n" +
-                            "Your clinic \"" + job.tenantName() + "\" is ready on Nabd.\n\n" +
-                            "Set your PIN and sign in here (link expires in 72 hours):\n" + link + "\n\n" +
-                            "If you weren't expecting this, you can ignore this email.");
-        } catch (Exception e) {
-            // Best-effort: email is a convenience on top of the reveal-once token below, never a
-            // requirement for it. Render blocks outbound SMTP on its network (confirmed by a live
-            // timeout), so this catch is load-bearing today, not defensive-for-its-own-sake — without
-            // it, a send failure would roll back the staff row this same @Transactional step just created.
-            log.warn("owner invite email failed to send for tenant {} — falling back to manual relay",
-                    job.tenantSlug(), e);
-        }
-        // Still returned even though the email above may already have delivered it — same
+        emails.add(new Email(job.ownerEmail(), "You're invited to " + job.tenantName() + " on Nabd",
+                "Hi " + job.ownerName() + ",\n\n" +
+                        "Your clinic \"" + job.tenantName() + "\" is ready on Nabd.\n\n" +
+                        "Set your PIN and sign in here (link expires in 72 hours):\n" + link + "\n\n" +
+                        "If you weren't expecting this, you can ignore this email.", "owner invite"));
+        // Still returned even though the email may deliver it too — same
         // reveal-once value shown as a manual-relay fallback if the email never arrives (unconfigured
         // SMTP, spam filter, wrong address typed at provisioning time).
-        return new StepResult(invite.inviteToken(), ownerAccountInviteToken);
+        return new StepResult(invite.inviteToken(), ownerAccountInviteToken, emails);
     }
 
     private void goLive(Job job) {

@@ -91,12 +91,6 @@ class AuthRepository {
                 otpHash, Timestamp.from(expiresAt), staffId);
     }
 
-    /** PLT-006: was a code issued in the last few seconds (expiry is issue + 5 min)? Guards the outbox send against redelivery. */
-    boolean whatsAppOtpIssuedWithin(UUID staffId, int seconds) {
-        return Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT COALESCE(whatsapp_otp_expires_at > now() + interval '5 minutes' - ? * interval '1 second', false) FROM staff WHERE id = ?",
-                Boolean.class, seconds, staffId));
-    }
 
     /**
      * Atomically validates and consumes the OTP in one statement: the WHERE clause is the check,

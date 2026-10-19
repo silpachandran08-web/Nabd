@@ -34,7 +34,7 @@ class OtpPumpingTest extends ApiTestBase {
     }
 
     private int sendEvents(SeededTenant t) {
-        return su.queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.otp.send.v1'", Integer.class, t.id());
+        return su.queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.otp.requested.v1'", Integer.class, t.id());
     }
 
     private int abuseEvents(SeededTenant t, String capHit) {
@@ -141,9 +141,9 @@ class OtpPumpingTest extends ApiTestBase {
         assertThat(su.queryForObject("SELECT count(*) FROM otp_send_counters WHERE tenant_id = ? AND (position(convert_to(?, 'UTF8') in phone_hmac) > 0 "
                 + "OR position(convert_to(?, 'UTF8') in phone_hmac) > 0)", Integer.class, t.id(), digits, digits.substring(2))).isZero();
         assertThat(su.queryForObject("SELECT min(length(phone_hmac)) FROM otp_send_counters WHERE tenant_id = ? AND sends > 0", Integer.class, t.id())).isEqualTo(32);
-        // the outbox event carries the staff id only, never the phone or a code
-        assertThat(su.queryForObject("SELECT payload::text FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.otp.send.v1'", String.class, t.id()))
-                .doesNotContain(digits.substring(2)).contains("staffId");
+        // the outbox event (OPS-012 iam.otp.requested.v1) carries ids only, never the phone or a code
+        assertThat(su.queryForObject("SELECT payload::text FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.otp.requested.v1'", String.class, t.id()))
+                .doesNotContain(digits.substring(2)).contains("otpRequestId");
 
         su.update("INSERT INTO otp_send_counters (tenant_id, phone_hmac, window_start, sends) VALUES (?, '\\x01'::bytea, now() - interval '49 hours', 1)", t.id());
         su.update("INSERT INTO otp_send_counters (tenant_id, phone_hmac, window_start, sends) VALUES (?, '\\x02'::bytea, now() - interval '47 hours', 1)", t.id());

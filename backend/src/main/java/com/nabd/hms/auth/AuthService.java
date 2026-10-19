@@ -30,7 +30,6 @@ import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.PhoneNumbers;
 import com.nabd.hms.common.TenantContext;
-import com.nabd.hms.common.WhatsAppOtpSender;
 import com.nabd.hms.config.AuthProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +48,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -74,22 +74,20 @@ public class AuthService {
     private final ChallengeTokenDecoder jwtDecoder;
     private final AuthProperties props;
     private final ObjectMapper objectMapper;
-    private final WhatsAppOtpSender otpSender;
+    private final OtpOutbox otpOutbox;
     private final AuditService auditService;
     private final LoginGuard guard;
     private final StepUpVerifier stepUpVerifier;
     private final MfaPolicy mfaPolicy;
     private final OtpSendLimiter otpLimiter;
-    private final com.nabd.hms.common.EventPublisher events;
+    private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
-                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
-                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy, OtpSendLimiter otpLimiter,
-                com.nabd.hms.common.EventPublisher events) {
+                AuthProperties props, ObjectMapper objectMapper, OtpOutbox otpOutbox, AuditService auditService,
+                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy, OtpSendLimiter otpLimiter) {
         this.mfaPolicy = mfaPolicy;
         this.otpLimiter = otpLimiter;
-        this.events = events;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -99,7 +97,7 @@ public class AuthService {
         this.jwtDecoder = jwtDecoder;
         this.props = props;
         this.objectMapper = objectMapper;
-        this.otpSender = otpSender;
+        this.otpOutbox = otpOutbox;
         this.auditService = auditService;
         this.guard = guard;
         this.stepUpVerifier = stepUpVerifier;
@@ -187,8 +185,8 @@ public class AuthService {
     public void requestOtp(OtpRequestRequest req, String ip) {
         enforceIpRateLimit(ip);
         // PLT-006: same 202 for every outcome (unknown clinic or number, limited, sent). The per-number and per-tenant
-        // limits are counted whether or not the number exists, and the code is generated and sent by the outbox
-        // handler (OtpOutboxHandlers.Send), so neither the response nor its timing shows which numbers are registered.
+        // limits are counted whether or not the number exists, and the WhatsApp call happens in the outbox (OPS-012
+        // OtpOutbox / OtpRequestedHandler), so neither the response nor its timing shows which numbers are registered.
         Tenant tenant = repo.findTenantBySlug(req.tenantSlug())
                 .filter(t -> !"offboarded".equals(t.status()) && !"suspended".equals(t.status()))
                 .orElse(null);
@@ -200,9 +198,18 @@ public class AuthService {
             return;
         }
         Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
-        if (staff != null && "active".equals(staff.status())) {
-            events.publish(tenant.id(), OtpOutboxHandlers.SEND_EVENT, java.util.Map.of("staffId", staff.id().toString()));
+        if (staff == null || !"active".equals(staff.status())) {
+            return; // PLT-006: same 202 as a real send, so the response does not reveal which numbers exist
         }
+        String code = generateOtpCode();
+        Instant expiresAt = Instant.now().plus(5, ChronoUnit.MINUTES);
+        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), expiresAt);
+        otpOutbox.queue(tenant.id(), staff.id(), "login", code, expiresAt); // OPS-012: sent by the outbox, to the number on file
+        log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
+    }
+
+    private String generateOtpCode() {
+        return String.format("%06d", random.nextInt(1_000_000));
     }
 
     // noRollbackFor: recordLoginAttempt()/markMobileVerified() must survive the ApiException thrown
@@ -422,8 +429,9 @@ public class AuthService {
             return;
         }
         String token = OpaqueTokens.generate();
-        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), Instant.now().plus(15, ChronoUnit.MINUTES));
-        otpSender.send(staff.mobilePhone(), token);
+        Instant expiresAt = Instant.now().plus(15, ChronoUnit.MINUTES);
+        repo.setPinResetToken(staff.id(), OpaqueTokens.sha256Hex(token), expiresAt);
+        otpOutbox.queue(tenant.id(), staff.id(), "pin_reset", token, expiresAt); // OPS-012: sent by the outbox
         log.info("PIN reset token issued to staff {} (tenant {})", staff.id(), tenant.id());
     }
 

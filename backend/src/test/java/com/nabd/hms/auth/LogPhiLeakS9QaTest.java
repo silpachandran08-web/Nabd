@@ -35,6 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LogPhiLeakS9QaTest extends ApiTestBase {
 
     static final List<String> SECRETS = new CopyOnWriteArrayList<>();
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.OutboxDispatcher dispatcher; // OPS-012: OTPs are sent by the outbox, after the request
     private ListAppender<ILoggingEvent> appender;
     private Logger root;
 
@@ -69,6 +71,7 @@ class LogPhiLeakS9QaTest extends ApiTestBase {
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099", "code", "000000")), Map.class);
         http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099")), Void.class);
+        dispatcher.poll();
         String token = SECRETS.get(SECRETS.size() - 1);
         ResponseEntity<Void> rc = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099", "token", token, "newPin", "482913")), Void.class);
@@ -131,8 +134,6 @@ class LogPhiLeakS9QaTest extends ApiTestBase {
         }
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private com.nabd.hms.common.OutboxDispatcher dispatcher;
 
     private void awaitSecret() {
         for (int i = 0; i < 100 && SECRETS.isEmpty(); i++) {

@@ -111,6 +111,11 @@ class ProvisioningRepository {
                 errorDetail, stepId);
     }
 
+    /** OPS-012: keeps a done step done but records why something best-effort (the invite email) did not happen. */
+    void recordStepNote(UUID stepId, String note) {
+        jdbc.update("UPDATE master.provisioning_job_steps SET error_detail = ? WHERE id = ?", note, stepId);
+    }
+
     void markStepRolledBack(UUID stepId) {
         jdbc.update("UPDATE master.provisioning_job_steps SET status = 'rolled_back' WHERE id = ?", stepId);
     }

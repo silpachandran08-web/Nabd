@@ -1,5 +1,6 @@
 package com.nabd.hms.common;
 
+import com.nabd.hms.shared.integration.ExternalCallGuard;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -17,10 +18,11 @@ class MailConfig {
     @Bean
     EmailSender emailSender(ObjectProvider<JavaMailSender> mailSenderProvider,
                              @Value("${spring.mail.host:}") String smtpHost,
-                             @Value("${spring.mail.username:}") String smtpUsername) {
+                             @Value("${spring.mail.username:}") String smtpUsername,
+                             ExternalCallGuard guard) {
         if (smtpHost.isBlank()) {
             return new LoggingEmailSender();
         }
-        return new SmtpEmailSender(mailSenderProvider.getObject(), smtpUsername);
+        return new SmtpEmailSender(mailSenderProvider.getObject(), smtpUsername, guard);
     }
 }

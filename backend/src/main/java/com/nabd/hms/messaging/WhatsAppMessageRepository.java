@@ -29,11 +29,14 @@ class WhatsAppMessageRepository {
                 """, UUID.class, tenantId, patientId, toPhone, templateId, templateName, language, paramsJson);
     }
 
-    Optional<Message> find(UUID id) {
+    /** OPS-014: locks the message row until the caller's transaction ends, so two workers holding the same
+     * outbox event (one with an expired lease) serialize here and the second sees the first one's result. */
+    Optional<Message> findForUpdate(UUID id) {
         return jdbc.query("""
                 SELECT m.*, t.status AS template_status FROM whatsapp_messages m
                 LEFT JOIN whatsapp_templates t ON t.id = m.template_id
                 WHERE m.id = ?
+                FOR UPDATE OF m
                 """, (rs, i) -> new Message(
                 rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class), rs.getString("to_phone"),
                 rs.getString("template_name"), rs.getString("language"), rs.getString("params"),
@@ -51,12 +54,29 @@ class WhatsAppMessageRepository {
         return granted;
     }
 
-    void markSent(UUID id, String wamid) {
-        jdbc.update("UPDATE whatsapp_messages SET status = 'sent', wamid = ? WHERE id = ?", wamid, id);
+    /** OPS-012: committed before the provider call, so a second worker can see a send is (or was) in flight. */
+    void markSending(UUID id) {
+        jdbc.update("UPDATE whatsapp_messages SET status = 'sending' WHERE id = ? AND status IN ('queued', 'sending')", id);
+    }
+
+    /** True while a 'sending' row is younger than {@code seconds}: its sender may still be mid-call. */
+    boolean sendInFlight(UUID id, int seconds) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT status = 'sending' AND updated_at > now() - make_interval(secs => ?) FROM whatsapp_messages WHERE id = ?",
+                Boolean.class, seconds, id));
+    }
+
+    /** The provider call failed in a way that is safe to retry: back to queued for the next attempt. */
+    void requeue(UUID id) {
+        jdbc.update("UPDATE whatsapp_messages SET status = 'queued' WHERE id = ? AND status = 'sending'", id);
+    }
+
+    int markSent(UUID id, String wamid) {
+        return jdbc.update("UPDATE whatsapp_messages SET status = 'sent', wamid = ? WHERE id = ? AND status IN ('queued', 'sending')", wamid, id);
     }
 
     void markFailed(UUID id, String error) {
-        jdbc.update("UPDATE whatsapp_messages SET status = 'failed', error = ? WHERE id = ?", error, id);
+        jdbc.update("UPDATE whatsapp_messages SET status = 'failed', error = ? WHERE id = ? AND status IN ('queued', 'sending')", error, id);
     }
 
     void markBlocked(UUID id, String reason) {

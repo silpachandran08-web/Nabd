@@ -26,6 +26,8 @@ class AuthApiTest extends ApiTestBase {
 
     @org.springframework.beans.factory.annotation.Autowired
     private CapturingOtpSender otpSender;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.OutboxDispatcher dispatcher; // OPS-012: OTPs are sent by the outbox, after the request
 
     // ---- login ----
 
@@ -227,8 +229,6 @@ class AuthApiTest extends ApiTestBase {
         assertThat(noClinic.getBody()).isEqualTo(resp.getBody());
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private com.nabd.hms.common.OutboxDispatcher dispatcher;
 
     /** PLT-006: the OTP is generated and sent by an outbox handler, not on the request path. */
     private String awaitOtp(String mobile) {
@@ -255,6 +255,7 @@ class AuthApiTest extends ApiTestBase {
         ResponseEntity<Void> reqResp = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile)), Void.class);
         assertThat(reqResp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        dispatcher.poll();
 
         String code = awaitOtp(mobile);
         assertThat(code).isNotNull();
@@ -462,6 +463,7 @@ class AuthApiTest extends ApiTestBase {
         ResponseEntity<Void> reqResp = http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile)), Void.class);
         assertThat(reqResp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        dispatcher.poll();
         String token = otpSender.sentTo.get(mobile);
         assertThat(token).isNotNull();
 
