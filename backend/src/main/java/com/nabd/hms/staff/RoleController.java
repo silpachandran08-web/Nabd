@@ -46,7 +46,7 @@ public class RoleController {
     @PostMapping
     @PreAuthorize("hasAuthority('staff:create')")
     public ResponseEntity<RoleResponse> create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RoleWriteRequest req) {
-        RoleResponse created = service.create(tenantId(jwt), staffId(jwt), req, permissions(jwt));
+        RoleResponse created = service.create(tenantId(jwt), staffId(jwt), req);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -60,7 +60,7 @@ public class RoleController {
     @PreAuthorize("hasAuthority('staff:edit')")
     public RoleResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                 @Valid @RequestBody RoleWriteRequest req) {
-        return service.update(tenantId(jwt), staffId(jwt), id, req, permissions(jwt));
+        return service.update(tenantId(jwt), staffId(jwt), id, req);
     }
 
     /** PLT-016: Owner only (checked in RoleService); 409 NOT_A_PRESET for a custom role. */
@@ -98,10 +98,5 @@ public class RoleController {
 
     private UUID staffId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
-    }
-
-    private List<String> permissions(Jwt jwt) {
-        List<String> permissions = jwt.getClaimAsStringList("permissions");
-        return permissions == null ? List.of() : permissions;
     }
 }

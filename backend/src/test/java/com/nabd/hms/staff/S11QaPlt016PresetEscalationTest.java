@@ -4,7 +4,6 @@ import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.staff.presets.RolePresets;
 import com.nabd.hms.support.ApiTestBase;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -228,7 +227,6 @@ class S11QaPlt016PresetEscalationTest extends ApiTestBase {
 
     /** A delegated (loaned) grant must not be turned into a permanent one by editing one's own permanent role. */
     @Test
-    @Tag("known-defect-PLT-016")
     void nonOwnerOnLoan_cannotBakeTheLoanedGrantIntoTheirPermanentRole() {
         SeededTenant t = seedTenant();
         Map<String, UUID> p = presets(t.id());
