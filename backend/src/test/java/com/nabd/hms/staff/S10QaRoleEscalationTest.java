@@ -72,7 +72,7 @@ class S10QaRoleEscalationTest extends ApiTestBase {
     }
 
     private boolean sessionAlive(String access) {
-        return exchange("/v1/auth/sessions", HttpMethod.GET, authed(access), Map[].class).getStatusCode() == HttpStatus.OK;
+        return exchange("/v1/auth/sessions", HttpMethod.GET, authed(access), String.class).getStatusCode() == HttpStatus.OK;
     }
 
     private ResponseEntity<Map> refresh(String rt) {

@@ -138,6 +138,8 @@ class S10QaOps004LastVisitTest extends ApiTestBase {
     }
 
     @Test
+    // known defect (OPS-004): the header lastVisit and lastVisitAt use different definitions of 'last visit'
+    @org.junit.jupiter.api.Tag("known-defect-OPS-004")
     void ac2_inconsistentDefinitions_headerLastVisitAndLastVisitAtAgreeOnTheSameDay() {
         Ctx c = ctx();
         String p = patient(c, "Agree");
