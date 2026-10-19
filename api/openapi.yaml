@@ -201,12 +201,53 @@ paths:
               type: object
               properties:
                 setupToken: { type: string, description: "typ=mfa_setup token from login; omit when signed in" }
+                currentCode: { type: string, description: "PLT-004: live TOTP of the active authenticator; required to re-enrol when MFA is on (or send X-Step-Up-Token)" }
+      parameters:
+        - { name: X-Step-Up-Token, in: header, required: false, schema: { type: string } }
       responses:
         "200":
-          description: Secret and otpauth URI
+          description: Secret and otpauth URI; stored as a pending secret, the active one keeps working until /auth/mfa/confirm
           content: { application/json: { schema: { type: object } } }
+        "403":
+          description: step-up-required - MFA is on and neither a valid current code nor a step-up token was sent; active secret unchanged
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "401":
           description: No valid setup token or access session (token-type-not-allowed)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /auth/mfa/recovery-verify:
+    post:
+      tags: [Auth]
+      summary: Complete an MFA challenge with a single-use recovery code (PLT-004)
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, recoveryCode]
+              properties:
+                challengeToken: { type: string, description: "mfa_pending token from login" }
+                recoveryCode: { type: string, maxLength: 32 }
+      responses:
+        "200":
+          description: Session issued, code consumed, audit auth.recovery_code_used written
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+                  expiresIn: { type: integer }
+                  remainingCodes: { type: integer }
+        "401":
+          description: challenge-invalid or recovery-code-invalid
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /auth/mfa/confirm:
@@ -628,6 +669,30 @@ paths:
               properties: { reason: { type: string, minLength: 3 } }
       responses:
         "204": { description: "Suspended; sessions killed < 30s, audit event written" }
+
+  /staff/{id}/mfa/reset:
+    post:
+      tags: [Staff]
+      summary: Owner resets a staff member's authenticator (PLT-004) - revokes sessions, forces enrolment at next sign-in, audit staff.mfa_reset
+      x-required-permission: staff:edit
+      x-step-up: true
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: X-Step-Up-Token, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reasonCode]
+              properties:
+                reasonCode: { type: string, enum: [lost_device, left_clinic, other] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "204": { description: "Reset; sessions revoked, recovery codes revoked" }
+        "403": { description: "forbidden or step-up-required", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /staff/invitations/{token}/accept:
     post:

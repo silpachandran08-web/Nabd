@@ -100,6 +100,14 @@ class StaffRepository {
         jdbc.update("UPDATE staff SET status = 'suspended' WHERE tenant_id = ? AND id = ?", tenantId, id);
     }
 
+    /** PLT-004: drops the authenticator and every unused recovery code; the next sign-in must enrol again. */
+    void resetMfa(UUID tenantId, UUID staffId) {
+        jdbc.update("UPDATE staff SET mfa_enabled = false, mfa_secret_enc = NULL, mfa_pending_secret_enc = NULL, "
+                + "mfa_pending_created_at = NULL, mfa_reset_required = true WHERE tenant_id = ? AND id = ?", tenantId, staffId);
+        jdbc.update("UPDATE mfa_recovery_codes SET revoked_at = now() WHERE tenant_id = ? AND staff_id = ? "
+                + "AND used_at IS NULL AND revoked_at IS NULL", tenantId, staffId);
+    }
+
     void revokeAllSessions(UUID tenantId, UUID staffId, String reason) {
         jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
                 "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL", reason, tenantId, staffId);

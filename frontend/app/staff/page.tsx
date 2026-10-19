@@ -161,6 +161,8 @@ export default function StaffAccessPage() {
   const [builderSubmitting, setBuilderSubmitting] = useState(false);
 
   const [stepUpFor, setStepUpFor] = useState<string | null>(null);
+  const [stepUpKind, setStepUpKind] = useState<"suspend" | "reset">("suspend"); // PLT-004: same step-up prompt serves the MFA reset
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
   const [stepUpCode, setStepUpCode] = useState("");
   const [stepUpBusy, setStepUpBusy] = useState(false);
   const [stepUpError, setStepUpError] = useState<string | null>(null);
@@ -407,6 +409,14 @@ export default function StaffAccessPage() {
     }
   }
 
+  function startReset(id: string) {
+    setStepUpKind("reset");
+    setStepUpFor(id);
+    setStepUpCode("");
+    setStepUpError(null);
+    setResetNotice(null);
+  }
+
   async function confirmStepUp(e: React.FormEvent) {
     e.preventDefault();
     if (!stepUpFor) return;
@@ -432,18 +442,25 @@ export default function StaffAccessPage() {
         return;
       }
       const { stepUpToken }: { stepUpToken: string } = await mfaRes.json();
-      const suspendRes = await authedFetch(`/staff/${stepUpFor}/suspend`, {
+      const reset = stepUpKind === "reset";
+      const suspendRes = await authedFetch(reset ? `/staff/${stepUpFor}/mfa/reset` : `/staff/${stepUpFor}/suspend`, {
         method: "POST",
         headers: { "X-Step-Up-Token": stepUpToken },
+        ...(reset ? { body: JSON.stringify({ reasonCode: "lost_device" }) } : {}),
       });
       if (!suspendRes) return;
       if (suspendRes.status === 204) {
-        setStaff((prev) => prev.map((s) => (s.id === stepUpFor ? { ...s, status: "suspended" } : s)));
+        if (reset) {
+          setResetNotice("Authenticator reset. They are signed out and must set up a new one at next sign-in.");
+        } else {
+          setStaff((prev) => prev.map((s) => (s.id === stepUpFor ? { ...s, status: "suspended" } : s)));
+        }
         setStepUpFor(null);
         return;
       }
-      const body: Problem = await suspendRes.json().catch(() => ({ title: "", detail: "Couldn't suspend staff member." }));
-      setStepUpError(body.detail || "Couldn't suspend staff member.");
+      const fallback = reset ? "Couldn't reset the authenticator." : "Couldn't suspend staff member.";
+      const body: Problem = await suspendRes.json().catch(() => ({ title: "", detail: fallback }));
+      setStepUpError(body.detail || fallback);
     } finally {
       setStepUpBusy(false);
     }
@@ -471,6 +488,7 @@ export default function StaffAccessPage() {
 
   const canInvite = permissions.includes("staff:create");
   const canSuspend = permissions.includes("staff:delete");
+  const canResetMfa = permissions.includes("staff:edit");
   // Login column only when the backend reports it (BE2 OWN-034); an older backend shows no column.
   const showLogin = staff.some((s) => typeof s.loginMethod === "string");
   const canEditRoles = permissions.includes("staff:edit");
@@ -498,6 +516,7 @@ export default function StaffAccessPage() {
       </div>
 
       {error && !loading && staff.length > 0 && <div className={styles.formError} role="alert">{error}</div>}
+      {resetNotice && <div className={styles.formError} role="status">{resetNotice}</div>}
       {rolesFailed && !loading && staff.length > 0 && (
         <div className={styles.formError} role="alert">Couldn&apos;t load roles, so Role and Restriction show &ldquo;—&rdquo;. Reload to try again.</div>
       )}
@@ -552,8 +571,11 @@ export default function StaffAccessPage() {
                           {s.professionalRegistrationNo ? "Reg. no." : "Add reg. no."}
                         </button>
                       )}
+                      {canResetMfa && s.status === "active" && (
+                        <button className={styles.actionBtn} onClick={() => startReset(s.id)}>Reset authenticator</button>
+                      )}
                       {canSuspend && s.status === "active" && (
-                        <button className={styles.actionBtn} disabled={suspending === s.id} onClick={() => suspend(s.id)}>
+                        <button className={styles.actionBtn} disabled={suspending === s.id} onClick={() => { setStepUpKind("suspend"); suspend(s.id); }}>
                           {suspending === s.id ? "…" : "Suspend"}
                         </button>
                       )}
@@ -802,7 +824,7 @@ export default function StaffAccessPage() {
         <div className={styles.stepUpOverlay}>
           <form className={styles.stepUpCard} onSubmit={confirmStepUp}>
             <h2 className={styles.stepUpTitle}>Confirm it&apos;s you</h2>
-            <p className={styles.stepUpText}>Suspending a staff member needs a fresh code from your authenticator app.</p>
+            <p className={styles.stepUpText}>{stepUpKind === "reset" ? "Resetting an authenticator" : "Suspending a staff member"} needs a fresh code from your authenticator app.</p>
             {stepUpError && <div className={styles.formError} role="alert">{stepUpError}</div>}
             <div className={styles.field}>
               <label className={styles.label} htmlFor="stepUpCode">Authentication code</label>
@@ -821,7 +843,7 @@ export default function StaffAccessPage() {
             <div className={styles.stepUpActions}>
               <button type="button" className={styles.cancelBtn} onClick={() => setStepUpFor(null)}>Cancel</button>
               <button type="submit" className={styles.submit} disabled={stepUpBusy || stepUpCode.length !== 6}>
-                {stepUpBusy ? "Verifying…" : "Confirm & suspend"}
+                {stepUpBusy ? "Verifying…" : stepUpKind === "reset" ? "Confirm & reset" : "Confirm & suspend"}
               </button>
             </div>
           </form>

@@ -88,6 +88,16 @@ public class StaffController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/mfa/reset")
+    @PreAuthorize("hasAuthority('staff:edit')")
+    public ResponseEntity<Void> resetMfa(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                          @Valid @RequestBody com.nabd.hms.staff.dto.MfaResetRequest req,
+                                          @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken,
+                                          HttpServletRequest http) {
+        staffService.resetMfa(tenantId(jwt), id, staffId(jwt), stepUpToken, req, RequestMeta.clientIp(http));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/invitations/{token}/accept")
     public TokenPairResponse acceptInvite(@PathVariable String token, @Valid @RequestBody AcceptInviteRequest req,
                                            HttpServletRequest http) {

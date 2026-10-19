@@ -9,6 +9,7 @@ import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.staff.dto.AcceptInviteRequest;
 import com.nabd.hms.staff.dto.AcceptedStaffIdentity;
 import com.nabd.hms.staff.dto.CallerInfo;
+import com.nabd.hms.staff.dto.MfaResetRequest;
 import com.nabd.hms.staff.dto.PageMeta;
 import com.nabd.hms.staff.dto.StaffInviteRequest;
 import com.nabd.hms.staff.dto.StaffInviteResponse;
@@ -153,6 +154,21 @@ public class StaffService {
         staffRepo.suspend(tenantId, id);
         staffRepo.revokeAllSessions(tenantId, id, "suspended");
         log.warn("staff {} suspended by {} (tenant {}) — all sessions killed", id, callerStaffId, tenantId);
+    }
+
+    /** PLT-004: idempotent; the audit row is written on every call. */
+    @Transactional
+    public void resetMfa(UUID tenantId, UUID id, UUID callerStaffId, String stepUpToken, MfaResetRequest req, String ipAddress) {
+        stepUpVerifier.require(stepUpToken, callerStaffId);
+        tenantContext.set(tenantId);
+        staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
+        staffRepo.resetMfa(tenantId, id);
+        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
+        String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+        auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,
+                ipAddress, "staff.mfa_reset", "staff", id, null, Map.of("reasonCode", req.reasonCode()));
+        log.warn("MFA of staff {} reset by {} (tenant {}), sessions revoked", id, callerStaffId, tenantId);
     }
 
     @Transactional
