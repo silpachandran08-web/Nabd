@@ -20,6 +20,7 @@
     <java.version>17</java.version>
     <!-- OPS-031: Boot 3.3.4 manages 1.19.8, which fails on Docker Engine 29. Keep >= 1.21. -->
     <testcontainers.version>1.21.3</testcontainers.version>
+    <pit.history>${project.build.directory}/pit-history.bin</pit.history>
   </properties>
 
   <dependencies>
@@ -113,4 +114,41 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <!-- OPS-032: nightly mutation testing, run with -Ppit org.pitest:pitest-maven:mutationCoverage -->
+      <id>pit</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-maven</artifactId>
+            <version>1.17.1</version>
+            <dependencies>
+              <dependency>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-junit5-plugin</artifactId>
+                <version>1.2.1</version>
+              </dependency>
+            </dependencies>
+            <configuration>
+              <targetClasses>
+                <param>com.nabd.hms.clinical.RxSafetyChecks*</param>
+                <param>com.nabd.hms.clinical.AllergyDrugClasses*</param>
+                <param>com.nabd.hms.clinical.PrescriptionService*</param>
+                <param>com.nabd.hms.billing.CheckoutService*</param>
+              </targetClasses>
+              <outputFormats><param>XML</param></outputFormats>
+              <timestampedReports>false</timestampedReports>
+              <withHistory>true</withHistory>
+              <historyInputFile>${pit.history}</historyInputFile>
+              <historyOutputFile>${pit.history}</historyOutputFile>
+              <threads>2</threads>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

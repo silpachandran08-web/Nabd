@@ -14,3 +14,11 @@ Required checks on `main`: `stage1-static`, `stage2-unit`, `stage3-integration`,
 
 ## Needs external action
 Create teams in `.github/CODEOWNERS`; run `scripts/ci/apply-branch-protection.sh OWNER/REPO` (required checks, CODEOWNER review, signed commits, no direct push/force push); add `NVD_API_KEY` secret; create label `quarantine`; first real run to measure stage timings and populate the baseline. Render deploys must switch to the signed digest, since the Dockerfile now packages a CI-built jar.
+
+## Coverage and mutation gates (OPS-032)
+- Config: `ci/quality-gates.json`. Scripts: `scripts/ci/quality.py`, tests `python3 scripts/ci/test_quality.py`.
+- Every backend PR: stage 3 posts a JaCoCo comment (overall, new-code, gated classes: RxSafetyChecks, AllergyDrugClasses, PrescriptionService, CheckoutService, `auth.*` which is the IAM module).
+- All gates start report-only (`enabled_from: null`). Turn one on by setting its date in the PR that proves the baseline meets it: new code >= 80% (from S3), overall >= 75%, per-class >= 90% line / 85% branch. Record the baseline with `quality.py baseline` into `ci/coverage-baseline.json` (not yet recorded: needs a green CI run).
+- Nightly `pit-nightly` (`mvn -Ppit`, incremental history restored from the Actions cache) mutates the clinical-safety and checkout classes; fails below 85% overall or 90% on AllergyDrugClasses. There is no separate tax class: the tax rule lives in `CheckoutService.computeTotals`.
+- A drop of more than 2 points vs the last green score sets repo variable `PIT_BLOCKED=true`; stage 3 then fails PRs touching clinical/billing/auth until a nightly run recovers it.
+- Needs external action: secret `VARS_TOKEN` (can write repo variables), first CI run for the baseline, first nightly to confirm < 30 min and the real score.

@@ -1,0 +1,37 @@
+{
+  "_note": "OPS-032. Set enabled_from (YYYY-MM-DD) in the PR that turns a gate on, only once ci/coverage-baseline.json shows the baseline already meets it. null = report only.",
+  "coverage": {
+    "overall_min_line": 75,
+    "overall_enabled_from": null,
+    "new_code_min": 80,
+    "new_code_enabled_from": null,
+    "per_class_min_line": 90,
+    "per_class_min_branch": 85,
+    "per_class_enabled_from": null,
+    "classes": [
+      "com/nabd/hms/clinical/RxSafetyChecks",
+      "com/nabd/hms/clinical/AllergyDrugClasses",
+      "com/nabd/hms/clinical/PrescriptionService",
+      "com/nabd/hms/billing/CheckoutService",
+      "com/nabd/hms/auth/*"
+    ]
+  },
+  "pit": {
+    "min_score": 85,
+    "class_min_score": { "com.nabd.hms.clinical.AllergyDrugClasses": 90 },
+    "max_drop_points": 2,
+    "target_classes": [
+      "com.nabd.hms.clinical.RxSafetyChecks",
+      "com.nabd.hms.clinical.AllergyDrugClasses",
+      "com.nabd.hms.clinical.PrescriptionService",
+      "com.nabd.hms.billing.CheckoutService",
+      "com.nabd.hms.billing.CheckoutService$Totals"
+    ],
+    "target_methods_note": "CheckoutService.computeTotals carries the tax rule (no separate tax class exists); PIT is class-level, PrescriptionService and CheckoutService are mutated whole.",
+    "guarded_paths": [
+      "backend/src/main/java/com/nabd/hms/clinical/",
+      "backend/src/main/java/com/nabd/hms/billing/",
+      "backend/src/main/java/com/nabd/hms/auth/"
+    ]
+  }
+}
