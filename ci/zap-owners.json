@@ -1,0 +1,13 @@
+{
+  "_note": "OPS-037: owner listed next to each ZAP Medium alert. Keys are ZAP plugin ids. Team handles as in .github/CODEOWNERS (placeholders until the teams exist).",
+  "default": "@nabd/platform-owners",
+  "plugins": {
+    "10038": "@nabd/platform-owners",
+    "10035": "@nabd/platform-owners",
+    "10098": "@nabd/security-owners",
+    "10020": "@nabd/platform-owners",
+    "10202": "@nabd/security-owners",
+    "40012": "@nabd/security-owners",
+    "90022": "@nabd/engineering"
+  }
+}

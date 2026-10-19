@@ -76,6 +76,9 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: write   # OPS-033 architecture report comment
     steps:
       - uses: actions/checkout@v4
       - if: needs.changes.outputs.frontend == 'true'
@@ -92,6 +95,29 @@ jobs:
         name: JUnit unit tests (no Docker; ApiTestBase classes run in stage 3)
         working-directory: backend
         run: mvn -B -q test -Dtest='!*ApiTest,!*IT' -Dsurefire.failIfNoSpecifiedTests=false
+      # OPS-033: ArchitectureRulesTest (above) writes Modulith + ArchUnit findings; arch.py adds the SQL scans and the gate
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        name: architecture report (Modulith, ArchUnit, SQL ownership, tenant predicate; counts by module)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          pip install -q pyyaml
+          python3 scripts/ci/arch.py summary backend/target/architecture-violations.json architecture-report.json > arch.md
+          cat arch.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            pr="${{ github.event.pull_request.number }}"
+            id=$(gh api "repos/${{ github.repository }}/issues/$pr/comments" --paginate --jq '[.[] | select(.body | startswith("<!-- architecture-report -->"))] | last | .id // empty') || true
+            if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@arch.md || true
+            else gh pr comment "$pr" --body-file arch.md || true; fi
+          fi
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        uses: actions/upload-artifact@v4
+        with: { name: architecture-report, path: "architecture-report.json\narch.md" }
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        name: architecture gate (mode from ci/architecture-gate.json; report only until its dates are set)
+        run: python3 scripts/ci/arch.py gate backend/target/architecture-violations.json
 
   stage3-integration:
     needs: changes

@@ -1,0 +1,5 @@
+{
+  "_note": "OPS-033 stage 2 architecture gate. null = report only (S2-S4). Set new_code_blocking_from (YYYY-MM-DD) to the first day of S5: new violations fail, existing ones stay in ci/architecture-baseline.json. Set all_blocking_from to the Phase 1 exit (S8): baseline must be empty and any violation fails; then make stage2-unit's architecture step a plain required check.",
+  "new_code_blocking_from": null,
+  "all_blocking_from": null
+}
