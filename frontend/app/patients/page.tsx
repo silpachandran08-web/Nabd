@@ -760,7 +760,7 @@ function PatientsList() {
       </div>
 
       {checkInFor && (
-        <CheckInDialog patient={checkInFor} authedFetch={authedFetch} onClose={() => setCheckInFor(null)}
+        <CheckInDialog patient={checkInFor} onClose={() => setCheckInFor(null)}
           onDone={(token) => { setFlash(`${checkInFor.name} checked in · T-${token}`); setCheckInFor(null); void load(q, filter); }} />
       )}
       {registering && (
