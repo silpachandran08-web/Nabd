@@ -1,6 +1,7 @@
 package com.nabd.hms.patient;
 
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.patient.registry.RegistryReconciler;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ class S10QaOps004LastVisitTest extends ApiTestBase {
 
     @Autowired AuditService auditService;
     @Autowired PatientRepository patientRepository;
+    @Autowired RegistryReconciler reconciler;
 
     private record Ctx(SeededTenant t, SeededStaff staff, String token) { }
 
@@ -63,6 +65,7 @@ class S10QaOps004LastVisitTest extends ApiTestBase {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> registryRow(Ctx c, String patient) {
+        reconciler.reconcileTenant(c.t.id()); // OPS-008: registry reads the summary read model
         var rows = (List<Map<String, Object>>) exchange("/v1/patients/registry", HttpMethod.GET, authed(c.token), Map.class).getBody().get("rows");
         return rows.stream().filter(r -> patient.equals(r.get("id"))).findFirst().orElseThrow();
     }

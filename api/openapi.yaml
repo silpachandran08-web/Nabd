@@ -1407,14 +1407,15 @@ paths:
         Rows for the selected filter, narrowed by `q` (name, MRN, 3+ mobile digits, or today's token
         such as `T-12`), ordered by name then id. Consent- and row-scope-gated like every patient read.
         `total` and `counts` ignore `q` and paging; `matchedTotal` is the number of rows matching filter + q
-        before paging. Paging is additive: a call without `limit`/`cursor` returns the first 200 rows exactly
-        as before. `cursor` is opaque (an offset into the ordered result); pass `page.nextCursor` back
-        unchanged with the same `q`/`filter`. Flags and counts are computed for at most 3000 patients per clinic.
+        before paging. A call without `limit`/`cursor` returns the first 200 rows. `cursor` is an opaque keyset
+        on (name, id) (OPS-008): pass `page.nextCursor` back unchanged with the same `q`/`filter`; rows registered
+        between pages are never repeated or skipped. Read from the patient_registry_summary read model (no cap):
+        a write shows within seconds; a duplicate partner's flag is set by the nightly duplicate job.
       x-required-permission: patients:view
       parameters:
         - { name: q, in: query, required: false, schema: { type: string } }
         - { name: filter, in: query, required: false, schema: { type: string, enum: [all, recent, followup, package, balance, duplicate, archived], default: all } }
-        - { name: limit, in: query, required: false, description: "1..100 when sent; when omitted the registry returns up to 200 rows (no paging UI yet)", schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: limit, in: query, required: false, description: "1..200, default 200; out of range is a 400 validation problem with code INVALID_LIMIT", schema: { type: integer, minimum: 1, maximum: 200, default: 200 } }
         - { name: cursor, in: query, required: false, schema: { type: string } }
       responses:
         "200":
@@ -1431,7 +1432,7 @@ paths:
                   hasMore: { type: boolean, description: "True when page.nextCursor fetches another page (REC-040)" }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400":
-          description: Invalid filter (`invalid-filter`) or malformed cursor (`invalid-cursor`)
+          description: Invalid filter (`invalid-filter`), limit outside 1..200 (`validation`, code `INVALID_LIMIT`) or malformed cursor (`invalid-cursor`)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /patients/{id}:

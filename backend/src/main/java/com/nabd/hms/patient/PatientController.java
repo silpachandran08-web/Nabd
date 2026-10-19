@@ -43,7 +43,7 @@ public class PatientController {
 
     /**
      * Patient Registry — filter: all (default), recent, followup, package, balance, duplicate, archived.
-     * REC-040: optional limit (1-200, default 200) and opaque cursor page the matching rows.
+     * REC-040/OPS-008: optional limit (1-200, default 200) and opaque keyset cursor page the matching rows.
      */
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_registry_list", key = "id")
     @GetMapping("/registry")
@@ -53,7 +53,7 @@ public class PatientController {
                                             @RequestParam(required = false) String filter,
                                             @RequestParam(required = false) Integer limit,
                                             @RequestParam(required = false) String cursor) {
-        return service.registry(tenantId(jwt), staffId(jwt), q, filter, limit == null ? null : com.nabd.hms.common.PageRequest.limit(limit), cursor);
+        return service.registry(tenantId(jwt), staffId(jwt), q, filter, limit == null ? null : com.nabd.hms.common.PageRequest.limit(limit, 200), cursor);
     }
 
     @com.nabd.hms.shared.phiread.PhiRead(value = "patient_list", key = "id")

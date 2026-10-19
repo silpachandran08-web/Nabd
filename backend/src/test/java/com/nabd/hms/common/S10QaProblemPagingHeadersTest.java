@@ -61,7 +61,7 @@ class S10QaProblemPagingHeadersTest extends ApiTestBase {
         String tok = loginAndGetAccessToken(owner(t));
         List<String> failures = new ArrayList<>();
         for (String path : staffListPaths()) {
-            for (String bad : List.of("0", "-5", "101", "1000000", "abc", "2147483648")) {
+            for (String bad : List.of("0", "-5", path.endsWith("/registry") ? "201" : "101", "1000000", "abc", "2147483648")) { // OPS-008: registry max is 200
                 ResponseEntity<Map> r = get(tok, path + "?limit=" + bad);
                 boolean ok = r.getStatusCode() == HttpStatus.BAD_REQUEST && r.getBody() != null && type(r).contains("validation") && namesField(r, "limit");
                 if (!ok) failures.add(path + "?limit=" + bad + " -> " + r.getStatusCode() + " " + r.getBody());

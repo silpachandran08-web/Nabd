@@ -345,8 +345,6 @@ class S10QaOps007RegistryTest extends ApiTestBase {
 
     /** Not one of the 4 listed ACs, but the story's stated goal ("filters like 'balance due' cover every patient, not just the first 3,000"). */
     @Test
-    // known defect (OPS-007): balance-due filter times out beyond the first 3000 patients
-    @Tag("known-defect-OPS-007")
     @SuppressWarnings("unchecked")
     void goal_balanceDueFilterFindsAPatientBeyondTheFirst3000ByName() {
         Ctx c = ctx();
@@ -359,6 +357,7 @@ class S10QaOps007RegistryTest extends ApiTestBase {
             jdbc.update("INSERT INTO invoices (tenant_id, invoice_number, queue_entry_id, patient_id, doctor_id, subtotal, tax, total, created_by) VALUES (?,?,?,?,?,500,0,500,?)",
                     c.t.id(), "Z-" + UUID.randomUUID(), q, zed, c.staff.id(), c.staff.id());
         });
+        reconciler.reconcileTenant(c.t.id()); // OPS-008: the registry reads the summary read model (poll is off in tests)
         var r = exchange("/v1/patients/registry?filter=balance", HttpMethod.GET, authed(c.token), Map.class);
         assertThat(r.getStatusCode().value()).as("registry: " + r.getBody()).isEqualTo(200);
         var rows = (List<Map<String, Object>>) r.getBody().get("rows");

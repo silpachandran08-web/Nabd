@@ -44,7 +44,9 @@ class Plt027ProblemAndPagingApiTest extends ApiTestBase {
     void everyListRefusesAnOutOfRangeLimitWithAValidationProblemNamingLimit(String limit) {
         String token = staffToken();
         for (String path : TENANT_LISTS) {
-            ResponseEntity<Map> r = exchange(path + "?limit=" + limit, HttpMethod.GET, authed(token), Map.class);
+            // OPS-008: the registry's ceiling is 200 (one full registry page), every other list's is 100
+            String bad = path.endsWith("/registry") && limit.equals("101") ? "201" : limit;
+            ResponseEntity<Map> r = exchange(path + "?limit=" + bad, HttpMethod.GET, authed(token), Map.class);
             assertThat(r.getStatusCode()).as(path + " limit=" + limit).isEqualTo(HttpStatus.BAD_REQUEST);
             assertThat(r.getHeaders().getContentType().toString()).contains("application/problem+json");
             assertThat((String) r.getBody().get("type")).endsWith("/validation");
