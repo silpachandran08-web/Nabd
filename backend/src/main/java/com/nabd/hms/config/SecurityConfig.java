@@ -71,3 +71,75 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); // PUT: DOC-R7 working hours and the allergy/pregnancy safety writes (CLN-001)
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id", "X-Step-Up-Token", "Idempotency-Key"));
         config.setExposedHeaders(List.of("X-Request-Id", "Idempotent-Replayed"));
+        config.setMaxAge(600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/v1/**", config);
+        return source;
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,
+            Converter<org.springframework.security.oauth2.jwt.Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
+            CorsConfigurationSource corsConfigurationSource,
+            com.nabd.hms.shared.idempotency.IdempotencyFilter idempotencyFilter) throws Exception {
+        http
+                .addFilterAfter(idempotencyFilter, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class) // PLT-026
+                .csrf(csrf -> csrf.disable()) // stateless bearer-token API, no cookies to forge
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // PLT-027: API responses (any status) are never cached, sniffed, framed or sent with a referrer
+                .headers(h -> h
+                        .cacheControl(c -> { })
+                        .contentTypeOptions(c -> { })
+                        .referrerPolicy(r -> r.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                        .httpStrictTransportSecurity(x -> x.maxAgeInSeconds(31536000).includeSubDomains(true)
+                                .requestMatcher(org.springframework.security.web.util.matcher.AnyRequestMatcher.INSTANCE))
+                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/v1/auth/login",
+                                "/v1/auth/otp/request",
+                                "/v1/auth/otp/verify",
+                                "/v1/auth/mfa/verify",
+                                "/v1/auth/mfa/recovery-verify",
+                                "/v1/auth/pin/reset-request",
+                                "/v1/auth/pin/reset-confirm",
+                                "/v1/auth/refresh",
+                                // PLT-001: consume their own challenge token (mfa_setup in the body / owner_select in the
+                                // Authorization header) via ChallengeTokenDecoder; MfaCaller / OwnerController refuse with 401
+                                "/v1/auth/mfa/enroll",
+                                "/v1/auth/mfa/confirm",
+                                "/v1/owners/me/workspaces",
+                                "/v1/owners/workspaces/select",
+                                "/v1/staff/invitations/*/accept",
+                                "/v1/owners/auth/login",
+                                "/v1/owners/invitations/*/accept",
+                                "/v1/platform/auth/login",
+                                "/v1/platform/auth/mfa/verify",
+                                "/v1/platform/auth/refresh",
+                                "/.well-known/jwks.json",
+                                "/v1/webhooks/whatsapp" // HMAC-signed by Meta, verified in WhatsAppWebhookController
+                        ).permitAll()
+                        // PLT-001: a sid claim (staff/operator access token) or at least one granted authority
+                        .anyRequest().access((authn, ctx) -> {
+                            var a = authn.get();
+                            boolean ok = a != null && a.isAuthenticated() && !(a instanceof AnonymousAuthenticationToken)
+                                    && ((a instanceof JwtAuthenticationToken j && j.getToken().getClaimAsString("sid") != null)
+                                    || !a.getAuthorities().isEmpty());
+                            return new AuthorizationDecision(ok);
+                        })
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .bearerTokenResolver(ownerSelectAwareResolver())
+                        .authenticationEntryPoint((req, res, ex) -> {
+                            String dbCode = com.nabd.hms.common.DbFailureAdvice.classify(ex.getCause());
+                            if (dbCode != null) {
+                                com.nabd.hms.common.DbFailureAdvice.write(res, dbCode);
+                            } else {
+                                new org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint().commence(req, res, ex);
+                            }
+                        })
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
+        return http.build();
+    }
+}
