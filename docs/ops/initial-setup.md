@@ -53,7 +53,16 @@ Run steps 1 and 2 in the Neon SQL editor (or `psql`) as the default owner login.
    values set `APP_CRYPTO_REENCRYPT_ENABLED=true` until the log line `crypto re-encrypt verify` shows `failed=0 legacy=0` for
    every column. Rotation: add `2:<new key>` to the keyring, set `APP_CRYPTO_ACTIVE_KID=2`, run the job again; remove a kid
    (and finally APP_CRYPTO_KEY) only after a clean verify.
+   OPS-012/PLT-005: set `OTP_PHONE_HMAC_KEY` (base64 pepper; hashes phone numbers in the OTP send counters; required under prod).
+   `REAL_DATA_ONBOARDING`: unset means `blocked` under the prod profile, so tenant provisioning returns 409. Set it to `open`
+   only after `docs/gates/phase0.md` records a passed gate (pending decision).
    Redeploy. A clean start logs no `RLS self-check failed`.
+
+## After upgrading to Sprint 11 (S2) code
+
+Re-run step 1 (`bootstrap-roles.sql`) once as the owner login: it now also creates `nabd_platform` (operator console, PLT-056;
+needs Postgres 16+). Then step 4 (migrate) and step 5 (the new variables above). Owners are forced to enrol MFA on the next
+login (PLT-038): tell them before the deploy.
 
 ## Errors seen and what they mean
 
