@@ -10,8 +10,8 @@ import java.util.UUID;
 @Repository
 class PrescriptionPrintRepository {
 
-    record Header(UUID prescriptionId, String status, Instant signedAt, UUID doctorId, UUID signerId, String clinicName,
-                  String clinicRegion, String clinicPhone) {
+    record Header(UUID prescriptionId, String status, Instant signedAt, UUID doctorId, UUID signerId, String signerRegistrationNo,
+                  String clinicName, String clinicRegion, String clinicPhone) {
     }
 
     record Person(String name, String registrationNo) {
@@ -23,14 +23,10 @@ class PrescriptionPrintRepository {
         this.jdbc = jdbc;
     }
 
-    /** The signer comes from the audit row written by sign() (the prescriptions table has no signed_by column). */
+    /** CLN-005: the signer is the stored prescriptions.signed_by (backfilled by V1222), never read from audit_log. */
     Optional<Header> findHeader(UUID tenantId, UUID queueEntryId) {
         return jdbc.query("""
-                SELECT p.id, p.status, p.signed_at, p.doctor_id,
-                       (SELECT a.actor_id FROM audit_log a
-                         WHERE a.tenant_id = p.tenant_id AND a.action = 'prescription.signed'
-                           AND a.entity_type = 'prescription' AND a.entity_id = p.id AND a.actor_type = 'staff'
-                         ORDER BY a.id DESC LIMIT 1) AS signer_id,
+                SELECT p.id, p.status, p.signed_at, p.doctor_id, p.signed_by AS signer_id, p.signed_by_registration_no,
                        t.name AS clinic_name, t.region AS clinic_region, t.whatsapp_number AS clinic_phone
                   FROM prescriptions p JOIN tenants t ON t.id = p.tenant_id
                  WHERE p.tenant_id = ? AND p.queue_entry_id = ?
@@ -38,6 +34,7 @@ class PrescriptionPrintRepository {
                 rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant(),
                 rs.getString("doctor_id") == null ? null : UUID.fromString(rs.getString("doctor_id")),
                 rs.getString("signer_id") == null ? null : UUID.fromString(rs.getString("signer_id")),
+                rs.getString("signed_by_registration_no"),
                 rs.getString("clinic_name"), rs.getString("clinic_region"), rs.getString("clinic_phone")),
                 tenantId, queueEntryId).stream().findFirst();
     }

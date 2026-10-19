@@ -19,7 +19,7 @@ public final class FieldGrantMasker {
 
     public static NoteResponse note(ReadScope s, NoteResponse n) {
         return s.sees(DIAGNOSIS) ? n : new NoteResponse(n.id(), n.queueEntryId(), n.patientId(), n.doctorId(), n.subjective(),
-                n.objective(), n.assessment(), n.plan(), null, n.status(), n.signedAt(), n.updatedAt());
+                n.objective(), n.assessment(), n.plan(), null, n.status(), n.signedAt(), n.updatedAt(), n.signedBy());
     }
 
     public static List<NoteAmendmentResponse> amendments(ReadScope s, List<NoteAmendmentResponse> list) {

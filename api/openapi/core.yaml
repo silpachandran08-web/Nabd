@@ -1735,7 +1735,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - clinical
-      x-required-permission: clinical:edit
+      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve')"
   /v1/clinical/drugs/search:
     get:
       operationId: PrescriptionController_searchDrugs
@@ -2968,7 +2968,47 @@ paths:
           description: Error (RFC 7807)
       tags:
       - clinical
-      x-required-permission: clinical:edit
+      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve')"
+  /v1/clinical/prescriptions/{queueEntryId}/signing-authority:
+    get:
+      operationId: PrescriptionController_signingAuthority
+      parameters:
+      - in: path
+        name: queueEntryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: clinical:view
   /v1/clinical/rx-sets:
     get:
       operationId: PrescriptionController_listSets
@@ -10558,6 +10598,131 @@ paths:
       tags:
       - staff
       x-required-permission: staff:edit
+  /v1/staff/{id}/clinical-licence:
+    get:
+      operationId: StaffLicenceController_get
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LicenceResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - staff
+      x-required-permission: staff:view
+    put:
+      operationId: StaffLicenceController_put
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LicenceRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LicenceResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - staff
+      x-required-permission: staff:edit
+  /v1/staff/{id}/clinical-licence/override:
+    post:
+      operationId: StaffLicenceController_override
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OverrideRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/LicenceResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - staff
+      x-required-permission: staff:edit
   /v1/staff/{id}/mfa/reset:
     post:
       operationId: StaffController_resetMfa
@@ -12962,28 +13127,32 @@ components:
         sessionsOwed:
           type: integer
           format: int64
+    LicenceRequest:
+      type: object
+      properties:
+        isClinician:
+          type: boolean
+        licenceExpiresOn:
+          type: string
+          format: date
+      required:
+      - isClinician
     LicenceResponse:
       type: object
       properties:
-        expiryDate:
+        hasRegistrationNo:
+          type: boolean
+        isClinician:
+          type: boolean
+        licenceExpiresOn:
           type: string
           format: date
-        holderId:
+        licenceOverrideUntil:
           type: string
-        holderName:
+          format: date-time
+        staffId:
           type: string
-        id:
-          type: string
-        issuingBody:
-          type: string
-        licenceType:
-          type: string
-        number:
-          type: string
-        region:
-          type: string
-        status:
-          type: string
+          format: uuid
     LicenceWriteRequest:
       type: object
       properties:
@@ -13433,6 +13602,14 @@ components:
           type: number
           exclusiveMinimum: false
           minimum: 0
+    OverrideRequest:
+      type: object
+      properties:
+        until:
+          type: string
+          format: date-time
+      required:
+      - until
     OverviewResponse:
       type: object
       properties:
@@ -14342,6 +14519,11 @@ components:
         signedAt:
           type: string
           format: date-time
+        signedBy:
+          type: string
+          format: uuid
+        signedByRegistrationNo:
+          type: string
         status:
           type: string
         unresolvedWarnings:

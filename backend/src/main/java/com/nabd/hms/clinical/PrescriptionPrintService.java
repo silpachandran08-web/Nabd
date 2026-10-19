@@ -30,10 +30,10 @@ public class PrescriptionPrintService {
             throw new ApiException(HttpStatus.CONFLICT, "prescription-not-signed", "Prescription not signed",
                     "Only a signed prescription can be printed.");
         }
-        // The signer is the prescriber of record; fall back to the visit's doctor if no signing audit row exists.
-        UUID prescriberId = h.signerId() != null ? h.signerId() : h.doctorId();
+        // CLN-005: signed_by is NOT NULL on every signed row (V1221 CHECK); the number printed is the one signed under.
+        UUID prescriberId = h.signerId();
         PrescriptionPrintRepository.Person who = prescriberId == null ? null : repo.findPerson(tenantId, prescriberId).orElse(null);
-        String reg = who == null || who.registrationNo() == null || who.registrationNo().isBlank() ? null : who.registrationNo();
+        String reg = h.signerRegistrationNo() == null || h.signerRegistrationNo().isBlank() ? null : h.signerRegistrationNo();
         return new PrescriptionPrintHeaderResponse(h.prescriptionId(), h.signedAt(), h.clinicName(), h.clinicRegion(),
                 h.clinicPhone(), prescriberId, who == null ? null : who.name(), reg);
     }

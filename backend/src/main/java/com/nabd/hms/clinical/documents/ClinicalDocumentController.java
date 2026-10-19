@@ -82,8 +82,9 @@ public class ClinicalDocumentController {
         return service.updateDraft(tenantId(jwt), id, req);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/documents/{id}/issue")
-    @PreAuthorize("hasAuthority('clinical:edit')")
+    @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve')") // CLN-005: see PrescriptionController.sign
     public DocumentResponse issue(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, HttpServletRequest http) {
         return service.issue(tenantId(jwt), staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), id);
     }

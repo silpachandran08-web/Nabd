@@ -29,6 +29,7 @@ import { useSafetyDictionarySource } from "../components/consult/safetyDictionar
 import RxPad from "../components/consult/RxPad";
 import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
+import { signBlockMessage, type SignAuthority } from "../components/consult/signAuthority";
 import VisitOutputs from "../components/consult/VisitOutputs";
 import VisitTimeline from "../components/consult/VisitTimeline";
 import {
@@ -169,6 +170,7 @@ export default function ConsultPage() {
   const [transferError, setTransferError] = useState<string | null>(null);
   const [rxItems, setRxItems] = useState<PrescriptionItem[]>([]);
   const [rxStatus, setRxStatus] = useState<"draft" | "signed">("draft");
+  const [signAuthority, setSignAuthority] = useState<SignAuthority | null | "error">(null); // CLN-005
   const [rxSaving, setRxSaving] = useState(false);
   const [rxError, setRxError] = useState<string | null>(null);
   const [showSignConfirm, setShowSignConfirm] = useState(false);
@@ -492,6 +494,7 @@ export default function ConsultPage() {
     setShowDental(false);
     setRxItems([]);
     setRxStatus("draft");
+    setSignAuthority(null);
     setRxError(null);
     setRxDirty(false);
     setOverride(null);
@@ -569,6 +572,9 @@ export default function ConsultPage() {
       } else {
         setRxItems([{ ...BLANK_RX_ITEM }]);
       }
+      const aRes = await authedFetch(`/clinical/prescriptions/${row.id}/signing-authority`);
+      if (stale()) return;
+      setSignAuthority(aRes?.status === 200 ? ((await aRes.json()) as SignAuthority) : "error");
     } catch {
       if (!stale()) {
         if (noteLoadRef.current === "loading") { noteLoadRef.current = "error"; setNoteLoad("error"); }
@@ -914,7 +920,10 @@ export default function ConsultPage() {
     const locked = noteStatus === "signed";
     const openWarnings = rxItems.reduce((n, i) => n + (i.warnings ?? []).filter((w) => w.requiresDecision && !w.resolved).length, 0);
     // Recording a warning decision and signing are the visit doctor's (or a clinical:approve holder's); the server enforces it (403 not-prescriber), the UI simply doesn't offer it to anyone else.
-    const mayDecideRx = activeEntry.doctorId === selfId || can("clinical:approve");
+    // CLN-005: and only as a registered clinician with an in-date licence (signing-authority, same rule as the server).
+    const mayDecideRx = (activeEntry.doctorId === selfId || can("clinical:approve"))
+      && signAuthority !== null && signAuthority !== "error" && signAuthority.canSign;
+    const signBlocked = signBlockMessage(signAuthority);
     // Advisory warnings (moderate/mild allergy) don't block but are acknowledged at signing; decisions already recorded are shown, not re-asked.
     const advisoryItems = rxItems.filter((i) => (i.warnings ?? []).some((w) => !w.requiresDecision));
     const doctorName = getIdentity()?.staffName ?? "";
@@ -1173,6 +1182,7 @@ export default function ConsultPage() {
                       </div>
                     )}
                   </div>
+                  {rxStatus !== "signed" && signBlocked && <p className={p.muted} role="status" data-testid="rx-sign-blocked">{signBlocked}</p>}
                   {rxStatus !== "signed" && <p className={p.muted}>The allergy check matches drug names and common drug classes only. It is not a drug database, so confirm against the patient&apos;s record.</p>}
                   {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
                   {openWarnings > 0 && rxStatus !== "signed" && (
