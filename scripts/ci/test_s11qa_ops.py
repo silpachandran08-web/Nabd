@@ -119,7 +119,6 @@ class GitHubRestrictions(unittest.TestCase):
             for k, spec in declared.items():
                 if spec.get("required"): self.assertIn(k, j.get("with") or {}, f"{f}:{jid} misses required input {k}")
 
-    @unittest.expectedFailure  # QA-5 defect D1 (OPS-036/FEF-049): ci.yml grants the preview call only contents: read
     def test_called_workflow_permissions_do_not_exceed_the_caller(self):
         """GitHub: a called workflow can only downgrade the GITHUB_TOKEN permissions of the calling job; a nested job that
         asks for more makes the whole caller workflow invalid at load time ('The nested job ... is requesting ...')."""
@@ -362,13 +361,22 @@ class Ops037(unittest.TestCase):
         self.assertIn("6", str(j["schemathesis"]["timeout-minutes"]))
         self.assertIn("ghcr.io/zaproxy/zaproxy:2.16.0", json.dumps(j["zap-baseline"]))
 
-    @unittest.expectedFailure  # QA-5 defect D2 (OPS-037 x OPS-036): nothing emits the deployment_status dast.yml waits for
     def test_ac1_pr_previews_actually_trigger_the_dast_workflow(self):
-        """dast.yml runs on PRs only via deployment_status for an environment containing 'review'. preview.yml neither
-        declares a job `environment:` nor creates a deployment, so no PR preview ever starts the ZAP baseline."""
-        p = json.dumps(wf("preview.yml")) + open("infra/preview/deploy.sh").read()
-        self.assertTrue("environment" in json.dumps(wf("preview.yml")["jobs"]["deploy"]) or "/deployments" in p,
-                        "preview pipeline creates no GitHub deployment")
+        """A PR preview must start dast.yml. Deployments created with GITHUB_TOKEN (a job `environment:` or a /deployments
+        call) never trigger workflows, so a job environment alone is not enough (QA-5 D2). Fix M: dast.yml runs on
+        workflow_run of the workflow that calls preview.yml, gated on vars.PREVIEW_ENABLED, and scans deploy.sh's host."""
+        d = wf("dast.yml")
+        callers = [wf(f)["name"] for f in STORY_WORKFLOWS
+                   if any(str(j.get("uses", "")).endswith("/preview.yml") for j in wf(f)["jobs"].values())]
+        self.assertTrue(callers, "nothing calls preview.yml")
+        wr = (d["on"] or {}).get("workflow_run") or {}
+        self.assertTrue(set(callers) <= set(wr.get("workflows") or []), f"dast.yml does not run after {callers}")
+        self.assertIn("completed", wr.get("types") or [])
+        cond = d["jobs"]["target"]["if"]
+        for w in ("vars.PREVIEW_ENABLED == 'true'", "workflow_run.event == 'pull_request'", "workflow_run.conclusion == 'success'"):
+            self.assertIn(w, cond)
+        self.assertIn('HOST="pr-$PR.$PREVIEW_DOMAIN"', open("infra/preview/deploy.sh").read())
+        self.assertIn('web="https://pr-$RUN_PR.$PREVIEW_DOMAIN"', json.dumps(d["jobs"]["target"]).replace('\\"', '"'))
 
 
 # =====================================================================================================================
