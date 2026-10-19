@@ -1,4 +1,5 @@
 import { decodeJwtPayload } from "./jwt.ts";
+import { clearLocalSessionData } from "./idleLock.ts";
 // The access token's "permissions" claim (SecurityConfig.java: authoritiesClaimName) already
 // carries everything the client needs for nav/redirect — decoding it here avoids a round trip
 // to a /me endpoint that doesn't exist for clinic staff (only /platform/auth/me does).
@@ -141,4 +142,5 @@ export async function signOut(): Promise<void> {
   }
   localStorage.removeItem("nabd_access_token");
   localStorage.removeItem("nabd_refresh_token");
+  await clearLocalSessionData(); // FEF-005: lock flag + drafts database
 }

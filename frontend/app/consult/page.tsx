@@ -19,7 +19,7 @@ import NoteTemplates from "../components/consult/NoteTemplates";
 import DoseCalculator from "../components/consult/DoseCalculator";
 import DentalDrawer from "../components/consult/DentalDrawer";
 import DoctorOrders from "../components/consult/DoctorOrders";
-import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
+import { deleteDraft, readDraft, takeLostDrafts, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
 import PackageSessionCard from "../components/consult/PackageSessionCard";
@@ -527,6 +527,7 @@ export default function ConsultPage() {
       // Not when the note failed to load: the draft is kept untouched for the next successful open.
       const draft = noteLoadRef.current === "ok" ? await readDraft(row.id) : null;
       if (stale()) return;
+      if (takeLostDrafts() > 0) setNotice("An unsent local draft could not be recovered after the page reloaded. Re-check this note.");
       if (draft) {
         const serverFields = server ? toFields(server) : BLANK_DRAFT;
         if (server?.status === "signed") {

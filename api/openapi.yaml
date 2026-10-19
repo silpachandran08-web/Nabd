@@ -853,6 +853,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PolicyWrite" } } }
       responses:
         "200": { description: "Updated policy", content: { application/json: { schema: { $ref: "#/components/schemas/Policy" } } } }
+        "422": { description: "Value out of range (session.idle_lock_minutes must be a whole number 2-30)" }
 
   /setup/consent-contact:
     get:

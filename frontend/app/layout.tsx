@@ -20,8 +20,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={poppins.variable}>
       <body>
-        <AppShell>{children}</AppShell>
-        <IdleLockGuard />
+        <IdleLockGuard>
+          <AppShell>{children}</AppShell>
+        </IdleLockGuard>
       </body>
     </html>
   );

@@ -76,14 +76,14 @@ try {
     await s.page.clock.install();
     await s.page.goto(`${APP}/arrivals`, { waitUntil: 'networkidle' });
     await s.page.clock.fastForward(6 * 60 * 1000);
-    await s.page.getByText('Session locked').waitFor({ timeout: 5000 });
+    await s.page.getByText('Screen locked').waitFor({ timeout: 5000 });
     await s.page.locator('input[type=password]').fill('1234');
     await s.page.getByRole('button', { name: 'Unlock' }).click();
     if (expect) {
       await s.page.getByRole('alert').filter({ hasText: expect }).waitFor({ timeout: 5000 });
       check(`3 ${name}: "${expect}" in an alert (aria-live) region`, true);
     } else {
-      await s.page.getByText('Session locked').waitFor({ state: 'detached', timeout: 5000 });
+      await s.page.getByText('Screen locked').waitFor({ state: 'detached', timeout: 5000 });
       check(`3 ${name}: lock dismissed`, true);
     }
     check(`3 ${name}: refresh is called before unlock`, order[0] === 'refresh' && (order[1] === 'unlock' || name === 'expired session'), order.join('>'));
