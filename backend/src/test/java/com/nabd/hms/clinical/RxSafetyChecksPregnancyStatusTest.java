@@ -13,21 +13,21 @@ class RxSafetyChecksPregnancyStatusTest {
 
     @Test
     void recordedPregnantOrLactatingEscalatesForARiskDrug() {
-        assertThat(RxSafetyChecks.recordedStatusWarning("Warfarin 5mg", "pregnant")).contains("PREGNANT");
-        assertThat(RxSafetyChecks.recordedStatusWarning("Warfarin 5mg", "lactating")).contains("LACTATING");
+        assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "Warfarin 5mg", "pregnant")).contains("PREGNANT");
+        assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "Warfarin 5mg", "lactating")).contains("LACTATING");
     }
 
     @Test
     void otherStatusesNeverProduceTheEscalationSoBehaviourIsUnchanged() {
         for (String status : new String[]{null, "not_pregnant", "unknown"}) {
-            assertThat(RxSafetyChecks.recordedStatusWarning("Warfarin 5mg", status)).isNull();
+            assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "Warfarin 5mg", status)).isNull();
         }
-        assertThat(RxSafetyChecks.recordedStatusWarning("Paracetamol", "pregnant")).isNull();
+        assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "Paracetamol", "pregnant")).isNull();
     }
 
     @Test
     void theExistingRuleIsUntouchedByARecordedNotPregnantStatus() {
         LocalDate today = LocalDate.of(2026, 1, 1);
-        assertThat(RxSafetyChecks.pregnancyWarning("Warfarin", "female", LocalDate.of(1995, 1, 1), today)).isNotNull();
+        assertThat(RxSafetyChecks.pregnancyWarning(SafetyDictionaryFixtures.IN, "Warfarin", "female", LocalDate.of(1995, 1, 1), today)).isNotNull();
     }
 }

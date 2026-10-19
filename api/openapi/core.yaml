@@ -28,6 +28,193 @@ paths:
       tags:
       - config
       x-required-permission: public
+  /internal/v1/safety-dictionaries/{region}/versions:
+    get:
+      operationId: SafetyDictionaryController_listSafetyDictionaryVersions
+      parameters:
+      - in: path
+        name: region
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties:
+                    type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: safety_content:edit
+    post:
+      operationId: SafetyDictionaryController_uploadSafetyDictionaryVersion
+      parameters:
+      - in: path
+        name: region
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SafetyDictionaryBundle"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: safety_content:edit
+  /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate:
+    post:
+      operationId: SafetyDictionaryController_activateSafetyDictionaryVersion
+      parameters:
+      - in: path
+        name: region
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: versionId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: safety_content:edit
+  /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve:
+    post:
+      operationId: SafetyDictionaryController_approveSafetyDictionaryVersion
+      parameters:
+      - in: path
+        name: region
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: versionId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: safety_content:edit
   /v1/appointments:
     get:
       operationId: AppointmentController_list
@@ -2928,6 +3115,39 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:edit
+  /v1/clinical/safety-dictionary:
+    get:
+      operationId: SafetyDictionaryController_getActiveSafetyDictionary
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: clinical:view
   /v1/clinical/visits/{queueEntryId}/documents:
     get:
       operationId: ClinicalDocumentController_listForVisit
@@ -10686,6 +10906,20 @@ components:
           pattern: "^[0-9]{4,6}$"
       required:
       - pin
+    ActivateRequest:
+      type: object
+      properties:
+        csoApprovalRef:
+          type: string
+          maxLength: 200
+          minLength: 0
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - csoApprovalRef
+      - reason
     ActiveStaff:
       type: object
       properties:
@@ -11009,6 +11243,20 @@ components:
       - doctorId
       - patientId
       - startTime
+    ApproveRequest:
+      type: object
+      properties:
+        approvedBy:
+          type: string
+          maxLength: 200
+          minLength: 0
+        csoApprovalRef:
+          type: string
+          maxLength: 200
+          minLength: 0
+      required:
+      - approvedBy
+      - csoApprovalRef
     AuditEntryResponse:
       type: object
       properties:
@@ -11386,6 +11634,15 @@ components:
             $ref: "#/components/schemas/LineItemRequest"
       required:
       - lineItems
+    ClassDef:
+      type: object
+      properties:
+        crossReactsTo:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
     ClinicHolidayResponse:
       type: object
       properties:
@@ -12671,19 +12928,14 @@ components:
     Item:
       type: object
       properties:
-        dosage:
+        classId:
           type: string
-        drugName:
+        lang:
           type: string
-        duration:
+        matchKind:
           type: string
-        frequency:
+        value:
           type: string
-        instructions:
-          type: string
-        stockQty:
-          type: integer
-          format: int32
     JsonNode:
       type: object
     LiabilityResponse:
@@ -14085,6 +14337,8 @@ components:
         queueEntryId:
           type: string
           format: uuid
+        safetyDictionaryVersion:
+          type: string
         signedAt:
           type: string
           format: date-time
@@ -14711,6 +14965,39 @@ components:
           type: boolean
         severity:
           type: string
+    SafetyDictionaryBundle:
+      type: object
+      properties:
+        classes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClassDef"
+        controlled:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        exclusions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        labels:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+        pregnancyRisk:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        stems:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        terms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
     SalesDay:
       type: object
       properties:

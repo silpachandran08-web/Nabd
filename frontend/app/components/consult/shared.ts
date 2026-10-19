@@ -44,6 +44,8 @@ export type PrescriptionAllergySnapshot = {
 export type Prescription = {
   id: string; status: string; signedAt: string | null; items: PrescriptionItem[]; unresolvedWarnings?: number;
   allergySnapshot?: PrescriptionAllergySnapshot | null;
+  /** CLN-004: dictionary version active at signing; null for drafts and older prescriptions. */
+  safetyDictionaryVersion?: string | null;
 };
 export type Problem = { title: string; detail: string };
 

@@ -1,0 +1,707 @@
+{
+ "classes": [
+  {
+   "id": "penicillin",
+   "crossReactsTo": [
+    "cephalosporin"
+   ]
+  },
+  {
+   "id": "cephalosporin",
+   "crossReactsTo": []
+  },
+  {
+   "id": "sulfonamide-antibiotic",
+   "crossReactsTo": []
+  },
+  {
+   "id": "nsaid",
+   "crossReactsTo": []
+  },
+  {
+   "id": "macrolide",
+   "crossReactsTo": []
+  },
+  {
+   "id": "fluoroquinolone",
+   "crossReactsTo": []
+  },
+  {
+   "id": "tetracycline",
+   "crossReactsTo": []
+  },
+  {
+   "id": "aminoglycoside",
+   "crossReactsTo": []
+  },
+  {
+   "id": "opioid",
+   "crossReactsTo": []
+  }
+ ],
+ "terms": [
+  {
+   "classId": "penicillin",
+   "value": "penicillin"
+  },
+  {
+   "classId": "penicillin",
+   "value": "amoxil"
+  },
+  {
+   "classId": "penicillin",
+   "value": "augmentin"
+  },
+  {
+   "classId": "penicillin",
+   "value": "novamox"
+  },
+  {
+   "classId": "penicillin",
+   "value": "moxikind"
+  },
+  {
+   "classId": "penicillin",
+   "value": "clavam"
+  },
+  {
+   "classId": "penicillin",
+   "value": "bioclav"
+  },
+  {
+   "classId": "penicillin",
+   "value": "ampoxin"
+  },
+  {
+   "classId": "penicillin",
+   "value": "megapen"
+  },
+  {
+   "classId": "penicillin",
+   "value": "unasyn"
+  },
+  {
+   "classId": "penicillin",
+   "value": "tazocin"
+  },
+  {
+   "classId": "penicillin",
+   "value": "zosyn"
+  },
+  {
+   "classId": "penicillin",
+   "value": "floxapen"
+  },
+  {
+   "classId": "penicillin",
+   "value": "moxclav"
+  },
+  {
+   "classId": "penicillin",
+   "value": "pen v"
+  },
+  {
+   "classId": "penicillin",
+   "value": "pen-v"
+  },
+  {
+   "classId": "penicillin",
+   "value": "pen vk"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "keflex"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "rocephin"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "zinnat"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "claforan"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "fortum"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "suprax"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "omnicef"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "ceftin"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "taxim"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "zifi"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "sulfonamide"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "trimethoprim"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "bactrim"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "septran"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "septrin"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "cotrim"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "salazopyrin"
+  },
+  {
+   "classId": "nsaid",
+   "value": "nsaid"
+  },
+  {
+   "classId": "nsaid",
+   "value": "dexibuprofen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "nonsteroidal"
+  },
+  {
+   "classId": "nsaid",
+   "value": "non-steroidal"
+  },
+  {
+   "classId": "nsaid",
+   "value": "non steroidal"
+  },
+  {
+   "classId": "nsaid",
+   "value": "ibuprofen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "brufen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "advil"
+  },
+  {
+   "classId": "nsaid",
+   "value": "nurofen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "ibugesic"
+  },
+  {
+   "classId": "nsaid",
+   "value": "combiflam"
+  },
+  {
+   "classId": "nsaid",
+   "value": "diclofenac"
+  },
+  {
+   "classId": "nsaid",
+   "value": "voltaren"
+  },
+  {
+   "classId": "nsaid",
+   "value": "voveran"
+  },
+  {
+   "classId": "nsaid",
+   "value": "naproxen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "naprosyn"
+  },
+  {
+   "classId": "nsaid",
+   "value": "ketorolac"
+  },
+  {
+   "classId": "nsaid",
+   "value": "toradol"
+  },
+  {
+   "classId": "nsaid",
+   "value": "ketoprofen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "indomethacin"
+  },
+  {
+   "classId": "nsaid",
+   "value": "indometacin"
+  },
+  {
+   "classId": "nsaid",
+   "value": "mefenamic"
+  },
+  {
+   "classId": "nsaid",
+   "value": "ponstan"
+  },
+  {
+   "classId": "nsaid",
+   "value": "meftal"
+  },
+  {
+   "classId": "nsaid",
+   "value": "aspirin"
+  },
+  {
+   "classId": "nsaid",
+   "value": "acetylsalicylic"
+  },
+  {
+   "classId": "nsaid",
+   "value": "disprin"
+  },
+  {
+   "classId": "nsaid",
+   "value": "ecosprin"
+  },
+  {
+   "classId": "nsaid",
+   "value": "etoricoxib"
+  },
+  {
+   "classId": "nsaid",
+   "value": "arcoxia"
+  },
+  {
+   "classId": "nsaid",
+   "value": "celecoxib"
+  },
+  {
+   "classId": "nsaid",
+   "value": "celebrex"
+  },
+  {
+   "classId": "nsaid",
+   "value": "piroxicam"
+  },
+  {
+   "classId": "nsaid",
+   "value": "meloxicam"
+  },
+  {
+   "classId": "nsaid",
+   "value": "mobic"
+  },
+  {
+   "classId": "nsaid",
+   "value": "nimesulide"
+  },
+  {
+   "classId": "nsaid",
+   "value": "nimulid"
+  },
+  {
+   "classId": "nsaid",
+   "value": "aceclofenac"
+  },
+  {
+   "classId": "nsaid",
+   "value": "zerodol"
+  },
+  {
+   "classId": "nsaid",
+   "value": "hifenac"
+  },
+  {
+   "classId": "nsaid",
+   "value": "flurbiprofen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "tenoxicam"
+  },
+  {
+   "classId": "nsaid",
+   "value": "lornoxicam"
+  },
+  {
+   "classId": "nsaid",
+   "value": "dexketoprofen"
+  },
+  {
+   "classId": "nsaid",
+   "value": "etodolac"
+  },
+  {
+   "classId": "nsaid",
+   "value": "parecoxib"
+  },
+  {
+   "classId": "nsaid",
+   "value": "sulindac"
+  },
+  {
+   "classId": "nsaid",
+   "value": "diflunisal"
+  },
+  {
+   "classId": "macrolide",
+   "value": "macrolide"
+  },
+  {
+   "classId": "macrolide",
+   "value": "erythrocin"
+  },
+  {
+   "classId": "macrolide",
+   "value": "azithral"
+  },
+  {
+   "classId": "macrolide",
+   "value": "zithromax"
+  },
+  {
+   "classId": "macrolide",
+   "value": "azee"
+  },
+  {
+   "classId": "macrolide",
+   "value": "althrocin"
+  },
+  {
+   "classId": "macrolide",
+   "value": "klacid"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "fluoroquinolone"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "quinolone"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "ciplox"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "cifran"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "tavanic"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "avelox"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "levaquin"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "zanocin"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "cipro"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "ciprobay"
+  },
+  {
+   "classId": "tetracycline",
+   "value": "vibramycin"
+  },
+  {
+   "classId": "tetracycline",
+   "value": "minocin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "aminoglycoside"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "dihydrostreptomycin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "gentamicin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "gentamycin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "amikacin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "tobramycin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "streptomycin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "neomycin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "kanamycin"
+  },
+  {
+   "classId": "aminoglycoside",
+   "value": "netilmicin"
+  },
+  {
+   "classId": "opioid",
+   "value": "opioid"
+  },
+  {
+   "classId": "opioid",
+   "value": "opiate"
+  },
+  {
+   "classId": "opioid",
+   "value": "dihydrocodeine"
+  },
+  {
+   "classId": "opioid",
+   "value": "codeine"
+  },
+  {
+   "classId": "opioid",
+   "value": "morphine"
+  },
+  {
+   "classId": "opioid",
+   "value": "tramadol"
+  },
+  {
+   "classId": "opioid",
+   "value": "tapentadol"
+  },
+  {
+   "classId": "opioid",
+   "value": "pethidine"
+  },
+  {
+   "classId": "opioid",
+   "value": "meperidine"
+  },
+  {
+   "classId": "opioid",
+   "value": "fentanyl"
+  },
+  {
+   "classId": "opioid",
+   "value": "oxycodone"
+  },
+  {
+   "classId": "opioid",
+   "value": "hydrocodone"
+  },
+  {
+   "classId": "opioid",
+   "value": "buprenorphine"
+  },
+  {
+   "classId": "opioid",
+   "value": "pholcodine"
+  }
+ ],
+ "stems": [
+  {
+   "classId": "penicillin",
+   "value": "penicil"
+  },
+  {
+   "classId": "penicillin",
+   "value": "pencill"
+  },
+  {
+   "classId": "penicillin",
+   "value": "cillin"
+  },
+  {
+   "classId": "penicillin",
+   "value": "amoxi"
+  },
+  {
+   "classId": "penicillin",
+   "value": "amoxy"
+  },
+  {
+   "classId": "penicillin",
+   "value": "ampicil"
+  },
+  {
+   "classId": "penicillin",
+   "value": "clavulan"
+  },
+  {
+   "classId": "penicillin",
+   "value": "tazobactam"
+  },
+  {
+   "classId": "penicillin",
+   "value": "sulbactam"
+  },
+  {
+   "classId": "penicillin",
+   "value": "fluclox"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "cef"
+  },
+  {
+   "classId": "cephalosporin",
+   "value": "cefalosporin"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "sulfa"
+  },
+  {
+   "classId": "sulfonamide-antibiotic",
+   "value": "trimoxazol"
+  },
+  {
+   "classId": "macrolide",
+   "value": "thromycin"
+  },
+  {
+   "classId": "fluoroquinolone",
+   "value": "floxacin"
+  },
+  {
+   "classId": "tetracycline",
+   "value": "cyclin"
+  },
+  {
+   "classId": "opioid",
+   "value": "hydromorph"
+  },
+  {
+   "classId": "opioid",
+   "value": "diamorph"
+  }
+ ],
+ "exclusions": [
+  {
+   "value": "penicillamine"
+  },
+  {
+   "value": "acefylline"
+  }
+ ],
+ "pregnancyRisk": [
+  {
+   "value": "isotretinoin",
+   "matchKind": "stem"
+  },
+  {
+   "value": "warfarin",
+   "matchKind": "stem"
+  },
+  {
+   "value": "methotrexate",
+   "matchKind": "stem"
+  },
+  {
+   "value": "misoprostol",
+   "matchKind": "stem"
+  },
+  {
+   "value": "thalidomide",
+   "matchKind": "stem"
+  },
+  {
+   "value": "valproate",
+   "matchKind": "stem"
+  },
+  {
+   "value": "valproic",
+   "matchKind": "stem"
+  },
+  {
+   "value": "tetracycline",
+   "matchKind": "stem"
+  },
+  {
+   "value": "doxycycline",
+   "matchKind": "stem"
+  },
+  {
+   "value": "lisinopril",
+   "matchKind": "stem"
+  },
+  {
+   "value": "enalapril",
+   "matchKind": "stem"
+  }
+ ],
+ "controlled": [
+  {
+   "value": "tramadol",
+   "matchKind": "stem"
+  },
+  {
+   "value": "alprazolam",
+   "matchKind": "stem"
+  },
+  {
+   "value": "diazepam",
+   "matchKind": "stem"
+  },
+  {
+   "value": "codeine",
+   "matchKind": "stem"
+  },
+  {
+   "value": "buprenorphine",
+   "matchKind": "stem"
+  },
+  {
+   "value": "zolpidem",
+   "matchKind": "stem"
+  }
+ ],
+ "labels": {
+  "controlled": {
+   "en": "Schedule H1 controlled substance"
+  }
+ }
+}

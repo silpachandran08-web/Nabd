@@ -68,8 +68,8 @@ class AllergyDrugClassesTest {
             "Lidocaine 2% gel, lidocaine"
     })
     void warnsForSameClassBrandAndSpellingVariants(String drug, String allergy) {
-        assertThat(AllergyDrugClasses.matches(drug, allergy)).isTrue();
-        assertThat(RxSafetyChecks.allergyMatches(drug, allergy)).isTrue();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, drug, allergy)).isTrue();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, drug, allergy)).isTrue();
     }
 
     @ParameterizedTest(name = "allergy \"{1}\" does not warn for \"{0}\"")
@@ -95,28 +95,28 @@ class AllergyDrugClassesTest {
             "Ciprofibrate, Ciprofloxacin"
     })
     void doesNotWarnAcrossUnrelatedClasses(String drug, String allergy) {
-        assertThat(AllergyDrugClasses.matches(drug, allergy)).isFalse();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, drug, allergy)).isFalse();
     }
 
     // V3-005: the drug IS the recorded substance, so it still warns (an exact repeat is never an exclusion).
     @Test
     void anExcludedDrugStillWarnsForItself() {
-        assertThat(AllergyDrugClasses.matches("Penicillamine 250", "Penicillamine")).isTrue();
-        assertThat(AllergyDrugClasses.matches("Mobicol", "Mobicol")).isTrue();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, "Penicillamine 250", "Penicillamine")).isTrue();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, "Mobicol", "Mobicol")).isTrue();
     }
 
     @Test
     void blankInputsNeverMatch() {
-        assertThat(AllergyDrugClasses.matches("Amoxicillin", "")).isFalse();
-        assertThat(AllergyDrugClasses.matches("Amoxicillin", "   ")).isFalse();
-        assertThat(AllergyDrugClasses.matches("", "Penicillin")).isFalse();
-        assertThat(AllergyDrugClasses.matches(null, "Penicillin")).isFalse();
-        assertThat(AllergyDrugClasses.matches("Amoxicillin", null)).isFalse();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, "Amoxicillin", "")).isFalse();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, "Amoxicillin", "   ")).isFalse();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, "", "Penicillin")).isFalse();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, null, "Penicillin")).isFalse();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, "Amoxicillin", null)).isFalse();
     }
 
     @Test
     void matchingIsCaseAndWhitespaceInsensitive() {
-        assertThat(AllergyDrugClasses.matches("  AUGMENTIN   625 ", "  pEnIcIlLiN ")).isTrue();
+        assertThat(AllergyDrugClasses.matches(SafetyDictionaryFixtures.IN, "  AUGMENTIN   625 ", "  pEnIcIlLiN ")).isTrue();
     }
 
     @Test
@@ -127,7 +127,7 @@ class AllergyDrugClassesTest {
 
     @Test
     void everyClassTermIsLongEnoughNotToMatchUnrelatedWords() {
-        for (AllergyDrugClasses.DrugClass c : AllergyDrugClasses.CLASSES) {
+        for (AllergyDrugClasses.DrugClass c : SafetyDictionaryFixtures.IN.classes()) {
             List<String> all = new ArrayList<>(c.terms());
             all.addAll(c.stems());
             for (String term : all) {
@@ -136,7 +136,7 @@ class AllergyDrugClassesTest {
                 assertThat(term).isEqualTo(term.toLowerCase());
             }
             for (String target : c.crossReactsTo()) {
-                assertThat(AllergyDrugClasses.CLASSES.stream().anyMatch(o -> o.id().equals(target)))
+                assertThat(SafetyDictionaryFixtures.IN.classes().stream().anyMatch(o -> o.id().equals(target)))
                         .as("%s cross-reacts to unknown class %s", c.id(), target).isTrue();
             }
         }

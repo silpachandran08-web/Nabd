@@ -26,37 +26,37 @@ class SafetyLocaleS9QaTest {
     @ValueSource(strings = {"en-IN", "tr-TR", "az-AZ", "ar-SA", "hi-IN", "lt-LT"})
     void ibuprofenUpperCase_firesNsaidAllergy(String tag) {
         Locale.setDefault(Locale.forLanguageTag(tag));
-        assertThat(RxSafetyChecks.allergyMatches("IBUPROFEN", "NSAID")).isTrue();
-        assertThat(RxSafetyChecks.allergyMatches("Ibuprofen 400mg", "NSAID")).isTrue();
-        assertThat(RxSafetyChecks.allergyMatches("DICLOFENAC", "NSAID")).isTrue();
-        assertThat(RxSafetyChecks.allergyMatches("PARACETAMOL", "NSAID")).isFalse(); // negative control stays negative
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "IBUPROFEN", "NSAID")).isTrue();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "Ibuprofen 400mg", "NSAID")).isTrue();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "DICLOFENAC", "NSAID")).isTrue();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "PARACETAMOL", "NSAID")).isFalse(); // negative control stays negative
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"tr-TR", "az-AZ"})
     void dotlessIDoesNotLeakIntoPregnancyAndControlledLists(String tag) {
         Locale.setDefault(Locale.forLanguageTag(tag));
-        assertThat(RxSafetyChecks.pregnancyWarning("ISOTRETINOIN", "female", java.time.LocalDate.of(1995, 1, 1), java.time.LocalDate.of(2026, 1, 1))).isNotNull();
-        assertThat(RxSafetyChecks.pregnancyWarning("TETRACYCLINE", "female", java.time.LocalDate.of(1995, 1, 1), java.time.LocalDate.of(2026, 1, 1))).isNotNull();
-        assertThat(RxSafetyChecks.recordedStatusWarning("WARFARIN", "pregnant")).isNotNull();
-        assertThat(RxSafetyChecks.recordedStatusWarning("VALPROIC ACID", "lactating")).isNotNull();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("BUPRENORPHINE", "IN")).isNotNull();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("FENTANYL", "KSA")).isNotNull();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("PARACETAMOL", "IN")).isNull();
+        assertThat(RxSafetyChecks.pregnancyWarning(SafetyDictionaryFixtures.IN, "ISOTRETINOIN", "female", java.time.LocalDate.of(1995, 1, 1), java.time.LocalDate.of(2026, 1, 1))).isNotNull();
+        assertThat(RxSafetyChecks.pregnancyWarning(SafetyDictionaryFixtures.IN, "TETRACYCLINE", "female", java.time.LocalDate.of(1995, 1, 1), java.time.LocalDate.of(2026, 1, 1))).isNotNull();
+        assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "WARFARIN", "pregnant")).isNotNull();
+        assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "VALPROIC ACID", "lactating")).isNotNull();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "BUPRENORPHINE")).isNotNull();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), "FENTANYL")).isNotNull();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "PARACETAMOL")).isNull();
     }
 
     private static List<String> snapshot(List<String> inputs) {
         List<String> out = new ArrayList<>();
         for (String d : inputs) {
             StringBuilder sb = new StringBuilder(d).append('|');
-            for (AllergyDrugClasses.DrugClass c : AllergyDrugClasses.CLASSES) {
-                sb.append(RxSafetyChecks.allergyMatches(d, c.id()) ? '1' : '0');
+            for (AllergyDrugClasses.DrugClass c : SafetyDictionaryFixtures.IN.classes()) {
+                sb.append(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, d, c.id()) ? '1' : '0');
             }
-            sb.append('|').append(AllergyDrugClasses.classesOf(d))
-              .append('|').append(RxSafetyChecks.controlledSubstanceWarning(d, "IN"))
-              .append('|').append(RxSafetyChecks.controlledSubstanceWarning(d, "KSA"))
-              .append('|').append(RxSafetyChecks.recordedStatusWarning(d, "pregnant"))
-              .append('|').append(RxSafetyChecks.pregnancyWarning(d, "female", java.time.LocalDate.of(1995, 1, 1), java.time.LocalDate.of(2026, 1, 1)));
+            sb.append('|').append(AllergyDrugClasses.classesOf(SafetyDictionaryFixtures.IN, d))
+              .append('|').append(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), d))
+              .append('|').append(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), d))
+              .append('|').append(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, d, "pregnant"))
+              .append('|').append(RxSafetyChecks.pregnancyWarning(SafetyDictionaryFixtures.IN, d, "female", java.time.LocalDate.of(1995, 1, 1), java.time.LocalDate.of(2026, 1, 1)));
             out.add(sb.toString());
         }
         return out;
@@ -64,7 +64,7 @@ class SafetyLocaleS9QaTest {
 
     private static List<String> catalogueInputs() {
         List<String> in = new ArrayList<>();
-        for (AllergyDrugClasses.DrugClass c : AllergyDrugClasses.CLASSES) {
+        for (AllergyDrugClasses.DrugClass c : SafetyDictionaryFixtures.IN.classes()) {
             for (String t : c.terms()) { in.add(t); in.add(t.toUpperCase(Locale.ROOT)); in.add(t.toUpperCase(Locale.ROOT) + " 500MG"); }
             for (String t : c.stems()) { in.add(t + "ine"); in.add(t.toUpperCase(Locale.ROOT) + "INE"); }
         }
@@ -88,9 +88,9 @@ class SafetyLocaleS9QaTest {
     @Test
     void everyCatalogueTerm_matchesItsOwnClass_underRoot() {
         Locale.setDefault(Locale.ROOT);
-        for (AllergyDrugClasses.DrugClass c : AllergyDrugClasses.CLASSES) {
+        for (AllergyDrugClasses.DrugClass c : SafetyDictionaryFixtures.IN.classes()) {
             for (String t : c.terms()) {
-                assertThat(RxSafetyChecks.allergyMatches(t.toUpperCase(Locale.ROOT), c.id())).as("%s in %s", t, c.id()).isTrue();
+                assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, t.toUpperCase(Locale.ROOT), c.id())).as("%s in %s", t, c.id()).isTrue();
             }
         }
     }
@@ -98,15 +98,15 @@ class SafetyLocaleS9QaTest {
     @Test
     void nfkcFolding_fullWidthAndCompatibilityForms() {
         Locale.setDefault(Locale.forLanguageTag("tr-TR"));
-        assertThat(RxSafetyChecks.allergyMatches("ＩＢＵＰＲＯＦＥＮ", "NSAID")).isTrue();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("ＴＲＡＭＡＤＯＬ", "IN")).isNotNull();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "ＩＢＵＰＲＯＦＥＮ", "NSAID")).isTrue();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "ＴＲＡＭＡＤＯＬ")).isNotNull();
     }
 
     @Test
     void nullAndBlankInputs_doNotThrow() {
-        assertThat(RxSafetyChecks.allergyMatches(null, "NSAID")).isFalse();
-        assertThat(RxSafetyChecks.allergyMatches("IBUPROFEN", null)).isFalse();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("", "IN")).isNull();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, null, "NSAID")).isFalse();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "IBUPROFEN", null)).isFalse();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "")).isNull();
     }
 
     /** Exploratory (not an acceptance criterion): Turkish capital dotted İ in a drug name. Fails if it silently misses. */
@@ -114,7 +114,7 @@ class SafetyLocaleS9QaTest {
     @org.junit.jupiter.api.Disabled("OBSERVATION CLN-003-O1: U+0130 lower-cases to i+combining dot under ROOT, so IBUPROFEN with a dotted capital I is missed; remove @Disabled to reproduce")
     void turkishCapitalDottedI_inDrugName_stillMatches() {
         Locale.setDefault(Locale.ROOT);
-        assertThat(RxSafetyChecks.allergyMatches("İBUPROFEN", "NSAID")).as("U+0130 in İBUPROFEN").isTrue();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "İBUPROFEN", "NSAID")).as("U+0130 in İBUPROFEN").isTrue();
     }
 
     /** Criterion 6 (local part): H-07 has verifying tests tagged for the report generator, including max-age and stale-weight ones. */

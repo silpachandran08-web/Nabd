@@ -28,9 +28,11 @@ const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB",
  * A recorded decision is shown with its reason, who and when. Advisory warnings (moderate/mild allergy)
  * stay visible but do not block. Nothing here clears a warning: only the server's answer does. */
 export default function RxWarnings({
-  item, locked, onOverride, onChangeMedicine, onRemove,
+  item, locked, onOverride, onChangeMedicine, onRemove, source,
 }: {
   item: PrescriptionItem; locked: boolean;
+  /** CLN-004: "Source: Nabd CSO dictionary IN v1"; undefined while loading, null when unavailable. */
+  source?: string | null;
   /** Absent for someone who may not record a decision (not the visit's doctor, no clinical:approve): the button is then not rendered. */
   onOverride?: (w: RxWarning) => void; onChangeMedicine: () => void; onRemove?: () => void;
 }) {
@@ -46,6 +48,7 @@ export default function RxWarnings({
             <div className={s.warnBody}>
               <strong>{WARNING_TITLE[w.kind]}{w.kind === "allergy" && SEVERITY_LABEL[w.severity] ? ` · ${SEVERITY_LABEL[w.severity]}` : ""}{w.requiresDecision ? "" : " (advisory)"}</strong>
               <span>{WARNING_BODY[w.kind](w)}</span>
+              {source !== undefined && <span className={s.muted}>{source ?? "Source: safety dictionary version unavailable"}</span>}
               {w.decision && (
                 <span>
                   <StatusPill tone="info" icon="check" label="Decision recorded" />{" "}

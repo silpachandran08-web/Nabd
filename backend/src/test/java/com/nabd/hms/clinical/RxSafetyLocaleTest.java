@@ -31,17 +31,17 @@ class RxSafetyLocaleTest {
     @ValueSource(strings = {"en-IN", "tr-TR", "ar-SA", "hi-IN"})
     void ibuprofenWarnsForAnNsaidAllergyUnderAnyDefaultLocale(String tag) {
         Locale.setDefault(Locale.forLanguageTag(tag));
-        assertThat(RxSafetyChecks.allergyMatches("IBUPROFEN", "NSAID")).isTrue();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("TRAMADOL", "IN")).isNotNull();
-        assertThat(RxSafetyChecks.recordedStatusWarning("ISOTRETINOIN", "pregnant")).isNotNull();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("DIAZEPAM", "KSA")).isNotNull();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "IBUPROFEN", "NSAID")).isTrue();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "TRAMADOL")).isNotNull();
+        assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "ISOTRETINOIN", "pregnant")).isNotNull();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), "DIAZEPAM")).isNotNull();
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"tr-TR", "ar-SA", "hi-IN"})
     void wholeCatalogueGivesTheSameResultAsRoot(String tag) {
         List<String> drugs = new ArrayList<>(List.of("ISOTRETINOIN", "WARFARIN", "TRAMADOL", "IBUPROFEN 400", "Cotrimoxazole", "I", "İbuprofen"));
-        for (AllergyDrugClasses.DrugClass c : AllergyDrugClasses.CLASSES) {
+        for (AllergyDrugClasses.DrugClass c : SafetyDictionaryFixtures.IN.classes()) {
             for (String t : c.terms()) drugs.add(t.toUpperCase(Locale.ROOT));
             for (String t : c.stems()) drugs.add(t.toUpperCase(Locale.ROOT) + "X");
         }
@@ -55,18 +55,18 @@ class RxSafetyLocaleTest {
     private static List<String> results(List<String> drugs) {
         List<String> out = new ArrayList<>();
         for (String d : drugs) {
-            boolean any = AllergyDrugClasses.CLASSES.stream().anyMatch(c -> RxSafetyChecks.allergyMatches(d, c.id()));
-            out.add(d + "|" + any + "|" + RxSafetyChecks.controlledSubstanceWarning(d, "IN") + "|"
-                    + RxSafetyChecks.controlledSubstanceWarning(d, "KSA") + "|" + RxSafetyChecks.recordedStatusWarning(d, "pregnant"));
+            boolean any = SafetyDictionaryFixtures.IN.classes().stream().anyMatch(c -> RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, d, c.id()));
+            out.add(d + "|" + any + "|" + RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), d) + "|"
+                    + RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), d) + "|" + RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, d, "pregnant"));
         }
         // keep the NSAID case greppable
-        out.add("IBUPROFEN 400|" + RxSafetyChecks.allergyMatches("IBUPROFEN 400", "NSAID"));
+        out.add("IBUPROFEN 400|" + RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "IBUPROFEN 400", "NSAID"));
         return out;
     }
 
     @Test
     void fullWidthLettersAreFoldedBeforeMatching() {
-        assertThat(RxSafetyChecks.allergyMatches("ＩＢＵＰＲＯＦＥＮ", "NSAID")).isTrue(); // NFKC
-        assertThat(RxSafetyChecks.controlledSubstanceWarning("ＴＲＡＭＡＤＯＬ", "IN")).isNotNull();
+        assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "ＩＢＵＰＲＯＦＥＮ", "NSAID")).isTrue(); // NFKC
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "ＴＲＡＭＡＤＯＬ")).isNotNull();
     }
 }
