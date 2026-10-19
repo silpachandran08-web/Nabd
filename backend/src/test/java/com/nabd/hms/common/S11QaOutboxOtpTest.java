@@ -52,6 +52,14 @@ class S11QaOutboxOtpTest extends SlowProviderTestBase {
 
     @AfterEach
     void realTime() {
+        // The breaker reads this frozen clock, so a breaker a test opened would never time out (the base class's
+        // @BeforeEach waits on real time): step past the open window and close it with one good call, then real time.
+        if (integration.isOpen(META)) {
+            clock.advance(Duration.ofSeconds(60));
+            STUB.reset(0);
+            integration.builder(META).baseUrl(STUB.baseUrl()).build().post().uri("/probe/messages")
+                    .contentType(MediaType.APPLICATION_JSON).body("{}").retrieve().toBodilessEntity();
+        }
         clock.reset();
     }
 

@@ -38,6 +38,18 @@ class SafetyDictionaryApiTest extends ApiTestBase {
     @Autowired TenantContext tenantCtx;
     @Autowired PlatformAudit platformAudit;
 
+    private Runnable restoreDictionaries;
+
+    @org.junit.jupiter.api.BeforeEach
+    void snapshotDictionaries() {
+        restoreDictionaries = SafetyDictionaryFixtures.snapshotState(superuserDataSource(), service);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void restoreDictionaries() {
+        restoreDictionaries.run();
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────
 
     private String operator(String role) {

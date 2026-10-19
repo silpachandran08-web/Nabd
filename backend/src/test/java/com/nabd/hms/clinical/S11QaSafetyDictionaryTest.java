@@ -35,6 +35,20 @@ class S11QaSafetyDictionaryTest extends ApiTestBase {
 
     private static final AtomicInteger SEQ = new AtomicInteger((int) (System.nanoTime() % 300_000) + 300_000);
     private static final String DICT = "/v1/clinical/safety-dictionary";
+
+    @org.springframework.beans.factory.annotation.Autowired SafetyDictionaryService dictionaryService;
+
+    private Runnable restoreDictionaries;
+
+    @org.junit.jupiter.api.BeforeEach
+    void snapshotDictionaries() {
+        restoreDictionaries = SafetyDictionaryFixtures.snapshotState(superuserDataSource(), dictionaryService);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void restoreDictionaries() {
+        restoreDictionaries.run();
+    }
     private static final List<String> NON_CONTENT_ROLES = List.of("implementation", "support_engineer", "billing", "sre", "commercial", "compliance_dpo");
 
     private static String phone() {

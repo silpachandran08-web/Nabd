@@ -20,6 +20,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** CLN-006: only the visit doctor (or a clinical:approve holder) signs or amends a note; signer stored and audited. */
 class NoteSigningAuthorityApiTest extends ApiTestBase {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    com.nabd.hms.common.ClinicClock clinicClock;
+
     // CLN-005 via CLN-006: signing/amending a note needs a registered clinician; every staff member seeded here is one.
     @Override
     protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
@@ -202,7 +205,9 @@ class NoteSigningAuthorityApiTest extends ApiTestBase {
         assertThat(unlicensed.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(unlicensed.getBody().get("type")).asString().contains("not-licensed-clinician");
 
-        su.update("UPDATE staff SET is_clinician = true, licence_expires_on = current_date - 1 WHERE id = ?", v.doctor().id());
+        // yesterday on the clinic's calendar (ClinicClock), not the DB session's current_date: those differ near midnight
+        su.update("UPDATE staff SET is_clinician = true, licence_expires_on = ? WHERE id = ?",
+                java.sql.Date.valueOf(clinicClock.today(v.tenant().id()).minusDays(1)), v.doctor().id());
         ResponseEntity<Map> expired = sign(v.doctorToken(), v.queueEntryId());
         assertThat(expired.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(expired.getBody().get("type")).asString().contains("licence-expired");

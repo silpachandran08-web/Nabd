@@ -13,7 +13,6 @@ import org.springframework.http.ResponseEntity;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -57,11 +56,25 @@ class ConcurrencyApiTest extends ApiTestBase {
         }
     }
 
-    /** A 15-minute-aligned start a couple of hours out, today (UTC), with room for +5 min. */
-    private static Instant slot() {
-        Instant candidate = Instant.now().plus(2, ChronoUnit.HOURS).truncatedTo(ChronoUnit.HOURS);
-        Instant cap = LocalDate.now(ZoneOffset.UTC).atTime(23, 0).toInstant(ZoneOffset.UTC);
-        return candidate.isAfter(cap) ? Instant.now().plus(5, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) : candidate;
+    @Autowired
+    com.nabd.hms.common.ClinicClock clinicClock;
+
+    /** Tomorrow 10:00 on the clinic's wall clock: on the 15-minute grid, inside the all-day hours, never past near midnight. */
+    private Instant slot(Ctx c) {
+        java.time.ZoneId zone = clinicClock.zone(c.tenant().id());
+        return clinicClock.today(zone).plusDays(1).atTime(10, 0).atZone(zone).toInstant();
+    }
+
+    /** A scheduled appointment on the clinic's today (check-in only accepts today's), inserted directly so no
+     * "future slot left today" is needed near midnight; the race under test is the check-in, not the booking. */
+    private String todayAppointment(Ctx c, String patientId) {
+        java.time.ZoneId zone = clinicClock.zone(c.tenant().id());
+        Instant start = clinicClock.today(zone).atStartOfDay(zone).toInstant();
+        UUID id = UUID.randomUUID();
+        inTenantTx(c.tenant().id(), () -> jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, status) " +
+                        "VALUES (?,?,?,?,?,?,'scheduled')", id, c.tenant().id(), UUID.fromString(patientId), c.staff().id(),
+                java.sql.Timestamp.from(start), java.sql.Timestamp.from(start.plus(15, ChronoUnit.MINUTES))));
+        return id.toString();
     }
 
     private ResponseEntity<Map> book(Ctx c, String patientId, Instant start) {
@@ -83,7 +96,7 @@ class ConcurrencyApiTest extends ApiTestBase {
         Ctx c = setup();
         allDayWorkingHours(c);
         String patientId = registerPatient(c.token());
-        String apptId = (String) book(c, patientId, slot()).getBody().get("id");
+        String apptId = todayAppointment(c, patientId);
 
         List<ResponseEntity<Map>> rs = ConcurrencyHarness.raceSame(2, () -> checkIn(c.token(), c, patientId, apptId));
 
@@ -135,7 +148,7 @@ class ConcurrencyApiTest extends ApiTestBase {
         allDayWorkingHours(c);
         String a = registerPatient(c.token());
         String b = registerPatient(c.token());
-        Instant t = slot();
+        Instant t = slot(c);
 
         List<ResponseEntity<Map>> rs = ConcurrencyHarness.race(List.of(
                 () -> book(c, a, t), () -> book(c, b, t.plus(5, ChronoUnit.MINUTES))));
@@ -149,7 +162,7 @@ class ConcurrencyApiTest extends ApiTestBase {
         allDayWorkingHours(c);
         String a = registerPatient(c.token());
         String b = registerPatient(c.token());
-        Instant t = slot();
+        Instant t = slot(c);
 
         List<ResponseEntity<Map>> rs = ConcurrencyHarness.race(List.of(() -> book(c, a, t), () -> book(c, b, t)));
 
