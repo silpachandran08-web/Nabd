@@ -1,0 +1,17 @@
+# OPS-031. Team handles are placeholders: create these GitHub teams (Needs external action).
+*                                  @nabd/engineering
+/backend/src/main/java/com/nabd/hms/clinical/  @nabd/clinical-owners
+/backend/src/test/java/com/nabd/hms/clinical/  @nabd/clinical-owners
+/frontend/app/components/consult/  @nabd/clinical-owners
+/backend/src/main/java/com/nabd/hms/auth/      @nabd/security-owners
+/db/migrations/                    @nabd/db-owners
+/infra/                            @nabd/platform-owners
+/.github/                          @nabd/platform-owners
+/Dockerfile                        @nabd/platform-owners
+
+# Clinical safety paths need the CSO (team @nabd/clinical-safety; CSO is a member). See docs/clinical-safety/README.md
+/backend/src/main/java/com/nabd/hms/clinical/RxSafetyChecks.java @nabd/clinical-safety
+/backend/src/main/java/com/nabd/hms/clinical/AllergyDrugClasses.java @nabd/clinical-safety
+/backend/src/main/resources/clinical-safety/ @nabd/clinical-safety
+/backend/src/main/java/com/nabd/hms/clinical/cds/ @nabd/clinical-safety
+/docs/clinical-safety/ @nabd/clinical-safety

@@ -1,0 +1,93 @@
+{
+  "commit_sha": "0123abc",
+  "dictionary_versions": {
+    "IN": "1"
+  },
+  "generated_at": "2026-09-21T14:13:20+00:00",
+  "hazard_log": {
+    "hazards": 3,
+    "path": "docs/clinical-safety/hazard-log.csv",
+    "sha256": "16e8af4440455376c30370d86617f8870ee1c881b5f0688fad8446263be64d32",
+    "signoff": {
+      "reason": "sign-off fields empty: cso_name, approved_on, approval_ref, hazard_log_sha256",
+      "record": {
+        "_how": "CLN-007.4. The CSO fills every field in a PR that only the CSO approves (CODEOWNERS @nabd/clinical-safety). hazard_log_sha256 = sha256sum docs/clinical-safety/hazard-log.csv at the reviewed commit; any later edit to the log voids this sign-off and the release gate fails until re-signed. approval_ref = link to the signed record (signed PDF in the DMS, or the CSO's PR approval URL). Engineers never fill these fields.",
+        "approval_ref": "",
+        "approved_on": "",
+        "cso_name": "",
+        "hazard_log_sha256": "",
+        "scope": "Each hazard's controls and residual risk reviewed by the CSO",
+        "version": "v1"
+      },
+      "signed": false
+    }
+  },
+  "hazards": [
+    {
+      "hazard": "Fixture hazard one",
+      "id": "H-01",
+      "log_status": "open",
+      "passing_tests": 1,
+      "residual_risk": "UNRATED",
+      "source": "fixture",
+      "tests": [
+        {
+          "id": "fx.FxClassTest#one",
+          "kind": "junit",
+          "status": "passed"
+        }
+      ],
+      "verified": true
+    },
+    {
+      "hazard": "Fixture: controlled drug sold without Rx",
+      "id": "H-04",
+      "log_status": "open",
+      "passing_tests": 2,
+      "residual_risk": "UNRATED",
+      "source": "fixture",
+      "tests": [
+        {
+          "id": "fx.OtcGateApiTest#otcCheckoutRefusesRxItem",
+          "kind": "junit",
+          "status": "passed"
+        },
+        {
+          "id": "fx.OtcGateApiTest#rxLineNeedsSignedPrescriptionItem(int)[1]",
+          "kind": "junit",
+          "status": "passed"
+        },
+        {
+          "id": "fx.OtcGateApiTest#rxLineNeedsSignedPrescriptionItem(int)[2]",
+          "kind": "junit",
+          "status": "failed"
+        }
+      ],
+      "verified": true
+    },
+    {
+      "hazard": "Fixture hazard verified only by a browser test",
+      "id": "H-05",
+      "log_status": "open",
+      "passing_tests": 1,
+      "residual_risk": "UNRATED",
+      "source": "fixture",
+      "tests": [
+        {
+          "id": "otc.spec.ts > pharmacy OTC blocks an Rx item",
+          "kind": "playwright",
+          "status": "passed"
+        }
+      ],
+      "verified": true
+    }
+  ],
+  "release": "v0.0.0-fixture",
+  "report": "safety-test-report",
+  "schema": 1,
+  "summary": {
+    "tag_errors": [],
+    "unverified": [],
+    "verified": 3
+  }
+}

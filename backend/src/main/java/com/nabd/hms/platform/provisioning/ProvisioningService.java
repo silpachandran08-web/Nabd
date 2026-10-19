@@ -41,14 +41,18 @@ public class ProvisioningService {
     private final ProvisioningRepository repo;
     private final ProvisioningStepRunner stepRunner;
     private final PlatformAudit audit;
+    private final RealDataOnboardingGuard realDataGuard;
 
-    ProvisioningService(ProvisioningRepository repo, ProvisioningStepRunner stepRunner, PlatformAudit audit) {
+    ProvisioningService(ProvisioningRepository repo, ProvisioningStepRunner stepRunner, PlatformAudit audit,
+                        RealDataOnboardingGuard realDataGuard) {
         this.repo = repo;
         this.stepRunner = stepRunner;
         this.audit = audit;
+        this.realDataGuard = realDataGuard;
     }
 
     public ProvisioningJobResponse createJob(CreateProvisioningJobRequest req, UUID requestedBy, String ip) {
+        realDataGuard.check();
         UUID jobId = UUID.randomUUID();
         repo.insertJob(jobId, requestedBy, req.tenantSlug().toLowerCase(), req.tenantName(), req.region(),
                 req.ownerEmail().toLowerCase(), req.ownerName(), req.ownerMobile(), req.brandName(), req.path());
@@ -98,6 +102,7 @@ public class ProvisioningService {
     /** Runs the next incomplete step (a queued first attempt, or a retry of the step that last failed). Idempotent once done. */
     public ProvisioningJobResponse advance(UUID jobId, UUID operatorId, String ip) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
+        realDataGuard.check();
         if (job.isGatedAndUnapproved()) {
             return toResponse(jobId); // enterprise job awaiting approval — same no-op idiom as "already done"
         }

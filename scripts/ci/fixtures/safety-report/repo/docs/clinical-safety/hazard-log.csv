@@ -1,0 +1,4 @@
+id,source,hazard,cause,existing_control,planned_control,verifying_test,residual_risk,owner,status,closing_pr
+H-01,fixture,Fixture hazard one,fixture,fixture,fixture,FxClassTest,UNRATED,fixture,open,
+H-04,fixture,Fixture: controlled drug sold without Rx,fixture,fixture,fixture,OTC gate tests (T-056),UNRATED,fixture,open,
+H-05,fixture,Fixture hazard verified only by a browser test,fixture,fixture,fixture,playwright,UNRATED,fixture,open,

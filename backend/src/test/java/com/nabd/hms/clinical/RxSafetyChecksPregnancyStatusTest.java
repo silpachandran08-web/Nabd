@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.support.Hazard;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -7,6 +8,7 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** DOC-021. NOT EXECUTED in the authoring environment. */
+@Hazard("H-09")
 class RxSafetyChecksPregnancyStatusTest {
 
     @Test

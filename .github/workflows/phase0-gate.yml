@@ -1,0 +1,51 @@
+# OPS-048: Phase 0 exit gate. Every PR: controls mapping completeness + gate record check (red until all 67 controls
+# are mapped; not a required check). On demand: the gate pack for a release candidate.
+name: phase0-gate
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      rc_ref: { description: "release candidate commit SHA or tag", required: true }
+      evidence_file: { description: "committed evidence file, e.g. docs/gates/evidence/phase0-rc1.json", required: true }
+permissions:
+  contents: read
+jobs:
+  controls-mapping:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash   # -o pipefail: the tee must not hide a failing check
+        run: |
+          pip install -q pyyaml
+          python3 scripts/ci/test_phase0_gate.py
+          python3 scripts/ci/phase0_gate.py record
+          python3 scripts/ci/phase0_gate.py controls | tee -a "$GITHUB_STEP_SUMMARY"
+
+  gate-pack:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ inputs.rc_ref }}" }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17", cache: maven }
+      - name: Backend suite at the release candidate (results feed criteria 5, 7, 8)
+        working-directory: backend
+        run: mvn -B test -Dmaven.test.failure.ignore=true
+      - name: Gate pack
+        run: |
+          pip install -q pyyaml
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          set +e
+          python3 scripts/ci/phase0_gate.py pack --sha "$(git rev-parse HEAD)" --junit backend/target/surefire-reports \
+            --evidence "${{ inputs.evidence_file }}" --out phase0-gate
+          rc=$?
+          set -e
+          cat phase0-gate/phase0-gate-pack.md >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: phase0-gate-pack, path: phase0-gate/ }
