@@ -19,7 +19,7 @@ import java.util.UUID;
 
 import static com.nabd.hms.platform.audit.AuditSearchModels.AuditFilter;
 
-/** Gated on audit_compliance:view — per NB-257's matrix, super_admin/sre/compliance_dpo. The CSV export
+/** Gated on audit_compliance:view — super_admin/compliance_dpo (PLT-056 removed sre). The CSV export
  * (PLT-028) sits behind the same authority: PlatformPermissions has no separate export grant, and the export
  * shows nothing the view does not; it is audited instead (see AuditSearchService.exportCsv). */
 @RestController
@@ -44,9 +44,14 @@ public class AuditSearchController {
                                 @RequestParam(required = false) String actorRole,
                                 @RequestParam(required = false) String actorName,
                                 @RequestParam(required = false) Integer limit,
-                                @RequestParam(required = false) String cursor) {
+                                @RequestParam(required = false) String cursor,
+                                @RequestParam(defaultValue = "false") boolean includeValues,
+                                @RequestParam(required = false) String reason,
+                                @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
         return service.search(new AuditFilter(tenantId, action, entityType, createdAfter, createdBefore,
-                actorId, actorType, actorRole, actorName), com.nabd.hms.common.PageRequest.limit(limit), cursor);
+                actorId, actorType, actorRole, actorName), limit, cursor,
+                new AuditSearchService.ValueAccess(includeValues, reason), UUID.fromString(jwt.getSubject()),
+                RequestMeta.clientIp(http));
     }
 
     @GetMapping("/export")
@@ -59,9 +64,12 @@ public class AuditSearchController {
                                          @RequestParam(required = false) String actorType,
                                          @RequestParam(required = false) String actorRole,
                                          @RequestParam(required = false) String actorName,
+                                         @RequestParam(defaultValue = "false") boolean includeValues,
+                                         @RequestParam(required = false) String reason,
                                          @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
         String csv = service.exportCsv(new AuditFilter(tenantId, action, entityType, createdAfter, createdBefore,
-                actorId, actorType, actorRole, actorName), UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
+                actorId, actorType, actorRole, actorName), new AuditSearchService.ValueAccess(includeValues, reason),
+                UUID.fromString(jwt.getSubject()), RequestMeta.clientIp(http));
         // Cross-tenant export: there is no single clinic zone, so the filename carries the UTC date, labelled as such.
         String utcDate = Instant.now().toString().substring(0, 10);
         return ResponseEntity.ok()

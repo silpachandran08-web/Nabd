@@ -11,10 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.nabd.hms.platform.access.SupportAccessModels.Grant;
@@ -33,7 +33,8 @@ import static com.nabd.hms.platform.access.SupportAccessModels.RedactedPatient;
 public class SupportAccessService {
 
     private static final Logger log = LoggerFactory.getLogger(SupportAccessService.class);
-    private static final Duration GRANT_DURATION = Duration.ofMinutes(60); // matches the wireframe's stated window
+    static final int MAX_MINUTES = 60; // matches the wireframe's stated window; PLT-056 makes it a ceiling
+    static final Set<String> SCOPES = Set.of("config_only", "redacted_patient_view");
 
     private final SupportAccessRepository repo;
     private final AuditService auditService;
@@ -46,16 +47,38 @@ public class SupportAccessService {
     }
 
     @Transactional
-    public GrantResponse requestGrant(UUID tenantId, UUID operatorId, String reason, String ipAddress) {
+    public GrantResponse requestGrant(UUID tenantId, UUID ticketId, String scope, Integer minutes, UUID operatorId,
+                                      String reason, String ipAddress) {
+        if (ticketId == null) {
+            throw badRequest("ticket-required", "Ticket required", "TICKET_REQUIRED",
+                    "A support grant must name the support ticket it serves.");
+        }
+        if (scope == null || !SCOPES.contains(scope)) {
+            throw badRequest("scope-invalid", "Scope invalid", "SCOPE_INVALID",
+                    "scope must be config_only or redacted_patient_view.");
+        }
+        int mins = minutes == null ? MAX_MINUTES : minutes;
+        if (mins < 1 || mins > MAX_MINUTES) {
+            throw badRequest("duration-out-of-range", "Duration out of range", "DURATION_OUT_OF_RANGE",
+                    "minutes must be between 1 and " + MAX_MINUTES + ".");
+        }
+        if (!repo.ticketBelongsToTenant(ticketId, tenantId)) {
+            throw badRequest("ticket-invalid", "Ticket invalid", "TICKET_INVALID",
+                    "No support ticket with this id exists for this clinic.");
+        }
         OperatorInfo operator = operatorInfo(operatorId);
-        Grant grant = new Grant(UUID.randomUUID(), tenantId, operatorId, reason, Instant.now(),
-                Instant.now().plus(GRANT_DURATION), null);
-        repo.insert(grant);
+        UUID grantId = UUID.randomUUID();
+        repo.insert(grantId, tenantId, ticketId, scope, operatorId, reason, mins);
         auditService.record(tenantId, "operator", operatorId, operator.name(), operator.role(), ipAddress,
-                "support_access.grant", "tenant", tenantId, null, Map.of("reason", reason));
+                "support_access.grant", "tenant", tenantId, null,
+                Map.of("reason", reason, "ticketId", ticketId.toString(), "scope", scope, "minutes", mins));
         log.info("support access grant {} for tenant {} by operator {} ({})",
-                grant.id(), tenantId, operatorId, operator.role());
-        return toResponse(repo.findById(grant.id()).orElseThrow(), operator);
+                grantId, tenantId, operatorId, operator.role());
+        return toResponse(repo.findById(grantId).orElseThrow(), operator);
+    }
+
+    private static ApiException badRequest(String slug, String title, String code, String detail) {
+        return new ApiException(HttpStatus.BAD_REQUEST, slug, title, detail, Map.of("code", code));
     }
 
     public List<GrantResponse> listGrants() {
@@ -90,6 +113,10 @@ public class SupportAccessService {
             throw new ApiException(HttpStatus.FORBIDDEN, "grant-not-active", "Grant not active",
                     "This support access grant has expired or been revoked.");
         }
+        if (!"redacted_patient_view".equals(grant.scope())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "scope-not-permitted", "Outside grant scope",
+                    "This support access grant is config_only and does not open patient records.");
+        }
 
         tenantContext.set(grant.tenantId());
         RedactedPatient patient = repo.findRedactedPatient(grant.tenantId(), patientId).orElseThrow(
@@ -108,7 +135,7 @@ public class SupportAccessService {
     }
 
     private GrantResponse toResponse(Grant g, OperatorInfo operator) {
-        return new GrantResponse(g.id(), g.tenantId(), g.operatorId(), operator.name(), operator.role(),
+        return new GrantResponse(g.id(), g.tenantId(), g.ticketId(), g.scope(), g.operatorId(), operator.name(), operator.role(),
                 g.reason(), g.grantedAt(), g.expiresAt(), g.revokedAt(), g.isActive(Instant.now()));
     }
 
