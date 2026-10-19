@@ -28,6 +28,7 @@ import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.OpaqueTokens;
+import com.nabd.hms.common.PhoneNumbers;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WhatsAppOtpSender;
 import com.nabd.hms.config.AuthProperties;
@@ -47,7 +48,6 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -78,12 +78,18 @@ public class AuthService {
     private final AuditService auditService;
     private final LoginGuard guard;
     private final StepUpVerifier stepUpVerifier;
-    private final SecureRandom random = new SecureRandom();
+    private final MfaPolicy mfaPolicy;
+    private final OtpSendLimiter otpLimiter;
+    private final com.nabd.hms.common.EventPublisher events;
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
-                LoginGuard guard, StepUpVerifier stepUpVerifier) {
+                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy, OtpSendLimiter otpLimiter,
+                com.nabd.hms.common.EventPublisher events) {
+        this.mfaPolicy = mfaPolicy;
+        this.otpLimiter = otpLimiter;
+        this.events = events;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -140,19 +146,24 @@ public class AuthService {
     }
 
     /**
-     * NB-042: "mandatory for Owner ... and anyone holding refund or discount rights" is a real-world
-     * description of which roles a clinic will assign this to, not a rule about role names or a
-     * heuristic over grants — a role's display name is free text (renamed on a whim), and this
-     * codebase's own "full access" test/seed roles hold every grant including refundDiscount, so
-     * either heuristic would gate roles that were never meant to require it. Enforcement is a plain
-     * per-role flag instead, set deliberately by whoever builds the role (see roles.mfa_required).
+     * NB-042: roles.mfa_required is the per-role opt-in. PLT-005 adds an invariant on top that no role
+     * edit can clear: the built-in Owner role and any role (own or on loan) holding :approve or
+     * :refundDiscount always requires MFA (see MfaPolicy).
      */
     private boolean mfaRequiredByPolicy(Staff staff) {
         if (staff.mfaResetRequired()) { // PLT-004: an owner reset forces enrolment at next sign-in
             return true;
         }
         Role role = repo.findRole(staff.roleId()).orElseThrow(() -> new IllegalStateException("role missing"));
-        return role.mfaRequired();
+        return role.mfaRequired() || privilegedByPolicy(staff, role);
+    }
+
+    private boolean privilegedByPolicy(Staff staff, Role role) {
+        if (mfaPolicy.requiredForRole(role.builtIn(), flattenGrants(role.grantsJson()))) {
+            return true;
+        }
+        return repo.findActiveDelegatedRoles(staff.id()).stream()
+                .anyMatch(d -> mfaPolicy.requiredForRole(d.builtIn(), flattenGrants(d.grantsJson())));
     }
 
     private MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
@@ -171,35 +182,27 @@ public class AuthService {
         return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
     }
 
-    /** No enumeration: silently no-ops for an unknown tenant/mobile, but still returns as if sent. */
+    /** PLT-006: no enumeration and no message pumping (see OtpSendLimiter). */
     @Transactional(noRollbackFor = ApiException.class)
     public void requestOtp(OtpRequestRequest req, String ip) {
         enforceIpRateLimit(ip);
-
+        // PLT-006: same 202 for every outcome (unknown clinic or number, limited, sent). The per-number and per-tenant
+        // limits are counted whether or not the number exists, and the code is generated and sent by the outbox
+        // handler (OtpOutboxHandlers.Send), so neither the response nor its timing shows which numbers are registered.
         Tenant tenant = repo.findTenantBySlug(req.tenantSlug())
                 .filter(t -> !"offboarded".equals(t.status()) && !"suspended".equals(t.status()))
                 .orElse(null);
-        // ponytail: explicit "not found" errors were asked for so staff know why no OTP came. This
-        // lets anyone probe which clinic codes / mobiles exist (only the per-IP rate limit slows it);
-        // switch both back to a silent return + 202 to restore no-enumeration.
         if (tenant == null) {
-            log.info("OTP requested for unknown/inactive tenant slug from {}", ip);
-            throw new ApiException(HttpStatus.NOT_FOUND, "clinic-not-found", "Clinic not found",
-                    "No clinic with that clinic code. Check the code and try again.");
+            return;
         }
         tenantContext.set(tenant.id());
-
-        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
-        if (staff == null || !"active".equals(staff.status())) {
-            log.info("OTP requested for a mobile with no active staff in tenant {} from {}", tenant.id(), ip);
-            throw new ApiException(HttpStatus.NOT_FOUND, "mobile-not-found", "Mobile number not found",
-                    "No active staff member with that mobile number in this clinic.");
+        if (otpLimiter.tryConsume(tenant.id(), PhoneNumbers.digits(req.mobilePhone(), tenant.region())) != OtpSendLimiter.Decision.SEND) {
+            return;
         }
-
-        String code = generateOtpCode();
-        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), Instant.now().plus(5, ChronoUnit.MINUTES));
-        otpSender.send(staff.mobilePhone(), code); // the number on file, not whatever format was typed
-        log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
+        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
+        if (staff != null && "active".equals(staff.status())) {
+            events.publish(tenant.id(), OtpOutboxHandlers.SEND_EVENT, java.util.Map.of("staffId", staff.id().toString()));
+        }
     }
 
     // noRollbackFor: recordLoginAttempt()/markMobileVerified() must survive the ApiException thrown
@@ -237,10 +240,6 @@ public class AuthService {
             return issueMfaChallenge(staff);
         }
         return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
-    }
-
-    private String generateOtpCode() {
-        return String.format("%06d", random.nextInt(1_000_000));
     }
 
     @Transactional(noRollbackFor = ApiException.class) // the failed-attempt row must survive the 401
@@ -463,7 +462,19 @@ public class AuthService {
         guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "unlock", true);
     }
 
-    /** Called from StaffController right after a successful invite-accept — lands the new staff member logged in. */
+    /** PLT-005: invite accept lands the new staff member signed in, unless their role needs MFA first (then a setup token). */
+    @Transactional
+    public Object sessionAfterInviteAccept(UUID tenantId, UUID staffId, String ip, String device, String userAgent) {
+        tenantContext.set(tenantId);
+        Staff staff = repo.findStaffById(staffId)
+                .orElseThrow(() -> new IllegalStateException("staff " + staffId + " vanished right after invite accept"));
+        if (!staff.mfaEnabled() && mfaRequiredByPolicy(staff)) {
+            return issueMfaSetupRequired(staff);
+        }
+        return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+    }
+
+    /** Called from OwnerService once the owner account is through its own MFA — lands the owner in the clinic. */
     @Transactional
     public TokenPairResponse issueTokensForStaff(UUID tenantId, UUID staffId, String ip, String device, String userAgent) {
         tenantContext.set(tenantId);
@@ -495,6 +506,13 @@ public class AuthService {
 
         Staff staff = repo.findStaffById(session.staffId()).orElseThrow(this::invalidRefresh);
         if (!"active".equals(staff.status())) {
+            throw invalidRefresh();
+        }
+        // PLT-005: the invariant is checked at every mint; a privileged session without MFA ends here and the next sign-in enrols.
+        // Owner shadow rows are exempt: the owner account passes its own MFA before entering a clinic.
+        if (!staff.mfaEnabled() && privilegedByPolicy(staff, repo.findRole(staff.roleId()).orElseThrow(this::invalidRefresh))
+                && !repo.isOwnerLinked(staff.id())) {
+            repo.revokeFamily(session.familyId(), "admin_revoke");
             throw invalidRefresh();
         }
 

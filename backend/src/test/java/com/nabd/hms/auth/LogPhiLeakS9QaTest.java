@@ -60,6 +60,7 @@ class LogPhiLeakS9QaTest extends ApiTestBase {
         String access = loginAndGetAccessToken(s); // before the PIN is changed below
         http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099")), Void.class);
+        awaitSecret(); // PLT-006: the OTP is sent by the outbox handler, not on the request path
         String otp = SECRETS.get(0);
         ResponseEntity<Map> v = http.exchange(url("/v1/auth/otp/verify"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", t.slug(), "mobilePhone", "+919812340099", "code", otp)), Map.class);
@@ -129,4 +130,15 @@ class LogPhiLeakS9QaTest extends ApiTestBase {
             };
         }
     }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.OutboxDispatcher dispatcher;
+
+    private void awaitSecret() {
+        for (int i = 0; i < 100 && SECRETS.isEmpty(); i++) {
+            dispatcher.poll();
+            try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+    }
+
 }

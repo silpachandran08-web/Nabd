@@ -1,7 +1,6 @@
 package com.nabd.hms.staff;
 
 import com.nabd.hms.auth.AuthService;
-import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.staff.dto.AcceptInviteRequest;
 import com.nabd.hms.staff.dto.AcceptedStaffIdentity;
@@ -106,10 +105,10 @@ public class StaffController {
     }
 
     @PostMapping("/invitations/{token}/accept")
-    public TokenPairResponse acceptInvite(@PathVariable String token, @Valid @RequestBody AcceptInviteRequest req,
-                                           HttpServletRequest http) {
+    public Object acceptInvite(@PathVariable String token, @Valid @RequestBody AcceptInviteRequest req,
+                               HttpServletRequest http) {
         AcceptedStaffIdentity identity = staffService.acceptInvite(token, req);
-        return authService.issueTokensForStaff(identity.tenantId(), identity.staffId(),
+        return authService.sessionAfterInviteAccept(identity.tenantId(), identity.staffId(),
                 RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
     }
 

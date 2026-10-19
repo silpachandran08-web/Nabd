@@ -6,6 +6,7 @@ import styles from "../../login/login.module.css";
 import { API_BASE } from "../surfaces";
 import { SESSION_EXPIRED_MESSAGE, storePlatformSession } from "../platformApi";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
+import MfaEnrolCard from "../../components/MfaEnrolCard";
 
 // Matches POST /v1/platform/auth/login's oneOf response and RFC 7807 Problem errors.
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
@@ -21,6 +22,9 @@ export default function PlatformLoginPage() {
   const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
+  // PLT-005: every operator must have MFA; one without it enrols here, then signs in again.
+  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [enrolled, setEnrolled] = useState(false);
   const [code, setCode] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -55,6 +59,7 @@ export default function PlatformLoginPage() {
       const body = await res.json();
       if (res.ok) {
         if ("challengeId" in body) setChallenge(body as MfaChallenge);
+        else if ("setupToken" in body) { setPin(""); setEnrolled(false); setSetupToken(body.setupToken); }
         else handleTokens(body as TokenPair);
         return;
       }
@@ -110,6 +115,18 @@ export default function PlatformLoginPage() {
     setFormError(problem.detail || "Invalid credentials.");
   }
 
+  if (setupToken) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.card}>
+          <MfaEnrolCard enrollUrl={`${API_BASE}/platform/auth/mfa/enroll`} confirmUrl={`${API_BASE}/platform/auth/mfa/confirm`}
+            setupToken={setupToken} subtitle="Every Nabd operator account uses an authenticator app. Set it up to continue."
+            onDone={() => { setSetupToken(null); setEnrolled(true); }} />
+        </div>
+      </main>
+    );
+  }
+
   if (challenge) {
     return (
       <main className={styles.page}>
@@ -147,6 +164,7 @@ export default function PlatformLoginPage() {
         <h1 className={styles.title}>Nabd Platform</h1>
         <p className={styles.subtitle}>Sign in with your operator email and PIN.</p>
         <form onSubmit={submitLogin} noValidate>
+          {enrolled && !formError && <p className={styles.hint} role="status">Authenticator set up. Sign in again with your PIN and a code.</p>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
           {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}

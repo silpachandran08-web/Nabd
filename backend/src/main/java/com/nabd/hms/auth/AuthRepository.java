@@ -91,6 +91,13 @@ class AuthRepository {
                 otpHash, Timestamp.from(expiresAt), staffId);
     }
 
+    /** PLT-006: was a code issued in the last few seconds (expiry is issue + 5 min)? Guards the outbox send against redelivery. */
+    boolean whatsAppOtpIssuedWithin(UUID staffId, int seconds) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT COALESCE(whatsapp_otp_expires_at > now() + interval '5 minutes' - ? * interval '1 second', false) FROM staff WHERE id = ?",
+                Boolean.class, seconds, staffId));
+    }
+
     /**
      * Atomically validates and consumes the OTP in one statement: the WHERE clause is the check,
      * so there's no read-then-clear race, and no RETURNING-sees-the-post-update-row trap (Postgres
@@ -308,6 +315,11 @@ class AuthRepository {
     }
 
     /** Reuse detection: kill every still-active row in the chain, not just the one presented. */
+    /** PLT-005: an owner's shadow staff row (staff.owner_id set) is reached only through the owner account's own MFA. */
+    boolean isOwnerLinked(UUID staffId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT owner_id IS NOT NULL FROM staff WHERE id = ?", Boolean.class, staffId));
+    }
+
     void revokeFamily(UUID familyId, String reason) {
         jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE family_id = ? AND revoked_at IS NULL",
                 reason, familyId);

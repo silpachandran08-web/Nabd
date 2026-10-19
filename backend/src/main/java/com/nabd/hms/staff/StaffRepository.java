@@ -19,9 +19,11 @@ import static com.nabd.hms.staff.StaffRoleModels.StaffRow;
 class StaffRepository {
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.auth.MfaPolicy mfaPolicy;
 
-    StaffRepository(JdbcTemplate jdbc) {
+    StaffRepository(JdbcTemplate jdbc, com.nabd.hms.auth.MfaPolicy mfaPolicy) {
         this.jdbc = jdbc;
+        this.mfaPolicy = mfaPolicy;
     }
 
     // ::citext cast is load-bearing — see AuthRepository's class comment for why a bare "= ?"
@@ -45,7 +47,7 @@ class StaffRepository {
                         // No tenant is set on this bootstrap path, so a roles subquery would hit roles' RLS
                         // policy with an empty app.tenant_id (uuid cast error). Not needed here: constant.
                         "(s.pin_hash IS NOT NULL) AS has_pin, (s.owner_id IS NOT NULL) AS owner_linked, " +
-                        "false AS role_mfa_required, false AS is_clinician " +
+                        "false AS role_mfa_required, false AS role_privileged, false AS is_clinician " +
                         "FROM find_staff_by_invite_token_hash(?) s " +
                         "WHERE s.invite_expires_at > now()",
                 staffMapper(), tokenHash
@@ -145,6 +147,9 @@ class StaffRepository {
                 // OWN-034: credential facts as booleans only — pin_hash itself never leaves SQL.
                 "(s.pin_hash IS NOT NULL) AS has_pin, (s.owner_id IS NOT NULL) AS owner_linked, " +
                 "COALESCE((SELECT r.mfa_required FROM roles r WHERE r.id = s.role_id), false) AS role_mfa_required, " +
+                // PLT-005: same rule as MfaPolicy.privilegedRole (built-in Owner, or any approve/refundDiscount grant)
+                "COALESCE((SELECT r.built_in OR EXISTS (SELECT 1 FROM jsonb_array_elements(r.grants) g " +
+                "  WHERE g->>'approve' = 'true' OR g->>'refundDiscount' = 'true') FROM roles r WHERE r.id = s.role_id), false) AS role_privileged, " +
                 "s.is_clinician " +
                 "FROM staff s ";
     }
@@ -176,7 +181,7 @@ class StaffRepository {
                     rs.getString("professional_registration_no"),
                     rs.getBoolean("has_pin"),
                     rs.getBoolean("owner_linked"),
-                    rs.getBoolean("role_mfa_required"),
+                    rs.getBoolean("role_mfa_required") || (mfaPolicy.enforced() && rs.getBoolean("role_privileged")),
                     rs.getBoolean("is_clinician"));
         };
     }

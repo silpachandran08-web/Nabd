@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Dialog from "../components/ui/Dialog";
 import Icon from "../components/ui/Icon";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
+import { mfaBadge } from "./mfaStatus";
 import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
 import PermissionMatrix from "../components/staff/PermissionMatrix";
 import RegistrationNoDialog from "../components/staff/RegistrationNoDialog";
@@ -349,7 +350,8 @@ export default function StaffAccessPage() {
       const isEdit = builder.mode === "edit";
       const res = await authedFetch(isEdit ? `/roles/${builder.sourceId}` : "/roles", {
         method: isEdit ? "PATCH" : "POST",
-        body: JSON.stringify({ name, grants, mfaRequired: builder.mfaRequired }),
+        // PLT-005: false is never sent; the server forces MFA on approve/refund roles and 422s an explicit false
+        body: JSON.stringify({ name, grants, ...(builder.mfaRequired ? { mfaRequired: true } : {}) }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -611,6 +613,7 @@ export default function StaffAccessPage() {
                   <th>Restriction</th>
                   <th>Active</th>
                   {showLogin && <th>Login</th>}
+                  {showLogin && <th>MFA</th>}
                   <th></th>
                 </tr>
               </thead>
@@ -629,6 +632,7 @@ export default function StaffAccessPage() {
                     {showLogin && (
                       <td className={styles.muted}>{s.loginMethod ? (LOGIN_METHOD_LABELS[s.loginMethod] ?? s.loginMethod) : "—"}</td>
                     )}
+                    {showLogin && (() => { const m = mfaBadge(s); return <td data-testid="mfa-status"><StatusPill tone={m.tone} label={m.label} /></td>; })()}
                     <td>
                       {canEditRoles && (
                         <button className={styles.actionBtn} onClick={() => setRegEdit(s)}>

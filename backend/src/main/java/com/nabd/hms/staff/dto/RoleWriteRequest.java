@@ -9,6 +9,6 @@ import java.util.List;
 public record RoleWriteRequest(
         @NotBlank String name,
         @NotEmpty List<ModuleGrant> grants,
-        boolean mfaRequired
+        Boolean mfaRequired // PLT-005: optional; omitted keeps the current value (false on create)
 ) {
 }

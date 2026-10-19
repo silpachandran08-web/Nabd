@@ -57,6 +57,7 @@ class LogPhiLeakTest extends ApiTestBase {
         assertThat(http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+919812340077")), Void.class).getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
+        awaitSecret(); // PLT-006: the OTP is sent by the outbox handler, not on the request path
         assertThat(http.exchange(url("/v1/auth/pin/reset-request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+919812340077")), Void.class).getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
@@ -92,4 +93,15 @@ class LogPhiLeakTest extends ApiTestBase {
             };
         }
     }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.OutboxDispatcher dispatcher;
+
+    private void awaitSecret() {
+        for (int i = 0; i < 100 && SENT_SECRETS.isEmpty(); i++) {
+            dispatcher.poll();
+            try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+    }
+
 }

@@ -101,6 +101,37 @@ class OwnerRepository {
         return count == null ? 0 : count;
     }
 
+    // ── PLT-005 owner MFA: secrets via the V1360 SECURITY DEFINER functions, never a plain SELECT ──
+
+    record MfaState(boolean enabled, byte[] secretEnc, byte[] pendingSecretEnc) {
+    }
+
+    MfaState mfaState(UUID ownerId) {
+        return jdbc.query("SELECT * FROM owner_mfa_state(?)",
+                (rs, i) -> new MfaState(rs.getBoolean("mfa_enabled"), rs.getBytes("mfa_secret_enc"), rs.getBytes("mfa_pending_secret_enc")),
+                ownerId).stream().findFirst().orElse(new MfaState(false, null, null));
+    }
+
+    void setPendingMfaSecret(UUID ownerId, byte[] secretEnc) {
+        jdbc.update("UPDATE owners SET mfa_pending_secret_enc = ? WHERE id = ?", secretEnc, ownerId);
+    }
+
+    /** TOTP replay guard: a time-step is accepted once per owner (atomic). */
+    boolean claimTotpStep(UUID ownerId, long step) {
+        return jdbc.update("UPDATE owners SET mfa_last_used_step = ? WHERE id = ? "
+                + "AND (mfa_last_used_step IS NULL OR mfa_last_used_step < ?)", step, ownerId, step) == 1;
+    }
+
+    boolean confirmPendingMfa(UUID ownerId, List<String> codeHashes) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT owner_mfa_confirm(?, ?)", Boolean.class,
+                ownerId, codeHashes.toArray(String[]::new)));
+    }
+
+    /** null = not a live code; otherwise the live codes left after this one was used. */
+    Integer consumeRecoveryCode(UUID ownerId, String codeHash) {
+        return jdbc.queryForObject("SELECT owner_mfa_consume_recovery(?, ?)", Integer.class, ownerId, codeHash);
+    }
+
     /** Every brand this owner has, each with its clinics (a brand with no clinics yet still appears, empty). */
     List<BrandWorkspace> listWorkspaces(UUID ownerId) {
         Map<UUID, List<ClinicSummary>> clinicsByBrand = new LinkedHashMap<>();
