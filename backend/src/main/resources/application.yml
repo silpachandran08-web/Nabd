@@ -1,6 +1,8 @@
 spring:
   application:
     name: hms-backend
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/nabd}
     username: ${DB_USER:nabd_app}
@@ -39,8 +41,27 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
+# OPS-025: actuator lives on its own port, never routed by the ingress. Readiness = DB + outbox dispatcher freshness.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-components: always
+      group:
+        readiness:
+          include: readinessState,db,outbox
+
 server:
   port: 8080
+  # OPS-025: SIGTERM lets in-flight requests finish (the phase timeout below is the 20 s budget)
+  shutdown: graceful
   # PLT-003: the client IP is the TCP peer unless the peer is a trusted proxy. Tomcat's RemoteIpValve only
   # honours X-Forwarded-For from internal-proxies; empty (the default here) = trust nobody. Set per cell,
   # e.g. APP_TRUSTED_PROXIES='10\.0\.0\.\d+' (regex).

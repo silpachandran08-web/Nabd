@@ -130,7 +130,11 @@ jobs:
         run: mvn -B -q -f backend/pom.xml package -Dmaven.test.skip=true
       - uses: docker/setup-buildx-action@v3
       - name: build image once
-        run: docker build -t "$IMAGE:${{ github.sha }}" .
+        run: |
+          docker build -t "$IMAGE:${{ github.sha }}" .
+          docker build --target migrate -t "$IMAGE-migrate:${{ github.sha }}" .
+      - name: Container structure test (non-root, no shell, JVM flags, migrate entrypoint)
+        run: infra/ci/check-image.sh "$IMAGE:${{ github.sha }}" "$IMAGE-migrate:${{ github.sha }}"
       - name: Trivy image scan (fail on new High/Critical)
         uses: aquasecurity/trivy-action@0.28.0
         with:
@@ -168,6 +172,7 @@ jobs:
         name: push, sign, attach SBOM
         run: |
           docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE-migrate:${{ github.sha }}"   # deploys run the migrate image to completion before rolling out the API
           digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:${{ github.sha }}")
           cosign sign --yes "$digest"
           cosign attach sbom --sbom backend/target/sbom-backend.json --type cyclonedx "$digest"
