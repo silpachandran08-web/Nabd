@@ -301,6 +301,12 @@ class AuthRepository {
         return rows == 1;
     }
 
+    /** Logout: every still-active row in the family of the given session. */
+    void revokeFamilyOf(UUID sessionId, String reason) {
+        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE revoked_at IS NULL " +
+                "AND family_id = (SELECT family_id FROM sessions WHERE id = ?)", reason, sessionId);
+    }
+
     /** Reuse detection: kill every still-active row in the chain, not just the one presented. */
     void revokeFamily(UUID familyId, String reason) {
         jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE family_id = ? AND revoked_at IS NULL",

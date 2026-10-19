@@ -279,7 +279,8 @@ public class PlatformAuthService {
         repo.insertSession(sessionId, operator.id(), familyId,
                 OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent);
 
-        return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds());
+        return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds(),
+                Duration.between(now, refreshExp).toSeconds());
     }
 
     private ApiException invalidCredentials() {

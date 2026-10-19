@@ -5,6 +5,7 @@
 // React-free so it is unit-tested (tests/unit/apiClient.test.mjs). Never logs a token.
 import { decodeJwtPayload } from "./jwt.ts";
 import { clearLocalSessionData } from "./idleLock.ts";
+import { COOKIE_AUTH } from "./bffShim.ts";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const ACCESS_KEY = "nabd_access_token";
@@ -21,6 +22,7 @@ function claims(token: string | null): Claims {
 
 /** True once 80% of the token's lifetime has passed. An unreadable token is left to the reactive 401 path. */
 export function needsRefresh(token: string | null, nowMs = Date.now()): boolean {
+  if (COOKIE_AUTH) return false; // FEF-009: the BFF refreshes server-side
   const { exp, iat } = claims(token);
   if (!exp) return false;
   const start = iat ?? exp - DEFAULT_TTL_S;
@@ -162,6 +164,7 @@ let inflight: Promise<boolean> | null = null;
 /** Refreshes the session once however many callers/tabs ask. `stale` is the access token the caller
  * just saw rejected (or ageing): if storage already holds a different, fresh one, another tab did it. */
 export function refreshSession(stale: string | null): Promise<boolean> {
+  if (COOKIE_AUTH) return cookieSession(); // FEF-009: GET /api/session refreshes via the cookie if it can
   if (inflight) return inflight;
   const locked = async (): Promise<boolean> => {
     if (localStorage.getItem(REFRESH_KEY)) await freshestRefreshToken(); // adopt a pair another tab rotated moments ago
@@ -177,9 +180,18 @@ export function refreshSession(stale: string | null): Promise<boolean> {
   return inflight;
 }
 
+async function cookieSession(): Promise<boolean> {
+  const res = await fetch("/api/session", { cache: "no-store" });
+  if (res.status === 401) return false;
+  if (!res.ok) throw new Error(`session check failed: ${res.status}`);
+  const s: { accessToken?: string } = await res.json();
+  if (s.accessToken) localStorage.setItem(ACCESS_KEY, s.accessToken); // claims snapshot, not a token
+  return true;
+}
+
 let timer: ReturnType<typeof setTimeout> | undefined;
 function schedule(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || COOKIE_AUTH) return;
   clearTimeout(timer);
   const token = localStorage.getItem(ACCESS_KEY);
   const { exp, iat } = claims(token);

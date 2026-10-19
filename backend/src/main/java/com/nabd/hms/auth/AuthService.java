@@ -506,7 +506,7 @@ public class AuthService {
     @Transactional
     public void logout(UUID tenantId, UUID sessionId) {
         tenantContext.set(tenantId);
-        repo.revokeSession(sessionId, "logout");
+        repo.revokeFamilyOf(sessionId, "logout"); // FEF-009: the whole family, so no sibling of this login survives sign-out
         log.info("staff logged out, session {}", sessionId);
     }
 
@@ -637,7 +637,8 @@ public class AuthService {
         repo.insertSession(sessionId, staff.tenantId(), staff.id(), familyId,
                 OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent);
 
-        return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds());
+        return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds(),
+                Duration.between(now, refreshExp).toSeconds());
     }
 
     private List<String> flattenGrants(String grantsJson) {

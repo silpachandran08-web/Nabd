@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { decodeAccessToken, landingPathFor } from "../../lib/session";
+import { storeTokens } from "../../lib/apiClient";
 import styles from "../../login/login.module.css";
 
 // Matches POST /v1/staff/invitations/{token}/accept (StaffController.acceptInvite) — used by both
@@ -42,8 +43,7 @@ export default function AcceptInvitePage() {
         return;
       }
       const pair = body as TokenPair;
-      localStorage.setItem("nabd_access_token", pair.accessToken);
-      localStorage.setItem("nabd_refresh_token", pair.refreshToken);
+      storeTokens(pair);
       // Land where the role works (as login does); /account when the role has no home worklist.
       const claims = decodeAccessToken(pair.accessToken);
       router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));

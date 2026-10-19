@@ -7,6 +7,8 @@ import styles from "./workspaces.module.css";
 import StatusPill, { type PillTone } from "../../components/ui/StatusPill";
 import { ErrorState, Skeleton } from "../../components/ui/StateViews";
 import { decodeAccessToken, regionLabel, signOut as endClinicSession } from "../../lib/session";
+import { storeTokens } from "../../lib/apiClient";
+import { COOKIE_AUTH } from "../../lib/bffShim";
 
 // Matches GET /v1/owners/me/workspaces and POST /v1/owners/workspaces/select (OwnerController).
 type Clinic = { id: string; name: string; slug: string; region: string; status: string };
@@ -108,6 +110,8 @@ export default function OwnerWorkspacesPage() {
     setSelectingId(clinicId);
     setError(null);
     try {
+      // FEF-009: one cookie session per browser, so the old clinic's session ends before the new one replaces it.
+      if (COOKIE_AUTH) await endClinicSession();
       const res = await fetch(`${API_BASE}/owners/workspaces/select`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -125,9 +129,8 @@ export default function OwnerWorkspacesPage() {
       }
       const pair: TokenPair = await res.json();
       // Switching from another clinic: end that clinic's session server-side first (best effort).
-      await endClinicSession();
-      localStorage.setItem("nabd_access_token", pair.accessToken);
-      localStorage.setItem("nabd_refresh_token", pair.refreshToken);
+      if (!COOKIE_AUTH) await endClinicSession();
+      storeTokens(pair);
       try { localStorage.setItem(LAST_CLINIC_KEY, JSON.stringify({ id: clinicId, at: new Date().toISOString() })); } catch { /* storage full/blocked: not needed to continue */ }
       // Unlike staff PIN login (lib/session's landingPathFor, which guesses a home page from
       // permissions), this caller already knows the identity entering the clinic — the tenant
