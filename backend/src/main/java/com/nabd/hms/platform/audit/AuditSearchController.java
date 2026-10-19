@@ -43,10 +43,10 @@ public class AuditSearchController {
                                 @RequestParam(required = false) String actorType,
                                 @RequestParam(required = false) String actorRole,
                                 @RequestParam(required = false) String actorName,
-                                @RequestParam(defaultValue = "50") int limit,
+                                @RequestParam(required = false) Integer limit,
                                 @RequestParam(required = false) String cursor) {
         return service.search(new AuditFilter(tenantId, action, entityType, createdAfter, createdBefore,
-                actorId, actorType, actorRole, actorName), limit, cursor);
+                actorId, actorType, actorRole, actorName), com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     @GetMapping("/export")

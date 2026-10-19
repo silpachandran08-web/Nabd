@@ -85,6 +85,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // stateless bearer-token API, no cookies to forge
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // PLT-027: API responses (any status) are never cached, sniffed, framed or sent with a referrer
+                .headers(h -> h
+                        .cacheControl(c -> { })
+                        .contentTypeOptions(c -> { })
+                        .referrerPolicy(r -> r.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                        .httpStrictTransportSecurity(x -> x.maxAgeInSeconds(31536000).includeSubDomains(true)
+                                .requestMatcher(org.springframework.security.web.util.matcher.AnyRequestMatcher.INSTANCE))
+                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/v1/auth/login",

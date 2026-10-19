@@ -41,9 +41,9 @@ public class BillingController {
     }
 
     @GetMapping("/subscriptions")
-    public SubscriptionPage listSubscriptions(@RequestParam(defaultValue = "50") int limit,
+    public SubscriptionPage listSubscriptions(@RequestParam(required = false) Integer limit,
                                                @RequestParam(required = false) String cursor) {
-        return billingService.list(limit, cursor);
+        return billingService.list(com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     @PostMapping("/subscriptions/{tenantId}")
@@ -64,9 +64,9 @@ public class BillingController {
     }
 
     @GetMapping("/discounts")
-    public DiscountPage listDiscounts(@RequestParam(defaultValue = "50") int limit,
+    public DiscountPage listDiscounts(@RequestParam(required = false) Integer limit,
                                        @RequestParam(required = false) String cursor) {
-        return discountService.list(limit, cursor);
+        return discountService.list(com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     @PostMapping("/discounts")

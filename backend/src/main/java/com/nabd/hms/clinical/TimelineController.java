@@ -25,7 +25,7 @@ public class TimelineController {
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
     public EncounterPage get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
-                              @RequestParam(defaultValue = "20") int limit, @RequestParam(required = false) String cursor) {
-        return service.get(UUID.fromString(jwt.getClaimAsString("tenantId")), patientId, limit, cursor);
+                              @RequestParam(required = false) Integer limit, @RequestParam(required = false) String cursor) {
+        return service.get(UUID.fromString(jwt.getClaimAsString("tenantId")), patientId, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 }

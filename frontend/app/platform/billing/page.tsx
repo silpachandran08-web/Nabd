@@ -119,7 +119,7 @@ export default function BillingPage() {
       const discRes = await authedFetch("/platform/billing/discounts?limit=100");
       if (discRes?.ok) setDiscounts((await discRes.json()).data);
 
-      const tenantsRes = await authedFetch("/platform/tenants?limit=200");
+      const tenantsRes = await authedFetch("/platform/tenants?limit=100");
       if (tenantsRes?.ok) setTenants((await tenantsRes.json()).data);
 
       const plansRes = await authedFetch("/platform/plans");

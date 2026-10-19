@@ -52,16 +52,16 @@ public class PatientController {
                                             @RequestParam(required = false) String filter,
                                             @RequestParam(required = false) Integer limit,
                                             @RequestParam(required = false) String cursor) {
-        return service.registry(tenantId(jwt), staffId(jwt), q, filter, limit, cursor);
+        return service.registry(tenantId(jwt), staffId(jwt), q, filter, limit == null ? null : com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('patients:view')")
     public PatientPage list(@AuthenticationPrincipal Jwt jwt,
                              @RequestParam(required = false) String q,
-                             @RequestParam(defaultValue = "20") int limit,
+                             @RequestParam(required = false) Integer limit,
                              @RequestParam(required = false) String cursor) {
-        return service.list(tenantId(jwt), staffId(jwt), q, limit, cursor);
+        return service.list(tenantId(jwt), staffId(jwt), q, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     @GetMapping("/guardian-reviews-due")

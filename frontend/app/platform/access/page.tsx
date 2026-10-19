@@ -59,7 +59,7 @@ export default function SupportAccessPage() {
       }
       setGrants(await grantsRes.json());
 
-      const tenantsRes = await authedFetch("/platform/tenants?limit=200");
+      const tenantsRes = await authedFetch("/platform/tenants?limit=100");
       if (tenantsRes?.ok) {
         const body: { data: TenantOption[] } = await tenantsRes.json();
         setTenants(body.data);
