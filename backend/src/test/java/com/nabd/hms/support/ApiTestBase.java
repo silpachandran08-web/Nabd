@@ -151,6 +151,15 @@ public abstract class ApiTestBase {
         http.getRestTemplate().setRequestFactory(new org.springframework.http.client.JdkClientHttpRequestFactory());
     }
 
+    /** Tests call OutboxDispatcher.poll() (one batch, oldest first) and no background poll runs, so rows
+     * left by earlier tests (any tenant, any event type) would fill the batch and starve the test's own row. */
+    @BeforeEach
+    void settleLeftoverOutboxRows() throws SQLException {
+        try (Connection su = superuserConnection(); var st = su.createStatement()) {
+            st.executeUpdate("UPDATE outbox_events SET status = 'done' WHERE status IN ('pending', 'processing')");
+        }
+    }
+
     @Autowired
     protected JdbcTemplate jdbc;
 
