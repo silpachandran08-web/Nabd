@@ -7,6 +7,7 @@ import { usePlatformFetch } from "../platformApi";
 import { ErrorState, Skeleton, EmptyState } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { TenantStatusPill } from "../../components/platform/statusPills";
+import StatusPill from "../../components/ui/StatusPill";
 
 // Matches GET /v1/platform/tenants (api/openapi.yaml has no Platform paths yet — see PlatformAuthController).
 type TenantSummary = {
@@ -19,6 +20,10 @@ type TenantSummary = {
   ownerName: string | null;
   ownerEmail: string | null;
   createdAt: string;
+  // PLT-005: privileged identities (Owner role, approve/refund grants) and how many have MFA; target 100%
+  privilegedUsers?: number;
+  privilegedMfaEnrolled?: number;
+  privilegedMfaPercent?: number | null;
 };
 type FleetPage = { data: TenantSummary[]; page: { nextCursor: string | null; limit: number } };
 // Matches GET /v1/platform/tenants/summary (FleetController) — the header's KPI grid.
@@ -164,6 +169,7 @@ export default function FleetPage() {
                     <th>Status</th>
                     <th>Brand</th>
                     <th>Owner</th>
+                    <th>Privileged MFA</th>
                     {canRequestSupportAccess && <th></th>}
                   </tr>
                 </thead>
@@ -181,6 +187,12 @@ export default function FleetPage() {
                       <td className={t.brandName ? undefined : styles.muted}>{t.brandName ?? "—"}</td>
                       <td className={t.ownerEmail ? undefined : styles.muted}>
                         {t.ownerName ? `${t.ownerName} (${t.ownerEmail})` : "—"}
+                      </td>
+                      <td data-testid="mfa-percent" className={t.privilegedMfaPercent == null ? styles.muted : undefined}
+                        title={t.privilegedUsers ? `${t.privilegedMfaEnrolled ?? 0} of ${t.privilegedUsers} privileged users enrolled` : undefined}>
+                        {t.privilegedMfaPercent == null ? "—" : (
+                          <StatusPill tone={t.privilegedMfaPercent === 100 ? "ok" : "warn"} label={`${t.privilegedMfaPercent}%`} />
+                        )}
                       </td>
                       {canRequestSupportAccess && (
                         <td>

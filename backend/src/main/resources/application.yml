@@ -109,6 +109,8 @@ app:
     mfa-challenge-ttl-minutes: 5
     lockout-threshold: 5          # failed attempts before backoff kicks in
     rate-limit-per-ip-per-minute: 20
+    mfa:
+      enforce-privileged: ${MFA_ENFORCE_PRIVILEGED:true}  # PLT-005: false is refused at boot under the prod profile
   jwt:
     # Documented env var names (APP_JWT_KEYS_* still win via relaxed binding).
     keys-file: ${JWT_KEYS_FILE:}

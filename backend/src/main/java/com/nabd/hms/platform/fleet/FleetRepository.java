@@ -23,8 +23,10 @@ class FleetRepository {
 
     private static final String BASE_SELECT =
             "SELECT t.id, t.slug, t.name, t.region, t.status, t.created_at, " +
-                    "       b.name AS brand_name, o.name AS owner_name, o.email AS owner_email " +
-                    "FROM tenants t LEFT JOIN brands b ON t.brand_id = b.id LEFT JOIN owners o ON b.owner_id = o.id ";
+                    "       b.name AS brand_name, o.name AS owner_name, o.email AS owner_email, m.privileged, m.enrolled " +
+                    "FROM tenants t LEFT JOIN brands b ON t.brand_id = b.id LEFT JOIN owners o ON b.owner_id = o.id " +
+                    // PLT-005: counts only, through a definer function (staff/roles are tenant-RLS; this is the operator plane)
+                    "LEFT JOIN LATERAL tenant_privileged_mfa(t.id) m ON true ";
 
     List<TenantSummary> listPage(int limit, Instant afterCreatedAt, UUID afterId) {
         if (afterCreatedAt == null) {
@@ -49,6 +51,8 @@ class FleetRepository {
                 rs.getString("brand_name"),
                 rs.getString("owner_name"),
                 rs.getString("owner_email"),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(),
+                rs.getInt("privileged"),
+                rs.getInt("enrolled"));
     }
 }

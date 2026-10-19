@@ -1,7 +1,10 @@
 package com.nabd.hms.platform;
 
+import com.nabd.hms.auth.MfaPolicy;
 import com.nabd.hms.auth.TotpService;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
+import com.nabd.hms.auth.dto.MfaEnrollResponse;
+import com.nabd.hms.auth.dto.MfaSetupRequiredResponse;
 import com.nabd.hms.auth.dto.MfaVerifyRequest;
 import com.nabd.hms.auth.dto.RefreshRequest;
 import com.nabd.hms.auth.dto.SessionResponse;
@@ -61,10 +64,12 @@ public class PlatformAuthService {
     private final AuthProperties props;
     private final PlatformAudit audit;
     private final AuditService auditService;
+    private final MfaPolicy mfaPolicy;
 
     PlatformAuthService(PlatformAuthRepository repo, PasswordEncoder pinEncoder, TotpService totpService,
                          AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder, AuthProperties props,
-                         PlatformAudit audit, AuditService auditService) {
+                         PlatformAudit audit, AuditService auditService, MfaPolicy mfaPolicy) {
+        this.mfaPolicy = mfaPolicy;
         this.audit = audit;
         this.auditService = auditService;
         this.repo = repo;
@@ -112,6 +117,10 @@ public class PlatformAuthService {
             audit.record(null, operator.id(), ip, "platform_auth.mfa_challenged", "operator", operator.id(), null);
             return issueMfaChallenge(operator);
         }
+        if (mfaPolicy.requiredForOperator()) { // PLT-005: every operator role, super_admin included
+            audit.record(null, operator.id(), ip, "platform_auth.mfa_setup_required", "operator", operator.id(), null);
+            return issueMfaSetup(operator);
+        }
         audit.record(null, operator.id(), ip, "platform_auth.signed_in", "operator", operator.id(), Map.of("mfa", false));
         return mintTokenPair(operator, UUID.randomUUID(), ip, device, userAgent);
     }
@@ -153,6 +162,63 @@ public class PlatformAuthService {
         return mintTokenPair(operator, UUID.randomUUID(), ip, device, userAgent);
     }
 
+    /** PLT-005: forced enrolment, step 1 — only a platform mfa_setup token from login reaches it. */
+    @Transactional
+    public MfaEnrollResponse enrollMfa(String setupToken, String ip) {
+        Operator operator = repo.findById(requireSetupToken(setupToken)).orElseThrow(this::setupNotAllowed);
+        byte[] secret = totpService.generateSecret();
+        repo.setPendingMfaSecret(operator.id(), cipher.encrypt(secret));
+        audit.record(null, operator.id(), ip, "platform_auth.mfa_enrollment_started", "operator", operator.id(), null);
+        return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd Platform", operator.email()));
+    }
+
+    /** PLT-005: forced enrolment, step 2 — a code from the new secret switches MFA on; the operator then signs in again. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public void confirmMfa(String setupToken, String code, String ip) {
+        Operator operator = repo.findById(requireSetupToken(setupToken)).orElseThrow(this::setupNotAllowed);
+        enforceAccountLockout(operator);
+        byte[] pending = repo.findPendingMfaSecret(operator.id()).orElseThrow(this::mfaFailed);
+        long step = totpService.matchStep(cipher.decrypt(pending), code, Instant.now());
+        if (step < 0 || !repo.claimTotpStep(operator.id(), step)) {
+            repo.recordLoginAttempt(operator.id(), operator.email(), ip, false);
+            audit.record(null, operator.id(), ip, "platform_auth.mfa_failed", "operator", operator.id(), null);
+            throw mfaFailed();
+        }
+        repo.confirmPendingMfa(operator.id());
+        repo.recordLoginAttempt(operator.id(), operator.email(), ip, true);
+        audit.record(null, operator.id(), ip, "platform_auth.mfa_enrolled", "operator", operator.id(), null);
+    }
+
+    private UUID requireSetupToken(String setupToken) {
+        try {
+            Jwt jwt = jwtDecoder.decode(setupToken == null ? "" : setupToken, TokenType.MFA_SETUP);
+            if (!"platform_mfa_setup".equals(jwt.getClaimAsString("purpose"))) {
+                throw setupNotAllowed();
+            }
+            return UUID.fromString(jwt.getSubject());
+        } catch (JwtException | IllegalArgumentException e) {
+            throw setupNotAllowed();
+        }
+    }
+
+    private ApiException setupNotAllowed() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "token-type-not-allowed", "Token type not allowed",
+                "This action needs the MFA setup token from sign-in.");
+    }
+
+    private MfaSetupRequiredResponse issueMfaSetup(Operator operator) {
+        Instant now = Instant.now();
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
+                .issuer(ISSUER)
+                .issuedAt(now)
+                .expiresAt(now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES))
+                .subject(operator.id().toString())
+                .claim("purpose", "platform_mfa_setup");
+        TokenType.MFA_SETUP.stamp(claimsB, Audience.PLATFORM_MFA);
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claimsB.build())).getTokenValue();
+        return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
+    }
+
     // noRollbackFor: reuse detection's revokeFamily() write must survive the ApiException thrown
     // right after it — same reasoning as AuthService.refresh().
     @Transactional(noRollbackFor = ApiException.class)
@@ -174,6 +240,10 @@ public class PlatformAuthService {
 
         Operator operator = repo.findById(session.operatorId()).orElseThrow(this::invalidRefresh);
         if (!"active".equals(operator.status())) {
+            throw invalidRefresh();
+        }
+        if (!operator.mfaEnabled() && mfaPolicy.requiredForOperator()) { // PLT-005: checked at every mint
+            repo.revokeFamily(session.familyId(), "admin_revoke");
             throw invalidRefresh();
         }
 

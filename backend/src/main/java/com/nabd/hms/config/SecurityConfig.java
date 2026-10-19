@@ -134,6 +134,9 @@ public class SecurityConfig {
                                 "/v1/owners/workspaces/select",
                                 "/v1/staff/invitations/*/accept",
                                 "/v1/owners/auth/login",
+                                "/v1/owners/auth/mfa/*", // PLT-005: owner challenge / setup tokens in the body
+                                "/v1/platform/auth/mfa/enroll", // PLT-005: platform mfa_setup token in the body
+                                "/v1/platform/auth/mfa/confirm",
                                 "/v1/owners/invitations/*/accept",
                                 "/v1/platform/auth/login",
                                 "/v1/platform/auth/mfa/verify",

@@ -6,8 +6,14 @@ import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.shared.security.ChallengeTokenDecoder;
 import com.nabd.hms.shared.security.TokenType;
 import com.nabd.hms.owner.dto.AcceptOwnerInviteRequest;
+import com.nabd.hms.auth.dto.MfaEnrollResponse;
+import com.nabd.hms.auth.dto.RecoveryVerifyRequest;
 import com.nabd.hms.owner.dto.OwnerLoginRequest;
-import com.nabd.hms.owner.dto.PendingWorkspaceTokenResponse;
+import com.nabd.hms.owner.dto.OwnerMfaConfirmRequest;
+import com.nabd.hms.owner.dto.OwnerMfaConfirmResponse;
+import com.nabd.hms.owner.dto.OwnerMfaEnrollRequest;
+import com.nabd.hms.owner.dto.OwnerMfaVerifyRequest;
+import com.nabd.hms.owner.dto.OwnerWorkspaceTokenResponse;
 import com.nabd.hms.owner.dto.WorkspaceSelectRequest;
 import com.nabd.hms.owner.dto.WorkspacesResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,13 +43,34 @@ public class OwnerController {
     }
 
     @PostMapping("/auth/login")
-    public PendingWorkspaceTokenResponse login(@Valid @RequestBody OwnerLoginRequest req, HttpServletRequest http) {
+    public Object login(@Valid @RequestBody OwnerLoginRequest req, HttpServletRequest http) {
         return service.login(req, RequestMeta.clientIp(http));
+    }
+
+    // PLT-005: owner second factor. Challenge / setup tokens travel in the body and are decoded by OwnerService.
+    @PostMapping("/auth/mfa/verify")
+    public OwnerWorkspaceTokenResponse verifyMfa(@Valid @RequestBody OwnerMfaVerifyRequest req, HttpServletRequest http) {
+        return service.verifyMfa(req, RequestMeta.clientIp(http));
+    }
+
+    @PostMapping("/auth/mfa/recovery-verify")
+    public OwnerWorkspaceTokenResponse recoveryVerify(@Valid @RequestBody RecoveryVerifyRequest req, HttpServletRequest http) {
+        return service.recoveryVerify(req, RequestMeta.clientIp(http));
+    }
+
+    @PostMapping("/auth/mfa/enroll")
+    public MfaEnrollResponse enrollMfa(@Valid @RequestBody OwnerMfaEnrollRequest req) {
+        return service.enrollMfa(req);
+    }
+
+    @PostMapping("/auth/mfa/confirm")
+    public OwnerMfaConfirmResponse confirmMfa(@Valid @RequestBody OwnerMfaConfirmRequest req, HttpServletRequest http) {
+        return service.confirmMfa(req, RequestMeta.clientIp(http));
     }
 
     /** Public, like StaffController.acceptInvite — the raw token in the URL is the credential. */
     @PostMapping("/invitations/{token}/accept")
-    public PendingWorkspaceTokenResponse acceptInvite(@PathVariable String token, @Valid @RequestBody AcceptOwnerInviteRequest req) {
+    public Object acceptInvite(@PathVariable String token, @Valid @RequestBody AcceptOwnerInviteRequest req) {
         return service.acceptInvite(token, req.pin());
     }
 

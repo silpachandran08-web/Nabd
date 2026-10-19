@@ -21,7 +21,11 @@ class MfaCaller {
     Jwt resolve(Jwt accessSession, String setupToken) {
         if (setupToken != null && !setupToken.isBlank()) {
             try {
-                return decoder.decode(setupToken, TokenType.MFA_SETUP);
+                Jwt setup = decoder.decode(setupToken, TokenType.MFA_SETUP);
+                if (!"mfa_setup_required".equals(setup.getClaimAsString("purpose"))) {
+                    throw notAllowed(); // PLT-005: an owner's or operator's setup token never enrols a staff member
+                }
+                return setup;
             } catch (JwtException e) {
                 throw notAllowed();
             }

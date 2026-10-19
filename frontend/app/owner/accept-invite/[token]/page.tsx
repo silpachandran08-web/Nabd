@@ -42,6 +42,11 @@ export default function OwnerAcceptInvitePage() {
         setFormError((body as Problem).detail || "That invite link is invalid or has expired.");
         return;
       }
+      if ("setupToken" in body) { // PLT-005: owners must enrol an authenticator before any workspace
+        sessionStorage.setItem("nabd_owner_setup_token", body.setupToken); // read once by /owner/login
+        router.replace("/owner/login");
+        return;
+      }
       const pair = body as PendingWorkspaceToken;
       sessionStorage.setItem("nabd_owner_pending_token", pair.pendingToken);
       router.replace("/owner/workspaces");

@@ -302,6 +302,11 @@ class AuthRepository {
     }
 
     /** Reuse detection: kill every still-active row in the chain, not just the one presented. */
+    /** PLT-005: an owner's shadow staff row (staff.owner_id set) is reached only through the owner account's own MFA. */
+    boolean isOwnerLinked(UUID staffId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT owner_id IS NOT NULL FROM staff WHERE id = ?", Boolean.class, staffId));
+    }
+
     void revokeFamily(UUID familyId, String reason) {
         jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE family_id = ? AND revoked_at IS NULL",
                 reason, familyId);

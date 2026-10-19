@@ -531,15 +531,139 @@ paths:
                 pin: { type: string, pattern: "^[0-9]{4,8}$" }
       responses:
         "200":
-          description: PIN accepted; pendingToken can now list/select a workspace
+          description: >
+            PIN accepted. PLT-005: an owner with MFA gets an MfaChallenge (answer at /owners/auth/mfa/verify); one without
+            MFA gets an MfaSetupRequired token (enrol at /owners/auth/mfa/enroll + confirm). A PendingWorkspaceToken comes
+            straight back only where app.auth.mfa.enforce-privileged=false (never in prod).
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/PendingWorkspaceToken" }
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/MfaChallenge"
+                  - $ref: "#/components/schemas/MfaSetupRequired"
+                  - $ref: "#/components/schemas/PendingWorkspaceToken"
         "401":
           description: Invalid credentials (identical shape for unknown vs. wrong-PIN — no enumeration)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "423":
           description: Account locked (exponential backoff in effect)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/verify:
+    post:
+      tags: [Owners]
+      summary: Owner second factor before workspace selection (PLT-005)
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, code]
+              properties:
+                challengeToken: { type: string, description: "challengeId from /owners/auth/login (owner mfa_pending token)" }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200":
+          description: workspaceToken (the owner_select token used by /owners/me/workspaces and /owners/workspaces/select)
+          content: { application/json: { schema: { $ref: "#/components/schemas/OwnerWorkspaceToken" } } }
+        "401":
+          description: mfa-failed (wrong or replayed code, expired or foreign challenge)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/recovery-verify:
+    post:
+      tags: [Owners]
+      summary: Answer the owner challenge with a single-use recovery code (PLT-005)
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, recoveryCode]
+              properties:
+                challengeToken: { type: string }
+                recoveryCode: { type: string, maxLength: 32 }
+      responses:
+        "200":
+          description: workspaceToken plus remainingRecoveryCodes; audit owner_auth.recovery_code_used
+          content: { application/json: { schema: { $ref: "#/components/schemas/OwnerWorkspaceToken" } } }
+        "401":
+          description: mfa-failed (challenge) or recovery-code-invalid
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/enroll:
+    post:
+      tags: [Owners]
+      summary: Owner enrolment, step 1 (PLT-005) - setupToken from login or invite accept
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [setupToken]
+              properties:
+                setupToken: { type: string }
+      responses:
+        "200":
+          description: Pending secret stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secretBase32: { type: string }
+                  otpauthUri: { type: string }
+        "401":
+          description: token-type-not-allowed
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/confirm:
+    post:
+      tags: [Owners]
+      summary: Owner enrolment, step 2 (PLT-005) - a code from the new secret turns MFA on
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [setupToken, code]
+              properties:
+                setupToken: { type: string }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200":
+          description: 8 single-use recovery codes (shown once, stored hashed) and a workspaceToken to continue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recoveryCodes: { type: array, items: { type: string } }
+                  workspaceToken: { type: string }
+                  expiresIn: { type: integer }
+        "401":
+          description: token-type-not-allowed or mfa-failed
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /owners/me/workspaces:
@@ -712,7 +836,14 @@ paths:
               required: [pin]
               properties: { pin: { type: string, pattern: "^[0-9]{6,8}$" } }
       responses:
-        "200": { description: "TokenPair", content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+        "200":
+          description: TokenPair, or (PLT-005) MfaSetupRequired when the role requires MFA - enrol at /auth/mfa/enroll before any session
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TokenPair"
+                  - $ref: "#/components/schemas/MfaSetupRequired"
         "410": { description: "Invite expired (>72h) or already used", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   # --------------------------------------------------------------- Roles
@@ -789,6 +920,9 @@ paths:
         "200": { description: "Role", content: { application/json: { schema: { $ref: "#/components/schemas/Role" } } } }
         "400":
           description: Attempted edit of a built-in role, or a grant beyond the editor's own permissions (privilege escalation blocked)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "422":
+          description: mfa-required-by-policy (PLT-005) - mfaRequired=false on a role holding :approve or :refundDiscount
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   # ------------------------------------------------------------ Tenants
@@ -3394,6 +3528,20 @@ components:
       properties:
         brands: { type: array, items: { $ref: "#/components/schemas/BrandWorkspace" } }
 
+    MfaSetupRequired:
+      type: object
+      description: PLT-005 / NB-042 - policy requires MFA and none is enrolled; the token only reaches the enrol/confirm endpoints.
+      properties:
+        setupToken: { type: string }
+        expiresIn: { type: integer, example: 300 }
+
+    OwnerWorkspaceToken:
+      type: object
+      properties:
+        workspaceToken: { type: string, description: "owner_select token for /owners/me/workspaces and /owners/workspaces/select" }
+        expiresIn: { type: integer, example: 300 }
+        remainingRecoveryCodes: { type: integer, nullable: true }
+
     MfaChallenge:
       type: object
       properties:
@@ -3480,6 +3628,12 @@ components:
           type: array
           description: One entry per module the role touches
           items: { $ref: "#/components/schemas/ModuleGrant" }
+        mfaRequired:
+          type: boolean
+          description: >
+            Optional; omitted keeps the current value (false on create). PLT-005: on a Role this is the effective value,
+            always true for the built-in Owner role and any role with :approve or :refundDiscount; sending false for such
+            a role is 422 mfa-required-by-policy.
 
     Role:
       allOf:

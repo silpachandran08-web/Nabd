@@ -15,6 +15,7 @@ final class FleetModels {
      * platform health monitoring is NB-263/264) — omitted rather than faked with placeholder values.
      */
     record TenantSummary(UUID id, String slug, String name, String region, String status,
-                          String brandName, String ownerName, String ownerEmail, Instant createdAt) {
+                          String brandName, String ownerName, String ownerEmail, Instant createdAt,
+                          int privilegedUsers, int privilegedMfaEnrolled) {
     }
 }

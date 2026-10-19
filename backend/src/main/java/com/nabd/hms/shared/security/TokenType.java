@@ -8,7 +8,7 @@ import java.util.Set;
 public enum TokenType {
     ACCESS("access", Audience.STAFF_API, Audience.PLATFORM_API),
     MFA_PENDING("mfa_pending", Audience.MFA, Audience.PLATFORM_MFA),
-    MFA_SETUP("mfa_setup", Audience.MFA),
+    MFA_SETUP("mfa_setup", Audience.MFA, Audience.PLATFORM_MFA),
     STEP_UP("step_up", Audience.STEP_UP),
     OWNER_SELECT("owner_select", Audience.OWNER_SELECT);
 

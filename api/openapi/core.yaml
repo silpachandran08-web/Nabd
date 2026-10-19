@@ -4511,7 +4511,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PendingWorkspaceTokenResponse"
+                type: object
           description: OK
         default:
           content:
@@ -4522,6 +4522,130 @@ paths:
       tags:
       - owner
       x-required-permission: public
+  /v1/owners/auth/mfa/confirm:
+    post:
+      operationId: OwnerController_confirmMfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerMfaConfirmRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/OwnerMfaConfirmResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - owner
+      x-required-permission: authenticated
+  /v1/owners/auth/mfa/enroll:
+    post:
+      operationId: OwnerController_enrollMfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerMfaEnrollRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MfaEnrollResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - owner
+      x-required-permission: authenticated
+  /v1/owners/auth/mfa/recovery-verify:
+    post:
+      operationId: OwnerController_recoveryVerify
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecoveryVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/OwnerWorkspaceTokenResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - owner
+      x-required-permission: authenticated
+  /v1/owners/auth/mfa/verify:
+    post:
+      operationId: OwnerController_verifyMfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerMfaVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/OwnerWorkspaceTokenResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - owner
+      x-required-permission: authenticated
   /v1/owners/invitations/{token}/accept:
     post:
       operationId: OwnerController_acceptInvite
@@ -4542,7 +4666,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PendingWorkspaceTokenResponse"
+                type: object
           description: OK
         default:
           content:
@@ -6418,6 +6542,63 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/OperatorProfileResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: authenticated
+  /v1/platform/auth/mfa/confirm:
+    post:
+      operationId: PlatformAuthController_confirmMfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaConfirmRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: authenticated
+  /v1/platform/auth/mfa/enroll:
+    post:
+      operationId: PlatformAuthController_enrollMfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaEnrollRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MfaEnrollResponse"
           description: OK
         "401":
           content:
@@ -10056,7 +10237,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/TokenPairResponse"
+                type: object
           description: OK
         default:
           content:
@@ -13007,6 +13188,58 @@ components:
       required:
       - email
       - pin
+    OwnerMfaConfirmRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+        setupToken:
+          type: string
+      required:
+      - code
+      - setupToken
+    OwnerMfaConfirmResponse:
+      type: object
+      properties:
+        expiresIn:
+          type: integer
+          format: int64
+        recoveryCodes:
+          type: array
+          items:
+            type: string
+        workspaceToken:
+          type: string
+    OwnerMfaEnrollRequest:
+      type: object
+      properties:
+        setupToken:
+          type: string
+      required:
+      - setupToken
+    OwnerMfaVerifyRequest:
+      type: object
+      properties:
+        challengeToken:
+          type: string
+        code:
+          type: string
+          pattern: "^[0-9]{6}$"
+      required:
+      - challengeToken
+      - code
+    OwnerWorkspaceTokenResponse:
+      type: object
+      properties:
+        expiresIn:
+          type: integer
+          format: int64
+        remainingRecoveryCodes:
+          type: integer
+          format: int32
+        workspaceToken:
+          type: string
     PackageItemInput:
       type: object
       properties:
@@ -13425,14 +13658,6 @@ components:
         staffId:
           type: string
         staffName:
-          type: string
-    PendingWorkspaceTokenResponse:
-      type: object
-      properties:
-        expiresIn:
-          type: integer
-          format: int64
-        pendingToken:
           type: string
     PharmacyItemResponse:
       type: object
@@ -15005,6 +15230,15 @@ components:
           type: string
         ownerName:
           type: string
+        privilegedMfaEnrolled:
+          type: integer
+          format: int32
+        privilegedMfaPercent:
+          type: integer
+          format: int32
+        privilegedUsers:
+          type: integer
+          format: int32
         region:
           type: string
         slug:

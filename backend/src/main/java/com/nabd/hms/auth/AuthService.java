@@ -78,12 +78,14 @@ public class AuthService {
     private final AuditService auditService;
     private final LoginGuard guard;
     private final StepUpVerifier stepUpVerifier;
+    private final MfaPolicy mfaPolicy;
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
-                LoginGuard guard, StepUpVerifier stepUpVerifier) {
+                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy) {
+        this.mfaPolicy = mfaPolicy;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -140,19 +142,24 @@ public class AuthService {
     }
 
     /**
-     * NB-042: "mandatory for Owner ... and anyone holding refund or discount rights" is a real-world
-     * description of which roles a clinic will assign this to, not a rule about role names or a
-     * heuristic over grants — a role's display name is free text (renamed on a whim), and this
-     * codebase's own "full access" test/seed roles hold every grant including refundDiscount, so
-     * either heuristic would gate roles that were never meant to require it. Enforcement is a plain
-     * per-role flag instead, set deliberately by whoever builds the role (see roles.mfa_required).
+     * NB-042: roles.mfa_required is the per-role opt-in. PLT-005 adds an invariant on top that no role
+     * edit can clear: the built-in Owner role and any role (own or on loan) holding :approve or
+     * :refundDiscount always requires MFA (see MfaPolicy).
      */
     private boolean mfaRequiredByPolicy(Staff staff) {
         if (staff.mfaResetRequired()) { // PLT-004: an owner reset forces enrolment at next sign-in
             return true;
         }
         Role role = repo.findRole(staff.roleId()).orElseThrow(() -> new IllegalStateException("role missing"));
-        return role.mfaRequired();
+        return role.mfaRequired() || privilegedByPolicy(staff, role);
+    }
+
+    private boolean privilegedByPolicy(Staff staff, Role role) {
+        if (mfaPolicy.requiredForRole(role.builtIn(), flattenGrants(role.grantsJson()))) {
+            return true;
+        }
+        return repo.findActiveDelegatedRoles(staff.id()).stream()
+                .anyMatch(d -> mfaPolicy.requiredForRole(d.builtIn(), flattenGrants(d.grantsJson())));
     }
 
     private MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
@@ -463,7 +470,19 @@ public class AuthService {
         guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "unlock", true);
     }
 
-    /** Called from StaffController right after a successful invite-accept — lands the new staff member logged in. */
+    /** PLT-005: invite accept lands the new staff member signed in, unless their role needs MFA first (then a setup token). */
+    @Transactional
+    public Object sessionAfterInviteAccept(UUID tenantId, UUID staffId, String ip, String device, String userAgent) {
+        tenantContext.set(tenantId);
+        Staff staff = repo.findStaffById(staffId)
+                .orElseThrow(() -> new IllegalStateException("staff " + staffId + " vanished right after invite accept"));
+        if (!staff.mfaEnabled() && mfaRequiredByPolicy(staff)) {
+            return issueMfaSetupRequired(staff);
+        }
+        return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
+    }
+
+    /** Called from OwnerService once the owner account is through its own MFA — lands the owner in the clinic. */
     @Transactional
     public TokenPairResponse issueTokensForStaff(UUID tenantId, UUID staffId, String ip, String device, String userAgent) {
         tenantContext.set(tenantId);
@@ -495,6 +514,13 @@ public class AuthService {
 
         Staff staff = repo.findStaffById(session.staffId()).orElseThrow(this::invalidRefresh);
         if (!"active".equals(staff.status())) {
+            throw invalidRefresh();
+        }
+        // PLT-005: the invariant is checked at every mint; a privileged session without MFA ends here and the next sign-in enrols.
+        // Owner shadow rows are exempt: the owner account passes its own MFA before entering a clinic.
+        if (!staff.mfaEnabled() && privilegedByPolicy(staff, repo.findRole(staff.roleId()).orElseThrow(this::invalidRefresh))
+                && !repo.isOwnerLinked(staff.id())) {
+            repo.revokeFamily(session.familyId(), "admin_revoke");
             throw invalidRefresh();
         }
 

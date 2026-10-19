@@ -3,6 +3,7 @@ package com.nabd.hms.staff;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nabd.hms.auth.MfaPolicy;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
@@ -71,9 +72,10 @@ public class RoleService {
     public RoleResponse create(UUID tenantId, UUID callerStaffId, RoleWriteRequest req, List<String> callerPermissions) {
         tenantContext.set(tenantId);
         requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
+        requireMfaInvariant(req);
 
         UUID id = UUID.randomUUID();
-        repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
+        repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), Boolean.TRUE.equals(req.mfaRequired()));
         log.info("role {} created by {} (tenant {})", id, callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
@@ -86,10 +88,20 @@ public class RoleService {
             throw builtInImmutable();
         }
         requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
+        requireMfaInvariant(req);
 
-        repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
+        repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()),
+                req.mfaRequired() == null ? current.mfaRequired() : req.mfaRequired());
         log.info("role {} updated by {} (tenant {})", id, callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
+    }
+
+    /** PLT-005: a role holding :approve or :refundDiscount always requires MFA; asking for false is refused, not ignored. */
+    private void requireMfaInvariant(RoleWriteRequest req) {
+        if (Boolean.FALSE.equals(req.mfaRequired()) && MfaPolicy.privilegedGrants(GrantsFlattener.flatten(req.grants()))) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "mfa-required-by-policy", "MFA required by policy",
+                    "Roles that can approve, refund or discount always require MFA; mfaRequired cannot be false.");
+        }
     }
 
     /** "Attempted edit of a built-in role, or a grant beyond the editor's own permissions... blocked" — api/openapi.yaml. */
@@ -163,7 +175,9 @@ public class RoleService {
     }
 
     private RoleResponse toResponse(RoleRow row) {
-        return new RoleResponse(row.id(), row.name(), row.builtIn(), readGrants(row.grantsJson()), row.mfaRequired());
+        List<ModuleGrant> grants = readGrants(row.grantsJson());
+        boolean effective = row.mfaRequired() || MfaPolicy.privilegedRole(row.builtIn(), GrantsFlattener.flatten(grants));
+        return new RoleResponse(row.id(), row.name(), row.builtIn(), grants, effective);
     }
 
     private List<ModuleGrant> readGrants(String json) {

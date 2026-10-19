@@ -51,6 +51,7 @@ public class FleetService {
 
     private TenantSummaryResponse toResponse(TenantSummary t) {
         return new TenantSummaryResponse(t.id(), t.slug(), t.name(), t.region(), t.status(),
-                t.brandName(), t.ownerName(), t.ownerEmail(), t.createdAt());
+                t.brandName(), t.ownerName(), t.ownerEmail(), t.createdAt(), t.privilegedUsers(), t.privilegedMfaEnrolled(),
+                t.privilegedUsers() == 0 ? null : (int) Math.floor(100.0 * t.privilegedMfaEnrolled() / t.privilegedUsers()));
     }
 }
