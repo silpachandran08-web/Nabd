@@ -24,13 +24,13 @@ class RoleRepository {
 
     List<RoleRow> list(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json, mfa_required FROM roles WHERE tenant_id = ? ORDER BY name",
+                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json, mfa_required, preset_code, preset_version FROM roles WHERE tenant_id = ? ORDER BY name",
                 roleMapper(), tenantId);
     }
 
     Optional<RoleRow> findById(UUID tenantId, UUID id) {
         return jdbc.query(
-                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json, mfa_required FROM roles WHERE tenant_id = ? AND id = ?",
+                "SELECT id, tenant_id, name, built_in, grants::text AS grants_json, mfa_required, preset_code, preset_version FROM roles WHERE tenant_id = ? AND id = ?",
                 roleMapper(), tenantId, id
         ).stream().findFirst();
     }
@@ -43,6 +43,18 @@ class RoleRepository {
     void update(UUID tenantId, UUID id, String name, String grantsJson, boolean mfaRequired) {
         jdbc.update("UPDATE roles SET name = ?, grants = ?::jsonb, mfa_required = ? WHERE tenant_id = ? AND id = ? AND built_in = false",
                 name, grantsJson, mfaRequired, tenantId, id);
+    }
+
+    /** PLT-016: back to the current preset definition; built_in is not filtered, so the Owner preset can move versions too. */
+    void resetToPreset(UUID tenantId, UUID id, String grantsJson, int presetVersion) {
+        jdbc.update("UPDATE roles SET grants = ?::jsonb, preset_version = ? WHERE tenant_id = ? AND id = ? AND preset_code IS NOT NULL",
+                grantsJson, presetVersion, tenantId, id);
+    }
+
+    /** The caller's permanent role is the built-in Owner (same rule as GrantAuthority.isOwner). */
+    boolean isOwner(UUID tenantId, UUID staffId) {
+        return Boolean.TRUE.equals(jdbc.query("SELECT r.built_in AND r.name = 'Owner' FROM staff s JOIN roles r ON r.id = s.role_id " +
+                "WHERE s.tenant_id = ? AND s.id = ?", (rs, i) -> rs.getBoolean(1), tenantId, staffId).stream().findFirst().orElse(false));
     }
 
     record ActorInfo(String name, String role) {
@@ -149,6 +161,8 @@ class RoleRepository {
                 rs.getString("name"),
                 rs.getBoolean("built_in"),
                 rs.getString("grants_json"),
-                rs.getBoolean("mfa_required"));
+                rs.getBoolean("mfa_required"),
+                rs.getString("preset_code"),
+                rs.getObject("preset_version", Integer.class));
     }
 }

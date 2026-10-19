@@ -8,6 +8,7 @@ import com.nabd.hms.common.WabaProvisioningGateway;
 import com.nabd.hms.owner.OwnerService;
 import com.nabd.hms.platform.tenant.TenantLifecycleService;
 import com.nabd.hms.staff.StaffService;
+import com.nabd.hms.staff.presets.RolePresets;
 import com.nabd.hms.staff.dto.StaffInviteRequest;
 import com.nabd.hms.staff.dto.StaffInviteResponse;
 import org.slf4j.Logger;
@@ -177,7 +178,7 @@ class ProvisioningStepRunner {
         log.info("provisioning job {} created tenant {} (owner {}, brand {})", job.id(), tenantId, ownerId, brandId);
     }
 
-    /** Reuses ApiTestBase's proven full-access shape — every module the Owner shadow-staff path (OwnerRepository) needs. */
+    /** PLT-016: seeds the six preset role bundles from the iam preset catalogue (RolePresets). */
     private void seedMasters(Job job) {
         UUID tenantId = job.createdTenantId();
         if (tenantId == null) {
@@ -187,14 +188,11 @@ class ProvisioningStepRunner {
         // the idempotency check below, or the bare tenant_isolation policy cast ('' ::uuid) throws.
         tenantContext.set(tenantId);
         if (repo.hasBuiltInRole(tenantId)) {
-            return; // retry after a later step failed — already seeded, nothing to redo
+            return; // retry after a later step failed — already seeded (all presets in this one transaction), nothing to redo
         }
-        String grantsJson = writeGrantsJson(List.of(
-                fullGrant("staff"), fullGrant("patients"), fullGrant("queue"), fullGrant("setup"),
-                fullGrant("clinical"), fullGrant("billing"), fullGrant("specialty_dental"),
-                fullGrant("reports"), fullGrant("pharmacy"), fullGrant("packages"), fullGrant("nursing"),
-                fullGrant("departments")));
-        repo.insertBuiltInOwnerRole(tenantId, grantsJson);
+        for (RolePresets.Preset p : RolePresets.ALL) {
+            repo.insertPresetRole(tenantId, p.name(), p.builtIn(), writeGrantsJson(p.grants()), p.code(), RolePresets.VERSION);
+        }
         repo.seedDefaultDepartment(tenantId);
     }
 
@@ -264,10 +262,6 @@ class ProvisioningStepRunner {
             throw new IllegalStateException("go_live ran before create_tenant recorded a tenant id");
         }
         lifecycleService.transition(tenantId, "trialing", job.requestedBy(), "provisioning completed", null);
-    }
-
-    private static ModuleGrant fullGrant(String module) {
-        return new ModuleGrant(module, true, true, true, true, true, true, true, "clinical".equals(module));
     }
 
     private String writeGrantsJson(List<ModuleGrant> grants) {

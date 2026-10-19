@@ -45,7 +45,7 @@ class StaffRepository {
                         // No tenant is set on this bootstrap path, so a roles subquery would hit roles' RLS
                         // policy with an empty app.tenant_id (uuid cast error). Not needed here: constant.
                         "(s.pin_hash IS NOT NULL) AS has_pin, (s.owner_id IS NOT NULL) AS owner_linked, " +
-                        "false AS role_mfa_required " +
+                        "false AS role_mfa_required, false AS is_clinician " +
                         "FROM find_staff_by_invite_token_hash(?) s " +
                         "WHERE s.invite_expires_at > now()",
                 staffMapper(), tokenHash
@@ -63,16 +63,32 @@ class StaffRepository {
     }
 
     /** Deliberately id+name only, not baseSelect()'s full staff row — see StaffRosterEntry's doc
-     * comment. Roles are free-text tenant-defined objects (no fixed "is this a doctor" column
-     * anywhere), so a role literally named "Doctor" is the only signal this schema has — every
-     * caller (Arrivals' check-in picker, Packages' "Allowed doctors") wants a doctor list, never
-     * the whole staff directory. */
+     * comment. Every caller (Arrivals' check-in picker, Packages' "Allowed doctors") wants a doctor
+     * list, never the whole staff directory. PLT-016: doctors are staff.is_clinician, never a role
+     * name, so renaming the Doctor role leaves every picker unchanged. */
     List<StaffRosterEntry> listRoster(UUID tenantId) {
-        return jdbc.query("SELECT s.id, s.name, d.name AS department_name FROM staff s JOIN roles r ON r.id = s.role_id " +
+        return jdbc.query("SELECT s.id, s.name, d.name AS department_name FROM staff s " +
                         "LEFT JOIN departments d ON d.id = s.department_id " +
-                        "WHERE s.tenant_id = ? AND s.status = 'active' AND r.name ILIKE 'doctor' ORDER BY s.name",
+                        "WHERE s.tenant_id = ? AND s.status = 'active' AND s.is_clinician ORDER BY s.name",
                 (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name"),
                         rs.getString("department_name")),
+                tenantId);
+    }
+
+    /** PLT-016: iam is the single writer of is_clinician; a change resolves any open backfill review row. */
+    void updateClinician(UUID tenantId, UUID id, boolean clinician) {
+        jdbc.update("UPDATE staff SET is_clinician = ? WHERE tenant_id = ? AND id = ?", clinician, tenantId, id);
+        jdbc.update("UPDATE staff_clinician_review SET resolved_at = now() WHERE tenant_id = ? AND staff_id = ? AND resolved_at IS NULL",
+                tenantId, id);
+    }
+
+    /** PLT-016: the V1370 backfill's ambiguous rows the owner has not confirmed yet. */
+    List<com.nabd.hms.staff.dto.ClinicianReviewEntry> listClinicianReview(UUID tenantId) {
+        return jdbc.query("SELECT s.id, s.name, r.name AS role_name, c.reason, s.is_clinician FROM staff_clinician_review c " +
+                        "JOIN staff s ON s.id = c.staff_id JOIN roles r ON r.id = s.role_id " +
+                        "WHERE c.tenant_id = ? AND c.resolved_at IS NULL ORDER BY s.name",
+                (rs, i) -> new com.nabd.hms.staff.dto.ClinicianReviewEntry(UUID.fromString(rs.getString("id")), rs.getString("name"),
+                        rs.getString("role_name"), rs.getString("reason"), rs.getBoolean("is_clinician")),
                 tenantId);
     }
 
@@ -128,7 +144,8 @@ class StaffRepository {
                 "s.created_at, s.professional_registration_no, " +
                 // OWN-034: credential facts as booleans only — pin_hash itself never leaves SQL.
                 "(s.pin_hash IS NOT NULL) AS has_pin, (s.owner_id IS NOT NULL) AS owner_linked, " +
-                "COALESCE((SELECT r.mfa_required FROM roles r WHERE r.id = s.role_id), false) AS role_mfa_required " +
+                "COALESCE((SELECT r.mfa_required FROM roles r WHERE r.id = s.role_id), false) AS role_mfa_required, " +
+                "s.is_clinician " +
                 "FROM staff s ";
     }
 
@@ -159,7 +176,8 @@ class StaffRepository {
                     rs.getString("professional_registration_no"),
                     rs.getBoolean("has_pin"),
                     rs.getBoolean("owner_linked"),
-                    rs.getBoolean("role_mfa_required"));
+                    rs.getBoolean("role_mfa_required"),
+                    rs.getBoolean("is_clinician"));
         };
     }
 }

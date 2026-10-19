@@ -139,6 +139,15 @@ public class StaffService {
         String scope = req.scope() != null ? req.scope() : current.scope();
         List<String> fieldGrants = req.fieldGrants() != null ? req.fieldGrants() : current.fieldGrants();
         UUID departmentId = req.departmentId() != null ? req.departmentId() : current.departmentId();
+        String registrationAfter = req.professionalRegistrationNo() == null ? current.professionalRegistrationNo()
+                : req.professionalRegistrationNo().trim().isEmpty() ? null : req.professionalRegistrationNo().trim();
+        // PLT-016: a clinician is set when a registration is recorded; an explicit toggle wins, but "on" needs a number.
+        boolean registrationSet = registrationAfter != null && !registrationAfter.equals(current.professionalRegistrationNo());
+        boolean clinicianAfter = req.clinician() != null ? req.clinician() : registrationSet || current.clinician();
+        if (clinicianAfter && !current.clinician() && registrationAfter == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "clinician-needs-registration", "Registration number required",
+                    "Record a professional registration number before marking this person as a clinician.");
+        }
 
         staffRepo.update(tenantId, id, roleId, scope, fieldGrants, departmentId);
         log.info("staff {} updated by {} (role {}, scope {})", id, callerStaffId, roleId, scope);
@@ -164,7 +173,23 @@ public class StaffService {
                         ipAddress, "staff.registration_no_" + change, "staff", id, null, detail);
             }
         }
+        if (clinicianAfter != current.clinician() || req.clinician() != null) {
+            staffRepo.updateClinician(tenantId, id, clinicianAfter); // an explicit confirm also clears the backfill review row
+        }
+        if (clinicianAfter != current.clinician()) {
+            String callerRole = roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+            auditService.record(tenantId, "staff", callerStaffId, caller.name(), callerRole, ipAddress,
+                    clinicianAfter ? "staff.clinician_set" : "staff.clinician_cleared", "staff", id,
+                    Map.of("clinician", current.clinician()), Map.of("clinician", clinicianAfter));
+        }
         return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+    }
+
+    /** PLT-016: the clinician backfill's ambiguous rows still waiting for the owner. */
+    @Transactional
+    public List<com.nabd.hms.staff.dto.ClinicianReviewEntry> clinicianReview(UUID tenantId) {
+        tenantContext.set(tenantId);
+        return staffRepo.listClinicianReview(tenantId);
     }
 
     /** PLT-015: before/after audit, sessions killed so the new grants apply on the next request, event published. */
@@ -227,7 +252,7 @@ public class StaffService {
     private StaffResponse toResponse(StaffRow row) {
         return new StaffResponse(row.id(), row.email(), row.name(), row.mobilePhone(), row.roleId(), row.status(),
                 row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants(), row.departmentId(), row.lastSeenAt(),
-                row.professionalRegistrationNo(), loginMethod(row), loginFactors(row));
+                row.professionalRegistrationNo(), loginMethod(row), loginFactors(row), row.clinician());
     }
 
     /**
