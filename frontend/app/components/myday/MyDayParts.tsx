@@ -6,9 +6,10 @@ import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
 import { EmptyState } from "../ui/StateViews";
 import { age, minutesSince, statusLabel } from "../consult/shared";
+import { clinicToday, formatClinicDate, formatClinicTime } from "../../lib/clinicTime";
 import type { AppointmentPage, DayRow, DueCondition, MyDayData, Part } from "./useMyDay";
 
-const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const hhmm = (iso: string) => formatClinicTime(iso);
 const consultHref = (id: string) => `/consult?entry=${encodeURIComponent(id)}`;
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const nameOf = (r: DayRow) => r.patientName ?? `Token T-${r.tokenNumber}`;
@@ -146,7 +147,7 @@ export function NeedsMeCard() {
 }
 
 export function ChronicDueCard({ part }: { part: Part<DueCondition[]> }) {
-  const todayIso = new Date().toLocaleDateString("en-CA");
+  const todayIso = clinicToday();
   return (
     <section className={styles.card} aria-label="Chronic reviews due">
       <h2 className={styles.cardTitle}>Chronic reviews due {part.state === "ok" && <span className={styles.count}>{part.data.length}</span>}</h2>
@@ -160,7 +161,7 @@ export function ChronicDueCard({ part }: { part: Part<DueCondition[]> }) {
               return (
                 <li key={c.id} className={styles.drow}>
                   <span className={styles.qmain}><span className={styles.qname}>{c.patientName}</span><span className={styles.metaLine}>{c.condition}</span></span>
-                  <StatusPill tone={overdue ? "danger" : "warn"} icon={overdue ? "alert" : "clock"} label={`${overdue ? "Overdue" : "Due"} ${new Date(c.reviewDueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`} />
+                  <StatusPill tone={overdue ? "danger" : "warn"} icon={overdue ? "alert" : "clock"} label={`${overdue ? "Overdue" : "Due"} ${formatClinicDate(c.reviewDueDate, { day: "numeric", month: "short" })}`} />
                 </li>
               );
             })}

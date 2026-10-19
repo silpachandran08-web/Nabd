@@ -1,7 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import ClinicNav from "./ClinicNav";
+import { useClinicTimeZoneBoot } from "./lib/useClinicTimeZone";
 import TopBar from "./TopBar";
 
 const COLLAPSE_KEY = "nabd_sidebar_collapsed";
@@ -11,6 +13,7 @@ const COLLAPSE_KEY = "nabd_sidebar_collapsed";
 // localStorage is the right place for it, not anything server-synced.
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  useClinicTimeZoneBoot(usePathname()); // FEF-011: clinic timezone into session state at shell boot
 
   useEffect(() => {
     try {

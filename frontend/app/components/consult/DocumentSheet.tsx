@@ -1,20 +1,15 @@
 import { DOC_FIELDS, DOC_LABEL, obj, registrationNumber, str, type DocBody, type DocType } from "./documents";
 import s from "./documentSheet.module.css";
-
-// Clinic wall-clock dates (the region is chosen at provisioning), same map the follow-up panel uses.
-const REGION_TZ: Record<string, string> = { IN: "Asia/Kolkata", KSA: "Asia/Riyadh" };
+import { formatClinicDate } from "../../lib/clinicTime";
+import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
 
 /** Values shown while the document is still a draft; replaced by the issue-time snapshot once issued. */
 export type SheetFallback = {
   clinicName: string; patientName: string; mrn?: string; dob?: string; gender?: string; doctorName?: string;
 };
 
-function fmtDate(ymdOrIso: string, tz?: string): string {
-  if (!ymdOrIso) return "";
-  const d = new Date(ymdOrIso.length === 10 ? `${ymdOrIso}T00:00:00Z` : ymdOrIso);
-  if (Number.isNaN(d.getTime())) return ymdOrIso;
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: ymdOrIso.length === 10 ? "UTC" : tz });
-}
+// Calendar dates (dob, visit date) print as-is; an issue instant prints on the clinic's wall clock (FEF-011).
+const fmtDate = (ymdOrIso: string, tz?: string | null) => (ymdOrIso ? formatClinicDate(ymdOrIso, undefined, tz) : "");
 
 export default function DocumentSheet({
   type, body, header, issuedAt, fallback,
@@ -24,7 +19,7 @@ export default function DocumentSheet({
   const patient = obj(header, "patient");
   const doctor = obj(header, "doctor");
   const visit = obj(header, "visit");
-  const tz = REGION_TZ[str(clinic, "region")];
+  const tz = useClinicTimeZone();
 
   const clinicName = issued ? str(clinic, "name") : fallback?.clinicName ?? "";
   const patientName = issued ? str(patient, "name") : fallback?.patientName ?? "";

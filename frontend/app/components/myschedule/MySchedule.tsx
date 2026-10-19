@@ -9,6 +9,8 @@ import { can } from "../../lib/permissions";
 import { WEEKDAYS, hhmm, isoDate, useDayGrid, useMySchedule, type DayCell, type Leave, type WorkingHours } from "./useMySchedule";
 import { LeaveDialog, WorkingHoursDialog } from "./ScheduleDialogs";
 import ConfirmDialog from "../../patients/ConfirmDialog";
+import { clinicToday, formatClinicDate } from "../../lib/clinicTime";
+import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
 
 
 function parseIso(s: string): Date {
@@ -18,8 +20,9 @@ function parseIso(s: string): Date {
 function addDays(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
-const fmtDay = (d: Date) => d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-const fmtLong = (d: Date) => d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+// Calendar dates: the Date only carries y/m/d, so it is formatted as that date, never shifted by a zone (FEF-011).
+const fmtDay = (d: Date) => formatClinicDate(isoDate(d), { weekday: "short", day: "numeric", month: "short" });
+const fmtLong = (d: Date) => formatClinicDate(isoDate(d), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 const leaveOn = (leave: Leave[], iso: string) => leave.find((l) => l.dateFrom <= iso && iso <= l.dateTo) ?? null;
 
 const CELL_PILL: Record<string, { tone: PillTone; label: string; icon?: "check" | "clock" | "info" | "alert" | "list" }> = {
@@ -141,12 +144,13 @@ export default function MySchedule() {
     if (err) setRemoveError(err); else setRemoving(null);
   }
   const [mode, setMode] = useState<"week" | "day">("week");
-  const [anchor, setAnchor] = useState(() => isoDate(new Date()));
+  const todayIso = clinicToday(useClinicTimeZone()); // the clinic's date, not the device's
+  const [picked, setAnchor] = useState<string | null>(null);
+  const anchor = picked ?? todayIso;
   const [dialog, setDialog] = useState<"hours" | "leave" | null>(null);
 
   const step = mode === "week" ? 7 : 1;
   const shift = (dir: number) => setAnchor(isoDate(addDays(parseIso(anchor), dir * step)));
-  const todayIso = isoDate(new Date());
   const upcomingLeave = leave.filter((l) => l.dateTo >= todayIso);
 
   return (
