@@ -12,10 +12,13 @@ type Candidate = { patientId: string; name: string; phone: string; matchScore: n
 /** Plain-language booking refusals keyed by the problem type slug; anything unknown gets the generic line, never the raw server text. */
 function bookingMessage(status: number, p: Problem | null): string {
   const slug = p?.type?.split("/").pop();
-  if (slug === "slot-unavailable") return "That time was just taken by another booking.";
+  if (slug === "slot-taken") return "That time was just taken by another booking.";
+  if (slug === "doctor-on-leave") return "The doctor is on leave that day. Choose another day.";
+  if (slug === "outside-hours") return "The doctor doesn't work at that time. Choose a listed time.";
+  if (slug === "off-grid") return "That isn't a bookable slot start. Choose a listed time.";
   if (slug === "session-full") return "This doctor's session is full.";
-  if (slug === "slot-in-past") return "That time has already passed. Choose a later time.";
-  if (slug === "clinic-holiday") return p?.detail || "The clinic is closed on that day.";
+  if (slug === "in-past") return "That time has already passed. Choose a later time.";
+  if (slug === "clinic-closed") return p?.detail || "The clinic is closed on that day.";
   if (slug === "patient-not-found" || slug === "doctor-not-found") return "That patient or doctor can no longer be found. Search again.";
   if (status === 403) return "You don't have permission to book appointments.";
   if (status >= 500) return "Something went wrong on our side. Try again in a moment.";
@@ -121,7 +124,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
         const p: Problem | null = await res.json().catch(() => null);
         setError(bookingMessage(res.status, p));
         const slug = p?.type?.split("/").pop();
-        if (slug === "slot-unavailable" || slug === "session-full") { setConflictSlot(slot); setReload((n) => n + 1); }
+        if (slug === "slot-taken" || slug === "session-full") { setConflictSlot(slot); setReload((n) => n + 1); }
         return;
       }
       onBooked();

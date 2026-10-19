@@ -1364,7 +1364,8 @@ paths:
       responses:
         "201": { description: "Booked", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
         "404": { description: "patient-not-found or doctor-not-found (unknown id or another clinic's)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-        "409": { description: "Slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "Problem `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours` or `off-grid` (each also carries code IN_PAST, CLINIC_CLOSED, DOCTOR_ON_LEAVE, OUTSIDE_HOURS, OFF_GRID)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `slot-taken` (code SLOT_TAKEN; overlapping range, DB exclusion constraint) or `session-full`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/{id}:
     get:
@@ -1404,7 +1405,8 @@ paths:
       responses:
         "200": { description: "New appointment", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: "New slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "Problem `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours` or `off-grid` (each also carries code IN_PAST, CLINIC_CLOSED, DOCTOR_ON_LEAVE, OUTSIDE_HOURS, OFF_GRID)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `slot-taken` (code SLOT_TAKEN) or `session-full`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /departments/{id}/flow:
     get:
@@ -1453,8 +1455,8 @@ paths:
         Without a body (or with slotStart null) this accepts the slot the entry was offered, exactly as
         before: 409 `offer-expired` if the 15-minute offer lapsed or was used. With `slotStart` set, the
         entry (status waiting, offered or expired) is booked into that slot after the same checks as
-        POST /appointments: 400 `slot-in-past`, 400 `clinic-holiday`, 409 `session-full`, 409
-        `slot-unavailable` (doctor already booked then). A slot currently offered to another waitlisted
+        POST /appointments: 400 `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours`, `off-grid`, 409 `session-full`, 409
+        `slot-taken` (doctor already booked then). A slot currently offered to another waitlisted
         patient is refused with 409 `slot-on-offer`; a booked/removed entry is 409 `waitlist-entry-closed`.
         slotStart equal to the entry's own live offer is the plain accept. If the entry held a live offer of
         a different slot, that slot is offered to the next waiting patient. Audited as
@@ -1471,9 +1473,9 @@ paths:
                 slotStart: { type: [string, "null"], format: date-time, description: "Chosen slot start; omit to accept the offered slot" }
       responses:
         "200": { description: "Booked entry (status booked, bookedAppointmentId set)", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
-        "400": { description: "slot-in-past or clinic-holiday", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "in-past, clinic-closed, doctor-on-leave, outside-hours or off-grid", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: "offer-expired, slot-unavailable, slot-on-offer, session-full or waitlist-entry-closed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "offer-expired, slot-taken, slot-on-offer, session-full or waitlist-entry-closed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /waitlist/{id}:
     delete:

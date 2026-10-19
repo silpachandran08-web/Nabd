@@ -192,13 +192,13 @@ class WaitlistApiTest extends ApiTestBase {
         String entryB = (String) exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "doctorId", doctor.id().toString(), "patientId", waiterB)), Map.class).getBody().get("id");
 
-        // a slot already booked by someone else: 409 slot-unavailable, entry stays waiting
+        // a slot already booked by someone else: 409 slot-taken, entry stays waiting
         String other = registerPatient(token, "Taken", "+919700002803");
         bookAppointment(token, doctor.id(), other, base);
         ResponseEntity<Map> taken = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,
                 authedJsonBody(token, Map.of("slotStart", base.toString())), Map.class);
         assertThat(taken.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(taken.getBody().get("type")).asString().contains("slot-unavailable");
+        assertThat(taken.getBody().get("type")).asString().contains("slot-taken");
 
         // a slot in the past: 400
         ResponseEntity<Map> past = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,
