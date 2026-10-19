@@ -22,6 +22,7 @@ public class TimelineController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("timeline")
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
     public EncounterPage get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,

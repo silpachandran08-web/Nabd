@@ -37,6 +37,7 @@ public class AllergyController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("allergies")
     @GetMapping("/patients/{patientId}/allergies")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<AllergyResponse> list(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
@@ -68,12 +69,14 @@ public class AllergyController {
         service.deactivate(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("allergy_history")
     @GetMapping("/patients/{patientId}/allergies/history")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<AllergyEventResponse> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
         return service.history(tenantId(jwt), patientId);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("allergy_status")
     @GetMapping("/patients/{patientId}/allergies/status")
     @PreAuthorize("hasAuthority('clinical:view')")
     public AllergyStatusResponse status(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {

@@ -35,12 +35,14 @@ public class ClinicalDocumentController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("visit_documents")
     @GetMapping("/visits/{queueEntryId}/documents")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<DocumentResponse> listForVisit(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
         return service.listForVisit(tenantId(jwt), queueEntryId);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("document_prefill")
     @GetMapping("/visits/{queueEntryId}/documents/summary-prefill")
     @PreAuthorize("hasAuthority('clinical:view')")
     public SummaryPrefillResponse summaryPrefill(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
@@ -55,6 +57,7 @@ public class ClinicalDocumentController {
         return service.create(tenantId(jwt), staffId(jwt), queueEntryId, req);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("document")
     @GetMapping("/documents/{id}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public DocumentResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

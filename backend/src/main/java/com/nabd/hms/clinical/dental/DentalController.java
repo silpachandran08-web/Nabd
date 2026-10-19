@@ -34,6 +34,7 @@ public class DentalController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("dental_chart")
     @GetMapping
     @PreAuthorize("hasAuthority('specialty_dental:view')")
     public List<ToothResponse> chart(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
@@ -74,6 +75,7 @@ public class DentalController {
         service.removeSupernumerary(tenantId(jwt), patientId, id, staffId(jwt), RequestMeta.clientIp(http));
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("dental_history")
     @GetMapping("/entries/{id}/history")
     @PreAuthorize("hasAuthority('specialty_dental:view')")
     public List<ToothHistoryEntryResponse> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,

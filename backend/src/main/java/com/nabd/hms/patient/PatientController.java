@@ -45,6 +45,7 @@ public class PatientController {
      * Patient Registry — filter: all (default), recent, followup, package, balance, duplicate, archived.
      * REC-040: optional limit (1-200, default 200) and opaque cursor page the matching rows.
      */
+    @com.nabd.hms.shared.phiread.PhiRead(value = "patient_registry_list", key = "id")
     @GetMapping("/registry")
     @PreAuthorize("hasAuthority('patients:view')")
     public PatientRegistryResponse registry(@AuthenticationPrincipal Jwt jwt,
@@ -55,6 +56,7 @@ public class PatientController {
         return service.registry(tenantId(jwt), staffId(jwt), q, filter, limit == null ? null : com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead(value = "patient_list", key = "id")
     @GetMapping
     @PreAuthorize("hasAuthority('patients:view')")
     public PatientPage list(@AuthenticationPrincipal Jwt jwt,
@@ -64,6 +66,7 @@ public class PatientController {
         return service.list(tenantId(jwt), staffId(jwt), q, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("guardian_reviews_list")
     @GetMapping("/guardian-reviews-due")
     @PreAuthorize("hasAuthority('patients:view')")
     public List<GuardianReviewResponse> guardianReviewsDue(@AuthenticationPrincipal Jwt jwt) {
@@ -79,6 +82,7 @@ public class PatientController {
         return ResponseEntity.status(status).body(result);
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead(value = "patient", key = "id")
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('patients:view')")
     public PatientDetailResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {

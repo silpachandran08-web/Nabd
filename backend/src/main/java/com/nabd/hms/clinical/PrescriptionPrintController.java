@@ -21,6 +21,7 @@ public class PrescriptionPrintController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.phiread.PhiRead("prescription_print")
     @GetMapping("/prescriptions/{queueEntryId}/print-header")
     @PreAuthorize("hasAuthority('clinical:view')")
     public PrescriptionPrintHeaderResponse header(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
