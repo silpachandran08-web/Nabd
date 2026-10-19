@@ -30,6 +30,8 @@ class CheckoutDiscountPermissionApiTest extends ApiTestBase {
                 new ModuleGrant("billing", true, true, true, false, false, refundDiscount, false));
         // PHA-010: counter sales need a non-external pharmacy mode
         inTenantTx(tenant.id(), () -> jdbc.update("INSERT INTO pharmacy_settings (tenant_id, mode) VALUES (?, 'hybrid')", tenant.id()));
+        // FIN-003: a role without billing.discount can only bill codes that are in the price list
+        inTenantTx(tenant.id(), () -> jdbc.update("INSERT INTO charge_catalogue (tenant_id, code, name, category, base_amount) VALUES (?, 'X', 'X', 'Service', 100)", tenant.id()));
         return loginAndGetAccessToken(seedStaff(tenant, role, email, phone, false));
     }
 

@@ -11,12 +11,27 @@ import java.util.List;
  * checkpoint (NB-355) — CheckoutService enforces "must be non-empty" itself for the first time a
  * visit is billed, since that rule is conditional and can't be expressed as a bean validation
  * annotation. otcCheckout/sellPackageInvoice (always a brand-new standalone invoice) still get an
- * empty list rejected the same way, via that same service-level check. */
+ * empty list rejected the same way, via that same service-level check.
+ * FIN-003: discounts[] are ledger rows (each needs a reason code). The scalar {@code discount} is the legacy form,
+ * kept so older clients keep working; it is booked as one ledger row with reason code "unspecified". */
 public record CheckoutRequest(
         @NotNull @Valid List<LineItemRequest> lineItems,
-        @DecimalMin(value = "0") BigDecimal discount
+        @DecimalMin(value = "0") BigDecimal discount,
+        @Valid List<DiscountRequest> discounts
 ) {
+    public CheckoutRequest(List<LineItemRequest> lineItems, BigDecimal discount) {
+        this(lineItems, discount, null);
+    }
+
+    public record DiscountRequest(@NotNull String kind, @NotNull @DecimalMin(value = "0.01") BigDecimal value,
+                                  String reasonCode, String note) {
+    }
+
     public BigDecimal discountOrZero() {
         return discount == null ? BigDecimal.ZERO : discount;
+    }
+
+    public List<DiscountRequest> discountsOrEmpty() {
+        return discounts == null ? List.of() : discounts;
     }
 }
