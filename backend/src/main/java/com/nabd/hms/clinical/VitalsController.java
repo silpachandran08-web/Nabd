@@ -30,6 +30,7 @@ public class VitalsController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("vitals")
     @GetMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -39,6 +40,7 @@ public class VitalsController {
         return service.get(scope.tenantId(), queueEntryId);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("vitals_previous")
     @GetMapping("/patient/{patientId}/previous")
     @PreAuthorize("hasAuthority('clinical:view')")

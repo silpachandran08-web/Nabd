@@ -40,6 +40,7 @@ public class PrescriptionController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("prescription")
     @GetMapping("/prescriptions/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -75,6 +76,7 @@ public class PrescriptionController {
         return service.signingAuthority(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("prescription_history")
     @GetMapping("/patients/{patientId}/prescriptions")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -84,6 +86,7 @@ public class PrescriptionController {
         return service.previousForPatient(scope.tenantId(), patientId);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("dose_calculation")
     @GetMapping("/patients/{patientId}/dose-calculator")
     @PreAuthorize("hasAuthority('clinical:view')")

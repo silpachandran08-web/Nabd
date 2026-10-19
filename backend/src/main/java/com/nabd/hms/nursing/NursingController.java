@@ -122,6 +122,7 @@ public class NursingController {
         return vaccineRecordService.record(tenantId(jwt), staffId(jwt), req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @GetMapping("/vaccine-records/today")
     @PreAuthorize("hasAuthority('nursing:view')")
     public List<VaccineRecordResponse> vaccineRecordsToday(@AuthenticationPrincipal Jwt jwt) {

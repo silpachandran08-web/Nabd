@@ -32,6 +32,7 @@ public class PregnancyStatusController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("pregnancy_status")
     @GetMapping("/patients/{patientId}/pregnancy-status")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -48,6 +49,7 @@ public class PregnancyStatusController {
         return service.record(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("pregnancy_status_history")
     @GetMapping("/patients/{patientId}/pregnancy-status/history")
     @PreAuthorize("hasAuthority('clinical:view')")

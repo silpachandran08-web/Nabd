@@ -40,6 +40,7 @@ public class ClinicalDocumentController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("visit_documents")
     @GetMapping("/visits/{queueEntryId}/documents")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -49,6 +50,7 @@ public class ClinicalDocumentController {
         return service.listForVisit(scope.tenantId(), queueEntryId).stream().map(d -> masked(scope, d)).toList();
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("document_prefill")
     @GetMapping("/visits/{queueEntryId}/documents/summary-prefill")
     @PreAuthorize("hasAuthority('clinical:view')")
@@ -67,6 +69,7 @@ public class ClinicalDocumentController {
         return service.create(tenantId(jwt), staffId(jwt), queueEntryId, req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("document")
     @GetMapping("/documents/{id}")
     @PreAuthorize("hasAuthority('clinical:view')")

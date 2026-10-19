@@ -119,6 +119,21 @@ class S11QaIdc001ReadScopeTest extends ApiTestBase {
         return last;
     }
 
+    @Autowired
+    private TimelineController timelineController;
+
+    /** The shipped gated path: the controller method (@PreAuthorize needs an authenticated context on this thread). */
+    private Object shippedTimeline(Jwt jwt, UUID p) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt,
+                        List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("clinical:view"))));
+        try {
+            return timelineController.get(jwt, p, 20, null);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
     private Jwt jwtFor(SeededStaff s) {
         return Jwt.withTokenValue("t").header("alg", "none").subject(s.id().toString())
                 .claim("tenantId", s.tenantId().toString()).issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(600)).build();
@@ -291,7 +306,12 @@ class S11QaIdc001ReadScopeTest extends ApiTestBase {
             timelineService.get(t.id(), p, 20, null);
         });
         double oneTx = timerCount() - c0;
-        System.out.printf("QA3 IDC-001 pool checkouts per timeline read: ungated=%.0f gated=%.0f gated-in-one-tx=%.0f%n", ungated, gated, oneTx);
+
+        c0 = timerCount();
+        shippedTimeline(jwt, p);
+        double shipped = timerCount() - c0;
+        System.out.printf("QA3 IDC-001 pool checkouts per timeline read: ungated=%.0f gated=%.0f gated-in-one-tx=%.0f shipped-controller=%.0f%n", ungated, gated, oneTx, shipped);
+        assertThat(shipped).as("the shipped controller runs caller lookup, gate and read in one transaction").isEqualTo(1);
         assertThat(ungated).isEqualTo(1);
         assertThat(gated).as("resolve() and requirePatient() each open their own transaction").isEqualTo(3);
         assertThat(oneTx).isEqualTo(1);
@@ -339,6 +359,7 @@ class S11QaIdc001ReadScopeTest extends ApiTestBase {
             scopes.requirePatient(s, p);
             return timelineService.get(t.id(), p, 20, null);
         };
+        Callable<Object> shipped = () -> shippedTimeline(jwt, p);
         Callable<Object> gatedOneTx = () -> new TransactionTemplate(txManager).execute(st -> {
             try {
                 return gated.call();
@@ -346,16 +367,17 @@ class S11QaIdc001ReadScopeTest extends ApiTestBase {
                 throw new IllegalStateException(e);
             }
         });
-        parallel(50, 200, gated); // warm-up
+        parallel(50, 200, shipped); // warm-up
         List<Long> deltas = new ArrayList<>(), deltasOneTx = new ArrayList<>();
         StringBuilder rounds = new StringBuilder();
         for (int round = 0; round < 3; round++) {
             long base = p95(parallel(50, 200, ungated));
-            long g = p95(parallel(50, 200, gated));
+            long g = p95(parallel(50, 200, shipped)); // FIX-N: the gate as shipped is now the controller path (one tx)
             long g1 = p95(parallel(50, 200, gatedOneTx));
+            long g0 = p95(parallel(50, 200, gated)); // before the fix: three separate transactions
             deltas.add(g - base);
             deltasOneTx.add(g1 - base);
-            rounds.append(String.format("[ungated=%.1f gated=%.1f oneTx=%.1f]", base / 1e6, g / 1e6, g1 / 1e6));
+            rounds.append(String.format("[ungated=%.1f shipped=%.1f oneTx=%.1f threeTx=%.1f]", base / 1e6, g / 1e6, g1 / 1e6, g0 / 1e6));
         }
         Collections.sort(deltas);
         Collections.sort(deltasOneTx);

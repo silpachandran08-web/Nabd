@@ -25,6 +25,7 @@ public class EncounterListController {
         this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @com.nabd.hms.shared.phiread.PhiRead("encounter_list")
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
