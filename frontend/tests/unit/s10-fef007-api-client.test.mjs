@@ -142,13 +142,13 @@ test("a caller AbortSignal aborts the request and is not retried or reported as 
   assert.equal(e.name, "AbortError"); assert.equal(n, 1);
 });
 
-// Contract: the endpoints the migrated flows call exist in api/openapi.yaml, except the three T-089 gaps.
+// Contract: the endpoints the migrated flows call exist in api/openapi.yaml, except the T-089 gaps (the payments POST was added by FIN-001).
 test("contract: migrated endpoints are in api/openapi.yaml (known gaps listed)", () => {
   const spec = readFileSync(new URL("../../../api/openapi.yaml", import.meta.url), "utf8");
   const has = (p) => spec.split("\n").some((l) => l === `  ${p}:`);
   for (const p of ["/billing/checkout/{queueEntryId}", "/billing/otc-charges", "/billing/otc-checkout", "/queue/check-in", "/patients", "/queue/{id}/status", "/departments/{id}/flow", "/staff/roster", "/queue"]) assert.ok(has(p), p);
   const gaps = ["/billing/checkout/{queueEntryId}/invoice", "/billing/invoices/{id}/payments", "/queue/wait-estimate"].filter((p) => !has(p));
-  assert.equal(gaps.length, 3, "if this fails a gap was closed: drop it from types.ts TODO(T-089)");
+  assert.deepEqual(gaps, ["/billing/checkout/{queueEntryId}/invoice", "/queue/wait-estimate"], "FIN-001 added /billing/invoices/{id}/payments; if this fails a gap was closed: drop it from types.ts TODO(T-089)");
 });
 
 // Acceptance 3: the three flows carry no fetch(, API_BASE or local response types.
