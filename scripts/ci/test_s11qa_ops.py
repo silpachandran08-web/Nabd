@@ -266,7 +266,6 @@ class Ops033Gate(unittest.TestCase):
         steps = json.dumps(wf("ci.yml")["jobs"]["stage2-unit"]["steps"])
         self.assertIn("arch.py summary", steps); self.assertIn("arch.py gate", steps); self.assertIn("architecture-report", steps)
 
-    @unittest.expectedFailure  # QA-5 finding F2 (OPS-033): baseline frozen on E13's branch, stale after the Sprint 11 merge
     def test_ac2_committed_baseline_covers_every_sql_violation_of_the_integrated_tree(self):
         arch = load("scripts/ci/arch.py", "arch_qa")
         base = arch.load_baseline()
