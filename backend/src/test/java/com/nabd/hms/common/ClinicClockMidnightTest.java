@@ -56,4 +56,20 @@ class ClinicClockMidnightTest {
         assertThat(flips).isEqualTo(1);
         assertThat(last).isEqualTo(LocalDate.parse("2026-03-11"));
     }
+
+    // A NULL tenants.timezone uses the region default, the same map as the UI (FEF-011); unknown region or a bad value: UTC
+    @ParameterizedTest
+    @CsvSource(value = {
+            "NULL,          KSA,  Asia/Riyadh",
+            "NULL,          IN,   Asia/Kolkata",
+            "'',            AE,   Asia/Dubai",
+            "NULL,          QA,   Asia/Qatar",
+            "NULL,          NULL, UTC",
+            "NULL,          XX,   UTC",
+            "IST,           IN,   UTC",
+            "Asia/Dubai,    KSA,  Asia/Dubai",
+    }, nullValues = "NULL")
+    void missingTimezoneFallsBackToTheRegionDefault(String tz, String region, String expected) {
+        assertThat(ClinicClock.resolve(tz, region, null)).isEqualTo(ZoneId.of(expected));
+    }
 }
