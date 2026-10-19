@@ -212,18 +212,37 @@ class AuthApiTest extends ApiTestBase {
     // ---- WhatsApp OTP ----
 
     @Test
-    void otpRequestForUnknownMobileOrClinicSaysSo() {
+    void otpRequestForUnknownMobileOrClinicIsASilent202() { // PLT-006 reverses the earlier explicit 404s (no enumeration)
         SeededTenant tenant = seedTenant();
         ResponseEntity<Map> resp = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "+910000000000")), Map.class);
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(resp.getBody().get("detail")).isEqualTo("No active staff member with that mobile number in this clinic.");
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(resp.getBody()).isEqualTo(Map.of("status", "sent_if_eligible", "resendAfterSeconds", 60));
+        drainOutbox();
         assertThat(otpSender.sentTo).doesNotContainKey("+910000000000");
 
         ResponseEntity<Map> noClinic = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", "no-such-clinic", "mobilePhone", "+910000000000")), Map.class);
-        assertThat(noClinic.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(noClinic.getBody().get("type")).asString().endsWith("clinic-not-found");
+        assertThat(noClinic.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(noClinic.getBody()).isEqualTo(resp.getBody());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.nabd.hms.common.OutboxDispatcher dispatcher;
+
+    /** PLT-006: the OTP is generated and sent by an outbox handler, not on the request path. */
+    private String awaitOtp(String mobile) {
+        for (int i = 0; i < 100 && !otpSender.sentTo.containsKey(mobile); i++) {
+            dispatcher.poll();
+            try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
+        return otpSender.sentTo.get(mobile);
+    }
+
+    private void drainOutbox() {
+        for (int i = 0; i < 5; i++) {
+            dispatcher.poll();
+        }
     }
 
     @Test
@@ -237,7 +256,7 @@ class AuthApiTest extends ApiTestBase {
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile)), Void.class);
         assertThat(reqResp.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
 
-        String code = otpSender.sentTo.get(mobile);
+        String code = awaitOtp(mobile);
         assertThat(code).isNotNull();
 
         ResponseEntity<Map> verifyResp = http.postForEntity(url("/v1/auth/otp/verify"), jsonBody(Map.of(
@@ -255,7 +274,7 @@ class AuthApiTest extends ApiTestBase {
         ResponseEntity<Void> req = http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "98123 45671")), Void.class);
         assertThat(req.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-        String code = otpSender.sentTo.get("+919812345671"); // sent to the stored number, not the typed text
+        String code = awaitOtp("+919812345671"); // sent to the stored number, not the typed text
         assertThat(code).isNotNull();
         assertThat(otpSender.sentTo).doesNotContainKey("98123 45671");
 
@@ -264,11 +283,12 @@ class AuthApiTest extends ApiTestBase {
         assertThat(verify.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(verify.getBody()).containsKey("accessToken");
 
-        // an unknown number is refused and nothing is sent
+        // an unknown number gets the same 202 and nothing is sent (PLT-006)
         int before = otpSender.sentTo.size();
         assertThat(http.exchange(url("/v1/auth/otp/request"), HttpMethod.POST,
                 jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", "98000 00000")), Map.class).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isEqualTo(HttpStatus.ACCEPTED);
+        drainOutbox();
         assertThat(otpSender.sentTo).hasSize(before);
     }
 

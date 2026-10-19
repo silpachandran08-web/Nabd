@@ -52,9 +52,10 @@ public class AuthController {
     }
 
     @PostMapping("/otp/request")
-    public ResponseEntity<Void> requestOtp(@Valid @RequestBody OtpRequestRequest req, HttpServletRequest http) {
+    public ResponseEntity<java.util.Map<String, Object>> requestOtp(@Valid @RequestBody OtpRequestRequest req, HttpServletRequest http) {
         authService.requestOtp(req, RequestMeta.clientIp(http));
-        return ResponseEntity.accepted().build(); // 202 when sent; unknown clinic/mobile → 404 (AuthService.requestOtp)
+        // PLT-006: one body for every outcome: sent, limited, unknown clinic or number
+        return ResponseEntity.accepted().body(java.util.Map.of("status", "sent_if_eligible", "resendAfterSeconds", 60));
     }
 
     @PostMapping("/otp/verify")

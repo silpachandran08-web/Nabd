@@ -111,6 +111,9 @@ app:
     rate-limit-per-ip-per-minute: 20
     mfa:
       enforce-privileged: ${MFA_ENFORCE_PRIVILEGED:true}  # PLT-005: false is refused at boot under the prod profile
+    otp:  # PLT-006 (OtpSendLimiter)
+      tenant-hourly-cap: ${OTP_TENANT_HOURLY_CAP:200}   # default when the tenant's plan has no otp_hourly_cap
+      phone-hmac-key: ${OTP_PHONE_HMAC_KEY:}            # base64 pepper from the secret manager; required under prod
   jwt:
     # Documented env var names (APP_JWT_KEYS_* still win via relaxed binding).
     keys-file: ${JWT_KEYS_FILE:}

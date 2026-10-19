@@ -144,7 +144,7 @@ export default function LoginPage() {
         body: JSON.stringify({ tenantSlug, mobilePhone }),
       });
       if (!res.ok) {
-        // Unknown clinic code / mobile (404), rate limit (429), etc. — say why instead of moving on.
+        // PLT-006: unknown clinic/mobile and per-number limits are a silent 202; only a malformed phone (400) or the IP limit (429) lands here.
         const p = await res.json().catch(() => null);
         setFormError(p?.detail || "Couldn't send the code. Try again.");
         return;

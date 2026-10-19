@@ -633,6 +633,12 @@ paths:
         required: true
       responses:
         "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
           description: OK
         default:
           content:
@@ -13110,6 +13116,7 @@ components:
       properties:
         mobilePhone:
           type: string
+          pattern: "^\\+?[0-9](?:[ ()-]?[0-9]){7,14}$"
         tenantSlug:
           type: string
       required:

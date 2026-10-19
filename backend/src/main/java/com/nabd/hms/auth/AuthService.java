@@ -28,6 +28,7 @@ import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.OpaqueTokens;
+import com.nabd.hms.common.PhoneNumbers;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WhatsAppOtpSender;
 import com.nabd.hms.config.AuthProperties;
@@ -47,7 +48,6 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -79,13 +79,17 @@ public class AuthService {
     private final LoginGuard guard;
     private final StepUpVerifier stepUpVerifier;
     private final MfaPolicy mfaPolicy;
-    private final SecureRandom random = new SecureRandom();
+    private final OtpSendLimiter otpLimiter;
+    private final com.nabd.hms.common.EventPublisher events;
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
-                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy) {
+                LoginGuard guard, StepUpVerifier stepUpVerifier, MfaPolicy mfaPolicy, OtpSendLimiter otpLimiter,
+                com.nabd.hms.common.EventPublisher events) {
         this.mfaPolicy = mfaPolicy;
+        this.otpLimiter = otpLimiter;
+        this.events = events;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -178,35 +182,27 @@ public class AuthService {
         return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
     }
 
-    /** No enumeration: silently no-ops for an unknown tenant/mobile, but still returns as if sent. */
+    /** PLT-006: no enumeration and no message pumping (see OtpSendLimiter). */
     @Transactional(noRollbackFor = ApiException.class)
     public void requestOtp(OtpRequestRequest req, String ip) {
         enforceIpRateLimit(ip);
-
+        // PLT-006: same 202 for every outcome (unknown clinic or number, limited, sent). The per-number and per-tenant
+        // limits are counted whether or not the number exists, and the code is generated and sent by the outbox
+        // handler (OtpOutboxHandlers.Send), so neither the response nor its timing shows which numbers are registered.
         Tenant tenant = repo.findTenantBySlug(req.tenantSlug())
                 .filter(t -> !"offboarded".equals(t.status()) && !"suspended".equals(t.status()))
                 .orElse(null);
-        // ponytail: explicit "not found" errors were asked for so staff know why no OTP came. This
-        // lets anyone probe which clinic codes / mobiles exist (only the per-IP rate limit slows it);
-        // switch both back to a silent return + 202 to restore no-enumeration.
         if (tenant == null) {
-            log.info("OTP requested for unknown/inactive tenant slug from {}", ip);
-            throw new ApiException(HttpStatus.NOT_FOUND, "clinic-not-found", "Clinic not found",
-                    "No clinic with that clinic code. Check the code and try again.");
+            return;
         }
         tenantContext.set(tenant.id());
-
-        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
-        if (staff == null || !"active".equals(staff.status())) {
-            log.info("OTP requested for a mobile with no active staff in tenant {} from {}", tenant.id(), ip);
-            throw new ApiException(HttpStatus.NOT_FOUND, "mobile-not-found", "Mobile number not found",
-                    "No active staff member with that mobile number in this clinic.");
+        if (otpLimiter.tryConsume(tenant.id(), PhoneNumbers.digits(req.mobilePhone(), tenant.region())) != OtpSendLimiter.Decision.SEND) {
+            return;
         }
-
-        String code = generateOtpCode();
-        repo.setWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(code), Instant.now().plus(5, ChronoUnit.MINUTES));
-        otpSender.send(staff.mobilePhone(), code); // the number on file, not whatever format was typed
-        log.info("WhatsApp OTP issued to staff {} (tenant {})", staff.id(), tenant.id());
+        Staff staff = repo.findStaffByMobile(tenant.id(), tenant.region(), req.mobilePhone()).orElse(null);
+        if (staff != null && "active".equals(staff.status())) {
+            events.publish(tenant.id(), OtpOutboxHandlers.SEND_EVENT, java.util.Map.of("staffId", staff.id().toString()));
+        }
     }
 
     // noRollbackFor: recordLoginAttempt()/markMobileVerified() must survive the ApiException thrown
@@ -244,10 +240,6 @@ public class AuthService {
             return issueMfaChallenge(staff);
         }
         return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
-    }
-
-    private String generateOtpCode() {
-        return String.format("%06d", random.nextInt(1_000_000));
     }
 
     @Transactional(noRollbackFor = ApiException.class) // the failed-attempt row must survive the 401

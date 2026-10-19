@@ -116,9 +116,24 @@ paths:
               required: [tenantSlug, mobilePhone]
               properties:
                 tenantSlug: { type: string }
-                mobilePhone: { type: string }
+                mobilePhone: { type: string, pattern: "^\\+?[0-9](?:[ ()-]?[0-9]){7,14}$", description: "8-15 digits; local formats take the clinic's country code" }
       responses:
-        "202": { description: "Always 202 regardless of whether the tenant/mobile is known — no enumeration" }
+        "202":
+          description: >
+            PLT-006: the same body for every outcome (sent, limited, unknown clinic or number). Limits per number
+            (HMAC of the normalised number): 3 sends per 15 min, 10 per 24 h, 60 s between sends; per tenant: the
+            plan's otp_hourly_cap, else 200 per hour (hitting it publishes iam.otp_abuse.detected.v1). The code is
+            generated and sent by the outbox (iam.otp.send.v1), so latency does not depend on the number existing.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [sent_if_eligible] }
+                  resendAfterSeconds: { type: integer, example: 60 }
+        "400":
+          description: VALIDATION - malformed phone only
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /auth/otp/verify:
     post:
