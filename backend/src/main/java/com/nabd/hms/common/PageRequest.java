@@ -15,13 +15,15 @@ public final class PageRequest {
     }
 
     public static int limit(Integer raw) {
-        if (raw == null) {
-            return DEFAULT;
-        }
-        if (raw < 1 || raw > MAX) {
-            String msg = "must be between 1 and " + MAX;
+        return raw == null ? DEFAULT : limit(raw, MAX);
+    }
+
+    /** Same rule with an endpoint-specific ceiling (OPS-008: the registry pages up to 200). */
+    public static int limit(int raw, int max) {
+        if (raw < 1 || raw > max) {
+            String msg = "must be between 1 and " + max;
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Validation failed", "limit: " + msg,
-                    Map.of("errors", List.of(Map.of("field", "limit", "message", msg))));
+                    Map.of("errors", List.of(Map.of("field", "limit", "message", msg)), "code", "INVALID_LIMIT"));
         }
         return raw;
     }

@@ -1,8 +1,10 @@
 package com.nabd.hms.patient;
 
 import com.nabd.hms.common.ModuleGrant;
+import com.nabd.hms.patient.registry.RegistryReconciler;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,6 +19,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PatientApiTest extends ApiTestBase {
+
+    @Autowired RegistryReconciler reconciler;
 
     @Test
     void registerAdultPatientSucceeds() {
@@ -278,6 +282,7 @@ class PatientApiTest extends ApiTestBase {
                 "patientId", patientId, "doctorId", doc.id().toString())), Map.class);
 
         Map<String, Object> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody();
+        reconciler.reconcileTenant(tenant.id()); // OPS-008: registry reads the summary read model
         Map<String, Object> registryRow = ((List<Map<String, Object>>) exchange("/v1/patients/registry", HttpMethod.GET,
                 authed(token), Map.class).getBody().get("rows")).stream()
                 .filter(r -> patientId.equals(r.get("id"))).findFirst().orElseThrow();

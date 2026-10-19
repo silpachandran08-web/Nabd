@@ -167,49 +167,133 @@ class PatientRepository {
     record RegistryRow(UUID id, String mrn, String name, String phone, LocalDate dob, String gender, String status,
                        LocalDate lastVisit, Instant nextStart, String nextDoctorName, UUID nextDoctorId, UUID nextAppointmentId,
                        int packageUsed, int packageTotal, String condition, boolean followUpDue, String allergy,
-                       boolean balanceDue, boolean duplicate, Integer queueToken, String queueStatus) {
+                       boolean balanceDue, boolean duplicate, Integer queueToken, String queueStatus, String nameSearch) {
+    }
+
+    record RegistryCounts(java.util.Map<String, Integer> counts, int matched) {
+    }
+
+    /** A registry search: lower-cased text, its digits, and today's token it may name ("T-12" / "12"). */
+    record RegistrySearch(String needle, String digits, Integer token) {
+        static RegistrySearch of(String q) {
+            String needle = q == null ? "" : q.strip().toLowerCase();
+            if (needle.isEmpty()) return null;
+            String t = needle.startsWith("t-") ? needle.substring(2) : needle;
+            String digits = needle.replaceAll("\\D", "");
+            return new RegistrySearch(needle, digits.length() >= 3 ? digits : null, t.matches("[1-9]\\d{0,8}") ? Integer.valueOf(t) : null); // as typed: "007" is not token 7
+        }
+    }
+
+    private static final int RECENT_VISIT_DAYS = 90;
+
+    /**
+     * OPS-008: one registry filter as SQL over patient_registry_summary (alias s). "all" excludes archived records.
+     * The date is LocalDate.toString() (trusted ISO text, never request input), so it is inlined.
+     */
+    static String registryFilterSql(String filter, LocalDate today) {
+        String d = "DATE '" + today + "'";
+        return switch (filter) {
+            case "recent" -> "NOT s.archived AND s.last_visit_date >= " + d + " - " + RECENT_VISIT_DAYS;
+            case "followup" -> "NOT s.archived AND s.followup_due <= " + d;
+            case "package" -> "NOT s.archived AND s.pkg_total > 0";
+            case "balance" -> "s.balance_due > 0";
+            case "duplicate" -> "s.duplicate_flag";
+            case "archived" -> "s.archived";
+            default -> "NOT s.archived";
+        };
+    }
+
+    /** Name or MRN contains the text, the mobile's last 10 digits contain 3+ typed digits, or today's open token. */
+    private static String registrySearchSql(UUID tenantId, RegistrySearch q, LocalDate today, List<Object> args) {
+        String like = "%" + q.needle().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        StringBuilder sql = new StringBuilder("(s.name_search LIKE ? OR lower(s.mrn) LIKE ?");
+        args.add(like);
+        args.add(like);
+        if (q.digits() != null) {
+            String d = q.digits().length() > 10 ? q.digits().substring(q.digits().length() - 10) : q.digits();
+            sql.append(" OR s.phone_last10 LIKE ?");
+            args.add("%" + d + "%");
+        }
+        if (q.token() != null) {
+            // uncorrelated: one index probe for today's token, not one per summary row
+            sql.append(" OR s.patient_id IN (SELECT tq.patient_id FROM queue_entries tq WHERE tq.tenant_id = ?"
+                    + " AND tq.queue_date = ? AND tq.status NOT IN ('completed', 'no_show') AND tq.token_number = ?)");
+            args.add(tenantId);
+            args.add(java.sql.Date.valueOf(today));
+            args.add(q.token());
+        }
+        return sql.append(")").toString();
+    }
+
+    /** Summary rows joined to their patient, through the same consent and doctor-scope gates as every patient read. */
+    private static final String REGISTRY_FROM = """
+            FROM patient_registry_summary s JOIN patients ON patients.tenant_id = s.tenant_id AND patients.id = s.patient_id
+            WHERE s.tenant_id = ?
+            """ + CONSENT_GATE + SCOPE_GATE;
+
+    /** OPS-008: every filter's count (ignoring q) and matchedTotal (filter + q) in one pass over the tenant's summary rows. */
+    RegistryCounts registryCounts(UUID tenantId, UUID scopedToDoctorId, List<String> filters, String filter, RegistrySearch q, LocalDate today) {
+        jdbc.execute("SET LOCAL jit = off"); // a JIT compile costs more than this whole-tenant scan; this is an OLTP read
+        List<Object> args = new java.util.ArrayList<>();
+        StringBuilder sql = new StringBuilder("SELECT ");
+        for (String f : filters) {
+            sql.append("count(*) FILTER (WHERE ").append(registryFilterSql(f, today)).append("), ");
+        }
+        sql.append("count(*) FILTER (WHERE ").append(registryFilterSql(filter, today));
+        if (q != null) sql.append(" AND ").append(registrySearchSql(tenantId, q, today, args));
+        sql.append(") ").append(REGISTRY_FROM);
+        args.add(tenantId);
+        args.add(scopedToDoctorId);
+        args.add(scopedToDoctorId);
+        return jdbc.queryForObject(sql.toString(), (rs, i) -> {
+            java.util.Map<String, Integer> counts = new java.util.LinkedHashMap<>();
+            for (int k = 0; k < filters.size(); k++) counts.put(filters.get(k), rs.getInt(k + 1));
+            return new RegistryCounts(counts, rs.getInt(filters.size() + 1));
+        }, args.toArray());
     }
 
     /**
-     * Everything the Patient Registry shows per patient, in one pass, through the same consent and
-     * doctor-scope gates as every other patient read. Duplicate review reuses registration's own
-     * rule (findDuplicateCandidates: same phone, or same DOB + similar name) but skips guardian /
-     * sibling links, since a family legitimately shares one number (NB-080).
+     * OPS-008: one keyset page of the Patient Registry, filtered and searched in SQL over patient_registry_summary
+     * and ordered by (name_search, patient_id), so a page boundary never repeats or skips a row when patients are
+     * added between requests. Only the page's rows get the live per-row extras (today's token, next booking, condition).
      */
-    List<RegistryRow> registry(UUID tenantId, UUID scopedToDoctorId, LocalDate today, Instant todayStart, int cap) {
+    List<RegistryRow> registryPage(UUID tenantId, UUID scopedToDoctorId, String filter, RegistrySearch q, LocalDate today,
+                                   Instant todayStart, String afterName, UUID afterId, int limit) {
+        List<Object> args = new java.util.ArrayList<>();
+        StringBuilder where = new StringBuilder(" AND ").append(registryFilterSql(filter, today));
+        if (q != null) where.append(" AND ").append(registrySearchSql(tenantId, q, today, args));
+        if (afterId != null) {
+            // (name_search, patient_id) > (?, ?) spelled out: the >= is an index range on idx_registry_summary_name, a row
+            // constructor is not (record_gt is not leakproof, so under RLS it stays a filter)
+            where.append(" AND s.name_search >= ? AND (s.name_search > ? OR s.patient_id > ?)");
+            args.addAll(List.of(afterName, afterName, afterId));
+        }
+        // shortcut: planner hint. Under RLS the planner misprices the gated patients join and sorts the whole tenant
+        // (30-45 ms at 10k, 250 ms at 20k on a busy box) instead of walking idx_registry_summary_name and stopping at
+        // the limit (< 1 ms). Transaction-local, read-only request; revisit if a Postgres upgrade fixes the estimate.
+        jdbc.execute("SET LOCAL enable_sort = off");
+        List<Object> all = new java.util.ArrayList<>(java.util.Arrays.asList(java.sql.Date.valueOf(today), tenantId, scopedToDoctorId, scopedToDoctorId)); // scope may be null
+        all.addAll(args);
+        all.addAll(List.of(limit, java.sql.Timestamp.from(todayStart), java.sql.Date.valueOf(today)));
         return jdbc.query("""
-                SELECT patients.id, patients.mrn, patients.name, patients.phone, patients.dob, patients.gender, patients.status,
-                       """ + LAST_VISIT_SQL + """
-                        AS last_visit,
-                       na.start_time AS next_start, na.doctor_name AS next_doctor, na.doctor_id AS next_doctor_id, na.id AS next_appt_id,
-                       pk.used AS pkg_used, pk.total AS pkg_total,
-                       (SELECT c.condition FROM chronic_conditions c WHERE c.tenant_id = patients.tenant_id AND c.patient_id = patients.id AND c.status = 'active'
+                SELECT pg.*, na.start_time AS next_start, na.doctor_name AS next_doctor, na.doctor_id AS next_doctor_id, na.id AS next_appt_id,
+                       (SELECT c.condition FROM chronic_conditions c WHERE c.tenant_id = pg.tenant_id AND c.patient_id = pg.id AND c.status = 'active'
                         ORDER BY c.recorded_at LIMIT 1) AS condition,
-                       EXISTS (SELECT 1 FROM chronic_conditions c WHERE c.tenant_id = patients.tenant_id AND c.patient_id = patients.id AND c.status = 'active'
-                               AND c.review_due_date <= ?) AS followup_due,
-                       (SELECT a.substance FROM patient_allergies a WHERE a.tenant_id = patients.tenant_id AND a.patient_id = patients.id AND a.active
-                        ORDER BY CASE a.severity WHEN 'severe' THEN 0 WHEN 'moderate' THEN 1 ELSE 2 END, a.recorded_at LIMIT 1) AS allergy,
-                       EXISTS (SELECT 1 FROM invoices i WHERE i.tenant_id = patients.tenant_id AND i.patient_id = patients.id AND i.status IN ('unpaid', 'partial')) AS balance_due,
-                       (patients.status = 'active' AND EXISTS (
-                          SELECT 1 FROM patients d WHERE d.tenant_id = patients.tenant_id AND d.id <> patients.id AND d.status = 'active'
-                            AND ((regexp_replace(d.phone, '\\D', '', 'g') = regexp_replace(patients.phone, '\\D', '', 'g')
-                                  AND NOT (d.guardian_id IS NOT DISTINCT FROM patients.id OR patients.guardian_id IS NOT DISTINCT FROM d.id
-                                           OR (d.guardian_id IS NOT NULL AND d.guardian_id = patients.guardian_id)))
-                                 OR (d.dob = patients.dob AND similarity(d.name, patients.name) > 0.3)))) AS duplicate,
                        tq.token_number AS queue_token, tq.status AS queue_status
-                FROM patients
-                LEFT JOIN LATERAL (SELECT a.id, a.start_time, a.doctor_id, s.name AS doctor_name
-                                   FROM appointments a JOIN staff s ON s.id = a.doctor_id
-                                   WHERE a.tenant_id = patients.tenant_id AND a.patient_id = patients.id AND a.status = 'scheduled' AND a.start_time >= ?
+                FROM (SELECT patients.tenant_id, patients.id, patients.mrn, patients.name, patients.phone, patients.dob, patients.gender,
+                             patients.status, s.name_search, s.last_visit_date AS last_visit, s.pkg_used, s.pkg_total, s.top_allergy AS allergy,
+                             COALESCE(s.followup_due <= ?, false) AS followup_due, s.balance_due > 0 AS balance_due, s.duplicate_flag AS duplicate
+                      """ + REGISTRY_FROM + where + """
+                       ORDER BY s.name_search, s.patient_id LIMIT ?) pg
+                LEFT JOIN LATERAL (SELECT a.id, a.start_time, a.doctor_id, st.name AS doctor_name
+                                   FROM appointments a JOIN staff st ON st.id = a.doctor_id
+                                   WHERE a.tenant_id = pg.tenant_id AND a.patient_id = pg.id AND a.status = 'scheduled' AND a.start_time >= ?
                                    ORDER BY a.start_time LIMIT 1) na ON true
-                LEFT JOIN LATERAL (SELECT COALESCE(SUM(ii.quantity_consumed), 0) AS used, COALESCE(SUM(ii.quantity_total), 0) AS total
-                                   FROM package_instances pi JOIN package_instance_items ii ON ii.instance_id = pi.id
-                                   WHERE pi.tenant_id = patients.tenant_id AND pi.patient_id = patients.id AND pi.status = 'active') pk ON true
                 LEFT JOIN LATERAL (SELECT q.token_number, q.status FROM queue_entries q
-                                   WHERE q.tenant_id = patients.tenant_id AND q.patient_id = patients.id AND q.queue_date = ? AND q.status NOT IN ('completed', 'no_show')
+                                   WHERE q.tenant_id = pg.tenant_id AND q.patient_id = pg.id AND q.queue_date = ? AND q.status NOT IN ('completed', 'no_show')
                                    ORDER BY q.created_at DESC LIMIT 1) tq ON true
-                WHERE patients.tenant_id = ?
-                """ + CONSENT_GATE + SCOPE_GATE + "ORDER BY patients.name, patients.id LIMIT ?", // id: stable order for REC-040 paging
+                ORDER BY pg.name_search, pg.id
+                """,
                 (rs, i) -> new RegistryRow(rs.getObject("id", UUID.class), rs.getString("mrn"), rs.getString("name"),
                         rs.getString("phone"), rs.getDate("dob").toLocalDate(), rs.getString("gender"), rs.getString("status"),
                         rs.getDate("last_visit") == null ? null : rs.getDate("last_visit").toLocalDate(),
@@ -217,9 +301,8 @@ class PatientRepository {
                         rs.getString("next_doctor"), rs.getObject("next_doctor_id", UUID.class), rs.getObject("next_appt_id", UUID.class),
                         rs.getInt("pkg_used"), rs.getInt("pkg_total"), rs.getString("condition"), rs.getBoolean("followup_due"),
                         rs.getString("allergy"), rs.getBoolean("balance_due"), rs.getBoolean("duplicate"),
-                        (Integer) rs.getObject("queue_token"), rs.getString("queue_status")),
-                java.sql.Date.valueOf(today), java.sql.Timestamp.from(todayStart), java.sql.Date.valueOf(today),
-                tenantId, scopedToDoctorId, scopedToDoctorId, cap);
+                        (Integer) rs.getObject("queue_token"), rs.getString("queue_status"), rs.getString("name_search")),
+                all.toArray());
     }
 
     /** Free-text search: phone/MRN prefix, name by substring OR trigram fuzzy match (typo-tolerant). */

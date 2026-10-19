@@ -1,6 +1,7 @@
 package com.nabd.hms.patient;
 
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.patient.registry.RegistryReconciler;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ class Ops004LastVisitTest extends ApiTestBase {
     private static final Instant STAMP = Instant.parse("2026-10-01T09:00:00Z"); // stands in for the V43 migration time
 
     @Autowired AuditService auditService;
+    @Autowired RegistryReconciler reconciler;
 
     private String register(String token, String name, String phone) {
         var resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of("name", name, "phone", phone, "dob", "1990-01-01", "gender", "female")), Map.class);
@@ -57,6 +59,7 @@ class Ops004LastVisitTest extends ApiTestBase {
         assertThat(detail).containsEntry("lastVisit", "2026-03-02");
         assertThat((String) detail.get("lastVisitAt")).startsWith("2026-03-02");
         Map<String, Map<String, Object>> byId = new java.util.HashMap<>();
+        reconciler.reconcileTenant(t.id()); // OPS-008: registry reads the summary read model
         ((List<Map<String, Object>>) exchange("/v1/patients/registry", HttpMethod.GET, authed(token), Map.class).getBody().get("rows"))
                 .forEach(r -> byId.put((String) r.get("id"), r));
         assertThat(byId.get(returning)).containsEntry("lastVisit", "2026-03-02");

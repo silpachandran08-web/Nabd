@@ -19,14 +19,26 @@ class RegistrySummaryRepository {
      * writes when a field differs, so replaying a change is a no-op and change_seq moves only on a real change.
      */
     private static final String UPSERT = """
-            WITH dup AS (
+            WITH ph AS MATERIALIZED (
+                -- OPS-008: each active patient's phone digits, computed once per batch. Joining on regexp_replace(phone)
+                -- directly cannot hash-join under FORCE RLS (non-leakproof expression): as nabd_app it became a nested
+                -- loop (500 x 10k regexp calls, > 5 s statement_timeout), so the projector never drained a 10k tenant.
+                SELECT id, guardian_id, name, regexp_replace(phone, '\\D', '', 'g') AS digits
+                FROM patients WHERE tenant_id = ? AND status = 'active'),
+            batch AS MATERIALIZED (
+                -- the batch's own rows by primary key: the id list is an index condition, read once (on a CTE scan the
+                -- text-to-uuid[] cast ran per tenant row, ~5M uuid parses per 500-row batch)
+                SELECT id, guardian_id, name, regexp_replace(phone, '\\D', '', 'g') AS digits
+                FROM patients WHERE tenant_id = ? AND id = ANY (?::uuid[]) AND status = 'active'),
+            dup AS (
                 -- registration's duplicate rule (phone digits equal, or same DOB + similar name), minus guardian/sibling
-                -- links. Two hash joins instead of a per-row EXISTS, so a batch costs one scan of the tenant's patients.
-                SELECT p.id FROM patients p JOIN patients d ON d.tenant_id = p.tenant_id AND d.id <> p.id AND d.status = 'active'
-                   AND regexp_replace(d.phone, '\\D', '', 'g') = regexp_replace(p.phone, '\\D', '', 'g')
+                -- links, plus OPS-008: same last 10 phone digits (other country-code/trunk format) with a similar name
+                -- (pg_trgm normalises case and punctuation). The nightly RegistryReconciler pass is the duplicate-candidate
+                -- job: it also flags the earlier partner, whose own row nothing re-projects when a look-alike registers.
+                SELECT p.id FROM batch p JOIN ph d ON right(d.digits, 10) = right(p.digits, 10) AND d.id <> p.id
+                   AND (d.digits = p.digits OR similarity(d.name, p.name) > 0.3)
                    AND NOT (d.guardian_id IS NOT DISTINCT FROM p.id OR p.guardian_id IS NOT DISTINCT FROM d.id
                             OR (d.guardian_id IS NOT NULL AND d.guardian_id = p.guardian_id))
-                WHERE p.tenant_id = ? AND p.id = ANY (?::uuid[]) AND p.status = 'active'
                 UNION
                 SELECT p.id FROM patients p JOIN patients d ON d.tenant_id = p.tenant_id AND d.id <> p.id AND d.status = 'active'
                    AND d.dob = p.dob AND similarity(d.name, p.name) > 0.3
@@ -82,7 +94,7 @@ class RegistrySummaryRepository {
             return List.of();
         }
         String ids = "{" + String.join(",", patientIds.stream().map(UUID::toString).toList()) + "}";
-        return jdbc.query(UPSERT, (rs, i) -> new Changed(rs.getObject(1, UUID.class), rs.getLong(2)), tenantId, ids, tenantId, ids, tenantId, ids);
+        return jdbc.query(UPSERT, (rs, i) -> new Changed(rs.getObject(1, UUID.class), rs.getLong(2)), tenantId, tenantId, ids, tenantId, ids, tenantId, ids);
     }
 
     /** Takes up to {@code limit} dirty patients off the queue (rows another projector holds are skipped). */
