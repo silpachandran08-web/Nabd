@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 import static com.nabd.hms.clinical.EncounterListModels.EncounterListPage;
 
@@ -19,9 +18,11 @@ import static com.nabd.hms.clinical.EncounterListModels.EncounterListPage;
 public class EncounterListController {
 
     private final EncounterListService service;
+    private final ClinicalReadScope scopes;
 
-    EncounterListController(EncounterListService service) {
+    EncounterListController(EncounterListService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
     @com.nabd.hms.shared.phiread.PhiRead("encounter_list")
@@ -33,7 +34,7 @@ public class EncounterListController {
                                   @RequestParam(required = false) LocalDate to,
                                   @RequestParam(required = false) Integer limit,
                                   @RequestParam(required = false) String cursor) {
-        return service.list(UUID.fromString(jwt.getClaimAsString("tenantId")), UUID.fromString(jwt.getSubject()),
-                state, from, to, com.nabd.hms.common.PageRequest.limit(limit), cursor);
+        // Selects no diagnosis or other clinical free text, so there is nothing for FieldGrantMasker to drop.
+        return service.list(scopes.resolve(jwt), state, from, to, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 }

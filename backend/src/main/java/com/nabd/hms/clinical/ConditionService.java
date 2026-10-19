@@ -56,9 +56,10 @@ public class ConditionService {
     }
 
     @Transactional
-    public List<DueConditionResponse> due(UUID tenantId) {
+    public List<DueConditionResponse> due(ReadScope scope) {
+        UUID tenantId = scope.tenantId();
         tenantContext.set(tenantId);
-        return repo.findDue(tenantId, clock.today(tenantId)).stream()
+        return repo.findDue(scope, clock.today(tenantId)).stream()
                 .map(d -> new DueConditionResponse(d.id(), d.patientId(), d.patientName(), d.condition(), d.reviewDueDate()))
                 .toList();
     }

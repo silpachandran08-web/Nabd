@@ -1,5 +1,8 @@
 package com.nabd.hms.clinical.documents;
 
+import com.nabd.hms.clinical.ClinicalReadScope;
+import com.nabd.hms.clinical.FieldGrantMasker;
+import com.nabd.hms.clinical.ReadScope;
 import com.nabd.hms.clinical.PrescriptionService;
 import com.nabd.hms.common.RequestMeta;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,23 +33,30 @@ import static com.nabd.hms.clinical.documents.ClinicalDocumentModels.UpdateReque
 public class ClinicalDocumentController {
 
     private final ClinicalDocumentService service;
+    private final ClinicalReadScope scopes;
 
-    ClinicalDocumentController(ClinicalDocumentService service) {
+    ClinicalDocumentController(ClinicalDocumentService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
     @com.nabd.hms.shared.phiread.PhiRead("visit_documents")
     @GetMapping("/visits/{queueEntryId}/documents")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<DocumentResponse> listForVisit(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.listForVisit(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return service.listForVisit(scope.tenantId(), queueEntryId).stream().map(d -> masked(scope, d)).toList();
     }
 
     @com.nabd.hms.shared.phiread.PhiRead("document_prefill")
     @GetMapping("/visits/{queueEntryId}/documents/summary-prefill")
     @PreAuthorize("hasAuthority('clinical:view')")
     public SummaryPrefillResponse summaryPrefill(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.summaryPrefill(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        SummaryPrefillResponse r = service.summaryPrefill(scope.tenantId(), queueEntryId);
+        return new SummaryPrefillResponse(r.noteSigned(), r.prescriptionSigned(), FieldGrantMasker.body(scope, r.body()));
     }
 
     @PostMapping("/visits/{queueEntryId}/documents")
@@ -61,7 +71,9 @@ public class ClinicalDocumentController {
     @GetMapping("/documents/{id}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public DocumentResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.get(tenantId(jwt), id);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireDocument(scope, id);
+        return masked(scope, service.get(scope.tenantId(), id));
     }
 
     @PatchMapping("/documents/{id}")
@@ -79,6 +91,11 @@ public class ClinicalDocumentController {
     private static boolean canApprove(Jwt jwt) {
         List<String> permissions = jwt.getClaimAsStringList("permissions");
         return permissions != null && permissions.contains(PrescriptionService.PERMISSION_CLINICAL_APPROVE);
+    }
+
+    private static DocumentResponse masked(ReadScope scope, DocumentResponse d) {
+        return new DocumentResponse(d.id(), d.patientId(), d.queueEntryId(), d.doctorId(), d.type(), d.status(),
+                FieldGrantMasker.body(scope, d.body()), d.header(), d.issuedBy(), d.issuedAt(), d.createdAt(), d.updatedAt());
     }
 
     private UUID tenantId(Jwt jwt) {

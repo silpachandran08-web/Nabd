@@ -17,9 +17,11 @@ import java.util.UUID;
 public class TimelineController {
 
     private final TimelineService service;
+    private final ClinicalReadScope scopes;
 
-    TimelineController(TimelineService service) {
+    TimelineController(TimelineService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
     @com.nabd.hms.shared.phiread.PhiRead("timeline")
@@ -27,6 +29,8 @@ public class TimelineController {
     @PreAuthorize("hasAuthority('clinical:view')")
     public EncounterPage get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
                               @RequestParam(required = false) Integer limit, @RequestParam(required = false) String cursor) {
-        return service.get(UUID.fromString(jwt.getClaimAsString("tenantId")), patientId, com.nabd.hms.common.PageRequest.limit(limit), cursor);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return FieldGrantMasker.timeline(scope, service.get(scope.tenantId(), patientId, com.nabd.hms.common.PageRequest.limit(limit), cursor));
     }
 }

@@ -33,16 +33,20 @@ import java.util.UUID;
 public class PrescriptionController {
 
     private final PrescriptionService service;
+    private final ClinicalReadScope scopes;
 
-    PrescriptionController(PrescriptionService service) {
+    PrescriptionController(PrescriptionService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
     @com.nabd.hms.shared.phiread.PhiRead("prescription")
     @GetMapping("/prescriptions/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public PrescriptionResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.get(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return service.get(scope.tenantId(), queueEntryId);
     }
 
     @PatchMapping("/prescriptions/{queueEntryId}")
@@ -63,7 +67,9 @@ public class PrescriptionController {
     @GetMapping("/patients/{patientId}/prescriptions")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<PrescriptionResponse> previousForPatient(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.previousForPatient(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.previousForPatient(scope.tenantId(), patientId);
     }
 
     @com.nabd.hms.shared.phiread.PhiRead("dose_calculation")
@@ -71,11 +77,14 @@ public class PrescriptionController {
     @PreAuthorize("hasAuthority('clinical:view')")
     public DoseCalculationResponse calculateDose(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
                                                   @RequestParam BigDecimal mgPerKg) {
-        return service.calculateDose(tenantId(jwt), patientId, mgPerKg);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.calculateDose(scope.tenantId(), patientId, mgPerKg);
     }
 
     /** DOC-033: drug type-ahead from the tenant's own pharmacy item master and prescribing history (names only). */
     @GetMapping("/drugs/search")
+    @ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view') or hasAuthority('clinical:edit')")
     public List<DrugSuggestionResponse> searchDrugs(@AuthenticationPrincipal Jwt jwt, @RequestParam String q,
                                                      @RequestParam(defaultValue = "8") int limit) {
@@ -90,6 +99,7 @@ public class PrescriptionController {
     }
 
     @GetMapping("/rx-sets")
+    @ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<FavouriteRxSetResponse> listSets(@AuthenticationPrincipal Jwt jwt) {
         return service.listSets(tenantId(jwt), staffId(jwt), canApprove(jwt));

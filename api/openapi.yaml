@@ -1771,6 +1771,7 @@ paths:
         filters on the clinical note (none = no note yet, draft, signed, unsigned = none or draft).
         `from`/`to` filter on the clinic calendar day of the visit. Outputs are derived from the note,
         prescription and clinical documents tables; no clinical free text is returned.
+        IDC-001: patients with withdrawn data_processing consent are excluded in the SQL; an unverified caller gets 403 verification-required.
       x-required-permission: clinical:view
       parameters:
         - { name: state, in: query, required: false, schema: { type: string, enum: [none, draft, signed, unsigned] } }
@@ -1807,6 +1808,7 @@ paths:
                         documentsIssued: { type: integer }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "verification-required (caller email or mobile not verified) or missing permission (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/follow-ups:
     get:
@@ -1844,6 +1846,66 @@ paths:
                         cancelReason: { type: string, nullable: true, description: "QA-06: set only when cancelled" }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /clinical/patients/{patientId}/timeline:
+    get:
+      tags: [Clinical]
+      summary: "Completed visits of a patient, newest first, 5-year window (NB-115). IDC-001: consent, verification and own-patients gated"
+      description: >
+        Gated in SQL by ClinicalReadScope (withdrawn data_processing consent, own_patients_only via appointments OR queue
+        entries). staff.field_grants without `diagnosis` return diagnosis: null on every item.
+      x-required-permission: clinical:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 25, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        queueEntryId: { type: string, format: uuid }
+                        occurredAt: { type: string, format: date-time }
+                        doctorId: { type: string, format: uuid }
+                        diagnosis: { type: [string, "null"], description: "null when field_grants exclude diagnosis" }
+                        assessment: { type: [string, "null"] }
+                        medications: { type: [string, "null"] }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
+  /clinical/notes/{queueEntryId}:
+    get:
+      tags: [Clinical]
+      summary: "SOAP note of a visit (NB-103). IDC-001: gated through queue_entries.patient_id; diagnosis null when field_grants exclude it"
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  queueEntryId: { type: string, format: uuid }
+                  patientId: { type: string, format: uuid }
+                  doctorId: { type: string, format: uuid }
+                  subjective: { type: [string, "null"] }
+                  objective: { type: [string, "null"] }
+                  assessment: { type: [string, "null"] }
+                  plan: { type: [string, "null"] }
+                  diagnosis: { type: [string, "null"] }
+                  status: { type: string, enum: [draft, signed] }
+                  signedAt: { type: [string, "null"], format: date-time }
+                  updatedAt: { type: string, format: date-time }
+        "404": { description: "patient-not-found (gated, see PatientNotFound) or not-found (no note yet for a visible visit)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/patients/{patientId}/allergies:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1853,6 +1915,7 @@ paths:
       parameters: [{ name: includeInactive, in: query, required: false, schema: { type: boolean, default: false } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Allergy" } } } } }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
     post:
       tags: [Clinical]
       summary: Add an allergy (fast add). Severity is mandatory; audited.
@@ -1895,6 +1958,7 @@ paths:
       parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AllergyEvent" } } } } }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
   /clinical/patients/{patientId}/allergies/status:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1903,6 +1967,7 @@ paths:
       x-required-permission: clinical:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AllergyStatus" } } } }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
     put:
       tags: [Clinical]
       summary: Document "no known allergies" (who and when are stamped by the server; audited)
@@ -1917,7 +1982,7 @@ paths:
       x-required-permission: clinical:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PregnancyStatus" } } } }
-        "404": { description: Patient not found }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
     put:
       tags: [Clinical]
       summary: Record an explicit status (who and when are stamped by the server; appended to the history and audited). Never set automatically. A recorded pregnant or lactating status escalates the prescription pregnancy warning (severity severe, a fresh decision is required); other statuses leave the existing rule unchanged. Re-sending the status and date already recorded is a no-op (no history event, no audit row, recorded by / at unchanged; the current state is returned).
@@ -2958,6 +3023,13 @@ components:
         timeout 5 s / lock timeout 3 s) or no connection was free within 3 s (code DB_UNAVAILABLE). Safe to retry.
       headers:
         Retry-After: { schema: { type: integer } }
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    PatientNotFound:
+      description: >-
+        IDC-001. type .../patient-not-found. The patient (or the visit/document's patient) is unknown, has withdrawn
+        data_processing consent, or is outside an own_patients_only caller's scope (no appointment or queue entry with her).
+        Same body in every case; no patient data. An unverified caller (email or mobile) gets 403 verification-required first,
+        exactly as on /patients/registry.
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
     NotFound:
       description: Not found (or out of scope — see per-endpoint note)
