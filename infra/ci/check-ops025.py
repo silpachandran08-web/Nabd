@@ -37,7 +37,7 @@ def main():
     if m["endpoints"]["web"]["exposure"]["include"] != "health,prometheus": f.append("only health,prometheus may be exposed")
     if "8081" not in str(m["server"]["port"]): f.append("management port must default to 8081")
     if y["server"]["shutdown"] != "graceful": f.append("server.shutdown must be graceful")
-    if y["spring"]["lifecycle"]["timeout-per-shutdown-phase"] != "20s": f.append("shutdown phase timeout must be 20s")
+    if y["spring"]["lifecycle"]["timeout-per-shutdown-phase"] != "25s": f.append("shutdown phase timeout must be 25s (OPS-053; OPS-025 spec said 20s, decision pending)")
     if y["spring"]["flyway"]["enabled"] is not False: f.append("spring.flyway.enabled must be false")
     inc = m["endpoint"]["health"]["group"]["readiness"]["include"]
     if "db" not in inc or "outbox" not in inc: f.append("readiness must include db and outbox")
