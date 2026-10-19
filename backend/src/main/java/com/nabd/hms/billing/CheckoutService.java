@@ -14,6 +14,7 @@ import com.nabd.hms.billing.dto.PrescribedItemResponse;
 import com.nabd.hms.billing.dto.VoidInvoiceRequest;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.department.DepartmentService;
 import com.nabd.hms.queue.QueueService;
@@ -64,10 +65,12 @@ public class CheckoutService {
 
     private final DayCloseService dayClose;
     private final AuditService auditService;
+    private final EventPublisher eventPublisher;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose,
-                     AuditService auditService) {
+                     AuditService auditService, EventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
         this.auditService = auditService;
         this.dayClose = dayClose;
         this.clock = clock;
@@ -144,13 +147,19 @@ public class CheckoutService {
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         } else {
             invoiceId = existing.get().id();
+            InvoiceRow locked = repo.lockInvoice(tenantId, invoiceId).orElseThrow(this::notFound); // serialises with payments
             List<LineItemRow> existingItems = repo.findLineItems(tenantId, invoiceId);
             Totals t = computeTotals(lineItems, existingItems, req.discountOrZero());
             if (!lineItems.isEmpty()) {
                 repo.appendLineItems(tenantId, invoiceId, lineItems.stream().map(this::toLineItemInput).toList(),
                         repo.nextLineItemOrder(tenantId, invoiceId));
             }
-            repo.updateInvoiceTotals(tenantId, invoiceId, t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total());
+            if (locked.paid().compareTo(t.total()) > 0) {
+                throw new ApiException(HttpStatus.CONFLICT, "total-below-paid", "Total is below what was paid",
+                        "This invoice already has " + locked.paid().toPlainString() + " paid, which is more than the new total.");
+            }
+            repo.updateInvoiceTotals(tenantId, invoiceId, t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(),
+                    InvoiceStatus.derive(locked.status(), t.total(), locked.paid()));
             log.info("invoice {} extended at queue entry {} by {} (tenant {}, new total {})",
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         }
@@ -249,18 +258,54 @@ public class CheckoutService {
 
     @Transactional
     public InvoiceResponse recordPayment(UUID tenantId, UUID invoiceId, UUID staffId, PaymentRequest req) {
+        return recordPayment(tenantId, invoiceId, staffId, req, null);
+    }
+
+    /**
+     * FIN-001: the invoice row is locked first, so two cashiers queue up and each sees the other's payment. The
+     * amount is checked against the locked balance, the payment row is inserted, and paid + status are re-derived
+     * from the payment rows in the same transaction. A repeated Idempotency-Key returns the invoice unchanged.
+     */
+    @Transactional
+    public InvoiceResponse recordPayment(UUID tenantId, UUID invoiceId, UUID staffId, PaymentRequest req, String idempotencyKey) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
-        InvoiceRow invoice = repo.findInvoice(tenantId, invoiceId).orElseThrow(this::notFound);
-        rejectVoid(invoice);
-        if ("paid".equals(invoice.status())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "invoice-already-paid", "Invoice already paid",
-                    "This invoice has no outstanding balance.");
+        InvoiceRow invoice = repo.lockInvoice(tenantId, invoiceId).orElseThrow(this::notFound);
+        if (idempotencyKey != null) {
+            Optional<UUID> prior = repo.findInvoiceByPaymentKey(tenantId, idempotencyKey);
+            if (prior.isPresent()) {
+                if (!prior.get().equals(invoiceId)) {
+                    throw new ApiException(HttpStatus.CONFLICT, "idempotency-key-reused", "Idempotency key reused",
+                            "That Idempotency-Key was already used for a different invoice.");
+                }
+                return toInvoiceResponse(tenantId, invoice);
+            }
         }
-        repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId);
-        BigDecimal newPaid = invoice.paid().add(req.amount());
-        String newStatus = newPaid.compareTo(invoice.total()) >= 0 ? "paid" : "partial";
-        repo.updateInvoicePaidStatus(tenantId, invoiceId, newPaid, newStatus);
+        if (InvoiceStatus.CLOSED.contains(invoice.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "invoice-not-payable", "Invoice can't take payments",
+                    "This invoice is " + invoice.status() + "; it can't take payments.");
+        }
+        BigDecimal balance = invoice.total().subtract(invoice.paid());
+        if (req.amount().compareTo(balance) > 0) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "overpayment", "Payment is more than the balance",
+                    "The balance due is " + balance.toPlainString() + "; a payment can't be more than that.",
+                    java.util.Map.of("balance", balance));
+        }
+        String reference = req.reference() == null || req.reference().isBlank() ? null : req.reference().trim();
+        UUID paymentId = repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId, reference, idempotencyKey);
+        BigDecimal newPaid = repo.sumPayments(tenantId, invoiceId);
+        String newStatus = InvoiceStatus.derive(invoice.status(), invoice.total(), newPaid);
+        repo.syncInvoicePaid(tenantId, invoiceId, newStatus);
+        BigDecimal newBalance = invoice.total().subtract(newPaid);
+
+        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        auditService.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.payment_recorded", "invoice", invoiceId,
+                java.util.Map.of("paid", invoice.paid(), "status", invoice.status()),
+                java.util.Map.of("paymentId", paymentId, "method", req.method(), "amount", req.amount(), "paid", newPaid, "status", newStatus));
+        eventPublisher.publish(tenantId, PaymentRecordedHandler.TYPE, java.util.Map.of(
+                "tenantId", tenantId, "invoiceId", invoiceId, "paymentId", paymentId, "method", req.method(),
+                "amountMinor", req.amount().movePointRight(2).longValueExact(), "currency", currencyFor(tenantId),
+                "balanceMinor", newBalance.movePointRight(2).longValueExact(), "status", newStatus));
         log.info("payment recorded on invoice {} by {}: {} {} (tenant {})", invoiceId, staffId, req.amount(), req.method(), tenantId);
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }

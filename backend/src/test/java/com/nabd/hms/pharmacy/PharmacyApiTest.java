@@ -512,7 +512,7 @@ class PharmacyApiTest extends ApiTestBase {
         ResponseEntity<Map> pay = exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
                 authedJsonBody(token, Map.of("method", "cash", "amount", 10)), Map.class);
         assertThat(pay.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(pay.getBody().get("type")).asString().contains("invoice-void");
+        assertThat(pay.getBody().get("type")).asString().contains("invoice-not-payable"); // FIN-001: was invoice-void
     }
 
     @Test
