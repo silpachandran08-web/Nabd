@@ -217,7 +217,9 @@ class ClinicalLicenceApiTest extends ApiTestBase {
                 "SELECT grants::text FROM roles WHERE tenant_id = ? AND built_in AND name = 'Owner'", String.class, tenantId));
         List<ModuleGrant> grants = objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(List.class, ModuleGrant.class));
         ModuleGrant clinical = grants.stream().filter(g -> "clinical".equals(g.module())).findFirst().orElseThrow();
-        ModuleGrant expected = matrixGrant(matrix().get("Owner / Manager"));
+        ModuleGrant m = matrixGrant(matrix().get("Owner / Manager"));
+        // PLT-016 (MF-52) owns the Owner preset: no clinical:approve for the plain Owner, only for Owner-doctor
+        ModuleGrant expected = new ModuleGrant(m.module(), m.view(), m.create(), m.edit(), m.delete(), false, m.refundDiscount(), m.export());
         assertThat(new ModuleGrant(clinical.module(), clinical.view(), clinical.create(), clinical.edit(), clinical.delete(),
                 clinical.approve(), clinical.refundDiscount(), clinical.export())).isEqualTo(expected);
     }

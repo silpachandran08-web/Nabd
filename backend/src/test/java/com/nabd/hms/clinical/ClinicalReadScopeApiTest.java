@@ -248,7 +248,7 @@ class ClinicalReadScopeApiTest extends ApiTestBase {
         Visit v = visitWithData(token, restricted.id(), "Grants", "+919990000006");
         exchange("/v1/clinical/notes/" + v.queueEntryId() + "/sign", HttpMethod.POST, authed(token), Map.class);
         exchange("/v1/clinical/notes/" + v.queueEntryId() + "/amendments", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "reason", "typo", "diagnosis", "Dx-Amended")), Map.class);
+                "reason", "typo fix", "diagnosis", "Dx-Amended")), Map.class);
         complete(token, v.queueEntryId());
 
         Map<?, ?> fullNote = exchange("/v1/clinical/notes/" + v.queueEntryId(), HttpMethod.GET, authed(token), Map.class).getBody();

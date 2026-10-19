@@ -528,7 +528,8 @@ class PrescriptionApiTest extends ApiTestBase {
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
                 inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM prescriptions WHERE tenant_id = ? AND status = 'signed'", tenant.id())));
         // (c) TRUNCATE on either table
-        assertTruncateRefusedByTrigger("TRUNCATE prescription_items", "signed prescriptions are final");
+        // CASCADE: V1350 invoice_line_items references prescription_items, so a plain TRUNCATE stops at the FK first
+        assertTruncateRefusedByTrigger("TRUNCATE prescription_items CASCADE", "signed prescriptions are final");
         assertTruncateRefusedByTrigger("TRUNCATE prescriptions CASCADE", "signed prescriptions are final");
 
         Integer signedItems = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
