@@ -6,16 +6,16 @@
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
 modules:
   auth:
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, sessions]
+    owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, sessions]
     reads: []
   billing:
     owns: [charge_catalogue, day_closes, invoice_discounts, invoice_line_items, invoice_payments, invoice_series, invoices]
     reads: []
   clinical:
-    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, favourite_rx_set_items, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescriptions, safety_dictionary_versions, vitals]
+    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, favourite_rx_set_items, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]
     reads: []
   common:
-    owns: [audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
+    owns: [audit_chain_heads, audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
     reads: []
   department:
     owns: [department_transfers, department_workflow_selection, departments, service_points, workflow_definitions]
@@ -39,7 +39,7 @@ modules:
     owns: [pharmacy_settings, pharmacy_stock_movements]
     reads: []
   platform:
-    owns: [brands, master.discount_requests, master.login_attempts, master.operators, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, tenant_lifecycle_events, tenants]
+    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.operators, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, tenant_lifecycle_events, tenants]
     reads: []
   queue:
     owns: [appointments, doctor_delays, doctor_leave, doctor_working_hours, queue_entries, waitlist_entries]
@@ -51,5 +51,5 @@ modules:
     owns: [idempotency_keys]
     reads: []
   staff:
-    owns: [role_delegations, roles, staff]
+    owns: [role_delegations, roles, staff, staff_clinician_review]
     reads: []
