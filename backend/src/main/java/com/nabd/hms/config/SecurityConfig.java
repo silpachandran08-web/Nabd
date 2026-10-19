@@ -62,6 +62,27 @@ public class SecurityConfig {
                 ? null : delegate.resolve(req);
     }
 
+    /** PLT-027: security-layer 401/403 get the same Problem+JSON shape as GlobalExceptionHandler; no token detail is echoed. */
+    private static void unauthenticated(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res,
+            org.springframework.security.core.AuthenticationException ex) throws java.io.IOException {
+        new org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint().commence(req, res, ex); // sets 401 + WWW-Authenticate
+        problem(res, 401, "unauthenticated", "Unauthenticated", "Authentication is required or the access token is not valid.");
+    }
+
+    private static void forbidden(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res,
+            org.springframework.security.access.AccessDeniedException ex) throws java.io.IOException {
+        problem(res, 403, "forbidden", "Forbidden", "You do not have permission to do this.");
+    }
+
+    private static void problem(jakarta.servlet.http.HttpServletResponse res, int status, String slug, String title, String detail) throws java.io.IOException {
+        String traceId = org.slf4j.MDC.get(com.nabd.hms.common.RequestCorrelationFilter.MDC_KEY);
+        res.setStatus(status);
+        res.setCharacterEncoding("UTF-8");
+        res.setContentType("application/problem+json");
+        res.getWriter().write("{\"type\":\"https://api.nabd.health/errors/" + slug + "\",\"title\":\"" + title + "\",\"status\":" + status
+                + ",\"detail\":\"" + detail + "\",\"traceId\":\"" + (traceId != null ? traceId : java.util.UUID.randomUUID()) + "\"}");
+    }
+
     /** Dev default is the Next.js dev server; real deployments set app.cors.allowed-origins to the actual web app origin(s). */
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
@@ -129,6 +150,7 @@ public class SecurityConfig {
                             return new AuthorizationDecision(ok);
                         })
                 )
+                .exceptionHandling(e -> e.authenticationEntryPoint(SecurityConfig::unauthenticated).accessDeniedHandler(SecurityConfig::forbidden))
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .bearerTokenResolver(ownerSelectAwareResolver())
                         .authenticationEntryPoint((req, res, ex) -> {
@@ -136,9 +158,10 @@ public class SecurityConfig {
                             if (dbCode != null) {
                                 com.nabd.hms.common.DbFailureAdvice.write(res, dbCode);
                             } else {
-                                new org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint().commence(req, res, ex);
+                                unauthenticated(req, res, ex);
                             }
                         })
+                        .accessDeniedHandler(SecurityConfig::forbidden)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
     }

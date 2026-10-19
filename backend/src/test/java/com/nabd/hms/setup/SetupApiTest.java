@@ -345,7 +345,7 @@ class SetupApiTest extends ApiTestBase {
         SeededStaff staff = seedStaff(tenant, limitedRole, "reception@a.com", "+919400000002", false);
         String token = loginAndGetAccessToken(staff);
 
-        ResponseEntity<List> resp = exchange("/v1/setup/checklist", HttpMethod.GET, authed(token), List.class);
+        ResponseEntity<String> resp = exchange("/v1/setup/checklist", HttpMethod.GET, authed(token), String.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

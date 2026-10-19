@@ -1,7 +1,6 @@
 package com.nabd.hms.common;
 
 import com.nabd.hms.support.ApiTestBase;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -149,7 +148,6 @@ class S10QaProblemPagingHeadersTest extends ApiTestBase {
 
     // Story title: "every list is bounded". 59 list endpoints were unbounded; sample an unparameterised one with > 100 rows.
     @Test
-    @Tag("known-defect-PLT-027")
     void title_everyListIsBounded_rolesListWith120Rows_isCappedAt100() {
         SeededTenant t = seedTenant();
         String tok = loginAndGetAccessToken(owner(t));
@@ -189,7 +187,7 @@ class S10QaProblemPagingHeadersTest extends ApiTestBase {
         }
         String noSid = token(full, "sid");
         for (String path : List.of("/v1/auth/sessions")) {
-            ResponseEntity<Map[]> r = exchange(path, HttpMethod.GET, authed(noSid), Map[].class);
+            ResponseEntity<String> r = exchange(path, HttpMethod.GET, authed(noSid), String.class);
             if (r.getStatusCode().is5xxServerError()) failures.add("omit sid " + path + " -> " + r.getStatusCode());
         }
         ResponseEntity<Map> logout = exchange("/v1/auth/logout", HttpMethod.POST, authed(noSid), Map.class);
@@ -199,7 +197,6 @@ class S10QaProblemPagingHeadersTest extends ApiTestBase {
 
     /** Title: "every error is clean Problem+JSON". Spring Security's own 401/403 are written before MVC, so check them explicitly. */
     @Test
-    @Tag("known-defect-PLT-027")
     void title_securityLayer401And403_areProblemJson_notEmptyBodies() {
         SeededTenant t = seedTenant();
         SeededStaff s = owner(t);

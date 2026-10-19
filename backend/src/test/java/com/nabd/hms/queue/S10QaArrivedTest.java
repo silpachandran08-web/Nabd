@@ -373,6 +373,7 @@ class S10QaArrivedTest extends ApiTestBase {
 
     // ---------- events listed in the story ----------
     @Test
+    // known defect (ACC-003): checked_in/arrived events are not yet published to the outbox
     @Tag("known-defect-ACC-003")
     void events_checkedInAndArrivedArePublishedToOutbox() {
         Ctx c = ctx();

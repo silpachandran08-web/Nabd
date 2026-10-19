@@ -27,6 +27,9 @@ public class AccessTokenDecoderConfig {
                     && a.getRequest().getRequestURI().startsWith("/v1/platform/");
             Audience want = platformPath ? Audience.PLATFORM_API : Audience.STAFF_API;
             if (!jwt.getAudience().contains(want.value())) throw new BadJwtException("audience not allowed on this path");
+            // a staff token without sub/tenantId would NPE in controllers (UUID.fromString) -> 500; refuse it here as 401
+            if (want == Audience.STAFF_API && (jwt.getSubject() == null || jwt.getClaimAsString("tenantId") == null))
+                throw new BadJwtException("token missing a required claim");
             return jwt;
         };
     }

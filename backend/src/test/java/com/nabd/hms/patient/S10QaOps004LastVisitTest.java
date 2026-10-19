@@ -126,6 +126,7 @@ class S10QaOps004LastVisitTest extends ApiTestBase {
 
     /** Story context: "derive last visit from queue_date ... of completed visits". A waiting/checked-in entry is not a completed visit. */
     @Test
+    // known defect (OPS-004): last-visit derivation still counts unfinished entries
     @Tag("known-defect-OPS-004")
     void ac2_unfinishedEntryNewerThanTheCompletedVisitIsNotALastVisit() {
         Ctx c = ctx();

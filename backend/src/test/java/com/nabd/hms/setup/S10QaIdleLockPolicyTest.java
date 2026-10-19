@@ -2,7 +2,6 @@ package com.nabd.hms.setup;
 
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -35,7 +34,6 @@ class S10QaIdleLockPolicyTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-FEF-005")
     void validValues_2_10_30_areAccepted_andReadBackThroughTheListEndpointTheShellUses() {
         SeededTenant t = seedTenant();
         String tok = owner(t);

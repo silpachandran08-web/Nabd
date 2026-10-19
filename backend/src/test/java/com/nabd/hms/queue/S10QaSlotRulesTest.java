@@ -90,6 +90,7 @@ class S10QaSlotRulesTest extends ApiTestBase {
     /** Literal story wording: 10:05 on a 15-minute grid with a booking at 10:00 -> 409 SLOT_TAKEN.
      *  AC3 says an off-grid time is 400 OFF_GRID and 10:05 is off the grid, so the two criteria conflict. */
     @Test
+    // known defect (ACC-004): AC1 literal 10:05 conflicts with AC3 off-grid 400; story spec unresolved
     @Tag("known-defect-ACC-004")
     void ac1_literal_1005AgainstBookingAt1000_is409SlotTaken() {
         Clinic c = clinic("Asia/Kolkata");
@@ -340,6 +341,7 @@ class S10QaSlotRulesTest extends ApiTestBase {
     }
 
     @Test
+    // known defect (ACC-004): appointment.booked is not yet published to the outbox
     @Tag("known-defect-ACC-004")
     void event_appointmentBookedPublishedToOutbox() {
         Clinic c = clinic("Asia/Kolkata");

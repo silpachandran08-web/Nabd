@@ -139,6 +139,7 @@ class S10QaOps007RegistryTest extends ApiTestBase {
 
     /** OPS-004 says the registry read model "uses the same derivation": completed visits only. */
     @Test
+    // known defect (OPS-004): registry lastVisitDate still includes unfinished visits
     @Tag("known-defect-OPS-004")
     void ac1_lastVisitDateIsTheDateOfTheLastCompletedVisit() {
         Ctx c = ctx();
@@ -261,6 +262,7 @@ class S10QaOps007RegistryTest extends ApiTestBase {
     }
 
     @Test
+    // known defect (OPS-007): registry projection drift metric is not exported yet
     @Tag("known-defect-OPS-007")
     void ac3_driftMetricIsExportedAsRegistryProjectionDriftRows() throws Exception {
         Ctx c = ctx();
@@ -343,6 +345,7 @@ class S10QaOps007RegistryTest extends ApiTestBase {
 
     /** Not one of the 4 listed ACs, but the story's stated goal ("filters like 'balance due' cover every patient, not just the first 3,000"). */
     @Test
+    // known defect (OPS-007): balance-due filter times out beyond the first 3000 patients
     @Tag("known-defect-OPS-007")
     @SuppressWarnings("unchecked")
     void goal_balanceDueFilterFindsAPatientBeyondTheFirst3000ByName() {

@@ -89,6 +89,7 @@ class S10QaOps034SpecTest extends ApiTestBase {
     }
 
     @Test
+    // known defect (OPS-034): hand-written api/openapi.yaml still lists unimplemented operations
     @Tag("known-defect-OPS-034")
     void ac2_handWrittenOpenapiYamlNoLongerAdvertisesThePhantomOperations() throws Exception {
         @SuppressWarnings("unchecked")
@@ -197,7 +198,6 @@ class S10QaOps034SpecTest extends ApiTestBase {
     }
 
     @Test
-    @Tag("known-defect-OPS-034")
     @SuppressWarnings("unchecked")
     void permission_noTokenGets401OnEveryNonPublicOperation() throws Exception {
         List<String> bad = new ArrayList<>();

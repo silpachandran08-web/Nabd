@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Test-only endpoint that throws on demand, to observe how the API renders unhandled failures (S10 QA PLT-027). */
+@io.swagger.v3.oas.annotations.Hidden // test-only: keep it out of the generated core.yaml
 @RestController
 public class S10QaBoomController {
     @GetMapping("/v1/s10qa/boom/{kind}")
