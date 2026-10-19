@@ -425,7 +425,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
     void listAndGetRequireTheProvisioningAuthorityToo() {
         SeededOperator sre = seedOperator("sre-prov@nabd.health", "sre", false);
         String token = platformLoginAndGetAccessToken(sre);
-        assertThat(exchange("/v1/platform/provisioning-jobs", HttpMethod.GET, authed(token), List.class).getStatusCode())
+        assertThat(exchange("/v1/platform/provisioning-jobs", HttpMethod.GET, authed(token), String.class).getStatusCode())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 

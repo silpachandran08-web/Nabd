@@ -35,7 +35,7 @@ public class OpenApiConfig {
 
     /** Mirrors the permitAll matchers in SecurityConfig. shortcut: copied by hand, keep both lists together; read them from one place if a third copy is ever needed. */
     static final List<String> PUBLIC = List.of("/v1/auth/login", "/v1/auth/otp/request", "/v1/auth/otp/verify",
-            "/v1/auth/mfa/verify", "/v1/auth/pin/reset-request", "/v1/auth/pin/reset-confirm", "/v1/auth/refresh",
+            "/v1/auth/mfa/verify", "/v1/auth/mfa/recovery-verify", "/v1/auth/pin/reset-request", "/v1/auth/pin/reset-confirm", "/v1/auth/refresh",
             "/v1/auth/mfa/enroll", "/v1/auth/mfa/confirm", "/v1/owners/me/workspaces", "/v1/owners/workspaces/select",
             "/v1/staff/invitations/*/accept", "/v1/owners/auth/login", "/v1/owners/invitations/*/accept",
             "/v1/platform/auth/login", "/v1/platform/auth/mfa/verify", "/v1/platform/auth/refresh",

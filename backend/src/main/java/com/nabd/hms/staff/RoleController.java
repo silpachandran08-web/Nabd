@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,8 +37,10 @@ public class RoleController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('staff:view')")
-    public List<RoleResponse> list(@AuthenticationPrincipal Jwt jwt) {
-        return service.list(tenantId(jwt));
+    public List<RoleResponse> list(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) Integer limit) {
+        // shortcut: PLT-027 cap applied after the read (a tenant has tens of roles); the bare list shape the shell relies on stays, default is the max
+        int cap = limit == null ? com.nabd.hms.common.PageRequest.MAX : com.nabd.hms.common.PageRequest.limit(limit);
+        return service.list(tenantId(jwt)).stream().limit(cap).toList();
     }
 
     @PostMapping

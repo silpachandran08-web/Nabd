@@ -198,6 +198,7 @@ class S10QaOps025ObservabilityTest extends ApiTestBase {
             // roles are cluster-level and already exist; the migrator needs rights on the fresh database
             try (Connection su = java.sql.DriverManager.getConnection(url, superuserDataSource().getUsername(), superuserDataSource().getPassword()); Statement st = su.createStatement()) {
                 st.execute("ALTER SCHEMA public OWNER TO " + MIGRATOR_ROLE);
+                st.execute("GRANT USAGE, CREATE ON SCHEMA public TO nabd_definer"); // as infra/db/bootstrap-roles.sql: ALTER FUNCTION ... OWNER TO needs CREATE for the new owner
             }
             int n = com.nabd.hms.common.MigrateMain.migrate(url, MIGRATOR_ROLE, MIGRATOR_ROLE_PW, "filesystem:../db/migrations");
             assertThat(n).isGreaterThan(50);

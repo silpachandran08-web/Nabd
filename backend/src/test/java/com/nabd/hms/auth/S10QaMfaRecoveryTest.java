@@ -459,7 +459,7 @@ class S10QaMfaRecoveryTest extends ApiTestBase {
         // sessions: refresh token dead, access token dead, DB shows revocation
         ResponseEntity<Map> refresh = http.postForEntity(url("/v1/auth/refresh"), jsonBody(Map.of("refreshToken", w.doctorTokens().get("refreshToken"))), Map.class);
         assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        ResponseEntity<Map[]> withOldAccess = exchange("/v1/auth/sessions", HttpMethod.GET, authed((String) w.doctorTokens().get("accessToken")), Map[].class);
+        ResponseEntity<String> withOldAccess = exchange("/v1/auth/sessions", HttpMethod.GET, authed((String) w.doctorTokens().get("accessToken")), String.class);
         assertThat(withOldAccess.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(inTenantTx(w.t().id(), () -> jdbc.queryForObject(
                 "SELECT count(*) FROM sessions WHERE staff_id = ? AND revoked_at IS NULL", Integer.class, w.doctor().id()))).isZero();

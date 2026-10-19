@@ -130,6 +130,7 @@ class S10QaQueueCasTest extends ApiTestBase {
     }
 
     @Test
+    // known defect (ACC-002): queue status PATCH does not replay on the same Idempotency-Key yet
     @org.junit.jupiter.api.Tag("known-defect-ACC-002")
     void ac1_idempotencyKeyReplayReturnsSameResponseWithoutSecondMove() {
         Ctx c = ctx();

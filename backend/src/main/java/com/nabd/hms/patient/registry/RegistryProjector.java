@@ -43,7 +43,7 @@ public class RegistryProjector {
     }
 
     @Scheduled(fixedDelayString = "${app.registry.poll-interval-ms:1000}")
-    public void drain() {
+    public synchronized void drain() { // serialises the poller with explicit callers: SKIP LOCKED made a concurrent caller return before the poller's claim committed
         try {
             for (UUID tenantId : tx.execute(s -> repo.dirtyTenants(100))) {
                 int claimed;
