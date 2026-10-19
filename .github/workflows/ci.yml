@@ -162,7 +162,12 @@ jobs:
             echo '```'
           } > "$RUNNER_TEMP/report.md"
           cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
-          gh pr comment "${{ github.event.pull_request.number }}" --edit-last --create-if-none --body-file "$RUNNER_TEMP/report.md"
+          # own marker, so this report never overwrites the coverage comment (which uses --edit-last)
+          sed -i '1i <!-- oasdiff-report -->' "$RUNNER_TEMP/report.md"
+          pr="${{ github.event.pull_request.number }}"
+          id=$(gh api "repos/${{ github.repository }}/issues/$pr/comments" --paginate --jq '[.[] | select(.body | startswith("<!-- oasdiff-report -->"))] | last | .id // empty')
+          if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@"$RUNNER_TEMP/report.md"
+          else gh pr comment "$pr" --body-file "$RUNNER_TEMP/report.md"; fi
 
   stage6-build-and-scan:
     needs: [changes, stage1-static, stage2-unit, stage3-integration]

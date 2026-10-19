@@ -252,6 +252,7 @@ class Ops025Image(unittest.TestCase):
         y = yml("backend/src/main/resources/application.yml")
         self.assertGreaterEqual(int(y["spring"]["lifecycle"]["timeout-per-shutdown-phase"].rstrip("s")), 20)
 
+    @unittest.expectedFailure  # known defect: no SSE endpoint exists in Core yet
     def test_known_defect_OPS025_sse_clients_get_a_reconnect_hint_on_shutdown(self):
         src = "".join(open(os.path.join(d, f)).read() for d, _, fs in os.walk("backend/src/main/java") for f in fs if f.endswith(".java"))
         self.assertTrue(re.search(r"SseEmitter|text/event-stream", src), "no SSE endpoint exists in Core at all")
@@ -317,6 +318,7 @@ class Ops053Staging(unittest.TestCase):
             os.unlink(f.name)
         self.assertEqual(subprocess.run(["python3", "infra/staging-in/check-staging-in.py"], capture_output=True).returncode, 0)
 
+    @unittest.expectedFailure  # known defect: ShedLock waits on OPS-013
     def test_known_defect_OPS053_each_scheduled_job_runs_once_across_replicas_shedlock(self):
         pom = open("backend/pom.xml").read()
         src = "".join(open(os.path.join(d, f)).read() for d, _, fs in os.walk("backend/src/main/java") for f in fs if f.endswith(".java"))

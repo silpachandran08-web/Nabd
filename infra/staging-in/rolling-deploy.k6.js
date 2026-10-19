@@ -11,6 +11,6 @@ export const options = {
 
 export default function () {
   // unauthenticated, public, DB-free endpoint: measures routing and drain, not business logic
-  const r = http.get(`${__ENV.BASE}/v1/.well-known/jwks.json`);
+  const r = http.get(`${__ENV.BASE}/.well-known/jwks.json`);
   check(r, { 'status 200': (x) => x.status === 200 });
 }
