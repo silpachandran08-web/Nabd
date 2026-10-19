@@ -129,6 +129,13 @@
       <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- OPS-033: module-boundary checks (ArchitectureRulesTest); test scope only -->
+    <dependency>
+      <groupId>org.springframework.modulith</groupId>
+      <artifactId>spring-modulith-core</artifactId>
+      <version>1.2.13</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
