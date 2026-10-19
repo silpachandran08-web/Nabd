@@ -1,0 +1,29 @@
+# OPS-036: destroys previews older than 72 h, and the preview of a PR as soon as it is merged or closed.
+# Dry run (manual dispatch with apply=false) only lists what would go. Needs the same cluster login as preview.yml.
+name: preview-reaper
+on:
+  schedule: [{ cron: "17 * * * *" }]
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      apply: { description: "delete (false = dry run)", type: boolean, default: false }
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+jobs:
+  reap:
+    if: vars.PREVIEW_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: log in to the preview cluster (OIDC)
+        run: ${{ vars.PREVIEW_CLUSTER_LOGIN }}
+      - name: reap
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          open=$(gh pr list --repo "${{ github.repository }}" --state open --limit 500 --json number --jq '[.[].number] | join(",")')
+          apply=--apply; [ "${{ github.event_name }}" = workflow_dispatch ] && [ "${{ inputs.apply }}" != true ] && apply=
+          kubectl get ns -l nabd.io/preview=true -o json | python3 infra/preview/preview.py reap --open-prs "$open" $apply | tee -a "$GITHUB_STEP_SUMMARY"

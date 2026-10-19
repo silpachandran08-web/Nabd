@@ -153,6 +153,13 @@ class Artefacts(unittest.TestCase):
         for f in ("ci.yml", "ci-selftest.yml", "prod-config.yml"):  # OPS-031 / OPS-003 workflows only
             wf = yaml.safe_load(R(".github/workflows/" + f))
             for name, job in wf["jobs"].items():
+                if "uses" in job:  # OPS-036: GitHub forbids timeout-minutes on a reusable-workflow call; every job it calls must have one
+                    called = yaml.safe_load(R(job["uses"].removeprefix("./")))
+                    jobs = [*called["jobs"].values()]
+                    jobs += [j2 for j in jobs if "uses" in j for j2 in yaml.safe_load(R(j["uses"].removeprefix("./")))["jobs"].values()]
+                    for j in jobs:
+                        self.assertTrue("timeout-minutes" in j or "uses" in j, f + ":" + name + " -> " + job["uses"])
+                    continue
                 self.assertIn("timeout-minutes", job, f + ":" + name)
 
     def test_stage6_signs_attaches_sbom_and_exposes_a_digest_only_on_main_pushes(self):

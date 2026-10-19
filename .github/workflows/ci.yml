@@ -1,5 +1,5 @@
-# OPS-031: stages 1 (static), 2 (unit), 3 (integration), 6 (build and scan). Required checks on main:
-# stage1-static, stage2-unit, stage3-integration, stage6-build-and-scan (see .github/branch-protection.json).
+# OPS-031: stages 1 (static), 2 (unit), 3 (integration), 6 (build and scan); OPS-036: stage 7 (preview + smoke). Required checks on main:
+# stage1-static, stage2-unit, stage3-integration, stage6-build-and-scan, stage7-preview-e2e (see .github/branch-protection.json).
 name: ci
 on:
   pull_request:
@@ -168,6 +168,23 @@ jobs:
           id=$(gh api "repos/${{ github.repository }}/issues/$pr/comments" --paginate --jq '[.[] | select(.body | startswith("<!-- oasdiff-report -->"))] | last | .id // empty')
           if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@"$RUNNER_TEMP/report.md"
           else gh pr comment "$pr" --body-file "$RUNNER_TEMP/report.md"; fi
+
+  # OPS-036 / FEF-049 stage 7: preview per PR + browser smoke and axe. Off until the preview cluster exists (vars.PREVIEW_ENABLED).
+  preview:
+    needs: stage6-build-and-scan
+    if: github.event_name == 'pull_request' && vars.PREVIEW_ENABLED == 'true'
+    uses: ./.github/workflows/preview.yml
+    secrets: inherit
+  stage7-preview-e2e:
+    needs: preview
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: preview deploy, smoke journeys and axe must pass
+        run: |
+          if [ "${{ vars.PREVIEW_ENABLED }}" != true ]; then echo "::notice::stage 7 preview disabled (vars.PREVIEW_ENABLED); see docs/ops/preview.md"; exit 0; fi
+          [ "${{ needs.preview.result }}" = success ] || { echo "stage 7 failed: preview ${{ needs.preview.result }}"; exit 1; }
 
   stage6-build-and-scan:
     needs: [changes, stage1-static, stage2-unit, stage3-integration]
