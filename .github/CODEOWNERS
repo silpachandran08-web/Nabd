@@ -15,3 +15,6 @@
 /backend/src/main/resources/clinical-safety/ @nabd/clinical-safety
 /backend/src/main/java/com/nabd/hms/clinical/cds/ @nabd/clinical-safety
 /docs/clinical-safety/ @nabd/clinical-safety
+
+# CLN-007 safety-report test fixtures mirror docs/clinical-safety, so they need the CSO team too
+/scripts/ci/fixtures/safety-report/ @nabd/clinical-safety

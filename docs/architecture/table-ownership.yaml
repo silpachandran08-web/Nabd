@@ -6,16 +6,16 @@
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
 modules:
   auth:
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, sessions]
+    owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, sessions]
     reads: []
   billing:
     owns: [charge_catalogue, day_closes, invoice_discounts, invoice_line_items, invoice_payments, invoice_series, invoices]
     reads: []
   clinical:
-    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, favourite_rx_set_items, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescriptions, vitals]
+    owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, favourite_rx_set_items, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescriptions, safety_dictionary_versions, vitals]
     reads: []
   common:
-    owns: [audit_log, outbox_events]
+    owns: [audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
     reads: []
   department:
     owns: [department_transfers, department_workflow_selection, departments, service_points, workflow_definitions]
