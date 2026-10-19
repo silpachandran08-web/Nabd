@@ -178,6 +178,7 @@ await run('walk-in 390px', WALK, '/arrivals', roster, async ({ page }) => {
     await page.getByRole('dialog').getByRole('button', { name: 'Check in', exact: true }).click();
     await page.getByText('Checked in').waitFor();
     check('check-in: POST /queue/check-in carries appointmentId and a UUID v7 Idempotency-Key', st.ci.length === 1 && st.ci[0].body.appointmentId === 'ap1' && UUID7.test(st.ci[0].key), JSON.stringify(st.ci));
+    await page.getByRole('dialog').getByText(/5 min/).waitFor(); // the slip's position/wait reads are async (skeleton first)
     check('check-in: token slip shows queue position and wait via the client', /5 min/.test(await page.getByRole('dialog').innerText()));
   });
 }
