@@ -6,6 +6,7 @@ import com.nabd.hms.clinical.dto.NoteResponse;
 import com.nabd.hms.clinical.dto.NoteUpsertRequest;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.NoteModels.AmendmentRow;
@@ -35,11 +38,15 @@ public class NoteService {
     private final NoteRepository repo;
     private final AuditService auditService;
     private final TenantContext tenantContext;
+    private final EventPublisher events;
 
-    NoteService(NoteRepository repo, AuditService auditService, TenantContext tenantContext) {
+    static final String NOTE_SIGNED_EVENT = "clinical.note.signed.v1";
+
+    NoteService(NoteRepository repo, AuditService auditService, TenantContext tenantContext, EventPublisher events) {
         this.repo = repo;
         this.auditService = auditService;
         this.tenantContext = tenantContext;
+        this.events = events;
     }
 
     @Transactional
@@ -62,13 +69,37 @@ public class NoteService {
         return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(this::notFound);
     }
 
+    /** CLN-006: only the visit's doctor, or a holder of clinical:approve, signs; the signer is stored and audited.
+     * shortcut: the CLN-005 licence checks (is_clinician, registration no, expiry, break-glass) are not applied here
+     * yet; switch requireVisitDoctor to CLN-005's ClinicalAuthority once it is merged. */
     @Transactional
-    public NoteResponse sign(UUID tenantId, UUID queueEntryId) {
+    public NoteResponse sign(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove) {
         tenantContext.set(tenantId);
-        repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
-        repo.sign(tenantId, queueEntryId);
+        NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        requireVisitDoctor(tenantId, queueEntryId, callerStaffId, callerCanApprove, "sign");
+        if (repo.sign(tenantId, queueEntryId, callerStaffId) == 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "already-signed", "Note already signed",
+                    "This clinical note is already signed. Add an amendment to change it.");
+        }
+        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        Map<String, Object> after = new LinkedHashMap<>();
+        after.put("status", "signed");
+        after.put("signedBy", callerStaffId.toString());
+        after.put("queueEntryId", queueEntryId.toString());
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+                "clinical_note.signed", "clinical_note", note.id(), Map.of("status", note.status()), after);
+        events.publish(tenantId, NOTE_SIGNED_EVENT, Map.of("tenantId", tenantId.toString(), "noteId", note.id().toString(),
+                "queueEntryId", queueEntryId.toString(), "signedBy", callerStaffId.toString()));
         log.info("clinical note signed for queue entry {} (tenant {})", queueEntryId, tenantId);
         return repo.findByQueueEntry(tenantId, queueEntryId).map(this::toResponse).orElseThrow(this::notFound);
+    }
+
+    private void requireVisitDoctor(UUID tenantId, UUID queueEntryId, UUID callerStaffId, boolean callerCanApprove, String what) {
+        QueueEntryOwner owner = repo.findQueueEntryOwner(tenantId, queueEntryId).orElseThrow(this::notFound);
+        if (!PrescriptionService.mayActAsVisitDoctor(owner.doctorId(), callerStaffId, callerCanApprove)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "not-prescriber", "Visit doctor only",
+                    "Only the doctor on this visit, or a clinician with approval rights, can " + what + " this note.");
+        }
     }
 
     // ── amendments (NB-104) ──────────────────────────────────────────────
@@ -76,11 +107,13 @@ public class NoteService {
     // would just be a confusing second way to do the same thing.
 
     @Transactional
-    public NoteAmendmentResponse amend(UUID tenantId, UUID callerStaffId, UUID queueEntryId, NoteAmendmentRequest req) {
+    public NoteAmendmentResponse amend(UUID tenantId, UUID callerStaffId, boolean callerCanApprove, UUID queueEntryId,
+                                       NoteAmendmentRequest req) {
         tenantContext.set(tenantId);
         NoteRow note = repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound);
+        requireVisitDoctor(tenantId, queueEntryId, callerStaffId, callerCanApprove, "amend");
         if (!"signed".equals(note.status())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "note-not-signed", "Note not signed",
+            throw new ApiException(HttpStatus.CONFLICT, "note-not-signed", "Note not signed",
                     "Only a signed note can be amended — edit the draft directly instead.");
         }
         UUID id = repo.insertAmendment(tenantId, note.id(), callerStaffId, req.reason(), req.subjective(),
@@ -107,7 +140,7 @@ public class NoteService {
 
     private NoteResponse toResponse(NoteRow n) {
         return new NoteResponse(n.id(), n.queueEntryId(), n.patientId(), n.doctorId(), n.subjective(),
-                n.objective(), n.assessment(), n.plan(), n.diagnosis(), n.status(), n.signedAt(), n.updatedAt());
+                n.objective(), n.assessment(), n.plan(), n.diagnosis(), n.status(), n.signedAt(), n.updatedAt(), n.signedBy());
     }
 
     private ApiException notFound() {

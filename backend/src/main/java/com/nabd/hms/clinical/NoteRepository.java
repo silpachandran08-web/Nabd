@@ -48,10 +48,10 @@ class NoteRepository {
                 tenantId, queueEntryId, patientId, doctorId, subjective, objective, assessment, plan, diagnosis);
     }
 
-    /** Idempotent — signing an already-signed note is a no-op, not an error. */
-    void sign(UUID tenantId, UUID queueEntryId) {
-        jdbc.update("UPDATE clinical_notes SET status = 'signed', signed_at = now() " +
-                "WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'draft'", tenantId, queueEntryId);
+    /** Compare-and-set on status: 0 rows means the note was already signed (the caller answers 409). */
+    int sign(UUID tenantId, UUID queueEntryId, UUID signedBy) {
+        return jdbc.update("UPDATE clinical_notes SET status = 'signed', signed_at = now(), signed_by = ? " +
+                "WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'draft'", signedBy, tenantId, queueEntryId);
     }
 
     // ── amendments (NB-104) ──────────────────────────────────────────────
@@ -95,6 +95,7 @@ class NoteRepository {
                 rs.getString("diagnosis"),
                 rs.getString("status"),
                 rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant(),
-                rs.getTimestamp("updated_at").toInstant());
+                rs.getTimestamp("updated_at").toInstant(),
+                rs.getString("signed_by") == null ? null : UUID.fromString(rs.getString("signed_by")));
     }
 }

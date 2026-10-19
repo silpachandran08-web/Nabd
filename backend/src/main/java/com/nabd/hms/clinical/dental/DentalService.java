@@ -20,9 +20,9 @@ import static com.nabd.hms.clinical.dental.DentalModels.ToothRow;
 /** NB-121/122: the specialty-workspace framework's one proof-of-concept — gated entirely by the
  * "specialty_dental" RBAC module grant (see GrantsFlattener), not a new entitlement system.
  *
- * NB-127: every write is audited via the shared AuditService, scoped to this one
- * dental_chart_entries row (entity_id = the row's own id, stable across updates) — that's the
- * tooth's full timeline, no second history table needed. */
+ * NB-127: every write is audited via the shared AuditService. CLN-006 (MF-52): every write also appends a
+ * dental_chart_events row; the per-tooth history is read from there, so clinical history does not depend on
+ * the audit store. */
 @Service
 public class DentalService {
 
@@ -62,6 +62,7 @@ public class DentalService {
 
         audit(tenantId, callerStaffId, ipAddress, before == null ? "dental_chart.create" : "dental_chart.update",
                 after.id(), before, after);
+        event(tenantId, patientId, "set", after.id(), before, after, callerStaffId);
         return toResponse(after);
     }
 
@@ -75,6 +76,7 @@ public class DentalService {
         UUID id = repo.insertSupernumerary(tenantId, patientId, nearToothNumber, resolvedStatus, note, callerStaffId);
         ToothRow after = repo.findById(tenantId, patientId, id).orElseThrow();
         audit(tenantId, callerStaffId, ipAddress, "dental_chart.create", id, null, after);
+        event(tenantId, patientId, "supernumerary_added", id, null, after, callerStaffId);
         return toResponse(after);
     }
 
@@ -89,6 +91,7 @@ public class DentalService {
         }
         ToothRow after = repo.findById(tenantId, patientId, id).orElseThrow();
         audit(tenantId, callerStaffId, ipAddress, "dental_chart.update", id, before, after);
+        event(tenantId, patientId, "supernumerary_changed", id, before, after, callerStaffId);
         return toResponse(after);
     }
 
@@ -100,6 +103,7 @@ public class DentalService {
             throw notFound();
         }
         audit(tenantId, callerStaffId, ipAddress, "dental_chart.delete", id, before, null);
+        event(tenantId, patientId, "supernumerary_removed", id, before, null, callerStaffId);
     }
 
     @Transactional
@@ -117,6 +121,12 @@ public class DentalService {
         ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 action, "dental_chart_entries", entityId, snapshot(before), snapshot(after));
+    }
+
+    private void event(UUID tenantId, UUID patientId, String event, UUID entryId, ToothRow before, ToothRow after,
+                       UUID actorId) {
+        int tooth = (after != null ? after : before).toothNumber();
+        repo.insertEvent(tenantId, patientId, entryId, tooth, event, snapshot(before), snapshot(after), actorId);
     }
 
     private Map<String, Object> snapshot(ToothRow t) {
