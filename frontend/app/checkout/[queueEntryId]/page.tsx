@@ -249,11 +249,15 @@ export default function CheckoutPage() {
         const before = inv.payments.length;
         let next: Invoice;
         try {
-          const res = await authedFetch(`/billing/invoices/${inv.id}/payments`, { method: "POST", body: JSON.stringify({ method: row.method, amount: amt / 100 }) });
+          const res = await authedFetch(`/billing/invoices/${inv.id}/payments`, { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ method: row.method, amount: amt / 100 }) });
           if (!res) return;
           if (!res.ok) {
             const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
             setPaymentError(p.detail || "Couldn't record payment.");
+            if (res.status === 422) { // overpayment: the server detail names the balance; refresh the one shown
+              const r = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+              if (r?.ok) setInvoice(await r.json());
+            }
             return;
           }
           next = await res.json();

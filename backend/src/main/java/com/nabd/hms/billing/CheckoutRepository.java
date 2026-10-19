@@ -149,10 +149,10 @@ class CheckoutRepository {
      * appends more line items to an invoice created at an earlier one; the latest discount
      * replaces (not adds to) whatever discount was applied before. */
     void updateInvoiceTotals(UUID tenantId, UUID invoiceId, BigDecimal subtotal, BigDecimal discount,
-                              BigDecimal tax, BigDecimal roundOff, BigDecimal total) {
-        jdbc.update("UPDATE invoices SET subtotal = ?, discount = ?, tax = ?, round_off = ?, total = ? " +
+                              BigDecimal tax, BigDecimal roundOff, BigDecimal total, String status) {
+        jdbc.update("UPDATE invoices SET subtotal = ?, discount = ?, tax = ?, round_off = ?, total = ?, status = ?, version = version + 1 " +
                         "WHERE tenant_id = ? AND id = ?",
-                subtotal, discount, tax, roundOff, total, tenantId, invoiceId);
+                subtotal, discount, tax, roundOff, total, status, tenantId, invoiceId);
     }
 
     /** V3-004: the catalogue row for a stocked (pharmacy) code, active or not; empty for any non-pharmacy code. */
@@ -267,14 +267,35 @@ class CheckoutRepository {
                 tenantId, invoiceId);
     }
 
-    void insertPayment(UUID tenantId, UUID invoiceId, String method, BigDecimal amount, UUID recordedBy) {
-        jdbc.update("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by) VALUES (?,?,?,?,?)",
-                tenantId, invoiceId, method, amount, recordedBy);
+    /** FIN-001: the invoice row lock that serialises payments, totals changes and voids on one invoice. */
+    Optional<InvoiceRow> lockInvoice(UUID tenantId, UUID invoiceId) {
+        return jdbc.query(INVOICE_SELECT + "WHERE tenant_id = ? AND id = ? FOR UPDATE", invoiceMapper(), tenantId, invoiceId)
+                .stream().findFirst();
     }
 
-    void updateInvoicePaidStatus(UUID tenantId, UUID invoiceId, BigDecimal paid, String status) {
-        jdbc.update("UPDATE invoices SET paid = ?, status = ? WHERE tenant_id = ? AND id = ?",
-                paid, status, tenantId, invoiceId);
+    /** The invoice a payment with this Idempotency-Key was already recorded on, if any. */
+    Optional<UUID> findInvoiceByPaymentKey(UUID tenantId, String key) {
+        return jdbc.query("SELECT invoice_id FROM invoice_payments WHERE tenant_id = ? AND idempotency_key = ?",
+                (rs, i) -> UUID.fromString(rs.getString("invoice_id")), tenantId, key).stream().findFirst();
+    }
+
+    UUID insertPayment(UUID tenantId, UUID invoiceId, String method, BigDecimal amount, UUID recordedBy,
+                       String reference, String idempotencyKey) {
+        return jdbc.queryForObject("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by, reference, idempotency_key) " +
+                "VALUES (?,?,?,?,?,?,?) RETURNING id", UUID.class,
+                tenantId, invoiceId, method, amount, recordedBy, reference, idempotencyKey);
+    }
+
+    /** paid is always the sum of the payment rows, never an absolute value computed in Java. */
+    void syncInvoicePaid(UUID tenantId, UUID invoiceId, String status) {
+        jdbc.update("UPDATE invoices SET paid = (SELECT COALESCE(SUM(amount), 0) FROM invoice_payments WHERE tenant_id = ? AND invoice_id = ?), " +
+                        "status = ?, version = version + 1 WHERE tenant_id = ? AND id = ?",
+                tenantId, invoiceId, status, tenantId, invoiceId);
+    }
+
+    BigDecimal sumPayments(UUID tenantId, UUID invoiceId) {
+        return jdbc.queryForObject("SELECT COALESCE(SUM(amount), 0) FROM invoice_payments WHERE tenant_id = ? AND invoice_id = ?",
+                BigDecimal.class, tenantId, invoiceId);
     }
 
     private static final String INVOICE_SELECT =

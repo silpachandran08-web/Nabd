@@ -2278,7 +2278,7 @@ paths:
         "200": { description: The invoice (lineItems show the price actually charged), content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: Forbidden }
-        "409": { description: otc-not-available, item-inactive, insufficient-stock or day-closed }
+        "409": { description: "otc-not-available, item-inactive, insufficient-stock or day-closed" }
   /billing/checkout/{queueEntryId}:
     post:
       tags: [Billing]
@@ -2318,6 +2318,47 @@ paths:
                   voidedTotal: { type: number, description: "Sum of those invoices' total" }
                 additionalProperties: true
         "403": { description: Forbidden }
+  /billing/invoices/{id}:
+    get:
+      tags: [Billing]
+      summary: >
+        An invoice with its derived balance (`balanceDue`), status (`unpaid` / `partial` / `paid`, or `void` / `cancelled` / `refunded`)
+        and payments. Status is recomputed from paid vs total in the same transaction as every payment or totals change (FIN-001).
+      x-required-permission: billing:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /billing/invoices/{id}/payments:
+    post:
+      tags: [Billing]
+      summary: >
+        Record a payment against an invoice (FIN-001). The invoice row is locked, so simultaneous payments each add exactly once;
+        `paid` is the sum of the payment rows and status is re-derived in the same transaction. Audit `billing.payment_recorded`;
+        outbox event `billing.payment.recorded.v1`. An optional `Idempotency-Key` header makes a retry return the invoice without a
+        second payment (the same key on another invoice is 409 idempotency-key-reused). 422 overpayment (body carries `balance`);
+        409 invoice-not-payable (void, cancelled or refunded); 409 day-closed; 404 not-found.
+      x-required-permission: billing:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method, amount]
+              properties:
+                method: { type: string, enum: [cash, card, upi, other] }
+                amount: { type: number, minimum: 0.01, description: "At most 2 decimals, not more than the balance" }
+                reference: { type: string, maxLength: 100 }
+      responses:
+        "201": { description: "The invoice with its new paid, balanceDue, status and payments", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "day-closed, invoice-not-payable or idempotency-key-reused" }
+        "422": { description: "overpayment: amount is more than the balance (Problem with a numeric `balance` member)" }
   /billing/invoices/{id}/void:
     post:
       tags: [Billing]

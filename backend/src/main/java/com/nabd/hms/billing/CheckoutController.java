@@ -78,9 +78,11 @@ public class CheckoutController {
     @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/invoices/{id}/payments")
     @PreAuthorize("hasAuthority('billing:edit')")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     public InvoiceResponse recordPayment(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
-                                          @Valid @RequestBody PaymentRequest req) {
-        return service.recordPayment(tenantId(jwt), id, staffId(jwt), req);
+                                          @Valid @RequestBody PaymentRequest req,
+                                          @org.springframework.web.bind.annotation.RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        return service.recordPayment(tenantId(jwt), id, staffId(jwt), req, idempotencyKey == null || idempotencyKey.isBlank() ? null : idempotencyKey.trim());
     }
 
     /** PHA-011: void an unpaid invoice and restore its pharmacy stock. Same grant as discounts/refunds. */

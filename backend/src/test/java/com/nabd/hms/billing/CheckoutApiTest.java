@@ -273,7 +273,7 @@ class CheckoutApiTest extends ApiTestBase {
 
         ResponseEntity<Map> blocked = exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
                 authedJsonBody(token, Map.of("method", "cash", "amount", 1)), Map.class);
-        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY); // FIN-001: was 400 invoice-already-paid
     }
 
     @Test
