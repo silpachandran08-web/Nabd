@@ -1,0 +1,36 @@
+# OPS-053: manual staging-in verification. Needs the staging-in cluster and secrets (Needs external action); never runs on PRs.
+name: staging-in
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest: { description: "image@sha256:... to roll out under load", required: true }
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml && python3 infra/staging-in/check-staging-in.py && python3 infra/staging-in/check-staging-in.py --selftest
+  rolling:
+    needs: manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      STAGING_URL: ${{ secrets.STAGING_IN_URL }}
+      STAGING_TENANT: ${{ secrets.STAGING_IN_TENANT }}
+      STAGING_EMAIL: ${{ secrets.STAGING_IN_EMAIL }}
+      STAGING_PIN: ${{ secrets.STAGING_IN_PIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: kubeconfig
+        run: mkdir -p ~/.kube && echo "${{ secrets.STAGING_IN_KUBECONFIG }}" | base64 -d > ~/.kube/config
+      - name: Live-session restart test
+        run: infra/staging-in/rolling-restart-test.sh
+      - uses: grafana/setup-k6-action@v1
+      - name: Rolling deploy under light load (error rate < 0.1%)
+        run: |
+          k6 run -e BASE="$STAGING_URL" infra/staging-in/rolling-deploy.k6.js &
+          K6=$!
+          sleep 20
+          kubectl -n staging-in set image deploy/core core="${{ inputs.image_digest }}"
+          kubectl -n staging-in rollout status deploy/core --timeout=10m
+          wait $K6
