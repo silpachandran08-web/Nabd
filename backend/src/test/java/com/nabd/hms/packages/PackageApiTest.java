@@ -330,7 +330,9 @@ class PackageApiTest extends ApiTestBase {
 
         exchange(base + "/extend", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "newValidityEnd", LocalDate.now(ZoneOffset.UTC).plusDays(10).toString(), "reason", "Test near expiry")), Map.class);
-        assertThat(exchange(base + "/send-reminder", HttpMethod.POST, authed(token), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        ResponseEntity<Map> ok = exchange(base + "/send-reminder", HttpMethod.POST, authed(token), Map.class);
+        assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(ok.getBody().toString()).contains("expiry_warning_sent", "recorded only, no message sent");
     }
 
     @Test

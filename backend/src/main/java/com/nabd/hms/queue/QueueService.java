@@ -102,11 +102,16 @@ public class QueueService {
         }
 
         if (req.appointmentId() != null) {
-            appointmentRepo.findById(tenantId, req.appointmentId())
+            var appt = appointmentRepo.findById(tenantId, req.appointmentId())
                     .filter(a -> "scheduled".equals(a.status()))
                     .filter(a -> a.patientId().equals(req.patientId()) && a.doctorId().equals(req.doctorId()))
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
                             "Appointment not found, already resolved, or doesn't match patient/doctor."));
+            LocalDate apptDay = appt.startTime().atZone(clock.zone(tenantId)).toLocalDate();
+            if (!apptDay.equals(today)) {
+                throw new ApiException(HttpStatus.CONFLICT, "appointment-not-today", "Appointment is not for today",
+                        "This appointment is dated " + apptDay + ", not today. Book the patient as a walk-in instead.");
+            }
         }
 
         // serializes both "what's the next token number" and, for walk-ins, the session-capacity
@@ -122,12 +127,12 @@ public class QueueService {
         }
 
         UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
-        int token = repo.nextTokenNumber(req.doctorId(), today);
+        int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
         UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
                 null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode(), null, null);
-        log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",
+        log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",  // log-phi-ok: queue token number, not a credential
                 callerStaffId, token, req.doctorId(), req.appointmentId() == null ? "walk-in" : "scheduled", id);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
@@ -190,7 +195,7 @@ public class QueueService {
 
         LocalDate today = clock.today(tenantId);
         repo.lockDoctorDay(req.doctorId(), today);
-        int token = repo.nextTokenNumber(req.doctorId(), today);
+        int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
         // though this is a brand-new queue_entries row with its own status/practitioner/department.
         UUID newId = repo.insert(tenantId, null, current.patientId(), req.doctorId(), req.toDepartmentId(),
@@ -213,7 +218,7 @@ public class QueueService {
         tenantContext.set(tenantId);
         repo.findById(tenantId, id).orElseThrow(this::notFound);
         repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null, callerStaffId);
-        log.info("queue entry {} priority set to {} by {} ({})", id, req.priority(), callerStaffId, req.reason());
+        log.info("queue entry {} priority set to {} by {}", id, req.priority(), callerStaffId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
 
@@ -260,7 +265,7 @@ public class QueueService {
             return;
         }
 
-        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, today, block.get().startTime(), block.get().endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, today, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached (walk-in check-in): doctor {} on {} ({}/{})",
                     doctorId, today, occupancy, block.get().maxPatients());

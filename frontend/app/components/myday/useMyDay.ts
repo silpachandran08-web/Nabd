@@ -1,10 +1,12 @@
 "use client";
 
+import { decodeJwtPayload } from "../../lib/jwt";
 import { useCallback, useEffect, useState } from "react";
 import { can } from "../../lib/permissions";
+import { useLatestLoad } from "../../lib/useLatestLoad";
 import type { PatientDetail, QueueEntry } from "../consult/shared";
+import { apiFetch, goLogin } from "../../lib/apiClient";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 // DTOs mirror the backend records exactly (queue/dto/*, clinical/dto/DueConditionResponse).
 export type Appointment = { id: string; patientId: string; doctorId: string; startTime: string; endTime: string; status: string; isFollowUp: boolean };
@@ -28,12 +30,7 @@ export type MyDayData = {
 };
 
 function selfIdFromToken(token: string): string {
-  try {
-    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return String(JSON.parse(atob(b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "="))).sub ?? "");
-  } catch {
-    return "";
-  }
+  return String(decodeJwtPayload<{ sub?: string }>(token)?.sub ?? "");
 }
 
 function localDate(): string {
@@ -46,21 +43,23 @@ export function useMyDay() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const newSignal = useLatestLoad();
   const load = useCallback(async () => {
+    const signal = newSignal();
     setLoading(true);
     setError(null);
     const token = localStorage.getItem("nabd_access_token");
     const selfId = token ? selfIdFromToken(token) : "";
     if (!token || !selfId) {
-      window.location.replace("/login");
+      goLogin();
       return;
     }
     const get = async (path: string): Promise<Response | null> => {
       try {
-        const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` }, signal });
         if (res.status === 401) {
           localStorage.removeItem("nabd_access_token");
-          window.location.replace("/login");
+          goLogin();
           return null;
         }
         return res;
@@ -86,9 +85,11 @@ export function useMyDay() {
         part(`/queue/wait-estimate?doctorId=${selfId}`, (j) => j as WaitEstimate),
         wantDue ? part(`/clinical/conditions/due`, (j) => j as DueCondition[]) : Promise.resolve(null),
       ]);
+      if (signal.aborted) return;
       if (!queueRes) { setError("Couldn't reach the server. Check your connection and try again."); return; }
       if (!queueRes.ok) { setError("Couldn't load today's queue. Try again."); return; }
       const entries: QueueEntry[] = await queueRes.json();
+      if (signal.aborted) return;
 
       // Names/flags: one patient read per distinct patient across the queue and today's appointments.
       // Without patients:view (or on a failed read) the row shows its token instead of a name.
@@ -101,6 +102,7 @@ export function useMyDay() {
           details.set(id, r?.ok ? ((await r.json()) as PatientDetail) : null);
         }));
       }
+      if (signal.aborted) return;
       const patientNames: Record<string, string> = {};
       details.forEach((p, id) => { if (p) patientNames[id] = p.name; });
       setData({
@@ -109,11 +111,12 @@ export function useMyDay() {
         appointments, delay, wait, due, patientNames,
       });
     } catch {
+      if (signal.aborted) return;
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [newSignal]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
   return { data, loading, error, reload: load };

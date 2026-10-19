@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -62,8 +63,9 @@ public class RoleController {
     @PostMapping("/delegations")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('staff:edit')")
-    public DelegationResponse createDelegation(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DelegationRequest req) {
-        return service.createDelegation(tenantId(jwt), staffId(jwt), req, permissions(jwt));
+    public DelegationResponse createDelegation(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DelegationRequest req,
+                                               @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken) {
+        return service.createDelegation(tenantId(jwt), staffId(jwt), req, stepUpToken);
     }
 
     @GetMapping("/delegations")

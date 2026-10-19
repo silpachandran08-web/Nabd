@@ -8,6 +8,7 @@ import { can } from "../../lib/permissions";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { age, type Allergy, type AllergyStatus, type PatientDetail, type Prescription, type PrescriptionAllergySnapshot } from "./shared";
 import r from "./rxPrint.module.css";
+import { apiFetch, goLogin } from "../../lib/apiClient";
 
 // DOC-N1: printable SIGNED prescription. Data comes from GET /clinical/prescriptions/{queueEntryId},
 // GET /clinical/prescriptions/{queueEntryId}/print-header (clinic + prescriber of record + registration number),
@@ -63,13 +64,13 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
   const get = useCallback(async (path: string): Promise<Response> => {
     const token = localStorage.getItem("nabd_access_token");
     if (!token) {
-      router.replace("/login");
+      goLogin();
       throw new LoadError("signed out");
     }
-    const res = await fetch(`${API_BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
     if (res.status === 401) {
       localStorage.removeItem("nabd_access_token");
-      router.replace("/login");
+      goLogin();
       throw new LoadError("signed out");
     }
     return res;
@@ -173,11 +174,11 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
       <article className={r.sheet} aria-label="Prescription">
         <header className={r.letterhead}>
           <div>
-            <h2 className={r.clinicName}>{header.clinicName}</h2>
+            <h2 className={r.clinicName}><bdi>{header.clinicName}</bdi></h2>
             {header.clinicPhone && <div className={r.muted}>{header.clinicPhone}</div>}
           </div>
           <div className={r.prescriber}>
-            <div className={r.prescriberName}>{header.prescriberName ?? "Prescriber"}</div>
+            <div className={r.prescriberName}><bdi>{header.prescriberName ?? "Prescriber"}</bdi></div>
             {header.professionalRegistrationNo && <div>Reg. No. {header.professionalRegistrationNo}</div>}
           </div>
         </header>
@@ -238,7 +239,7 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
         <footer className={r.signature}>
           <div>
             <div className={r.metaLabel}>Signed electronically by</div>
-            <div className={r.prescriberName}>{header.prescriberName ?? "Prescriber"}</div>
+            <div className={r.prescriberName}><bdi>{header.prescriberName ?? "Prescriber"}</bdi></div>
             {header.professionalRegistrationNo && <div>Reg. No. {header.professionalRegistrationNo}</div>}
           </div>
           <div>

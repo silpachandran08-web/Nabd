@@ -102,7 +102,7 @@ public class AppointmentService {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
         repo.cancel(tenantId, id, req.reason());
-        log.info("appointment {} cancelled by {}: {}", id, callerStaffId, req.reason());
+        log.info("appointment {} cancelled by {}", id, callerStaffId);
         waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
@@ -184,7 +184,7 @@ public class AppointmentService {
         }
 
         queueRepo.lockDoctorDay(doctorId, date);
-        int occupancy = scheduleRepo.countSessionOccupancy(doctorId, date, block.get().startTime(), block.get().endTime(), zone);
+        int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             log.warn("session capacity reached: doctor {} on {} ({}/{})", doctorId, date, occupancy, block.get().maxPatients());
             throw sessionFull();

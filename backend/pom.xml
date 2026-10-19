@@ -18,6 +18,8 @@
 
   <properties>
     <java.version>17</java.version>
+    <!-- OPS-031: Boot 3.3.4 manages 1.19.8, which fails on Docker Engine 29. Keep >= 1.21. -->
+    <testcontainers.version>1.21.3</testcontainers.version>
   </properties>
 
   <dependencies>

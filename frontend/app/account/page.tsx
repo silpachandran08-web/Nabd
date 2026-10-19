@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./account.module.css";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
 // self-activated emergency access (NB-048). All work against a normal logged-in access token.
@@ -33,16 +34,16 @@ export default function AccountPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;
@@ -120,13 +121,13 @@ export default function AccountPage() {
   async function activateBreakGlass(e: React.FormEvent) {
     e.preventDefault();
     setBgError(null);
-    if (!bgReason.trim()) {
-      setBgError("A reason is required.");
+    if (bgReason.trim().length < 10) {
+      setBgError("Please describe the emergency (at least 10 characters).");
       return;
     }
     setBgBusy(true);
     try {
-      const res = await authedFetch("/auth/break-glass/activate", { method: "POST", body: JSON.stringify({ reason: bgReason.trim() }) });
+      const res = await authedFetch("/auth/break-glass/activate", { method: "POST", body: JSON.stringify({ reasonCode: "other", reasonText: bgReason.trim() }) });
       if (!res) return;
       if (!res.ok) {
         const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't activate emergency access." }));

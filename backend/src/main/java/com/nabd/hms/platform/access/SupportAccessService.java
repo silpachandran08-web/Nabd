@@ -53,8 +53,8 @@ public class SupportAccessService {
         repo.insert(grant);
         auditService.record(tenantId, "operator", operatorId, operator.name(), operator.role(), ipAddress,
                 "support_access.grant", "tenant", tenantId, null, Map.of("reason", reason));
-        log.info("support access grant {} for tenant {} by operator {} ({}): {}",
-                grant.id(), tenantId, operatorId, operator.role(), reason);
+        log.info("support access grant {} for tenant {} by operator {} ({})",
+                grant.id(), tenantId, operatorId, operator.role());
         return toResponse(repo.findById(grant.id()).orElseThrow(), operator);
     }
 

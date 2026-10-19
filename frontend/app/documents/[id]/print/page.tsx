@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, Skeleton } from "../../../components/ui/StateVi
 import DocumentSheet from "../../../components/consult/DocumentSheet";
 import { DOC_LABEL, type ClinicalDocument } from "../../../components/consult/documents";
 import styles from "./print.module.css";
+import { apiFetch, goLogin } from "../../../lib/apiClient";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -33,9 +34,9 @@ function PrintView() {
     setLoad({ state: "loading" });
     try {
       const token = localStorage.getItem("nabd_access_token");
-      if (!token) { router.replace("/login"); return; }
-      const res = await fetch(`${API_BASE}/clinical/documents/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 401) { localStorage.removeItem("nabd_access_token"); router.replace("/login"); return; }
+      if (!token) { goLogin(); return; }
+      const res = await apiFetch(`/clinical/documents/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 401) { localStorage.removeItem("nabd_access_token"); goLogin(); return; }
       if (res.status === 404 || res.status === 403) { setLoad({ state: "missing" }); return; }
       if (!res.ok) { setLoad({ state: "error" }); return; }
       setLoad({ state: "ok", doc: (await res.json()) as ClinicalDocument });

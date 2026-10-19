@@ -9,6 +9,8 @@ import { ErrorState, Skeleton } from "../components/ui/StateViews";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { formatMoney } from "../lib/money";
 import { getIdentity } from "../lib/session";
+import { eventLabel } from "./eventLabel";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // Matches GET/POST/PATCH /v1/packages/** (PackageController) — E14 Treatment Packages.
 type PackageItem = { id: string; itemType: string; name: string; quantity: number; unitListPrice: number; taxRatePercent: number; listValue: number };
@@ -107,16 +109,16 @@ export default function PackagesPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;
@@ -409,8 +411,12 @@ export default function PackagesPage() {
     await afterInstanceAction(res);
   }
 
+  const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   async function sendReminder(instanceId: string) {
+    // The endpoint only records the reminder; nothing is messaged (COM-044 wires real sending).
+    setReminderNotice(null);
     const res = await authedFetch(`/packages/instances/${instanceId}/send-reminder`, { method: "POST" });
+    if (res?.ok) setReminderNotice("Recorded. No message was sent.");
     await afterInstanceAction(res);
   }
 
@@ -856,6 +862,7 @@ export default function PackagesPage() {
 
           {tab === "expiring" && (
             <div className={styles.tableWrap}>
+              {reminderNotice && <div className={styles.muted} role="status">{reminderNotice}</div>}
               <table className={styles.table}>
                 <thead><tr><th>Patient</th><th>Package</th><th>Remaining</th><th>Expires</th><th>Value left</th><th>Contact</th><th></th></tr></thead>
                 <tbody>
@@ -866,8 +873,8 @@ export default function PackagesPage() {
                       <td>{e.quantityTotal - e.quantityConsumed}/{e.quantityTotal}</td>
                       <td>{e.expiresOn}</td>
                       <td>{money(e.valueLeft)}</td>
-                      <td><span className={`${styles.pill} ${e.reminderSentForTier ? styles.pillDone : styles.pillWarn}`}>{e.reminderSentForTier ? "Sent" : `${e.alertTier}-day reminder due`}</span></td>
-                      <td>{canEdit && <button className={styles.btnSmall} onClick={() => sendReminder(e.instanceId)} disabled={e.reminderSentForTier}>Send reminder</button>}</td>
+                      <td><span className={`${styles.pill} ${e.reminderSentForTier ? styles.pillDone : styles.pillWarn}`}>{e.reminderSentForTier ? "Marked reminded" : `${e.alertTier}-day reminder due`}</span></td>
+                      <td>{canEdit && <button className={styles.btnSmall} onClick={() => sendReminder(e.instanceId)} disabled={e.reminderSentForTier}>Mark reminded</button>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1019,7 +1026,7 @@ function InstanceDetail({
       {(instance.events ?? []).map((e, idx) => (
         <div key={idx} className={styles.ledgerItem}>
           <div>
-            <div>{e.eventType.replace(/_/g, " ")}{e.delta != null && e.delta !== 0 ? ` (${e.delta})` : ""}</div>
+            <div>{eventLabel(e.eventType, e.note)}{e.delta != null && e.delta !== 0 ? ` (${e.delta})` : ""}</div>
             <div className={styles.ledgerNote}>{e.note} · {e.actorName}</div>
           </div>
           <div className={styles.muted}>{new Date(e.createdAt).toLocaleString()}</div>

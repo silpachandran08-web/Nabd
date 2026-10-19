@@ -1,0 +1,4 @@
+{
+  "_doc": "Existing High/Critical findings accepted for now. Every entry needs id, scanner, owner, added, expires (<= 90 days after added) and reason. Mirror each entry into the scanner's own ignore file (.trivyignore, ci/dependency-check-suppressions.xml, .semgrepignore). Empty until the first scan runs in CI.",
+  "findings": []
+}

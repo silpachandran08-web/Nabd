@@ -96,12 +96,25 @@ public class PrescriptionService {
     @Transactional
     public DoseCalculationResponse calculateDose(UUID tenantId, UUID patientId, BigDecimal mgPerKg) {
         tenantContext.set(tenantId);
+        if (mgPerKg == null || mgPerKg.signum() <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Invalid dose rate",
+                    "mgPerKg must be a positive number.");
+        }
+        LocalDate dob = vitalsRepo.findPatientDob(tenantId, patientId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Patient not found", "No such patient."));
+        java.time.ZoneId zone = clock.zone(tenantId);
+        LocalDate today = LocalDate.now(zone);
+        if (DoseWeightPolicy.isAdult(dob, today)) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "adult-patient", "Adult patient",
+                    "Weight-based mg/kg dosing is for patients under 18; use the drug reference for adult doses.");
+        }
         VitalsRepository.WeightReading reading = vitalsRepo.findLatestWeight(tenantId, patientId)
                 .orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "no-weight-recorded", "No weight recorded",
                         "Record this patient's weight in vitals before calculating a weight-based dose."));
         BigDecimal weightKg = reading.weightKg();
         BigDecimal totalDoseMg = weightKg.multiply(mgPerKg).setScale(2, RoundingMode.HALF_UP);
-        return new DoseCalculationResponse(weightKg, mgPerKg, totalDoseMg, DOSE_RULE_SOURCE, reading.recordedAt());
+        return new DoseCalculationResponse(weightKg, mgPerKg, totalDoseMg, DOSE_RULE_SOURCE, reading.recordedAt(),
+                DoseWeightPolicy.isStale(reading.recordedAt(), dob, today, zone));
     }
 
     @Transactional
@@ -364,8 +377,8 @@ public class PrescriptionService {
 
     /** Stale = the tenant has an active pharmacy item master and neither the drug nor the brand text is in it. */
     static boolean isStale(FavouriteSetItemRow i, java.util.Set<String> master) {
-        String drug = i.drugName() == null ? "" : i.drugName().trim().toLowerCase();
-        String brand = i.brandName() == null ? "" : i.brandName().trim().toLowerCase();
+        String drug = i.drugName() == null ? "" : i.drugName().trim().toLowerCase(java.util.Locale.ROOT);
+        String brand = i.brandName() == null ? "" : i.brandName().trim().toLowerCase(java.util.Locale.ROOT);
         return !(master.contains(drug) || (!brand.isEmpty() && master.contains(brand)));
     }
 

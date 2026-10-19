@@ -46,10 +46,10 @@ class QueueRepository {
         jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?))", Object.class, doctorId + ":" + date);
     }
 
-    int nextTokenNumber(UUID doctorId, LocalDate date) {
+    int nextTokenNumber(UUID tenantId, UUID doctorId, LocalDate date) {
         Integer max = jdbc.queryForObject(
-                "SELECT COALESCE(MAX(token_number), 0) FROM queue_entries WHERE doctor_id = ? AND queue_date = ?",
-                Integer.class, doctorId, Date.valueOf(date));
+                "SELECT COALESCE(MAX(token_number), 0) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ?",
+                Integer.class, tenantId, doctorId, Date.valueOf(date));
         return (max == null ? 0 : max) + 1;
     }
 

@@ -1,0 +1,12 @@
+rules:
+  - id: log-phi-argument
+    languages: [java]
+    severity: ERROR
+    message: Log argument looks like PHI or a credential (phone, otp, code, token, reason, note, name, diagnosis). Log an id or a reason code instead.
+    patterns:
+      - pattern-either:
+          - pattern: log.$LVL(..., $X, ...)
+          - pattern: logger.$LVL(..., $X, ...)
+      - metavariable-regex:
+          metavariable: $X
+          regex: '(?i)^(.*\.)?(\w*(phone|otp|code|token|reason|note|name|diagnosis)\w*)(\(\))?$'

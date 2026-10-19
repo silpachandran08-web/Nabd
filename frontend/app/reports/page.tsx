@@ -9,6 +9,7 @@ import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { paymentMethodLabel } from "../components/checkout/paymentMethods";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
 // OWN-024: revenue / untaggedCount are additive (S3 contract); every new field is optional so an older backend still renders.
@@ -125,13 +126,13 @@ export default function ReportsPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, { ...init, headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch(path, { ...init, headers: { Authorization: `Bearer ${token}` } });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;
@@ -208,9 +209,9 @@ export default function ReportsPage() {
       const res = await authedFetch(`/packages/instances/${instanceId}/send-reminder`, { method: "POST" });
       if (!res) return;
       const p = res.ok ? null : await res.json().catch(() => null);
-      setReminded((r) => ({ ...r, [instanceId]: res.ok ? "sent" : p?.detail || "Couldn't send the reminder. Try again." }));
+      setReminded((r) => ({ ...r, [instanceId]: res.ok ? "sent" : p?.detail || "Couldn't record the reminder. Try again." }));
     } catch {
-      setReminded((r) => ({ ...r, [instanceId]: "Couldn't reach the server. The reminder wasn't sent." }));
+      setReminded((r) => ({ ...r, [instanceId]: "Couldn't reach the server. The reminder wasn't recorded." }));
     }
   }
 
@@ -220,7 +221,7 @@ export default function ReportsPage() {
     if (!token) return;
     let res: Response;
     try {
-      res = await fetch(`${API_BASE}/reports/export?reportType=${reportType}&${qs}`, { headers: { Authorization: `Bearer ${token}` } });
+      res = await apiFetch(`/reports/export?reportType=${reportType}&${qs}`);
     } catch {
       setExportError("Couldn't reach the server. The export wasn't downloaded.");
       return;
@@ -554,9 +555,9 @@ export default function ReportsPage() {
                         <td>{e.patientName}</td><td>{e.packageName}</td><td>{shortDate(e.expiredOn)}</td><td>{money(Number(e.remainingValue))}</td>
                         {canEdit && (
                           <td>
-                            {reminded[e.instanceId] === "sent" ? <span className={styles.muted}>Reminder sent</span> : (
+                            {reminded[e.instanceId] === "sent" ? <span className={styles.muted}>Marked reminded. No message was sent.</span> : (
                               <>
-                                <button type="button" className={styles.remindBtn} onClick={() => void remind(e.instanceId)}>Remind</button>
+                                <button type="button" className={styles.remindBtn} onClick={() => void remind(e.instanceId)}>Mark reminded</button>
                                 {reminded[e.instanceId] && <div className={styles.errorState} role="alert">{reminded[e.instanceId]}</div>}
                               </>
                             )}

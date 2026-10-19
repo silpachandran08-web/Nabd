@@ -10,6 +10,7 @@ import com.nabd.hms.queue.dto.DoctorLeaveResponse;
 import com.nabd.hms.queue.dto.DoctorLeaveWriteRequest;
 import com.nabd.hms.queue.dto.WorkingHoursResponse;
 import com.nabd.hms.queue.dto.WorkingHoursWriteRequest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -195,30 +196,52 @@ public class ScheduleService {
     @Transactional
     public DoctorDelayResponse announceDelay(UUID tenantId, UUID callerStaffId, UUID doctorId, DelayAnnounceRequest req) {
         tenantContext.set(tenantId);
-        UUID id = repo.announceDelay(tenantId, doctorId, req.delayMinutes(), req.reason(), callerStaffId);
-        log.info("doctor {} delay announced by {}: {} min ({})", doctorId, callerStaffId, req.delayMinutes(), req.reason());
-        return toDelayResponse(repo.findActiveDelay(doctorId).orElseThrow());
+        LocalDate today = clock.today(tenantId);
+        if (!repo.doctorInTenant(tenantId, doctorId)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Doctor not found", "No such doctor.");
+        }
+        UUID id;
+        try {
+            id = repo.announceDelay(tenantId, doctorId, req.delayMinutes(), req.reason(), callerStaffId, today);
+        } catch (DuplicateKeyException e) { // lost the race on uq_doctor_delays_active_day
+            throw new ApiException(HttpStatus.CONFLICT, "delay-already-active", "Delay already active",
+                    "Another delay was announced for this doctor at the same moment.");
+        }
+        log.info("doctor {} delay announced by {}: {} min", doctorId, callerStaffId, req.delayMinutes());
+        DoctorDelayRow row = repo.findActiveDelay(doctorId, today).orElseThrow();
+        auditDelay(tenantId, callerStaffId, "doctor_delay.announced", id, null, toDelayResponse(row, today));
+        return toDelayResponse(row, today);
     }
 
     @Transactional
     public void clearDelay(UUID tenantId, UUID callerStaffId, UUID doctorId) {
         tenantContext.set(tenantId);
-        if (repo.findActiveDelay(doctorId).isEmpty()) {
+        LocalDate today = clock.today(tenantId);
+        DoctorDelayRow active = repo.findActiveDelay(doctorId, today).orElse(null);
+        if (active == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "no-active-delay", "No active delay",
                     "This doctor doesn't have an active delay to clear.");
         }
         repo.clearActiveDelay(tenantId, doctorId, callerStaffId);
         log.info("doctor {} delay cleared by {}", doctorId, callerStaffId);
+        auditDelay(tenantId, callerStaffId, "doctor_delay.cleared", active.id(), toDelayResponse(active, today), null);
     }
 
     @Transactional
     public List<DoctorDelayResponse> delayHistory(UUID tenantId, UUID doctorId) {
         tenantContext.set(tenantId);
-        return repo.delayHistory(doctorId, 20).stream().map(this::toDelayResponse).toList();
+        LocalDate today = clock.today(tenantId);
+        return repo.delayHistory(doctorId, 20).stream().map(r -> toDelayResponse(r, today)).toList();
     }
 
-    private DoctorDelayResponse toDelayResponse(DoctorDelayRow row) {
+    private void auditDelay(UUID tenantId, UUID callerStaffId, String action, UUID delayId, Object before, Object after) {
+        QueueModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+                action, "doctor_delay", delayId, before, after);
+    }
+
+    private DoctorDelayResponse toDelayResponse(DoctorDelayRow row, LocalDate today) {
         return new DoctorDelayResponse(row.id(), row.doctorId(), row.delayMinutes(), row.reason(), row.announcedBy(),
-                row.announcedAt(), row.clearedBy(), row.clearedAt(), row.active());
+                row.announcedAt(), row.clearedBy(), row.clearedAt(), row.active(today), row.clinicDate());
     }
 }

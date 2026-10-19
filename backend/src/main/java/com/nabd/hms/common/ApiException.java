@@ -12,12 +12,23 @@ public class ApiException extends RuntimeException {
     private final HttpStatus status;
     private final String typeSlug;
     private final String title;
+    private final java.util.Map<String, Object> extras;
 
     public ApiException(HttpStatus status, String typeSlug, String title, String detail) {
+        this(status, typeSlug, title, detail, java.util.Map.of());
+    }
+
+    /** extras become top-level RFC 7807 members (e.g. retryAfterSeconds). */
+    public ApiException(HttpStatus status, String typeSlug, String title, String detail, java.util.Map<String, Object> extras) {
         super(detail);
         this.status = status;
         this.typeSlug = typeSlug;
         this.title = title;
+        this.extras = extras;
+    }
+
+    public java.util.Map<String, Object> extras() {
+        return extras;
     }
 
     public HttpStatus status() {

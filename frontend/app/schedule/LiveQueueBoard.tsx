@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { usePolling } from "../lib/usePolling";
+import { useLatestLoad } from "../lib/useLatestLoad";
 import styles from "./schedule.module.css";
 
 // Matches GET /v1/queue (QueueController) — same shape the Arrivals page reads.
@@ -46,20 +47,25 @@ export default function LiveQueueBoard({ doctors, names, authedFetch }: {
   const [entries, setEntries] = useState<QueueEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const newSignal = useLatestLoad();
   const load = useCallback(async () => {
+    const signal = newSignal();
     try {
-      const res = await authedFetch("/queue");
-      if (!res) return;
+      const res = await authedFetch("/queue", { signal });
+      if (!res || signal.aborted) return;
       if (!res.ok) {
         setError(res.status === 403 ? "You don't have access to the live queue." : "Couldn't load the live queue.");
         return;
       }
-      setEntries(await res.json());
+      const rows = await res.json();
+      if (signal.aborted) return;
+      setEntries(rows);
       setError(null);
     } catch {
+      if (signal.aborted) return;
       setError("Couldn't reach the server. Check your connection and try again.");
     }
-  }, [authedFetch]);
+  }, [authedFetch, newSignal]);
 
   useEffect(() => {
     void Promise.resolve().then(load);

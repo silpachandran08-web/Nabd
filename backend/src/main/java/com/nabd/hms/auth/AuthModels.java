@@ -27,8 +27,4 @@ final class AuthModels {
             return revokedAt == null && expiresAt.isAfter(Instant.now());
         }
     }
-
-    /** NB-048: an active break-glass grant, for the Owner-visible "who's elevated right now" panel. */
-    record BreakGlassRow(UUID id, UUID staffId, String staffName, String reason, Instant activatedAt, Instant expiresAt) {
-    }
 }

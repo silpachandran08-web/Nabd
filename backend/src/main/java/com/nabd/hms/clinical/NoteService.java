@@ -88,7 +88,7 @@ public class NoteService {
         ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 "clinical_note.amended", "clinical_note", note.id(), null, req);
-        log.info("clinical note {} amended (amendment {}) by {}: {}", note.id(), id, callerStaffId, req.reason());
+        log.info("clinical note {} amended (amendment {}) by {}", note.id(), id, callerStaffId);
         return repo.listAmendments(tenantId, note.id()).stream()
                 .filter(a -> a.id().equals(id)).findFirst().map(this::toAmendmentResponse).orElseThrow();
     }

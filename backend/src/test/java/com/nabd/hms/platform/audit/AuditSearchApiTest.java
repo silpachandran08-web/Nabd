@@ -26,6 +26,8 @@ class AuditSearchApiTest extends ApiTestBase {
 
     @Test
     void searchReturnsEntriesAcrossMultipleTenantsByDefault() {
+        // results page oldest-first, so a busy shared test DB would push our two rows past page 1: only look at rows created from now on
+        java.time.Instant since = java.time.Instant.now().minusSeconds(1);
         SeededTenant tenantA = seedTenant();
         SeededTenant tenantB = seedTenant();
         auditService.record(tenantA.id(), "system", null, "Nabd System", "System", null,
@@ -34,7 +36,7 @@ class AuditSearchApiTest extends ApiTestBase {
                 "patient.create", "patient", UUID.randomUUID(), null, Map.of("x", 2));
 
         String token = complianceToken();
-        ResponseEntity<Map> resp = exchange("/v1/platform/audit-log?limit=100", HttpMethod.GET, authed(token), Map.class);
+        ResponseEntity<Map> resp = exchange("/v1/platform/audit-log?limit=100&createdAfter=" + since, HttpMethod.GET, authed(token), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         List<Map<String, Object>> rows = (List<Map<String, Object>>) resp.getBody().get("data");
         Set<String> tenantIds = rows.stream().map(r -> (String) r.get("tenantId")).collect(Collectors.toSet());

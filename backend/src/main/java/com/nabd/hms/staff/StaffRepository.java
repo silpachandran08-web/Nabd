@@ -107,7 +107,7 @@ class StaffRepository {
 
     /** Accepting the emailed invite link is itself the email-verification step (NB-041). */
     void acceptInvite(UUID tenantId, UUID id, String pinHash) {
-        jdbc.update("UPDATE staff SET pin_hash = ?, status = 'active', email_verified = true, " +
+        jdbc.update("UPDATE staff SET pin_hash = ?, pin_policy_version = 2, status = 'active', email_verified = true, " +
                         "invite_token_hash = NULL, invite_expires_at = NULL " +
                         "WHERE tenant_id = ? AND id = ?",
                 pinHash, tenantId, id);

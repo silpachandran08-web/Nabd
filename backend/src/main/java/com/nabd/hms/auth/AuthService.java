@@ -3,8 +3,6 @@ package com.nabd.hms.auth;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
-import com.nabd.hms.auth.dto.BreakGlassResponse;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
@@ -35,6 +33,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
+import com.nabd.hms.shared.security.Audience;
+import com.nabd.hms.shared.security.ChallengeTokenDecoder;
+import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -67,16 +68,18 @@ public class AuthService {
     private final TotpService totpService;
     private final AesGcmCipher cipher;
     private final JwtEncoder jwtEncoder;
-    private final JwtDecoder jwtDecoder;
+    private final ChallengeTokenDecoder jwtDecoder;
     private final AuthProperties props;
     private final ObjectMapper objectMapper;
     private final WhatsAppOtpSender otpSender;
     private final AuditService auditService;
+    private final LoginGuard guard;
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
-                TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, JwtDecoder jwtDecoder,
-                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService) {
+                TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
+                AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
+                LoginGuard guard) {
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -88,6 +91,7 @@ public class AuthService {
         this.objectMapper = objectMapper;
         this.otpSender = otpSender;
         this.auditService = auditService;
+        this.guard = guard;
     }
 
     // noRollbackFor: recordLoginAttempt() below is the lockout counter's only durable state, and
@@ -116,7 +120,9 @@ public class AuthService {
             repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, false);
             throw invalidCredentials();
         }
-        repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, true);
+        if (!staff.mfaEnabled()) { // with MFA the success is recorded after the second factor, so PIN logins cannot reset TOTP failures
+            repo.recordLoginAttempt(tenant.id(), staff.id(), email, ip, true);
+        }
         log.info("staff {} authenticated via PIN (tenant {})", staff.id(), tenant.id());
 
         if (!staff.mfaEnabled() && mfaRequiredByPolicy(staff)) {
@@ -144,14 +150,15 @@ public class AuthService {
     private MfaSetupRequiredResponse issueMfaSetupRequired(Staff staff) {
         Instant now = Instant.now();
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staff.id().toString())
                 .claim("purpose", "mfa_setup_required")
-                .claim("tenantId", staff.tenantId().toString())
-                .build();
+                .claim("tenantId", staff.tenantId().toString());
+        TokenType.MFA_SETUP.stamp(claimsB, Audience.MFA);
+        JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
     }
@@ -206,10 +213,12 @@ public class AuthService {
         enforceAccountLockout(staff);
 
         if (!repo.consumeWhatsAppOtp(staff.id(), OpaqueTokens.sha256Hex(req.code()))) {
-            repo.recordLoginAttempt(tenant.id(), staff.id(), staff.email(), ip, false);
+            guard.recordAttempt(tenant.id(), staff.id(), staff.email(), "otp", false);
             throw invalidCredentials();
         }
-        repo.recordLoginAttempt(tenant.id(), staff.id(), staff.email(), ip, true);
+        if (!staff.mfaEnabled()) {
+            guard.recordAttempt(tenant.id(), staff.id(), staff.email(), "otp", true);
+        }
         repo.markMobileVerified(staff.id());
         log.info("staff {} authenticated via WhatsApp OTP, mobile verified (tenant {})", staff.id(), tenant.id());
 
@@ -226,11 +235,11 @@ public class AuthService {
         return String.format("%06d", random.nextInt(1_000_000));
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class) // the failed-attempt row must survive the 401
     public TokenPairResponse verifyMfa(MfaVerifyRequest req, String ip, String device, String userAgent) {
         Jwt challenge;
         try {
-            challenge = jwtDecoder.decode(req.challengeId());
+            challenge = jwtDecoder.decode(req.challengeId(), TokenType.MFA_PENDING);
         } catch (JwtException e) {
             throw mfaFailed(); // covers expired (5 min TTL) and tampered tokens alike
         }
@@ -247,11 +256,14 @@ public class AuthService {
         if (staff.mfaSecretEnc() == null) {
             throw mfaFailed(); // enrolled=false but flagged enabled — never silently skip the check
         }
+        guard.enforceLockout(staff.id());
         byte[] secret = cipher.decrypt(staff.mfaSecretEnc());
-        if (!totpService.verify(secret, req.code(), Instant.now())) {
+        if (!guard.verifyTotp(staff.id(), secret, req.code())) {
             log.warn("MFA verification failed for staff {}", staff.id());
+            guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "totp", false);
             throw mfaFailed();
         }
+        guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "totp", true);
         log.info("staff {} completed MFA", staff.id());
         return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
     }
@@ -261,7 +273,7 @@ public class AuthService {
      * involved, since the caller's own access token already establishes who they are; the TOTP
      * code is checked directly against their own secret.
      */
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class)
     public StepUpTokenResponse issueStepUpToken(Jwt callerJwt, String code) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
@@ -270,21 +282,24 @@ public class AuthService {
         if (staff.mfaSecretEnc() == null) {
             throw mfaFailed();
         }
+        guard.enforceLockout(staffId);
         byte[] secret = cipher.decrypt(staff.mfaSecretEnc());
-        if (!totpService.verify(secret, code, Instant.now())) {
+        if (!guard.verifyTotp(staffId, secret, code)) {
             log.warn("step-up denied for staff {} — TOTP mismatch", staffId);
+            guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "step_up", false);
             throw mfaFailed();
         }
 
         Instant now = Instant.now();
         Instant exp = now.plusSeconds(300);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staffId.toString())
-                .claim("purpose", "step_up")
-                .build();
+                .claim("purpose", "step_up");
+        TokenType.STEP_UP.stamp(claimsB, Audience.STEP_UP);
+        JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         log.info("staff {} obtained a step-up token", staffId);
         return new StepUpTokenResponse(token, 300);
@@ -307,14 +322,16 @@ public class AuthService {
         return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd", staff.email()));
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class)
     public MfaConfirmResponse confirmMfa(Jwt callerJwt, MfaConfirmRequest req) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
         tenantContext.set(tenantId);
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
 
-        if (staff.mfaSecretEnc() == null || !totpService.verify(cipher.decrypt(staff.mfaSecretEnc()), req.code(), Instant.now())) {
+        guard.enforceLockout(staffId);
+        if (staff.mfaSecretEnc() == null || !guard.verifyTotp(staffId, cipher.decrypt(staff.mfaSecretEnc()), req.code())) {
+            guard.recordAttempt(tenantId, staffId, staff.email(), "totp", false);
             throw mfaFailed();
         }
         repo.enableMfa(staffId);
@@ -370,54 +387,21 @@ public class AuthService {
         log.info("staff {} completed PIN reset (tenant {})", staff.id(), tenant.id());
     }
 
-    // ── break-glass (NB-048) ─────────────────────────────────────────────
-
-    @Transactional
-    public TokenPairResponse activateBreakGlass(Jwt callerJwt, BreakGlassActivateRequest req, String ip, String device, String userAgent) {
-        UUID staffId = UUID.fromString(callerJwt.getSubject());
-        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
-        tenantContext.set(tenantId);
-        Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
-
-        Instant expiresAt = Instant.now().plus(30, ChronoUnit.MINUTES);
-        UUID grantId = repo.insertBreakGlass(tenantId, staffId, req.reason(), expiresAt);
-        auditService.record(tenantId, "staff", staffId, staff.name(), "break-glass", ip,
-                "auth.break_glass_activated", "break_glass_grant", grantId, null, java.util.Map.of("reason", req.reason(), "expiresAt", expiresAt.toString()));
-        log.warn("BREAK-GLASS activated by staff {} (tenant {}): {}", staffId, tenantId, req.reason());
-        return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
-    }
-
-    @Transactional
-    public void deactivateBreakGlass(Jwt callerJwt, UUID grantId) {
-        UUID tenantId = UUID.fromString(callerJwt.getClaimAsString("tenantId"));
-        tenantContext.set(tenantId);
-        repo.deactivateBreakGlass(tenantId, grantId);
-        auditService.record(tenantId, "staff", UUID.fromString(callerJwt.getSubject()), "", "", null,
-                "auth.break_glass_deactivated", "break_glass_grant", grantId, null, null);
-    }
-
-    /** Owner-visible "who's elevated right now" — the honest substitute for "notified in real time"
-     * without a push channel: visible the moment anyone with staff:view loads this. */
-    @Transactional
-    public List<BreakGlassResponse> listActiveBreakGlass(UUID tenantId) {
-        tenantContext.set(tenantId);
-        return repo.listActiveBreakGlass(tenantId).stream()
-                .map(r -> new BreakGlassResponse(r.id(), r.staffId(), r.staffName(), r.reason(), r.activatedAt(), r.expiresAt()))
-                .toList();
-    }
-
     // ── idle-timeout unlock (NB-044) ─────────────────────────────────────
     // Client-side lock only — the underlying session/access token is untouched, so draft state in
     // the page (or already-autosaved backend rows) survives the lock exactly as if nothing happened.
 
-    @Transactional
+    @Transactional(noRollbackFor = ApiException.class)
     public void unlock(Jwt callerJwt, UnlockRequest req) {
         UUID staffId = UUID.fromString(callerJwt.getSubject());
         tenantContext.set(UUID.fromString(callerJwt.getClaimAsString("tenantId")));
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
+        guard.enforceLockout(staffId); // 423 before the PIN is even looked at
         if (staff.pinHash() == null || !pinEncoder.matches(req.pin(), staff.pinHash())) {
+            guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "unlock", false);
             throw invalidCredentials();
         }
+        guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "unlock", true);
     }
 
     /** Called from StaffController right after a successful invite-accept — lands the new staff member logged in. */
@@ -494,47 +478,34 @@ public class AuthService {
         }
     }
 
-    // Deliberately does NOT record a new failed attempt for a still-locked hit: doing so (the
-    // previous behavior) re-bases lockedUntil off "now" on every single request during the lock
-    // window, so a client polling faster than the backoff duration renews the lock forever — a
-    // trivial, unauthenticated (no correct PIN needed) permanent lockout of any known email. The
-    // counter should only grow from genuine post-expiry credential checks (see login(), which
-    // records real successes/failures after this gate).
+    // A still-locked hit records nothing (a client polling during the lock would otherwise renew it forever);
+    // see LoginGuard.enforceLockout, shared by every credential factor.
     private void enforceAccountLockout(Staff staff) {
-        int failures = repo.countFailedAttemptsSinceLastSuccess(staff.id());
-        if (failures < props.lockoutThreshold()) {
-            return;
-        }
-        Instant lastFailedAt = repo.lastFailedAttemptAt(staff.id()).orElse(Instant.EPOCH);
-        Instant lockedUntil = lastFailedAt.plus(backoffDuration(failures));
-        if (Instant.now().isBefore(lockedUntil)) {
-            log.warn("account locked: staff {} has {} failed attempts, locked until {}", staff.id(), failures, lockedUntil);
-            throw accountLocked();
-        }
-    }
-
-    private Duration backoffDuration(int failureCount) {
-        int overBy = failureCount - props.lockoutThreshold() + 1; // 1, 2, 3, ...
-        long minutes = Math.min(30, 1L << (overBy - 1)); // 1, 2, 4, 8, 16, 30(cap), ...
-        return Duration.ofMinutes(minutes);
+        guard.enforceLockout(staff.id());
     }
 
     private MfaChallengeResponse issueMfaChallenge(Staff staff) {
         Instant now = Instant.now();
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staff.id().toString())
                 .claim("purpose", "mfa_pending")
-                .claim("tenantId", staff.tenantId().toString())
-                .build();
+                .claim("tenantId", staff.tenantId().toString());
+        TokenType.MFA_PENDING.stamp(claimsB, Audience.MFA);
+        JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
         return new MfaChallengeResponse(token, "totp", props.mfaChallengeTtlMinutes() * 60L);
     }
 
     private TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent) {
+        return mintTokenPair(staff, familyId, ip, device, userAgent, null);
+    }
+
+    /** PLT-012: bg != null mints the read-only emergency token for that grant (see BreakGlassService). */
+    TokenPairResponse mintTokenPair(Staff staff, UUID familyId, String ip, String device, String userAgent, BreakGlassSession bg) {
         Role role = repo.findRole(staff.roleId())
                 .orElseThrow(() -> new IllegalStateException("role missing for staff " + staff.id()));
         Tenant tenant = repo.findTenantById(staff.tenantId())
@@ -548,7 +519,8 @@ public class AuthService {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
                     "staff.delegation_expired", "role_delegation", expiredId, null, null);
         }
-        for (Role delegated : repo.findActiveDelegatedRoles(staff.id())) {
+        // PLT-012: the emergency token is base + read scope only; loans are not folded in.
+        for (Role delegated : bg != null ? List.<Role>of() : repo.findActiveDelegatedRoles(staff.id())) {
             for (String p : flattenGrants(delegated.grantsJson())) {
                 if (!permissions.contains(p)) {
                     permissions.add(p);
@@ -561,21 +533,19 @@ public class AuthService {
             auditService.record(staff.tenantId(), "system", null, "System", "System", null,
                     "auth.break_glass_expired", "break_glass_grant", expiredId, null, null);
         }
-        if (repo.hasActiveBreakGlass(staff.id())) {
-            repo.findBuiltInOwnerRole(staff.tenantId()).ifPresent(ownerRole -> {
-                for (String p : flattenGrants(ownerRole.grantsJson())) {
-                    if (!permissions.contains(p)) {
-                        permissions.add(p);
-                    }
+        if (bg != null) {
+            for (String p : BreakGlassPolicy.BREAK_GLASS_GRANTS) {
+                if (!permissions.contains(p)) {
+                    permissions.add(p);
                 }
-            });
+            }
         }
 
-        UUID sessionId = UUID.randomUUID();
+        UUID sessionId = bg != null ? bg.sessionId() : UUID.randomUUID();
         Instant now = Instant.now();
-        Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
+        Instant accessExp = bg != null ? bg.expiresAt() : now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
                 .issuedAt(now)
                 .expiresAt(accessExp)
@@ -594,11 +564,17 @@ public class AuthService {
                 // their full grants would otherwise match the nursing rule first. From the staff
                 // member's own role, never a delegated one.
                 .claim("owner", role.builtIn())
-                .build();
+                // PLT-003: PinChangeInterceptor refuses everything but pin change/logout while true
+                .claim("pinChange", guard.pinChangeRequired(staff.id()));
+        if (bg != null) {
+            claimsB.claim("bg", bg.grantId().toString());
+        }
+        TokenType.ACCESS.stamp(claimsB, Audience.STAFF_API);
+        JwtClaimsSet claims = claimsB.build();
         String accessToken = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
 
         String rawRefresh = OpaqueTokens.generate();
-        Instant refreshExp = now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
+        Instant refreshExp = bg != null ? bg.expiresAt() : now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
         repo.insertSession(sessionId, staff.tenantId(), staff.id(), familyId,
                 OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent);
 
@@ -619,11 +595,6 @@ public class AuthService {
     private ApiException invalidCredentials() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "invalid-credentials", "Invalid credentials",
                 "Email/mobile or credential is incorrect.");
-    }
-
-    private ApiException accountLocked() {
-        return new ApiException(HttpStatus.LOCKED, "account-locked", "Account locked",
-                "Too many failed attempts. Try again later.");
     }
 
     private ApiException mfaFailed() {

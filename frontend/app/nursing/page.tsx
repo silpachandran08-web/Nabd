@@ -12,7 +12,9 @@ import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
+import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "../lib/vitals";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
@@ -263,20 +265,22 @@ function NursingWorklist() {
     });
   }, []);
 
+  const newSignal = useLatestLoad();
+
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;
@@ -285,14 +289,16 @@ function NursingWorklist() {
   );
 
   const load = useCallback(async () => {
+    const signal = newSignal();
     try {
       // NUR-019: one worklist call (queue entry + patient + vitals per row) replaces GET /queue,
       // GET /queue?priority=true and the per-row /patients/{id} + /clinical/vitals/{id} fan-out.
       const [queueRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
-        can(PERM.queueView) ? authedFetch("/nursing/worklist") : null, can(PERM.queueView) ? authedFetch("/staff/roster") : null,
-        authedFetch("/nursing/administration-orders/today"), authedFetch("/nursing/procedure-orders/today"),
-        authedFetch("/nursing/activity/today"),
+        can(PERM.queueView) ? authedFetch("/nursing/worklist", { signal }) : null, can(PERM.queueView) ? authedFetch("/staff/roster", { signal }) : null,
+        authedFetch("/nursing/administration-orders/today", { signal }), authedFetch("/nursing/procedure-orders/today", { signal }),
+        authedFetch("/nursing/activity/today", { signal }),
       ]);
+      if (signal.aborted) return;
       // LIVE-09: without queue:view the worklist is never requested; treat it like the server's 403.
       if (!queueRes && can(PERM.queueView)) return; // authedFetch returned null: session redirect
       const noQueue = !queueRes || queueRes.status === 403;
@@ -308,6 +314,8 @@ function NursingWorklist() {
         vitals: { recordedAt: string; abnormalFlags?: string[] } | null;
       };
       const items: WorklistItem[] = noQueue || !queueRes ? [] : ((await queueRes.json())?.items ?? []);
+      const [admin, proc, act] = await Promise.all([adminRes, procRes, activityRes].map((r) => (r?.ok ? r.json() : null)));
+      if (signal.aborted) return;
       const staffMap = new Map<string, string>();
       if (staffRes?.ok) {
         const options: StaffOption[] = await staffRes.json();
@@ -328,22 +336,23 @@ function NursingWorklist() {
       setRecordedRows(all.filter((r) => RECORDED_STATUSES.includes(r.status)));
       setProceduresPendingRows(all.filter((r) => r.status === "procedures_pending"));
       setPriorityRows(all.filter((r) => r.priority));
-      if (adminRes?.ok) setAdministrationOrders(await adminRes.json());
-      if (procRes?.ok) setProcedureOrders(await procRes.json());
-      if (activityRes?.ok) setActivity(await activityRes.json());
+      if (admin) setAdministrationOrders(admin);
+      if (proc) setProcedureOrders(proc);
+      if (act) setActivity(act);
       // A 403 on a secondary list just means that section isn't theirs; anything else is a failure
       // the nurse should hear about rather than see as a silently empty tab.
       setSectionFailed([adminRes, procRes, activityRes, staffRes].some((r) => r && !r.ok && r.status !== 403));
       setError(null);
       setLoaded(true);
     } catch {
+      if (signal.aborted) return;
       // Keep whatever was last loaded on screen (and any open dialog mounted); the page shows an
       // inline banner with Retry instead of replacing the worklist.
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, [authedFetch, newSignal]);
 
   useEffect(() => {
     void Promise.resolve().then(load);

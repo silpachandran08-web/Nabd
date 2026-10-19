@@ -25,7 +25,7 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
     private final JwtDecoder delegate;
     private final SessionLivenessChecker livenessChecker;
 
-    SessionRevocationJwtDecoder(@Qualifier("jwtDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker) {
+    SessionRevocationJwtDecoder(@Qualifier("accessTokenDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker) {
         this.delegate = delegate;
         this.livenessChecker = livenessChecker;
     }
@@ -35,7 +35,22 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
         Jwt jwt = delegate.decode(token);
         String sid = jwt.getClaimAsString("sid");
         String tenantId = jwt.getClaimAsString("tenantId");
-        if (sid != null && tenantId != null && !livenessChecker.isActive(UUID.fromString(tenantId), UUID.fromString(sid))) {
+        if (sid == null) {
+            throw new BadJwtException("access token without sid"); // PLT-001: no pass-through for sid-less tokens
+        }
+        boolean active = true;
+        if (tenantId != null) {
+            try {
+                active = livenessChecker.isActive(UUID.fromString(tenantId), UUID.fromString(sid));
+            } catch (RuntimeException e) {
+                if (com.nabd.hms.common.DbFailureAdvice.classify(e) != null) {
+                    // not an invalid token: SecurityConfig's entry point turns this into 503
+                    throw new BadJwtException("session check unavailable", e); // the resource-server filter rethrows AuthenticationServiceException, so it must be this type
+                }
+                throw e;
+            }
+        }
+        if (!active) {
             throw new BadJwtException("session revoked");
         }
         return jwt;

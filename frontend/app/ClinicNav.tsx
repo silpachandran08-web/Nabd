@@ -184,8 +184,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     if (skip || isOwner() || hasNursingGrant(perms) || isDoctorNav(perms) || !perms.includes("queue:view")) return;
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
+    const ctrl = new AbortController();
     let cancelled = false;
-    void fetch(`${API_BASE}/queue`, { headers: { Authorization: `Bearer ${token}` } })
+    void fetch(`${API_BASE}/queue`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
       .then(async (res) => {
         if (cancelled || !res.ok) return;
         const rows: { status: string }[] = await res.json();
@@ -196,7 +197,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         });
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => { cancelled = true; ctrl.abort(); };
   }, [pathname, skip]);
 
   // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view).
@@ -207,8 +208,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     const token = localStorage.getItem("nabd_access_token");
     const me = token ? decodeAccessToken(token)?.sub : undefined;
     if (!token || !me) return;
+    const ctrl = new AbortController();
     let cancelled = false;
-    void fetch(`${API_BASE}/queue?doctorId=${encodeURIComponent(me)}`, { headers: { Authorization: `Bearer ${token}` } })
+    void fetch(`${API_BASE}/queue?doctorId=${encodeURIComponent(me)}`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
       .then(async (res) => {
         if (cancelled || !res.ok) return;
         const rows: { status: string; doctorId?: string }[] = await res.json();
@@ -216,7 +218,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         setBadges((b) => ({ ...b, [MY_DAY_HREF]: rows.filter((r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status)).length }));
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => { cancelled = true; ctrl.abort(); };
   }, [pathname, skip]);
 
   // The Nurse sidebar's count badges, off the same endpoints the nursing page itself reads:
@@ -228,10 +230,11 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     if (skip || isOwner() || !hasNursingGrant(perms)) return;
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
+    const ctrl = new AbortController();
     let cancelled = false;
     const headers = { Authorization: `Bearer ${token}` };
     const load = (path: string, key: string, count: (rows: { status?: string }[]) => number) =>
-      fetch(`${API_BASE}${path}`, { headers })
+      fetch(`${API_BASE}${path}`, { headers, signal: ctrl.signal })
         .then(async (res) => {
           if (cancelled || !res.ok) return;
           const rows: { status?: string }[] = await res.json();
@@ -242,7 +245,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     if (perms.includes("nursing:view")) {
       void load("/nursing/administration-orders/today", "nursing:admin", (r) => r.filter((o) => o.status === "not_started").length);
     }
-    return () => { cancelled = true; };
+    return () => { cancelled = true; ctrl.abort(); };
   }, [pathname, skip]);
 
   // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
@@ -250,15 +253,16 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     if (skip || !isOwner() || !getPermissions().includes("setup:view")) return;
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
+    const ctrl = new AbortController();
     let cancelled = false;
-    void fetch(`${API_BASE}/setup/subscription`, { headers: { Authorization: `Bearer ${token}` } })
+    void fetch(`${API_BASE}/setup/subscription`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
       .then(async (res) => {
         if (cancelled || !res.ok) return;
         const body: { plan: string | null; status: string; branchesUsed: number; branchesLimit: number } = await res.json();
         if (!cancelled) setPlan({ plan: body.plan, status: body.status, branchesUsed: Number(body.branchesUsed), branchesLimit: Number(body.branchesLimit) });
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => { cancelled = true; ctrl.abort(); };
   }, [skip]);
 
   if (skip || !permissions || permissions.length === 0) return null;
@@ -336,7 +340,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
             aria-expanded={showClinic} aria-label={`Clinic: ${identity.tenantName}`} onClick={toggleClinicMenu}>
             <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
             <div className={styles.clinicText}>
-              <div className={styles.clinicName}>{identity.tenantName}</div>
+              <div className={styles.clinicName}><bdi>{identity.tenantName}</bdi></div>
             </div>
             <span className={styles.clinicChevron}><Icon name="chevron" size={14} /></span>
           </button>
@@ -348,7 +352,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                 <div className={styles.clinicCurrent} role="menuitem" aria-current="true">
                   <Icon name="building" size={14} />
                   <span className={styles.clinicRowText}>
-                    <span>{identity.tenantName}</span>
+                    <span><bdi>{identity.tenantName}</bdi></span>
                     {identity.tenantRegion && <span className={styles.clinicRowSub}>{regionLabel(identity.tenantRegion)}</span>}
                   </span>
                   <span className={styles.clinicRowTag}>Current</span>
@@ -382,7 +386,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         <div className={styles.clinicInfo}>
           <div className={styles.clinicIcon}><Icon name="building" size={16} /></div>
           <div className={styles.clinicText}>
-            <div className={styles.clinicName}>{identity.tenantName}</div>
+            <div className={styles.clinicName}><bdi>{identity.tenantName}</bdi></div>
           </div>
         </div>
       ))}
@@ -421,8 +425,8 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
                 <div className={styles.menuIdentityRow}>
                   <div className={styles.identityAvatar}>{initials(identity.staffName)}</div>
                   <div>
-                    <div className={styles.identityName}>{identity.staffName}</div>
-                    <div className={styles.identityRole}>{identity.tenantName}</div>
+                    <div className={styles.identityName}><bdi>{identity.staffName}</bdi></div>
+                    <div className={styles.identityRole}><bdi>{identity.tenantName}</bdi></div>
                   </div>
                 </div>
                 <div className={styles.menuRow}>
@@ -453,7 +457,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
           <button type="button" className={styles.identityFooter} onClick={openMenu}>
             <div className={styles.identityAvatar}>{initials(identity.staffName)}</div>
             <div className={styles.identityText}>
-              <div className={styles.identityName}>{identity.staffName}</div>
+              <div className={styles.identityName}><bdi>{identity.staffName}</bdi></div>
               <div className={styles.identityRole}>{identity.roleName}</div>
             </div>
           </button>

@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -166,32 +167,32 @@ class ScheduleRepository {
      * against. Both sides are read in the clinic's zone (explicit AT TIME ZONE, never the DB session's
      * zone) because blockStart/blockEnd are the clinic's wall-clock times.
      */
-    int countSessionOccupancy(UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
+    int countSessionOccupancy(UUID tenantId, UUID doctorId, LocalDate date, LocalTime blockStart, LocalTime blockEnd, ZoneId zone) {
         Instant rangeStart = date.atTime(blockStart).atZone(zone).toInstant();
         Instant rangeEnd = date.atTime(blockEnd).atZone(zone).toInstant();
         Integer count = jdbc.queryForObject(
                 "SELECT " +
                         // QA-04: a seen booking (completed) still used its place, as a completed walk-in does
-                        "(SELECT count(*) FROM appointments a WHERE a.doctor_id = ? AND a.status IN ('scheduled','completed') " +
+                        "(SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.doctor_id = ? AND a.status IN ('scheduled','completed') " +
                         "  AND a.start_time >= ? AND a.start_time < ?) " +
                         "+ " +
-                        "(SELECT count(*) FROM queue_entries q WHERE q.doctor_id = ? AND q.queue_date = ? " +
+                        "(SELECT count(*) FROM queue_entries q WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " +
                         "  AND q.appointment_id IS NULL AND q.status != 'no_show' " +
                         "  AND (q.created_at AT TIME ZONE ?)::time >= ? AND (q.created_at AT TIME ZONE ?)::time < ?)",
                 Integer.class,
-                doctorId, Timestamp.from(rangeStart), Timestamp.from(rangeEnd),
-                doctorId, Date.valueOf(date), zone.getId(), Time.valueOf(blockStart), zone.getId(), Time.valueOf(blockEnd));
+                tenantId, doctorId, Timestamp.from(rangeStart), Timestamp.from(rangeEnd),
+                tenantId, doctorId, Date.valueOf(date), zone.getId(), Time.valueOf(blockStart), zone.getId(), Time.valueOf(blockEnd));
         return count == null ? 0 : count;
     }
 
     // ── delay ladder (NB-100) ────────────────────────────────────────────
 
     private static final String DELAY_SELECT =
-            "SELECT id, doctor_id, delay_minutes, reason, announced_by, announced_at, cleared_by, cleared_at " +
+            "SELECT id, doctor_id, delay_minutes, reason, announced_by, announced_at, cleared_by, cleared_at, clinic_date " +
                     "FROM doctor_delays WHERE doctor_id = ? ";
 
-    Optional<DoctorDelayRow> findActiveDelay(UUID doctorId) {
-        return jdbc.query(DELAY_SELECT + "AND cleared_at IS NULL", delayMapper(), doctorId).stream().findFirst();
+    Optional<DoctorDelayRow> findActiveDelay(UUID doctorId, java.time.LocalDate today) {
+        return jdbc.query(DELAY_SELECT + "AND cleared_at IS NULL AND clinic_date = ?", delayMapper(), doctorId, today).stream().findFirst();
     }
 
     List<DoctorDelayRow> delayHistory(UUID doctorId, int limit) {
@@ -200,12 +201,22 @@ class ScheduleRepository {
 
     /** "Writing the delay then closing and appending to history" — a fresh announcement always
      * closes out any still-active one first, so the unique active-per-doctor index never fires. */
-    UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, UUID announcedBy) {
+    UUID announceDelay(UUID tenantId, UUID doctorId, int delayMinutes, String reason, UUID announcedBy, java.time.LocalDate clinicDate) {
+        // A concurrent announcement for the same doctor loses (409); sequential ones still supersede.
+        // Also lost if another announcement was inserted after this transaction began (shortcut: requests staggered beyond a txn are indistinguishable from fast sequential supersedes, which must stay 201).
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(hashtext(?))", Boolean.class, "doctor-delay:" + doctorId))
+                || Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM doctor_delays WHERE doctor_id = ? AND cleared_at IS NULL AND announced_at >= transaction_timestamp())", Boolean.class, doctorId))) {
+            throw new DuplicateKeyException("delay announcement in flight");
+        }
         clearActiveDelay(tenantId, doctorId, announcedBy);
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by) VALUES (?,?,?,?,?,?)",
-                id, tenantId, doctorId, delayMinutes, reason, announcedBy);
+        jdbc.update("INSERT INTO doctor_delays (id, tenant_id, doctor_id, delay_minutes, reason, announced_by, clinic_date, announced_at) VALUES (?,?,?,?,?,?,?, clock_timestamp())",
+                id, tenantId, doctorId, delayMinutes, reason, announcedBy, clinicDate);
         return id;
+    }
+
+    boolean doctorInTenant(UUID tenantId, UUID doctorId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM staff WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, doctorId));
     }
 
     void clearActiveDelay(UUID tenantId, UUID doctorId, UUID clearedBy) {
@@ -225,7 +236,8 @@ class ScheduleRepository {
                     UUID.fromString(rs.getString("announced_by")),
                     rs.getTimestamp("announced_at").toInstant(),
                     clearedBy == null ? null : UUID.fromString(clearedBy),
-                    clearedAt == null ? null : clearedAt.toInstant());
+                    clearedAt == null ? null : clearedAt.toInstant(),
+                    rs.getObject("clinic_date", java.time.LocalDate.class));
         };
     }
 

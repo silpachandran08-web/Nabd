@@ -222,8 +222,8 @@ class ProvisioningStepRunner {
                                 "Set your PIN here (link expires in 72 hours):\n" + accountLink + "\n\n" +
                                 "If you weren't expecting this, you can ignore this email.");
             } catch (Exception e) {
-                log.warn("owner account invite email failed to send to {} — falling back to manual relay",
-                        job.ownerEmail(), e);
+                log.warn("owner account invite email failed to send for tenant {} — falling back to manual relay",
+                        job.tenantSlug(), e);
             }
         }
 
@@ -249,8 +249,8 @@ class ProvisioningStepRunner {
             // requirement for it. Render blocks outbound SMTP on its network (confirmed by a live
             // timeout), so this catch is load-bearing today, not defensive-for-its-own-sake — without
             // it, a send failure would roll back the staff row this same @Transactional step just created.
-            log.warn("owner invite email failed to send to {} for tenant {} — falling back to manual relay",
-                    job.ownerEmail(), job.tenantSlug(), e);
+            log.warn("owner invite email failed to send for tenant {} — falling back to manual relay",
+                    job.tenantSlug(), e);
         }
         // Still returned even though the email above may already have delivered it — same
         // reveal-once value shown as a manual-relay fallback if the email never arrives (unconfigured
@@ -267,7 +267,7 @@ class ProvisioningStepRunner {
     }
 
     private static ModuleGrant fullGrant(String module) {
-        return new ModuleGrant(module, true, true, true, true, true, true, true);
+        return new ModuleGrant(module, true, true, true, true, true, true, true, "clinical".equals(module));
     }
 
     private String writeGrantsJson(List<ModuleGrant> grants) {

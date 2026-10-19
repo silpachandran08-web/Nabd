@@ -5,7 +5,16 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/nabd}
     username: ${DB_USER:nabd_app}
     password: ${DB_PASSWORD:nabd_app}
+    hikari:
+      # OPS-003: fixed pool, fail fast. A request that cannot get a connection in 3 s is a 503 (DbFailureAdvice), not a 30 s queue.
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_POOL_SIZE:20}
+      connection-timeout: 3000
+      max-lifetime: 1800000
+      leak-detection-threshold: 10000
   flyway:
+    # OPS-003: the API runs as nabd_app (DML only) and never migrates; the separate migrate job runs MigrateMain as nabd_migrator.
+    enabled: false
     # migrations live at repo root (db/migrations), shared with any future
     # non-Java tooling — not duplicated into src/main/resources
     locations: filesystem:../db/migrations
@@ -32,12 +41,20 @@ spring:
 
 server:
   port: 8080
+  # PLT-003: the client IP is the TCP peer unless the peer is a trusted proxy. Tomcat's RemoteIpValve only
+  # honours X-Forwarded-For from internal-proxies; empty (the default here) = trust nobody. Set per cell,
+  # e.g. APP_TRUSTED_PROXIES='10\.0\.0\.\d+' (regex).
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      remote-ip-header: X-Forwarded-For
+      internal-proxies: ${APP_TRUSTED_PROXIES:}
 
 logging:
   pattern:
     # [reqId=...] ties every line for one request together and matches the traceId returned in
     # RFC 7807 error bodies (RequestCorrelationFilter + GlobalExceptionHandler share the value)
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [reqId=%X{requestId:-none}] %logger{35} - %msg%n"
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [reqId=%X{requestId:-none}] %logger{35} - %mask%n"
   level:
     root: INFO
     # ponytail: no PHI-redaction scanner on top of this yet (NB-158) — logging code is
@@ -61,6 +78,10 @@ app:
     mfa-challenge-ttl-minutes: 5
     lockout-threshold: 5          # failed attempts before backoff kicks in
     rate-limit-per-ip-per-minute: 20
+  jwt:
+    # Documented env var names (APP_JWT_KEYS_* still win via relaxed binding).
+    keys-file: ${JWT_KEYS_FILE:}
+    keys-json: ${JWT_KEYS_JSON:}
   outbox:
     poll-interval-ms: 2000
     batch-size: 20
@@ -76,7 +97,7 @@ app:
     verify-token: ${WHATSAPP_VERIFY_TOKEN:}   # blank = webhook subscription handshake always fails
     otp-template: ${WHATSAPP_OTP_TEMPLATE:nabd_login_otp}
     otp-language: ${WHATSAPP_OTP_LANGUAGE:en}
-    log-otp: ${WHATSAPP_LOG_OTP:true}          # also print every OTP to the log; set false once WhatsApp delivery works
+    log-otp: ${WHATSAPP_LOG_OTP:false}         # OtpLoggingGuard refuses to boot in prod when true; the sender no longer logs codes
   crypto:
     # base64, 32 bytes (AES-256), Vault/KMS-backed (NB-009) — no default;
     # boot fails fast if unset rather than encrypting MFA secrets with a

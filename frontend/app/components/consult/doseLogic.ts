@@ -6,6 +6,8 @@ export type DoseResult = {
   weightKg: number; mgPerKg: number; totalDoseMg: number; ruleSource: string;
   /** When the weight was recorded; null/absent only if the server could not say (treated as unknown, never as fresh). */
   weightRecordedAt?: string | null;
+  /** Server verdict (CLN-003): older than 30 days under 2 years, 90 days otherwise, or date unknown. */
+  weightStale?: boolean;
 };
 
 export const STALE_WEIGHT_MONTHS = 3;

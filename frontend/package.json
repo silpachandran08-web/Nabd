@@ -8,10 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "check:permissions": "node scripts/check-permission-rendering.mjs",
-    "test:unit": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/unit/*.test.mjs"
+    "typegen": "next typegen",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test:unit": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/unit/*.test.mjs scripts/test-consult-flow.mjs",
+    "test": "npm run -s test:unit"
   },
   "dependencies": {
-    "next": "16.3.1",
+    "next": "16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -20,7 +23,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.1",
+    "eslint-config-next": "16.4.2",
     "typescript": "^5"
   }
 }

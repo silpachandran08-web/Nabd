@@ -111,7 +111,7 @@ final class AllergyDrugClasses {
         if (text == null) {
             return "";
         }
-        return text.toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ")
+        return java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFKC).toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ")
                 .replace("sulph", "sulf")
                 .replace("ceph", "cef");
     }

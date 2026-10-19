@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./login.module.css";
 import { decodeAccessToken, landingPathFor } from "../lib/session";
+import { NEW_PIN_PATTERN, lockedMessage, needsPinChange } from "../lib/pinPolicy";
+import { useHasMounted } from "../lib/useHasMounted";
+import { safeReturnTo, storeTokens, takeReturnTo } from "../lib/apiClient";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../lib/loginFetch";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
@@ -15,12 +18,13 @@ type Problem = {
   title: string;
   detail: string;
   errors?: { field: string; message: string }[];
+  retryAfterSeconds?: number;
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 type View = "login" | "mfaVerify" | "mfaSetup" | "mfaSetupDone" | "forgotRequest" | "forgotConfirm" | "forgotDone"
-  | "otpRequest" | "otpVerify";
+  | "otpRequest" | "otpVerify" | "pinChange";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,12 +47,49 @@ export default function LoginPage() {
   const [mobilePhone, setMobilePhone] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPin, setNewPin] = useState("");
+  const mounted = useHasMounted();
+  const signedOut = mounted && !!safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
 
   function handleTokens(pair: TokenPair) {
-    localStorage.setItem("nabd_access_token", pair.accessToken);
-    localStorage.setItem("nabd_refresh_token", pair.refreshToken);
+    storeTokens(pair);
     const claims = decodeAccessToken(pair.accessToken);
-    router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
+    if (needsPinChange(claims)) { // PIN predates the 6-8 digit policy: nothing else works until it is changed
+      setNewPin("");
+      setFormError(null);
+      setView("pinChange");
+      return;
+    }
+    // FEF-002: back to the page the session ended on (validated same-origin path), else the role landing page.
+    router.replace(takeReturnTo() ?? landingPathFor(claims?.permissions ?? [], claims?.owner === true));
+  }
+
+  async function submitPinChange(e: FormEvent) {
+    e.preventDefault();
+    setFormError(null);
+    if (!NEW_PIN_PATTERN.test(newPin)) { setFormError("Choose a PIN of 6 to 8 digits."); return; }
+    setLoading(true);
+    try {
+      const res = await loginFetch(`${API_BASE}/auth/pin/change`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("nabd_access_token")}` },
+        body: JSON.stringify({ currentPin: pin, newPin }),
+      }, () => setSlow(true));
+      if (!res.ok) { applyProblem(res.status, (await res.json()) as Problem); return; }
+      // the old token still carries pinChange=true; a refresh mints one without it
+      const r = await loginFetch(`${API_BASE}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: localStorage.getItem("nabd_refresh_token") }),
+      }, () => setSlow(true));
+      if (!r.ok) { setFormError("PIN changed. Sign in again with the new PIN."); setView("login"); setPin(""); return; }
+      handleTokens((await r.json()) as TokenPair);
+    } catch (err) {
+      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
+      else setFormError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setSlow(false);
+      setLoading(false);
+    }
   }
 
   async function submitLogin(e?: FormEvent) {
@@ -178,7 +219,8 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/mfa/enroll`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${setupToken}` },
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setupToken }), // PLT-001: challenge tokens travel in the body, never as a bearer
       });
       const body = await res.json();
       if (!res.ok) {
@@ -200,8 +242,8 @@ export default function LoginPage() {
     try {
       const res = await fetch(`${API_BASE}/auth/mfa/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${setupRequired.setupToken}` },
-        body: JSON.stringify({ code }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, setupToken: setupRequired.setupToken }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -265,7 +307,7 @@ export default function LoginPage() {
       return;
     }
     if (status === 423) {
-      setFormError("Too many failed attempts. Try again later.");
+      setFormError(lockedMessage(problem.retryAfterSeconds));
       return;
     }
     if (status === 429) {
@@ -284,6 +326,26 @@ export default function LoginPage() {
     setCode("");
     setPin("");
     setFormError(null);
+  }
+
+  if (view === "pinChange") {
+    return (
+      <main className={styles.page}>
+        <div className={styles.card}>
+          <h1 className={styles.title}>Choose a new PIN</h1>
+          <p className={styles.subtitle}>PINs are now 6 to 8 digits. Set yours to continue.</p>
+          {formError && <div className={styles.formError} role="alert">{formError}</div>}
+          <form onSubmit={submitPinChange} noValidate>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="cNewPin">New PIN</label>
+              <input id="cNewPin" type="password" inputMode="numeric" pattern="[0-9]{6,8}" maxLength={8} className={styles.input}
+                value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} autoFocus required />
+            </div>
+            <button className={styles.submit} type="submit" disabled={loading}>{loading ? "Saving…" : "Save PIN"}</button>
+          </form>
+        </div>
+      </main>
+    );
   }
 
   if (view === "mfaSetup" || view === "mfaSetupDone") {
@@ -390,7 +452,7 @@ export default function LoginPage() {
               </div>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="fNewPin">New PIN</label>
-                <input id="fNewPin" type="password" inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6} className={styles.input}
+                <input id="fNewPin" type="password" inputMode="numeric" pattern="[0-9]{6,8}" maxLength={8} className={styles.input}
                   value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} required />
               </div>
               <button className={styles.submit} type="submit" disabled={loading}>{loading ? "Saving…" : "Set new PIN"}</button>
@@ -450,6 +512,7 @@ export default function LoginPage() {
         <h1 className={styles.title}>Sign in to Nabd</h1>
         <p className={styles.subtitle}>Enter your clinic, email and PIN.</p>
         <form onSubmit={submitLogin} noValidate>
+          {signedOut && !formError && <div className={styles.formError} role="status">Signed out. Your draft is saved. Sign in to continue.</div>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
           {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}
@@ -487,8 +550,8 @@ export default function LoginPage() {
               id="pin"
               type="password"
               inputMode="numeric"
-              pattern="[0-9]{4,6}"
-              maxLength={6}
+              pattern="[0-9]{4,8}"
+              maxLength={8}
               className={`${styles.input} ${fieldErrors.pin ? styles.inputError : ""}`}
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}

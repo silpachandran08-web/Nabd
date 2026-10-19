@@ -1,5 +1,6 @@
 "use client";
 
+import { decodeJwtPayload } from "../lib/jwt";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -39,6 +40,7 @@ import {
 } from "../components/consult/shared";
 import p from "../components/consult/consultParts.module.css";
 import styles from "./consult.module.css";
+import { apiFetch, goLogin } from "../lib/apiClient";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
@@ -98,14 +100,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function decodeJwt(token: string): Record<string, unknown> {
-  try {
-    const payload = token.split(".")[1];
-    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = b64.padEnd(b64.length + ((4 - (b64.length % 4)) % 4), "=");
-    return JSON.parse(atob(padded));
-  } catch {
-    return {};
-  }
+  return decodeJwtPayload(token) ?? {};
 }
 
 function toFields(n: Note): NoteFields {
@@ -204,16 +199,16 @@ export default function ConsultPage() {
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
       if (!token) {
-        router.replace("/login");
+        goLogin();
         return null;
       }
-      const res = await fetch(`${API_BASE}${path}`, {
+      const res = await apiFetch(path, {
         ...init,
         headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
       if (res.status === 401) {
         localStorage.removeItem("nabd_access_token");
-        router.replace("/login");
+        goLogin();
         return null;
       }
       return res;
@@ -229,7 +224,7 @@ export default function ConsultPage() {
     setForbidden(false);
     const token = localStorage.getItem("nabd_access_token");
     if (!token) {
-      router.replace("/login");
+      goLogin();
       return;
     }
     const self = String(decodeJwt(token).sub ?? "");
@@ -1164,9 +1159,9 @@ export default function ConsultPage() {
                   ))}
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
 
-                  <div className={styles.previousMeds}>
+                  {!(pat && age(pat.dob) >= 18) && <div className={styles.previousMeds}>
                     <DoseCalculator key={activeEntry.patientId} authedFetch={authedFetch} patientId={activeEntry.patientId} queueEntryId={activeEntry.id} canRecordWeight={can("clinical:edit")} onWeightRecorded={reloadCtx} />
-                  </div>
+                  </div>}
 
                   <div className={styles.previousMeds}>
                     <div className={styles.rxTitle} style={{ fontSize: "12px" }}>Favourite Rx sets</div>

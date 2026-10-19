@@ -392,11 +392,11 @@ class AuthApiTest extends ApiTestBase {
         String setupToken = (String) loginResp.getBody().get("setupToken");
 
         // the setup token authorizes enroll/confirm — nothing else
-        ResponseEntity<Map> enrollResp = exchange("/v1/auth/mfa/enroll", HttpMethod.POST, authed(setupToken), Map.class);
+        ResponseEntity<Map> enrollResp = exchange("/v1/auth/mfa/enroll", HttpMethod.POST, jsonBody(Map.of("setupToken", setupToken)), Map.class);
         assertThat(enrollResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         String secretBase32 = (String) enrollResp.getBody().get("secretBase32");
         ResponseEntity<Map> confirmResp = exchange("/v1/auth/mfa/confirm", HttpMethod.POST,
-                authedJsonBody(setupToken, Map.of("code", totpCodeFor(secretBase32))), Map.class);
+                jsonBody(Map.of("code", totpCodeFor(secretBase32), "setupToken", setupToken)), Map.class);
         assertThat(confirmResp.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // logging in again now goes through the normal MFA challenge, same as any other enrolled staff
@@ -405,7 +405,7 @@ class AuthApiTest extends ApiTestBase {
         assertThat(secondLogin.getBody()).containsKey("challengeId");
         String challengeId = (String) secondLogin.getBody().get("challengeId");
         ResponseEntity<Map> mfaResp = http.postForEntity(url("/v1/auth/mfa/verify"), jsonBody(Map.of(
-                "challengeId", challengeId, "code", totpCodeFor(secretBase32))), Map.class);
+                "challengeId", challengeId, "code", totpCodeFor(secretBase32, 1))), Map.class); // next step: confirm used this one
         assertThat(mfaResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(mfaResp.getBody()).containsKey("accessToken");
     }
@@ -446,7 +446,7 @@ class AuthApiTest extends ApiTestBase {
         assertThat(token).isNotNull();
 
         ResponseEntity<Void> confirmResp = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
-                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", token, "newPin", "9999")), Void.class);
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", token, "newPin", "999999")), Void.class);
         assertThat(confirmResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         ResponseEntity<Map> oldPinLogin = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
@@ -454,7 +454,7 @@ class AuthApiTest extends ApiTestBase {
         assertThat(oldPinLogin.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         ResponseEntity<Map> newPinLogin = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of(
-                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", "9999")), Map.class);
+                "tenantSlug", tenant.slug(), "email", staff.email(), "pin", "999999")), Map.class);
         assertThat(newPinLogin.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
@@ -475,70 +475,11 @@ class AuthApiTest extends ApiTestBase {
         seedStaff(tenant, roleId, "reset2@a.com", mobile, false);
 
         ResponseEntity<Void> resp = http.exchange(url("/v1/auth/pin/reset-confirm"), HttpMethod.POST,
-                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", "not-a-real-token", "newPin", "9999")), Void.class);
+                jsonBody(Map.of("tenantSlug", tenant.slug(), "mobilePhone", mobile, "token", "not-a-real-token", "newPin", "999999")), Void.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
-    // ---- break-glass (NB-048) ----
-
-    @Test
-    void breakGlassGrantsOwnerPermissionsImmediatelyAndExpiryIsAudited() {
-        SeededTenant tenant = seedTenant();
-        UUID ownerRoleId = seedFullAccessRole(tenant.id()); // built_in Owner — break-glass elevates to this
-        UUID limitedRoleId = seedRole(tenant.id(), "Receptionist", false,
-                new ModuleGrant("queue", true, false, false, false, false, false, false));
-        SeededStaff staff = seedStaff(tenant, limitedRoleId, "bg@a.com", "+919300000007", false);
-        String token = loginAndGetAccessToken(staff);
-        assertThat(permissionsOf(token)).doesNotContain("staff:delete");
-
-        ResponseEntity<Map> activateResp = exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "Patient emergency, need chart access now")), Map.class);
-        assertThat(activateResp.getStatusCode()).isEqualTo(HttpStatus.OK);
-        String elevatedToken = (String) activateResp.getBody().get("accessToken");
-        assertThat(permissionsOf(elevatedToken)).contains("staff:delete"); // full Owner grant, immediately
-
-        // find the grant id via the owner-visible panel, then force it into the past
-        String ownerToken = loginAndGetAccessToken(seedStaff(tenant, ownerRoleId, "owner8@a.com", "+919300000008", false));
-        ResponseEntity<List> activeResp = exchange("/v1/auth/break-glass/active", HttpMethod.GET, authed(ownerToken), List.class);
-        assertThat(activeResp.getBody()).hasSize(1);
-        String grantId = (String) ((Map<?, ?>) activeResp.getBody().get(0)).get("id");
-
-        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE break_glass_grants SET expires_at = now() - interval '1 minute' WHERE id = ?",
-                UUID.fromString(grantId)));
-        String tokenAfterExpiry = loginAndGetAccessToken(staff);
-        assertThat(permissionsOf(tokenAfterExpiry)).doesNotContain("staff:delete");
-
-        Integer auditRows = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
-                "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'break_glass_grant' AND entity_id = ? AND action IN ('auth.break_glass_activated','auth.break_glass_expired')",
-                Integer.class, UUID.fromString(grantId)));
-        assertThat(auditRows).isEqualTo(2);
-    }
-
-    @Test
-    void breakGlassCanBeDeactivatedManually() {
-        SeededTenant tenant = seedTenant();
-        UUID limitedRoleId = seedRole(tenant.id(), "Receptionist 2", false,
-                new ModuleGrant("queue", true, false, false, false, false, false, false));
-        seedFullAccessRole(tenant.id()); // ensures a built-in Owner role exists to elevate to
-        SeededStaff staff = seedStaff(tenant, limitedRoleId, "bg2@a.com", "+919300000009", false);
-        String token = loginAndGetAccessToken(staff);
-
-        ResponseEntity<Map> activateResp = exchange("/v1/auth/break-glass/activate", HttpMethod.POST,
-                authedJsonBody(token, Map.of("reason", "testing")), Map.class);
-        String elevatedToken = (String) activateResp.getBody().get("accessToken");
-
-        Map<?, ?> claims = decodeClaims(elevatedToken);
-        // grantId isn't in the token; look it up the same way the owner panel would
-        ResponseEntity<List> activeResp = exchange("/v1/auth/break-glass/active", HttpMethod.GET, authed(elevatedToken), List.class);
-        String grantId = (String) ((Map<?, ?>) activeResp.getBody().get(0)).get("id");
-
-        ResponseEntity<Void> deactivateResp = exchange("/v1/auth/break-glass/" + grantId + "/deactivate", HttpMethod.POST,
-                authed(elevatedToken), Void.class);
-        assertThat(deactivateResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-
-        String tokenAfter = loginAndGetAccessToken(staff);
-        assertThat(permissionsOf(tokenAfter)).doesNotContain("staff:delete");
-    }
+    // break-glass (NB-048, reworked by PLT-012): see BreakGlassAuthzTest
 
     // ---- helpers ----
 
@@ -558,8 +499,12 @@ class AuthApiTest extends ApiTestBase {
     }
 
     private String totpCodeFor(String secretBase32) {
+        return totpCodeFor(secretBase32, 0);
+    }
+
+    private String totpCodeFor(String secretBase32, int stepOffset) {
         byte[] secret = org.bouncycastle.util.encoders.Base32.decode(secretBase32);
-        long counter = java.time.Instant.now().getEpochSecond() / 30;
+        long counter = java.time.Instant.now().getEpochSecond() / 30 + stepOffset;
         return new TotpService().generate(secret, counter);
     }
 

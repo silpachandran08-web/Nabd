@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.GrantsFlattener;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.TenantContext;
@@ -39,8 +40,15 @@ public class RoleService {
     private final TenantContext tenantContext;
     private final ObjectMapper objectMapper;
     private final AuditService auditService;
+    private final DelegationGuard delegationGuard;
+    private final EventPublisher eventPublisher;
 
-    RoleService(RoleRepository repo, TenantContext tenantContext, ObjectMapper objectMapper, AuditService auditService) {
+    static final String DELEGATION_EVENT = "iam.delegation.changed.v1";
+
+    RoleService(RoleRepository repo, TenantContext tenantContext, ObjectMapper objectMapper, AuditService auditService,
+                DelegationGuard delegationGuard, EventPublisher eventPublisher) {
+        this.delegationGuard = delegationGuard;
+        this.eventPublisher = eventPublisher;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.objectMapper = objectMapper;
@@ -66,7 +74,7 @@ public class RoleService {
 
         UUID id = UUID.randomUUID();
         repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
-        log.info("role {} '{}' created by {} (tenant {})", id, req.name(), callerStaffId, tenantId);
+        log.info("role {} created by {} (tenant {})", id, callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
@@ -99,18 +107,21 @@ public class RoleService {
     // ── delegations (NB-057) ─────────────────────────────────────────────
 
     @Transactional
-    public DelegationResponse createDelegation(UUID tenantId, UUID callerStaffId, DelegationRequest req, List<String> callerPermissions) {
+    public DelegationResponse createDelegation(UUID tenantId, UUID callerStaffId, DelegationRequest req, String stepUpToken) {
         tenantContext.set(tenantId);
         RoleRow delegatedRole = repo.findById(tenantId, req.delegatedRoleId()).orElseThrow(this::notFound);
         if (req.expiresAt().isAfter(Instant.now().plus(MAX_DELEGATION_WINDOW))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "delegation-window-too-long", "Window too long",
                     "A delegation can't run longer than 30 days — create a new one if the cover extends past that.");
         }
-        requireNoPrivilegeEscalation(tenantId, callerStaffId, readGrants(delegatedRole.grantsJson()), callerPermissions);
+        // unknown id (FK would 500) or another tenant's staff (FK would pass) -> 404
+        repo.findActorInfo(tenantId, req.staffId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such staff member."));
+        delegationGuard.check(tenantId, callerStaffId, req.staffId(), delegatedRole, stepUpToken);
 
         UUID id = repo.insertDelegation(tenantId, req.staffId(), req.delegatedRoleId(), callerStaffId, req.reason(), req.expiresAt());
         DelegationRow row = repo.findDelegation(tenantId, id).orElseThrow();
-        audit(tenantId, callerStaffId, "staff.delegation_granted", id, null, row);
+        audit(tenantId, callerStaffId, "role.delegation_created", id, null, auditView(row));
+        changed(tenantId, row, "created");
         return toDelegationResponse(row);
     }
 
@@ -123,9 +134,22 @@ public class RoleService {
     @Transactional
     public void revokeDelegation(UUID tenantId, UUID callerStaffId, UUID id) {
         tenantContext.set(tenantId);
-        repo.findDelegation(tenantId, id).orElseThrow(this::notFound);
+        DelegationRow row = repo.findDelegation(tenantId, id).orElseThrow(this::notFound);
         repo.revokeDelegation(tenantId, id);
-        audit(tenantId, callerStaffId, "staff.delegation_revoked", id, null, null);
+        audit(tenantId, callerStaffId, "role.delegation_revoked", id, auditView(row), null);
+        changed(tenantId, row, "revoked");
+    }
+
+    /** Kills the target's sessions so the new grant set applies on their very next request, and announces the change. */
+    private void changed(UUID tenantId, DelegationRow row, String change) {
+        repo.revokeSessions(tenantId, row.staffId(), "admin_revoke");
+        eventPublisher.publish(tenantId, DELEGATION_EVENT, java.util.Map.of("tenantId", tenantId.toString(),
+                "delegationId", row.id().toString(), "staffId", row.staffId().toString(), "change", change));
+    }
+
+    private java.util.Map<String, Object> auditView(DelegationRow row) {
+        return java.util.Map.of("staffId", row.staffId(), "delegatedRoleId", row.delegatedRoleId(),
+                "delegatedRoleName", row.delegatedRoleName(), "expiresAt", row.expiresAt().toString());
     }
 
     private DelegationResponse toDelegationResponse(DelegationRow row) {

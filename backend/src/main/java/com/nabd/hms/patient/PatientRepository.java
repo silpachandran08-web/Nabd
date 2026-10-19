@@ -69,7 +69,7 @@ class PatientRepository {
      * any queue entry for the patient that is not a no-show (so a visit in progress today counts).
      * Shared verbatim by the registry list and the patient detail (drawer) so they cannot disagree. */
     private static final String LAST_VISIT_SQL =
-            "(SELECT max(q.queue_date) FROM queue_entries q WHERE q.patient_id = patients.id AND q.status <> 'no_show')";
+            "(SELECT max(q.queue_date) FROM queue_entries q WHERE q.tenant_id = patients.tenant_id AND q.patient_id = patients.id AND q.status <> 'no_show')";
 
     Optional<LocalDate> findLastVisit(UUID tenantId, UUID patientId) {
         return jdbc.query("SELECT " + LAST_VISIT_SQL + " AS last_visit FROM patients WHERE tenant_id = ? AND id = ?",
@@ -181,13 +181,13 @@ class PatientRepository {
                         AS last_visit,
                        na.start_time AS next_start, na.doctor_name AS next_doctor, na.doctor_id AS next_doctor_id, na.id AS next_appt_id,
                        pk.used AS pkg_used, pk.total AS pkg_total,
-                       (SELECT c.condition FROM chronic_conditions c WHERE c.patient_id = patients.id AND c.status = 'active'
+                       (SELECT c.condition FROM chronic_conditions c WHERE c.tenant_id = patients.tenant_id AND c.patient_id = patients.id AND c.status = 'active'
                         ORDER BY c.recorded_at LIMIT 1) AS condition,
-                       EXISTS (SELECT 1 FROM chronic_conditions c WHERE c.patient_id = patients.id AND c.status = 'active'
+                       EXISTS (SELECT 1 FROM chronic_conditions c WHERE c.tenant_id = patients.tenant_id AND c.patient_id = patients.id AND c.status = 'active'
                                AND c.review_due_date <= ?) AS followup_due,
-                       (SELECT a.substance FROM patient_allergies a WHERE a.patient_id = patients.id AND a.active
+                       (SELECT a.substance FROM patient_allergies a WHERE a.tenant_id = patients.tenant_id AND a.patient_id = patients.id AND a.active
                         ORDER BY CASE a.severity WHEN 'severe' THEN 0 WHEN 'moderate' THEN 1 ELSE 2 END, a.recorded_at LIMIT 1) AS allergy,
-                       EXISTS (SELECT 1 FROM invoices i WHERE i.patient_id = patients.id AND i.status IN ('unpaid', 'partial')) AS balance_due,
+                       EXISTS (SELECT 1 FROM invoices i WHERE i.tenant_id = patients.tenant_id AND i.patient_id = patients.id AND i.status IN ('unpaid', 'partial')) AS balance_due,
                        (patients.status = 'active' AND EXISTS (
                           SELECT 1 FROM patients d WHERE d.tenant_id = patients.tenant_id AND d.id <> patients.id AND d.status = 'active'
                             AND ((regexp_replace(d.phone, '\\D', '', 'g') = regexp_replace(patients.phone, '\\D', '', 'g')
@@ -198,13 +198,13 @@ class PatientRepository {
                 FROM patients
                 LEFT JOIN LATERAL (SELECT a.id, a.start_time, a.doctor_id, s.name AS doctor_name
                                    FROM appointments a JOIN staff s ON s.id = a.doctor_id
-                                   WHERE a.patient_id = patients.id AND a.status = 'scheduled' AND a.start_time >= ?
+                                   WHERE a.tenant_id = patients.tenant_id AND a.patient_id = patients.id AND a.status = 'scheduled' AND a.start_time >= ?
                                    ORDER BY a.start_time LIMIT 1) na ON true
                 LEFT JOIN LATERAL (SELECT COALESCE(SUM(ii.quantity_consumed), 0) AS used, COALESCE(SUM(ii.quantity_total), 0) AS total
                                    FROM package_instances pi JOIN package_instance_items ii ON ii.instance_id = pi.id
-                                   WHERE pi.patient_id = patients.id AND pi.status = 'active') pk ON true
+                                   WHERE pi.tenant_id = patients.tenant_id AND pi.patient_id = patients.id AND pi.status = 'active') pk ON true
                 LEFT JOIN LATERAL (SELECT q.token_number, q.status FROM queue_entries q
-                                   WHERE q.patient_id = patients.id AND q.queue_date = ? AND q.status NOT IN ('completed', 'no_show')
+                                   WHERE q.tenant_id = patients.tenant_id AND q.patient_id = patients.id AND q.queue_date = ? AND q.status NOT IN ('completed', 'no_show')
                                    ORDER BY q.created_at DESC LIMIT 1) tq ON true
                 WHERE patients.tenant_id = ?
                 """ + CONSENT_GATE + SCOPE_GATE + "ORDER BY patients.name, patients.id LIMIT ?", // id: stable order for REC-040 paging

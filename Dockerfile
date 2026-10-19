@@ -23,4 +23,11 @@ ENV SPRING_FLYWAY_LOCATIONS=filesystem:/app/db/migrations
 
 EXPOSE 8080
 
+# OPS-003: the API runs as nabd_app with Flyway off. Schema changes run as a separate job from this same image, with
+# MIGRATE_DB_URL / MIGRATE_DB_USER (nabd_migrator) / MIGRATE_DB_PASSWORD set only on that job:
+#   java -cp app.jar -Dloader.main=com.nabd.hms.common.MigrateMain org.springframework.boot.loader.launch.PropertiesLauncher
+# One-time per database before the first migrate: infra/db/bootstrap-roles.sql
+# OPS-031: run as a non-root user
+RUN addgroup -S app && adduser -S app -G app
+USER app
 CMD ["java", "-jar", "app.jar"]

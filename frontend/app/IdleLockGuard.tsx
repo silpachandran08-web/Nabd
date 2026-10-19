@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { lockedMessage } from "./lib/pinPolicy";
+import { refreshSession, unlockMessage } from "./lib/apiClient";
 
 // NB-044: shared clinic workstations auto-lock after inactivity. This is an overlay on top of
 // whatever page is mounted, not a navigation — nothing in the page underneath unmounts, so a
@@ -48,14 +50,25 @@ export default function IdleLockGuard() {
     setError(null);
     setChecking(true);
     try {
+      // FEF-002: the token may have expired during the lock. Refresh first, so a 401 from unlock then
+      // means the PIN is wrong (the backend answers both with 401), not "session expired".
+      if (!(await refreshSession(localStorage.getItem("nabd_access_token")))) {
+        setError(unlockMessage(401, null, true));
+        return;
+      }
       const token = localStorage.getItem("nabd_access_token");
       const res = await fetch(`${API_BASE}/auth/unlock`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ pin }),
       });
+      if (res.status === 423) { // locked out: say so, distinct from a wrong PIN
+        const problem = await res.json().catch(() => ({}));
+        setError(lockedMessage(problem?.retryAfterSeconds));
+        return;
+      }
       if (!res.ok) {
-        setError("Incorrect PIN.");
+        setError(unlockMessage(res.status, res.headers.get("Retry-After"), false));
         return;
       }
       setLocked(false);
@@ -98,9 +111,9 @@ export default function IdleLockGuard() {
       }}>
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: "var(--nb-text-primary)" }}>Session locked</h2>
         <p style={{ fontSize: 13, color: "var(--nb-text-secondary)", margin: "0 0 16px" }}>Enter your PIN to continue where you left off.</p>
-        {error && <div style={{ background: "var(--nb-danger-tint)", color: "var(--nb-danger-500)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>{error}</div>}
+        {error && <div role="alert" aria-live="assertive" style={{ background: "var(--nb-danger-tint)", color: "var(--nb-danger-500)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>{error}</div>}
         <input
-          type="password" inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6} autoFocus required
+          type="password" inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} autoFocus required
           value={pin} onChange={(ev) => setPin(ev.target.value.replace(/\D/g, ""))}
           style={{
             width: "100%", height: 40, background: "var(--nb-surface-3)", border: "1px solid var(--nb-border-default)",

@@ -1,10 +1,9 @@
 package com.nabd.hms.auth;
 
-import com.nabd.hms.auth.dto.BreakGlassActivateRequest;
-import com.nabd.hms.auth.dto.BreakGlassResponse;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
 import com.nabd.hms.auth.dto.MfaConfirmResponse;
+import com.nabd.hms.auth.dto.MfaEnrollRequest;
 import com.nabd.hms.auth.dto.MfaEnrollResponse;
 import com.nabd.hms.auth.dto.MfaVerifyRequest;
 import com.nabd.hms.auth.dto.OtpRequestRequest;
@@ -39,9 +38,11 @@ import java.util.UUID;
 public class AuthController {
 
     private final AuthService authService;
+    private final MfaCaller mfaCaller;
 
-    AuthController(AuthService authService) {
+    AuthController(AuthService authService, MfaCaller mfaCaller) {
         this.authService = authService;
+        this.mfaCaller = mfaCaller;
     }
 
     @PostMapping("/login")
@@ -96,13 +97,13 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/enroll")
-    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt) {
-        return authService.enrollMfa(jwt);
+    public MfaEnrollResponse enrollMfa(@AuthenticationPrincipal Jwt jwt, @RequestBody(required = false) MfaEnrollRequest req) {
+        return authService.enrollMfa(mfaCaller.resolve(jwt, req == null ? null : req.setupToken()));
     }
 
     @PostMapping("/mfa/confirm")
     public MfaConfirmResponse confirmMfa(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody MfaConfirmRequest req) {
-        return authService.confirmMfa(jwt, req);
+        return authService.confirmMfa(mfaCaller.resolve(jwt, req.setupToken()), req);
     }
 
     @PostMapping("/pin/reset-request")
@@ -121,24 +122,6 @@ public class AuthController {
     public ResponseEntity<Void> unlock(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UnlockRequest req) {
         authService.unlock(jwt, req);
         return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/break-glass/activate")
-    public TokenPairResponse activateBreakGlass(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody BreakGlassActivateRequest req,
-                                                 HttpServletRequest http) {
-        return authService.activateBreakGlass(jwt, req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
-    }
-
-    @PostMapping("/break-glass/{id}/deactivate")
-    public ResponseEntity<Void> deactivateBreakGlass(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        authService.deactivateBreakGlass(jwt, id);
-        return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/break-glass/active")
-    @PreAuthorize("hasAuthority('staff:view')")
-    public List<BreakGlassResponse> activeBreakGlass(@AuthenticationPrincipal Jwt jwt) {
-        return authService.listActiveBreakGlass(tenantId(jwt));
     }
 
     private UUID tenantId(Jwt jwt) {

@@ -2,7 +2,8 @@ package com.nabd.hms.common;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
+import com.nabd.hms.shared.security.ChallengeTokenDecoder;
+import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 
@@ -12,9 +13,9 @@ import java.util.UUID;
 @Component
 public class StepUpVerifier {
 
-    private final JwtDecoder jwtDecoder;
+    private final ChallengeTokenDecoder jwtDecoder;
 
-    public StepUpVerifier(JwtDecoder jwtDecoder) {
+    public StepUpVerifier(ChallengeTokenDecoder jwtDecoder) {
         this.jwtDecoder = jwtDecoder;
     }
 
@@ -24,7 +25,7 @@ public class StepUpVerifier {
         }
         Jwt token;
         try {
-            token = jwtDecoder.decode(stepUpToken);
+            token = jwtDecoder.decode(stepUpToken, TokenType.STEP_UP);
         } catch (JwtException e) {
             throw stepUpError();
         }
