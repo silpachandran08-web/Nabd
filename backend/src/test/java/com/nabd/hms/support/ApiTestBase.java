@@ -1,7 +1,7 @@
 package com.nabd.hms.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ModuleGrant;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -167,7 +167,7 @@ public abstract class ApiTestBase {
     protected PasswordEncoder pinEncoder;
 
     @Autowired
-    protected AesGcmCipher cipher;
+    protected FieldCipher cipher;
 
     @Autowired
     protected ObjectMapper objectMapper;
@@ -270,7 +270,7 @@ public abstract class ApiTestBase {
 
     protected SeededOperator seedOperator(String email, String role, boolean mfaEnabled) {
         UUID id = UUID.randomUUID();
-        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET) : null;
+        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET, FieldCipher.Aad.of("platform", "master.operators", "mfa_secret", id)) : null;
         jdbc.update("INSERT INTO master.operators (id, name, email, pin_hash, role, status, mfa_enabled, mfa_secret_enc) " +
                         "VALUES (?,?,?,?,?,'active',?,?)",
                 id, "Test Operator", email, pinEncoder.encode(STAFF_PIN), role, mfaEnabled, mfaSecretEnc);
@@ -359,7 +359,7 @@ public abstract class ApiTestBase {
     protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
                                      boolean emailVerified, boolean mobileVerified) {
         UUID id = UUID.randomUUID();
-        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET) : null;
+        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET, FieldCipher.Aad.of(tenant.id(), "staff", "mfa_secret", id)) : null;
         inTenantTx(tenant.id(), () -> jdbc.update("""
                 INSERT INTO staff (id, tenant_id, role_id, email, name, mobile_phone, pin_hash, status,
                                     email_verified, mobile_verified, mfa_enabled, mfa_secret_enc)

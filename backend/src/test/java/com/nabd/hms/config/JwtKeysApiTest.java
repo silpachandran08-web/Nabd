@@ -117,7 +117,8 @@ class JwtKeysApiTest extends ApiTestBase {
 
     @Test
     void prodProfileWithoutKeysFailsToBoot() {
-        assertThatThrownBy(() -> replica(false, "--spring.profiles.active=prod").close())
+        assertThatThrownBy(() -> replica(false, "--spring.profiles.active=prod", // PLT-044: prod also needs a keyring; give one so the JWT guard is what fails
+                "--app.crypto.keyring=1:" + env.getProperty("app.crypto.key")).close())
                 .hasStackTraceContaining("JWT_KEYS_FILE");
     }
 }

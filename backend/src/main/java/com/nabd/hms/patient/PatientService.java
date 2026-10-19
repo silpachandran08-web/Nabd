@@ -3,7 +3,7 @@ package com.nabd.hms.patient;
 import com.nabd.hms.common.PhoneNumbers;
 import com.nabd.hms.patient.dto.PatientRegistryResponse;
 import com.nabd.hms.common.ClinicClock;
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.Cursor;
@@ -47,14 +47,14 @@ public class PatientService {
 
     private final PatientRepository repo;
     private final TenantContext tenantContext;
-    private final AesGcmCipher cipher;
+    private final FieldCipher cipher;
     private final StepUpVerifier stepUpVerifier;
     private final StaffService staffService;
     private final AuditService auditService;
 
     private final ClinicClock clock;
 
-    PatientService(PatientRepository repo, TenantContext tenantContext, AesGcmCipher cipher,
+    PatientService(PatientRepository repo, TenantContext tenantContext, FieldCipher cipher,
                     StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock) {
         this.clock = clock;
         this.repo = repo;
@@ -215,8 +215,9 @@ public class PatientService {
                     .toList());
         }
 
-        byte[] nationalIdEnc = encryptOrNull(req.nationalId());
-        UUID id = repo.insert(tenantId, req.name(), phone, req.dob(), req.gender(),
+        UUID id = UUID.randomUUID();
+        byte[] nationalIdEnc = encryptOrNull(tenantId, id, req.nationalId());
+        repo.insert(id, tenantId, req.name(), phone, req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
         if (req.guardianId() != null) {
             grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId(), req.guardianConsent().channel());
@@ -305,7 +306,7 @@ public class PatientService {
             changes.put("guardian_review_kept_by", null);
         }
         if (req.has("address")) changes.put("address", req.address());
-        if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(req.nationalId()));
+        if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(tenantId, id, req.nationalId()));
         repo.update(tenantId, id, changes);
         auditUpdate(tenantId, callerStaffId, id, before, req, changes.get("phone"), hadNationalId);
         // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
@@ -521,10 +522,11 @@ public class PatientService {
         }
     }
 
-    private byte[] encryptOrNull(String nationalId) {
+    private byte[] encryptOrNull(UUID tenantId, UUID patientId, String nationalId) {
         return nationalId == null || nationalId.isBlank()
                 ? null
-                : cipher.encrypt(nationalId.getBytes(StandardCharsets.UTF_8));
+                : cipher.encrypt(nationalId.getBytes(StandardCharsets.UTF_8),
+                        FieldCipher.Aad.of(tenantId, "patients", "national_id_enc", patientId));
     }
 
     private PatientResponse toResponse(PatientRow row) {

@@ -267,13 +267,11 @@ class PatientRepository {
                 candidateMapper(), digits, dob, name, digits, dob, name, tenantId, digits, dob, name, limit);
     }
 
-    UUID insert(UUID tenantId, String name, String phone, LocalDate dob, String gender,
+    void insert(UUID id, UUID tenantId, String name, String phone, LocalDate dob, String gender,
                 UUID guardianId, String address, byte[] nationalIdEnc) {
-        UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO patients (id, tenant_id, name, phone, dob, gender, guardian_id, address, national_id_enc) " +
                         "VALUES (?,?,?,?,?,?,?,?,?)",
                 id, tenantId, name, phone, Date.valueOf(dob), gender, guardianId, address, nationalIdEnc);
-        return id;
     }
 
     /**

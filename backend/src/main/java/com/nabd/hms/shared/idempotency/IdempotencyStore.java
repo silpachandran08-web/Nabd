@@ -1,6 +1,6 @@
 package com.nabd.hms.shared.idempotency;
 
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.TenantContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -26,9 +26,9 @@ public class IdempotencyStore {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final TenantContext tenantContext;
-    private final AesGcmCipher cipher;
+    private final FieldCipher cipher;
 
-    IdempotencyStore(JdbcTemplate jdbc, PlatformTransactionManager tm, TenantContext tenantContext, AesGcmCipher cipher) {
+    IdempotencyStore(JdbcTemplate jdbc, PlatformTransactionManager tm, TenantContext tenantContext, FieldCipher cipher) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(tm);
         this.tenantContext = tenantContext;
@@ -55,7 +55,12 @@ public class IdempotencyStore {
                 if (!java.security.MessageDigest.isEqual(rs.getBytes(1), hash)) return new Outcome(Outcome.Kind.REUSED, 0, null);
                 if (!"completed".equals(rs.getString(2))) return new Outcome(Outcome.Kind.IN_PROGRESS, 0, null);
                 byte[] enc = rs.getBytes(4);
-                return new Outcome(Outcome.Kind.REPLAY, rs.getInt(3), enc == null ? new byte[0] : cipher.decrypt(enc));
+                if (enc == null) return new Outcome(Outcome.Kind.REPLAY, rs.getInt(3), new byte[0]);
+                // PLT-044: a body that does not open for this row is never replayed nor re-executed
+                int status = rs.getInt(3);
+                return cipher.tryDecrypt(enc, aad(tenant, actor, key))
+                        .map(body -> new Outcome(Outcome.Kind.REPLAY, status, body))
+                        .orElse(new Outcome(Outcome.Kind.REUSED, 0, null));
             }, tenant, actor, key);
         });
     }
@@ -66,8 +71,12 @@ public class IdempotencyStore {
             jdbc.update("""
                     UPDATE idempotency_keys SET status = 'completed', response_status = ?, response_body_enc = ?
                     WHERE tenant_id = ? AND actor_id = ? AND idem_key = ?
-                    """, status, cipher.encrypt(body), tenant, actor, key);
+                    """, status, cipher.encrypt(body, aad(tenant, actor, key)), tenant, actor, key);
         });
+    }
+
+    static FieldCipher.Aad aad(UUID tenant, UUID actor, UUID key) {
+        return FieldCipher.Aad.of(tenant, "idempotency_keys", "response_body_enc", actor + ":" + key);
     }
 
     /** Failed attempt: free the key so the retry is processed again. */

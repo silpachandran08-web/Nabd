@@ -48,6 +48,11 @@ Run steps 1 and 2 in the Neon SQL editor (or `psql`) as the default owner login.
    Run it again on every release, **before** the API rolls out.
 5. **Point the API at `nabd_app`** (Render: Environment): `DB_USER=nabd_app`, `DB_PASSWORD=<app_pw>`, `DB_URL` unchanged, plus
    `APP_CRYPTO_KEY` (no default, boot fails without it). Remove every `neondb_owner` credential from the API service.
+   PLT-044: also set `APP_CRYPTO_KEYRING=1:<the same base64 as APP_CRYPTO_KEY>` and `APP_CRYPTO_ACTIVE_KID=1` (the prod
+   profile refuses to boot without a keyring; keeping APP_CRYPTO_KEY lets pre-PLT-044 values keep decrypting). To migrate old
+   values set `APP_CRYPTO_REENCRYPT_ENABLED=true` until the log line `crypto re-encrypt verify` shows `failed=0 legacy=0` for
+   every column. Rotation: add `2:<new key>` to the keyring, set `APP_CRYPTO_ACTIVE_KID=2`, run the job again; remove a kid
+   (and finally APP_CRYPTO_KEY) only after a clean verify.
    Redeploy. A clean start logs no `RLS self-check failed`.
 
 ## Errors seen and what they mean

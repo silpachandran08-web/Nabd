@@ -21,7 +21,7 @@ import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.auth.dto.OtpRequestRequest;
 import com.nabd.hms.auth.dto.OtpVerifyRequest;
 import com.nabd.hms.auth.dto.UnlockRequest;
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.StepUpVerifier;
@@ -69,7 +69,7 @@ public class AuthService {
     private final TenantContext tenantContext;
     private final PasswordEncoder pinEncoder;
     private final TotpService totpService;
-    private final AesGcmCipher cipher;
+    private final FieldCipher cipher;
     private final JwtEncoder jwtEncoder;
     private final ChallengeTokenDecoder jwtDecoder;
     private final AuthProperties props;
@@ -81,7 +81,7 @@ public class AuthService {
     private final SecureRandom random = new SecureRandom();
 
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
-                TotpService totpService, AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
+                TotpService totpService, FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, WhatsAppOtpSender otpSender, AuditService auditService,
                 LoginGuard guard, StepUpVerifier stepUpVerifier) {
         this.repo = repo;
@@ -265,7 +265,7 @@ public class AuthService {
             throw mfaFailed(); // enrolled=false but flagged enabled — never silently skip the check
         }
         guard.enforceLockout(staff.id());
-        byte[] secret = cipher.decrypt(staff.mfaSecretEnc());
+        byte[] secret = cipher.tryDecrypt(staff.mfaSecretEnc(), mfaAad(staff)).orElseThrow(this::mfaFailed);
         if (!guard.verifyTotp(staff.id(), secret, req.code())) {
             log.warn("MFA verification failed for staff {}", staff.id());
             guard.recordAttempt(staff.tenantId(), staff.id(), staff.email(), "totp", false);
@@ -291,7 +291,7 @@ public class AuthService {
             throw mfaFailed();
         }
         guard.enforceLockout(staffId);
-        byte[] secret = cipher.decrypt(staff.mfaSecretEnc());
+        byte[] secret = cipher.tryDecrypt(staff.mfaSecretEnc(), mfaAad(staff)).orElseThrow(this::mfaFailed);
         if (!guard.verifyTotp(staffId, secret, code)) {
             log.warn("step-up denied for staff {} — TOTP mismatch", staffId);
             guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "step_up", false);
@@ -330,7 +330,7 @@ public class AuthService {
             } else {
                 guard.enforceLockout(staffId);
                 if (currentCode == null || staff.mfaSecretEnc() == null
-                        || !guard.verifyTotp(staffId, cipher.decrypt(staff.mfaSecretEnc()), currentCode)) {
+                        || !guard.verifyTotp(staffId, cipher.tryDecrypt(staff.mfaSecretEnc(), mfaAad(staff)).orElse(null), currentCode)) {
                     if (currentCode != null) {
                         guard.recordAttempt(staff.tenantId(), staffId, staff.email(), "totp", false);
                     }
@@ -341,7 +341,7 @@ public class AuthService {
         }
 
         byte[] secret = totpService.generateSecret();
-        repo.setPendingMfaSecret(staffId, cipher.encrypt(secret));
+        repo.setPendingMfaSecret(staffId, cipher.encrypt(secret, mfaAad(staff)));
         log.info("staff {} started MFA enrollment", staffId);
         return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd", staff.email()));
     }
@@ -354,7 +354,7 @@ public class AuthService {
         Staff staff = repo.findStaffById(staffId).orElseThrow(this::notFound);
 
         guard.enforceLockout(staffId);
-        if (staff.mfaPendingSecretEnc() == null || !guard.verifyTotp(staffId, cipher.decrypt(staff.mfaPendingSecretEnc()), req.code())) {
+        if (staff.mfaPendingSecretEnc() == null || !guard.verifyTotp(staffId, cipher.tryDecrypt(staff.mfaPendingSecretEnc(), mfaAad(staff)).orElse(null), req.code())) {
             guard.recordAttempt(tenantId, staffId, staff.email(), "totp", false);
             throw mfaFailed();
         }
@@ -655,6 +655,11 @@ public class AuthService {
     private ApiException invalidCredentials() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "invalid-credentials", "Invalid credentials",
                 "Email/mobile or credential is incorrect.");
+    }
+
+    /** PLT-044: pending and active secrets share one AAD column, since confirmPendingMfa moves the value in SQL. */
+    static FieldCipher.Aad mfaAad(Staff staff) {
+        return FieldCipher.Aad.of(staff.tenantId(), "staff", "mfa_secret", staff.id());
     }
 
     private ApiException mfaFailed() {

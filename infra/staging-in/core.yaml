@@ -28,7 +28,9 @@ spec:
             - { name: DB_USER, value: nabd_app }
             - { name: DB_URL, valueFrom: { secretKeyRef: { name: core-secrets, key: db-url } } }          # PgBouncer endpoint
             - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: core-secrets, key: db-password } } }
-            - { name: APP_CRYPTO_KEY, valueFrom: { secretKeyRef: { name: core-secrets, key: app-crypto-key } } }   # no default: boot fails fast when unset
+            - { name: APP_CRYPTO_KEY, valueFrom: { secretKeyRef: { name: core-secrets, key: app-crypto-key } } }   # PLT-044: legacy reads only, drop after the re-encrypt verify pass
+            - { name: APP_CRYPTO_KEYRING, valueFrom: { secretKeyRef: { name: core-secrets, key: app-crypto-keyring } } }   # PLT-044: "kid:base64,..."; prod refuses to boot without it
+            - { name: APP_CRYPTO_ACTIVE_KID, value: "1" }
           volumeMounts:
             - { name: jwt-keys, mountPath: /secrets/jwt, readOnly: true }
           # Probe paths are Spring's standard group endpoints; they wait on OPS-025 shipping them (not in this tree yet).
