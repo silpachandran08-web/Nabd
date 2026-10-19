@@ -79,7 +79,8 @@ class Ops025ObservabilityApiTest extends ApiTestBase {
             assertThat(get(apiPort, p).statusCode()).isIn(401, 403, 404);
         }
         assertThat(get(mgmtPort, "/v1/auth/login").statusCode()).isEqualTo(404); // and the API is not on the management port
-        assertThat(get(mgmtPort, "/actuator/env").statusCode()).isEqualTo(404);   // only health and prometheus are exposed
+        // only health and prometheus are exposed; an unexposed path is outside the permitAll actuator chain so the main chain answers 401 (never 200)
+        assertThat(get(mgmtPort, "/actuator/env").statusCode()).isIn(401, 404);
     }
 
     @Test
@@ -95,9 +96,9 @@ class Ops025ObservabilityApiTest extends ApiTestBase {
     }
 
     @Test
-    void shutdownIsGracefulWithin20sAndFlywayIsOff() {
+    void shutdownIsGracefulWithin25sAndFlywayIsOff() {
         assertThat(env.getProperty("server.shutdown")).isEqualTo("graceful");
-        assertThat(env.getProperty("spring.lifecycle.timeout-per-shutdown-phase")).isEqualTo("20s");
+        assertThat(env.getProperty("spring.lifecycle.timeout-per-shutdown-phase")).isEqualTo("25s"); // OPS-053 raised OPS-025's 20s to 25s
         assertThat(env.getProperty("spring.flyway.enabled")).isEqualTo("false");
     }
 }

@@ -20,7 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * OPS-034: the committed api/openapi/core.yaml must equal what springdoc generates from the controllers (CI stage 3 runs this).
  * To refresh the file after an endpoint change: mvn test -Dtest=OpenApiSpecApiTest -Dopenapi.write=true, then commit it.
  */
-@TestPropertySource(properties = {"springdoc.api-docs.enabled=true", "springdoc.writer-with-order-by-keys=true"})
+// test-only controllers on the test classpath (idempotency/ops003 tests) must not leak into the committed spec
+@TestPropertySource(properties = {"springdoc.api-docs.enabled=true", "springdoc.writer-with-order-by-keys=true",
+        "springdoc.paths-to-exclude=/v1/test-idem/**,/v1/s9qa/**"})
 class OpenApiSpecApiTest extends ApiTestBase {
 
     static final Path COMMITTED = Path.of("../api/openapi/core.yaml");
