@@ -30,7 +30,8 @@ class OpenApiSpecApiTest extends ApiTestBase {
     @Test
     @SuppressWarnings("unchecked")
     void generatedSpecEqualsCommittedAndEveryOperationIsComplete() throws Exception {
-        String generated = new String(resource.openapiYaml(new MockHttpServletRequest(), "/v3/api-docs.yaml", Locale.ROOT), StandardCharsets.UTF_8);
+        var req = new MockHttpServletRequest("GET", "/v3/api-docs.yaml"); // springdoc strips the docs path from the request URL
+        String generated = new String(resource.openapiYaml(req, "/v3/api-docs.yaml", Locale.ROOT), StandardCharsets.UTF_8);
         if (Boolean.getBoolean("openapi.write")) Files.writeString(COMMITTED, generated);
         assertEquals(Files.readString(COMMITTED), generated, "api/openapi/core.yaml is stale: regenerate with -Dopenapi.write=true");
 
