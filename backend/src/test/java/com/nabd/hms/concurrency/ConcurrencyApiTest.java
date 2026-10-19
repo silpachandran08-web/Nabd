@@ -91,7 +91,7 @@ class ConcurrencyApiTest extends ApiTestBase {
         assertThat(count(rs, HttpStatus.CREATED)).isEqualTo(1);
         ResponseEntity<Map> loser = rs.stream().filter(r -> r.getStatusCode() != HttpStatus.CREATED).findFirst().orElseThrow();
         assertThat(loser.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(loser.getBody().get("type")).asString().contains("already-arrived");
+        assertThat(loser.getBody().get("type")).asString().contains("already-checked-in");
         Integer entries = inTenantTx(c.tenant().id(), () -> jdbc.queryForObject(
                 "SELECT COUNT(*) FROM queue_entries WHERE appointment_id = ?", Integer.class, UUID.fromString(apptId)));
         assertThat(entries).isEqualTo(1);
@@ -117,7 +117,7 @@ class ConcurrencyApiTest extends ApiTestBase {
         List<ResponseEntity<Map>> rs = ConcurrencyHarness.race(List.of(
                 () -> pay(c, invoiceId, 300), () -> pay(c, invoiceId, 200)));
 
-        assertThat(rs).allMatch(r -> r.getStatusCode() == HttpStatus.OK);
+        assertThat(rs).allMatch(r -> r.getStatusCode() == HttpStatus.CREATED); // FIN-001: payment is 201
         Map<String, Object> row = inTenantTx(c.tenant().id(), () -> jdbc.queryForMap(
                 "SELECT i.paid, i.status, (SELECT SUM(amount) FROM invoice_payments WHERE invoice_id = i.id) AS summed FROM invoices i WHERE i.id = ?",
                 UUID.fromString(invoiceId)));
@@ -169,7 +169,7 @@ class ConcurrencyApiTest extends ApiTestBase {
                 "patientId", patientId, "doctorId", c.staff().id().toString())), Map.class).getBody().get("id");
 
         List<ResponseEntity<Map>> rs = ConcurrencyHarness.raceSame(10, () -> exchange("/v1/queue/" + entry + "/status",
-                HttpMethod.PATCH, authedJsonBody(c.token(), Map.of("status", "waiting")), Map.class));
+                HttpMethod.PATCH, authedJsonBody(c.token(), Map.of("status", "waiting", "expectedStatus", "checked_in")), Map.class)); // ACC-002: compare-and-set names the stage the screen shows
 
         assertThat(count(rs, HttpStatus.OK)).isEqualTo(1);
         assertThat(count(rs, HttpStatus.CONFLICT)).isEqualTo(9);
