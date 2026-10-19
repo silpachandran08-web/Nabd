@@ -15,6 +15,7 @@ import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, problemMessage, type CheckInResult } from "../components/arrivals/CheckInDialog";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { fingerprint, submitKeyed } from "../lib/idempotency";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
@@ -475,15 +476,13 @@ function ArrivalsPageInner() {
           setModalError("Confirm the guardian's consent and how it was given.");
           return;
         }
-        const res = await authedFetch("/patients", {
-          method: "POST",
-          body: JSON.stringify({
-            name: newName, phone: newPhone, dob: newDob, gender: newGender,
-            guardianId: minor ? guardian?.id ?? null : null,
-            ...(minor ? { guardianConsent: { confirmed: true, channel: guardianChannel } } : {}),
-            ...(confirmedNotDuplicate ? { confirmedNotDuplicate: true } : {}),
-          }),
-        });
+        const regBody = {
+          name: newName, phone: newPhone, dob: newDob, gender: newGender,
+          guardianId: minor ? guardian?.id ?? null : null,
+          ...(minor ? { guardianConsent: { confirmed: true, channel: guardianChannel } } : {}),
+          ...(confirmedNotDuplicate ? { confirmedNotDuplicate: true } : {}),
+        };
+        const res = await submitKeyed(authedFetch, "/patients", regBody, `reg.${fingerprint(JSON.stringify(regBody))}`);
         if (!res) return;
         if (res.status === 409) {
           const body: { candidates: DuplicateCandidate[] } = await res.json().catch(() => ({ candidates: [] }));
@@ -502,14 +501,8 @@ function ArrivalsPageInner() {
         registeredRef.current = { id: patientId as string, name: newName };
       }
 
-      const ciRes = await authedFetch("/queue/check-in", {
-        method: "POST",
-        body: JSON.stringify({
-          patientId, doctorId,
-          presentingComplaint: presentingComplaint.trim() || null,
-          paymentMode,
-        }),
-      });
+      const ciBody = { patientId, doctorId, presentingComplaint: presentingComplaint.trim() || null, paymentMode };
+      const ciRes = await submitKeyed(authedFetch, "/queue/check-in", ciBody, `ci.${fingerprint(JSON.stringify(ciBody))}`);
       if (!ciRes) return;
       if (!ciRes.ok) {
         setModalError(await problemMessage(ciRes, "Couldn't check in."));

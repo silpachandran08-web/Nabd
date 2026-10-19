@@ -1,4 +1,5 @@
 import { decodeJwtPayload } from "./jwt.ts";
+import { clearIntents } from "./idempotency.ts";
 // The access token's "permissions" claim (SecurityConfig.java: authoritiesClaimName) already
 // carries everything the client needs for nav/redirect — decoding it here avoids a round trip
 // to a /me endpoint that doesn't exist for clinic staff (only /platform/auth/me does).
@@ -141,4 +142,5 @@ export async function signOut(): Promise<void> {
   }
   localStorage.removeItem("nabd_access_token");
   localStorage.removeItem("nabd_refresh_token");
+  clearIntents(); // FEF-008: no payment intent outlives the session
 }

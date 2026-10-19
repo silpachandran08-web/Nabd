@@ -19,6 +19,8 @@ function billing(o = {}) {
     ['GET', /^\/billing\/checkout\/[^/]+$/, o.context ?? { body: ctx(o.ctx) }],
     ['GET', /^\/departments\/[^/]+\/flow/, { body: [] }],
     ['GET', /^\/billing\/checkout\/[^/]+\/invoice$/, (r) => st.invoice ? r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mk()) }) : r.fulfill({ status: 404, contentType: 'application/problem+json', body: '{"title":"Not found","detail":"x"}' })],
+    // FEF-008: the status check after a lost response reads the invoice by id.
+    ['GET', /^\/billing\/invoices\/inv-1$/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mk()) })],
     ['POST', /^\/billing\/checkout\/[^/]+$/, async (r, req) => {
       st.posts.checkout++;
       if (o.delay) await new Promise((x) => setTimeout(x, o.delay));
@@ -33,7 +35,7 @@ function billing(o = {}) {
       if (o.delay) await new Promise((x) => setTimeout(x, o.delay));
       const n = st.posts.payments.length;
       if (o.failPaymentOnce === n && !st.failed) { st.failed = true; return r.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"title":"Error","detail":"Payment gateway down"}' }); }
-      st.invoice.payments.push({ id: `p${n}`, method: b.method, amount: b.amount, recordedAt: '2026-10-18T10:00:00Z' });
+      st.invoice.payments.push({ id: `p${n}`, method: b.method, amount: b.amount, recordedAt: '2026-10-18T10:00:00Z', idempotencyKey: req.headers()['idempotency-key'] });
       if (o.landThenAbort === n && !st.aborted) { st.aborted = true; return r.abort('failed'); }
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(mk()) });
     }],

@@ -11,13 +11,14 @@ import AccessGate from "../../components/ui/AccessGate";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
 import { apiFetch, goLogin } from "../../lib/apiClient";
+import { fingerprint, recordPayment, submitKeyed } from "../../lib/idempotency";
 
 // NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
 // /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
 type OtcContext = { currency: string; charges: Charge[] };
 type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
-type Payment = { id: string; method: string; amount: number; recordedAt: string };
+type Payment = { id: string; method: string; amount: number; recordedAt: string; idempotencyKey?: string | null };
 type Invoice = {
   id: string; invoiceNumber: string; patientName: string; currency: string;
   subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
@@ -66,6 +67,7 @@ function OtcCheckoutInner() {
   const [amount, setAmount] = useState("");
   const [recording, setRecording] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [payStatus, setPayStatus] = useState<null | "checking" | "recorded" | "notRecorded">(null); // FEF-008
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -156,13 +158,11 @@ function OtcCheckoutInner() {
     }
     setCreating(true);
     try {
-      const res = await authedFetch("/billing/otc-checkout", {
-        method: "POST",
-        body: JSON.stringify({
-          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          ...(canDiscount ? { discount: discountNum } : {}),
-        }),
-      });
+      const body = {
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
+        ...(canDiscount ? { discount: discountNum } : {}),
+      };
+      const res = await submitKeyed(authedFetch, "/billing/otc-checkout", body, `otc.${fingerprint(JSON.stringify(body))}`);
       if (!res) return;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
@@ -170,6 +170,8 @@ function OtcCheckoutInner() {
         return;
       }
       setInvoice(await res.json());
+    } catch {
+      setCreateError("Couldn't confirm the sale. Try again: the same request is re-sent safely and cannot bill twice.");
     } finally {
       setCreating(false);
     }
@@ -184,18 +186,16 @@ function OtcCheckoutInner() {
       return;
     }
     setRecording(true);
+    setPayStatus(null);
     try {
-      const res = await authedFetch(`/billing/invoices/${invoice.id}/payments`, {
-        method: "POST",
-        body: JSON.stringify({ method, amount: amt }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
-        setPaymentError(p.detail || "Couldn't record payment.");
-        return;
-      }
-      setInvoice(await res.json());
+      const out = await recordPayment(authedFetch, { invoiceId: invoice.id, method, amountMinor: Math.round(amt * 100), slot: invoice.payments.length }, () => setPayStatus("checking"));
+      if (out.kind === "gone") return;
+      if (out.kind === "offline") { setPaymentError("You are offline — payments cannot be queued"); return; }
+      if (out.kind === "rejected") { setPayStatus(null); setPaymentError(out.message); return; }
+      if (out.kind === "unknown") { setPayStatus("notRecorded"); setPaymentError("Couldn't confirm whether that payment was recorded. Check again before collecting."); return; }
+      setInvoice(out.invoice as Invoice);
+      if (out.kind === "notRecorded") { setPayStatus("notRecorded"); setPaymentError(out.message ?? null); return; }
+      setPayStatus((cur) => (cur === "checking" ? "recorded" : null));
       setAmount("");
     } finally {
       setRecording(false);
@@ -219,6 +219,12 @@ function OtcCheckoutInner() {
         </div>
         {invoice && <BillingStatePill state={invoice.status} />}
       </div>
+
+      {payStatus && (
+        <div className={payStatus === "notRecorded" ? styles.errorState : styles.banner} role="status" data-testid="pay-status">
+          {payStatus === "checking" ? "Checking payment status…" : payStatus === "recorded" ? "Payment recorded" : "Not recorded — retry"}
+        </div>
+      )}
 
       {invoice ? (
         <div className={styles.layout} style={{ gridTemplateColumns: "1fr 300px" }}>

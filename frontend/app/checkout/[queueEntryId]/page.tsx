@@ -12,6 +12,7 @@ import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
 import { apiFetch, goLogin } from "../../lib/apiClient";
+import { checkStatus, fingerprint, pendingFor, recordPayment, submitKeyed } from "../../lib/idempotency";
 
 // Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
 type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
@@ -23,7 +24,7 @@ type CheckoutContext = {
 };
 type FlowStep = { stepType: string };
 type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
-type Payment = { id: string; method: string; amount: number; recordedAt: string };
+type Payment = { id: string; method: string; amount: number; recordedAt: string; idempotencyKey?: string | null };
 type Invoice = {
   id: string; invoiceNumber: string; patientName: string; doctorName: string; currency: string;
   subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
@@ -84,6 +85,8 @@ export default function CheckoutPage() {
   const [recording, setRecording] = useState(false);
   const busyLock = useRef(false); // synchronous guard: a double-click must never start a second bill or payment
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  // FEF-008: "checking" while the invoice is read back after a timeout/5xx; "recorded"/"notRecorded" are its two answers.
+  const [payStatus, setPayStatus] = useState<null | "checking" | "recorded" | "notRecorded">(null);
 
   const [flowSteps, setFlowSteps] = useState<FlowStep[]>([]);
   const [continuing, setContinuing] = useState(false);
@@ -139,7 +142,20 @@ export default function CheckoutPage() {
 
       const invRes = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`);
       if (invRes?.status === 200) {
-        setInvoice(await invRes.json());
+        const inv: Invoice = await invRes.json();
+        setInvoice(inv);
+        // Reload mid-timeout: a stored payment intent is checked automatically (never re-sent unasked).
+        const pending = pendingFor(inv.id);
+        if (pending.length > 0) {
+          setPayStatus("checking");
+          const out = await checkStatus(authedFetch, inv.id, pending[0].key, pending[0].scope);
+          if (out.kind === "recorded") { setInvoice(out.invoice as Invoice); setPayStatus("recorded"); }
+          else {
+            setPayStatus("notRecorded");
+            setTenders([{ id: 1, method: pending[0].method, amount: String(pending[0].amountMinor / 100) }]);
+            setPaymentError(out.kind === "unknown" ? "Couldn't confirm whether that payment was recorded. Check again before collecting." : null);
+          }
+        }
       }
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
@@ -198,13 +214,11 @@ export default function CheckoutPage() {
     }
     setCreating(true);
     try {
-      const res = await authedFetch(`/billing/checkout/${queueEntryId}`, {
-        method: "POST",
-        body: JSON.stringify({
-          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          ...(canDiscount ? { discount: discountNum } : {}),
-        }),
-      });
+      const body = {
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
+        ...(canDiscount ? { discount: discountNum } : {}),
+      };
+      const res = await submitKeyed(authedFetch, `/billing/checkout/${queueEntryId}`, body, `co.${queueEntryId}.${fingerprint(JSON.stringify(body))}`);
       if (!res) return null;
       if (!res.ok) {
         const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
@@ -218,7 +232,7 @@ export default function CheckoutPage() {
       setShowAddMore(false);
       return inv;
     } catch {
-      setCreateError("Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
+      setCreateError("Couldn't confirm the invoice. Try again: the same request is re-sent safely and cannot bill twice.");
       return null;
     } finally {
       setCreating(false);
@@ -236,6 +250,7 @@ export default function CheckoutPage() {
   // the cashier: anything over the balance due stops the run with a message.
   async function payTenders(start: Invoice) {
     setPaymentError(null);
+    setPayStatus(null);
     setRecording(true);
     let inv = start;
     try {
@@ -245,31 +260,14 @@ export default function CheckoutPage() {
           setPaymentError("That amount is more than the balance due. Adjust it and collect again.");
           return;
         }
-        const before = inv.payments.length;
-        let next: Invoice;
-        try {
-          const res = await authedFetch(`/billing/invoices/${inv.id}/payments`, { method: "POST", body: JSON.stringify({ method: row.method, amount: amt / 100 }) });
-          if (!res) return;
-          if (!res.ok) {
-            const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
-            setPaymentError(p.detail || "Couldn't record payment.");
-            return;
-          }
-          next = await res.json();
-        } catch {
-          // Outcome unknown: read the invoice back instead of guessing, so a payment that landed is never re-sent.
-          const r = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
-          if (!r?.ok) {
-            setPaymentError("Couldn't confirm whether that payment was recorded. Reload this page and check the Payments list before collecting again.");
-            return;
-          }
-          next = await r.json();
-          if (next.payments.length <= before) {
-            setInvoice(next);
-            setPaymentError("That payment did not go through and nothing was recorded. Try again.");
-            return;
-          }
-        }
+        const out = await recordPayment(authedFetch, { invoiceId: inv.id, method: row.method, amountMinor: amt, slot: inv.payments.length }, () => setPayStatus("checking"));
+        if (out.kind === "gone") return;
+        if (out.kind === "offline") { setPaymentError("You are offline — payments cannot be queued"); return; }
+        if (out.kind === "rejected") { setPayStatus(null); setPaymentError(out.message); return; }
+        if (out.kind === "unknown") { setPaymentError("Couldn't confirm whether that payment was recorded. Check again before collecting."); setPayStatus("notRecorded"); return; }
+        if (out.kind === "notRecorded") { setInvoice(out.invoice as Invoice); setPayStatus("notRecorded"); setPaymentError(out.message ?? null); return; }
+        setPayStatus((cur) => (cur === "checking" ? "recorded" : null));
+        const next = out.invoice as Invoice;
         setInvoice(next);
         inv = next;
         setTenders((prev) => prev.map((t) => (t.id === row.id ? { ...t, amount: "" } : t)));
@@ -334,6 +332,13 @@ export default function CheckoutPage() {
   const categories = ["All", ...Array.from(new Set(context.charges.map((c) => c.category)))];
   const visibleCharges = category === "All" ? context.charges : context.charges.filter((c) => c.category === category);
 
+  const payStatusView = payStatus && (
+    <div className={payStatus === "notRecorded" ? styles.errorState : styles.banner} role="status" data-testid="pay-status">
+      {payStatus === "checking" && "Checking payment status…"}
+      {payStatus === "recorded" && "Payment recorded"}
+      {payStatus === "notRecorded" && "Not recorded — retry"}
+    </div>
+  );
   const picker = (
     <div className={styles.layout}>
       <div className={styles.card}>
@@ -439,6 +444,8 @@ export default function CheckoutPage() {
         </div>
         {invoice && <BillingStatePill state={invoice.status} />}
       </div>
+
+      {payStatusView}
 
       {context.followUpEligible && !invoice && (
         <div className={styles.banner}>
