@@ -6,6 +6,8 @@ import styles from "../checkout.module.css";
 import { formatMoney } from "../../lib/money";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
+import StatusPill from "../../components/ui/StatusPill";
+import { autoLink, rxErrorMessage, unlinkedRx } from "../../components/checkout/rxLink";
 import { getIdentity } from "../../lib/session";
 import { can } from "../../lib/permissions";
 import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
@@ -120,8 +122,14 @@ export default function CheckoutPage() {
         if (charge.stockQty != null && existing.quantity >= charge.stockQty) return prev; // PHA-011: cap at stock
         return prev.map((i) => (i.chargeCode === charge.code ? { ...i, quantity: i.quantity + 1 } : i));
       }
-      return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice, taxRatePercent: charge.taxRatePercent }];
+      // PHL-001: an Rx item is pre-linked to the visit's signed line for it; otherwise the row asks for one.
+      const prescriptionItemId = charge.isRx ? autoLink(charge.name, context?.prescribedItems ?? []) ?? undefined : undefined;
+      return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice, taxRatePercent: charge.taxRatePercent, prescriptionItemId }];
     });
+  }
+
+  function linkRx(code: string, prescriptionItemId: string) {
+    setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, prescriptionItemId } : i)));
   }
 
   function applyOverride(code: string) {
@@ -147,6 +155,8 @@ export default function CheckoutPage() {
   const rawTotal = subtotal - discountNum + tax;
   const previewTotal = Math.round(rawTotal);
   const roundOff = round2(previewTotal - rawTotal);
+  const waitingForRx = unlinkedRx(items, context?.charges ?? []);
+  const rxChoices = (context?.prescribedItems ?? []).filter((p) => p.remainingQty > 0);
 
   // Bills the visit (creates or extends the invoice). Returns the invoice, or null when it failed.
   async function billVisit(): Promise<Invoice | null> {
@@ -166,7 +176,8 @@ export default function CheckoutPage() {
     try {
       const body = {
         // codes only: the server prices every line from the catalogue (FIN-003)
-        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, quantity: i.quantity, ...(canDiscount && i.override ? { override: i.override } : {}) })),
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, quantity: i.quantity, ...(canDiscount && i.override ? { override: i.override } : {}),
+          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
         ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
       };
       const inv = await api.post<Invoice>(`/billing/checkout/${queueEntryId}`, body, { idempotencyKey: keys.current.get("bill", body) });
@@ -179,7 +190,7 @@ export default function CheckoutPage() {
       return inv;
     } catch (e) {
       // A server answer is a refusal; no answer (or a timeout) leaves the outcome unknown.
-      setCreateError(e instanceof ApiError ? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : "Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : "Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
       return null;
     } finally {
       setCreating(false);
@@ -306,7 +317,7 @@ export default function CheckoutPage() {
           const isFollowUp = price !== c.baseAmount;
           const body = (
             <>
-              <span className={styles.chargeName}>{c.name} <StockPill qty={c.stockQty} /></span>
+              <span className={styles.chargeName}>{c.name} {c.isRx && <StatusPill tone="danger" label="Rx" />} <StockPill qty={c.stockQty} /></span>
               <span className={styles.chargePrice}>
                 {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{formatMoney(c.baseAmount, context.currency)}</span>}
                 {formatMoney(price, context.currency)}
@@ -330,7 +341,19 @@ export default function CheckoutPage() {
             <tbody>
               {items.map((i) => (
                 <tr key={i.chargeCode}>
-                  <td>{i.chargeName}<div className={styles.muted}>{i.category}</div></td>
+                  <td>
+                    {i.chargeName}<div className={styles.muted}>{i.category}</div>
+                    {/* PHL-001: an Rx line is linked to one signed line of this visit's prescription; no "unlink" choice once linked */}
+                    {(i.prescriptionItemId || waitingForRx.includes(i.chargeCode)) && (
+                      <select aria-label={`Prescription line for ${i.chargeName}`} className={styles.rxPickerInput} value={i.prescriptionItemId ?? ""}
+                        onChange={(e) => e.target.value && linkRx(i.chargeCode, e.target.value)}>
+                        {!i.prescriptionItemId && <option value="">{rxChoices.length ? "Choose prescription line…" : "No signed prescription line left"}</option>}
+                        {(context.prescribedItems ?? []).filter((p) => p.remainingQty > 0 || p.prescriptionItemId === i.prescriptionItemId).map((p) => (
+                          <option key={p.prescriptionItemId} value={p.prescriptionItemId}>Rx: {p.drugName}{p.dosage ? ` ${p.dosage}` : ""} · {p.remainingQty} left</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
                   <td>
                     <span className={styles.qtyStepper}>
                       <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity - 1)}>−</button>
@@ -389,7 +412,10 @@ export default function CheckoutPage() {
           <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
         </div>
         <p className={styles.muted}>The total is computed from line items and can never be typed over.</p>
-        {createError && <div className={styles.errorState}>{createError}</div>}
+        {waitingForRx.length > 0 && (
+          <div className={styles.errorState} data-testid="rx-wait">Link every Rx item to a line of the signed prescription before checkout.</div>
+        )}
+        {createError && <div className={styles.errorState} role="alert">{createError}</div>}
         {canPay && !invoice && (
           <>
             <TenderRows rows={tenders} onChange={setTenders} region={region} balanceMinor={previewTotal * 100} disabled={creating || recording} />
@@ -407,7 +433,7 @@ export default function CheckoutPage() {
         <span>Total <b>{formatMoney(previewTotal, context.currency)}</b></span>
         {canPay && !invoice && <span>Balance due <b data-testid="balance-due">{formatMoney(Math.max(0, previewTotal * 100 - tenderedMinor) / 100, context.currency)}</b></span>}
       </div>
-      <button className={styles.collectBtn} onClick={invoice ? submitCheckout : collect} disabled={creating || recording || (!invoice && items.length === 0)}>
+      <button className={styles.collectBtn} onClick={invoice ? submitCheckout : collect} disabled={creating || recording || (!invoice && items.length === 0) || waitingForRx.length > 0}>
         {creating || recording ? "Working…" : invoice ? "Add to invoice" : canPay && tenderedMinor > 0 ? `Collect ${formatMoney(tenderedMinor / 100, context.currency)}` : "Checkout"}
       </button>
     </div>
@@ -434,7 +460,7 @@ export default function CheckoutPage() {
       {context.prescribedItems.length > 0 && (
         <div className={styles.banner}>
           Prescription ready: {context.prescribedItems.length} {context.prescribedItems.length === 1 ? "item" : "items"}
-          <span className={styles.bannerSub}>No separate dispense screen — add matching Pharmacy charges below if in stock.</span>
+          <span className={styles.bannerSub}>No separate dispense screen — add matching Pharmacy charges below if in stock. Rx items link to these lines.</span>
         </div>
       )}
 

@@ -375,3 +375,55 @@
   .card { overflow-x: auto; }
   .collectBtn { inline-size: 100%; }
 }
+
+/* PHL-001: Rx-only lines and the link-prescription picker */
+.rxPicker {
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding: var(--nb-space-12);
+  margin-block: var(--nb-space-8);
+  background: var(--nb-surface-2);
+}
+
+.rxPickerRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nb-space-8);
+  margin-block-end: var(--nb-space-8);
+}
+
+.rxPickerInput {
+  flex: 1 1 160px;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  padding-inline: var(--nb-space-8);
+  color: var(--nb-text-primary);
+  font: inherit;
+}
+
+.rxPickerBtn {
+  min-block-size: 44px;
+  min-inline-size: 44px;
+  padding-inline: var(--nb-space-12);
+  background: var(--nb-surface-3);
+  border: 1px solid var(--nb-border-default);
+  border-radius: var(--nb-radius-md);
+  color: var(--nb-text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.rxLinkBtn {
+  min-block-size: 44px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--nb-accent-500);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  text-align: start;
+}

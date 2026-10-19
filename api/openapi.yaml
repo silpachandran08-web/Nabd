@@ -2273,6 +2273,36 @@ paths:
         "200": { description: The item, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /pharmacy/rx-lines/search:
+    post:
+      tags: [Pharmacy]
+      summary: >
+        PHL-001 counter "Link prescription" picker: signed prescription lines with quantity left for the patients whose phone matches
+        (last 10 digits; POST so the number is never in a URL). At most 50, newest first. Fewer than 6 digits is 400 validation-failed.
+      x-required-permission: billing:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [phone], properties: { phone: { type: string } } } } }
+      responses:
+        "200":
+          description: Matching lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    prescriptionItemId: { type: string, format: uuid }
+                    patientId: { type: string, format: uuid }
+                    patientName: { type: string }
+                    drugName: { type: string }
+                    dosage: { type: string, nullable: true }
+                    quantity: { type: number, nullable: true }
+                    remainingQty: { type: number }
+                    signedAt: { type: string, format: date-time, nullable: true }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
   /pharmacy/dispensing-queue:
     get:
       tags: [Pharmacy]
@@ -2300,12 +2330,20 @@ paths:
         come from the catalogue and the client's values are silently ignored (no 400 on mismatch); a catalogue entry flagged
         doctorOverride keeps the client's unitPrice. Lines with no catalogue entry use the client's values (chargeName required,
         unitPrice and taxRatePercent >= 0, else 400 validation-failed). Non-zero discount needs billing.discount (403 discount-not-permitted).
+        PHL-001: a line whose catalogue item is prescription-only (`isRx`, the clinic's flag) needs `prescriptionItemId` (uuid) pointing at a
+        signed prescription line of the same tenant and patient with quantity left (prescribed quantity minus units on non-void invoices;
+        a line with no prescribed quantity has none left). Refusals are 422 Problem+JSON: rx-required (no link, or the id is unknown in this
+        tenant), rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted. Each refusal writes audit `pharmacy.rx_gate_blocked` and event
+        `pharmacy.rx_gate.blocked.v1` { tenantId, itemId, reason, actorId }; nothing else is written and stock is unchanged.
+        A counter sale with linked Rx lines is recorded against that prescription's patient (patientId set); lines from two patients are
+        rx-patient-mismatch. Sales against an outside (paper/photo) prescription are PHL-020.
       x-required-permission: billing:create
       responses:
         "200": { description: The invoice (lineItems show the price actually charged), content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: Forbidden }
         "409": { description: "otc-not-available, item-inactive, insufficient-stock or day-closed" }
+        "422": { description: "rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted (PHL-001), unknown-charge, reason-required" }
   /billing/checkout/{queueEntryId}:
     post:
       tags: [Billing]
@@ -2322,6 +2360,13 @@ paths:
         invoices.discount is their sum across checkpoints; more than the remaining subtotal is 422 discount-exceeds-subtotal. The legacy scalar
         `discount` still works and is booked with reason `unspecified`. Every override and discount writes an audit row. Not gated by pharmacy mode.
         Not done here: Idempotency-Key, an `emergency` tier (no catalogue column), the billing.invoice.issued.v1 event (no consumer yet).
+        PHL-001: a line whose catalogue item is prescription-only (`isRx`, the clinic's flag) needs `prescriptionItemId` (uuid) pointing at a
+        signed prescription line of the same tenant and patient with quantity left (prescribed quantity minus units on non-void invoices;
+        a line with no prescribed quantity has none left). Refusals are 422 Problem+JSON: rx-required (no link, or the id is unknown in this
+        tenant), rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted. Each refusal writes audit `pharmacy.rx_gate_blocked` and event
+        `pharmacy.rx_gate.blocked.v1` { tenantId, itemId, reason, actorId }; nothing else is written and stock is unchanged.
+        The checkout context (GET) lists the visit's signed lines in `prescribedItems` with `prescriptionItemId`, `quantity` and
+        `remainingQty`, and every charge carries `isRx`, so the screen can pre-link Rx lines.
       x-required-permission: billing:create
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
@@ -2329,7 +2374,7 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden (including discount-not-permitted)" }
         "409": { description: Conflict }
-        "422": { description: "unknown-charge, reason-required, invalid-reason or discount-exceeds-subtotal" }
+        "422": { description: "unknown-charge, reason-required, invalid-reason, discount-exceeds-subtotal, rx-required, rx-not-signed, rx-patient-mismatch or rx-quantity-exhausted" }
   /billing/day-close:
     get:
       tags: [Billing]

@@ -66,11 +66,13 @@ public class CheckoutService {
     private final AuditService auditService;
     private final EventPublisher eventPublisher;
     private final BillingPricing pricing;
+    private final com.nabd.hms.pharmacy.RxGate rxGate;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
-                     EventPublisher eventPublisher, BillingPricing pricing) {
+                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate) {
+        this.rxGate = rxGate;
         this.visitCommands = visitCommands;
         this.eventPublisher = eventPublisher;
         this.pricing = pricing;
@@ -95,7 +97,8 @@ public class CheckoutService {
         List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
                 .map(this::toChargeResponse).toList();
         List<PrescribedItemResponse> prescribedItems = repo.findSignedPrescriptionItems(tenantId, queueEntryId).stream()
-                .map(p -> new PrescribedItemResponse(p.drugName(), p.dosage(), p.frequency(), p.duration(), p.instructions()))
+                .map(p -> new PrescribedItemResponse(p.id(), p.drugName(), p.dosage(), p.frequency(), p.duration(), p.instructions(),
+                        p.quantity(), p.quantity() == null ? BigDecimal.ZERO : p.quantity().subtract(p.dispensed()).max(BigDecimal.ZERO)))
                 .toList();
         return new CheckoutContextResponse(queueEntryId, patientName, doctorName,
                 ctx.hasAppointment() ? "Appointment" : "Walk-in", followUpEligible, currencyFor(tenantId), charges,
@@ -140,6 +143,7 @@ public class CheckoutService {
                 clock.today(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
         if (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty()) BillingPricing.requireDiscountRight(canDiscount);
         List<LineItemInput> lineItems = pricing.resolveLines(tenantId, req.lineItems(), followUp, canDiscount, false, staffId);
+        rxGate.check(tenantId, ctx.patientId(), rxLines(lineItems), staffId, ip); // PHL-001: before anything is written
         Optional<InvoiceRow> existing = repo.findInvoiceByQueueEntry(tenantId, queueEntryId);
         existing.ifPresent(CheckoutService::rejectVoid);
         UUID invoiceId;
@@ -226,9 +230,11 @@ public class CheckoutService {
         }
         if (!trusted && (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty())) BillingPricing.requireDiscountRight(canDiscount);
         List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), false, canDiscount, trusted, staffId);
+        // PHL-001: a counter sale of an Rx line needs a signed in-system prescription; the invoice then carries that patient.
+        UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
         Totals t = computeTotals(items, List.of(), BigDecimal.ZERO, req, canDiscount);
 
-        UUID invoiceId = repo.insertInvoice(tenantId, null, patientId, null, t.subtotal(), t.discount(), t.tax(),
+        UUID invoiceId = repo.insertInvoice(tenantId, null, patientId != null ? patientId : rxPatient, null, t.subtotal(), t.discount(), t.tax(),
                 t.roundOff(), t.total(), staffId);
         repo.insertLineItems(tenantId, invoiceId, items);
         repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
@@ -236,6 +242,11 @@ public class CheckoutService {
         log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
+    }
+
+    private static List<com.nabd.hms.pharmacy.RxGate.Line> rxLines(List<LineItemInput> items) {
+        return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.Line(i.chargeCode(), i.catalogueId(), i.isRx(), i.quantity(),
+                i.prescriptionItemId())).toList();
     }
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,
@@ -409,7 +420,7 @@ public class CheckoutService {
     }
 
     private ChargeResponse toChargeResponse(ChargeRow c) {
-        return new ChargeResponse(c.id(), c.code(), c.name(), c.category(), c.baseAmount(), c.followUpAmount(), c.taxRatePercent(), c.stockQty());
+        return new ChargeResponse(c.id(), c.code(), c.name(), c.category(), c.baseAmount(), c.followUpAmount(), c.taxRatePercent(), c.stockQty(), c.isRx());
     }
 
     private void requireOtcAvailable(UUID tenantId) {

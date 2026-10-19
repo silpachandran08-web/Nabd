@@ -10,8 +10,11 @@ import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/p
 import AccessGate from "../../components/ui/AccessGate";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
+import StatusPill from "../../components/ui/StatusPill";
+import RxLinkPicker from "../../components/checkout/RxLinkPicker";
+import { rxErrorMessage, unlinkedRx } from "../../components/checkout/rxLink";
 import { api, ApiError, errorText, intentKeys } from "../../lib/api";
-import type { Charge, Invoice, LineItem, OtcContext } from "../../../packages/api-client/types.ts";
+import type { Charge, Invoice, LineItem, OtcContext, RxLine } from "../../../packages/api-client/types.ts";
 
 // NB-186: a counter sale — no patient record, no queue token (GET /billing/otc-charges, POST /billing/otc-checkout).
 
@@ -48,6 +51,8 @@ function OtcCheckoutInner() {
   const [discount, setDiscount] = useState("0");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [linking, setLinking] = useState<string | null>(null); // PHL-001: chargeCode whose prescription picker is open
+  const [links, setLinks] = useState<Record<string, RxLine>>({}); // chargeCode -> the signed line it is billed against
 
   const [method, setMethod] = useState("cash");
   const [amount, setAmount] = useState("");
@@ -84,6 +89,13 @@ function OtcCheckoutInner() {
       }
       return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice: charge.baseAmount, taxRatePercent: charge.taxRatePercent }];
     });
+    if (charge.isRx && !links[charge.code]) setLinking(charge.code); // PHL-001: adding an Rx item opens the picker
+  }
+
+  function link(code: string, line: RxLine) {
+    setLinks((prev) => ({ ...prev, [code]: line }));
+    setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, prescriptionItemId: line.prescriptionItemId } : i)));
+    setLinking(null);
   }
 
   function setQty(code: string, qty: number) {
@@ -91,6 +103,8 @@ function OtcCheckoutInner() {
     if (stock != null && qty > stock) return; // PHA-011: cap at stock
     if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.chargeCode !== code));
+      setLinks((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== code)));
+      if (linking === code) setLinking(null);
       return;
     }
     setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, quantity: qty } : i)));
@@ -102,6 +116,7 @@ function OtcCheckoutInner() {
   const rawTotal = subtotal - discountNum + tax;
   const previewTotal = Math.round(rawTotal);
   const roundOff = round2(previewTotal - rawTotal);
+  const waitingForRx = unlinkedRx(items, context?.charges ?? []);
 
   async function submitCheckout() {
     setCreateError(null);
@@ -112,13 +127,14 @@ function OtcCheckoutInner() {
     setCreating(true);
     try {
       const body = {
-        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent,
+          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
         ...(canDiscount ? { discount: discountNum } : {}),
       };
       setInvoice(await api.post<Invoice>("/billing/otc-checkout", body, { idempotencyKey: keys.current.get("sale", body) }));
       keys.current.done("sale");
     } catch (e) {
-      setCreateError(e instanceof ApiError ? stockErrorMessage(e.problem, "Couldn't generate the invoice.") : errorText(e, ""));
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, "Couldn't generate the invoice.") : errorText(e, ""));
     } finally {
       setCreating(false);
     }
@@ -239,7 +255,7 @@ function OtcCheckoutInner() {
             {visibleCharges.map((c) => {
               const body = (
                 <>
-                  <span className={styles.chargeName}>{c.name} <StockPill qty={c.stockQty} /></span>
+                  <span className={styles.chargeName}>{c.name} {c.isRx && <StatusPill tone="danger" icon="alert" label="Rx" />} <StockPill qty={c.stockQty} /></span>
                   <span className={styles.chargePrice}>{formatMoney(c.baseAmount, context.currency)}</span>
                 </>
               );
@@ -260,7 +276,20 @@ function OtcCheckoutInner() {
                 <tbody>
                   {items.map((i) => (
                     <tr key={i.chargeCode}>
-                      <td>{i.chargeName}<div className={styles.muted}>{i.category}</div></td>
+                      <td>
+                        {i.chargeName}<div className={styles.muted}>{i.category}</div>
+                        {links[i.chargeCode] && (
+                          <div className={styles.muted} data-testid={`rx-linked-${i.chargeCode}`}>
+                            Rx: {links[i.chargeCode].drugName} · {links[i.chargeCode].patientName} · {links[i.chargeCode].remainingQty} left
+                          </div>
+                        )}
+                        {waitingForRx.includes(i.chargeCode) && linking !== i.chargeCode && (
+                          <button type="button" className={styles.rxLinkBtn} onClick={() => setLinking(i.chargeCode)}>Link prescription</button>
+                        )}
+                        {linking === i.chargeCode && (
+                          <RxLinkPicker itemName={i.chargeName} onPick={(l) => link(i.chargeCode, l)} onCancel={() => setLinking(null)} />
+                        )}
+                      </td>
                       <td>
                         <span className={styles.qtyStepper}>
                           <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity - 1)}>−</button>
@@ -293,9 +322,12 @@ function OtcCheckoutInner() {
               <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
             </div>
             <p className={styles.muted}>No patient record or queue token is created for a counter sale.</p>
-            {createError && <div className={styles.errorState}>{createError}</div>}
+            {waitingForRx.length > 0 && (
+              <div className={styles.errorState} data-testid="rx-wait">Link a signed prescription to every Rx item before checkout.</div>
+            )}
+            {createError && <div className={styles.errorState} role="alert">{createError}</div>}
             {canCheckout && (
-              <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0}>
+              <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0 || waitingForRx.length > 0}>
                 {creating ? "Generating…" : "Checkout"}
               </button>
             )}
