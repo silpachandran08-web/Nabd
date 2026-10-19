@@ -39,7 +39,7 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     @Override
     public void handle(OutboxEvent event) throws Exception {
         UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("messageId").asText());
-        WhatsAppMessageRepository.Message msg = repo.find(id).orElse(null);
+        WhatsAppMessageRepository.Message msg = repo.findForUpdate(id).orElse(null); // OPS-014: row lock, see findForUpdate
         if (msg == null || !"queued".equals(msg.status())) {
             return;
         }

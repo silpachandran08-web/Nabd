@@ -29,11 +29,14 @@ class WhatsAppMessageRepository {
                 """, UUID.class, tenantId, patientId, toPhone, templateId, templateName, language, paramsJson);
     }
 
-    Optional<Message> find(UUID id) {
+    /** OPS-014: locks the message row until the caller's transaction ends, so two workers holding the same
+     * outbox event (one with an expired lease) serialize here and the second sees the first one's result. */
+    Optional<Message> findForUpdate(UUID id) {
         return jdbc.query("""
                 SELECT m.*, t.status AS template_status FROM whatsapp_messages m
                 LEFT JOIN whatsapp_templates t ON t.id = m.template_id
                 WHERE m.id = ?
+                FOR UPDATE OF m
                 """, (rs, i) -> new Message(
                 rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class), rs.getString("to_phone"),
                 rs.getString("template_name"), rs.getString("language"), rs.getString("params"),

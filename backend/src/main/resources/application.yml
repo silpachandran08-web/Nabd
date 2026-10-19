@@ -117,6 +117,12 @@ app:
     poll-interval-ms: 2000
     batch-size: 20
     lease-seconds: 60
+    # OPS-014: slowest handler's connect + read timeout (Meta: 5 s + 10 s). 20 x 15 s > 60 s, so the lease is
+    # renewed before each event; OutboxProperties refuses to boot a config where a batch can outlive its lease.
+    per-event-timeout-ms: 15000
+    extend-lease-per-event: true
+    purge-cron: "0 23 * * * *"   # hourly: done rows after 7 days, dead after 90
+    metrics-interval-ms: 15000
   whatsapp:
     # Meta WhatsApp Cloud API. Blank access token = LoggingWhatsAppClient (logs, never sends) —
     # every local/test run, same as spring.mail.host above.

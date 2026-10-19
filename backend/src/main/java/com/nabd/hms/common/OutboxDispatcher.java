@@ -31,7 +31,14 @@ public class OutboxDispatcher {
     public void poll() {
         var events = repo.claim(props.batchSize(), props.leaseSeconds());
         int failures = 0;
-        for (OutboxEvent event : events) {
+        for (int i = 0; i < events.size(); i++) {
+            OutboxEvent event = events.get(i);
+            // OPS-014: renew the lease of this event and every one still waiting behind it, so a slow provider
+            // cannot push them past their lease; an event no longer ours was reclaimed and is skipped.
+            if (props.extendLeasePerEvent() && !repo.extendLeases(events.subList(i, events.size()), props.leaseSeconds()).contains(event.id())) {
+                processor.fenced(event, "extendLease");
+                continue;
+            }
             try {
                 processor.runHandler(event);
             } catch (Exception e) {
