@@ -321,7 +321,6 @@ class S10QaOps041ConcurrencyTest extends ApiTestBase {
     // ---- refund approve race ----
 
     @Test
-    @Tag("known-defect-refund-approve-race")
     void refundApprovedByThreeApproversAtOnce_isApprovedOnce() {
         Ctx c = ctx();
         List<String> tokens = new ArrayList<>();

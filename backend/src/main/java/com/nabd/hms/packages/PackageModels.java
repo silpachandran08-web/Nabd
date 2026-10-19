@@ -41,7 +41,7 @@ final class PackageModels {
 
     record RefundRow(UUID id, UUID instanceId, String patientName, String packageName, String reason,
                       BigDecimal usedListValue, BigDecimal refundAmount, BigDecimal amountOwed, String status,
-                      String creditNoteNumber, UUID requestedBy, Instant createdAt) {
+                      String creditNoteNumber, UUID requestedBy, Instant createdAt, BigDecimal recomputedAmount) {
     }
 
     record LiabilityRow(long activePackages, long sessionsOwed, BigDecimal remainingListValue,

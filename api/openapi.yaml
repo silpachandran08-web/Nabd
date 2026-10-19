@@ -2598,6 +2598,54 @@ paths:
       responses:
         "200": { description: "Package instances (InstanceResponse, without per-item lines)", content: { application/json: { schema: { type: array, items: { type: object } } } } }
         "403": { description: "Forbidden: no packages:view" }
+  # ------------------------------------------------- Packages: refund integrity (FIN-004)
+  /packages/instances/{id}/refund:
+    post:
+      tags: [Packages]
+      summary: Request a refund. One open (pending) refund per instance; the instance row is locked while checking.
+      x-required-permission: packages:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } }
+      responses:
+        "201": { description: "RefundResponse (status pending)", content: { application/json: { schema: { $ref: "#/components/schemas/PackageRefund" } } } }
+        "404": { description: Instance not found }
+        "409": { description: "refund-already-open (a pending refund exists) or instance-not-refundable (refunded/cancelled)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /packages/refunds/{id}/approve:
+    post:
+      tags: [Packages]
+      summary: >-
+        Approve a pending refund (maker != checker). The amount is recomputed under the instance lock (used sessions at full
+        list price). expectedAmount is the amount the approver saw; it may be omitted only when the amount is unchanged since the request.
+        Publishes billing.package_refund.approved.v1.
+      x-required-permission: packages:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { expectedAmount: { type: number } } } } }
+      responses:
+        "200": { description: "RefundResponse with creditNoteNumber and recomputedAmount", content: { application/json: { schema: { $ref: "#/components/schemas/PackageRefund" } } } }
+        "403": { description: "same-user (requester cannot approve) or no packages:approve", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "already-decided, or amount-changed (extras requestedAmount, currentAmount, currentAmountOwed)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /packages/refunds/{id}/reject:
+    post:
+      tags: [Packages]
+      summary: Reject a pending refund.
+      x-required-permission: packages:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } }
+      responses:
+        "200": { description: "RefundResponse (status rejected)", content: { application/json: { schema: { $ref: "#/components/schemas/PackageRefund" } } } }
+        "409": { description: already-decided, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   # ------------------------------------------------- Platform console: fleet summary (LIVE-07)
   /platform/tenants/summary:
     get:
@@ -3314,6 +3362,22 @@ components:
         documentedBy: { type: [string, "null"], format: uuid, description: "Who documented no known allergies; null unless none_documented" }
         documentedByName: { type: [string, "null"] }
         documentedAt: { type: [string, "null"], format: date-time }
+    PackageRefund:
+      type: object
+      description: FIN-004 RefundResponse. refundAmount is the request-time amount; recomputedAmount is set at approval.
+      properties:
+        id: { type: string, format: uuid }
+        instanceId: { type: string, format: uuid }
+        patientName: { type: string }
+        packageName: { type: string }
+        reason: { type: string }
+        usedListValue: { type: number }
+        refundAmount: { type: number }
+        amountOwed: { type: number }
+        status: { type: string, enum: [pending, approved, rejected] }
+        creditNoteNumber: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        recomputedAmount: { type: [number, "null"] }
     Problem:
       type: object
       description: RFC 7807

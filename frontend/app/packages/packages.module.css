@@ -193,6 +193,11 @@
   box-shadow: var(--nb-accent-glow);
 }
 
+.decisionBtn {
+  composes: btn;
+  min-block-size: 44px;
+}
+
 .btnSmall {
   composes: btn;
   height: 30px;
