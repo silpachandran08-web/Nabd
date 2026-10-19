@@ -5,8 +5,11 @@
 export type Problem = { type?: string; title?: string; status?: number; detail?: string; code?: string; traceId?: string; errors?: { field: string; message: string }[] };
 
 // TODO(T-089): GET/POST /billing/checkout/{queueEntryId}, /billing/invoices/{id}, /billing/otc-charges, /billing/otc-checkout (CheckoutController)
-export type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
-export type PrescribedItem = { drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null };
+export type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null; isRx?: boolean };
+export type PrescribedItem = { drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null;
+  prescriptionItemId: string; quantity: number | null; remainingQty: number }; // PHL-001
+export type RxLine = { prescriptionItemId: string; patientId: string; patientName: string; drugName: string; dosage: string | null;
+  quantity: number | null; remainingQty: number; signedAt: string | null }; // PHL-001 POST /pharmacy/rx-lines/search
 export type CheckoutContext = {
   queueEntryId: string; patientName: string; doctorName: string; visitType: string;
   followUpEligible: boolean; currency: string; charges: Charge[]; pendingProcedures: Charge[];
@@ -17,6 +20,7 @@ export type FlowStep = { stepType: string };
 export type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number;
   listUnitPrice?: number | null; overrideReason?: string | null; // from the server (FIN-003)
   override?: { unitPrice: number; reasonCode: string }; // picked here, sent as the override
+  prescriptionItemId?: string; // PHL-001: required for an isRx line
 };
 export type Payment = { id: string; method: string; amount: number; recordedAt: string };
 export type Invoice = {

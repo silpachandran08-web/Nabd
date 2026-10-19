@@ -42,13 +42,14 @@ class CheckoutRepository {
     // wireframe's "in External mode every inventory and dispensing screen is genuinely absent" rule.
     List<ChargeRow> listActiveCharges(UUID tenantId) {
         return jdbc.query(
-                "SELECT c.id, c.code, c.name, c.category, c.base_amount, c.follow_up_amount, c.tax_rate_percent, c.stock_qty " +
+                "SELECT c.id, c.code, c.name, c.category, c.base_amount, c.follow_up_amount, c.tax_rate_percent, c.stock_qty, " +
+                        "COALESCE(c.is_rx, false) AS is_rx " +
                         "FROM charge_catalogue c LEFT JOIN pharmacy_settings ps ON ps.tenant_id = c.tenant_id " +
                         "WHERE c.tenant_id = ? AND c.active = true AND (c.stock_qty IS NULL OR ps.mode = 'hybrid') " +
                         "ORDER BY c.display_order, c.name",
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("code"), rs.getString("name"),
                         rs.getString("category"), rs.getBigDecimal("base_amount"), rs.getBigDecimal("follow_up_amount"),
-                        rs.getBigDecimal("tax_rate_percent"), (Integer) rs.getObject("stock_qty")),
+                        rs.getBigDecimal("tax_rate_percent"), (Integer) rs.getObject("stock_qty"), rs.getBoolean("is_rx")),
                 tenantId);
     }
 
@@ -60,7 +61,7 @@ class CheckoutRepository {
                         "WHERE tenant_id = ? AND queue_entry_id = ? AND status = 'completed' AND billed = false",
                 (rs, i) -> new ChargeRow(UUID.fromString(rs.getString("id")), rs.getString("charge_code"),
                         rs.getString("charge_name"), "Procedure", rs.getBigDecimal("base_amount"), null,
-                        rs.getBigDecimal("tax_rate_percent"), null),
+                        rs.getBigDecimal("tax_rate_percent"), null, false),
                 tenantId, queueEntryId);
     }
 
@@ -68,11 +69,14 @@ class CheckoutRepository {
      * no separate dispense screen, same "visible from billing" precedent as pharmacy stock (V25). */
     List<PrescribedItemRow> findSignedPrescriptionItems(UUID tenantId, UUID queueEntryId) {
         return jdbc.query(
-                "SELECT pi.drug_name, pi.dosage, pi.frequency, pi.duration, pi.instructions " +
+                "SELECT pi.id, pi.drug_name, pi.dosage, pi.frequency, pi.duration, pi.instructions, pi.quantity, " +
+                        "(SELECT COALESCE(SUM(li.quantity), 0) FROM invoice_line_items li JOIN invoices i ON i.id = li.invoice_id " +
+                        "  WHERE li.tenant_id = pi.tenant_id AND li.prescription_item_id = pi.id AND i.status <> 'void') AS dispensed " +
                         "FROM prescription_items pi JOIN prescriptions pr ON pr.id = pi.prescription_id " +
                         "WHERE pr.tenant_id = ? AND pr.queue_entry_id = ? AND pr.status = 'signed' ORDER BY pi.display_order",
-                (rs, i) -> new PrescribedItemRow(rs.getString("drug_name"), rs.getString("dosage"),
-                        rs.getString("frequency"), rs.getString("duration"), rs.getString("instructions")),
+                (rs, i) -> new PrescribedItemRow(UUID.fromString(rs.getString("id")), rs.getString("drug_name"), rs.getString("dosage"),
+                        rs.getString("frequency"), rs.getString("duration"), rs.getString("instructions"),
+                        rs.getBigDecimal("quantity"), rs.getBigDecimal("dispensed")),
                 tenantId, queueEntryId);
     }
 
@@ -133,10 +137,11 @@ class CheckoutRepository {
             jdbc.update(
                     "INSERT INTO invoice_line_items (tenant_id, invoice_id, charge_code, charge_name, category, " +
                             "quantity, unit_price, tax_rate_percent, line_total, display_order, charge_catalogue_id, list_unit_price, " +
-                            "tier, override_reason_code, override_note, overridden_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "tier, override_reason_code, override_note, overridden_by, is_rx, prescription_item_id) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     tenantId, invoiceId, item.chargeCode(), item.chargeName(), item.category(), item.quantity(),
                     item.unitPrice(), item.taxRatePercent(), lineTotal, order++, item.catalogueId(), item.listUnitPrice(),
-                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy());
+                    item.tier(), item.overrideReasonCode(), item.overrideNote(), item.overriddenBy(), item.isRx(), item.prescriptionItemId());
         }
     }
 
@@ -156,15 +161,19 @@ class CheckoutRepository {
                 subtotal, discount, tax, roundOff, total, status, tenantId, invoiceId);
     }
 
-    /** V3-004: the catalogue row for a stocked (pharmacy) code, active or not; empty for any non-pharmacy code. */
-    Optional<PharmacyChargeRow> findCatalogueCharge(UUID tenantId, String chargeCode) {
-        return jdbc.query(
-                "SELECT id, name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
-                        "stock_qty IS NOT NULL AS stocked FROM charge_catalogue WHERE tenant_id = ? AND code = ?",
-                (rs, i) -> new PharmacyChargeRow(UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
+    /** V3-004: the catalogue rows behind these codes, active or not, keyed by code; one batched query (PHL-001, DP-30). */
+    java.util.Map<String, PharmacyChargeRow> findCatalogueCharges(UUID tenantId, List<String> chargeCodes) {
+        java.util.Map<String, PharmacyChargeRow> out = new java.util.HashMap<>();
+        jdbc.query(
+                "SELECT code, id, name, category, base_amount, follow_up_amount, tax_rate_percent, active, doctor_override, " +
+                        "stock_qty IS NOT NULL AS stocked, COALESCE(is_rx, false) AS is_rx FROM charge_catalogue " +
+                        "WHERE tenant_id = ? AND code = ANY (?)",
+                (org.springframework.jdbc.core.RowCallbackHandler) rs -> out.put(rs.getString("code"), new PharmacyChargeRow(
+                        UUID.fromString(rs.getString("id")), rs.getString("name"), rs.getString("category"), rs.getBigDecimal("base_amount"),
                         rs.getBigDecimal("follow_up_amount"), rs.getBigDecimal("tax_rate_percent"), rs.getBoolean("active"),
-                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked")),
-                tenantId, chargeCode).stream().findFirst();
+                        rs.getBoolean("doctor_override"), rs.getBoolean("stocked"), rs.getBoolean("is_rx"))),
+                tenantId, chargeCodes.toArray(String[]::new));
+        return out;
     }
 
     void insertDiscounts(UUID tenantId, UUID invoiceId, List<BillingPricing.DiscountInput> discounts, UUID staffId) {
