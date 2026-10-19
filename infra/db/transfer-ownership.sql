@@ -6,6 +6,13 @@
 -- Skips objects owned by an extension. Safe to re-run.
 -- Neon: the owner login is not a superuser, so it must be allowed to SET ROLE nabd_migrator to hand objects to it.
 GRANT nabd_migrator TO CURRENT_USER;
+-- The new owner needs CREATE on every schema whose objects it receives (bootstrap-roles.sql only covers public).
+GRANT USAGE, CREATE ON SCHEMA public TO nabd_migrator, nabd_definer;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'master') THEN
+    GRANT USAGE, CREATE ON SCHEMA master TO nabd_migrator, nabd_definer;
+  END IF;
+END $$;
 
 DO $$
 DECLARE r record;

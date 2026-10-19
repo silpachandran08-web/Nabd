@@ -46,3 +46,8 @@ END $$;
 
 GRANT USAGE, CREATE ON SCHEMA public TO nabd_migrator, nabd_definer;  -- CREATE: a role must have it to own functions in the schema
 GRANT USAGE ON SCHEMA public TO nabd_app, nabd_reports;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'master') THEN  -- present once the migrations have run once
+    GRANT USAGE, CREATE ON SCHEMA master TO nabd_migrator, nabd_definer;
+  END IF;
+END $$;
