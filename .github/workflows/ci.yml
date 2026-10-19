@@ -30,6 +30,7 @@ jobs:
             backend:
               - 'backend/**'
               - 'db/**'
+              - 'api/**'
               - 'Dockerfile'
               - '.github/**'
             frontend:
@@ -111,6 +112,40 @@ jobs:
       - if: needs.changes.outputs.backend == 'true'
         uses: actions/upload-artifact@v4
         with: { name: jacoco, path: backend/target/site/jacoco }
+
+  # OPS-034 stage 5: report only. Never a required check (test_ci.py: required contexts = stage* jobs), failures never block the PR.
+  api-contract-report:
+    name: stage5-api-contract (report only)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: oasdiff base vs head (api/openapi/core.yaml)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OASDIFF_VERSION: "1.10.23"
+        run: |
+          curl -sSfL "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz" | tar xz oasdiff
+          git show "origin/${{ github.base_ref }}:api/openapi/core.yaml" > "$RUNNER_TEMP/base.yaml" || { echo "no base spec yet"; exit 0; }
+          {
+            echo "<!-- api-contract-report -->"
+            echo "### API contract report (oasdiff, non-blocking)"
+            echo '```'
+            ./oasdiff changelog "$RUNNER_TEMP/base.yaml" api/openapi/core.yaml | head -c 60000
+            echo '```'
+            echo "Breaking changes only:"
+            echo '```'
+            ./oasdiff breaking "$RUNNER_TEMP/base.yaml" api/openapi/core.yaml | head -c 20000
+            echo '```'
+          } > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment "${{ github.event.pull_request.number }}" --edit-last --create-if-none --body-file "$RUNNER_TEMP/report.md"
 
   stage6-build-and-scan:
     needs: [changes, stage1-static, stage2-unit, stage3-integration]
