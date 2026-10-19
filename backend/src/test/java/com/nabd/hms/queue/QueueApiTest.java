@@ -314,7 +314,7 @@ class QueueApiTest extends ApiTestBase {
         String entryId = (String) checkin.getBody().get("id");
 
         ResponseEntity<Map> illegal = exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH,
-                authedJsonBody(token, Map.of("status", "completed")), Map.class);
+                authedJsonBody(token, Map.of("status", "in_consult")), Map.class); // ACC-002: "completed" is now 403 (own test)
         assertThat(illegal.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(illegal.getBody().get("type")).asString().contains("illegal-transition");
 

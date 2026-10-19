@@ -65,8 +65,9 @@ class CheckoutApiTest extends ApiTestBase {
 
         ResponseEntity<Map> queue = exchange("/v1/queue/" + queueEntryId + "/status", HttpMethod.PATCH,
                 authedJsonBody(token, Map.of("status", "completed")), Map.class);
-        // already completed by checkout — a second attempt at the same transition is illegal, proving it happened
-        assertThat(queue.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        // ACC-002: PATCH may never complete a visit (403), and checkout already did
+        assertThat(queue.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(queueStatus(tenant.id(), queueEntryId)).isEqualTo("completed");
     }
 
     @Test

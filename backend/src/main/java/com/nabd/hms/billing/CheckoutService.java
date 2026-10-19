@@ -58,6 +58,7 @@ public class CheckoutService {
     private final CheckoutRepository repo;
     private final TenantContext tenantContext;
     private final QueueService queueService;
+    private final com.nabd.hms.queue.VisitCommands visitCommands;
     private final DepartmentService departmentService;
 
     private final ClinicClock clock;
@@ -67,7 +68,8 @@ public class CheckoutService {
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose,
-                     AuditService auditService) {
+                     AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands) {
+        this.visitCommands = visitCommands;
         this.auditService = auditService;
         this.dayClose = dayClose;
         this.clock = clock;
@@ -161,7 +163,11 @@ public class CheckoutService {
         // to completed. An interim (billing_pending) checkpoint advances to whatever this
         // department's configured flow puts next — the visit continues, it doesn't end here.
         String nextStatus = sequence.get(currentIndex + 1);
-        queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest(nextStatus));
+        if ("completed".equals(nextStatus)) {
+            visitCommands.completeAfterPayment(tenantId, staffId, queueEntryId, ctx.queueStatus());
+        } else {
+            queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest(nextStatus, ctx.queueStatus()));
+        }
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }
