@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { adminOrdersQuery, prefix, queueQuery } from "./lib/query";
 import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
 import { decodeAccessToken, getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
@@ -145,7 +147,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [showClinic, setShowClinic] = useState(false);
   const [plan, setPlan] = useState<{ plan: string | null; status: string; branchesUsed: number; branchesLimit: number } | null>(null);
   const [canReturnToWorkspaces, setCanReturnToWorkspaces] = useState(false);
-  const [badges, setBadges] = useState<Record<string, number>>({});
+  const [myDayBadge, setMyDayBadge] = useState<Record<string, number>>({});
 
   // Escape closes the mobile More menu and hands focus back to its button.
   useEffect(() => {
@@ -176,29 +178,29 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     setOwner(skip ? false : isOwner());
   }, [pathname, skip]);
 
-  // The Receptionist sidebar's count badges: today's waiting arrivals and visits sent to checkout,
-  // both off today's queue (GET /queue). Refreshed on every navigation.
-  // ponytail: no polling — a count can lag until the next page change; poll if reception asks.
+  // The Receptionist sidebar's count badges: today's waiting arrivals and visits sent to checkout, off
+  // today's queue. FEF-015: the same query (key and request) Arrivals reads, so the two share one GET /queue.
+  const perms = permissions ?? [];
+  const nurseNav = !skip && !owner && hasNursingGrant(perms);
+  const queueRows = useQuery({ ...queueQuery(), enabled: !skip && !owner && !nurseNav && !isDoctorNav(perms) && perms.includes("queue:view") }).data;
+  // The Nurse sidebar's count badges, off the same queries the nursing page itself reads: priority-flagged
+  // queue entries (queue:view) and today's administration orders not yet given (nursing:view).
+  const priorityRows = useQuery({ ...queueQuery(true), enabled: nurseNav && perms.includes("queue:view") }).data;
+  const adminRows = useQuery({ ...adminOrdersQuery(), enabled: nurseNav && perms.includes("nursing:view") }).data;
+  const count = <T,>(rows: T[] | undefined, keep: (r: T) => boolean) => (Array.isArray(rows) ? rows.filter(keep).length : undefined);
+  const badges: Record<string, number | undefined> = {
+    ...myDayBadge,
+    "/arrivals": count(queueRows, (r) => WAITING_STATUSES.includes(r.status ?? "")),
+    "/billing": count(queueRows, (r) => r.status === "checkout_pending"),
+    "nursing:priority": count(priorityRows, () => true),
+    "nursing:admin": count(adminRows, (o) => o.status === "not_started"),
+  };
+  // Badges refresh on every navigation, as before; a newer refresh cancels a slower one still in flight (FEF-004).
+  const qc = useQueryClient();
   useEffect(() => {
-    const perms = getPermissions();
-    if (skip || isOwner() || hasNursingGrant(perms) || isDoctorNav(perms) || !perms.includes("queue:view")) return;
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) return;
-    const ctrl = new AbortController();
-    let cancelled = false;
-    void fetch(`${API_BASE}/queue`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
-      .then(async (res) => {
-        if (cancelled || !res.ok) return;
-        const rows: { status: string }[] = await res.json();
-        if (cancelled) return;
-        setBadges({
-          "/arrivals": rows.filter((r) => WAITING_STATUSES.includes(r.status)).length,
-          "/billing": rows.filter((r) => r.status === "checkout_pending").length,
-        });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; ctrl.abort(); };
-  }, [pathname, skip]);
+    void qc.refetchQueries({ queryKey: prefix("queue"), type: "active" });
+    void qc.refetchQueries({ queryKey: adminOrdersQuery().queryKey, type: "active" });
+  }, [pathname, qc]);
 
   // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view).
   // The JWT subject is the staff id (AuthService.mintTokenPair); no queue:view = no badge.
@@ -215,36 +217,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
         if (cancelled || !res.ok) return;
         const rows: { status: string; doctorId?: string }[] = await res.json();
         if (cancelled || !Array.isArray(rows)) return;
-        setBadges((b) => ({ ...b, [MY_DAY_HREF]: rows.filter((r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status)).length }));
+        setMyDayBadge({ [MY_DAY_HREF]: rows.filter((r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status)).length });
       })
       .catch(() => {});
-    return () => { cancelled = true; ctrl.abort(); };
-  }, [pathname, skip]);
-
-  // The Nurse sidebar's count badges, off the same endpoints the nursing page itself reads:
-  // priority-flagged queue entries (GET /queue?priority=true, queue:view) and today's administration
-  // orders not yet given (GET /nursing/administration-orders/today, nursing:view). A section the role
-  // can't read just shows no badge. Refreshed on every navigation, like the reception badges.
-  useEffect(() => {
-    const perms = getPermissions();
-    if (skip || isOwner() || !hasNursingGrant(perms)) return;
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) return;
-    const ctrl = new AbortController();
-    let cancelled = false;
-    const headers = { Authorization: `Bearer ${token}` };
-    const load = (path: string, key: string, count: (rows: { status?: string }[]) => number) =>
-      fetch(`${API_BASE}${path}`, { headers, signal: ctrl.signal })
-        .then(async (res) => {
-          if (cancelled || !res.ok) return;
-          const rows: { status?: string }[] = await res.json();
-          if (!cancelled && Array.isArray(rows)) setBadges((b) => ({ ...b, [key]: count(rows) }));
-        })
-        .catch(() => {});
-    if (perms.includes("queue:view")) void load("/queue?priority=true", "nursing:priority", (r) => r.length);
-    if (perms.includes("nursing:view")) {
-      void load("/nursing/administration-orders/today", "nursing:admin", (r) => r.filter((o) => o.status === "not_started").length);
-    }
     return () => { cancelled = true; ctrl.abort(); };
   }, [pathname, skip]);
 

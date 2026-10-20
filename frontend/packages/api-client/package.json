@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./index.ts", "./types": "./types.ts" },
+  "exports": { ".": "./index.ts", "./types": "./types.ts", "./generated": "./src/generated/index.ts", "./queries": "./queries/keys.ts" },
   "dependencies": { "zod": "4.4.3" },
   "scripts": {
     "lint": "eslint .",
