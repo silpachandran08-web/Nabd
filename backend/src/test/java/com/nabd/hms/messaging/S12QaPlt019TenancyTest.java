@@ -5,7 +5,6 @@ import com.nabd.hms.common.TenantMismatchException;
 import com.nabd.hms.common.TenantScope;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
@@ -185,7 +184,6 @@ class S12QaPlt019TenancyTest extends ApiTestBase {
     /** Hardening probe beyond the literal AC (story: "can never silently change"): bypassing TenantContext with a raw
      * set_config inside a bound transaction switches the tenant silently and nothing (runtime or static rule) stops it. */
     @Test
-    @Tag("known-defect-PLT-019")
     void ac3_probe_rawSetConfigCannotSilentlySwitchABoundTransaction() {
         UUID a = seedTenant().id();
         UUID b = seedTenant().id();

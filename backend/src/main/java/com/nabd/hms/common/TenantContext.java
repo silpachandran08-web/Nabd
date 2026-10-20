@@ -6,8 +6,11 @@ import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -74,6 +77,33 @@ public class TenantContext {
             rollbackOnly();
             throw new TenantMismatchException(UUID.fromString(r.substring(1)), tenantId);
         }
+        if (TransactionSynchronizationManager.getResource(jdbc.getDataSource()) instanceof ConnectionHolder h) {
+            bound.put(h, r); // PLT-019: what this transaction was bound to, for verifyBinding()
+        }
+    }
+
+    /** Per transaction (its ConnectionHolder, weakly held): app.tenant_id || app.visible_tenant_ids as set() bound them. */
+    private final Map<ConnectionHolder, String> bound = Collections.synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * PLT-019: a raw set_config('app.tenant_id' / 'app.visible_tenant_ids') bypassing set() (forbidden in main code by
+     * TenancyRulesTest) would switch tenant silently; this refuses a transaction whose GUCs no longer match its binding
+     * (TenantMismatchException + rollback-only). One round trip, so it runs per repository call in tests only
+     * (RepositoryTransactionGuard). No-op for an unbound transaction.
+     */
+    public void verifyBinding() {
+        if (!(TransactionSynchronizationManager.getResource(jdbc.getDataSource()) instanceof ConnectionHolder h)) return;
+        String expected = bound.get(h);
+        if (expected == null) return;
+        String now = jdbc.queryForObject("SELECT current_setting('app.tenant_id', true) || current_setting('app.visible_tenant_ids', true)", String.class);
+        if (!expected.equals(now)) {
+            rollbackOnly();
+            throw new TenantMismatchException(UUID.fromString(expected.substring(0, 36)), parseOrNull(now));
+        }
+    }
+
+    private static UUID parseOrNull(String s) {
+        try { return s == null || s.length() < 36 ? null : UUID.fromString(s.substring(0, 36)); } catch (IllegalArgumentException e) { return null; }
     }
 
     /** The tenant bound to the current transaction (services migrated off explicit tenantId parameters use this). */
