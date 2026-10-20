@@ -36,6 +36,7 @@ jobs:
             frontend:
               - 'frontend/**'
               - '.github/**'
+              - 'scripts/api/**'
 
   stage1-static:
     needs: changes
@@ -232,7 +233,7 @@ jobs:
         run: mvn -B -q test -Dtest=ApiContractGateTest -Dsurefire.failIfNoSpecifiedTests=false
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - name: generated client (frontend/packages/api-client/src/generated) matches api/openapi/core.yaml
+      - name: generated types, Zod schemas, MSW handlers and Permission union (frontend/packages/api-client/src/generated) match api/openapi/core.yaml
         run: pip install -q pyyaml && python3 scripts/api/generate_client.py --check
       - name: oasdiff breaking changes block unless deprecated with a Sunset (x-sunset)
         if: github.event_name == 'pull_request'
