@@ -60,7 +60,7 @@
 }
 .optionActive { background: var(--nb-accent-tint); outline: 2px solid var(--nb-accent-500); outline-offset: -2px; }
 .optionMeta { display: inline-flex; gap: var(--nb-space-8); align-items: center; font-size: 11px; color: var(--nb-text-secondary); }
-.listNote { padding: var(--nb-space-8); font-size: 12px; color: var(--nb-text-secondary); }
+.listNote { margin: 0; padding: var(--nb-space-8); font-size: 12px; color: var(--nb-text-secondary); }
 .qtyRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--nb-space-4); }
 .suggest {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8);

@@ -14,13 +14,14 @@ const PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$/;
 type Licence = { isClinician: boolean; licenceExpiresOn: string | null; licenceOverrideUntil: string | null };
 type Fetcher = (path: string, init?: RequestInit) => Promise<Response | null | undefined>;
 
-export default function RegistrationNoDialog({ staffId, staffName, current, onSave, onClose, authedFetch }: {
+export default function RegistrationNoDialog({ staffId, staffName, current, onSave, onClose, authedFetch, onClinicianSaved }: {
   staffId: string;
   staffName: string;
   current: string | null;
   onSave: (value: string) => Promise<string | null>; // resolves to an error message, or null when saved
   onClose: () => void;
   authedFetch: Fetcher;
+  onClinicianSaved?: (isClinician: boolean) => void; // the row's Clinician pill follows the saved status
 }) {
   const [value, setValue] = useState(current ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,7 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
         const body = await res.json().catch(() => ({ detail: "" }));
         return body.detail || "Couldn't save the clinician status.";
       }
+      onClinicianSaved?.(clinician);
       return null;
     } catch {
       return "Couldn't reach the server. The clinician status was not saved.";

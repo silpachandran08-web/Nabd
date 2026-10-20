@@ -96,6 +96,7 @@ export default function DrugCombobox({
   }
 
   const expanded = open && !disabled && state !== "idle";
+  const hasList = expanded && items.length > 0;
   const status =
     state === "loading" ? "Searching…"
     : state === "error" ? "Suggestions are unavailable. You can still type the name."
@@ -111,9 +112,9 @@ export default function DrugCombobox({
         className={s.field}
         role="combobox"
         aria-autocomplete="list"
-        aria-expanded={expanded}
+        aria-expanded={hasList}
         aria-controls={listId}
-        aria-activedescendant={expanded && active >= 0 ? `${uid}-opt-${active}` : undefined}
+        aria-activedescendant={hasList && active >= 0 ? `${uid}-opt-${active}` : undefined}
         autoComplete="off"
         spellCheck={false}
         placeholder={placeholder}
@@ -127,30 +128,31 @@ export default function DrugCombobox({
       />
       {hint && <p className={s.hint}>{hint}</p>}
       <span className={s.srOnly} role="status" aria-live="polite">{expanded ? status : ""}</span>
-      <ul id={listId} role="listbox" aria-label={`${label} suggestions`} className={s.listbox} hidden={!expanded}>
-        {expanded && state === "loading" && <li className={s.listNote} role="presentation">Searching…</li>}
-        {expanded && state === "error" && <li className={s.listNote} role="presentation">{status}</li>}
-        {expanded && state === "done" && items.length === 0 && <li className={s.listNote} role="presentation">{status}</li>}
-        {expanded && items.map((it, n) => (
-          <li
-            key={`${it.source}-${it.name}-${it.code ?? ""}`}
-            id={`${uid}-opt-${n}`}
-            role="option"
-            aria-selected={n === active}
-            className={`${s.option} ${n === active ? s.optionActive : ""}`}
-            onMouseDown={(e) => { e.preventDefault(); pick(it); }}
-            onMouseMove={() => setActive(n)}
-          >
-            <span>{it.name}</span>
-            <span className={s.optionMeta}>
-              {it.source === "pharmacy" ? <span>Pharmacy list</span> : <span>Prescribed before</span>}
-              {it.source === "pharmacy" && it.inStock === true && <StatusPill tone="ok" label="In stock" />}
-              {it.source === "pharmacy" && it.inStock === false && <StatusPill tone="warn" label="Out of stock" />}
-              {it.prescriptionOnly === true && <span>Rx only</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {/* CARRY-12: a listbox exists only with options (an empty one fails aria-required-children); notes sit outside it. */}
+      {expanded && !hasList && <div className={s.listbox} aria-hidden="true"><p className={s.listNote}>{status}</p></div>}
+      {hasList && (
+        <ul id={listId} role="listbox" aria-label={`${label} suggestions`} className={s.listbox}>
+          {items.map((it, n) => (
+            <li
+              key={`${it.source}-${it.name}-${it.code ?? ""}`}
+              id={`${uid}-opt-${n}`}
+              role="option"
+              aria-selected={n === active}
+              className={`${s.option} ${n === active ? s.optionActive : ""}`}
+              onMouseDown={(e) => { e.preventDefault(); pick(it); }}
+              onMouseMove={() => setActive(n)}
+            >
+              <span>{it.name}</span>
+              <span className={s.optionMeta}>
+                {it.source === "pharmacy" ? <span>Pharmacy list</span> : <span>Prescribed before</span>}
+                {it.source === "pharmacy" && it.inStock === true && <StatusPill tone="ok" label="In stock" />}
+                {it.source === "pharmacy" && it.inStock === false && <StatusPill tone="warn" label="Out of stock" />}
+                {it.prescriptionOnly === true && <span>Rx only</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }
