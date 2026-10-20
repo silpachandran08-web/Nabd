@@ -4,10 +4,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.ConnectionHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -31,6 +34,9 @@ import java.util.stream.Collectors;
 @Component
 public class TenantContext {
 
+    /** OPS-020: tenant bound to each live transaction (keyed by its ConnectionHolder; no savepoints are used, see set()). */
+    private static final Map<ConnectionHolder, UUID> BOUND = new ConcurrentHashMap<>();
+
     private final JdbcTemplate jdbc;
     private final boolean legacyBrandVisibility;
     private final String legacyAllowedBrandIds;
@@ -48,6 +54,16 @@ public class TenantContext {
     public void set(UUID tenantId) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalStateException("TenantContext.set outside a transaction: app.tenant_id would not survive the statement");
+        }
+        // OPS-020: a transaction is bound once (binder at begin, then the service's own set): later calls skip the round trip
+        ConnectionHolder holder = TransactionSynchronizationManager.getResource(jdbc.getDataSource()) instanceof ConnectionHolder h ? h : null;
+        UUID bound = holder == null ? null : BOUND.get(holder);
+        if (bound != null) {
+            if (!bound.equals(tenantId)) {
+                rollbackOnly();
+                throw new TenantMismatchException(bound, tenantId);
+            }
+            return;
         }
         // Both set_config() calls fire for their side effect regardless of how the results are
         // combined — concatenated into one column only so queryForObject(String.class) still
@@ -73,6 +89,15 @@ public class TenantContext {
         if (r != null && r.startsWith("!")) {
             rollbackOnly();
             throw new TenantMismatchException(UUID.fromString(r.substring(1)), tenantId);
+        }
+        if (holder != null && TransactionSynchronizationManager.isSynchronizationActive()) {
+            BOUND.put(holder, tenantId);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    BOUND.remove(holder);
+                }
+            });
         }
     }
 

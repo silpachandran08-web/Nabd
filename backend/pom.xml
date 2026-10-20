@@ -175,6 +175,19 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- OPS-020: PLT-052's column tiers ship in the jar for CacheKeyPolicy (classpath:db/classification.yaml) -->
+      <resource>
+        <directory>../db</directory>
+        <targetPath>db</targetPath>
+        <includes>
+          <include>classification.yaml</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>

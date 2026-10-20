@@ -22,10 +22,13 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
 
     private final JwtDecoder delegate;
     private final SessionLivenessChecker livenessChecker;
+    private final SessionLivenessCache cache;
 
-    SessionRevocationJwtDecoder(@Qualifier("accessTokenDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker) {
+    SessionRevocationJwtDecoder(@Qualifier("accessTokenDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker,
+                                SessionLivenessCache cache) {
         this.delegate = delegate;
         this.livenessChecker = livenessChecker;
+        this.cache = cache;
     }
 
     @Override
@@ -38,7 +41,10 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
         }
         boolean active;
         try { // PLT-007: operator tokens (no tenantId) are checked against master.sessions too
-            active = livenessChecker.isActive(tenantId == null ? null : UUID.fromString(tenantId), UUID.fromString(sid));
+            UUID s = UUID.fromString(sid);
+            active = tenantId == null
+                    ? livenessChecker.isActive(null, s)
+                    : cache.isActive(s, jwt.getExpiresAt(), () -> livenessChecker.isActive(UUID.fromString(tenantId), s)); // OPS-020
         } catch (RuntimeException e) {
             if (com.nabd.hms.common.DbFailureAdvice.classify(e) != null) {
                 // not an invalid token: SecurityConfig's entry point turns this into 503

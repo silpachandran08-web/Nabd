@@ -34,9 +34,17 @@ import static com.nabd.hms.auth.AuthModels.Tenant;
 class AuthRepository {
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions;
 
-    AuthRepository(JdbcTemplate jdbc) {
+    AuthRepository(JdbcTemplate jdbc, com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions) {
         this.jdbc = jdbc;
+        this.revokedSessions = revokedSessions;
+    }
+
+    /** OPS-020: every revoke statement RETURNs the revoked ids and passes them here (Valkey revocation cache). */
+    private List<UUID> revoked(List<UUID> sessionIds) {
+        revokedSessions.revoked(sessionIds);
+        return sessionIds;
     }
 
     Optional<Tenant> findTenantBySlug(String slug) {
@@ -265,8 +273,11 @@ class AuthRepository {
 
     /** PLT-007: tenant suspended/offboarded, one UPDATE for every live session (partial index on tenant_id); one staff id per revoked session. */
     List<UUID> revokeAllForTenant(UUID tenantId, String reason) {
-        return jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
-                "WHERE tenant_id = ? AND revoked_at IS NULL RETURNING staff_id", UUID.class, reason, tenantId);
+        List<UUID[]> rows = jdbc.query("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
+                "WHERE tenant_id = ? AND revoked_at IS NULL RETURNING id, staff_id",
+                (rs, i) -> new UUID[] {rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)}, reason, tenantId);
+        revoked(rows.stream().map(r -> r[0]).toList());
+        return rows.stream().map(r -> r[1]).toList();
     }
 
     /**
@@ -299,8 +310,8 @@ class AuthRepository {
     }
 
     void revokeSession(UUID sessionId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND revoked_at IS NULL",
-                reason, sessionId);
+        revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND revoked_at IS NULL RETURNING id",
+                UUID.class, reason, sessionId));
     }
 
     /**
@@ -309,16 +320,15 @@ class AuthRepository {
      * Returns false if the session doesn't exist, is already revoked, or belongs to someone else.
      */
     boolean revokeSessionOwnedBy(UUID staffId, UUID sessionId, String reason) {
-        int rows = jdbc.update(
-                "UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND staff_id = ? AND revoked_at IS NULL",
-                reason, sessionId, staffId);
-        return rows == 1;
+        return revoked(jdbc.queryForList(
+                "UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE id = ? AND staff_id = ? AND revoked_at IS NULL RETURNING id",
+                UUID.class, reason, sessionId, staffId)).size() == 1;
     }
 
     /** Logout: every still-active row in the family of the given session. */
     void revokeFamilyOf(UUID sessionId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE revoked_at IS NULL " +
-                "AND family_id = (SELECT family_id FROM sessions WHERE id = ?)", reason, sessionId);
+        revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE revoked_at IS NULL " +
+                "AND family_id = (SELECT family_id FROM sessions WHERE id = ?) RETURNING id", UUID.class, reason, sessionId));
     }
 
     /** Reuse detection: kill every still-active row in the chain, not just the one presented. */
@@ -328,8 +338,8 @@ class AuthRepository {
     }
 
     void revokeFamily(UUID familyId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE family_id = ? AND revoked_at IS NULL",
-                reason, familyId);
+        revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? WHERE family_id = ? AND revoked_at IS NULL RETURNING id",
+                UUID.class, reason, familyId));
     }
 
     private RowMapper<Tenant> tenantMapper() {
