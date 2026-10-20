@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { STALE } from "@nabd/api-client/queries";
-import type { ActivityEntryResponse, AdministrationOrderResponse, FlowStepResponse, PatientDetailResponse, ProcedureOrderResponse, QueueEntryResponse, StaffRosterEntry, VitalsHistoryResponse, VitalsResponse } from "@nabd/api-client/generated";
+import type { ActivityEntryResponse, AdministrationOrderResponse, FlowStepResponse, ProcedureOrderResponse, StaffRosterEntry, VitalsHistoryResponse, VitalsResponse, WorklistResponse } from "@nabd/api-client/generated";
 import styles from "./nursing.module.css";
 import Icon from "../components/ui/Icon";
 import Dialog from "../components/ui/Dialog";
@@ -17,20 +17,19 @@ import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useHasMounted } from "../lib/useHasMounted";
 import { adminOrdersQuery, getter, key, live, prefix, useReload } from "../lib/query";
-import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, VISIT_LABEL, type VitalKey, type VitalsForm, type VitalsExtras } from "@nabd/domain";
+import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, VISIT_LABEL, age, type QueueEntry, type VitalKey, type VitalsForm, type VitalsExtras } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { api, ApiError } from "../lib/api";
 import { staleMessage } from "../lib/queueMove";
+import { clinicToday } from "../lib/clinicTime";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
 // WhatsApp inbox, which doesn't exist. NB-147 (package sessions) is a link to /packages, which
 // already has the redeem action — no new UI needed for it.
-// FEF-015: response types are generated from the API spec. springdoc marks no field required; a queue
-// entry always carries these, so the worklist types them so. Generated WorklistResponse.items is typed
-// with a colliding "Item" schema name, so the row is composed from the generated parts it is made of.
-type Entry = Omit<QueueEntryResponse, "gender" | "ageYears"> & { id: string; patientId: string; doctorId: string; departmentId: string; tokenNumber: number; status: string; createdAt: string; source: string };
-type WorklistItem = { entry: QueueEntryResponse; patient: PatientDetailResponse | null; vitals: VitalsResponse | null };
+// FEF-015: response types are generated from the API spec; a row's queue fields are the one domain QueueEntry
+// (derived from the generated QueueEntryResponse, so a spec rename breaks here).
+type Entry = Omit<QueueEntry, "gender" | "ageYears">;
 type Row = Entry & {
   patientName: string; patientMrn: string; doctorName: string;
   allergies: string[]; chronicConditions: string[];
@@ -57,13 +56,8 @@ function ageSex(dob: string | null, gender: string | null, ageYears?: number | n
   const parts: string[] = [];
   if (ageYears != null) parts.push(String(ageYears));
   else if (dob) {
-    const d = new Date(dob);
-    if (!Number.isNaN(d.getTime())) {
-      const now = new Date();
-      let age = now.getFullYear() - d.getFullYear();
-      if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age -= 1;
-      parts.push(age >= 0 ? String(age) : "");
-    }
+    const a = age(dob, clinicToday());
+    if (a >= 0) parts.push(String(a));
   }
   const g = (gender ?? "").trim().charAt(0).toUpperCase();
   if (g) parts.push(g);
@@ -80,9 +74,7 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: 
 // The soft ranges are adult ranges: for a child (or when the age is unknown) showing "outside usual
 // range" would mislead, so no hint is given; the server's age-banded flags still appear after save.
 function isAdult(dob: string | null): boolean {
-  if (!dob) return false;
-  const born = new Date(dob).getTime();
-  return Number.isFinite(born) && Date.now() - born >= 18 * 365.25 * 86_400_000;
+  return !!dob && age(dob, clinicToday()) >= 18;
 }
 
 function softWarning(key: VitalKey, raw: string, adult: boolean): string | null {
@@ -253,7 +245,7 @@ function NursingWorklist() {
   // 40-row worklist is still one request. The worklist, priority and procedures-pending lists need queue:view;
   // a nurse role without it still has the nursing:view sections (orders, procedures, activity).
   const worklistQ = useQuery({
-    ...live, queryKey: key("nursing", { list: "worklist" }), queryFn: getter<{ items?: WorklistItem[] }>("/nursing/worklist"), enabled: queueView,
+    ...live, queryKey: key("nursing", { list: "worklist" }), queryFn: getter<WorklistResponse>("/nursing/worklist"), enabled: queueView,
   });
   const rosterQ = useQuery({ queryKey: key("roster"), queryFn: getter<StaffOption[]>("/staff/roster"), staleTime: STALE.roster, enabled: queueView });
   const adminQ = useQuery({ ...adminOrdersQuery(), enabled: mounted }); // shared with the sidebar badge
@@ -291,8 +283,8 @@ function NursingWorklist() {
       ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
       allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
       lastVitalsAt: v?.recordedAt ?? null, vitalsOutOfRange: (v?.abnormalFlags?.length ?? 0) > 0,
-      dob: p?.dob ?? null, gender: entry.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
-      ageYears: entry.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
+      dob: p?.dob ?? null, gender: entry?.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
+      ageYears: entry?.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
     };
   });
   // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today. Rows

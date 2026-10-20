@@ -307,7 +307,8 @@ export type WithdrawConsentRequest = { consentType?: string; };
 export type WorkflowTemplateResponse = { code?: string; name?: string; steps?: Array<string>; toggleKeys?: Array<string>; };
 export type WorkingHoursResponse = { dayOfWeek?: number; endTime?: LocalTime; id?: string; maxPatients?: number; slotMinutes?: number; startTime?: LocalTime; };
 export type WorkingHoursWriteRequest = { dayOfWeek: number; endTime: LocalTime; maxPatients?: number; slotMinutes?: number; startTime: LocalTime; };
-export type WorklistResponse = { items?: Array<Item>; };
+export type WorklistItem = { entry?: QueueEntryResponse; patient?: PatientDetailResponse; vitals?: VitalsResponse; };
+export type WorklistResponse = { items?: Array<WorklistItem>; };
 export type WorkspaceSelectRequest = { clinicId: string; };
 export type WorkspacesResponse = { brands?: Array<BrandWorkspaceResponse>; };
 

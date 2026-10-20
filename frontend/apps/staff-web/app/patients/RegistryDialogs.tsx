@@ -5,6 +5,8 @@ import styles from "./patients.module.css";
 import StatusPill from "../components/ui/StatusPill";
 import { fingerprint, submitKeyed } from "../lib/idempotency";
 import type { Problem } from "@nabd/api-client/types";
+import { age } from "@nabd/domain";
+import { clinicToday } from "../lib/clinicTime";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
@@ -53,14 +55,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
   const [saving, setSaving] = useState(false);
   useEscape(onClose);
 
-  const minor = (() => {
-    if (!form.dob) return false;
-    const [y, m, d] = form.dob.split("-").map(Number);
-    const now = new Date();
-    let age = now.getFullYear() - y;
-    if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age--;
-    return age < 18;
-  })();
+  const minor = !!form.dob && age(form.dob, clinicToday()) < 18;
 
   useEffect(() => {
     const q = guardianQuery.trim();

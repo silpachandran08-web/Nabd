@@ -17,7 +17,8 @@ import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useHasMounted } from "../lib/useHasMounted";
 import { getter, key, live, prefix, queueQuery, useDebounced, useReload } from "../lib/query";
-import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, VISIT_LABEL, type VitalsForm } from "@nabd/domain";
+import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, VISIT_LABEL, age, type QueueEntry, type VitalsForm } from "@nabd/domain";
+import { clinicToday } from "../lib/clinicTime";
 import { staleMessage } from "../lib/queueMove";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, type CheckInResult } from "../components/arrivals/CheckInDialog";
 import { api, ApiError, errorText, intentKeys } from "../lib/api";
@@ -25,8 +26,8 @@ import { api, ApiError, errorText, intentKeys } from "../lib/api";
 // FEF-015: server state through TanStack Query (lib/query.tsx), response types generated from the API spec.
 // GET /v1/queue, /v1/staff/roster (queue:view, so Reception can populate the doctor picker), /v1/patients/{id}
 // (one cached query per patient, shared by the board, the detail rail and the check-in picker).
-// springdoc marks no response field required; a queue entry always carries these, so the board types them so.
-type Entry = QueueEntryResponse & { id: string; status: string; patientId: string; doctorId: string; departmentId: string; createdAt: string; source: string };
+// A board row is the one domain QueueEntry (derived from the generated QueueEntryResponse, so a spec rename breaks here).
+type Entry = QueueEntry;
 type Row = Entry & { patientName: string; patientMrn: string };
 type Staff = StaffRosterEntry & { id: string; name: string };
 const DELAY_PRESETS = [10, 15, 30, 45, 60];
@@ -334,14 +335,7 @@ function ArrivalsPageInner() {
     setGuardianChannel("");
   }
 
-  const minor = (() => {
-    if (!newDob) return false;
-    const [y, m, d] = newDob.split("-").map(Number);
-    const now = new Date();
-    let age = now.getFullYear() - y;
-    if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age--;
-    return age < 18;
-  })();
+  const minor = !!newDob && age(newDob, clinicToday()) < 18;
 
   function submitCheckIn(e: React.FormEvent) {
     e.preventDefault();
@@ -522,7 +516,7 @@ function ArrivalsPageInner() {
       return;
     }
     const alreadyArrived = new Set(rows.map((r) => r.appointmentId).filter(Boolean));
-    const pending = list.filter((a) => a.status === "scheduled" && !alreadyArrived.has(a.id));
+    const pending = list.filter((a) => a.status === "scheduled" && !alreadyArrived.has(a.id ?? null));
     // Names from the same patient cache the board fills: a patient already on screen costs no request.
     const withNames = await Promise.all(pending.map(async (a) => {
       const p = grants.patientsView && a.patientId ? await qc.ensureQueryData(patientDetailQuery(a.patientId)).catch(() => null) : null;

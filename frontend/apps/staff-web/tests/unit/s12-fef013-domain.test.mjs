@@ -2,7 +2,8 @@
 // and staff-web reads them from there. Plain source scan over apps/* and packages/* (node_modules excluded).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const fe = new URL("../../../../", import.meta.url).pathname; // frontend/
@@ -11,18 +12,36 @@ function sources(dir, out = []) {
     if (["node_modules", ".next", ".turbo", "coverage", "lint-fixtures"].includes(e.name)) continue;
     const p = join(dir, e.name);
     if (e.isDirectory()) sources(p, out);
-    else if (/\.(ts|tsx|mts|mjs)$/.test(e.name) && !/\.test\./.test(e.name)) out.push(p);
+    else if (/\.(ts|tsx|mts|mjs)$/.test(e.name)) out.push(p);
   }
   return out;
 }
-const files = [...sources(join(fe, "apps")), ...sources(join(fe, "packages"))].map((p) => [p.slice(fe.length), readFileSync(p, "utf8")]);
-const definedIn = (re) => files.filter(([, s]) => re.test(s)).map(([p]) => p).sort();
+// Test files are scanned too: a test that redefines a production type drifts from it unseen. The one exclusion is
+// test-local fixture text: string literals in *.test.* files (source a test writes to a temp dir to prove a scanner
+// bites, e.g. s12qa-fef013-gates' planted duplicates) are blanked before matching. A fixture TYPE in a test must use
+// its own name, never QueueEntry / PatientSummary / Problem.
+const STRINGS = /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g;
+const read = (p) => { const s = readFileSync(p, "utf8"); return /\.test\./.test(p) ? s.replace(STRINGS, '""') : s; };
+const scan = (roots) => roots.flatMap((r) => sources(r)).map((p) => [p.startsWith(fe) ? p.slice(fe.length) : p, read(p)]);
+const files = scan([join(fe, "apps"), join(fe, "packages")]);
+const definedIn = (re, list = files) => list.filter(([, s]) => re.test(s)).map(([p]) => p).sort();
+const QUEUE_ENTRY_DEF = /^\s*(export\s+)?(type|interface)\s+QueueEntry\b(?!\s*=\s*G\.\w+;)/m;
 
 // A plain `export type X = G.Y;` alias of the generated type (FEF-014 "wired" line) is not a second definition.
 test("AC3: QueueEntry, PatientSummary and Problem are each defined once", () => {
-  assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+QueueEntry\b(?!\s*=\s*G\.\w+;)/m), ["packages/domain/src/types.ts"]);
+  assert.deepEqual(definedIn(QUEUE_ENTRY_DEF), ["packages/domain/src/types.ts"]);
   assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+PatientSummary\b(?!\s*=\s*G\.\w+;)/m), ["packages/domain/src/types.ts"]);
   assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+Problem\b(?!\s*=\s*G\.\w+;)\s*=/m), ["packages/api-client/src/generated/types.ts"]);
+});
+
+test("AC3 gate: a production type redefined in a *.test.* file is caught; fixture text in a test's string literal is not", () => {
+  const dir = mkdtempSync(join(tmpdir(), "fef013-dup-"));
+  try {
+    mkdirSync(join(dir, "app"));
+    writeFileSync(join(dir, "app/dup.test.ts"), "export type QueueEntry = { id: string };\n");
+    writeFileSync(join(dir, "app/fixture.test.mjs"), 'const planted = ["export type QueueEntry = { id: string };"];\nexport type QueueRowFixture = { id: string };\n');
+    assert.deepEqual(definedIn(QUEUE_ENTRY_DEF, scan([dir])), [join(dir, "app/dup.test.ts")]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test("AC4: VISIT_LABEL, initials() and age() exist once, in packages/domain", () => {

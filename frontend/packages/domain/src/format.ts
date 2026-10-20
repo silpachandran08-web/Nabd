@@ -1,11 +1,13 @@
 // FEF-013: small display helpers every screen used its own copy of.
 
-/** Whole years since `dob` (birthday not yet reached this year counts one less). */
-export function age(dob: string, now: Date = new Date()): number {
-  const d = new Date(dob);
-  let a = now.getFullYear() - d.getFullYear();
-  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) a--;
-  return a;
+/** Whole years from `dob` ("YYYY-MM-DD") to `today` (birthday not yet reached counts one less); NaN for an unparseable dob.
+ * Pure calendar arithmetic, never `new Date(dob)` (which is UTC midnight and shifts a day in negative-offset zones).
+ * `today` is a "YYYY-MM-DD" (pass clinicToday() for the clinic day) or a Date read on its own wall clock. */
+export function age(dob: string, today: Date | string = new Date()): number {
+  const ymd = (s: string) => /^(\d{4})-(\d{2})-(\d{2})/.exec(s)?.slice(1).map(Number) ?? [NaN, NaN, NaN];
+  const [y, m, d] = ymd(dob);
+  const [ty, tm, td] = typeof today === "string" ? ymd(today) : [today.getFullYear(), today.getMonth() + 1, today.getDate()];
+  return ty - y - (tm < m || (tm === m && td < d) ? 1 : 0);
 }
 
 /** Up to two upper-case initials ("asha  rao" -> "AR"); "" for a blank name. */
