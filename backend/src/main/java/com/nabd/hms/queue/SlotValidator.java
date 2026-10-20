@@ -63,9 +63,12 @@ class SlotValidator {
     }
 
     /** The exclusion constraint is the only integrity failure here that means "slot taken"; anything else stays a 500. */
-    static ApiException slotTakenOrRethrow(org.springframework.dao.DataIntegrityViolationException e) {
+    static ApiException slotTakenOrRethrow(org.springframework.dao.DataAccessException e) {
         String msg = String.valueOf(e.getMostSpecificCause().getMessage());
-        if (!msg.contains("ex_appointments_doctor_overlap")) {
+        // two concurrent overlapping inserts can deadlock inside the exclusion check; the loser is a slot-taken too
+        boolean exclusionDeadlock = e instanceof org.springframework.dao.PessimisticLockingFailureException
+                && msg.contains("exclusion constraint") && msg.contains("\"appointments\"");
+        if (!msg.contains("ex_appointments_doctor_overlap") && !exclusionDeadlock) {
             throw e;
         }
         return new ApiException(HttpStatus.CONFLICT, "slot-taken", "Slot no longer available",

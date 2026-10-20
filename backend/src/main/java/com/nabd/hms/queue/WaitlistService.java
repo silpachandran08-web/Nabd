@@ -150,7 +150,7 @@ public class WaitlistService {
         UUID appointmentId;
         try {
             appointmentId = appointmentRepo.insert(tenantId, entry.patientId(), entry.doctorId(), entry.offeredSlotStart(), end, false);
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | org.springframework.dao.PessimisticLockingFailureException e) {
             // vanishingly unlikely (the slot was free the moment it was offered) but never silently drop the claim
             throw SlotValidator.slotTakenOrRethrow(e);
         }
@@ -191,7 +191,7 @@ public class WaitlistService {
         UUID appointmentId;
         try {
             appointmentId = appointmentRepo.insert(tenantId, entry.patientId(), doctorId, slotStart, end, false);
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | org.springframework.dao.PessimisticLockingFailureException e) {
             log.warn("waitlist chosen-slot conflict: doctor {} already booked at {}", doctorId, slotStart);
             throw SlotValidator.slotTakenOrRethrow(e);
         }
