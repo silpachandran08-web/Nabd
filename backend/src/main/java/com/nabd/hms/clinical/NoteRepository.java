@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.NoteModels.AmendmentRow;
-import static com.nabd.hms.clinical.NoteModels.ActorInfo;
 import static com.nabd.hms.clinical.NoteModels.NoteRow;
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
 
@@ -73,13 +72,6 @@ class NoteRepository {
                         rs.getString("subjective"), rs.getString("objective"), rs.getString("assessment"),
                         rs.getString("plan"), rs.getString("diagnosis"), rs.getTimestamp("created_at").toInstant()),
                 tenantId, noteId);
-    }
-
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     private RowMapper<NoteRow> mapper() {

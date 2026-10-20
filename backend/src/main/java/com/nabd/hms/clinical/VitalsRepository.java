@@ -114,13 +114,6 @@ class VitalsRepository {
                 tempCelsius, spo2Percent, bloodSugar, painScore, recordedBy, weightKg);
     }
 
-    Optional<VitalsModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new VitalsModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
-
     private RowMapper<VitalsRow> mapper() {
         return (rs, i) -> new VitalsRow(
                 UUID.fromString(rs.getString("id")),

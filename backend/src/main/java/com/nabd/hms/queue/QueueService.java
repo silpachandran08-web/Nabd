@@ -1,10 +1,11 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.DomainEventType;
 import com.nabd.hms.common.TenantContext;
-import com.nabd.hms.department.DepartmentService;
+import com.nabd.hms.organization.api.OrganizationConfig;
 import com.nabd.hms.queue.dto.CheckInRequest;
 import com.nabd.hms.queue.dto.QueueEntryResponse;
 import com.nabd.hms.queue.dto.QueueReorderRequest;
@@ -70,17 +71,20 @@ public class QueueService {
     private final AppointmentRepository appointmentRepo;
     private final AppointmentService appointmentService;
     private final ScheduleRepository scheduleRepo;
-    private final DepartmentService departmentService;
+    private final OrganizationConfig departmentService;
     private final TenantContext tenantContext;
 
     private final ClinicClock clock;
     private final com.nabd.hms.common.AuditService auditService;
     private final com.nabd.hms.common.EventPublisher events;
 
+    private final ActorDirectory actors;
+
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
-                 ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext, ClinicClock clock,
+                 ScheduleRepository scheduleRepo, OrganizationConfig departmentService, TenantContext tenantContext, ClinicClock clock,
                  com.nabd.hms.common.AuditService auditService,
-                 com.nabd.hms.common.EventPublisher events) {
+                 com.nabd.hms.common.EventPublisher events, ActorDirectory actors) {
+        this.actors = actors;
         this.events = events;
         this.auditService = auditService;
         this.clock = clock;
@@ -153,8 +157,8 @@ public class QueueService {
             events.publish(tenantId, DomainEventType.APPOINTMENT_ARRIVED, req.appointmentId(), java.util.Map.of(
                     "appointmentId", req.appointmentId(), "doctorId", req.doctorId(), "queueEntryId", id, "status", "arrived"));
         }
-        var actor = repo.actor(tenantId, callerStaffId);
-        auditService.record(tenantId, "staff", callerStaffId, (String) actor.get("name"), (String) actor.get("role"), null,
+        var actor = actors.findActor(tenantId, callerStaffId).orElseThrow();
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 "queue.check_in", "queue_entry", id, null,
                 java.util.Map.of("doctorId", req.doctorId(), "tokenNumber", token, "source", source,
                         "appointmentId", req.appointmentId() == null ? "" : req.appointmentId().toString()));
@@ -205,7 +209,7 @@ public class QueueService {
             throw stale(repo.findById(tenantId, current.id()).map(QueueEntryRow::status).orElseThrow(this::notFound));
         }
         log.info("queue entry {} moved {} -> {} by {}", current.id(), current.status(), nextStatus, callerStaffId);
-        String role = (String) repo.actor(tenantId, callerStaffId).get("role");
+        String role = actors.findActor(tenantId, callerStaffId).orElseThrow().role();
         var payload = new java.util.LinkedHashMap<String, Object>();
         payload.put("tenantId", tenantId);
         payload.put("queueEntryId", current.id());
@@ -287,8 +291,8 @@ public class QueueService {
                 newId, id, req.doctorId(), req.toDepartmentId());
         entryCreated(tenantId, newId, req.doctorId(), today, "waiting");
 
-        var actor = repo.actor(tenantId, callerStaffId);
-        auditService.record(tenantId, "staff", callerStaffId, (String) actor.get("name"), (String) actor.get("role"), null,
+        var actor = actors.findActor(tenantId, callerStaffId).orElseThrow();
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 "queue.transfer", "queue_entry", newId, java.util.Map.of("departmentId", current.departmentId(), "fromEntryId", id),
                 java.util.Map.of("departmentId", req.toDepartmentId(), "doctorId", req.doctorId(),
                         "reason", req.reason() == null ? "" : req.reason(), "reasonNote", blankToNull(req.reasonNote()) == null ? "" : req.reasonNote().trim()));

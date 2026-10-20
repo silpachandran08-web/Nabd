@@ -1,5 +1,6 @@
 package com.nabd.hms.reports;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.reports.dto.MoneyResponse;
 import com.nabd.hms.reports.dto.OverviewResponse;
 import com.nabd.hms.reports.dto.PackagesReportResponse;
@@ -29,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.nabd.hms.reports.ReportsModels.ActorInfo;
 import static com.nabd.hms.reports.ReportsModels.DoctorPunctualityRow;
 import static com.nabd.hms.reports.ReportsModels.LeakageRow;
 import static com.nabd.hms.reports.ReportsModels.NoShowRiskRow;
@@ -60,7 +60,10 @@ public class ReportsService {
 
     private final ClinicClock clock;
 
-    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext, ClinicClock clock) {
+    private final ActorDirectory actors;
+
+    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext, ClinicClock clock, ActorDirectory actors) {
+        this.actors = actors;
         this.clock = clock;
         this.repo = repo;
         this.staffService = staffService;
@@ -265,7 +268,7 @@ public class ReportsService {
                     "reportType must be 'sources' or 'staff-performance'.");
         }
 
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "report.export", "report", null, null, Map.of("reportType", reportType, "rowCount", rowCount));
         return csv;

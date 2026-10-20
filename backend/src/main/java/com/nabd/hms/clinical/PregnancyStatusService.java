@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,8 +41,11 @@ public class PregnancyStatusService {
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
 
+    private final ActorDirectory actors;
+
     PregnancyStatusService(PregnancyStatusRepository repo, AllergyRepository allergyRepo, TenantContext tenantContext,
-                           AuditService auditService, ObjectMapper objectMapper) {
+                           AuditService auditService, ObjectMapper objectMapper, ActorDirectory actors) {
+        this.actors = actors;
         this.repo = repo;
         this.allergyRepo = allergyRepo;
         this.tenantContext = tenantContext;
@@ -81,7 +85,7 @@ public class PregnancyStatusService {
         Map<String, Object> beforeSnap = before == null ? null
                 : snapshot(before.status(), before.expectedDeliveryDate() == null ? null : before.expectedDeliveryDate().toString());
         repo.insertEvent(tenantId, patientId, beforeSnap == null ? null : json(beforeSnap), json(after), callerStaffId);
-        AllergyModels.ActorInfo actor = allergyRepo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 "patient.pregnancy_status.recorded", "patient_pregnancy_status", patientId, beforeSnap, after);
         return current(tenantId, patientId);

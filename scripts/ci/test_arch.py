@@ -107,7 +107,7 @@ class TenantPredicate(unittest.TestCase):
 class SqlOwnership(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.v = [x for x in arch.scan(fixture_repo()) if x["rule"] == "sql-ownership"]
+        cls.v = [x for x in arch.scan(fixture_repo()) if x["rule"] == "sql-ownership" and x["file"] != arch.OWNERSHIP]  # map gaps: OwnershipMap
     def test_foreign_write_reported(self):
         d = [(x["module"], x["detail"], x["line"]) for x in self.v]
         self.assertIn(("billing", "writes queue_entries owned by queue", line_of(BILLING_REPO, "UPDATE queue_entries")), d)
@@ -117,6 +117,29 @@ class SqlOwnership(unittest.TestCase):
         self.assertIn(("billing", "writes audit_trail (not in table-ownership.yaml)"), d)
         self.assertFalse(any("tenants" in x or "invoices" in x for _, x in d))  # allow-listed read, own table
         self.assertFalse(any(m == "queue" for m, _ in d))                       # queue touches only its own tables
+
+
+class OwnershipMap(unittest.TestCase):
+    """PLT-033: every public/identity/consent table has exactly one owner; packages: maps Java packages onto a module."""
+    def gaps(self, d):
+        return {x["detail"] for x in arch.scan(d) if x["file"] == arch.OWNERSHIP}
+    def test_unowned_public_tables_reported_master_schema_not_required(self):
+        g = self.gaps(fixture_repo())
+        self.assertEqual(g, {"table tenants has no owner in table-ownership.yaml", "table audit_trail has no owner in table-ownership.yaml"})
+    def test_second_owner_and_identity_consent_schemas_reported(self):
+        d = fixture_repo()
+        open(f"{d}/db/migrations/V2__schemas.sql", "w").write("CREATE TABLE identity.users (id uuid);\nCREATE TABLE consent.grants (id uuid);\n")
+        own = {"modules": {**OWNERS["modules"], "billing": {"owns": ["invoices", "queue_entries", "tenants", "audit_trail", "identity.users"], "reads": []}}}
+        open(f"{d}/{arch.OWNERSHIP}", "w").write(yaml.safe_dump(own))
+        self.assertEqual(self.gaps(d), {"table queue_entries has 2 owners in table-ownership.yaml: billing, queue",
+                                        "table consent.grants has no owner in table-ownership.yaml"})
+    def test_packages_map_java_packages_onto_one_module(self):
+        d = fixture_repo()
+        own = {"modules": {"queue": {"packages": ["queue", "billing"], "owns": ["queue_entries", "ops_events", "master.plans", "invoices", "tenants", "audit_trail"], "reads": []}}}
+        open(f"{d}/{arch.OWNERSHIP}", "w").write(yaml.safe_dump(own))
+        own_v = [x for x in arch.scan(d) if x["rule"] == "sql-ownership"]
+        self.assertEqual(own_v, [])  # billing's queue_entries reads/writes are now inside the same module
+        self.assertTrue(all(x["module"] == "queue" for x in arch.scan(d)))
 
 
 class Gate(unittest.TestCase):

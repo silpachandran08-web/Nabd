@@ -29,7 +29,7 @@ class S10QaQueueCasTest extends ApiTestBase {
     private static final AtomicInteger SEQ = new AtomicInteger(5000);
 
     @Autowired
-    com.nabd.hms.department.DepartmentService departmentService;
+    com.nabd.hms.organization.api.OrganizationConfig departmentService;
     @Autowired
     QueueRepository queueRepo;
 

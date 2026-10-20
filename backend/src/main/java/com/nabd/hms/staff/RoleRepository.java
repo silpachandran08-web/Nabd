@@ -57,16 +57,6 @@ class RoleRepository {
                 "WHERE s.tenant_id = ? AND s.id = ?", (rs, i) -> rs.getBoolean(1), tenantId, staffId).stream().findFirst().orElse(false));
     }
 
-    record ActorInfo(String name, String role) {
-    }
-
-    /** NB-056/057: audit_log's actor_name/actor_role snapshot — same per-module pattern as Patient/Nursing/Packages. */
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
 
     // ── delegations (NB-057) ─────────────────────────────────────────────
 

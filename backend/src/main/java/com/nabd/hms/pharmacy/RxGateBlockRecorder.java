@@ -1,5 +1,6 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
@@ -27,7 +28,10 @@ class RxGateBlockRecorder {
     private final AuditService auditService;
     private final EventPublisher eventPublisher;
 
-    RxGateBlockRecorder(RxGateRepository repo, TenantContext tenantContext, AuditService auditService, EventPublisher eventPublisher) {
+    private final ActorDirectory actors;
+
+    RxGateBlockRecorder(RxGateRepository repo, TenantContext tenantContext, AuditService auditService, EventPublisher eventPublisher, ActorDirectory actors) {
+        this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.auditService = auditService;
@@ -37,7 +41,7 @@ class RxGateBlockRecorder {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(UUID tenantId, UUID staffId, String ip, String chargeCode, UUID itemId, String reason) {
         tenantContext.set(tenantId);
-        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
         auditService.record(tenantId, "staff", staffId, actor[0], actor[1], ip, "pharmacy.rx_gate_blocked", "charge_catalogue", itemId,
                 null, Map.of("itemCode", chargeCode, "reason", reason));
         java.util.Map<String, Object> payload = new java.util.HashMap<>();

@@ -28,9 +28,4 @@ final class ReportsModels {
     record DoctorPunctualityRow(UUID doctorId, String doctorName, long delayCount, double avgDelayMinutes,
                                  long sameDayRepeatDays) {
     }
-
-    /** For AuditService's actor_name/actor_role snapshot fields, same pattern as
-     * PrescriptionRepository/DentalRepository.findActorInfo. */
-    record ActorInfo(String name, String role) {
-    }
 }

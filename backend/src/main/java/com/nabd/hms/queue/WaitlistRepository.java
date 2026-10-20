@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.queue.QueueModels.ActorInfo;
 import static com.nabd.hms.queue.QueueModels.WaitlistEntryRow;
 
 @Repository
@@ -102,13 +101,6 @@ class WaitlistRepository {
                         "AND status = 'offered' AND offer_expires_at > now() AND offered_slot_start = ? AND id <> ?)",
                 Boolean.class, tenantId, doctorId, Timestamp.from(slotStart), exceptEntryId);
         return Boolean.TRUE.equals(held);
-    }
-
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     void cancelMembership(UUID tenantId, UUID id) {

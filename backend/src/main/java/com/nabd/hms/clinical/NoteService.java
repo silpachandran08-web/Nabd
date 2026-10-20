@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.clinical.dto.NoteAmendmentRequest;
 import com.nabd.hms.clinical.dto.NoteAmendmentResponse;
 import com.nabd.hms.clinical.dto.NoteResponse;
@@ -20,7 +21,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.NoteModels.AmendmentRow;
-import static com.nabd.hms.clinical.NoteModels.ActorInfo;
 import static com.nabd.hms.clinical.NoteModels.NoteRow;
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
 
@@ -43,8 +43,11 @@ public class NoteService {
 
     static final String NOTE_SIGNED_EVENT = "clinical.note.signed.v1";
 
+    private final ActorDirectory actors;
+
     NoteService(NoteRepository repo, AuditService auditService, TenantContext tenantContext, EventPublisher events,
-                ClinicalAuthority clinicalAuthority) {
+                ClinicalAuthority clinicalAuthority, ActorDirectory actors) {
+        this.actors = actors;
         this.clinicalAuthority = clinicalAuthority;
         this.repo = repo;
         this.auditService = auditService;
@@ -83,7 +86,7 @@ public class NoteService {
             throw new ApiException(HttpStatus.CONFLICT, "already-signed", "Note already signed",
                     "This clinical note is already signed. Add an amendment to change it.");
         }
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", "signed");
         after.put("signedBy", callerStaffId.toString());
@@ -119,7 +122,7 @@ public class NoteService {
         }
         UUID id = repo.insertAmendment(tenantId, note.id(), callerStaffId, req.reason(), req.subjective(),
                 req.objective(), req.assessment(), req.plan(), req.diagnosis());
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         Map<String, Object> amended = new LinkedHashMap<>();
         amended.put("amendment", req);
         amended.put("licenceNo", licence.registrationNo());

@@ -28,9 +28,6 @@ final class NursingModels {
                              Instant administeredAt) {
     }
 
-    record ActorInfo(String name, String role) {
-    }
-
     record ActivityRow(String kind, String activity, UUID patientId, UUID staffId, Instant occurredAt) {
     }
 }

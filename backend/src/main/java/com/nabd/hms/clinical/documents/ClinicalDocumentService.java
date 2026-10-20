@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical.documents;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -47,8 +48,11 @@ public class ClinicalDocumentService {
     private final ObjectMapper objectMapper;
     private final ClinicalAuthority clinicalAuthority;
 
+    private final ActorDirectory actors;
+
     ClinicalDocumentService(ClinicalDocumentRepository repo, AuditService auditService, TenantContext tenantContext,
-                            ObjectMapper objectMapper, ClinicalAuthority clinicalAuthority) {
+                            ObjectMapper objectMapper, ClinicalAuthority clinicalAuthority, ActorDirectory actors) {
+        this.actors = actors;
         this.clinicalAuthority = clinicalAuthority;
         this.repo = repo;
         this.auditService = auditService;
@@ -129,7 +133,7 @@ public class ClinicalDocumentService {
         Map<String, String> body = fromJson(row.bodyJson(), BODY_TYPE);
         ClinicalDocumentRules.requireIssuable(row.type(), body);
 
-        PartyInfo issuer = repo.findStaff(tenantId, staffId).orElseThrow(this::notFound);
+        PartyInfo issuer = actors.findActor(tenantId, staffId).map(a -> new PartyInfo(a.name(), a.role())).orElseThrow(this::notFound);
         String headerJson = toJson(buildHeader(tenantId, row, staffId, issuer));
         if (repo.issue(tenantId, id, staffId, headerJson) == 0) {
             throw issued();
@@ -147,7 +151,7 @@ public class ClinicalDocumentService {
     private Map<String, Object> buildHeader(UUID tenantId, DocumentRow row, UUID staffId, PartyInfo issuer) {
         VisitInfo visit = repo.findVisit(tenantId, row.queueEntryId()).orElseThrow(this::notFound);
         PatientHeader patient = repo.findPatientHeader(tenantId, row.patientId()).orElseThrow(this::notFound);
-        PartyInfo doctor = repo.findStaff(tenantId, row.doctorId()).orElseThrow(this::notFound);
+        PartyInfo doctor = actors.findActor(tenantId, row.doctorId()).map(a -> new PartyInfo(a.name(), a.role())).orElseThrow(this::notFound);
 
         Map<String, Object> clinic = new LinkedHashMap<>();
         clinic.put("name", repo.findClinicName(tenantId).orElse(null));

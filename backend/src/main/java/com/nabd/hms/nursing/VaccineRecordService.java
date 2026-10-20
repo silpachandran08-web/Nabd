@@ -1,5 +1,6 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.clinical.ReadScope;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -33,7 +34,10 @@ public class VaccineRecordService {
     private final ClinicClock clock;
     private final AuditService auditService;
 
-    VaccineRecordService(NursingRepository repo, TenantContext tenantContext, ClinicClock clock, AuditService auditService) {
+    private final ActorDirectory actors;
+
+    VaccineRecordService(NursingRepository repo, TenantContext tenantContext, ClinicClock clock, AuditService auditService, ActorDirectory actors) {
+        this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.clock = clock;
@@ -52,7 +56,7 @@ public class VaccineRecordService {
                 req.dose().trim(), req.route(), blankToNull(req.site()), blankToNull(req.lotNumber()), req.expiryDate(),
                 blankToNull(req.notes()));
         VaccineRecordResponse out = toResponse(tenantId, repo.findVaccineRecord(tenantId, id).orElseThrow());
-        var actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
+        var actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), null,
                 "nursing.vaccine_recorded", "vaccine_record", id, null, auditPayload(out));
         return out;

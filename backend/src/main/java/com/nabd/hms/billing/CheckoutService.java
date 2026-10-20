@@ -1,5 +1,6 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.billing.dto.CheckoutContextResponse;
 import com.nabd.hms.billing.dto.CheckoutRequest;
@@ -15,7 +16,7 @@ import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
-import com.nabd.hms.department.DepartmentService;
+import com.nabd.hms.organization.api.OrganizationConfig;
 import com.nabd.hms.queue.QueueService;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
 import org.slf4j.Logger;
@@ -58,7 +59,7 @@ public class CheckoutService {
     private final TenantContext tenantContext;
     private final QueueService queueService;
     private final com.nabd.hms.queue.VisitCommands visitCommands;
-    private final DepartmentService departmentService;
+    private final OrganizationConfig departmentService;
 
     private final ClinicClock clock;
 
@@ -68,10 +69,13 @@ public class CheckoutService {
     private final BillingPricing pricing;
     private final com.nabd.hms.pharmacy.RxGate rxGate;
 
+    private final ActorDirectory actors;
+
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
-                     DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose,
+                     OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
-                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate) {
+                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors) {
+        this.actors = actors;
         this.rxGate = rxGate;
         this.visitCommands = visitCommands;
         this.eventPublisher = eventPublisher;
@@ -289,7 +293,7 @@ public class CheckoutService {
                               List<BillingPricing.DiscountInput> discounts, BigDecimal earlierDiscount) {
         var changed = items.stream().filter(i -> i.overriddenBy() != null).toList();
         if (changed.isEmpty() && discounts.isEmpty()) return;
-        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
         for (LineItemInput i : changed) {
             auditService.record(tenantId, "staff", staffId, actor[0], actor[1], ip, "billing.price_overridden", "invoice", invoiceId,
                     java.util.Map.of("chargeCode", i.chargeCode(), "unitPrice", i.listUnitPrice()),
@@ -354,7 +358,7 @@ public class CheckoutService {
         repo.syncInvoicePaid(tenantId, invoiceId, newStatus);
         BigDecimal newBalance = invoice.total().subtract(newPaid);
 
-        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
         auditService.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.payment_recorded", "invoice", invoiceId,
                 java.util.Map.of("paid", invoice.paid(), "status", invoice.status()),
                 java.util.Map.of("paymentId", paymentId, "method", req.method(), "amount", req.amount(), "paid", newPaid, "status", newStatus));
@@ -395,7 +399,7 @@ public class CheckoutService {
         }
         List<Object[]> restored = repo.restockInvoiceLines(tenantId, invoiceId, staffId, "Invoice " + inv.invoiceNumber() + " voided: " + reason);
         repo.markInvoiceVoid(tenantId, invoiceId, staffId, reason);
-        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
         java.util.Map<String, Object> after = new java.util.LinkedHashMap<>();
         after.put("status", "void");
         after.put("invoiceNumber", inv.invoiceNumber());

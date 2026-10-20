@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.nabd.hms.clinical.AllergyModels.ActorInfo;
 import static com.nabd.hms.clinical.AllergyModels.AllergyEventRow;
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
 import static com.nabd.hms.clinical.AllergyModels.AssessmentRow;
@@ -119,14 +118,6 @@ class AllergyRepository {
 
     int deleteAssessment(UUID tenantId, UUID patientId) {
         return jdbc.update("DELETE FROM patient_allergy_assessments WHERE tenant_id = ? AND patient_id = ?", tenantId, patientId);
-    }
-
-    /** NB-108: actor_name/actor_role snapshot for audit rows. */
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     Map<UUID, String> findStaffNames(UUID tenantId, Set<UUID> ids) {
