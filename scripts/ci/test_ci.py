@@ -40,8 +40,10 @@ class Pipeline(unittest.TestCase):
 
 class Artefacts(unittest.TestCase):
     def test_testcontainers_pinned(self):
-        v = re.search(r"<testcontainers.version>([\d.]+)<", R("backend/pom.xml")).group(1)
-        self.assertGreaterEqual(tuple(map(int, v.split("."))), (1, 21, 0))
+        # PLT-032: Testcontainers comes from the Boot 4 BOM (2.0.x), so there is no property to read; the pom must say so
+        pom = R("backend/pom.xml")
+        self.assertNotIn("<testcontainers.version>", pom)
+        self.assertIn("Testcontainers comes from the Boot BOM", pom)
     def test_frontend_scripts(self):
         s = json.load(open("frontend/apps/staff-web/package.json"))["scripts"]
         self.assertIn("next typegen && tsc --noEmit", s["typecheck"])
