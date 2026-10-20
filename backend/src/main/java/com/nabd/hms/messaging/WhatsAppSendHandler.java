@@ -5,11 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
 import com.nabd.hms.common.OutboxRetryLaterException;
-import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.common.TenantScope;
 import com.nabd.hms.config.OutboxProperties;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
@@ -36,17 +34,15 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     private final WhatsAppMessageRepository repo;
     private final WhatsAppClient client;
     private final ObjectMapper objectMapper;
-    private final TenantContext tenantContext;
-    private final TransactionTemplate tx;
+    private final TenantScope tenantScope;
     private final int inFlightSeconds;
 
     WhatsAppSendHandler(WhatsAppMessageRepository repo, WhatsAppClient client, ObjectMapper objectMapper,
-                        TenantContext tenantContext, PlatformTransactionManager txManager, OutboxProperties outbox) {
+                        TenantScope tenantScope, OutboxProperties outbox) {
         this.repo = repo;
         this.client = client;
         this.objectMapper = objectMapper;
-        this.tenantContext = tenantContext;
-        this.tx = new TransactionTemplate(txManager);
+        this.tenantScope = tenantScope;
         this.inFlightSeconds = outbox.leaseSeconds();
     }
 
@@ -120,9 +116,6 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     }
 
     private <T> T inTx(OutboxEvent event, Supplier<T> work) {
-        return tx.execute(status -> {
-            tenantContext.set(event.tenantId());
-            return work.get();
-        });
+        return tenantScope.run(event.tenantId(), work);
     }
 }

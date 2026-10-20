@@ -82,7 +82,7 @@ final class BreakGlassOwnerNotifier {
             for (BreakGlassRepository.Owner o : repo.owners(e.tenantId())) {
                 if (o.phone() != null && !o.phone().isBlank()) {
                     // throws if the tenant has no approved emergency_access_used template: the outbox retries, then dead-letters visibly
-                    whatsApp.queueTemplate(e.tenantId(), null, o.phone(), BreakGlassPolicy.WHATSAPP_TEMPLATE, "en", List.of(name, time));
+                    whatsApp.queueTemplate(null, o.phone(), BreakGlassPolicy.WHATSAPP_TEMPLATE, "en", List.of(name, time));
                 }
             }
         }
