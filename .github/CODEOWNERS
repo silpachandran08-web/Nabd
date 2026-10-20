@@ -5,6 +5,7 @@
 /frontend/app/components/consult/  @nabd/clinical-owners
 /backend/src/main/java/com/nabd/hms/auth/      @nabd/security-owners
 /db/migrations/                    @nabd/db-owners
+/db/classification.yaml            @nabd/db-owners @nabd/security-owners
 /infra/                            @nabd/platform-owners
 /.github/                          @nabd/platform-owners
 /Dockerfile                        @nabd/platform-owners
