@@ -74,6 +74,7 @@ public class SafetyDictionaryService {
     }
 
     /** Per-pod reload: one indexed query; a region is reloaded only when its active version number changed. */
+    // OPS-013: no @SchedulerLock on purpose: per-replica cache, every pod must reload its own dictionary
     @Scheduled(fixedDelayString = "${app.safety-dictionary.refresh-ms:60000}", initialDelayString = "${app.safety-dictionary.refresh-ms:60000}")
     public void refresh() {
         Map<String, Integer> now = repo.activeVersions();

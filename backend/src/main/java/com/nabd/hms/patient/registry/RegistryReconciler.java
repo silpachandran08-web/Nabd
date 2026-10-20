@@ -3,6 +3,7 @@ package com.nabd.hms.patient.registry;
 import com.nabd.hms.common.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -46,6 +47,7 @@ public class RegistryReconciler {
     }
 
     @Scheduled(cron = "${app.registry.reconcile-cron:0 30 2 * * *}")
+    @SchedulerLock(name = "registry-reconcile", lockAtMostFor = "PT2H")
     public void runAll() {
         long total = 0;
         for (UUID tenantId : tx.execute(s -> repo.allTenants())) {

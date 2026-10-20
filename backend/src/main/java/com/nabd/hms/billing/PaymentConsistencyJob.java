@@ -4,6 +4,7 @@ import com.nabd.hms.common.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class PaymentConsistencyJob {
     }
 
     @Scheduled(cron = "${app.billing.consistency-cron:0 30 2 * * *}")
+    @SchedulerLock(name = "payment-consistency", lockAtMostFor = "PT1H")
     public void runAll() {
         List<UUID> tenants = jdbc.query("SELECT id FROM tenants", (rs, i) -> UUID.fromString(rs.getString("id")));
         for (UUID tenantId : tenants) {

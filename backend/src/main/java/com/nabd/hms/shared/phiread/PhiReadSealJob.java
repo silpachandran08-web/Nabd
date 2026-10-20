@@ -2,6 +2,7 @@ package com.nabd.hms.shared.phiread;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,11 @@ public class PhiReadSealJob {
     }
 
     @Scheduled(fixedDelayString = "${app.phi-read.seal-interval-ms:60000}", initialDelayString = "${app.phi-read.seal-interval-ms:60000}")
+    @SchedulerLock(name = "phi-read-seal", lockAtMostFor = "PT5M")
+    public void scheduled() { // ShedLock cannot lock a method returning a primitive
+        run();
+    }
+
     public int run() {
         try {
             repo.ensurePartitions();

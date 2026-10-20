@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -111,6 +112,7 @@ public class OtpSendLimiter {
     }
 
     @Scheduled(fixedDelayString = "${app.auth.otp.purge-interval-ms:3600000}", initialDelayString = "${app.auth.otp.purge-interval-ms:3600000}")
+    @SchedulerLock(name = "otp-counter-purge", lockAtMostFor = "PT30M")
     public void purge() {
         int n = repo.purgeOlderThan48h();
         if (n > 0) {

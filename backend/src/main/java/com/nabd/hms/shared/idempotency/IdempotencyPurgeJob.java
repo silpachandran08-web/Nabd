@@ -2,6 +2,7 @@ package com.nabd.hms.shared.idempotency;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,7 @@ public class IdempotencyPurgeJob {
     }
 
     @Scheduled(fixedDelayString = "${app.idempotency.purge-interval-ms:3600000}", initialDelayString = "${app.idempotency.purge-interval-ms:3600000}")
+    @SchedulerLock(name = "idempotency-purge", lockAtMostFor = "PT30M")
     public void purge() {
         try {
             int n = store.purgeExpired();
