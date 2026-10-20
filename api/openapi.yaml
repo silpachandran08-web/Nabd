@@ -1100,7 +1100,7 @@ paths:
       tags: [Setup]
       summary: Mark a wizard step as skipped
       x-required-permission: setup:edit
-      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      parameters: [{ name: step, in: path, required: true, schema: { type: string } }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/SetupProgressUpdate" } } }
@@ -1113,7 +1113,7 @@ paths:
       tags: [Setup]
       summary: Mark a wizard step as done
       x-required-permission: setup:edit
-      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      parameters: [{ name: step, in: path, required: true, schema: { type: string } }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/SetupProgressUpdate" } } }
