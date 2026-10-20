@@ -6,7 +6,7 @@ import StatusPill from "../components/ui/StatusPill";
 import { fingerprint, submitKeyed } from "../lib/idempotency";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-type Problem = { title: string; detail: string; errors?: { field: string; message: string }[] };
+export type Problem = { title: string; detail: string; errors?: { field: string; message: string }[] };
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
 
 // PatientMatchCandidateResponse.matchScore is a 0-1 fraction (1.0 = exact phone match, else name similarity).
@@ -28,7 +28,7 @@ function useEscape(onClose: () => void) {
 }
 
 /** ACC-028: the server's field error for the phone (it names the clinic country), shown under the input. */
-function phoneFieldError(p: Problem | null): string | null {
+export function phoneFieldError(p: Problem | null): string | null {
   const e = p?.errors?.find((x) => x.field === "phone");
   return e ? `Mobile ${e.message}.` : null;
 }

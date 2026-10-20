@@ -8,6 +8,7 @@ import { CheckInDialog } from "../components/arrivals/CheckInDialog";
 import Dialog from "../components/ui/Dialog";
 import ConfirmDialog from "./ConfirmDialog";
 import GuardianReviews from "./GuardianReviews";
+import PhoneDataQuality from "./PhoneDataQuality";
 import StatusPill from "../components/ui/StatusPill";
 import BillingStatePill from "../components/ui/BillingStatePill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
@@ -141,6 +142,7 @@ function PatientsList() {
   const [filter, setFilter] = useState("all");
   const [checkInFor, setCheckInFor] = useState<RegistryRow | null>(null);
   const [registering, setRegistering] = useState(false);
+  const [fixingPhones, setFixingPhones] = useState(false); // ACC-028 data-quality list
   const [flash, setFlash] = useState<string | null>(null);
   const [perms, setPerms] = useState<Perms>(NO_PERMS);
   const { checkIn: canCheckIn, register: canRegister, clinicalView, clinicalEdit, dentalView: canDental, dentalEdit, billingView, patientsEdit } = perms;
@@ -699,9 +701,14 @@ function PatientsList() {
             </p>
           )}
         </div>
-        {canRegister && !forbidden && (
-          <button type="button" className={styles.primaryBtn} onClick={() => setRegistering(true)}>＋ Register patient</button>
-        )}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--nb-space-8)" }}>
+          {patientsEdit && !forbidden && (
+            <button type="button" className={styles.secondaryBtn} style={{ minBlockSize: 44 }} onClick={() => setFixingPhones(true)}>Numbers to fix</button>
+          )}
+          {canRegister && !forbidden && (
+            <button type="button" className={styles.primaryBtn} onClick={() => setRegistering(true)}>＋ Register patient</button>
+          )}
+        </div>
       </div>
 
       {!forbidden && (
@@ -797,6 +804,10 @@ function PatientsList() {
       {checkInFor && (
         <CheckInDialog patient={checkInFor} onClose={() => setCheckInFor(null)}
           onDone={(token) => { setFlash(`${checkInFor.name} checked in · T-${token}`); setCheckInFor(null); void load(q, filter); }} />
+      )}
+      {fixingPhones && (
+        <PhoneDataQuality authedFetch={authedFetch} onClose={() => setFixingPhones(false)}
+          onFixed={() => { setFlash("Mobile number corrected."); void load(q, filter); }} />
       )}
       {registering && (
         <RegisterDialog authedFetch={authedFetch} onClose={() => setRegistering(false)}
