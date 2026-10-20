@@ -27,6 +27,7 @@ const ACTION_LABELS: Record<string, string> = {
   "platform_provisioning.job_created": "Provisioning job created",
   "platform_provisioning.job_approved": "Provisioning job approved",
   "platform_provisioning.step_run": "Provisioning step run",
+  "platform_provisioning.job_rolled_back": "Provisioning job rolled back",
   "platform_tenant.lifecycle_changed": "Clinic status changed",
   "platform_billing.subscription_created": "Subscription created",
   "platform_billing.subscription_updated": "Subscription updated",

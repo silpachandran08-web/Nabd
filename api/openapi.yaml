@@ -3188,7 +3188,8 @@ paths:
         null for unknown_account; never the PIN or typed email), platform_auth.mfa_challenged, platform_auth.mfa_failed,
         platform_auth.signed_out, platform_auth.session_revoked, platform_auth.refresh_reuse_detected,
         platform_plan.created, platform_plan.updated (before/after plan terms), platform_provisioning.job_created
-        (no owner contact details), platform_provisioning.job_approved, platform_provisioning.step_run, audit_log.export
+        (no owner contact details), platform_provisioning.job_approved, platform_provisioning.step_run,
+        platform_provisioning.job_rolled_back (after.compensated: step names in undo order), audit_log.export
         (when platform rows or no rows are exported). Tenant scope - platform_tenant.lifecycle_changed (fromStatus,
         toStatus, reason; also written by billing dunning transitions), platform_billing.subscription_created,
         platform_billing.subscription_updated, platform_billing.discount_requested, platform_billing.discount_auto_approved,

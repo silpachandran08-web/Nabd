@@ -25,6 +25,9 @@ final class ProvisioningModels {
                    Instant startedAt, Instant completedAt, String errorDetail) {
     }
 
+    record JobWithSteps(Job job, List<JobStep> steps) {
+    }
+
     /** Only verify_invite_owner ever populates either field — every other step yields NONE. Two
      * separate invites now exist for the same real-world owner: the per-tenant staff row (accept at
      * /accept-invite) and the top-level Owner account PIN (accept at /owner/accept-invite) that lets

@@ -2,12 +2,16 @@ package com.nabd.hms.platform.provisioning;
 
 import com.nabd.hms.common.ClinicClock;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -60,6 +64,31 @@ class ProvisioningRepository {
         return jdbc.query("SELECT " + JOB_COLUMNS + "FROM master.provisioning_jobs ORDER BY created_at DESC", jobMapper());
     }
 
+    /** PLT-058: every job with its steps in ONE query (was 1 + 2 per job). */
+    List<ProvisioningModels.JobWithSteps> listJobsWithSteps() {
+        Map<UUID, ProvisioningModels.JobWithSteps> out = new LinkedHashMap<>();
+        RowMapper<Job> jobs = jobMapper();
+        jdbc.query("SELECT j.*, s.* FROM (SELECT " + JOB_COLUMNS + ", created_at FROM master.provisioning_jobs) j " +
+                "LEFT JOIN (SELECT id AS step_id, job_id, step_name, step_order, status AS step_status, started_at, completed_at, error_detail " +
+                "FROM master.provisioning_job_steps) s ON s.job_id = j.id ORDER BY j.created_at DESC, j.id, s.step_order", (RowCallbackHandler) rs -> {
+            UUID id = UUID.fromString(rs.getString("id"));
+            ProvisioningModels.JobWithSteps js = out.get(id);
+            if (js == null) {
+                js = new ProvisioningModels.JobWithSteps(jobs.mapRow(rs, out.size()), new ArrayList<>());
+                out.put(id, js);
+            }
+            if (rs.getString("step_id") != null) {
+                Timestamp startedAt = rs.getTimestamp("started_at");
+                Timestamp completedAt = rs.getTimestamp("completed_at");
+                js.steps().add(new JobStep(UUID.fromString(rs.getString("step_id")), id, rs.getString("step_name"),
+                        rs.getInt("step_order"), rs.getString("step_status"),
+                        startedAt == null ? null : startedAt.toInstant(), completedAt == null ? null : completedAt.toInstant(),
+                        rs.getString("error_detail")));
+            }
+        });
+        return new ArrayList<>(out.values());
+    }
+
     List<JobStep> findSteps(UUID jobId) {
         return jdbc.query(
                 "SELECT id, job_id, step_name, step_order, status, started_at, completed_at, error_detail " +
@@ -98,8 +127,32 @@ class ProvisioningRepository {
                 ownerNewlyCreated, brandNewlyCreated, jobId);
     }
 
-    void markStepRunning(UUID stepId) {
-        jdbc.update("UPDATE master.provisioning_job_steps SET status = 'running', started_at = now(), error_detail = NULL WHERE id = ?", stepId);
+    /** PLT-058: compare-and-set claim. Only one caller can move a queued/failed step to running; false means someone else holds it. */
+    boolean claimStep(UUID stepId) {
+        return jdbc.update("UPDATE master.provisioning_job_steps SET status = 'running', started_at = now(), completed_at = NULL, error_detail = NULL " +
+                "WHERE id = ? AND status IN ('queued', 'failed')", stepId) == 1;
+    }
+
+    /** PLT-058: the step's idempotency key, keyed by (job_id, step_name). Called inside the step's own transaction. */
+    boolean effectCommitted(UUID jobId, String stepName) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT effect_committed_at IS NOT NULL FROM master.provisioning_job_steps WHERE job_id = ? AND step_name = ?",
+                Boolean.class, jobId, stepName));
+    }
+
+    void recordEffect(UUID jobId, String stepName) {
+        jdbc.update("UPDATE master.provisioning_job_steps SET effect_committed_at = now() WHERE job_id = ? AND step_name = ?", jobId, stepName);
+    }
+
+    /** PLT-058 reaper: steps running since before the cutoff fail with 'timeout'; their running jobs become failed (retryable). */
+    int failStuckSteps(Instant cutoff) {
+        Integer n = jdbc.queryForObject(
+                "WITH s AS (UPDATE master.provisioning_job_steps SET status = 'failed', completed_at = now(), error_detail = 'timeout' " +
+                        "WHERE status = 'running' AND started_at < ? RETURNING job_id), " +
+                        "j AS (UPDATE master.provisioning_jobs SET status = 'failed' WHERE status = 'running' AND id IN (SELECT job_id FROM s) RETURNING id) " +
+                        "SELECT count(*) FROM s",
+                Integer.class, Timestamp.from(cutoff));
+        return n == null ? 0 : n;
     }
 
     void markStepDone(UUID stepId) {
