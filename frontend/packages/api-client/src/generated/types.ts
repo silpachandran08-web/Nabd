@@ -49,7 +49,7 @@ export type ClinicProfileResponse = { id?: string; name?: string; region?: strin
 export type ClinicProfileWriteRequest = { name: string; specialties?: Array<string>; taxId?: string; taxIdType?: string; timezone: string; whatsappNumber?: string; };
 export type ClinicSummaryResponse = { id?: string; name?: string; region?: string; slug?: string; status?: string; };
 export type ClinicianReviewEntry = { clinician?: boolean; name?: string; reason?: string; roleName?: string; staffId?: string; };
-export type Close = { closedAt?: string; closedByName?: string; countedCash?: number; expectedCash?: number; note?: string; reopenReason?: string; reopenedAt?: string; reopenedByName?: string; status?: string; variance?: number; };
+export type Close = { closeCount?: number; closedAt?: string; closedByName?: string; countedCash?: number; expectedCash?: number; note?: string; reopenReason?: string; reopenedAt?: string; reopenedByName?: string; status?: string; variance?: number; };
 export type Collections = { collected?: number; invoices?: number; pendingInvoices?: number; };
 export type ComplianceHealthResponse = { items?: Array<Item>; licences?: Licences; };
 export type ConditionResponse = { condition?: string; id?: string; patientId?: string; recordedAt?: string; recordedBy?: string; reviewDueDate?: string; status?: string; };
@@ -60,11 +60,13 @@ export type Counts = { appointments?: number; freeSlots?: number; walkIns?: numb
 export type CreateProvisioningJobRequest = { brandName: string; ownerEmail: string; ownerMobile: string; ownerName: string; path: string; region: string; tenantName: string; tenantSlug: string; };
 export type CreateRequest = { body?: Record<string, string>; type?: string; };
 export type DailyMoneyResponse = { billedToday?: number; collectedToday?: number; invoiceCountToday?: number; outstandingTotal?: number; paymentCountToday?: number; };
+export type DataQualityPage = { items?: Array<Item>; nextCursor?: string; };
 export type Day = { date?: string; holiday?: string; sessions?: Array<SessionCount>; };
 export type DayClose = { closed?: boolean; pendingCheckouts?: number; unbilledConsultations?: number; };
-export type DayCloseRequest = { countedCash: number; note?: string; };
+export type DayCloseHistoryResponse = { items?: Array<Item>; nextCursor?: string; };
+export type DayCloseRequest = { countedCash: number; date?: string; note?: string; };
 export type DayCloseSummaryResponse = { cashTolerance?: number; close?: Close; currency?: string; date?: string; methods?: Array<Method>; outstanding?: Outstanding; pendingCheckouts?: number; splitPaymentBills?: number; taxBands?: Array<TaxBand>; taxLabel?: string; today?: boolean; totals?: Totals; unbilled?: Array<Unbilled>; voidedCount?: number; voidedTotal?: number; };
-export type DayReopenRequest = { reason: string; };
+export type DayReopenRequest = { date?: string; reason: string; };
 export type DelayAnnounceRequest = { delayMinutes: number; reason?: string; };
 export type DelegationRequest = { delegatedRoleId: string; expiresAt: string; reason: string; staffId: string; };
 export type DelegationResponse = { active?: boolean; delegatedRoleId?: string; delegatedRoleName?: string; expiresAt?: string; grantedBy?: string; id?: string; reason?: string; revokedAt?: string; revokedReason?: string; staffId?: string; startsAt?: string; };
@@ -346,6 +348,7 @@ export type Operations = {
   CheckoutController_existingInvoice: { method: "get"; path: "/v1/billing/checkout/{queueEntryId}/invoice"; permission: "billing:view"; pathParams: { queueEntryId: string; }; query: never; body: never; response: InvoiceResponse };
   DayCloseController_summary: { method: "get"; path: "/v1/billing/day-close"; permission: "billing:view"; pathParams: never; query: { date?: string; }; body: never; response: DayCloseSummaryResponse };
   DayCloseController_close: { method: "post"; path: "/v1/billing/day-close"; permission: "billing:approve"; pathParams: never; query: never; body: DayCloseRequest; response: DayCloseSummaryResponse };
+  DayCloseController_history: { method: "get"; path: "/v1/billing/day-close/history"; permission: "billing:view"; pathParams: never; query: { from?: string; to?: string; cursor?: string; limit?: number; }; body: never; response: DayCloseHistoryResponse };
   DayCloseController_reopen: { method: "post"; path: "/v1/billing/day-close/reopen"; permission: "billing:approve"; pathParams: never; query: { date?: string; }; body: DayReopenRequest; response: DayCloseSummaryResponse };
   CheckoutController_getInvoice: { method: "get"; path: "/v1/billing/invoices/{id}"; permission: "billing:view"; pathParams: { id: string; }; query: never; body: never; response: InvoiceResponse };
   CheckoutController_recordPayment: { method: "post"; path: "/v1/billing/invoices/{id}/payments"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: PaymentRequest; response: InvoiceResponse };
@@ -467,6 +470,7 @@ export type Operations = {
   PackageController_deactivate: { method: "post"; path: "/v1/packages/{id}/deactivate"; permission: "packages:edit"; pathParams: { id: string; }; query: never; body: never; response: PackageResponse };
   PatientController_list: { method: "get"; path: "/v1/patients"; permission: "patients:view"; pathParams: never; query: { q?: string; limit?: number; cursor?: string; }; body: never; response: PatientPage };
   PatientController_register: { method: "post"; path: "/v1/patients"; permission: "patients:create"; pathParams: never; query: never; body: PatientWriteRequest; response: Record<string, unknown> };
+  PatientController_dataQuality: { method: "get"; path: "/v1/patients/data-quality"; permission: "patients:edit"; pathParams: never; query: { issue: string; limit?: number; cursor?: string; }; body: never; response: DataQualityPage };
   PatientController_guardianReviewsDue: { method: "get"; path: "/v1/patients/guardian-reviews-due"; permission: "patients:view"; pathParams: never; query: never; body: never; response: Array<GuardianReviewResponse> };
   PatientController_undoMerge: { method: "post"; path: "/v1/patients/merges/{mergeId}/undo"; permission: "patients:delete"; pathParams: { mergeId: string; }; query: never; body: never; response: void };
   PatientController_registry: { method: "get"; path: "/v1/patients/registry"; permission: "patients:view"; pathParams: never; query: { q?: string; filter?: string; limit?: number; cursor?: string; }; body: never; response: PatientRegistryResponse };

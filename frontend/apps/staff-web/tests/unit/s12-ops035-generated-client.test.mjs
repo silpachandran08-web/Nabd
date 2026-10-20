@@ -2,10 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createHandlers, operationCount } from "../../packages/api-client/src/generated/handlers.ts";
-import { operationSchemas, ProblemSchema } from "../../packages/api-client/src/generated/index.ts";
+import { createHandlers, operationCount } from "../../../../packages/api-client/src/generated/handlers.ts";
+import { operationSchemas, ProblemSchema } from "../../../../packages/api-client/src/generated/index.ts";
 
-const GEN = new URL("../../packages/api-client/src/generated/", import.meta.url);
+const GEN = new URL("../../../../packages/api-client/src/generated/", import.meta.url);
 
 // stand-in for msw's http/HttpResponse: records each route and what its resolver answers
 function fakeMsw() {

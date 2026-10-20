@@ -19,6 +19,7 @@ owner,GET /v1/auth/break-glass/active,staff:view,allow
 owner,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 owner,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 owner,GET /v1/billing/day-close,billing:view,allow
+owner,GET /v1/billing/day-close/history,billing:view,allow
 owner,GET /v1/billing/invoices/{id},billing:view,allow
 owner,GET /v1/billing/otc-charges,billing:view,allow
 owner,GET /v1/clinical/conditions/due,clinical:view,allow
@@ -71,6 +72,7 @@ owner,GET /v1/packages/refunds,packages:view,allow
 owner,GET /v1/packages/settings,packages:view,allow
 owner,GET /v1/packages/{id},packages:view,allow
 owner,GET /v1/patients,patients:view,allow
+owner,GET /v1/patients/data-quality,patients:edit,allow
 owner,GET /v1/patients/guardian-reviews-due,patients:view,allow
 owner,GET /v1/patients/registry,patients:view,allow
 owner,GET /v1/patients/{id},patients:view,allow
@@ -276,6 +278,7 @@ owner_doctor,GET /v1/auth/break-glass/active,staff:view,allow
 owner_doctor,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 owner_doctor,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 owner_doctor,GET /v1/billing/day-close,billing:view,allow
+owner_doctor,GET /v1/billing/day-close/history,billing:view,allow
 owner_doctor,GET /v1/billing/invoices/{id},billing:view,allow
 owner_doctor,GET /v1/billing/otc-charges,billing:view,allow
 owner_doctor,GET /v1/clinical/conditions/due,clinical:view,allow
@@ -328,6 +331,7 @@ owner_doctor,GET /v1/packages/refunds,packages:view,allow
 owner_doctor,GET /v1/packages/settings,packages:view,allow
 owner_doctor,GET /v1/packages/{id},packages:view,allow
 owner_doctor,GET /v1/patients,patients:view,allow
+owner_doctor,GET /v1/patients/data-quality,patients:edit,allow
 owner_doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
 owner_doctor,GET /v1/patients/registry,patients:view,allow
 owner_doctor,GET /v1/patients/{id},patients:view,allow
@@ -533,6 +537,7 @@ doctor,GET /v1/auth/break-glass/active,staff:view,deny-403
 doctor,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 doctor,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 doctor,GET /v1/billing/day-close,billing:view,allow
+doctor,GET /v1/billing/day-close/history,billing:view,allow
 doctor,GET /v1/billing/invoices/{id},billing:view,allow
 doctor,GET /v1/billing/otc-charges,billing:view,allow
 doctor,GET /v1/clinical/conditions/due,clinical:view,allow
@@ -585,6 +590,7 @@ doctor,GET /v1/packages/refunds,packages:view,allow
 doctor,GET /v1/packages/settings,packages:view,allow
 doctor,GET /v1/packages/{id},packages:view,allow
 doctor,GET /v1/patients,patients:view,allow
+doctor,GET /v1/patients/data-quality,patients:edit,allow
 doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
 doctor,GET /v1/patients/registry,patients:view,allow
 doctor,GET /v1/patients/{id},patients:view,allow
@@ -790,6 +796,7 @@ nurse,GET /v1/auth/break-glass/active,staff:view,deny-403
 nurse,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-403
 nurse,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-403
 nurse,GET /v1/billing/day-close,billing:view,deny-403
+nurse,GET /v1/billing/day-close/history,billing:view,deny-403
 nurse,GET /v1/billing/invoices/{id},billing:view,deny-403
 nurse,GET /v1/billing/otc-charges,billing:view,deny-403
 nurse,GET /v1/clinical/conditions/due,clinical:view,allow
@@ -842,6 +849,7 @@ nurse,GET /v1/packages/refunds,packages:view,allow
 nurse,GET /v1/packages/settings,packages:view,allow
 nurse,GET /v1/packages/{id},packages:view,allow
 nurse,GET /v1/patients,patients:view,allow
+nurse,GET /v1/patients/data-quality,patients:edit,allow
 nurse,GET /v1/patients/guardian-reviews-due,patients:view,allow
 nurse,GET /v1/patients/registry,patients:view,allow
 nurse,GET /v1/patients/{id},patients:view,allow
@@ -1047,6 +1055,7 @@ receptionist,GET /v1/auth/break-glass/active,staff:view,deny-403
 receptionist,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 receptionist,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 receptionist,GET /v1/billing/day-close,billing:view,allow
+receptionist,GET /v1/billing/day-close/history,billing:view,allow
 receptionist,GET /v1/billing/invoices/{id},billing:view,allow
 receptionist,GET /v1/billing/otc-charges,billing:view,allow
 receptionist,GET /v1/clinical/conditions/due,clinical:view,deny-403
@@ -1099,6 +1108,7 @@ receptionist,GET /v1/packages/refunds,packages:view,allow
 receptionist,GET /v1/packages/settings,packages:view,allow
 receptionist,GET /v1/packages/{id},packages:view,allow
 receptionist,GET /v1/patients,patients:view,allow
+receptionist,GET /v1/patients/data-quality,patients:edit,allow
 receptionist,GET /v1/patients/guardian-reviews-due,patients:view,allow
 receptionist,GET /v1/patients/registry,patients:view,allow
 receptionist,GET /v1/patients/{id},patients:view,allow
@@ -1304,6 +1314,7 @@ frontdesk_vitals,GET /v1/auth/break-glass/active,staff:view,deny-403
 frontdesk_vitals,GET /v1/billing/checkout/{queueEntryId},billing:view,allow
 frontdesk_vitals,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,allow
 frontdesk_vitals,GET /v1/billing/day-close,billing:view,allow
+frontdesk_vitals,GET /v1/billing/day-close/history,billing:view,allow
 frontdesk_vitals,GET /v1/billing/invoices/{id},billing:view,allow
 frontdesk_vitals,GET /v1/billing/otc-charges,billing:view,allow
 frontdesk_vitals,GET /v1/clinical/conditions/due,clinical:view,allow
@@ -1356,6 +1367,7 @@ frontdesk_vitals,GET /v1/packages/refunds,packages:view,allow
 frontdesk_vitals,GET /v1/packages/settings,packages:view,allow
 frontdesk_vitals,GET /v1/packages/{id},packages:view,allow
 frontdesk_vitals,GET /v1/patients,patients:view,allow
+frontdesk_vitals,GET /v1/patients/data-quality,patients:edit,allow
 frontdesk_vitals,GET /v1/patients/guardian-reviews-due,patients:view,allow
 frontdesk_vitals,GET /v1/patients/registry,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{id},patients:view,allow

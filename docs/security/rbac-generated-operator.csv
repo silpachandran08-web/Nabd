@@ -19,6 +19,7 @@ super_admin,GET /v1/auth/break-glass/active,staff:view,deny-401
 super_admin,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 super_admin,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 super_admin,GET /v1/billing/day-close,billing:view,deny-401
+super_admin,GET /v1/billing/day-close/history,billing:view,deny-401
 super_admin,GET /v1/billing/invoices/{id},billing:view,deny-401
 super_admin,GET /v1/billing/otc-charges,billing:view,deny-401
 super_admin,GET /v1/clinical/conditions/due,clinical:view,deny-401
@@ -71,6 +72,7 @@ super_admin,GET /v1/packages/refunds,packages:view,deny-401
 super_admin,GET /v1/packages/settings,packages:view,deny-401
 super_admin,GET /v1/packages/{id},packages:view,deny-401
 super_admin,GET /v1/patients,patients:view,deny-401
+super_admin,GET /v1/patients/data-quality,patients:edit,deny-401
 super_admin,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 super_admin,GET /v1/patients/registry,patients:view,deny-401
 super_admin,GET /v1/patients/{id},patients:view,deny-401
@@ -276,6 +278,7 @@ implementation,GET /v1/auth/break-glass/active,staff:view,deny-401
 implementation,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 implementation,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 implementation,GET /v1/billing/day-close,billing:view,deny-401
+implementation,GET /v1/billing/day-close/history,billing:view,deny-401
 implementation,GET /v1/billing/invoices/{id},billing:view,deny-401
 implementation,GET /v1/billing/otc-charges,billing:view,deny-401
 implementation,GET /v1/clinical/conditions/due,clinical:view,deny-401
@@ -328,6 +331,7 @@ implementation,GET /v1/packages/refunds,packages:view,deny-401
 implementation,GET /v1/packages/settings,packages:view,deny-401
 implementation,GET /v1/packages/{id},packages:view,deny-401
 implementation,GET /v1/patients,patients:view,deny-401
+implementation,GET /v1/patients/data-quality,patients:edit,deny-401
 implementation,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 implementation,GET /v1/patients/registry,patients:view,deny-401
 implementation,GET /v1/patients/{id},patients:view,deny-401
@@ -533,6 +537,7 @@ support_engineer,GET /v1/auth/break-glass/active,staff:view,deny-401
 support_engineer,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 support_engineer,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 support_engineer,GET /v1/billing/day-close,billing:view,deny-401
+support_engineer,GET /v1/billing/day-close/history,billing:view,deny-401
 support_engineer,GET /v1/billing/invoices/{id},billing:view,deny-401
 support_engineer,GET /v1/billing/otc-charges,billing:view,deny-401
 support_engineer,GET /v1/clinical/conditions/due,clinical:view,deny-401
@@ -585,6 +590,7 @@ support_engineer,GET /v1/packages/refunds,packages:view,deny-401
 support_engineer,GET /v1/packages/settings,packages:view,deny-401
 support_engineer,GET /v1/packages/{id},packages:view,deny-401
 support_engineer,GET /v1/patients,patients:view,deny-401
+support_engineer,GET /v1/patients/data-quality,patients:edit,deny-401
 support_engineer,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 support_engineer,GET /v1/patients/registry,patients:view,deny-401
 support_engineer,GET /v1/patients/{id},patients:view,deny-401
@@ -790,6 +796,7 @@ billing,GET /v1/auth/break-glass/active,staff:view,deny-401
 billing,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 billing,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 billing,GET /v1/billing/day-close,billing:view,deny-401
+billing,GET /v1/billing/day-close/history,billing:view,deny-401
 billing,GET /v1/billing/invoices/{id},billing:view,deny-401
 billing,GET /v1/billing/otc-charges,billing:view,deny-401
 billing,GET /v1/clinical/conditions/due,clinical:view,deny-401
@@ -842,6 +849,7 @@ billing,GET /v1/packages/refunds,packages:view,deny-401
 billing,GET /v1/packages/settings,packages:view,deny-401
 billing,GET /v1/packages/{id},packages:view,deny-401
 billing,GET /v1/patients,patients:view,deny-401
+billing,GET /v1/patients/data-quality,patients:edit,deny-401
 billing,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 billing,GET /v1/patients/registry,patients:view,deny-401
 billing,GET /v1/patients/{id},patients:view,deny-401
@@ -1047,6 +1055,7 @@ sre,GET /v1/auth/break-glass/active,staff:view,deny-401
 sre,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 sre,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 sre,GET /v1/billing/day-close,billing:view,deny-401
+sre,GET /v1/billing/day-close/history,billing:view,deny-401
 sre,GET /v1/billing/invoices/{id},billing:view,deny-401
 sre,GET /v1/billing/otc-charges,billing:view,deny-401
 sre,GET /v1/clinical/conditions/due,clinical:view,deny-401
@@ -1099,6 +1108,7 @@ sre,GET /v1/packages/refunds,packages:view,deny-401
 sre,GET /v1/packages/settings,packages:view,deny-401
 sre,GET /v1/packages/{id},packages:view,deny-401
 sre,GET /v1/patients,patients:view,deny-401
+sre,GET /v1/patients/data-quality,patients:edit,deny-401
 sre,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 sre,GET /v1/patients/registry,patients:view,deny-401
 sre,GET /v1/patients/{id},patients:view,deny-401
@@ -1304,6 +1314,7 @@ commercial,GET /v1/auth/break-glass/active,staff:view,deny-401
 commercial,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 commercial,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 commercial,GET /v1/billing/day-close,billing:view,deny-401
+commercial,GET /v1/billing/day-close/history,billing:view,deny-401
 commercial,GET /v1/billing/invoices/{id},billing:view,deny-401
 commercial,GET /v1/billing/otc-charges,billing:view,deny-401
 commercial,GET /v1/clinical/conditions/due,clinical:view,deny-401
@@ -1356,6 +1367,7 @@ commercial,GET /v1/packages/refunds,packages:view,deny-401
 commercial,GET /v1/packages/settings,packages:view,deny-401
 commercial,GET /v1/packages/{id},packages:view,deny-401
 commercial,GET /v1/patients,patients:view,deny-401
+commercial,GET /v1/patients/data-quality,patients:edit,deny-401
 commercial,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 commercial,GET /v1/patients/registry,patients:view,deny-401
 commercial,GET /v1/patients/{id},patients:view,deny-401
@@ -1561,6 +1573,7 @@ compliance_dpo,GET /v1/auth/break-glass/active,staff:view,deny-401
 compliance_dpo,GET /v1/billing/checkout/{queueEntryId},billing:view,deny-401
 compliance_dpo,GET /v1/billing/checkout/{queueEntryId}/invoice,billing:view,deny-401
 compliance_dpo,GET /v1/billing/day-close,billing:view,deny-401
+compliance_dpo,GET /v1/billing/day-close/history,billing:view,deny-401
 compliance_dpo,GET /v1/billing/invoices/{id},billing:view,deny-401
 compliance_dpo,GET /v1/billing/otc-charges,billing:view,deny-401
 compliance_dpo,GET /v1/clinical/conditions/due,clinical:view,deny-401
@@ -1613,6 +1626,7 @@ compliance_dpo,GET /v1/packages/refunds,packages:view,deny-401
 compliance_dpo,GET /v1/packages/settings,packages:view,deny-401
 compliance_dpo,GET /v1/packages/{id},packages:view,deny-401
 compliance_dpo,GET /v1/patients,patients:view,deny-401
+compliance_dpo,GET /v1/patients/data-quality,patients:edit,deny-401
 compliance_dpo,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 compliance_dpo,GET /v1/patients/registry,patients:view,deny-401
 compliance_dpo,GET /v1/patients/{id},patients:view,deny-401

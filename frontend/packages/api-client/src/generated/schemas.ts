@@ -60,7 +60,7 @@ export const ClinicHolidayWriteRequestSchema = z.object({ holidayDate: z.string(
 export const ClinicProfileResponseSchema = z.object({ id: z.string().optional(), name: z.string().optional(), region: z.string().optional(), setupCompletedAt: z.string().optional(), specialties: z.array(z.string()).optional(), status: z.string().optional(), taxId: z.string().optional(), taxIdType: z.string().optional(), timezone: z.string().optional(), whatsappNumber: z.string().optional() });
 export const ClinicProfileWriteRequestSchema = z.object({ name: z.string(), specialties: z.array(z.string()).optional(), taxId: z.string().optional(), taxIdType: z.string().optional(), timezone: z.string(), whatsappNumber: z.string().optional() });
 export const ClinicianReviewEntrySchema = z.object({ clinician: z.boolean().optional(), name: z.string().optional(), reason: z.string().optional(), roleName: z.string().optional(), staffId: z.string().optional() });
-export const CloseSchema = z.object({ closedAt: z.string().optional(), closedByName: z.string().optional(), countedCash: z.number().optional(), expectedCash: z.number().optional(), note: z.string().optional(), reopenReason: z.string().optional(), reopenedAt: z.string().optional(), reopenedByName: z.string().optional(), status: z.string().optional(), variance: z.number().optional() });
+export const CloseSchema = z.object({ closeCount: z.number().int().optional(), closedAt: z.string().optional(), closedByName: z.string().optional(), countedCash: z.number().optional(), expectedCash: z.number().optional(), note: z.string().optional(), reopenReason: z.string().optional(), reopenedAt: z.string().optional(), reopenedByName: z.string().optional(), status: z.string().optional(), variance: z.number().optional() });
 export const CollectionsSchema = z.object({ collected: z.number().optional(), invoices: z.number().int().optional(), pendingInvoices: z.number().int().optional() });
 export const LicencesSchema = z.object({ expired: z.number().int().optional(), expiringSoon: z.number().int().optional(), total: z.number().int().optional() });
 export const ComplianceHealthResponseSchema = z.object({ items: z.array(ItemSchema).optional(), licences: LicencesSchema.optional() });
@@ -72,17 +72,19 @@ export const CountsSchema = z.object({ appointments: z.number().int().optional()
 export const CreateProvisioningJobRequestSchema = z.object({ brandName: z.string(), ownerEmail: z.string(), ownerMobile: z.string(), ownerName: z.string(), path: z.string(), region: z.string(), tenantName: z.string(), tenantSlug: z.string() });
 export const CreateRequestSchema = z.object({ body: z.record(z.string(), z.string()).optional(), type: z.string().optional() });
 export const DailyMoneyResponseSchema = z.object({ billedToday: z.number().optional(), collectedToday: z.number().optional(), invoiceCountToday: z.number().int().optional(), outstandingTotal: z.number().optional(), paymentCountToday: z.number().int().optional() });
+export const DataQualityPageSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
 export const SessionCountSchema = z.object({ booked: z.number().int().optional(), free: z.number().int().optional(), label: z.string().optional() });
 export const DaySchema = z.object({ date: z.string().optional(), holiday: z.string().optional(), sessions: z.array(SessionCountSchema).optional() });
 export const DayCloseSchema = z.object({ closed: z.boolean().optional(), pendingCheckouts: z.number().int().optional(), unbilledConsultations: z.number().int().optional() });
-export const DayCloseRequestSchema = z.object({ countedCash: z.number().gte(0.0), note: z.string().min(0).max(1000).optional() });
+export const DayCloseHistoryResponseSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
+export const DayCloseRequestSchema = z.object({ countedCash: z.number().gte(0.0), date: z.string().optional(), note: z.string().min(0).max(1000).optional() });
 export const MethodSchema = z.object({ amount: z.number().optional(), method: z.string().optional(), transactions: z.number().int().optional() });
 export const OutstandingSchema = z.object({ amount: z.number().optional(), bills: z.number().int().optional(), patients: z.number().int().optional() });
 export const TaxBandSchema = z.object({ ratePercent: z.number().optional(), tax: z.number().optional(), taxable: z.number().optional() });
 export const TotalsSchema = z.object({ billed: z.number().optional(), bills: z.number().int().optional(), collected: z.number().optional(), payments: z.number().int().optional(), tax: z.number().optional() });
 export const UnbilledSchema = z.object({ doctorName: z.string().optional(), endedAt: z.string().optional(), patientName: z.string().optional(), queueEntryId: z.string().optional(), token: z.number().int().optional() });
 export const DayCloseSummaryResponseSchema = z.object({ cashTolerance: z.number().optional(), close: CloseSchema.optional(), currency: z.string().optional(), date: z.string().optional(), methods: z.array(MethodSchema).optional(), outstanding: OutstandingSchema.optional(), pendingCheckouts: z.number().int().optional(), splitPaymentBills: z.number().int().optional(), taxBands: z.array(TaxBandSchema).optional(), taxLabel: z.string().optional(), today: z.boolean().optional(), totals: TotalsSchema.optional(), unbilled: z.array(UnbilledSchema).optional(), voidedCount: z.number().int().optional(), voidedTotal: z.number().optional() });
-export const DayReopenRequestSchema = z.object({ reason: z.string().min(0).max(500) });
+export const DayReopenRequestSchema = z.object({ date: z.string().optional(), reason: z.string().min(0).max(500) });
 export const DelayAnnounceRequestSchema = z.object({ delayMinutes: z.number().int().gte(1).lte(240), reason: z.string().min(0).max(200).optional() });
 export const DelegationRequestSchema = z.object({ delegatedRoleId: z.string(), expiresAt: z.string(), reason: z.string(), staffId: z.string() });
 export const DelegationResponseSchema = z.object({ active: z.boolean().optional(), delegatedRoleId: z.string().optional(), delegatedRoleName: z.string().optional(), expiresAt: z.string().optional(), grantedBy: z.string().optional(), id: z.string().optional(), reason: z.string().optional(), revokedAt: z.string().optional(), revokedReason: z.string().optional(), staffId: z.string().optional(), startsAt: z.string().optional() });
@@ -348,6 +350,7 @@ export const operationSchemas = {
   CheckoutController_existingInvoice: { response: InvoiceResponseSchema },
   DayCloseController_summary: { response: DayCloseSummaryResponseSchema },
   DayCloseController_close: { body: DayCloseRequestSchema, response: DayCloseSummaryResponseSchema },
+  DayCloseController_history: { response: DayCloseHistoryResponseSchema },
   DayCloseController_reopen: { body: DayReopenRequestSchema, response: DayCloseSummaryResponseSchema },
   CheckoutController_getInvoice: { response: InvoiceResponseSchema },
   CheckoutController_recordPayment: { body: PaymentRequestSchema, response: InvoiceResponseSchema },
@@ -469,6 +472,7 @@ export const operationSchemas = {
   PackageController_deactivate: { response: PackageResponseSchema },
   PatientController_list: { response: PatientPageSchema },
   PatientController_register: { body: PatientWriteRequestSchema, response: z.record(z.string(), z.unknown()) },
+  PatientController_dataQuality: { response: DataQualityPageSchema },
   PatientController_guardianReviewsDue: { response: z.array(GuardianReviewResponseSchema) },
   PatientController_undoMerge: {  },
   PatientController_registry: { response: PatientRegistryResponseSchema },
