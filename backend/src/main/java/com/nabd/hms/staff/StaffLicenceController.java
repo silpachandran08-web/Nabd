@@ -53,7 +53,7 @@ public class StaffLicenceController {
         return service.update(tenantId(jwt), UUID.fromString(jwt.getSubject()), id, req, RequestMeta.clientIp(http));
     }
 
-    @com.nabd.hms.shared.idempotency.Idempotent
+    @com.nabd.hms.shared.Idempotent
     @PostMapping("/override")
     @PreAuthorize("hasAuthority('staff:edit')")
     public LicenceResponse override(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody OverrideRequest req,

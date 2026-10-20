@@ -22,7 +22,7 @@
     <testcontainers.version>1.21.3</testcontainers.version>
     <!-- S10: tests that document REAL unfixed defects stay in the tree but are not run by default (CONTEXT.md lists them).
          Run them with: mvn test -Dknown.defect.tags= -->
-    <known.defect.tags>known-defect-ACC-002 | known-defect-ACC-003 | known-defect-ACC-004 | known-defect-FIN-003 | known-defect-OPS-004 | known-defect-OPS-007 | known-defect-OPS-034 | known-defect-PLT-044 | known-defect-PLT-038 | known-defect-IDC-001 | known-defect-CLN-004 | known-defect-CLN-005 | known-defect-OPS-012 | known-defect-OPS-015 | known-defect-OPS-042 | known-defect-FIN-005</known.defect.tags>
+    <known.defect.tags>known-defect-ACC-002 | known-defect-ACC-003 | known-defect-ACC-004 | known-defect-FIN-003 | known-defect-OPS-004 | known-defect-OPS-007 | known-defect-OPS-034 | known-defect-PLT-044 | known-defect-PLT-038 | known-defect-IDC-001 | known-defect-CLN-004 | known-defect-CLN-005 | known-defect-OPS-012 | known-defect-OPS-015 | known-defect-OPS-042</known.defect.tags>
     <pit.history>${project.build.directory}/pit-history.bin</pit.history>
   </properties>
 

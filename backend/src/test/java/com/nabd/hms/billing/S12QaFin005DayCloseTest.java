@@ -3,7 +3,6 @@ package com.nabd.hms.billing;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
 import com.nabd.hms.support.ConcurrencyHarness;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -335,7 +334,6 @@ class S12QaFin005DayCloseTest extends ApiTestBase {
     }
 
     // API spec: POST /billing/day-close is idempotent with an Idempotency-Key: a retry with the same key replays the first 200.
-    @Tag("known-defect-FIN-005")
     @Test
     void closeRetriedWithTheSameIdempotencyKeyReplaysTheFirstResult() {
         Owner o = owner();
