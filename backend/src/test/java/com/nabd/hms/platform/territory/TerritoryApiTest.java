@@ -18,14 +18,17 @@ class TerritoryApiTest extends ApiTestBase {
     @Test
     void regionsWithNoClinicsStillAppearAsACoverageGap() {
         String token = platformLoginAndGetAccessToken(seedOperator("sre1@nabd.internal", "sre", false));
-        // No KSA tenant seeded anywhere in this test run's data.
+        // The test DB is shared by the whole run and other classes seed KSA clinics (order-dependent before S12 FIX-B):
+        // the region must be listed with exactly the clinics it has, 0 when this class runs first or alone.
+        long ksaClinics = new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource())
+                .queryForObject("SELECT count(*) FROM tenants WHERE region = 'KSA'", Long.class);
 
         ResponseEntity<List> resp = exchange("/v1/platform/territories", HttpMethod.GET, authed(token), List.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).extracting(o -> ((Map) o).get("region")).contains("IN", "KSA");
         Map ksa = (Map) resp.getBody().stream().filter(o -> ((Map) o).get("region").equals("KSA")).findFirst().orElseThrow();
-        assertThat(ksa.get("clinicCount")).isEqualTo(0);
+        assertThat(((Number) ksa.get("clinicCount")).longValue()).isEqualTo(ksaClinics);
         assertThat(ksa.get("currency")).isEqualTo("SAR");
     }
 

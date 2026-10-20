@@ -34,6 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * No HTTP sign-ins in this class, so the loopback IP bucket is only used by the test's own anonymous calls.
  * Tomcat trusts no proxy (default), so X-Forwarded-For must never change the bucket.
  */
+// Own context (Valkey + rate-limit properties): closed after the class so its pool does not hold Postgres slots for the rest of the run.
+@org.springframework.test.annotation.DirtiesContext
 @SuppressWarnings({"rawtypes", "unchecked"})
 class S12QaRateLimitIpOtpTest extends ApiTestBase {
 

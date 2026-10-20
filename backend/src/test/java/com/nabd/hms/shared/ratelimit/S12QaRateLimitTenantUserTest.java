@@ -28,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * S12 QA-2, PLT-008 tenant and user dimensions over HTTP against a real Redis 6.2 (Valkey stand-in). Refill is set to
  * 1 token/min so bucket boundaries are exact within a short test: tenant burst 30, user burst 12. Plans re-read every 2 s.
  */
+// Own context (Valkey + rate-limit properties): closed after the class so its pool does not hold Postgres slots for the rest of the run.
+@org.springframework.test.annotation.DirtiesContext
 @SuppressWarnings({"rawtypes", "unchecked"})
 class S12QaRateLimitTenantUserTest extends ApiTestBase {
 
