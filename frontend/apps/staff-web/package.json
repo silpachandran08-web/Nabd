@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "staff-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -14,6 +14,7 @@
     "test": "npm run -s test:unit"
   },
   "dependencies": {
+    "@nabd/api-client": "workspace:*",
     "next": "16.4.2",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -24,6 +25,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "eslint-plugin-boundaries": "7.2.0",
     "typescript": "^5"
   }
 }

@@ -6,7 +6,7 @@ import { Skeleton } from "../ui/StateViews";
 import { PAYMENT_METHODS, paymentMethodLabel } from "../checkout/paymentMethods";
 import { getIdentity } from "../../lib/session";
 import { api, errorText, intentKeys } from "../../lib/api";
-import type { QueueEntry, StaffOption, WaitEstimate } from "../../../packages/api-client/types.ts";
+import type { QueueEntry, StaffOption, WaitEstimate } from "@nabd/api-client/types";
 import styles from "./checkin.module.css";
 
 // One check-in overlay shared by Arrivals and Patients (REC-041, REC-017): confirm -> POST

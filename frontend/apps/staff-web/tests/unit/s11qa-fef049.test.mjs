@@ -117,7 +117,7 @@ test('AC2 policy "expires <= 30 days" is enforced by the gate, not only by revie
 });
 
 test('workflow selfcheck asserts the broken run fails and the healthy one passes', () => {
-  const y = readFileSync(new URL('../../../.github/workflows/e2e-smoke.yml', import.meta.url), 'utf8');
-  assert.match(y, /if node frontend\/tests\/e2e\/smoke\/run-smoke\.mjs --only=J9 --break[^\n]*; then echo "smoke MISSED[^\n]*exit 1; fi/);
+  const y = readFileSync(new URL('../../../../../.github/workflows/e2e-smoke.yml', import.meta.url), 'utf8');
+  assert.match(y, /if node frontend\/apps\/staff-web\/tests\/e2e\/smoke\/run-smoke\.mjs --only=J9 --break[^\n]*; then echo "smoke MISSED[^\n]*exit 1; fi/);
   assert.ok(existsSync(new URL('../e2e/smoke/run-smoke.mjs', import.meta.url)));
 });

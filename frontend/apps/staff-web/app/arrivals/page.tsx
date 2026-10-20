@@ -17,7 +17,7 @@ import { moveBody, moveErrorMessage } from "../lib/queueMove";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, type CheckInResult } from "../components/arrivals/CheckInDialog";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { api, ApiError, errorText, intentKeys, problemMessage } from "../lib/api";
-import type { CreatedPatient, DuplicateCandidate, QueueEntry as CheckedInEntry } from "../../packages/api-client/types.ts";
+import type { CreatedPatient, DuplicateCandidate, QueueEntry as CheckedInEntry } from "@nabd/api-client/types";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception

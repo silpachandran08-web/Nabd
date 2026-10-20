@@ -14,7 +14,7 @@ import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
 import { api, ApiError, errorText, intentKeys } from "../../lib/api";
-import type { Charge, CheckoutContext, FlowStep, Invoice, LineItem } from "../../../packages/api-client/types.ts";
+import type { Charge, CheckoutContext, FlowStep, Invoice, LineItem } from "@nabd/api-client/types";
 import { PRICE_REASONS, reasonLabel } from "../../components/checkout/priceReasons";
 
 

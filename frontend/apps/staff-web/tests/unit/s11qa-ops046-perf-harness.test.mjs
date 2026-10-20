@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, writeFileSync, readdirSync, existsSync, copy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const PERF = new URL("../../../perf/", import.meta.url).pathname;
+const PERF = new URL("../../../../../perf/", import.meta.url).pathname;
 const tmp = () => mkdtempSync(join(tmpdir(), "qa4-perf-"));
 
 function summary(profile, { p95 = 120, errorRate = 0, thresholdsOk = true, endpoint = true } = {}) {

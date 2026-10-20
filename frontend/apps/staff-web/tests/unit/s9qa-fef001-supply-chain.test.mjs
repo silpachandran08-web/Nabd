@@ -5,12 +5,13 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { evaluate } from "../../scripts/audit-gate.mjs";
 
-const root = new URL("../../../", import.meta.url).pathname;
-const lock = JSON.parse(readFileSync(root + "frontend/package-lock.json", "utf8"));
-const pkg = JSON.parse(readFileSync(root + "frontend/package.json", "utf8"));
+const root = new URL("../../../../../", import.meta.url).pathname;
+// FEF-012: pnpm workspace; the lockfile sits at the monorepo root frontend/.
+const lock = readFileSync(root + "frontend/pnpm-lock.yaml", "utf8");
+const pkg = JSON.parse(readFileSync(root + "frontend/apps/staff-web/package.json", "utf8"));
 const renovate = JSON.parse(readFileSync(root + "renovate.json", "utf8"));
 const wf = readFileSync(root + ".github/workflows/frontend-supply-chain.yml", "utf8");
-const ver = (n) => lock.packages["node_modules/" + n]?.version;
+const ver = (n) => lock.match(new RegExp(`^  '?${n.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}@(\\d+\\.\\d+\\.\\d+)`, "m"))?.[1];
 const adv = (severity, id) => ({ vulnerabilities: { pkgx: { via: [{ severity, url: "https://github.com/advisories/" + id, title: "t" }] } } });
 
 test("lockfile resolves next and eslint-config-next to >= 16.4.2", () => {
@@ -46,7 +47,7 @@ test("audit gate: allowlist works until expiry day, then fails and reports expir
 test("workflow parses as YAML and carries audit, trivy, dependency-check, sbom, 365d retention", () => {
   const py = spawnSync("python3", ["-c", "import sys,yaml;d=yaml.safe_load(open(sys.argv[1]));print(list(d['jobs']))", root + ".github/workflows/frontend-supply-chain.yml"], { encoding: "utf8" });
   assert.equal(py.status, 0, py.stderr);
-  for (const s of ["npm audit --omit=dev --audit-level=high", "trivy-action", "exit-code: \"1\"", "HIGH,CRITICAL", "Dependency-Check", "cyclonedx", "retention-days: 365", "upload-artifact", "pull_request"]) {
+  for (const s of ["pnpm audit --prod --audit-level=high", "trivy-action", "exit-code: \"1\"", "HIGH,CRITICAL", "Dependency-Check", "cyclonedx", "retention-days: 365", "upload-artifact", "pull_request"]) {
     assert.ok(wf.includes(s), s);
   }
 });

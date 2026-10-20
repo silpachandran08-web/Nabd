@@ -1,0 +1,11 @@
+{
+  "name": "@nabd/tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

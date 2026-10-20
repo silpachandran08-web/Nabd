@@ -9,3 +9,5 @@ target/
 .vercel
 perf/out/
 __pycache__/
+# FEF-012: Turborepo local cache
+.turbo/

@@ -14,7 +14,7 @@ import StatusPill from "../../components/ui/StatusPill";
 import RxLinkPicker from "../../components/checkout/RxLinkPicker";
 import { rxErrorMessage, unlinkedRx } from "../../components/checkout/rxLink";
 import { api, ApiError, errorText, intentKeys } from "../../lib/api";
-import type { Charge, Invoice, LineItem, OtcContext, RxLine } from "../../../packages/api-client/types.ts";
+import type { Charge, Invoice, LineItem, OtcContext, RxLine } from "@nabd/api-client/types";
 
 // NB-186: a counter sale — no patient record, no queue token (GET /billing/otc-charges, POST /billing/otc-checkout).
 

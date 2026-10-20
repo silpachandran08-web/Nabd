@@ -1,10 +1,10 @@
 // FEF-007: the clinic app's configured API client. Refresh stays in apiClient.ts (FEF-002); this wires it in.
-import { createClient, ApiError, TimeoutError } from "../../packages/api-client/index.ts";
-import type { Problem } from "../../packages/api-client/types.ts";
+import { createClient, ApiError, TimeoutError } from "@nabd/api-client";
+import type { Problem } from "@nabd/api-client/types";
 import { goLogin, needsRefresh, refreshSession } from "./apiClient.ts";
 
 export { ApiError, TimeoutError };
-export { intentKeys } from "../../packages/api-client/index.ts";
+export { intentKeys } from "@nabd/api-client";
 
 export const api = createClient({
   baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1",

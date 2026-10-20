@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { decodeJwtPayload } from "../../app/lib/jwt.ts";
 
@@ -56,13 +56,11 @@ test("grep: no JSON.parse(atob / window.atob / globalThis.atob anywhere in front
   assert.deepEqual(hits, []);
 });
 test("eslint: atob in a new file is an error; jwt.ts is clean", () => {
-  const f = fe + "app/lib/__s9qa_tmp.ts";
-  writeFileSync(f, "export const x = (s: string) => atob(s);\n");
-  try {
-    const bad = spawnSync("npx", ["eslint", "--no-warn-ignored", "app/lib/__s9qa_tmp.ts", "-f", "json"], { cwd: fe, encoding: "utf8" });
-    const msgs = JSON.parse(bad.stdout)[0].messages.map((m) => m.ruleId);
-    assert.ok(msgs.includes("no-restricted-globals"), bad.stdout);
-  } finally { spawnSync("rm", ["-f", f]); }
+  // FEF-012: via stdin, no temp file under app/ (it raced with turbo's parallel lint/build and changed their cache inputs).
+  const bad = spawnSync("npx", ["eslint", "--no-warn-ignored", "--stdin", "--stdin-filename", "app/lib/__s9qa_tmp.ts", "-f", "json"],
+    { cwd: fe, encoding: "utf8", input: "export const x = (s: string) => atob(s);\n" });
+  const msgs = JSON.parse(bad.stdout)[0].messages.map((m) => m.ruleId);
+  assert.ok(msgs.includes("no-restricted-globals"), bad.stdout);
   const ok = spawnSync("npx", ["eslint", "app/lib/jwt.ts"], { cwd: fe, encoding: "utf8" });
   assert.equal(ok.status, 0, ok.stdout);
 });

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createClient, intentKeys, ApiError, TimeoutError, uuidv7 } from "../../packages/api-client/index.ts";
+import { createClient, intentKeys, ApiError, TimeoutError, uuidv7 } from "@nabd/api-client";
 
 const json = (status, body) => new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 function make(handler, o = {}) {
@@ -144,7 +144,7 @@ test("a caller AbortSignal aborts the request and is not retried or reported as 
 
 // Contract: the endpoints the migrated flows call exist in api/openapi.yaml, except the T-089 gaps (the payments POST was added by FIN-001).
 test("contract: migrated endpoints are in api/openapi.yaml (known gaps listed)", () => {
-  const spec = readFileSync(new URL("../../../api/openapi.yaml", import.meta.url), "utf8");
+  const spec = readFileSync(new URL("../../../../../api/openapi.yaml", import.meta.url), "utf8");
   const has = (p) => spec.split("\n").some((l) => l === `  ${p}:`);
   for (const p of ["/billing/checkout/{queueEntryId}", "/billing/otc-charges", "/billing/otc-checkout", "/queue/check-in", "/patients", "/queue/{id}/status", "/departments/{id}/flow", "/staff/roster", "/queue"]) assert.ok(has(p), p);
   const gaps = ["/billing/checkout/{queueEntryId}/invoice", "/billing/invoices/{id}/payments", "/queue/wait-estimate"].filter((p) => !has(p));

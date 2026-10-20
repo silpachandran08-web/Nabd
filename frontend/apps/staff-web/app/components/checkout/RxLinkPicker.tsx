@@ -3,7 +3,7 @@
 import { useState } from "react";
 import styles from "../../checkout/checkout.module.css";
 import { api, errorText } from "../../lib/api";
-import type { RxLine } from "../../../packages/api-client/types.ts";
+import type { RxLine } from "@nabd/api-client/types";
 
 // PHL-001: counter "Link prescription" picker. Finds the patient's signed lines with quantity left by phone
 // (POST, so the number is never in a URL). Rx QR lookup waits on a QR format; outside prescriptions are PHL-020.

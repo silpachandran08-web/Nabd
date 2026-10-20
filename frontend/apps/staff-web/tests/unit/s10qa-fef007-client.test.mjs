@@ -2,7 +2,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { createClient, ApiError, TimeoutError, intentKeys, uuidv7 } from "../../packages/api-client/index.ts";
+import { createClient, ApiError, TimeoutError, intentKeys, uuidv7 } from "@nabd/api-client";
 
 const UUID7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const res = (status, body, raw) => new Response(raw ?? (body === undefined ? null : JSON.stringify(body)), { status, headers: { "Content-Type": "application/json" } });
@@ -252,6 +252,6 @@ test("AC3: the walk-in registration function in arrivals/page.tsx uses the clien
   assert.match(body, /api\.post/);
 });
 test("AC3: the client itself has no module-level API_BASE constant and exports its types file", () => {
-  assert.doesNotMatch(strip(src("packages/api-client/index.ts")), /API_BASE/);
-  assert.match(src("packages/api-client/types.ts"), /export type Invoice\b/);
+  assert.doesNotMatch(strip(src("../../packages/api-client/index.ts")), /API_BASE/);
+  assert.match(src("../../packages/api-client/types.ts"), /export type Invoice\b/);
 });
