@@ -7,15 +7,11 @@ import { API_BASE } from "../surfaces";
 import { SESSION_EXPIRED_MESSAGE, storePlatformSession } from "../platformApi";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
 import MfaEnrolCard from "../../components/MfaEnrolCard";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches POST /v1/platform/auth/login's oneOf response and RFC 7807 Problem errors.
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
 type MfaChallenge = { challengeId: string; method: string; expiresIn: number };
-type Problem = {
-  title: string;
-  detail: string;
-  errors?: { field: string; message: string }[];
-};
 
 export default function PlatformLoginPage() {
   const router = useRouter();

@@ -13,6 +13,7 @@ import RegistrationNoDialog from "../components/staff/RegistrationNoDialog";
 import styles from "./staff.module.css";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { isOwner } from "../lib/session";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches GET /v1/staff (StaffController) and GET /v1/roles (RoleController).
 type Staff = {
@@ -45,7 +46,6 @@ const REVIEW_REASON: Record<string, string> = {
 type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 // GlobalExceptionHandler serializes RFC 7807 ProblemDetail — the machine-readable
 // error code lives in `type` (a "…/errors/<slug>" URI), not `title` (human text).
-type Problem = { type?: string; title: string; detail: string };
 
 type ActionKey = "view" | "create" | "edit" | "delete" | "approve" | "refundDiscount" | "export";
 type Grid = Record<string, Record<ActionKey, boolean>>;

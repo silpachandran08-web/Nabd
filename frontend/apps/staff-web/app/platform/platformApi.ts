@@ -10,7 +10,8 @@ export {
   clearPlatformSession, hasPlatformSession, platformLogout, SESSION_EXPIRED_MESSAGE, storePlatformSession,
 } from "./platformSession";
 
-export type Problem = { title?: string; detail?: string };
+import type { Problem } from "@nabd/api-client/types";
+export type { Problem };
 
 /** Returns an authed fetch. Resolves to null when the session is gone (the operator is already being
  * redirected to login); callers treat null as "stop quietly", same contract the old copies had. */

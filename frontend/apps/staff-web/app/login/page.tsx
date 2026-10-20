@@ -9,17 +9,14 @@ import { NEW_PIN_PATTERN, lockedMessage, needsPinChange } from "../lib/pinPolicy
 import { useHasMounted } from "../lib/useHasMounted";
 import { safeReturnTo, storeTokens, takeReturnTo } from "../lib/apiClient";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../lib/loginFetch";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
 type MfaChallenge = { challengeId: string; method: string; expiresIn: number };
 type MfaSetupRequired = { setupToken: string; expiresIn: number };
-type Problem = {
-  title: string;
-  detail: string;
-  errors?: { field: string; message: string }[];
-  retryAfterSeconds?: number;
-};
+// Problem+JSON plus the login-only Retry-After hint.
+type LoginProblem = Problem & { retryAfterSeconds?: number };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -75,7 +72,7 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("nabd_access_token")}` },
         body: JSON.stringify({ currentPin: pin, newPin }),
       }, () => setSlow(true));
-      if (!res.ok) { applyProblem(res.status, (await res.json()) as Problem); return; }
+      if (!res.ok) { applyProblem(res.status, (await res.json()) as LoginProblem); return; }
       // the old token still carries pinChange=true; a refresh mints one without it
       const r = await loginFetch(`${API_BASE}/auth/refresh`, {
         method: "POST",
@@ -119,7 +116,7 @@ export default function LoginPage() {
         }
         return;
       }
-      applyProblem(res.status, body as Problem);
+      applyProblem(res.status, body as LoginProblem);
     } catch (err) {
       if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
       else setFormError("Couldn't reach the server. Check your connection and try again.");
@@ -181,7 +178,7 @@ export default function LoginPage() {
         }
         return;
       }
-      setFormError((body as Problem).detail || "That code is incorrect or has expired.");
+      setFormError((body as LoginProblem).detail || "That code is incorrect or has expired.");
     } catch {
       setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -207,7 +204,7 @@ export default function LoginPage() {
         handleTokens(body as TokenPair);
         return;
       }
-      applyProblem(res.status, body as Problem);
+      applyProblem(res.status, body as LoginProblem);
     } catch {
       setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -227,7 +224,7 @@ export default function LoginPage() {
       });
       const body = await res.json();
       if (!res.ok) {
-        setFormError((body as Problem).detail || "Couldn't start MFA setup.");
+        setFormError((body as LoginProblem).detail || "Couldn't start MFA setup.");
         return;
       }
       setSecretBase32(body.secretBase32);
@@ -250,7 +247,7 @@ export default function LoginPage() {
       });
       const body = await res.json();
       if (!res.ok) {
-        applyProblem(res.status, body as Problem);
+        applyProblem(res.status, body as LoginProblem);
         return;
       }
       setRecoveryCodes(body.recoveryCodes);
@@ -293,7 +290,7 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ title: "", detail: "That code is incorrect or has expired." }));
-        setFormError((body as Problem).detail || "That code is incorrect or has expired.");
+        setFormError((body as LoginProblem).detail || "That code is incorrect or has expired.");
         return;
       }
       setView("forgotDone");
@@ -304,7 +301,7 @@ export default function LoginPage() {
     }
   }
 
-  function applyProblem(status: number, problem: Problem) {
+  function applyProblem(status: number, problem: LoginProblem) {
     if (status === 400 && problem.errors?.length) {
       setFieldErrors(Object.fromEntries(problem.errors.map((e) => [e.field, e.message])));
       return;

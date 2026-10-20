@@ -3,13 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../../../login/login.module.css";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches POST /v1/owners/invitations/{token}/accept (OwnerController) — sets this owner's
 // top-level account PIN (separate from any per-clinic staff PIN) and, like staff's own accept-invite,
 // logs them straight in: here that means handing back a pending workspace token, not real clinic
 // tokens, since which clinic to enter still isn't chosen yet.
 type PendingWorkspaceToken = { pendingToken: string; expiresIn: number };
-type Problem = { title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import styles from "./myDay.module.css";
 import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
-import { DONE_STATUSES, WAITING_STATUSES } from "../consult/shared";
+import { DONE_STATUSES, WAITING_STATUSES } from "@nabd/domain";
 import { useMyDay } from "./useMyDay";
 import { clinicToday, formatClinicDate } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";

@@ -12,28 +12,19 @@ import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
-import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
+import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, VISIT_LABEL, type PatientSummary, type QueueEntry, type VitalsForm } from "@nabd/domain";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, type CheckInResult } from "../components/arrivals/CheckInDialog";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { api, ApiError, errorText, intentKeys, problemMessage } from "../lib/api";
-import type { CreatedPatient, DuplicateCandidate, QueueEntry as CheckedInEntry } from "@nabd/api-client/types";
+import type { CreatedPatient, DuplicateCandidate } from "@nabd/api-client/types";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
 // GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
 // can populate the doctor picker), POST /v1/queue/check-in, POST /v1/queue/{id}/reorder.
-type QueueEntry = {
-  id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
-  queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
-  createdAt: string; source: string;
-  // REC-011: already on GET /v1/queue rows; optional so an older backend just shows less.
-  visitType?: string | null; presentingComplaint?: string | null; ageYears?: number | null; gender?: string | null;
-};
 type Row = QueueEntry & { patientName: string; patientMrn: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
 type GuardianOption = { id: string; name: string; phone: string };
-// GET /v1/patients/{id} — only the fields the detail rail shows; all optional on purpose.
-type PatientDetail = { name?: string; mrn?: string; phone?: string; dob?: string; gender?: string };
 const DELAY_PRESETS = [10, 15, 30, 45, 60];
 // LIVE-04: each flag is exactly what its control's endpoint needs (see the setGrants effect).
 type Grants = { queueCreate: boolean; queueEdit: boolean; checkout: boolean; vitalsRecord: boolean; patientsView: boolean; patientsCreate: boolean };
@@ -48,10 +39,6 @@ type AppointmentOption = { id: string; patientId: string; patientName: string; d
 const MOVE_REASONS: [string, string][] = [["wrong_department", "Wrong department"], ["doctor_unavailable", "Doctor unavailable"], ["patient_request", "Patient request"], ["other", "Other"]];
 type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
 
-const VISIT_LABEL: Record<string, string> = {
-  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
-  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
-};
 
 // REC-011: the table's Visit column (QueueRepository's visit_type), same labels as /schedule.
 const VISIT_TYPE_LABEL: Record<string, string> = {
@@ -152,7 +139,7 @@ function ArrivalsPageInner() {
   const newSignal = useLatestLoad();
   const [sendingIds, setSendingIds] = useState<string[]>([]);
   const [railId, setRailId] = useState<string | null>(null);
-  const [railPatient, setRailPatient] = useState<{ state: "loading" | "error" | "ready"; data: PatientDetail | null }>({ state: "loading", data: null });
+  const [railPatient, setRailPatient] = useState<{ state: "loading" | "error" | "ready"; data: Partial<PatientSummary> | null }>({ state: "loading", data: null });
   const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null);
   const [checkinTarget, setCheckinTarget] = useState<AppointmentOption | null>(null);
   const [guardianQuery, setGuardianQuery] = useState("");
@@ -505,9 +492,9 @@ function ArrivalsPageInner() {
       }
 
       const ciBody = { patientId, doctorId, presentingComplaint: presentingComplaint.trim() || null, paymentMode };
-      let entry: CheckedInEntry;
+      let entry: QueueEntry;
       try {
-        entry = await api.post<CheckedInEntry>("/queue/check-in", ciBody, { idempotencyKey: keys.current.get("checkin", ciBody) });
+        entry = await api.post<QueueEntry>("/queue/check-in", ciBody, { idempotencyKey: keys.current.get("checkin", ciBody) });
       } catch (e) {
         setModalError(errorText(e, "Couldn't check in."));
         return;

@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./departments.module.css";
 import { apiFetch, goLogin } from "../../lib/apiClient";
+import type { Problem } from "@nabd/api-client/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 type TransferEdge = { fromDepartmentId: string; toDepartmentId: string };
-type Problem = { title: string; detail: string };
 // Matches GET/POST /v1/departments/{id}/workflow (DepartmentController) — platform-authored
 // templates (NB-357) replaced the free-reorder flow editor (NB-355).
 type WorkflowTemplate = { code: string; name: string; steps: string[]; toggleKeys: string[] };

@@ -6,6 +6,7 @@ import Link from "next/link";
 import styles from "./platform.module.css";
 import Icon from "../components/ui/Icon";
 import { Skeleton } from "../components/ui/StateViews";
+import { initials as initialsOf } from "@nabd/domain";
 import { groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
 import { hasPlatformSession, platformLogout, usePlatformFetch } from "./platformApi";
 
@@ -75,7 +76,7 @@ export function PlatformNav() {
 
   const groups = groupBySection(visibleSurfaces(profile.permissions));
   const roleLabel = ROLE_LABELS[profile.role] ?? profile.role;
-  const initials = profile.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+  const initials = initialsOf(profile.name);
 
   return (
     <nav className={styles.navBar} aria-label="Platform">

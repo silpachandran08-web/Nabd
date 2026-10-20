@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import styles from "./setup.module.css";
+import type { Problem } from "@nabd/api-client/types";
 
 type Template = {
   id: string; name: string; language: string; category: "UTILITY" | "MARKETING"; headerText: string; body: string;
   paramCount: number; status: "pending" | "approved" | "flagged" | "paused" | "disabled" | "rejected";
   rejectionReason: string | null; qualityRating: "GREEN" | "YELLOW" | "RED" | "UNKNOWN"; updatedAt: string;
 };
-type Problem = { title: string; detail: string };
 type Draft = { name: string; language: string; category: "UTILITY" | "MARKETING"; body: string; examples: string[] };
 
 const EMPTY: Draft = { name: "", language: "en", category: "UTILITY", body: "", examples: [] };
@@ -72,7 +72,7 @@ export default function WhatsAppTemplates({ authedFetch }: { authedFetch: (path:
     if (!res) return;
     if (!res.ok) {
       const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't submit the template." }));
-      setError(p.detail || p.title);
+      setError(p.detail || p.title || null);
       return;
     }
     cancel();

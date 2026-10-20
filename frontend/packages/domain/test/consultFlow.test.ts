@@ -1,13 +1,11 @@
-#!/usr/bin/env node
-// Unit checks for the consult workspace rules in app/components/consult/consultFlow.ts
-// (DOC-019 start eligibility, DOC-025 timeline / next patient, DOC-038 follow-up state, DOC-044 labels).
-// There is no unit-test runner in this app yet; this uses node:test and Node's built-in type stripping
-// (Node >= 22.18):  node --test scripts/test-consult-flow.mjs
-import { test } from "node:test";
+// Unit checks for the consult workspace rules in src/consultFlow.ts (DOC-019 start eligibility, DOC-025 timeline /
+// next patient, DOC-038 follow-up state, DOC-044 labels). FEF-013: the 8 cases of the old scripts/test-consult-flow.mjs, on Vitest.
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
   buildTimeline, nextPatient, queueStatusLabel, statusBeforeConsult, statusSequence, upcomingFollowUp, NOTE_FIELD_LABEL,
-} from "../app/components/consult/consultFlow.ts";
+  type QueueRowLite, type TimelineInput,
+} from "../src/consultFlow.ts";
 
 test("default pipeline starts the consult from vitals_done", () => {
   assert.equal(statusBeforeConsult(statusSequence([])), "vitals_done");
@@ -51,14 +49,14 @@ test("next patient prefers a visit already in consultation, then the lowest star
     { id: "c", doctorId: "other", status: "in_consult", tokenNumber: 1 },
     { id: "cur", doctorId: "me", status: "checkout_pending", tokenNumber: 2 },
   ];
-  const startable = (r) => r.status === "vitals_done";
+  const startable = (r: QueueRowLite) => r.status === "vitals_done";
   assert.equal(nextPatient(rows, "cur", "me", startable)?.id, "b");
   assert.equal(nextPatient([...rows, { id: "d", doctorId: "me", status: "in_consult", tokenNumber: 9 }], "cur", "me", startable)?.id, "d");
   assert.equal(nextPatient(rows.filter((r) => r.doctorId !== "me" || r.id === "cur"), "cur", "me", startable), null);
 });
 
 test("timeline only lists what is recorded", () => {
-  const base = { checkedInAt: "2026-10-14T05:00:00Z", vitals: { status: "none" }, status: "in_consult", draft: { savedAt: null, pendingOnDevice: false }, signedAt: null, noteSigned: false, amendments: [] };
+  const base: TimelineInput = { checkedInAt: "2026-10-14T05:00:00Z", vitals: { status: "none" }, status: "in_consult", draft: { savedAt: null, pendingOnDevice: false }, signedAt: null, noteSigned: false, amendments: [] };
   assert.deepEqual(buildTimeline(base).map((e) => e.id), ["in", "vitals", "consult"]);
   const offline = buildTimeline({ ...base, draft: { savedAt: null, pendingOnDevice: true } });
   assert.equal(offline.find((e) => e.id === "draft")?.sub, "on this device · waiting to sync");

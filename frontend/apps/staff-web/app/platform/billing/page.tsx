@@ -7,7 +7,7 @@ import Dialog from "../../components/ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied, { ReadOnlyNote } from "../../components/platform/RoleDenied";
 import { DiscountStatusPill, TenantStatusPill } from "../../components/platform/statusPills";
-import { formatMoney } from "../../lib/money";
+import { formatMoney } from "@nabd/domain";
 import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
 
 // Matches GET/POST /v1/platform/billing/* (BillingController) and GET /v1/platform/tenants (FleetController)

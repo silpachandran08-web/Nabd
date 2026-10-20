@@ -9,6 +9,7 @@ import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { initials } from "@nabd/domain";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -59,10 +60,6 @@ const stepLabel = (step: string) => {
 };
 const hideKey = (tenant: string) => `nabd_setup_card_hidden:${tenant}`;
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
-}
 
 /** "2026-09-26" → a local calendar date (new Date("2026-09-26") would be UTC midnight, a day early west of UTC). */
 function localDate(iso: string): Date {

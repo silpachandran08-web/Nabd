@@ -6,12 +6,12 @@ import Link from "next/link";
 import styles from "../../login/login.module.css";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
 import MfaEnrolCard from "../../components/MfaEnrolCard";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches POST /v1/owners/auth/login (OwnerController) — a separate top-level identity from any
 // one clinic's staff login (NB-350): this PIN is the owner's own, not tied to a tenant slug, and
 // only ever unlocks a workspace list, never clinic data directly.
 type PendingWorkspaceToken = { pendingToken: string; expiresIn: number };
-type Problem = { title: string; detail: string };
 // PLT-005: the PIN now leads to a TOTP challenge (enrolled) or forced enrolment (not enrolled);
 // the workspace token exists only after the second factor.
 type MfaChallenge = { challengeId: string; method: string; expiresIn: number };

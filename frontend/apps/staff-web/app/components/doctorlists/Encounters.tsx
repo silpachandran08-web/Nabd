@@ -25,7 +25,7 @@ const STATES: { key: string; label: string }[] = [
   { key: "none", label: "No note" },
   { key: "signed", label: "Signed" },
 ];
-const VISIT_LABEL: Record<Encounter["visitStatus"], string> = { in_consult: "In consultation", checkout_pending: "At checkout", completed: "Completed" };
+const VISIT_STATUS_LABEL: Record<Encounter["visitStatus"], string> = { in_consult: "In consultation", checkout_pending: "At checkout", completed: "Completed" };
 const PAGE = 20;
 
 function noteTone(s: Encounter["noteState"]) {
@@ -153,7 +153,7 @@ export default function Encounters() {
                   const n = noteTone(e.noteState);
                   const body = (
                     <>
-                      <span className={styles.cell}><span className={styles.name}>{e.patientName}</span><span className={styles.meta}>{e.patientMrn} · {VISIT_LABEL[e.visitStatus]}</span></span>
+                      <span className={styles.cell}><span className={styles.name}>{e.patientName}</span><span className={styles.meta}>{e.patientMrn} · {VISIT_STATUS_LABEL[e.visitStatus]}</span></span>
                       <span className={styles.cell}><span className={styles.mlabel}>Date</span>{fmtDate(e.queueDate)}</span>
                       <span className={styles.cell}><span className={styles.mlabel}>Outputs</span><Outputs e={e} /></span>
                       <span className={styles.cell}>

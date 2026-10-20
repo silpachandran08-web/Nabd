@@ -2,11 +2,11 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import styles from "../login/login.module.css";
+import type { Problem } from "@nabd/api-client/types";
 
 // PLT-005: the forced-enrolment step (owner and platform sign-in). The setup token only opens the
 // enrol/confirm pair and travels in the body (PLT-001). onDone receives the confirm response body
 // (null for a 204), so each caller decides what comes next.
-type Problem = { title?: string; detail?: string };
 
 export default function MfaEnrolCard({ enrollUrl, confirmUrl, setupToken, subtitle, onDone }: {
   enrollUrl: string;

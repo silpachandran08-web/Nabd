@@ -17,18 +17,13 @@ import { formatLastVisit } from "../lib/lastVisit";
 import VitalsCard from "../components/consult/VitalsCard";
 import type { Part } from "../components/consult/clinical";
 import type { Vitals } from "../components/consult/shared";
-import { DEFAULT_START_STATUS, statusBeforeConsult, statusSequence } from "../components/consult/consultFlow";
+import { age, DEFAULT_START_STATUS, initials, statusBeforeConsult, statusSequence, type PatientSummary } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
-type PatientDetail = Patient & {
-  allergies: string[];
-  chronicConditions: string[];
-  activePackages: number;
-  outstandingBalance?: number; // NB-052: omitted entirely from the response when the caller's field grants restrict financial data
-  lastVisitAt: string | null;
+type PatientDetail = PatientSummary & {
   lastVisit?: string | null; // LIVE-03: same definition as the registry list (date)
   isMinor: boolean;
   guardianId: string | null;
@@ -62,7 +57,8 @@ type Registry = { total: number; counts: Record<string, number>; rows: RegistryR
 // Today's queue entry for the drawer patient (GET /v1/queue, QueueEntryResponse subset).
 type TodayVisit = { id: string; patientId: string; doctorId: string; departmentId: string; status: string; tokenNumber: number };
 const VISIT_DONE = ["completed", "cancelled", "no_show", "transferred_out"];
-const VISIT_LABEL: Record<string, string> = {
+// Drawer wording for today's visit (shorter than the queue board labels), keyed by queue status.
+const TODAY_STATUS_LABEL: Record<string, string> = {
   checked_in: "Waiting", waiting: "Waiting", billing_pending: "Billing", vitals_pending: "Waiting for vitals",
   vitals_done: "Ready for doctor", in_consult: "In consultation", procedures_pending: "Procedures", checkout_pending: "At checkout",
 };
@@ -81,10 +77,6 @@ function maskPhone(phone: string): string {
   return `${cc}••••• ${digits.slice(-4)}`;
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
-}
 
 function nextLabel(r: RegistryRow): string {
   if (!r.nextAppointment) return "—";
@@ -116,13 +108,6 @@ const FDI_TO_UNIVERSAL: Record<number, number> = {
   41: 25, 42: 26, 43: 27, 44: 28, 45: 29, 46: 30, 47: 31, 48: 32,
 };
 
-function age(dob: string): number {
-  const d = new Date(dob);
-  const now = new Date();
-  let a = now.getFullYear() - d.getFullYear();
-  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) a--;
-  return a;
-}
 
 export default function PatientsPage() {
   return (
@@ -828,7 +813,7 @@ function PatientsList() {
                       {starting ? "Starting…" : `Start consultation · T-${visit.tokenNumber}`}
                     </button>
                   );
-                  return <StatusPill tone="info" icon="users" label={`${mine ? "In your queue" : "In today's queue"} · T-${visit.tokenNumber} · ${VISIT_LABEL[visit.status] ?? visit.status.replace(/_/g, " ")}`} />;
+                  return <StatusPill tone="info" icon="users" label={`${mine ? "In your queue" : "In today's queue"} · T-${visit.tokenNumber} · ${TODAY_STATUS_LABEL[visit.status] ?? visit.status.replace(/_/g, " ")}`} />;
                 })()}
               </div>
               {startError && <div className={styles.errorInline} role="alert">{startError}</div>}

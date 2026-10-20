@@ -7,7 +7,7 @@ import Link from "next/link";
 import { getIdentity } from "../lib/session";
 import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
-import { paymentMethodLabel } from "../components/checkout/paymentMethods";
+import { paymentMethodLabel } from "@nabd/domain";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
 import { apiFetch, goLogin } from "../lib/apiClient";
 

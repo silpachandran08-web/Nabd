@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import styles from "./patients.module.css";
 import StatusPill from "../components/ui/StatusPill";
 import { fingerprint, submitKeyed } from "../lib/idempotency";
+import type { Problem } from "@nabd/api-client/types";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-type Problem = { title: string; detail: string; errors?: { field: string; message: string }[] };
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
 
 // PatientMatchCandidateResponse.matchScore is a 0-1 fraction (1.0 = exact phone match, else name similarity).

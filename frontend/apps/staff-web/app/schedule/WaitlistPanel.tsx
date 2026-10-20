@@ -6,6 +6,7 @@ import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { clinicTime } from "./NewAppointmentDialog";
 import styles from "./schedule.module.css";
+import type { Problem } from "@nabd/api-client/types";
 
 // WaitlistController (/v1/waitlist): GET ?doctorId= (queue:view), POST {doctorId, patientId}
 // (queue:create), POST /{id}/accept (queue:edit), DELETE /{id} (queue:edit). Response = WaitlistEntryResponse.
@@ -14,7 +15,6 @@ type WaitlistEntry = {
   offeredSlotStart: string | null; offerExpiresAt: string | null; bookedAppointmentId: string | null;
 };
 type Patient = { id: string; mrn: string; name: string; phone: string };
-type Problem = { title?: string; detail?: string };
 
 const STATUS: Record<string, { tone: PillTone; label: string }> = {
   waiting: { tone: "info", label: "Waiting" },

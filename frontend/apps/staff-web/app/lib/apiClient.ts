@@ -15,6 +15,9 @@ const RETURN_KEY = "nabd_return_to";
 const MUTEX_KEY = "nabd_refresh_mutex";
 const DEFAULT_TTL_S = 15 * 60;
 
+/** A page-level fetch bound to the session: null when the session ended (the page is already redirecting). */
+export type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
+
 type Claims = { exp?: number; iat?: number };
 function claims(token: string | null): Claims {
   return (token ? decodeJwtPayload<Claims>(token) : null) ?? {};

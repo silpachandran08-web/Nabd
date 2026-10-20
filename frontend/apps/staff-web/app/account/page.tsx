@@ -4,11 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./account.module.css";
 import { apiFetch, goLogin, storeTokens } from "../lib/apiClient";
+import type { Problem } from "@nabd/api-client/types";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
 // self-activated emergency access (NB-048). All work against a normal logged-in access token.
 type Session = { id: string; device: string | null; ip: string | null; lastSeenAt: string; current: boolean };
-type Problem = { title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 

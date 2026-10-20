@@ -13,22 +13,15 @@ import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
-import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "../lib/vitals";
+import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, VISIT_LABEL, type QueueEntry, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
+import type { Problem } from "@nabd/api-client/types";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
 // WhatsApp inbox, which doesn't exist. NB-147 (package sessions) is a link to /packages, which
 // already has the redeem action — no new UI needed for it.
-type QueueEntry = {
-  id: string; patientId: string; doctorId: string; departmentId: string; tokenNumber: number; status: string; createdAt: string;
-  priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
-  priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
-  source: string; presentingComplaint: string | null; appointmentId: string | null;
-  // NUR-012 (S4 contract): optional until the backend ships them; the UI falls back to the worklist's patient / roster.
-  ageYears?: number | null; gender?: string | null; doctorName?: string | null; waitMinutes?: number | null; visitType?: string | null;
-};
 type Row = QueueEntry & {
   patientName: string; patientMrn: string; doctorName: string;
   allergies: string[]; chronicConditions: string[];
@@ -90,10 +83,6 @@ function softWarning(key: VitalKey, raw: string, adult: boolean): string | null 
   if (!Number.isFinite(n) || n < d.min || n > d.max) return null;
   return n < d.soft[0] || n > d.soft[1] ? `Outside usual range (${d.soft[0]}–${d.soft[1]} ${d.unit}) — recheck` : null;
 }
-const VISIT_LABEL: Record<string, string> = {
-  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
-  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
-};
 // Same catalogue as arrivals' Mark priority — nursing can only acknowledge an existing flag
 // today, never raise one; this is the missing "Mark urgent" quick action from DESIGN.md's
 // Vitals Worklist toolbar, using the same POST /queue/{id}/reorder reception already drives.
@@ -115,7 +104,6 @@ type ProcedureOrder = {
   consentSignedName: string | null; consentRecordedByName: string | null; consentSignedAt: string | null;
 };
 type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
-type Problem = { title: string; detail: string };
 // REC-060: recording vitals (blank fields go out as null, so the server keeps stored values) needs
 // clinical:create or clinical:edit; the server 403s (vitals-correction-forbidden) a changed recorded value
 // without clinical:edit, and the capture form never pre-fills or offers to change recorded values.
