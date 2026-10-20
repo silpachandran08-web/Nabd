@@ -1,6 +1,7 @@
 package com.nabd.hms.auth;
 
 import com.nabd.hms.common.TenantScope;
+import com.nabd.hms.common.SessionRevocation;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -15,13 +16,19 @@ class SessionLivenessChecker {
 
     private final AuthRepository repo;
     private final TenantScope tenantScope;
+    private final SessionRevocation.OperatorLiveness operators;
 
-    SessionLivenessChecker(AuthRepository repo, TenantScope tenantScope) {
+    SessionLivenessChecker(AuthRepository repo, TenantScope tenantScope, SessionRevocation.OperatorLiveness operators) {
         this.repo = repo;
         this.tenantScope = tenantScope;
+        this.operators = operators;
     }
 
+    /** The one revocation check for every access token (OPS-020 caches in front of this). tenantId null = platform operator. */
     boolean isActive(UUID tenantId, UUID sessionId) {
+        if (tenantId == null) {
+            return operators.isActive(sessionId); // PLT-007: master.sessions
+        }
         return tenantScope.run(tenantId, () -> repo.isSessionActive(tenantId, sessionId));
     }
 }

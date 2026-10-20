@@ -109,6 +109,7 @@ app:
   auth:
     access-token-ttl-minutes: 15
     refresh-token-ttl-days: 30
+    absolute-session-hours: 12    # PLT-007: a refresh family ends one shift after sign-in
     mfa-challenge-ttl-minutes: 5
     lockout-threshold: 5          # failed attempts before backoff kicks in
     rate-limit-per-ip-per-minute: 20

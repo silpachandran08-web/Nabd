@@ -130,9 +130,9 @@ class StaffRepository {
                 + "AND used_at IS NULL AND revoked_at IS NULL", tenantId, staffId);
     }
 
-    void revokeAllSessions(UUID tenantId, UUID staffId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
-                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL", reason, tenantId, staffId);
+    List<UUID> revokeAllSessions(UUID tenantId, UUID staffId, String reason) {
+        return jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
+                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL RETURNING id", UUID.class, reason, tenantId, staffId);
     }
 
     /** Accepting the emailed invite link is itself the email-verification step (NB-041). */

@@ -248,12 +248,25 @@ class AuthRepository {
     }
 
     void insertSession(UUID id, UUID tenantId, UUID staffId, UUID familyId, String tokenHash,
-                        Instant expiresAt, String deviceLabel, String ip, String userAgent) {
+                        Instant expiresAt, String deviceLabel, String ip, String userAgent, Instant now) {
         jdbc.update(
-                "INSERT INTO sessions (id, tenant_id, staff_id, family_id, token_hash, expires_at, device_label, ip_address, user_agent) " +
-                        "VALUES (?,?,?,?,?,?,?,?::inet,?)",
-                id, tenantId, staffId, familyId, tokenHash, Timestamp.from(expiresAt), deviceLabel, ip, userAgent
+                "INSERT INTO sessions (id, tenant_id, staff_id, family_id, token_hash, expires_at, device_label, ip_address, user_agent, family_started_at) " +
+                        "VALUES (?,?,?,?,?,?,?,?::inet,?, COALESCE((SELECT min(family_started_at) FROM sessions WHERE tenant_id = ? AND family_id = ?), ?))",
+                id, tenantId, staffId, familyId, tokenHash, Timestamp.from(expiresAt), deviceLabel, ip, userAgent,
+                tenantId, familyId, Timestamp.from(now) // PLT-007: a rotated session keeps its family's start (12 h cap)
         );
+    }
+
+    /** PLT-007: when the refresh family of this session was first signed in. */
+    Instant familyStartedAt(UUID tenantId, UUID sessionId) {
+        return jdbc.queryForObject("SELECT family_started_at FROM sessions WHERE tenant_id = ? AND id = ?",
+                Timestamp.class, tenantId, sessionId).toInstant();
+    }
+
+    /** PLT-007: tenant suspended/offboarded, one UPDATE for every live session (partial index on tenant_id). */
+    List<UUID> revokeAllForTenant(UUID tenantId, String reason) {
+        return jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
+                "WHERE tenant_id = ? AND revoked_at IS NULL RETURNING id", UUID.class, reason, tenantId);
     }
 
     /**
