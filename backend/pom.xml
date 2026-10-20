@@ -103,6 +103,11 @@
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>
     </dependency>
+    <!-- PLT-008: Valkey client (Spring Data Redis over Lettuce), configured only by com.nabd.hms.common.valkey -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -112,6 +117,13 @@
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- PLT-008: Redis 6.2 binary as the Valkey stand-in for tests (no Valkey image here); see ValkeyTestSupport -->
+    <dependency>
+      <groupId>com.github.codemonstur</groupId>
+      <artifactId>embedded-redis</artifactId>
+      <version>1.4.3</version>
       <scope>test</scope>
     </dependency>
     <!--

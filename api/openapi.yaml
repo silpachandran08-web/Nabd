@@ -3378,6 +3378,15 @@ components:
       headers:
         Retry-After: { schema: { type: integer } }
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    RateLimited:
+      description: >-
+        PLT-008. Any endpoint except the OTP ones (always 202) can return this: a token bucket in Valkey is empty, per
+        tenant (default 600/min, burst 1,200, raised per plan), per user (120/min) or, before sign-in, per client IP
+        (20/min). type .../rate_limited, extra members dimension (tenant | user | ip) and retryAfterSeconds. Retry after
+        the Retry-After seconds, with jitter.
+      headers:
+        Retry-After: { schema: { type: integer, minimum: 1 } }
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
     PatientNotFound:
       description: >-
         IDC-001. type .../patient-not-found. The patient (or the visit/document's patient) is unknown, has withdrawn
