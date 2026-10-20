@@ -9,6 +9,7 @@ variable "db_allocated_storage_gb" { type = number }
 variable "audit_lock_days" { type = number }
 variable "dns_zone" { type = string }
 variable "pitr_lag_alarm_seconds" { type = number }
+variable "valkey_node_type" { type = string }
 
 data "aws_caller_identity" "current" {}
 

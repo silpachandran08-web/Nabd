@@ -79,6 +79,8 @@ jobs:
         run: pip install -q openapi-spec-validator && python3 -m openapi_spec_validator api/openapi.yaml
       - name: Event schemas (OPS-015 catalogue, PHI denylist, envelope < 2 KB) and the gate's own tests
         run: python3 scripts/ci/events.py check && python3 scripts/ci/test_events.py
+      - name: No cache value in logs or metrics (OPS-020 static scan) and the scan's own tests
+        run: python3 scripts/ci/cache_values.py check && python3 scripts/ci/test_cache_values.py
 
   stage2-unit:
     needs: changes
@@ -159,6 +161,9 @@ jobs:
       - if: needs.changes.outputs.backend == 'true'
         name: every event the producer tests published validates (OPS-015, samples from DomainEventContractApiTest)
         run: pip install -q jsonschema && python3 scripts/ci/events.py check --samples backend/target/event-samples
+      - if: needs.changes.outputs.backend == 'true'
+        name: no cached value in the captured logs or Prometheus scrape (OPS-020, samples from Ops020CacheApiTest)
+        run: python3 scripts/ci/cache_values.py check --samples backend/target/cache-scan
       # OPS-032: coverage comment + gates (ci/quality-gates.json; gates stay report-only until enabled_from is set)
       - if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request'
         name: JaCoCo summary comment and coverage gates

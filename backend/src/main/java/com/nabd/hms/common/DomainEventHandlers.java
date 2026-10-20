@@ -26,6 +26,9 @@ class DomainEventHandlers {
             @Override
             public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
                 for (DomainEventType t : DomainEventType.values()) {
+                    if (t == DomainEventType.ORGANIZATION_CONFIG_CHANGED) {
+                        continue; // OPS-020: TenantConfigEvictions consumes it (cache invalidation on every instance)
+                    }
                     registry.registerBeanDefinition("domainEventLogHandler." + t.type(),
                             new RootBeanDefinition(LogOnly.class, () -> new LogOnly(t.type())));
                 }

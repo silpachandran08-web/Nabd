@@ -2,6 +2,9 @@ package com.nabd.hms.common;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.nabd.hms.shared.cache.CacheKeyPolicy;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -10,7 +13,11 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The one place a clinic's calendar is defined. A doctor's "09:00–13:00", a queue_date, "today's"
@@ -31,10 +38,32 @@ public class ClinicClock {
 
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final CacheKeyPolicy keys;
+    private final long ttlNanos;
+    /** OPS-020: tenant zone/region per instance; evicted on organization.config.changed.v1 (TenantConfigEvictions), TTL as backstop. */
+    private final Map<String, Cached> rows = new ConcurrentHashMap<>();
+
+    private record Cached(String[] row, long loadedAt) {
+    }
 
     ClinicClock(JdbcTemplate jdbc, Clock clock) {
+        this(jdbc, clock, null, 0);
+    }
+
+    @Autowired
+    ClinicClock(JdbcTemplate jdbc, Clock clock, CacheKeyPolicy keys,
+                @Value("${app.cache.tenant-config-ttl-seconds:30}") long ttlSeconds) {
         this.jdbc = jdbc;
         this.clock = clock;
+        this.keys = keys;
+        this.ttlNanos = keys == null ? 0 : TimeUnit.SECONDS.toNanos(ttlSeconds);
+    }
+
+    /** OPS-020: drop this tenant's cached zone/region (its configuration changed). */
+    public void evict(UUID tenantId) {
+        if (ttlNanos > 0) {
+            rows.remove(key(tenantId));
+        }
     }
 
     /** The current instant from the injected Clock (PLT-028), so tests can freeze it. */
@@ -54,10 +83,32 @@ public class ClinicClock {
     }
 
     private String[] tenantRow(UUID tenantId) {
-        // ponytail: one PK lookup per call; cache per request if it ever shows in a profile.
+        String key = ttlNanos > 0 ? key(tenantId) : null;
+        Cached c = key == null ? null : rows.get(key);
+        long now = System.nanoTime();
+        if (c != null && now - c.loadedAt() < ttlNanos) {
+            return c.row();
+        }
+        String[] row = load(tenantId);
+        if (row == null) {
+            return new String[2]; // unknown tenant: never cached
+        }
+        if (key != null) {
+            // shortcut: a load racing an eviction can put the old row back until the TTL; a version check if that ever matters
+            rows.put(key, new Cached(row, now));
+        }
+        return row;
+    }
+
+    private String[] load(UUID tenantId) {
         // a list of String[] because a null timezone in a List<String> made findFirst() throw (500 on /schedule/day)
         return jdbc.query("SELECT timezone, region FROM tenants WHERE id = ?",
-                (rs, i) -> new String[] {rs.getString(1), rs.getString(2)}, tenantId).stream().findFirst().orElse(new String[2]);
+                (rs, i) -> new String[] {rs.getString(1), rs.getString(2)}, tenantId).stream().findFirst().orElse(null);
+    }
+
+    /** Built by CacheKeyPolicy: tenants.timezone/region are operational, so this never refuses (ADR-04 gate). */
+    private String key(UUID tenantId) {
+        return keys.key("tenant-zone", tenantId, List.of("tenants.timezone", "tenants.region"), false, "row");
     }
 
     public LocalDate today(UUID tenantId) {

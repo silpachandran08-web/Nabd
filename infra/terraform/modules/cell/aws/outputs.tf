@@ -4,6 +4,17 @@ output "network" {
 output "postgres" {
   value = { identifier = aws_db_instance.this.identifier, address = aws_db_instance.this.address, arn = aws_db_instance.this.arn, master_secret_arn = one(aws_db_instance.this.master_user_secret[*].secret_arn) }
 }
+output "valkey" {
+  value = {
+    primary_endpoint  = aws_elasticache_replication_group.valkey.primary_endpoint_address
+    reader_endpoint   = aws_elasticache_replication_group.valkey.reader_endpoint_address
+    auth_secret_arn   = aws_secretsmanager_secret.valkey_auth.arn
+    tls_required      = aws_elasticache_replication_group.valkey.transit_encryption_mode == "required"
+    replicas          = aws_elasticache_replication_group.valkey.num_cache_clusters - 1
+    encrypted_at_rest = aws_elasticache_replication_group.valkey.at_rest_encryption_enabled
+    zones             = aws_elasticache_replication_group.valkey.preferred_cache_cluster_azs
+  }
+}
 output "storage" {
   value = { data_bucket = aws_s3_bucket.this["data"].id, audit_bucket = aws_s3_bucket.this["audit"].id }
 }

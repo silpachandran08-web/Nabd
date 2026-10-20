@@ -21,9 +21,11 @@ class BreakGlassRepository {
     }
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions;
 
-    BreakGlassRepository(JdbcTemplate jdbc) {
+    BreakGlassRepository(JdbcTemplate jdbc, com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions) {
         this.jdbc = jdbc;
+        this.revokedSessions = revokedSessions;
     }
 
     boolean hasActive(UUID staffId) {
@@ -53,8 +55,9 @@ class BreakGlassRepository {
     }
 
     void revokeSession(UUID tenantId, UUID sessionId) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = 'admin_revoke' WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL",
-                tenantId, sessionId);
+        revokedSessions.revoked(jdbc.queryForList( // OPS-020: Valkey revocation cache
+                "UPDATE sessions SET revoked_at = now(), revoked_reason = 'admin_revoke' WHERE tenant_id = ? AND id = ? AND revoked_at IS NULL RETURNING id",
+                UUID.class, tenantId, sessionId));
     }
 
     List<BreakGlassResponse> listActive(UUID tenantId) {

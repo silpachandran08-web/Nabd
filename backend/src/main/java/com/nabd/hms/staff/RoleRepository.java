@@ -17,9 +17,11 @@ import static com.nabd.hms.staff.StaffRoleModels.RoleRow;
 class RoleRepository {
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions;
 
-    RoleRepository(JdbcTemplate jdbc) {
+    RoleRepository(JdbcTemplate jdbc, com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions) {
         this.jdbc = jdbc;
+        this.revokedSessions = revokedSessions;
     }
 
     List<RoleRow> list(UUID tenantId) {
@@ -118,8 +120,8 @@ class RoleRepository {
     }
 
     void revokeSessions(UUID tenantId, UUID staffId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
-                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL", reason, tenantId, staffId);
+        revokedSessions.revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " + // OPS-020: Valkey cache
+                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL RETURNING id", UUID.class, reason, tenantId, staffId));
     }
 
     void revokeDelegation(UUID tenantId, UUID id) {
