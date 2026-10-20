@@ -1,3 +1,5 @@
+// KNOWN-DEFECT EXPECTATION (known-defect-FEF-008): the Sprint-10 FEF-008 payment-status UX was never delivered (board: FEF-008
+// blocked), so the FEF-008 checks here are EXPECTED TO FAIL until that story ships. Do not "fix" them by editing assertions.
 // S10 independent QA for FEF-008 (payment status UX) + the "every money POST carries Idempotency-Key" criterion. Mocked API.
 // Run: NODE_PATH=/home/claude/ws/qa/node_modules APP=http://localhost:3412 node tests/e2e/s10qa-fef-008-payment-status.mjs
 import { launch, seedClinic, mockApi, check, results, sleep, dumpLog, APP } from './qa-lib.mjs';

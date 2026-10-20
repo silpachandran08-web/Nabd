@@ -106,30 +106,32 @@ export function formatClinicTime(iso: string | number | Date, tz?: string | null
 
 type Fetcher = (path: string) => Promise<Response>;
 
+/** The zone Core answered with (possibly null), or undefined when no zone answer arrived (401/404/5xx, offline). */
 async function configuredZone(fetcher: Fetcher): Promise<unknown> {
   try {
     const profile = await fetcher("/setup/profile");
     if (profile.ok) return ((await profile.json()) as { timezone?: unknown }).timezone ?? null;
-    if (profile.status !== 403) return null;
+    if (profile.status !== 403) return undefined;
     // No setup:view (most doctors): the schedule board carries the same clinic zone under queue:view.
     const day = await fetcher("/schedule/day");
-    return day.ok ? ((await day.json()) as { timezone?: unknown }).timezone ?? null : null;
+    return day.ok ? ((await day.json()) as { timezone?: unknown }).timezone ?? null : undefined;
   } catch {
-    return null;
+    return undefined;
   }
 }
 
 /** Shell boot: load the clinic zone once per tenant (later callers share the same promise; a different tenantKey,
  * e.g. an owner switching clinics, reloads). Null or unusable tenants.timezone falls back to the region default
- * and warns once per page load. */
+ * and warns once per page load; a failed zone request falls back without the warning. */
 export function loadClinicTimeZone(fetcher: Fetcher, region: string | null | undefined, tenantKey = ""): Promise<string> {
   if (ready && readyFor === tenantKey) return ready;
   readyFor = tenantKey;
   ready = configuredZone(fetcher).then((configured) => {
-    const { tz, fallback } = resolveClinicTimeZone(configured, region);
-    if (fallback && !warned) {
+    const { tz, fallback } = resolveClinicTimeZone(configured ?? null, region);
+    // Warn only when Core really answered with a null/unusable tenants.timezone; a failed request is not a config problem.
+    if (fallback && configured !== undefined && !warned) {
       warned = true;
-      console.warn("[clinic-timezone-fallback]", { region: region ?? null, timezone: tz });
+      console.warn("[clinic-timezone-fallback]", { region: region ?? null, configured: configured ?? null, usingDefault: tz });
     }
     setClinicTimeZone(tz);
     return tz;

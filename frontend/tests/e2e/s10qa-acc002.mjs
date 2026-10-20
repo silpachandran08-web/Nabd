@@ -1,4 +1,6 @@
 // S10 QA ACC-002 (independent): stale screen recovery on /arrivals. NODE_PATH=/home/claude/ws/qa/node_modules APP=http://localhost:3411 node s10qa-acc002.mjs
+// KNOWN-DEFECT EXPECTATION (known-defect-ACC-002, s10-QA-1 finding 2): Q1e "by <name>" fails until Core returns who moved the visit
+// in the stale-status 409 (not recorded/returned today). Expected red; do not edit the assertion.
 import { launch, seedClinic, mockApi, check, sleep, results } from './qa-lib.mjs';
 const APP = process.env.APP ?? 'http://localhost:3411';
 const DOC = '33333333-3333-3333-3333-333333333331';

@@ -1,4 +1,6 @@
 // S10 QA ACC-003 (independent): check-in once, Arrived badge, J2 stopwatch (mocked API). NODE_PATH=... APP=http://localhost:3411 node s10qa-acc003.mjs
+// KNOWN-DEFECT EXPECTATION (known-defect-ACC-003, s10-QA-1 finding 2): 409b "by <name>" fails until Core returns who checked the
+// patient in on ALREADY_CHECKED_IN (not returned today). Expected red; do not edit the assertion.
 import { launch, seedClinic, mockApi, check, sleep, results } from './qa-lib.mjs';
 const APP = process.env.APP ?? 'http://localhost:3411';
 const startTime = new Date().toISOString();
