@@ -7,6 +7,7 @@ Required checks on `main`: `stage1-static`, `stage2-unit`, `stage3-integration`,
 - Stage 1: gitleaks (`.gitleaks.toml`: defaults plus Meta tokens), baseline check, Semgrep new-vs-base, `next typegen && tsc --noEmit`, ESLint, permission check, OpenAPI.
 - Stage 2: `npm test` (unit tests plus `scripts/test-consult-flow.mjs`), JUnit classes that need no Docker.
 - Stage 3: `*ApiTest` on Testcontainers >= 1.21 (pinned in `backend/pom.xml`, needed for Docker Engine 29), JaCoCo report.
+  OPS-042: `RbacMatrixApiTest` / `OperatorMatrixApiTest` generate one case per (role, operation) from `docs/security/rbac-matrix.csv` and the `@PreAuthorize` checks; the cases are committed (`docs/security/rbac-generated-*.csv`), so a matrix change shows in the PR diff and a stale list fails stage 3 (regenerate with `-Drbac.write=true`).
 - Stage 6: image built once from the tested jar (distroless, non-root), Trivy, Dependency-Check (CVSS >= 7), `npm audit` with baseline, CycloneDX SBOMs. On push to main: push to GHCR, keyless cosign signature (OIDC), SBOM attached, digest printed. Deploy by that digest only.
 - Baseline: `.github/security-baseline.json` (id, scanner, owner, added, expires <= 90 days, reason), mirrored in `.trivyignore` and `ci/dependency-check-suppressions.xml`. Expired entries fail stage 1.
 - Flaky policy: a test failing >= 2 of 20 reruns gets the `quarantine` label, an owner and a 5-day SLA (label created by the admin below).
