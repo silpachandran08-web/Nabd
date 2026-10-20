@@ -171,6 +171,27 @@ public class PatientService {
         return new PatientPage(page.stream().map(this::toResponse).toList(), new PageMeta(nextCursor, limit));
     }
 
+    /** ACC-028: active patients whose stored phone failed validation (phone_invalid), keyset-paged by id. Only issue=phone exists. */
+    @Transactional
+    public com.nabd.hms.patient.dto.DataQualityPage dataQuality(UUID tenantId, UUID callerStaffId, String issue, int limit, String cursor) {
+        if (!"phone".equals(issue)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "issue: must be phone",
+                    Map.of("errors", List.of(Map.of("field", "issue", "message", "must be phone"))));
+        }
+        UUID after;
+        try {
+            after = cursor == null ? null : UUID.fromString(cursor);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-cursor", "Invalid cursor", "The pagination cursor is malformed.");
+        }
+        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
+        tenantContext.set(tenantId);
+        List<com.nabd.hms.patient.dto.DataQualityPage.Item> rows = repo.findInvalidPhones(tenantId, scopedToDoctorId, after, limit + 1);
+        boolean more = rows.size() > limit;
+        List<com.nabd.hms.patient.dto.DataQualityPage.Item> page = more ? rows.subList(0, limit) : rows;
+        return new com.nabd.hms.patient.dto.DataQualityPage(page, more ? page.get(limit - 1).patientId().toString() : null);
+    }
+
     /** Returns PatientResponse on success, DuplicateCandidatesResponse if a likely-duplicate match blocks it. */
     @Transactional
     public Object register(UUID tenantId, UUID callerStaffId, PatientWriteRequest req) {
@@ -181,7 +202,7 @@ public class PatientService {
             requireGuardianConsent(req.guardianConsent());
         }
 
-        String phone = PhoneNumbers.e164(req.phone(), repo.region(tenantId)); // one stored format, whatever was typed
+        String phone = PhoneNumbers.require(req.phone(), repo.region(tenantId), "phone"); // ACC-028: valid for the clinic country, stored E.164
         List<MatchCandidateRow> candidates = Boolean.TRUE.equals(req.confirmedNotDuplicate())
                 ? List.of() // reviewed and confirmed distinct; the registry's Duplicate review flag still surfaces it
                 : repo.findDuplicateCandidates(tenantId, phone, req.name(), req.dob(), 5);
@@ -276,7 +297,10 @@ public class PatientService {
 
         java.util.Map<String, Object> changes = new java.util.LinkedHashMap<>();
         if (req.has("name")) changes.put("name", req.name());
-        if (req.has("phone")) changes.put("phone", PhoneNumbers.e164(req.phone(), repo.region(tenantId)));
+        if (req.has("phone")) {
+            changes.put("phone", PhoneNumbers.require(req.phone(), repo.region(tenantId), "phone"));
+            changes.put("phone_invalid", false); // ACC-028: a corrected number leaves the data-quality list
+        }
         if (req.has("dob")) changes.put("dob", java.sql.Date.valueOf(req.dob()));
         if (req.has("gender")) changes.put("gender", req.gender());
         if (req.has("guardianId")) changes.put("guardian_id", req.guardianId());

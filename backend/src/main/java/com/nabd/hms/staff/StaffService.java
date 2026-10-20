@@ -101,12 +101,13 @@ public class StaffService {
                     req.scopeOrDefault(), null);
         }
 
+        String mobile = com.nabd.hms.common.PhoneNumbers.require(req.mobilePhone(), staffRepo.tenantRegion(tenantId), "mobilePhone"); // ACC-028
         UUID id = UUID.randomUUID();
         String rawToken = OpaqueTokens.generate();
         Instant expiresAt = Instant.now(clock).plus(72, ChronoUnit.HOURS);
         try {
             staffRepo.insertInvite(id, tenantId, req.roleId(), req.email().toLowerCase(), req.name(),
-                    req.mobilePhone(), req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy, req.departmentId());
+                    mobile, req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy, req.departmentId());
         } catch (DataIntegrityViolationException e) {
             throw staffConflict(e);
         }

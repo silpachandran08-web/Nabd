@@ -334,6 +334,15 @@ class PatientRepository {
                 patientMapper(), tenantId, Timestamp.from(afterCreatedAt), afterId, scopedToDoctorId, scopedToDoctorId, limit);
     }
 
+    /** ACC-028: the data-quality list; same consent and own-patients gates as every other patient read. */
+    List<com.nabd.hms.patient.dto.DataQualityPage.Item> findInvalidPhones(UUID tenantId, UUID scopedToDoctorId, UUID afterId, int limit) {
+        return jdbc.query("SELECT id, name, phone FROM patients " +
+                        "WHERE tenant_id = ? AND status = 'active' AND phone_invalid AND (?::uuid IS NULL OR id > ?::uuid) " +
+                        CONSENT_GATE + SCOPE_GATE + "ORDER BY id LIMIT ?",
+                (rs, i) -> new com.nabd.hms.patient.dto.DataQualityPage.Item(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("phone")),
+                tenantId, afterId, afterId, scopedToDoctorId, scopedToDoctorId, limit);
+    }
+
     /** Phone-exact is the strong signal; DOB match + trigram name similarity is the fuzzy one (NB-060). */
     // Phones compare as digits (PhoneNumbers), so records saved in any format before normalisation still match.
     // REC-038: phone_match / dob_match / name_match report which compared fields agreed (same 0.3 name threshold).

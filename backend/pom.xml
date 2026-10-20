@@ -95,6 +95,12 @@
       <artifactId>bcprov-jdk18on</artifactId>
       <version>1.78.1</version>
     </dependency>
+    <!-- ACC-028: per-country phone validation + E.164 (no transitive deps; nothing in the tree parses phone numbers) -->
+    <dependency>
+      <groupId>com.googlecode.libphonenumber</groupId>
+      <artifactId>libphonenumber</artifactId>
+      <version>9.0.30</version>
+    </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-core</artifactId>

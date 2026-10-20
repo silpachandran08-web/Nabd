@@ -1391,13 +1391,49 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PatientWrite" } } }
       responses:
         "201": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
-        "400": { description: "validation-failed, guardian-required, guardian-not-found, or guardian-consent-required (guardianId without a valid guardianConsent)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "validation-failed (incl. ACC-028 phone: not a valid number for the clinic country, `errors[{field: phone}]`, code INVALID_PHONE), guardian-required, guardian-not-found, or guardian-consent-required (guardianId without a valid guardianConsent)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409":
           description: >
             Likely-duplicate match found (same phone digits, or same DOB + similar name) — client should
             offer merge instead of blind create, or resend with confirmedNotDuplicate=true after review.
             Each candidate carries matchScore (0..1) and matchedFields.
           content: { application/json: { schema: { type: object, properties: { candidates: { type: array, items: { $ref: "#/components/schemas/PatientMatchCandidate" } } } } } }
+
+  /patients/data-quality:
+    get:
+      tags: [Patients]
+      summary: Records needing correction (ACC-028)
+      description: >
+        issue=phone lists active patients whose stored phone failed per-country validation (phone_invalid, set by the
+        ACC-028 re-normalisation job); rawPhone is the stored value unchanged. Saving a valid phone (PATCH) removes the
+        row. Consent- and row-scope-gated like every patient read; ordered by patientId; `nextCursor` is opaque.
+      x-required-permission: patients:edit
+      parameters:
+        - { name: issue, in: query, required: true, schema: { type: string, enum: [phone] } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Data-quality page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [patientId, displayName, rawPhone]
+                      properties:
+                        patientId: { type: string, format: uuid }
+                        displayName: { type: string }
+                        rawPhone: { type: string }
+                  nextCursor: { type: string, nullable: true }
+        "400":
+          description: Unknown issue or limit (`validation-failed` / `validation`), malformed cursor (`invalid-cursor`)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /patients/registry:
     get:
