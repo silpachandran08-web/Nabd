@@ -9,7 +9,7 @@ modules:
     owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, sessions]
     reads: []
   billing:
-    owns: [charge_catalogue, day_closes, invoice_discounts, invoice_line_items, invoice_payments, invoice_series, invoices]
+    owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_payments, invoice_series, invoices]
     reads: []
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, favourite_rx_set_items, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]

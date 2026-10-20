@@ -27,7 +27,13 @@ type Summary = {
   close: {
     status: "closed" | "reopened"; expectedCash: number; countedCash: number; variance: number; note: string | null;
     closedByName: string; closedAt: string; reopenedByName: string | null; reopenedAt: string | null; reopenReason: string | null;
+    closeCount?: number; // FIN-005
   } | null;
+};
+// FIN-005: GET /v1/billing/day-close/history — every close and reopen, newest first.
+type HistoryItem = {
+  id: string; date: string; action: "close" | "reopen"; expectedCash: number | null; countedCash: number | null;
+  variance: number | null; note: string | null; actorName: string | null; at: string;
 };
 type Problem = { title: string; detail: string };
 
@@ -52,6 +58,10 @@ export default function BillingPage() {
   const [region, setRegion] = useState<string | undefined>(undefined);
   const [counted, setCounted] = useState(""); // cash counted, as typed
   const [dialog, setDialog] = useState<"close" | "reopen" | null>(null);
+  const [day, setDay] = useState<string | null>(null); // FIN-005: picked past day; null = today
+  const [todayIso, setTodayIso] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryItem[] | null>(null);
+  const [historyError, setHistoryError] = useState(false);
 
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -74,6 +84,19 @@ export default function BillingPage() {
     [router]
   );
 
+  const loadHistory = useCallback(async (date: string) => {
+    setHistory(null);
+    setHistoryError(false);
+    try {
+      const res = await authedFetch(`/billing/day-close/history?from=${date}&to=${date}`);
+      if (!res) return;
+      if (!res.ok) { setHistoryError(true); return; }
+      setHistory((await res.json()).items ?? []);
+    } catch {
+      setHistoryError(true);
+    }
+  }, [authedFetch]);
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -86,7 +109,7 @@ export default function BillingPage() {
       if (can("billing:create") && can("billing:view")) {
         void authedFetch("/billing/otc-charges").then((r) => setCanOtc(!!r?.ok)).catch(() => {});
       }
-      const res = await authedFetch("/billing/day-close");
+      const res = await authedFetch(day ? `/billing/day-close?date=${day}` : "/billing/day-close");
       if (!res) return;
       if (res.status === 403) {
         setForbidden(true);
@@ -98,6 +121,8 @@ export default function BillingPage() {
       }
       const summary = await res.json();
       setS(summary);
+      if (summary.today) setTodayIso(summary.date);
+      void loadHistory(summary.date);
       // The owner top bar's "Start day close" lands here with ?action=close.
       if (new URLSearchParams(window.location.search).get("action") === "close"
         && getPermissions().includes("billing:approve") && summary.today && summary.close?.status !== "closed") {
@@ -106,7 +131,7 @@ export default function BillingPage() {
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     }
-  }, [authedFetch]);
+  }, [authedFetch, day, loadHistory]);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body never calls setState synchronously
@@ -121,6 +146,7 @@ export default function BillingPage() {
   const money = new Intl.NumberFormat(s.currency === "SAR" ? "en-SA" : "en-IN", { style: "currency", currency: s.currency, minimumFractionDigits: 2 });
   const m = Object.fromEntries(s.methods.map((x) => [x.method, x])) as Record<Summary["methods"][number]["method"], Summary["methods"][number]>;
   const closed = s.close?.status === "closed";
+  const reopened = s.close?.status === "reopened";
   const blocked = !closed && s.unbilled.length > 0;
   const expectedCash = Number(m.cash.amount);
   const countedNum = counted.trim() === "" ? null : Number(counted);
@@ -162,9 +188,11 @@ export default function BillingPage() {
         <div className={styles.headerActions}>
           {canOtc && <Link className={styles.btn} href="/checkout/otc">Counter sale</Link>}
           {canSetup && <Link className={styles.btn} href="/setup?tab=charges">Charges &amp; Taxes</Link>}
-          {canApprove && s.today && (closed
+          <input type="date" className={styles.input} aria-label="Day to view" value={s.date} max={todayIso ?? undefined}
+            onChange={(e) => { setCounted(""); setDay(e.target.value && e.target.value !== todayIso ? e.target.value : null); }} />
+          {canApprove && (closed
             ? <button type="button" className={styles.btnPrimary} onClick={() => setDialog("reopen")}>Unlock day</button>
-            : <button type="button" className={styles.btnPrimary} onClick={() => setDialog("close")}>Start day close</button>)}
+            : <button type="button" className={styles.btnPrimary} onClick={() => setDialog("close")}>{reopened ? "Close again" : "Start day close"}</button>)}
         </div>
       </div>
 
@@ -228,7 +256,7 @@ export default function BillingPage() {
               <div className={styles.line}>
                 <span>Closed by {s.close!.closedByName} at {time(s.close!.closedAt)}{s.close!.note && <div className={styles.lineSub}>{s.close!.note}</div>}</span>
               </div>
-            ) : canApprove && s.today && (
+            ) : canApprove && (
               <div className={styles.countBox}>
                 <label className={styles.countLabel} htmlFor="counted-cash">Enter counted cash</label>
                 <div className={styles.countRow}>
@@ -285,6 +313,22 @@ export default function BillingPage() {
           </div>
         </section>
 
+        <section className={styles.card} aria-label="Close history">
+          <div className={styles.cardHead}>Close history</div>
+          {historyError ? <div className={styles.error} role="alert">Couldn&apos;t load the close history.</div>
+            : history === null ? <div className={styles.line}><span className={styles.lineSub}>Loading…</span></div>
+              : history.length === 0 ? <div className={styles.line}><span className={styles.lineSub}>This day hasn&apos;t been closed yet.</span></div>
+                : <ol className={styles.history}>
+                  {history.map((h) => (
+                    <li key={h.id} className={styles.line} data-action={h.action}>
+                      <span>{h.action === "close" ? "Closed" : "Unlocked"} by {h.actorName ?? "Unknown"} at {time(h.at)}
+                        {h.note && <div className={styles.lineSub}>{h.note}</div>}</span>
+                      <span className={styles.amt}>{h.action === "close" ? `${money.format(Number(h.countedCash))} / ${money.format(Number(h.expectedCash))}` : "—"}</span>
+                    </li>
+                  ))}
+                </ol>}
+        </section>
+
         <section className={styles.card} aria-label={`${s.taxLabel} summary`}>
           <div className={styles.cardHead}>
             {s.taxLabel} summary
@@ -307,10 +351,10 @@ export default function BillingPage() {
 
       {dialog === "close" && (
         <CloseDialog summary={s} money={money} counted={counted} setCounted={setCounted} variance={variance} beyond={beyond}
-          authedFetch={authedFetch} onClose={() => setDialog(null)} onDone={(next) => { setS(next); setDialog(null); setCounted(""); }} />
+          authedFetch={authedFetch} onClose={() => setDialog(null)} onDone={(next) => { setS(next); setDialog(null); setCounted(""); void loadHistory(next.date); }} />
       )}
       {dialog === "reopen" && (
-        <ReopenDialog authedFetch={authedFetch} onClose={() => setDialog(null)} onDone={(next) => { setS(next); setDialog(null); }} />
+        <ReopenDialog date={s.date} authedFetch={authedFetch} onClose={() => setDialog(null)} onDone={(next) => { setS(next); setDialog(null); void loadHistory(next.date); }} />
       )}
     </main>
   );
@@ -349,7 +393,7 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
     setError(null);
     try {
       const res = await authedFetch("/billing/day-close", {
-        method: "POST", body: JSON.stringify({ countedCash: Number(counted), note: note.trim() || null }),
+        method: "POST", body: JSON.stringify({ countedCash: Number(counted), note: note.trim() || null, date: summary.date }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -367,7 +411,7 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
   return (
     <div className={styles.overlay} onClick={onClose}>
       <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="close-title" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h2 id="close-title" className={styles.dialogTitle}>Day close</h2>
+        <h2 id="close-title" className={styles.dialogTitle}>{summary.close?.status === "reopened" ? "Close the day again" : "Day close"}</h2>
         <p className={styles.dialogSub}>{formatDate(summary.date)} · billing locks once the day is closed</p>
         <div className={styles.step}><span>1. Pending issues</span>
           <span className={blocked ? styles.amtBad : styles.amtOk}>{blocked ? `${summary.unbilled.length} blocking` : "None"}</span></div>
@@ -403,7 +447,8 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
   );
 }
 
-function ReopenDialog({ authedFetch, onClose, onDone }: {
+function ReopenDialog({ date, authedFetch, onClose, onDone }: {
+  date: string;
   authedFetch: (path: string, init?: RequestInit) => Promise<Response | null>;
   onClose: () => void; onDone: (s: Summary) => void;
 }) {
@@ -419,7 +464,7 @@ function ReopenDialog({ authedFetch, onClose, onDone }: {
     setSaving(true);
     setError(null);
     try {
-      const res = await authedFetch("/billing/day-close/reopen", { method: "POST", body: JSON.stringify({ reason }) });
+      const res = await authedFetch("/billing/day-close/reopen", { method: "POST", body: JSON.stringify({ reason, date }) });
       if (!res) return;
       if (!res.ok) {
         setError(await problemDetail(res, "Couldn't unlock the day."));
@@ -437,7 +482,7 @@ function ReopenDialog({ authedFetch, onClose, onDone }: {
     <div className={styles.overlay} onClick={onClose}>
       <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="reopen-title" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
         <h2 id="reopen-title" className={styles.dialogTitle}>Unlock a closed day</h2>
-        <p className={styles.dialogSub}>Unlocking reopens billing for today and is recorded in the audit log with your name, the time and your reason.</p>
+        <p className={styles.dialogSub}>Unlocking reopens {formatDate(date)} so it can be corrected and closed again. It is recorded in the audit log with your name, the time and your reason.</p>
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
           <legend className={styles.countLabel}>Reason (required)</legend>
           {[...REOPEN_REASONS, "other"].map((r) => (

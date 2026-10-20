@@ -151,9 +151,14 @@ class SetupRepository {
         ensurePoliciesSeeded(tenantId);
         int n = jdbc.update("UPDATE clinic_policies SET value = ?, version = version + 1, updated_at = now() WHERE tenant_id = ? AND policy_key = ?",
                 value, tenantId, policyKey);
-        if (n == 0 && "session.idle_lock_minutes".equals(policyKey)) { // FEF-005: not seeded, first write creates it
+        if (n == 0 && ("session.idle_lock_minutes".equals(policyKey) || "cash_variance_tolerance".equals(policyKey))) { // FEF-005/FIN-005: not seeded, first write creates it
             jdbc.update("INSERT INTO clinic_policies (tenant_id, policy_key, value) VALUES (?, ?, ?)", tenantId, policyKey, value);
         }
+    }
+
+    Optional<String> findPolicyValue(UUID tenantId, String policyKey) {
+        return jdbc.query("SELECT value FROM clinic_policies WHERE tenant_id = ? AND policy_key = ?", (rs, i) -> rs.getString(1),
+                tenantId, policyKey).stream().findFirst();
     }
 
     private void ensurePoliciesSeeded(UUID tenantId) {
