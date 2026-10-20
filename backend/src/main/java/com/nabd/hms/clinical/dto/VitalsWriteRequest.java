@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 // error (temp 370, SpO2 150). They are deliberately wide at the low end so that genuine neonatal, preterm,
 // shock, cyanotic and hypothermic readings can be recorded (V1-011): they are not age-banded and not clinical
 // normal ranges (see VitalsRanges for the abnormal flags), and they never alter a value: out of bounds is a 400.
-// The numbers mirror the VITAL_FIELDS table in frontend/app/nursing/page.tsx and need clinical sign-off (NB-321).
+// The numbers mirror the VITAL_FIELDS table in frontend/apps/staff-web/app/nursing/page.tsx and need clinical sign-off (NB-321).
 public record VitalsWriteRequest(
         @DecimalMin("20") @DecimalMax("250") BigDecimal heightCm,
         @DecimalMin("0.2") @DecimalMax("400") BigDecimal weightKg,

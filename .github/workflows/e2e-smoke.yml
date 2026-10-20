@@ -1,7 +1,7 @@
 # FEF-049: stage 7 browser smoke. J1 walk-in < 45 s, J5 sign < 2 s, J6 allergy warning < 500 ms, J9 checkout < 60 s,
 # in Chromium, IN + KSA tenants, desktop + 390px, 4 shards (budget 8 min), axe critical/serious fails the step,
 # one retry: fail-then-pass is reported flaky; 3 flaky runs in 5 days auto-quarantine the case with its owner.
-# Called by preview.yml (OPS-036) with the preview URLs and the seed artifact. Harness: frontend/tests/e2e/smoke/.
+# Called by preview.yml (OPS-036) with the preview URLs and the seed artifact. Harness: frontend/apps/staff-web/tests/e2e/smoke/.
 name: e2e-smoke
 on:
   workflow_call:
@@ -51,7 +51,7 @@ jobs:
           AXE_CORE_PATH: ${{ runner.temp }}/e2e/node_modules/axe-core/axe.min.js
         run: |
           [ -f smoke-state/quarantine.json ] && export SMOKE_QUARANTINE=smoke-state/quarantine.json
-          node frontend/tests/e2e/smoke/run-smoke.mjs --shard=${{ matrix.shard }}/4 --retries=1 --out=smoke-results
+          node frontend/apps/staff-web/tests/e2e/smoke/run-smoke.mjs --shard=${{ matrix.shard }}/4 --retries=1 --out=smoke-results
       - if: always()
         uses: actions/upload-artifact@v4
         with: { name: "smoke-results-${{ matrix.shard }}", path: smoke-results, retention-days: 14 }
@@ -73,7 +73,7 @@ jobs:
         id: gate
         run: |
           mkdir -p smoke-state
-          set +e; node frontend/tests/e2e/smoke/flaky.mjs --results=smoke-results --history=smoke-state/flaky-history.json --out=smoke-state; rc=$?; set -e
+          set +e; node frontend/apps/staff-web/tests/e2e/smoke/flaky.mjs --results=smoke-results --history=smoke-state/flaky-history.json --out=smoke-state; rc=$?; set -e
           cat smoke-state/report.md >> "$GITHUB_STEP_SUMMARY"
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
       - name: save flaky history
@@ -89,18 +89,20 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
       - uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
       - name: Playwright Chromium + axe-core
         run: |
           mkdir -p "$RUNNER_TEMP/e2e" && cd "$RUNNER_TEMP/e2e" && npm init -y >/dev/null
           npm i --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" "axe-core@$AXE_VERSION"
           npx playwright install --with-deps chromium
       - name: build and start the staff web app
-        working-directory: frontend
+        working-directory: frontend/apps/staff-web
         run: |
-          npm ci --no-audit --no-fund && npx next build
-          (npx next start -p 3000 &) ; for i in $(seq 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 1; done
+          pnpm install --frozen-lockfile && pnpm exec next build
+          (pnpm exec next start -p 3000 &) ; for i in $(seq 60); do curl -sf -o /dev/null http://localhost:3000/login && break; sleep 1; done
       - name: J9 must fail on a broken stack and pass on a healthy one
         env:
           APP: http://localhost:3000
@@ -109,5 +111,5 @@ jobs:
           PW_CHROMIUM: ""
           AXE_CORE_PATH: ${{ runner.temp }}/e2e/node_modules/axe-core/axe.min.js
         run: |
-          if node frontend/tests/e2e/smoke/run-smoke.mjs --only=J9 --break --retries=0 --out=selfcheck; then echo "smoke MISSED the broken checkout"; exit 1; fi
-          node frontend/tests/e2e/smoke/run-smoke.mjs --only=J9 --retries=0 --out=selfcheck-ok
+          if node frontend/apps/staff-web/tests/e2e/smoke/run-smoke.mjs --only=J9 --break --retries=0 --out=selfcheck; then echo "smoke MISSED the broken checkout"; exit 1; fi
+          node frontend/apps/staff-web/tests/e2e/smoke/run-smoke.mjs --only=J9 --retries=0 --out=selfcheck-ok

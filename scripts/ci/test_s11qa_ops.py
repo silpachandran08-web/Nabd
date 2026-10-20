@@ -400,7 +400,7 @@ class Ops036Seed(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.data = synth.generate(seed=7, day="2026-11-02")
-        cls.roles = [k for k in json.load(open("frontend/tests/e2e/smoke/roles.json")) if not k.startswith("_")]
+        cls.roles = [k for k in json.load(open("frontend/apps/staff-web/tests/e2e/smoke/roles.json")) if not k.startswith("_")]
 
     def test_ac3_four_tenants_one_staff_per_role_2000_patients(self):
         ts = self.data["tenants"]
@@ -556,7 +556,7 @@ class Ops036Isolation(unittest.TestCase):
 
 
 # =====================================================================================================================
-# FEF-049 workflow wiring (logic is in frontend/tests/unit/s11qa-fef049.test.mjs; browser runs in the report)
+# FEF-049 workflow wiring (logic is in frontend/apps/staff-web/tests/unit/s11qa-fef049.test.mjs; browser runs in the report)
 # =====================================================================================================================
 class Fef049Workflow(unittest.TestCase):
     def test_four_shards_8_min_chromium_selfcheck(self):

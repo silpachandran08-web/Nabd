@@ -12,7 +12,7 @@
     "groupName": null
   },
   "packageRules": [
-    { "matchManagers": ["npm"], "groupName": "frontend npm", "matchFileNames": ["frontend/package.json"] },
+    { "matchManagers": ["npm"], "groupName": "frontend npm", "matchFileNames": ["frontend/**/package.json"] },
     { "matchManagers": ["maven"], "groupName": "backend maven" },
     { "matchManagers": ["dockerfile"], "groupName": "docker" },
     {

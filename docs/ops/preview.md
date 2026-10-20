@@ -8,14 +8,14 @@ Then the FEF-049 smoke runs against it. The required check is `stage7-preview-e2
 |---|---|
 | Stage 7 wiring | `.github/workflows/ci.yml` jobs `preview` and `stage7-preview-e2e` |
 | Deploy + seed + PR comment | `.github/workflows/preview.yml`, `infra/preview/deploy.sh`, `preview.yaml`, `migrate.yaml`, `web.Dockerfile` |
-| Smoke J1/J5/J6/J9 + axe, 4 shards | `.github/workflows/e2e-smoke.yml`, `frontend/tests/e2e/smoke/` |
+| Smoke J1/J5/J6/J9 + axe, 4 shards | `.github/workflows/e2e-smoke.yml`, `frontend/apps/staff-web/tests/e2e/smoke/` |
 | Reaper (72 h, PR closed/merged) | `.github/workflows/preview-reaper.yml`, `infra/preview/preview.py reap` |
 | Synthetic data + real-PHI scanner | `tools/synthetic-data/synth.py`, loader `load.py` |
-| Checks | `python3 infra/preview/test_preview.py`, `python3 tools/synthetic-data/test_synth.py`, `python3 scripts/ci/test_e2e_smoke.py`, `node --test frontend/tests/unit/s11-fef049-smoke.test.mjs` |
+| Checks | `python3 infra/preview/test_preview.py`, `python3 tools/synthetic-data/test_synth.py`, `python3 scripts/ci/test_e2e_smoke.py`, `node --test frontend/apps/staff-web/tests/unit/s11-fef049-smoke.test.mjs` |
 
 ## What a preview holds
 - 4 tenants: IN (region IN), AE, SA, QA (region KSA: the platform has only IN and KSA regions). One staff per role in
-  `frontend/tests/e2e/smoke/roles.json` (taken from the RBAC Matrix), 2,000 patients with Indian or Arabic names, a day of
+  `frontend/apps/staff-web/tests/e2e/smoke/roles.json` (taken from the RBAC Matrix), 2,000 patients with Indian or Arabic names, a day of
   appointments (tomorrow 09:00-16:45 on the 15-minute grid), a charge, and fresh visits for every smoke case and retry.
 - Phones only in the reserved test range `+<cc>0000nnnnnn` (a national number never starts with 0). National ids are
   id-shaped with a deliberately broken checksum; Qatar gets `TEST-` tokens.
@@ -36,7 +36,7 @@ error or horizontal scroll at 390 px fails it too. One retry: fail-then-pass is 
 quarantine the case (owner = the journey owner in `journeys.mjs`, from CODEOWNERS). A quarantined case still runs and is
 reported, but does not block. History lives in the Actions cache (`smoke-flaky-*`).
 Self-check (`e2e-smoke.yml` job `selfcheck`): J9 against a stack whose checkout write fails must fail, and pass when healthy.
-Local run (mocked API, any built frontend): `NODE_PATH=<playwright> APP=http://localhost:<port> AXE_CORE_PATH=<axe.min.js> node frontend/tests/e2e/smoke/run-smoke.mjs --shard=1/4`.
+Local run (mocked API, any built frontend): `NODE_PATH=<playwright> APP=http://localhost:<port> AXE_CORE_PATH=<axe.min.js> node frontend/apps/staff-web/tests/e2e/smoke/run-smoke.mjs --shard=1/4`.
 
 ## Needs external action
 1. Decide DEC-21 (namespace vs app per preview); this design is namespace-per-PR and maps 1:1 to app-per-preview.

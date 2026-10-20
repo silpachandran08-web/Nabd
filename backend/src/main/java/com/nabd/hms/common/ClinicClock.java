@@ -77,7 +77,7 @@ public class ClinicClock {
         }
     }
 
-    /** IANA zone for a region; same map as the UI's REGION_DEFAULT_TZ (frontend/app/lib/clinicTime.ts). */
+    /** IANA zone for a region; same map as the UI's REGION_DEFAULT_TZ (frontend/apps/staff-web/app/lib/clinicTime.ts). */
     public static String defaultZoneFor(String region) {
         return switch (region == null ? "" : region) {
             case "IN" -> "Asia/Kolkata";

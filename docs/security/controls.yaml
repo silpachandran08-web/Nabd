@@ -124,7 +124,7 @@ controls:
     owner: "@nabd/security-owners"
     tests: []
     evidence:
-      - { link: "frontend/package.json#check:permissions", accepted_by: null, accepted_on: null }
+      - { link: "frontend/apps/staff-web/package.json#check:permissions", accepted_by: null, accepted_on: null }
   - id: SC-13
     domain: "Access control"
     control: "Seven segregated SaaS operator roles; no single super-admin does everything (SSA-02)"
