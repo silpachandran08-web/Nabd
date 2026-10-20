@@ -72,7 +72,7 @@ class OwnershipScan(unittest.TestCase):
         self.assertFalse(any("reads staff" in x[2] for x in d), d)
         self.assertIn(("sql-ownership", "clinical", "writes departments owned by organization"), d)
 
-    @unittest.expectedFailure  # known-defect-PLT-033: arch.schema() ignores ALTER TABLE ... RENAME TO (latent: no migration renames yet)
+    # was expectedFailure known-defect-PLT-033; fixed in S12 FIX-B (arch.schema follows ALTER TABLE ... RENAME TO)
     def test_renamed_table_needs_its_new_name_owned(self):
         mig = MIG + "ALTER TABLE departments RENAME TO org_units;\n"
         owners = {**GOOD, "organization": {"owns": ["departments"]}}
