@@ -124,8 +124,7 @@ class UntaggedColumnGate(unittest.TestCase):
                     self.assertFalse(s.get("continue-on-error", False))
                     self.assertFalse(job.get("continue-on-error", False))
 
-    # shortcut documented by the engineer: CREATE TABLE ... AS SELECT is invisible to the static scan (only the --db step sees it).
-    @unittest.expectedFailure
+    # was expectedFailure (QA-4 finding 4); fixed in S12 FIX-B: CTAS columns are scanned statically.
     def test_create_table_as_select_with_untagged_columns_fails_statically(self):
         rc, out = gate("CREATE TABLE qa_copy AS SELECT name AS qa_alias FROM patients;\n")
         self.assertEqual(rc, 1, out)

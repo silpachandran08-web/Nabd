@@ -50,8 +50,43 @@ def split_top(body):
     return out + [cur]
 
 
+UNNAMED = "<unnamed: give every CREATE TABLE AS column an explicit name>"
+
+
+def top_level_from(sel):
+    """Index of the select list's top-level FROM (or len)."""
+    depth = 0
+    for m in re.finditer(r"[()]|\bfrom\b", sel, re.I):
+        tok = m.group(0)
+        if tok == "(": depth += 1
+        elif tok == ")": depth -= 1
+        elif depth == 0: return m.start()
+    return len(sel)
+
+
+def ctas_columns(rest):
+    """CREATE TABLE t [(a, b)] AS SELECT ...: the new table's column names, None if not CTAS. A column the regex cannot
+    name (SELECT *, an unaliased expression, TABLE x, VALUES) comes back as UNNAMED, so the static gate fails closed."""
+    m = re.match(r"(\((?:[^()]|\([^()]*\))*\))?\s*as\s+(.*)", rest, re.I | re.S)
+    if not m or (m.group(1) and not re.match(r"\s*\w", m.group(1)[1:])):
+        return None
+    if m.group(1):  # explicit column list wins
+        return [c.split()[0].replace('"', "").lower() for c in split_top(m.group(1)[1:-1]) if c.strip()]
+    q = re.match(r"\(?\s*select\s+(?:distinct\s+(?:on\s*\([^)]*\)\s*)?|all\s+)?(.*)", m.group(2), re.I | re.S)
+    if not q:
+        return [UNNAMED]
+    sel = q.group(1)
+    cols = []
+    for item in split_top(sel[:top_level_from(sel)]):
+        item = item.strip()
+        a = re.search(r"\bas\s+\"?(\w+)\"?$", item, re.I)
+        b = re.fullmatch(r"(?:[\w\"]+\.)*\"?(\w+)\"?", item)
+        cols.append(a.group(1).lower() if a else b.group(1).lower() if b and item != "*" else UNNAMED)
+    return cols
+
+
 def added_columns(sql):
-    """[(schema, table, column)] that CREATE TABLE / ALTER TABLE ADD COLUMN / RENAME COLUMN introduce."""
+    """[(schema, table, column)] that CREATE TABLE [AS SELECT] / ALTER TABLE ADD COLUMN / RENAME COLUMN introduce."""
     out = []
     for s in statements(sql):
         low = " ".join(s.split())
@@ -59,8 +94,14 @@ def added_columns(sql):
         if m:
             sch, t = qualify(m.group(1))
             rest = m.group(2)
-            if re.match(r"partition\s+of\b", rest, re.I) or not rest.startswith("("):
+            if re.match(r"partition\s+of\b", rest, re.I):
                 continue  # partitions inherit the parent's columns (and tags)
+            ctas = ctas_columns(rest)
+            if ctas is not None:
+                out += [(sch, t, c) for c in ctas]
+                continue
+            if not rest.startswith("("):
+                continue
             body, depth = "", 0
             for ch in rest:
                 depth += ch == "("
@@ -94,7 +135,9 @@ def check_files(files, tags):
 def db_columns(url):
     q = ("SELECT n.nspname||'.'||k.relname||'.'||a.attname FROM pg_attribute a JOIN pg_class k ON k.oid = a.attrelid "
          "JOIN pg_namespace n ON n.oid = k.relnamespace WHERE k.relkind IN ('r','p') AND NOT k.relispartition "
-         f"AND a.attnum > 0 AND NOT a.attisdropped AND n.nspname IN ({','.join(repr(s) for s in SCHEMAS)})")
+         f"AND a.attnum > 0 AND NOT a.attisdropped AND n.nspname IN ({','.join(repr(s) for s in SCHEMAS)}) "
+         # Flyway's own bookkeeping table (not product data; CI's migrate-check.sh creates it): see DOC#tagging-columns
+         "AND NOT (n.nspname = 'public' AND k.relname = 'flyway_schema_history')")
     return set(subprocess.run(["psql", url, "-Atc", q], capture_output=True, text=True, check=True).stdout.split())
 
 

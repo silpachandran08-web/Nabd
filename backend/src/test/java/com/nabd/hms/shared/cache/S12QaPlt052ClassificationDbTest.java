@@ -1,7 +1,6 @@
 package com.nabd.hms.shared.cache;
 
 import com.nabd.hms.support.ApiTestBase;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -42,7 +41,6 @@ class S12QaPlt052ClassificationDbTest extends ApiTestBase {
 
     /** Flyway-migrated DB, like ci/migration-lint/migrate-check.sh (flyway image) produces before the CI --db step. */
     @Test
-    @Tag("known-defect-PLT-052")
     void ciDriftStepPassesOnAFlywayMigratedSchema() throws Exception {
         Run clean = check();
         System.out.println("S12QA PLT-052 --db on Flyway-migrated schema: " + clean.out().trim());
