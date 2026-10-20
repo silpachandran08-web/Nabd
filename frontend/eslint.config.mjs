@@ -1,5 +1,5 @@
 // FEF-012: lint for packages/* (each package's `eslint .` finds this file; apps/* carry their own config).
-// Boundaries: ui/tokens/domain never import api-client; only api-client calls fetch.
+// Boundaries: ui/tokens/domain never import api-client (domain: type-only from /generated); only api-client calls fetch.
 import tseslint from "typescript-eslint";
 import boundaries from "eslint-plugin-boundaries";
 
@@ -34,6 +34,9 @@ export default tseslint.config(
           { from: { element: { type: "!api-client" } }, disallow: { to: { element: { type: "api-client" } } } },
           { from: { element: { type: "!api-client" } }, disallow: { to: { module: { source: ["@nabd/api-client", "@nabd/api-client/**"] } } } },
           { from: { element: { types: { anyOf: ["tokens", "domain"] } } }, disallow: { to: { element: { type: "ui" } } } },
+          // FEF-014: domain types are derived from the generated wire types (a spec rename breaks every consumer). Exception,
+          // narrow: domain only, `import type` only, only from @nabd/api-client/generated (no runtime code, no fetch).
+          { from: { element: { type: "domain" } }, allow: { dependency: { kind: "type", source: "@nabd/api-client/generated" } } },
         ],
       }],
     },

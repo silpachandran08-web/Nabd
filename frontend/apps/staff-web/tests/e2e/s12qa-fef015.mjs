@@ -213,7 +213,7 @@ async function sendForVitals({ tag, status = 'waiting', answer, offline = false,
   await r.context.setOffline(false);
   await r.page.evaluate(() => window.dispatchEvent(new Event('online')));
   await sleep(1500);
-  console.log(`  [info] offline: PATCHes sent after the connection returned: ${r.sent.length}`);
+  check('AC3 offline: no silent replay of the failed move after the connection returns', r.sent.length === 0, `${r.sent.length} PATCH(es) replayed`);
   r.release();
   await sleep(1500);
   console.log(`  [info] offline: after reconnect + 409 -> row "${(await r.row.innerText()).replace(/\s+/g, ' ')}", alerts "${(await r.page.getByRole('alert').allInnerTexts()).join(' | ')}"`);

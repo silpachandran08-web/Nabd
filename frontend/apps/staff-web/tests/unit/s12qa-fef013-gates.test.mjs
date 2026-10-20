@@ -190,7 +190,7 @@ test("FEF-013 AC3/AC4 negative: a planted duplicate of each name is detected (sc
 });
 
 // Stricter than the AC's name grep: the age-from-dob arithmetic itself should not be re-implemented under another name.
-test("FEF-013 AC4 strict: no inline age-from-dob arithmetic outside packages/domain", { todo: "known-defect-FEF-013: age logic re-implemented in arrivals, nursing, RegistryDialogs, NewAppointmentDialog" }, () => {
+test("FEF-013 AC4 strict: no inline age-from-dob arithmetic outside packages/domain", () => {
   const hits = sources(join(FE, "apps")).filter((p) => /getFullYear\(\)\s*-\s*(\w+\.getFullYear\(\)|y\b)|31557600000|365\.25\s*\*/.test(readFileSync(p, "utf8"))).map((p) => p.replace(FE, ""));
   assert.deepEqual(hits, [], `age logic still re-implemented in: ${hits.join(", ")}`);
 });

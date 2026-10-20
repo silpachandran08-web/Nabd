@@ -5,6 +5,8 @@ import { can } from "../lib/permissions";
 import styles from "./schedule.module.css";
 import { hijriLabel } from "../lib/hijri";
 import type { Problem } from "@nabd/api-client/types";
+import { age } from "@nabd/domain";
+import { clinicToday } from "../lib/clinicTime";
 
 type Patient = { id: string; mrn: string; name: string; phone: string };
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
@@ -137,8 +139,7 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
 
   async function registerPatient(e: React.FormEvent) {
     e.preventDefault();
-    const age = (Date.now() - new Date(np.dob).getTime()) / 31557600000;
-    if (age < 18) { setError("Patients under 18 need a guardian. Register them from Arrivals, then book here."); return; }
+    if (age(np.dob, clinicToday(timezone)) < 18) { setError("Patients under 18 need a guardian. Register them from Arrivals, then book here."); return; }
     setSaving(true);
     setError(null);
     try {

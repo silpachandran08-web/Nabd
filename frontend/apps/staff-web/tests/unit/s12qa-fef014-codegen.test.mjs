@@ -129,7 +129,7 @@ const tokenConsumers = () => {
   return out.filter((p) => p !== "app/lib/api.ts").sort();
 };
 
-test("FEF-014 AC2: renaming spec fields breaks compilation of EVERY consumer (QueueEntryResponse.tokenNumber/status, PatientDetailResponse.name, WaitEstimateResponse.estimatedMinutes)", { timeout: 300_000, todo: "known-defect-FEF-014: domain QueueEntry and page row types re-declare queue fields, so 7 consumers still compile" }, () => {
+test("FEF-014 AC2: renaming spec fields breaks compilation of EVERY consumer (QueueEntryResponse.tokenNumber/status, PatientDetailResponse.name, WaitEstimateResponse.estimatedMinutes)", { timeout: 300_000 }, () => {
   const dir = tmp();
   try {
     let spec = readFileSync(SPEC, "utf8");

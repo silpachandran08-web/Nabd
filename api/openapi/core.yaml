@@ -16704,13 +16704,22 @@ components:
       - dayOfWeek
       - endTime
       - startTime
+    WorklistItem:
+      type: object
+      properties:
+        entry:
+          $ref: "#/components/schemas/QueueEntryResponse"
+        patient:
+          $ref: "#/components/schemas/PatientDetailResponse"
+        vitals:
+          $ref: "#/components/schemas/VitalsResponse"
     WorklistResponse:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Item"
+            $ref: "#/components/schemas/WorklistItem"
     WorkspaceSelectRequest:
       type: object
       properties:

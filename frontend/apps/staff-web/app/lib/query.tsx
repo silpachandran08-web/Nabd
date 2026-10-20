@@ -11,7 +11,9 @@ import { decodeAccessToken } from "./session";
 
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   // No automatic retries: a failed read shows its error state at once (mutations retry inside the api client).
-  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  // Mutations run even offline (networkMode "always"): they fail fast and roll back with their error message instead
+  // of pausing silently and replaying the write when the connection returns.
+  const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { networkMode: "always" } } }));
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 

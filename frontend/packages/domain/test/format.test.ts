@@ -10,6 +10,15 @@ test("age counts a birthday not yet reached this year as one less", () => {
   expect(age("2000-01-01", now)).toBe(26);
 });
 
+test("age: clinic-day string, Date read on its own wall clock, and an unparseable dob", () => {
+  expect(age("2000-06-15", "2026-06-14")).toBe(25); // clinicToday() form
+  expect(age("2000-06-15", "2026-06-15")).toBe(26);
+  expect(age("2000-02-29", "2026-02-28")).toBe(25);
+  expect(age("2000-06-15T00:00:00Z", new Date(2026, 5, 15))).toBe(26);
+  expect(age("", "2026-06-15")).toBeNaN();
+  expect(age("15/06/2000", new Date(2026, 5, 15))).toBeNaN();
+});
+
 test("initials: first letters of the first two words, upper case", () => {
   expect(initials("asha rao")).toBe("AR");
   expect(initials("  Asha   Devi Rao ")).toBe("AD");

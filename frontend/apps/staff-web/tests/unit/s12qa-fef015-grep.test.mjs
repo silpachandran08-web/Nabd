@@ -55,7 +55,7 @@ test("FEF-015 AC5: no direct fetch() in either page (all reads go through the qu
 // roster doctor name, a view model, not a wire shape.
 const VIEW_MODELS = new Set(["AppointmentOption"]);
 
-test("FEF-015 AC5: 0 hand-written API types (object-literal types that copy a generated response shape)", { todo: "known-defect-FEF-015: nursing hand-writes the /nursing/worklist response (generated WorklistResponse.items is the colliding Item schema)" }, () => {
+test("FEF-015 AC5: 0 hand-written API types (object-literal types that copy a generated response shape)", () => {
   const found = [];
   for (const [p, s] of Object.entries(src)) {
     for (const m of s.matchAll(/^(?:export\s+)?type (\w+) = \{([^}]*)\};/gm)) {

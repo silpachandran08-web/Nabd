@@ -5,6 +5,7 @@ import Dialog from "../ui/Dialog";
 import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import styles from "../../nursing/nursing.module.css";
+import type { QueueEntry } from "@nabd/domain";
 
 // NUR-B2. Record-only vaccine log. There is NO immunisation schedule anywhere in the product, so
 // there is no "due list": nothing here computes, suggests or implies what a patient is due for.
@@ -15,7 +16,7 @@ export type VaccineRecord = {
   route: string; site?: string | null; lotNumber?: string | null; expiryDate?: string | null; notes?: string | null;
   recordedByName: string; administeredAt: string;
 };
-export type VaccineVisit = { patientId: string; queueEntryId: string; patientName: string; tokenNumber: number };
+export type VaccineVisit = { patientId: string; queueEntryId: string; patientName: string } & Pick<QueueEntry, "tokenNumber">;
 type Fetcher = (path: string, init?: RequestInit) => Promise<Response | null>;
 
 const ROUTES = ["IM", "SC", "oral", "IV", "infusion", "topical"] as const;
