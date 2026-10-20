@@ -131,7 +131,6 @@ app:
     # renewed before each event; OutboxProperties refuses to boot a config where a batch can outlive its lease.
     per-event-timeout-ms: 15000
     extend-lease-per-event: true
-    purge-cron: "0 23 * * * *"   # hourly: done rows after 7 days, dead after 90
     metrics-interval-ms: 15000
   # PLT-008 (docs/architecture/valkey.md): unset VALKEY_URL = no Valkey, the API limits nothing and still serves.
   # Under prod the URL must be rediss:// (TLS). Timeouts stay short: a slow Valkey must never slow the API.
