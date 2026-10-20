@@ -56,17 +56,17 @@ class WhatsAppTemplateApiTest extends ApiTestBase {
 
         // NB-191: wrong slot count and multi-line values are refused before anything is queued
         assertThatThrownBy(() -> inTenantTx(tenant.id(), () -> messages.queueTemplate(
-                tenant.id(), null, "+919000000000", "visit_reminder", "en", List.of("Asha"))))
+                null, "+919000000000", "visit_reminder", "en", List.of("Asha"))))
                 .isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> inTenantTx(tenant.id(), () -> messages.queueTemplate(
-                tenant.id(), null, "+919000000000", "visit_reminder", "en", List.of("Asha\nFree text here", "10:00"))))
+                null, "+919000000000", "visit_reminder", "en", List.of("Asha\nFree text here", "10:00"))))
                 .isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> inTenantTx(tenant.id(), () -> messages.queueTemplate(
-                tenant.id(), null, "+919000000000", "no_such_template", "en", List.of())))
+                null, "+919000000000", "no_such_template", "en", List.of())))
                 .isInstanceOf(ApiException.class);
 
         UUID id = inTenantTx(tenant.id(), () -> messages.queueTemplate(
-                tenant.id(), null, "+919000000000", "visit_reminder", "en", List.of("Asha", "10:00")));
+                null, "+919000000000", "visit_reminder", "en", List.of("Asha", "10:00")));
         dispatcher.poll();
         assertThat(messageStatus(tenant.id(), id)).isEqualTo("sent");
     }
@@ -125,7 +125,7 @@ class WhatsAppTemplateApiTest extends ApiTestBase {
                 "name", "visit_reminder", "language", "en", "category", "UTILITY",
                 "body", "Your visit is at {{1}} today.", "examples", List.of("10:00"))), Map.class);
         UUID id = inTenantTx(tenant.id(), () -> messages.queueTemplate(
-                tenant.id(), null, "+919000000000", "visit_reminder", "en", List.of("10:00")));
+                null, "+919000000000", "visit_reminder", "en", List.of("10:00")));
         String metaId = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
                 "SELECT meta_template_id FROM whatsapp_templates WHERE tenant_id = ?", String.class, tenant.id()));
         postWebhook("""

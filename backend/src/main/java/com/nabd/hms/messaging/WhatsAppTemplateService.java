@@ -40,11 +40,9 @@ public class WhatsAppTemplateService {
         this.tx = new TransactionTemplate(txManager);
     }
 
-    private <T> T inTenantTx(UUID tenantId, java.util.function.Supplier<T> work) {
-        return tx.execute(status -> {
-            tenantContext.set(tenantId);
-            return work.get();
-        });
+    /** PLT-019: the tenant is the one bound when the transaction started (the signed-in staff member's). */
+    private <T> T inTenantTx(java.util.function.Function<UUID, T> work) {
+        return tx.execute(status -> work.apply(tenantContext.current()));
     }
 
     private ApiException duplicate(TemplateRequest req) {
@@ -52,11 +50,11 @@ public class WhatsAppTemplateService {
                 "A template called " + req.name() + " already exists in " + req.language() + ".");
     }
 
-    public List<TemplateResponse> list(UUID tenantId) {
-        return inTenantTx(tenantId, () -> repo.list(tenantId).stream().map(WhatsAppTemplateService::toResponse).toList());
+    public List<TemplateResponse> list() {
+        return inTenantTx(tenantId -> repo.list(tenantId).stream().map(WhatsAppTemplateService::toResponse).toList());
     }
 
-    public TemplateResponse create(UUID tenantId, TemplateRequest req) {
+    public TemplateResponse create(TemplateRequest req) {
         TemplateRules.checkName(req.name(), req.language());
         if (!"UTILITY".equals(req.category()) && !"MARKETING".equals(req.category())) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid-whatsapp-template", "Invalid WhatsApp template",
@@ -64,7 +62,7 @@ public class WhatsAppTemplateService {
         }
         String body = req.body() == null ? null : req.body().strip();
         int paramCount = TemplateRules.checkBody(body, req.examples());
-        WhatsAppTemplateRepository.Clinic clinic = inTenantTx(tenantId, () -> {
+        WhatsAppTemplateRepository.Clinic clinic = inTenantTx(tenantId -> {
             if (repo.findByName(tenantId, req.name(), req.language()).isPresent()) {
                 throw duplicate(req);
             }
@@ -75,7 +73,7 @@ public class WhatsAppTemplateService {
         WhatsAppClient.Submission submission = submitToMeta(() ->
                 client.createTemplate(metaName, req.language(), req.category(), header, body, req.examples()));
         try {
-            return inTenantTx(tenantId, () -> {
+            return inTenantTx(tenantId -> {
                 UUID id = repo.insert(tenantId, req.name(), metaName, req.language(), req.category(), header, body, paramCount,
                         statusOf(submission.status()), submission.metaTemplateId());
                 return toResponse(repo.find(tenantId, id).orElseThrow());
@@ -86,8 +84,8 @@ public class WhatsAppTemplateService {
     }
 
     /** The fix path for a rejected template: new text goes back to Meta for review. */
-    public TemplateResponse resubmit(UUID tenantId, UUID id, TemplateRequest req) {
-        WhatsAppTemplateRepository.Template t = inTenantTx(tenantId, () -> repo.find(tenantId, id).orElseThrow(() ->
+    public TemplateResponse resubmit(UUID id, TemplateRequest req) {
+        WhatsAppTemplateRepository.Template t = inTenantTx(tenantId -> repo.find(tenantId, id).orElseThrow(() ->
                 new ApiException(HttpStatus.NOT_FOUND, "whatsapp-template-not-found", "Template not found", null)));
         if (!"rejected".equals(t.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "whatsapp-template-not-editable", "Template can't be edited",
@@ -95,12 +93,12 @@ public class WhatsAppTemplateService {
         }
         String body = req.body() == null ? null : req.body().strip();
         int paramCount = TemplateRules.checkBody(body, req.examples());
-        String header = header(inTenantTx(tenantId, () -> repo.clinic(tenantId)));
+        String header = header(inTenantTx(repo::clinic));
         submitToMeta(() -> {
             client.editTemplate(t.metaTemplateId(), header, body, req.examples());
             return null;
         });
-        return inTenantTx(tenantId, () -> {
+        return inTenantTx(tenantId -> {
             repo.resubmitted(tenantId, id, header, body, paramCount);
             return toResponse(repo.find(tenantId, id).orElseThrow());
         });
