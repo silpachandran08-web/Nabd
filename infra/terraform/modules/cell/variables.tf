@@ -95,3 +95,9 @@ variable "pitr_lag_alarm_seconds" {
   type        = number
   default     = 300
 }
+
+variable "valkey_node_type" {
+  description = "OPS-020: ElastiCache Valkey node type (primary and its replica)."
+  type        = string
+  default     = "cache.t4g.small"
+}

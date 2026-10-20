@@ -12,6 +12,7 @@ output "cell" {
 output "network" { value = one(module.aws[*].network) }
 output "postgres" { value = one(module.aws[*].postgres) }
 output "storage" { value = one(module.aws[*].storage) }
+output "valkey" { value = one(module.aws[*].valkey) }
 output "kms" { value = one(module.aws[*].kms) }
 output "dns" { value = one(module.aws[*].dns) }
 output "backup" { value = one(module.aws[*].backup) }

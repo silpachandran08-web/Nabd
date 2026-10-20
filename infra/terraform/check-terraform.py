@@ -8,7 +8,8 @@ Rules:
   tags      every taggable resource sets tags = merge(var.tags|local.tags, { ... data_class = ... })
   creds     no static cloud credentials in infra/terraform or the infra workflow (CI must use OIDC)
   regions   the reusable module hard-codes no region names (only modules/cell/residency.tf lists them)
-  safety    Postgres private, encrypted, 35-day PITR, deletion protection; every bucket has a full public-access block
+  safety    Postgres private, encrypted, 35-day PITR, deletion protection; every bucket has a full public-access block;
+            Valkey (OPS-020) TLS required, AUTH, encrypted at rest, a replica in a second AZ, private subnets only
 Needs: pip install python-hcl2
 """
 import pathlib
@@ -26,6 +27,7 @@ UNTAGGABLE = {
     "aws_s3_bucket_server_side_encryption_configuration", "aws_s3_bucket_object_lock_configuration",
     "aws_s3_bucket_replication_configuration", "aws_iam_role_policy", "aws_iam_role_policy_attachment",
     "aws_route53_record", "aws_db_instance_automated_backups_replication",
+    "random_password", "aws_secretsmanager_secret_version",
 }
 REGION = re.compile(r"\b(ap|me|eu|us|af|ca|sa|il|mx)-(north|south|east|west|central|northeast|southeast)-\d\b")
 CRED = re.compile(r"(access_key|secret_key|aws-access-key-id|aws-secret-access-key|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\s*[=:]"
@@ -58,6 +60,21 @@ def check(tf_dir, workflow):
             for k, v in want.items():
                 if body.get(k) != v:
                     errors.append(f"safety: {where} needs {k} = {str(v).lower()}")
+        if rtype == "aws_elasticache_replication_group":
+            want = {"transit_encryption_enabled": True, "transit_encryption_mode": "required", "at_rest_encryption_enabled": True,
+                    "automatic_failover_enabled": True, "multi_az_enabled": True}
+            for k, v in want.items():
+                got = body.get(k)
+                if (got.strip('"') if isinstance(got, str) else got) != v:
+                    errors.append(f"safety: {where} needs {k} = {str(v).lower() if isinstance(v, bool) else v}")
+            if not isinstance(body.get("num_cache_clusters"), int) or body["num_cache_clusters"] < 2:
+                errors.append(f"safety: {where} needs num_cache_clusters >= 2 (a replica in a second AZ)")
+            if not body.get("auth_token") or not body.get("kms_key_id"):
+                errors.append(f"safety: {where} needs auth_token and a customer kms_key_id")
+            if "aws_elasticache_subnet_group" not in str(body.get("subnet_group_name", "")):
+                errors.append(f"safety: {where} must sit in the cell's private subnet group (no public endpoint)")
+        if rtype == "aws_elasticache_subnet_group" and "aws_subnet.private" not in str(body.get("subnet_ids", "")):
+            errors.append(f"safety: {where} must use the private subnets only")
         if rtype == "aws_s3_bucket":
             buckets[(f.parent, name)] = where
         if rtype == "aws_s3_bucket_public_access_block":
@@ -94,9 +111,12 @@ BAD = {
     "open_bucket": 'resource "aws_s3_bucket" "x" {\n  tags = merge(var.tags, { data_class = "phi" })\n}\n',
     "static_key": 'provider "aws" {\n  access_key = "x"\n}\n',
     "region": 'variable "r" {\n  default = "ap-south-1"\n}\n',
+    "plaintext_valkey": 'resource "aws_elasticache_replication_group" "x" {\n  transit_encryption_enabled = false\n'
+                        '  at_rest_encryption_enabled = true\n  automatic_failover_enabled = true\n  multi_az_enabled = true\n'
+                        '  num_cache_clusters = 1\n  tags = merge(var.tags, { data_class = "ops" })\n}\n',
 }
 EXPECT = {"untagged": "tags:", "public_db": "publicly_accessible", "open_bucket": "public_access_block",
-          "static_key": "creds:", "region": "regions:"}
+          "static_key": "creds:", "region": "regions:", "plaintext_valkey": "transit_encryption_enabled"}
 
 
 def selftest():

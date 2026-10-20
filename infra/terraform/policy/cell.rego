@@ -108,3 +108,21 @@ deny contains msg if {
 	r.type == "aws_internet_gateway"
 	msg := sprintf("%v: cells have no internet gateway (private subnets only)", [r.address])
 }
+
+# OPS-020: managed Valkey is TLS-only, encrypted at rest, and has a replica in a second AZ with failover.
+deny contains msg if {
+	some r in changes
+	r.type == "aws_elasticache_replication_group"
+	a := r.change.after
+	not valkey_safe(a)
+	msg := sprintf("%v: Valkey needs TLS required, encryption at rest, >= 2 nodes, multi-AZ and automatic failover", [r.address])
+}
+
+valkey_safe(a) if {
+	a.transit_encryption_enabled == true
+	a.transit_encryption_mode == "required"
+	a.at_rest_encryption_enabled == true
+	a.num_cache_clusters >= 2
+	a.multi_az_enabled == true
+	a.automatic_failover_enabled == true
+}
