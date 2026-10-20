@@ -164,8 +164,12 @@ async function sendForVitals({ tag, status = 'waiting', answer, offline = false,
   const state = { queue: [entry(1, status)], names: { p1: 'Layla Haddad' } };
   let release; const gate = new Promise((r) => { release = r; });
   const sent = [];
+  // Playwright's route mock still answers while context.setOffline(true) is on; a real offline browser's fetch fails
+  // at once. So while "offline" the mock aborts the request as the network would (it never reaches the server).
+  const link = { offline };
   const ctx = await open('/arrivals', { state, viewport, extra: [
     ['PATCH', /^\/queue\/q1\/status$/, async (route, req) => {
+      if (link.offline) return route.abort('internetdisconnected');
       const body = JSON.parse(req.postData());
       sent.push(body);
       if (body.expectedStatus === 'checked_in') { state.queue = [{ ...state.queue[0], status: 'waiting' }]; return json(route, state.queue[0]); }
@@ -182,7 +186,7 @@ async function sendForVitals({ tag, status = 'waiting', answer, offline = false,
   let optimistic = false;
   try { await row.getByText('Vitals pending').waitFor({ timeout: 800 }); optimistic = true; } catch { /* checked below */ }
   check(`AC3 ${tag}: row shows Vitals pending immediately (<800 ms, before the server answers)`, optimistic, `${Date.now() - t0} ms`);
-  return { ...ctx, row, sent, release, t0, state };
+  return { ...ctx, row, sent, release, t0, state, link };
 }
 
 { // 409 rollback + toast
@@ -211,6 +215,7 @@ async function sendForVitals({ tag, status = 'waiting', answer, offline = false,
   check('AC3 offline: row rolled back to Waiting within 6 s (not left optimistic)', await r.row.getByText('Waiting').isVisible());
   check('AC3 offline: server received no PATCH while offline', r.sent.length === 0, `${r.sent.length}`);
   await r.context.setOffline(false);
+  r.link.offline = false;
   await r.page.evaluate(() => window.dispatchEvent(new Event('online')));
   await sleep(1500);
   check('AC3 offline: no silent replay of the failed move after the connection returns', r.sent.length === 0, `${r.sent.length} PATCH(es) replayed`);
