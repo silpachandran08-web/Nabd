@@ -77,7 +77,7 @@ class BillingPricing {
 
     private LineItemInput freeText(LineItemRequest li, boolean canDiscount, boolean trusted, UUID staffId) {
         if (!trusted && !canDiscount) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "unknown-charge", "Unknown charge",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "unknown-charge", "Unknown charge",
                     "'" + li.chargeCode() + "' is not an active charge in the price list.");
         }
         if (li.chargeName() == null || li.chargeName().isBlank() || li.unitPrice() == null) {
@@ -111,7 +111,7 @@ class BillingPricing {
         }
         BigDecimal sum = out.stream().map(DiscountInput::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (sum.compareTo(remaining) > 0 || out.stream().anyMatch(x -> x.amount().signum() <= 0)) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "discount-exceeds-subtotal", "Discount too large",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "discount-exceeds-subtotal", "Discount too large",
                     "The discount can't be more than the remaining subtotal.");
         }
         return out;
@@ -126,11 +126,11 @@ class BillingPricing {
 
     private static String requireReason(String code) {
         if (code == null || code.isBlank()) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "reason-required", "Reason required",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "reason-required", "Reason required",
                     "Pick a reason for this price change or discount.");
         }
         if (!REASON_CODES.contains(code)) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid-reason", "Unknown reason",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "invalid-reason", "Unknown reason",
                     "'" + code + "' is not a valid reason code.");
         }
         return code;

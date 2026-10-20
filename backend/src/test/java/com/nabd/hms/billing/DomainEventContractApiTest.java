@@ -1,6 +1,6 @@
 package com.nabd.hms.billing;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import tools.jackson.core.type.TypeReference;
 import com.nabd.hms.common.DomainEventType;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.OutboxEventHandler;

@@ -1,6 +1,6 @@
 package com.nabd.hms.platform.provisioning;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.EmailSender;
 import com.nabd.hms.platform.PlatformAudit;
 import com.nabd.hms.platform.provisioning.dto.ProvisioningJobResponse;

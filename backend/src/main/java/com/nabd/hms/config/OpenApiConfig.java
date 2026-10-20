@@ -47,6 +47,10 @@ public class OpenApiConfig {
     private static final Pattern OR_CHAIN = Pattern.compile("has(Any)?Authority\\('[^']+'(\\s*,\\s*'[^']+')*\\)(\\s+or\\s+has(Any)?Authority\\('[^']+'(\\s*,\\s*'[^']+')*\\))*");
     private static final AntPathMatcher MATCHER = new AntPathMatcher();
 
+    static { // PLT-032: swagger-core only knows Jackson 2's JsonNode; without this a Jackson 3 JsonNode is documented as a bean
+        org.springdoc.core.utils.SpringDocUtils.getConfig().replaceWithClass(tools.jackson.databind.JsonNode.class, com.fasterxml.jackson.databind.JsonNode.class);
+    }
+
     @Bean
     OpenAPI nabdOpenApi() {
         Schema<?> str = new Schema<>().type("string");

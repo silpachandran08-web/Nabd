@@ -68,7 +68,7 @@ class JwtKeysApiTest extends ApiTestBase {
         ResponseEntity<String> resp = http.getForEntity(url("/.well-known/jwks.json"), String.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getHeaders().getCacheControl()).contains("max-age=300");
-        Map<?, ?> body = new com.fasterxml.jackson.databind.ObjectMapper().convertValue(
+        Map<?, ?> body = new tools.jackson.databind.ObjectMapper().convertValue(
                 readJson(resp.getBody()), Map.class);
         List<?> ks = (List<?>) body.get("keys");
         assertThat(ks).hasSize(2);

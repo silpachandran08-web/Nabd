@@ -117,7 +117,7 @@ public class SafetyDictionaryService {
         checkRegion(region);
         List<String> errors = SafetyDictionaryBundles.validate(bundle);
         if (!errors.isEmpty()) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "BUNDLE_INVALID", "Dictionary bundle invalid",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "BUNDLE_INVALID", "Dictionary bundle invalid",
                     errors.size() + " problem(s) in the bundle; nothing was imported.",
                     Map.of("errors", errors.size() > 200 ? errors.subList(0, 200) : errors));
         }

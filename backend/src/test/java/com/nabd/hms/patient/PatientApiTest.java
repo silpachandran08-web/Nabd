@@ -199,7 +199,7 @@ class PatientApiTest extends ApiTestBase {
             List<Map<String, Object>> candidates = (List<Map<String, Object>>) parsed.get("candidates");
             assertThat(candidates).hasSize(1);
             return candidates.get(0);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
     }

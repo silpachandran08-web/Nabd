@@ -103,7 +103,7 @@ class CheckoutServerPricingApiTest extends ApiTestBase {
 
         // H-04 (PHL-001): free text at the counter could carry an Rx-only drug's name past the gate, so it is refused
         ResponseEntity<Map> adhoc = otc(token, line("ADHOC", "Ad hoc", 75, 0));
-        assertThat(adhoc.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(adhoc.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(adhoc.getBody().get("type")).asString().contains("free-text-not-allowed");
         assertThat(otc(token, line("ADHOC", "Ad hoc", -5, 0)).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(otc(token, line("ADHOC", " ", 5, 0)).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);

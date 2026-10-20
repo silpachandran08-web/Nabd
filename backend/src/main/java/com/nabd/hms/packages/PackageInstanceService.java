@@ -230,13 +230,13 @@ public class PackageInstanceService {
         InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
         LocalDate currentEnd = instance.validityEnd();
         if ("refunded".equals(instance.status()) || "cancelled".equals(instance.status())) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "instance-not-extendable", "Package cannot be extended",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "instance-not-extendable", "Package cannot be extended",
                     "This package is " + instance.status() + " and can no longer be extended.");
         }
         LocalDate today = clock.today(tenantId);
         LocalDate floor = currentEnd == null || currentEnd.isBefore(today) ? today : currentEnd;
         if (!req.newValidityEnd().isAfter(floor)) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "extension-not-later", "Extension must be later",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "extension-not-later", "Extension must be later",
                     "The new validity end must be after " + floor + ".");
         }
         repo.extendValidity(tenantId, id, req.newValidityEnd());

@@ -236,7 +236,7 @@ public class CheckoutService {
         List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), false, canDiscount, trusted, staffId);
         // H-04: a free-text line has no is_rx flag, so an Rx-only drug typed in by name would skip the gate. The counter sells catalogue items only.
         if (!trusted && items.stream().anyMatch(i -> i.catalogueId() == null)) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "free-text-not-allowed", "Only price-list items at the counter",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "free-text-not-allowed", "Only price-list items at the counter",
                     "Counter sales can only bill items from the price list. Add the item to the price list first.");
         }
         // PHL-001: a counter sale of an Rx line needs a signed in-system prescription; the invoice then carries that patient.
@@ -347,7 +347,7 @@ public class CheckoutService {
         }
         BigDecimal balance = invoice.total().subtract(invoice.paid());
         if (req.amount().compareTo(balance) > 0) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "overpayment", "Payment is more than the balance",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "overpayment", "Payment is more than the balance",
                     "The balance due is " + balance.toPlainString() + "; a payment can't be more than that.",
                     java.util.Map.of("balance", balance));
         }

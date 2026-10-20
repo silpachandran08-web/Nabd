@@ -1,6 +1,6 @@
 package com.nabd.hms.shared.ratelimit;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.RequestCorrelationFilter;
 import com.nabd.hms.common.RequestMeta;

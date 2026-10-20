@@ -1,13 +1,14 @@
 package com.nabd.hms.support;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ModuleGrant;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -19,7 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -44,6 +45,7 @@ import java.util.UUID;
  * share mutable state.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureTestRestTemplate // PLT-032: Boot 4 no longer registers TestRestTemplate without it
 public abstract class ApiTestBase {
 
     protected static final String APP_ROLE = "nabd_app";
@@ -57,8 +59,8 @@ public abstract class ApiTestBase {
     protected static final byte[] TOTP_SECRET = "12345678901234567890".getBytes(StandardCharsets.US_ASCII);
     protected static final String CRYPTO_KEY_B64 = Base64.getEncoder().encodeToString(new byte[32]);
 
-    private static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:16-alpine").withDatabaseName("nabd_test")
+    private static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer("postgres:16-alpine").withDatabaseName("nabd_test")
                     // OPS-003 pools are 20 wide and Spring caches many contexts: the default 100 slots run out
                     .withCommand("postgres", "-c", "max_connections=600");
 
@@ -337,7 +339,7 @@ public abstract class ApiTestBase {
                 req = new HttpEntity<>(req.getBody(), h);
             }
             return exchange("/v1/auth/break-glass/activate", HttpMethod.POST, req, Map.class);
-        } catch (java.io.IOException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
     }

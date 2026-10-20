@@ -342,7 +342,7 @@ class Plt007SessionRevocationApiTest extends ApiTestBase {
         try {
             Map<String, Object> c = objectMapper.readValue(java.util.Base64.getUrlDecoder().decode(token.split("\\.")[1]), Map.class);
             return String.valueOf(c.get(name));
-        } catch (java.io.IOException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
     }

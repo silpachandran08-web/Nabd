@@ -144,7 +144,7 @@ abstract class S10QaBillingSupport extends ApiTestBase {
     private String writeJson(Object o) {
         try {
             return objectMapper.writeValueAsString(o);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException ex) {
+        } catch (tools.jackson.core.JacksonException ex) {
             throw new IllegalStateException(ex);
         }
     }

@@ -133,7 +133,7 @@ class S11QaPlt006OtpLimitsTest extends ApiTestBase {
 
     private static Set<String> headerNames(ResponseEntity<?> r) {
         Set<String> s = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        s.addAll(r.getHeaders().keySet());
+        s.addAll(r.getHeaders().headerNames());
         s.removeIf(h -> h.equalsIgnoreCase("Date") || h.equalsIgnoreCase("X-Request-Id"));
         return s;
     }

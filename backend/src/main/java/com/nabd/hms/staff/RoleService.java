@@ -1,9 +1,9 @@
 package com.nabd.hms.staff;
 
 import com.nabd.hms.iam.api.ActorDirectory;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.auth.MfaPolicy;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -140,7 +140,7 @@ public class RoleService {
     /** PLT-005: a role holding :approve or :refundDiscount always requires MFA; asking for false is refused, not ignored. */
     private void requireMfaInvariant(RoleWriteRequest req) {
         if (Boolean.FALSE.equals(req.mfaRequired()) && MfaPolicy.privilegedGrants(GrantsFlattener.flatten(req.grants()))) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "mfa-required-by-policy", "MFA required by policy",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "mfa-required-by-policy", "MFA required by policy",
                     "Roles that can approve, refund or discount always require MFA; mfaRequired cannot be false.");
         }
     }
@@ -230,7 +230,7 @@ public class RoleService {
         try {
             return objectMapper.readValue(json, new TypeReference<List<ModuleGrant>>() {
             });
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("malformed grants JSON", e);
         }
     }
@@ -238,7 +238,7 @@ public class RoleService {
     private String writeGrantsJson(List<ModuleGrant> grants) {
         try {
             return objectMapper.writeValueAsString(grants);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("failed to serialize grants", e);
         }
     }

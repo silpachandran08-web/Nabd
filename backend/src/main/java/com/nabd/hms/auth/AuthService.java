@@ -1,8 +1,8 @@
 package com.nabd.hms.auth;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.auth.dto.LoginRequest;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
 import com.nabd.hms.auth.dto.MfaConfirmRequest;
@@ -697,7 +697,7 @@ public class AuthService {
             List<ModuleGrant> grants = objectMapper.readValue(grantsJson, new TypeReference<List<ModuleGrant>>() {
             });
             return GrantsFlattener.flatten(grants);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("malformed grants JSON", e);
         }
     }

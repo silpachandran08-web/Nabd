@@ -2,9 +2,9 @@
 # once (mvn -f backend/pom.xml package) and this file only wraps it. Local: mvn -f backend/pom.xml package && docker build .
 #   docker build .                  -> the API image (last stage, the default target)
 #   docker build --target migrate . -> the Flyway migrate job image
-ARG JAVA_RUNTIME=gcr.io/distroless/java17-debian12:nonroot
+ARG JAVA_RUNTIME=gcr.io/distroless/java21-debian12:nonroot
 
-FROM eclipse-temurin:17-jre-alpine AS layers
+FROM eclipse-temurin:21-jre-alpine AS layers
 WORKDIR /build
 COPY backend/target/hms-backend-0.1.0.jar app.jar
 RUN java -Djarmode=tools -jar app.jar extract --layers --destination extracted

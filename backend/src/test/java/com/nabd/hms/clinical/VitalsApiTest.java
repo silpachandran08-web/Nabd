@@ -109,7 +109,7 @@ class VitalsApiTest extends ApiTestBase {
         java.time.LocalDate today = java.time.LocalDate.now();
         String adult = registerPatient(token, "V6", "+919999950006", today.minusYears(18).minusDays(1).toString(), tenant.id());
         ResponseEntity<Map> r = dose(token, adult);
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat((String) r.getBody().get("type")).endsWith("adult-patient");
         // 17 years and almost 12 months is still a child: not refused for age (no weight yet -> 400)
         String teen = registerPatient(token, "V6b", "+919999950016", today.minusYears(18).plusDays(2).toString(), tenant.id());

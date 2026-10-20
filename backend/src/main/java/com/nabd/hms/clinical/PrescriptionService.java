@@ -17,9 +17,9 @@ import com.nabd.hms.clinical.dto.RxDecisionView;
 import com.nabd.hms.clinical.dto.RxReasonOption;
 import com.nabd.hms.clinical.dto.RxWarningDecision;
 import com.nabd.hms.clinical.dto.RxWarningResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
@@ -119,7 +119,7 @@ public class PrescriptionService {
         java.time.ZoneId zone = clock.zone(tenantId);
         LocalDate today = clock.today(zone);
         if (DoseWeightPolicy.isAdult(dob, today)) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "adult-patient", "Adult patient",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "adult-patient", "Adult patient",
                     "Weight-based mg/kg dosing is for patients under 18; use the drug reference for adult doses.");
         }
         VitalsRepository.WeightReading reading = vitalsRepo.findLatestWeight(tenantId, patientId)
@@ -592,7 +592,7 @@ public class PrescriptionService {
         StoredAllergySnapshot s;
         try {
             s = objectMapper.readValue(json, StoredAllergySnapshot.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // Never print a guessed statement: an unreadable snapshot is surfaced as an error, not as "none".
             throw new IllegalStateException("stored prescription allergy snapshot is unreadable", e);
         }
@@ -720,7 +720,7 @@ public class PrescriptionService {
         }
         try {
             return objectMapper.readValue(json, DECISIONS);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return List.of();
         }
     }
@@ -728,7 +728,7 @@ public class PrescriptionService {
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("prescription decision is not serializable", e);
         }
     }

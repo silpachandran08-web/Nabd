@@ -1,6 +1,6 @@
 package com.nabd.hms.common;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.nabd.hms.config.OutboxProperties;
 import com.nabd.hms.shared.integration.NoTransactionAllowedException;
 import com.nabd.hms.shared.ops.OutboxLag;
@@ -85,8 +85,8 @@ class Ops012SlowProviderApiTest extends SlowProviderTestBase {
         Map<String, Object> ev = inTenantTx(t.id(), () -> jdbc.queryForMap(
                 "SELECT payload::text AS payload, status FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.otp.requested.v1'", t.id()));
         JsonNode payload = objectMapper.readTree((String) ev.get("payload"));
-        assertThat(payload.fieldNames()).toIterable().containsExactlyInAnyOrder("tenantId", "otpRequestId", "channel");
-        assertThat(payload.path("channel").asText()).isEqualTo("whatsapp");
+        assertThat(payload.propertyNames()).containsExactlyInAnyOrder("tenantId", "otpRequestId", "channel");
+        assertThat(payload.path("channel").asString()).isEqualTo("whatsapp");
         assertThat(ev.get("status")).isEqualTo("pending");
 
         STUB.reset(0);
@@ -96,7 +96,7 @@ class Ops012SlowProviderApiTest extends SlowProviderTestBase {
         assertThat(code).matches("\\d{6}");
         assertThat((String) ev.get("payload")).doesNotContain(code);
         Map<String, Object> req = inTenantTx(t.id(), () -> jdbc.queryForMap(
-                "SELECT sent_at IS NOT NULL AS sent, code_enc IS NULL AS cleared FROM otp_requests WHERE id = ?::uuid", payload.path("otpRequestId").asText()));
+                "SELECT sent_at IS NOT NULL AS sent, code_enc IS NULL AS cleared FROM otp_requests WHERE id = ?::uuid", payload.path("otpRequestId").asString()));
         assertThat(req).containsEntry("sent", true).containsEntry("cleared", true);
         assertThat(inTenantTx(t.id(), () -> jdbc.queryForObject(
                 "SELECT status FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.otp.requested.v1'", String.class, t.id()))).isEqualTo("done");

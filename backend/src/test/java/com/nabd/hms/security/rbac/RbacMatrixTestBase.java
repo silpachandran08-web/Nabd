@@ -276,7 +276,7 @@ abstract class RbacMatrixTestBase extends ApiTestBase {
         return tests;
     }
 
-    static Set<String> jwtPermissions(com.fasterxml.jackson.databind.ObjectMapper om, String token) throws IOException {
+    static Set<String> jwtPermissions(tools.jackson.databind.ObjectMapper om, String token) throws IOException {
         Map<?, ?> claims = om.readValue(java.util.Base64.getUrlDecoder().decode(token.split("\\.")[1]), Map.class);
         Set<String> out = new TreeSet<>();
         ((List<?>) claims.get("permissions")).forEach(p -> out.add((String) p));

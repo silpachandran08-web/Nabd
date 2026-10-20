@@ -92,7 +92,7 @@ class S10QaFin001PaymentsTest extends S10QaBillingSupport {
         String inv = invoiceOf(e, "SVC");
         List<ResponseEntity<Map>> rs = parallel(8, i -> () -> pay(e.token(), inv, "cash", 100)); // 800 offered against 500
         long ok = rs.stream().filter(r -> r.getStatusCode() == HttpStatus.CREATED).count();
-        long refused = rs.stream().filter(r -> r.getStatusCode() == HttpStatus.UNPROCESSABLE_ENTITY).count();
+        long refused = rs.stream().filter(r -> r.getStatusCode() == HttpStatus.UNPROCESSABLE_CONTENT).count();
         assertThat(ok).isEqualTo(5);
         assertThat(refused).isEqualTo(3);
         assertThat(paidColumn(e, inv)).isEqualByComparingTo("500");
@@ -134,7 +134,7 @@ class S10QaFin001PaymentsTest extends S10QaBillingSupport {
         String inv = invoiceOf(e, "SVC");
         assertThat(pay(e.token(), inv, "cash", 300).getStatusCode()).isEqualTo(HttpStatus.CREATED); // balance 200
         ResponseEntity<Map> over = pay(e.token(), inv, "cash", 250);
-        assertThat(over.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(over.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(over)).containsIgnoringCase("overpayment");
         assertThat(String.valueOf(over.getBody())).contains("200");
         assertThat(num(over.getBody().get("balance"))).isEqualTo(200.0);
@@ -146,10 +146,10 @@ class S10QaFin001PaymentsTest extends S10QaBillingSupport {
     void boundaryExactBalanceAccepted_OnePaiseOverRefused_PaidInvoiceRefusesMore() {
         Env e = env();
         String inv = invoiceOf(e, "SVC");
-        assertThat(pay(e.token(), inv, "cash", "500.01").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(pay(e.token(), inv, "cash", "500.01").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(pay(e.token(), inv, "cash", "499.99").getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(getInvoice(e.token(), inv).getBody().get("status")).isEqualTo("partial");
-        assertThat(pay(e.token(), inv, "cash", "0.02").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(pay(e.token(), inv, "cash", "0.02").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(pay(e.token(), inv, "cash", "0.01").getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(getInvoice(e.token(), inv).getBody().get("status")).isEqualTo("paid");
         assertThat(pay(e.token(), inv, "cash", "0.01").getStatusCode().is2xxSuccessful()).isFalse();
@@ -300,7 +300,7 @@ class S10QaFin001PaymentsTest extends S10QaBillingSupport {
         String key = UUID.randomUUID().toString();
         assertThat(pay(e.token(), inv, "cash", 100, key).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         ResponseEntity<Map> reused = pay(e.token(), inv, "cash", 150, key);
-        assertThat(reused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(reused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(reused.getBody().get("code")).isEqualTo("IDEMPOTENCY_KEY_REUSED");
         assertThat(paymentRows(e, inv)).isEqualTo(1);
     }

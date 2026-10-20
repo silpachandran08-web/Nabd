@@ -33,11 +33,13 @@ public class ValkeyConfig {
         }
         RedisStandaloneConfiguration server = new RedisStandaloneConfiguration(uri.getHost(), uri.getPort());
         server.setDatabase(uri.getDatabase());
-        if (uri.getUsername() != null) {
-            server.setUsername(uri.getUsername());
+        // PLT-032: Lettuce 7 removed RedisURI.getUsername/getPassword; the URI's static credentials resolve immediately
+        io.lettuce.core.RedisCredentials creds = uri.getCredentialsProvider().resolveCredentials().block();
+        if (creds != null && creds.hasUsername()) {
+            server.setUsername(creds.getUsername());
         }
-        if (uri.getPassword() != null) {
-            server.setPassword(uri.getPassword());
+        if (creds != null && creds.hasPassword()) {
+            server.setPassword(creds.getPassword());
         }
         LettuceClientConfiguration.LettuceClientConfigurationBuilder client = LettuceClientConfiguration.builder()
                 .commandTimeout(Duration.ofMillis(props.commandTimeoutMs() == null ? 250 : props.commandTimeoutMs()))

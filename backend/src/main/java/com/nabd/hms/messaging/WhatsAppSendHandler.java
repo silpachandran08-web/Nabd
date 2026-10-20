@@ -1,7 +1,7 @@
 package com.nabd.hms.messaging;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
 import com.nabd.hms.common.OutboxRetryLaterException;
@@ -58,7 +58,7 @@ class WhatsAppSendHandler implements OutboxEventHandler {
 
     @Override
     public void handle(OutboxEvent event) throws Exception {
-        UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("messageId").asText());
+        UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("messageId").asString());
         WhatsAppMessageRepository.Message msg = inTx(event, () -> claimForSend(id));
         if (msg == null) {
             return;

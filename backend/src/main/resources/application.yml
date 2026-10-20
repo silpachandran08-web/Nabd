@@ -3,9 +3,13 @@ spring:
     timeout-per-shutdown-phase: 25s
   application:
     name: hms-backend
+  # PLT-032: Tomcat requests, @Async and @Scheduled run on virtual threads (Java 21); pinning review in the PLT-032 report
+  threads:
+    virtual:
+      enabled: true
   # PLT-008: Valkey is wired only by com.nabd.hms.common.valkey (app.valkey.*), never Boot's localhost default
   autoconfigure:
-    exclude: org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+    exclude: org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisReactiveAutoConfiguration,org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration
   mvc:
     problemdetails:
       enabled: true
@@ -51,6 +55,8 @@ spring:
 springdoc:
   api-docs:
     enabled: false
+    # PLT-032: springdoc 3 defaults to OpenAPI 3.1; keep core.yaml on 3.0 so the OPS-035 drift gate and client generator see no churn
+    version: openapi_3_0
   swagger-ui:
     enabled: false
 

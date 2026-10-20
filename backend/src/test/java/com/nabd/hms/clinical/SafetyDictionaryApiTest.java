@@ -158,7 +158,7 @@ class SafetyDictionaryApiTest extends ApiTestBase {
         SafetyDictionaryBundle shortTerm = new SafetyDictionaryBundle(in.classes(), plus(in.terms(), new Item("penicillin", "mox", null, null)),
                 in.stems(), in.exclusions(), in.pregnancyRisk(), in.controlled(), in.labels());
         ResponseEntity<Map> bad = post(op, versions("IN"), shortTerm);
-        assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat((String) bad.getBody().get("type")).endsWith("BUNDLE_INVALID");
         assertThat(bad.getBody().get("errors").toString()).contains("'mox' is shorter than 4 characters");
 

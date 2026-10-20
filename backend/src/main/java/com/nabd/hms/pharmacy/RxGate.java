@@ -119,6 +119,6 @@ public class RxGate {
 
     private void block(UUID tenantId, UUID staffId, String ip, Line l, String type, String title, String detail) {
         recorder.record(tenantId, staffId, ip, l.chargeCode(), l.catalogueId(), type);
-        throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, type, title, detail, Map.of("chargeCode", l.chargeCode()));
+        throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, type, title, detail, Map.of("chargeCode", l.chargeCode()));
     }
 }

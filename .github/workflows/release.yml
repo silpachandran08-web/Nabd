@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: "17", cache: maven }
+        with: { distribution: temurin, java-version: "21", cache: maven }
       - name: Backend suite (results feed the report; failures surface as unverified hazards)
         working-directory: backend
         run: mvn -B test -Dmaven.test.failure.ignore=true

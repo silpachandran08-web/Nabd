@@ -1,7 +1,7 @@
 package com.nabd.hms.clinical.dental;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -103,7 +103,7 @@ class DentalRepository {
     private String json(Map<String, Object> m) {
         try {
             return m == null ? null : objectMapper.writeValueAsString(m);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("dental chart snapshot is not serializable", e);
         }
     }

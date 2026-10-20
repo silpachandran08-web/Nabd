@@ -260,7 +260,7 @@ class S11QaSafetyDictionaryTest extends ApiTestBase {
         SafetyDictionaryBundle in = SafetyDictionaryFixtures.bundle("IN");
         ResponseEntity<Map> bad = post(op, versions("IN"), new SafetyDictionaryBundle(in.classes(),
                 plus(in.terms(), new Item("penicillin", "abc", null, null)), in.stems(), in.exclusions(), in.pregnancyRisk(), in.controlled(), in.labels()));
-        assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(bad.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(String.valueOf(bad.getBody().get("type"))).endsWith("BUNDLE_INVALID");
         // boundary: a 4-character term is accepted as a draft (not activated)
         ResponseEntity<Map> four = post(op, versions("IN"), new SafetyDictionaryBundle(in.classes(),

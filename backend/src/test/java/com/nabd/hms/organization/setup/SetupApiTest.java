@@ -141,7 +141,7 @@ class SetupApiTest extends ApiTestBase {
         for (String bad : new String[]{"1", "31", "0", "abc", "5.5", "-3"}) {
             ResponseEntity<Map> r = exchange("/v1/setup/policies/session.idle_lock_minutes", HttpMethod.PATCH,
                     authedJsonBody(token, Map.of("value", bad)), Map.class);
-            assertThat(r.getStatusCode()).as(bad).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            assertThat(r.getStatusCode()).as(bad).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         }
     }
 

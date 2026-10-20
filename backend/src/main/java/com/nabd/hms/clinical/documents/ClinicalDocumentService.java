@@ -1,9 +1,9 @@
 package com.nabd.hms.clinical.documents;
 
 import com.nabd.hms.iam.api.ActorDirectory;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.clinical.ClinicalAuthority;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -200,7 +200,7 @@ public class ClinicalDocumentService {
     private String toJson(Object o) {
         try {
             return objectMapper.writeValueAsString(o);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("could not serialise document json", e);
         }
     }
@@ -208,7 +208,7 @@ public class ClinicalDocumentService {
     private <T> T fromJson(String json, TypeReference<T> type) {
         try {
             return objectMapper.readValue(json == null ? "{}" : json, type);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("stored document json is unreadable", e);
         }
     }

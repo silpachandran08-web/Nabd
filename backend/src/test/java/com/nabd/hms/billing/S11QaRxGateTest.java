@@ -135,7 +135,7 @@ class S11QaRxGateTest extends ApiTestBase {
     }
 
     private static void assert422(ResponseEntity<Map> r, String type) {
-        assertThat(r.getStatusCode()).as("%s", r.getBody()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).as("%s", r.getBody()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(String.valueOf(r.getBody().get("type"))).as("%s", r.getBody()).endsWith("/" + type);
         assertThat(r.getHeaders().getContentType().toString()).contains("problem+json");
     }
@@ -205,7 +205,7 @@ class S11QaRxGateTest extends ApiTestBase {
         l.putAll(Map.of("chargeName", name, "category", "Pharmacy", "unitPrice", 12, "taxRatePercent", 0,
                 "override", Map.of("unitPrice", 12, "reasonCode", "other", "note", "typed in")));
         ResponseEntity<Map> r = otc(c, List.of(l));
-        assertThat(r.getStatusCode()).as("free-text sale of an Rx-only item: %s", r.getBody()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).as("free-text sale of an Rx-only item: %s", r.getBody()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     // ── AC2 / AC3 / AC4 ──────────────────────────────────────────────────
@@ -322,7 +322,7 @@ class S11QaRxGateTest extends ApiTestBase {
         Ctx b = ctx();
         String rxB = item(b, "Qa tenant rx", true, 20);
         ResponseEntity<Map> r = otc(b, List.of(line(rxB, 1, scriptA.itemId())));
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(r.getBody().toString()).doesNotContain(scriptA.patientId()).doesNotContain("Qa fixture drug");
         assertThat(stock(b, rxB)).isEqualTo(20);
         assertThat(count("SELECT count(*) FROM invoice_line_items WHERE prescription_item_id = ?::uuid", scriptA.itemId())).isZero();
@@ -347,7 +347,7 @@ class S11QaRxGateTest extends ApiTestBase {
         for (var f : fs) {
             HttpStatus s = HttpStatus.valueOf(f.get().getStatusCode().value());
             if (s == HttpStatus.OK) ok++;
-            if (s == HttpStatus.UNPROCESSABLE_ENTITY) refused++;
+            if (s == HttpStatus.UNPROCESSABLE_CONTENT) refused++;
         }
         pool.shutdown();
         assertThat(ok).isEqualTo(1);

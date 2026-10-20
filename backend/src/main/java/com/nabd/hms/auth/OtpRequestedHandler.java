@@ -1,6 +1,6 @@
 package com.nabd.hms.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
@@ -52,7 +52,7 @@ class OtpRequestedHandler implements OutboxEventHandler {
 
     @Override
     public void handle(OutboxEvent event) throws Exception {
-        UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("otpRequestId").asText());
+        UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("otpRequestId").asString());
         Pending p = tenantScope.run(event.tenantId(), () -> {
             jdbc.update("UPDATE otp_requests SET code_enc = NULL WHERE id = ? AND sent_at IS NULL AND expires_at <= now()", id);
             return jdbc.query("""

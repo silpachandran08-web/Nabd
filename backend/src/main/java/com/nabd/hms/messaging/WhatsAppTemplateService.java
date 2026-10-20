@@ -57,7 +57,7 @@ public class WhatsAppTemplateService {
     public TemplateResponse create(TemplateRequest req) {
         TemplateRules.checkName(req.name(), req.language());
         if (!"UTILITY".equals(req.category()) && !"MARKETING".equals(req.category())) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid-whatsapp-template", "Invalid WhatsApp template",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "invalid-whatsapp-template", "Invalid WhatsApp template",
                     "Category must be UTILITY (reminders, updates) or MARKETING (offers, campaigns).");
         }
         String body = req.body() == null ? null : req.body().strip();
@@ -115,7 +115,7 @@ public class WhatsAppTemplateService {
             return call.get();
         } catch (RestClientResponseException e) {
             if (e.getStatusCode().is4xxClientError()) {
-                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "whatsapp-template-refused",
+                throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "whatsapp-template-refused",
                         "Meta refused the template", metaMessage(e));
             }
             throw new ApiException(HttpStatus.BAD_GATEWAY, "whatsapp-unavailable", "WhatsApp is unavailable",
@@ -125,9 +125,9 @@ public class WhatsAppTemplateService {
 
     private static String metaMessage(RestClientResponseException e) {
         try {
-            var err = new com.fasterxml.jackson.databind.ObjectMapper().readTree(e.getResponseBodyAsString()).path("error");
-            String userMsg = err.path("error_user_msg").asText("");
-            return userMsg.isBlank() ? err.path("message").asText("Rejected by Meta") : userMsg;
+            var err = new tools.jackson.databind.ObjectMapper().readTree(e.getResponseBodyAsString()).path("error");
+            String userMsg = err.path("error_user_msg").asString("");
+            return userMsg.isBlank() ? err.path("message").asString("Rejected by Meta") : userMsg;
         } catch (Exception parseFailure) {
             return "Rejected by Meta";
         }

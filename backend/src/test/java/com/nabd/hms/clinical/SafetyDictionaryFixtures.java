@@ -1,6 +1,6 @@
 package com.nabd.hms.clinical;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.clinical.dto.SafetyDictionaryBundle;
 
 import java.io.InputStream;

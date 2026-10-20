@@ -1,7 +1,7 @@
 package com.nabd.hms.auth;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
@@ -22,7 +22,7 @@ final class BreakGlassOwnerNotifier {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd MMM HH:mm");
 
     private static String when(ClinicClock clock, OutboxEvent e, JsonNode p) {
-        return FMT.format(Instant.parse(p.path("activatedAt").asText()).atZone(clock.zone(e.tenantId())));
+        return FMT.format(Instant.parse(p.path("activatedAt").asString()).atZone(clock.zone(e.tenantId())));
     }
 
     @Component
@@ -45,8 +45,8 @@ final class BreakGlassOwnerNotifier {
         @Override
         public void handle(OutboxEvent e) throws Exception {
             JsonNode p = mapper.readTree(e.payloadJson());
-            UUID grantId = UUID.fromString(p.path("grantId").asText());
-            String message = "Emergency access used by " + repo.staffName(UUID.fromString(p.path("staffId").asText()))
+            UUID grantId = UUID.fromString(p.path("grantId").asString());
+            String message = "Emergency access used by " + repo.staffName(UUID.fromString(p.path("staffId").asString()))
                     + " at " + when(clock, e, p) + ". Review in Nabd.";
             for (BreakGlassRepository.Owner o : repo.owners(e.tenantId())) {
                 repo.insertAlert(e.tenantId(), grantId, o.id(), message);
@@ -77,7 +77,7 @@ final class BreakGlassOwnerNotifier {
         @Override
         public void handle(OutboxEvent e) throws Exception {
             JsonNode p = mapper.readTree(e.payloadJson());
-            String name = repo.staffName(UUID.fromString(p.path("staffId").asText()));
+            String name = repo.staffName(UUID.fromString(p.path("staffId").asString()));
             String time = when(clock, e, p);
             for (BreakGlassRepository.Owner o : repo.owners(e.tenantId())) {
                 if (o.phone() != null && !o.phone().isBlank()) {

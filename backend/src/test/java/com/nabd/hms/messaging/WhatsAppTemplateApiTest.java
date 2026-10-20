@@ -79,7 +79,7 @@ class WhatsAppTemplateApiTest extends ApiTestBase {
             ResponseEntity<Map> resp = exchange("/v1/setup/whatsapp-templates", HttpMethod.POST, authedJsonBody(token, Map.of(
                     "name", "bad", "language", "en", "category", "UTILITY", "body", badBody,
                     "examples", badBody.contains("{{2}}") ? List.of("a", "b") : List.of("a"))), Map.class);
-            assertThat(resp.getStatusCode()).as(badBody).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            assertThat(resp.getStatusCode()).as(badBody).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         }
     }
 

@@ -1,6 +1,6 @@
 package com.nabd.hms.messaging;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.nabd.hms.shared.integration.ResilientHttpClient;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
@@ -49,7 +49,7 @@ class MetaWhatsAppClient implements WhatsAppClient {
                 .body(Map.of("name", metaName, "language", language, "category", category,
                         "components", templateComponents(headerText, body, bodyExamples)))
                 .retrieve().body(JsonNode.class);
-        return new Submission(resp.path("id").asText(), resp.path("status").asText("PENDING").toLowerCase());
+        return new Submission(resp.path("id").asString(), resp.path("status").asString("PENDING").toLowerCase());
     }
 
     @Override
@@ -77,7 +77,7 @@ class MetaWhatsAppClient implements WhatsAppClient {
         JsonNode resp = http.post().uri("/{id}/messages", phoneNumberId)
                 .contentType(MediaType.APPLICATION_JSON).body(body)
                 .retrieve().body(JsonNode.class);
-        return resp.path("messages").path(0).path("id").asText();
+        return resp.path("messages").path(0).path("id").asString();
     }
 
     private static List<Map<String, String>> textParams(List<String> values) {

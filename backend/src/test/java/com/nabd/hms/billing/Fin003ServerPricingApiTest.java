@@ -121,7 +121,7 @@ class Fin003ServerPricingApiTest extends ApiTestBase {
         ghost.putAll(Map.of("chargeName", "Ghost", "category", "Service", "unitPrice", 0, "taxRatePercent", 0));
 
         ResponseEntity<Map> denied = post(reception, pending(e), Map.of("lineItems", List.of(ghost)));
-        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(denied.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(denied)).contains("unknown-charge");
 
         ghost.put("unitPrice", 75);
@@ -158,7 +158,7 @@ class Fin003ServerPricingApiTest extends ApiTestBase {
         // owner: reason required, unknown reason refused
         o.remove("reasonCode");
         ResponseEntity<Map> noReason = post(e.ownerToken(), entry, Map.of("lineItems", List.of(l)));
-        assertThat(noReason.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(noReason.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(noReason)).contains("reason-required");
         o.put("reasonCode", "not_a_reason");
         assertThat(type(post(e.ownerToken(), entry, Map.of("lineItems", List.of(l))))).contains("invalid-reason");
@@ -201,7 +201,7 @@ class Fin003ServerPricingApiTest extends ApiTestBase {
         Map<String, Object> d100 = Map.of("kind", "amount", "value", 100, "reasonCode", "goodwill");
         ResponseEntity<Map> tooBig = post(e.ownerToken(), entry, Map.of("lineItems", List.of(line("CONS", 1)),
                 "discounts", List.of(Map.of("kind", "amount", "value", 400.01, "reasonCode", "goodwill"))));
-        assertThat(tooBig.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(tooBig.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(tooBig)).contains("discount-exceeds-subtotal");
         assertThat(count(e, "SELECT count(*) FROM invoices")).isZero();
         assertThat(count(e, "SELECT count(*) FROM invoice_discounts")).isZero();

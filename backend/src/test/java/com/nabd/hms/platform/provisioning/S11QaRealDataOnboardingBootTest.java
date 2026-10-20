@@ -17,7 +17,7 @@ class S11QaRealDataOnboardingBootTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner().withUserConfiguration(RealDataOnboardingGuard.class);
 
     private static void assertRefuses(RealDataOnboardingGuard g) {
-        ApiException e = catchThrowableOfType(g::check, ApiException.class);
+        ApiException e = catchThrowableOfType(ApiException.class, g::check);
         assertThat(e).as("provisioning must be refused").isNotNull();
         assertThat(e.status()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(e.typeSlug()).isEqualTo("real-data-onboarding-blocked");

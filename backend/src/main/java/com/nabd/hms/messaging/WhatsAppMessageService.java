@@ -1,6 +1,6 @@
 package com.nabd.hms.messaging;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
@@ -43,7 +43,7 @@ public class WhatsAppMessageService {
         UUID tenantId = tenantContext.current(); // PLT-019: bound at transaction start (request) or by TenantScope (worker)
         WhatsAppTemplateRepository.Template template = templates.findByName(tenantId, templateName, language)
                 .filter(WhatsAppTemplateRepository.Template::sendable)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "whatsapp-template-not-sendable",
+                .orElseThrow(() -> new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "whatsapp-template-not-sendable",
                         "WhatsApp template not available",
                         "No approved template called " + templateName + " in " + language + "."));
         TemplateRules.checkParams(params, template.paramCount());

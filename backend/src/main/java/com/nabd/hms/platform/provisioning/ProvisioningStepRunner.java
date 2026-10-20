@@ -1,6 +1,6 @@
 package com.nabd.hms.platform.provisioning;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WabaProvisioningGateway;

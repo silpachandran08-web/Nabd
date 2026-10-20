@@ -243,7 +243,7 @@ class TokenMisuseMatrixTest extends ApiTestBase {
 
     private static Object parse(String json) {
         try {
-            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, Map.class);
+            return new tools.jackson.databind.ObjectMapper().readValue(json, Map.class);
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }

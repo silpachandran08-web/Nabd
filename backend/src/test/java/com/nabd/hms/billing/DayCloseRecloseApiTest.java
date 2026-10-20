@@ -242,7 +242,7 @@ class DayCloseRecloseApiTest extends ApiTestBase {
         Owner o = owner();
         assertThat(num(exchange("/v1/billing/day-close", HttpMethod.GET, authed(o.token()), Map.class).getBody().get("cashTolerance"))).isEqualTo(200.0);
         assertThat(exchange("/v1/setup/policies/cash_variance_tolerance", HttpMethod.PATCH, authedJsonBody(o.token(), Map.of("value", "12.5")),
-                Map.class).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                Map.class).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(exchange("/v1/setup/policies/cash_variance_tolerance", HttpMethod.PATCH, authedJsonBody(o.token(), Map.of("value", "50000")),
                 Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(num(exchange("/v1/billing/day-close", HttpMethod.GET, authed(o.token()), Map.class).getBody().get("cashTolerance"))).isEqualTo(500.0);

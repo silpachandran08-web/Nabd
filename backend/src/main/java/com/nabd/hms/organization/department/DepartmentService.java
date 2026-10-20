@@ -1,8 +1,8 @@
 package com.nabd.hms.organization.department;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.organization.api.OrganizationConfig;
@@ -242,7 +242,7 @@ public class DepartmentService implements OrganizationConfig {
         try {
             return objectMapper.readValue(json, new TypeReference<List<String>>() {
             });
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("malformed workflow JSON", e);
         }
     }
@@ -251,7 +251,7 @@ public class DepartmentService implements OrganizationConfig {
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Boolean>>() {
             });
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("malformed toggles JSON", e);
         }
     }
@@ -259,7 +259,7 @@ public class DepartmentService implements OrganizationConfig {
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("failed to serialize toggles", e);
         }
     }

@@ -254,15 +254,15 @@ class PackageRefundIntegrityApiTest extends ApiTestBase {
         LocalDate end = LocalDate.parse((String) exchange("/v1/packages/instances/" + c.instanceId(), HttpMethod.GET,
                 authed(c.maker()), Map.class).getBody().get("validityEnd"));
         ResponseEntity<Map> earlier = extend(c.maker(), c.instanceId(), end.minusDays(1));
-        assertThat(earlier.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(earlier.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(earlier)).endsWith("extension-not-later");
-        assertThat(extend(c.maker(), c.instanceId(), end).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(extend(c.maker(), c.instanceId(), end).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(extend(c.maker(), c.instanceId(), end.plusDays(1)).getStatusCode()).isEqualTo(HttpStatus.OK);
 
         String refundId = (String) request(c.maker(), c.instanceId()).getBody().get("id");
         approve(c.checker(), refundId, null);
         ResponseEntity<Map> refunded = extend(c.maker(), c.instanceId(), end.plusDays(30));
-        assertThat(refunded.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refunded.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(refunded)).endsWith("instance-not-extendable");
     }
 

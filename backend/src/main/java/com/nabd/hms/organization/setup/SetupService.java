@@ -159,10 +159,10 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     public PolicyResponse updatePolicy(UUID tenantId, UUID callerStaffId, String policyKey, PolicyWriteRequest req) {
         tenantContext.set(tenantId);
         if ("session.idle_lock_minutes".equals(policyKey) && !req.value().matches("^(?:[2-9]|[12][0-9]|30)$")) { // FEF-005
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "out-of-range", "Out of range", "Idle lock must be a whole number of minutes from 2 to 30");
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Idle lock must be a whole number of minutes from 2 to 30");
         }
         if ("cash_variance_tolerance".equals(policyKey) && !req.value().matches("^\\d{1,9}$")) { // FIN-005: minor units
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "out-of-range", "Out of range", "Cash tolerance must be a whole number of minor currency units (0 or more)");
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "out-of-range", "Out of range", "Cash tolerance must be a whole number of minor currency units (0 or more)");
         }
         repo.updatePolicy(tenantId, policyKey, req.value());
         log.info("policy {} updated for tenant {} by {}", policyKey, tenantId, callerStaffId);

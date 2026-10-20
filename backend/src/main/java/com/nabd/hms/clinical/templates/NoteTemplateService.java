@@ -1,8 +1,8 @@
 package com.nabd.hms.clinical.templates;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
 import org.springframework.http.HttpStatus;
@@ -85,7 +85,7 @@ public class NoteTemplateService {
         List<String> tags;
         try {
             tags = r.tagsJson() == null ? List.of() : objectMapper.readValue(r.tagsJson(), TAGS_TYPE);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             tags = List.of();
         }
         return new TemplateResponse(r.id(), r.name(), r.subjective(), r.objective(), r.assessment(), r.plan(), tags,
@@ -95,7 +95,7 @@ public class NoteTemplateService {
     private String toJson(Object o) {
         try {
             return objectMapper.writeValueAsString(o);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("could not serialise note template json", e);
         }
     }

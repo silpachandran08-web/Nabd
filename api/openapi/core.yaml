@@ -11367,6 +11367,7 @@ components:
       properties:
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6,8}$"
       required:
       - pin
@@ -11375,6 +11376,7 @@ components:
       properties:
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,6}$"
       required:
       - pin
@@ -11434,8 +11436,10 @@ components:
       properties:
         dose:
           type: string
+          minLength: 1
         drugName:
           type: string
+          minLength: 1
         queueEntryId:
           type: string
           format: uuid
@@ -11651,6 +11655,7 @@ components:
           minLength: 0
         severity:
           type: string
+          minLength: 1
           pattern: mild|moderate|severe
         source:
           type: string
@@ -11837,6 +11842,7 @@ components:
           format: uuid
         reasonCode:
           type: string
+          minLength: 1
           pattern: unconscious_patient|life_threatening|no_treating_clinician_available|other
         reasonText:
           type: string
@@ -11972,10 +11978,13 @@ components:
           type: boolean
         baseAmount:
           type: number
+          minimum: 0
         category:
           type: string
+          minLength: 1
         code:
           type: string
+          minLength: 1
         displayOrder:
           type: integer
           format: int32
@@ -11989,14 +11998,18 @@ components:
           format: date
         emergencyAmount:
           type: number
+          minimum: 0
         followUpAmount:
           type: number
+          minimum: 0
         name:
           type: string
+          minLength: 1
         taxCode:
           type: string
         taxRatePercent:
           type: number
+          minimum: 0
       required:
       - baseAmount
       - category
@@ -12140,6 +12153,7 @@ components:
           format: date
         name:
           type: string
+          minLength: 1
         recurring:
           type: boolean
       required:
@@ -12176,6 +12190,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         specialties:
           type: array
           items:
@@ -12187,6 +12202,7 @@ components:
           pattern: ^GSTIN|VAT$
         timezone:
           type: string
+          minLength: 1
         whatsappNumber:
           type: string
       required:
@@ -12295,6 +12311,7 @@ components:
       properties:
         condition:
           type: string
+          minLength: 1
         reviewDueDate:
           type: string
           format: date
@@ -12314,8 +12331,11 @@ components:
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         name:
           type: string
+          minLength: 1
         phone:
           type: string
       required:
@@ -12338,22 +12358,31 @@ components:
       properties:
         brandName:
           type: string
+          minLength: 1
         ownerEmail:
           type: string
+          format: email
+          minLength: 1
         ownerMobile:
           type: string
+          minLength: 1
         ownerName:
           type: string
+          minLength: 1
         path:
           type: string
+          minLength: 1
           pattern: ^(self_serve|enterprise)$
         region:
           type: string
+          minLength: 1
           pattern: ^(IN|KSA)$
         tenantName:
           type: string
+          minLength: 1
         tenantSlug:
           type: string
+          minLength: 1
           pattern: "^[A-Za-z0-9](?:[A-Za-z0-9-]{1,61}[A-Za-z0-9])?$"
       required:
       - brandName
@@ -12525,6 +12554,7 @@ components:
           format: date-time
         reason:
           type: string
+          minLength: 1
         staffId:
           type: string
           format: uuid
@@ -12582,6 +12612,7 @@ components:
       properties:
         templateCode:
           type: string
+          minLength: 1
         toggles:
           type: object
           additionalProperties:
@@ -12612,6 +12643,7 @@ components:
           type: boolean
         name:
           type: string
+          minLength: 1
       required:
       - name
     DiscountPage:
@@ -12650,6 +12682,7 @@ components:
           minimum: 0.01
         reason:
           type: string
+          minLength: 1
         tenantId:
           type: string
           format: uuid
@@ -13020,6 +13053,7 @@ components:
       properties:
         exportType:
           type: string
+          minLength: 1
           pattern: full_tenant|patients|invoices|charges
       required:
       - exportType
@@ -13047,6 +13081,7 @@ components:
           format: date
         reason:
           type: string
+          minLength: 1
       required:
       - newValidityEnd
       - reason
@@ -13279,8 +13314,10 @@ components:
       properties:
         fileName:
           type: string
+          minLength: 1
         importType:
           type: string
+          minLength: 1
           pattern: patients|appointments|invoices|charges
       required:
       - fileName
@@ -13507,11 +13544,14 @@ components:
           type: string
         licenceType:
           type: string
+          minLength: 1
           pattern: clinician|facility
         number:
           type: string
+          minLength: 1
         region:
           type: string
+          minLength: 1
           pattern: IN|KSA
       required:
       - expiryDate
@@ -13552,6 +13592,7 @@ components:
           type: string
         chargeCode:
           type: string
+          minLength: 1
         chargeName:
           type: string
         override:
@@ -13597,31 +13638,20 @@ components:
           type: string
         unitPrice:
           type: number
-    LocalTime:
-      type: object
-      properties:
-        hour:
-          type: integer
-          format: int32
-        minute:
-          type: integer
-          format: int32
-        nano:
-          type: integer
-          format: int32
-        second:
-          type: integer
-          format: int32
     LoginRequest:
       type: object
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - email
       - pin
@@ -13649,6 +13679,7 @@ components:
       properties:
         code:
           type: string
+          minLength: 1
           pattern: "\\d{6}"
         setupToken:
           type: string
@@ -13694,6 +13725,7 @@ components:
           type: string
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
       required:
       - challengeId
@@ -13864,8 +13896,11 @@ components:
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
       required:
       - email
@@ -13900,9 +13935,11 @@ components:
       properties:
         mobilePhone:
           type: string
+          minLength: 1
           pattern: "^\\+?[0-9](?:[ ()-]?[0-9]){7,14}$"
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - mobilePhone
       - tenantSlug
@@ -13911,11 +13948,14 @@ components:
       properties:
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
         mobilePhone:
           type: string
+          minLength: 1
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - code
       - mobilePhone
@@ -13981,8 +14021,11 @@ components:
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
       required:
       - email
@@ -13992,9 +14035,11 @@ components:
       properties:
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
         setupToken:
           type: string
+          minLength: 1
       required:
       - code
       - setupToken
@@ -14015,6 +14060,7 @@ components:
       properties:
         setupToken:
           type: string
+          minLength: 1
       required:
       - setupToken
     OwnerMfaVerifyRequest:
@@ -14022,8 +14068,10 @@ components:
       properties:
         challengeToken:
           type: string
+          minLength: 1
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
       required:
       - challengeToken
@@ -14047,9 +14095,12 @@ components:
           pattern: service_session|procedure|consultation|take_home_product
         name:
           type: string
+          minLength: 1
         quantity:
           type: integer
           format: int32
+          exclusiveMinimum: true
+          minimum: 0
         taxRatePercent:
           type: number
           exclusiveMinimum: false
@@ -14158,12 +14209,16 @@ components:
         graceDays:
           type: integer
           format: int32
+          exclusiveMinimum: false
+          minimum: 0
         items:
           type: array
           items:
             $ref: "#/components/schemas/PackageItemInput"
+          minItems: 1
         name:
           type: string
+          minLength: 1
         packageType:
           type: string
           pattern: combination|session
@@ -14180,6 +14235,8 @@ components:
         validityDays:
           type: integer
           format: int32
+          exclusiveMinimum: true
+          minimum: 0
         validityStarts:
           type: string
           pattern: purchase_date|first_session
@@ -14384,6 +14441,7 @@ components:
           format: date
         gender:
           type: string
+          minLength: 1
           pattern: male|female|other
         guardianConsent:
           $ref: "#/components/schemas/GuardianConsent"
@@ -14392,10 +14450,12 @@ components:
           format: uuid
         name:
           type: string
+          minLength: 1
         nationalId:
           type: string
         phone:
           type: string
+          minLength: 1
       required:
       - dob
       - gender
@@ -14500,13 +14560,17 @@ components:
           type: boolean
         name:
           type: string
+          minLength: 1
         price:
           type: number
+          minimum: 0
         stockQty:
           type: integer
           format: int32
+          minimum: 0
         taxRatePercent:
           type: number
+          minimum: 0
       required:
       - name
       - price
@@ -14574,9 +14638,11 @@ components:
       properties:
         currentPin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
         newPin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6,8}$"
       required:
       - currentPin
@@ -14586,13 +14652,17 @@ components:
       properties:
         mobilePhone:
           type: string
+          minLength: 1
         newPin:
           type: string
+          minLength: 1
           pattern: "\\d{6,8}"
         tenantSlug:
           type: string
+          minLength: 1
         token:
           type: string
+          minLength: 1
       required:
       - mobilePhone
       - newPin
@@ -14603,8 +14673,10 @@ components:
       properties:
         mobilePhone:
           type: string
+          minLength: 1
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - mobilePhone
       - tenantSlug
@@ -14646,8 +14718,10 @@ components:
           type: boolean
         code:
           type: string
+          minLength: 1
         currency:
           type: string
+          minLength: 1
           pattern: INR|SAR
         monthlyPriceCents:
           type: integer
@@ -14655,6 +14729,7 @@ components:
           minimum: 0
         name:
           type: string
+          minLength: 1
         seatLimit:
           type: integer
           format: int32
@@ -14682,6 +14757,7 @@ components:
       properties:
         value:
           type: string
+          minLength: 1
       required:
       - value
     PregnancyEventResponse:
@@ -14730,6 +14806,7 @@ components:
           format: date
         status:
           type: string
+          minLength: 1
           pattern: not_pregnant|pregnant|lactating|unknown
       required:
       - status
@@ -14971,6 +15048,7 @@ components:
       properties:
         signedName:
           type: string
+          minLength: 1
       required:
       - signedName
     ProcedureNotesRequest:
@@ -14985,6 +15063,7 @@ components:
       properties:
         chargeCode:
           type: string
+          minLength: 1
         consentNote:
           type: string
         prepNotes:
@@ -15197,6 +15276,7 @@ components:
           type: string
         status:
           type: string
+          minLength: 1
       required:
       - status
     RaiseTicketRequest:
@@ -15221,6 +15301,7 @@ components:
       properties:
         challengeToken:
           type: string
+          minLength: 1
         recoveryCode:
           type: string
           maxLength: 32
@@ -15255,6 +15336,7 @@ components:
       properties:
         refreshToken:
           type: string
+          minLength: 1
       required:
       - refreshToken
     RefundPreviewItem:
@@ -15287,6 +15369,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     RefundResponse:
@@ -15322,6 +15405,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     RegionSummaryResponse:
@@ -15359,6 +15443,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     RequestGrantRequest:
@@ -15433,10 +15518,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ModuleGrant"
+          minItems: 1
         mfaRequired:
           type: boolean
         name:
           type: string
+          minLength: 1
       required:
       - grants
       - name
@@ -15495,6 +15582,7 @@ components:
       properties:
         phone:
           type: string
+          minLength: 1
       required:
       - phone
     RxReasonOption:
@@ -15509,6 +15597,7 @@ components:
       properties:
         kind:
           type: string
+          minLength: 1
           pattern: allergy|pregnancy|controlled
         note:
           type: string
@@ -15516,6 +15605,7 @@ components:
           minLength: 0
         reasonCode:
           type: string
+          minLength: 1
       required:
       - kind
       - reasonCode
@@ -15630,6 +15720,7 @@ components:
           format: uuid
         paymentMethod:
           type: string
+          minLength: 1
       required:
       - packageId
       - patientId
@@ -15717,10 +15808,14 @@ components:
           format: uuid
         email:
           type: string
+          format: email
+          minLength: 1
         mobilePhone:
           type: string
+          minLength: 1
         name:
           type: string
+          minLength: 1
         roleId:
           type: string
           format: uuid
@@ -15881,6 +15976,7 @@ components:
           format: date
         patternJson:
           type: string
+          minLength: 1
         staffId:
           type: string
           format: uuid
@@ -15993,8 +16089,10 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
         toStatus:
           type: string
+          minLength: 1
       required:
       - reason
       - toStatus
@@ -16336,8 +16434,10 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
         toStatus:
           type: string
+          minLength: 1
       required:
       - reason
       - toStatus
@@ -16362,6 +16462,7 @@ components:
       properties:
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
       required:
       - pin
@@ -16579,6 +16680,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     WaitEstimateResponse:
@@ -16669,7 +16771,8 @@ components:
           type: integer
           format: int32
         endTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
         id:
           type: string
           format: uuid
@@ -16680,7 +16783,8 @@ components:
           type: integer
           format: int32
         startTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
     WorkingHoursWriteRequest:
       type: object
       properties:
@@ -16690,7 +16794,8 @@ components:
           maximum: 6
           minimum: 0
         endTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
         maxPatients:
           type: integer
           format: int32
@@ -16699,7 +16804,8 @@ components:
           type: integer
           format: int32
         startTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
       required:
       - dayOfWeek
       - endTime

@@ -1,7 +1,7 @@
 package com.nabd.hms.shared.ratelimit;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
 import org.slf4j.Logger;
@@ -28,6 +28,6 @@ class RateLimitExceededHandler implements OutboxEventHandler {
     public void handle(OutboxEvent e) throws Exception {
         JsonNode p = mapper.readTree(e.payloadJson());
         security.warn("security_event type=rate_limit_exceeded tenantId={} dimension={} keyHash={} limit={}",
-                e.tenantId(), p.path("dimension").asText(), p.path("keyHash").asText(), p.path("limit").asInt());
+                e.tenantId(), p.path("dimension").asString(), p.path("keyHash").asString(), p.path("limit").asInt());
     }
 }
