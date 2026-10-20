@@ -50,7 +50,8 @@ ALTER TABLE clinic_policies ADD CONSTRAINT clinic_policies_policy_key_check CHEC
   'appointment_buffer_minutes',
   'session.idle_lock_minutes',
   'cash_variance_tolerance'
-));
+)) NOT VALID;
+ALTER TABLE clinic_policies VALIDATE CONSTRAINT clinic_policies_policy_key_check;
 
 -- ADR-07 per-command policies: reads over app.visible_tenant_ids, writes only for app.tenant_id. A policy naming
 -- visible_tenant_ids first makes enforce_tenant_rls build the widened read policy (V211).

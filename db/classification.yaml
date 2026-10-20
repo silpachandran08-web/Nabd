@@ -260,6 +260,18 @@ schemas:
       reopen_reason: financial
       created_at: operational
       updated_at: operational
+      close_count: operational
+    day_close_events:
+      id: operational
+      tenant_id: operational
+      day_close_id: operational
+      action: operational
+      expected_cash: financial
+      counted_cash: financial
+      variance: financial
+      note: financial
+      actor_id: operational
+      created_at: operational
     dental_chart_entries:
       id: operational
       tenant_id: operational
@@ -958,6 +970,7 @@ schemas:
       expires_at: operational
       revoked_at: operational
       revoked_reason: operational
+      family_started_at: operational
     shedlock:
       name: operational
       lock_until: operational

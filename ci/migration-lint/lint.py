@@ -13,6 +13,10 @@ LINK = {"MIG-001": "#concurrent-indexes", "MIG-002": "#check-constraints", "MIG-
         "MIG-004": "#lock-timeout", "MIG-005": "#version-numbers", "MIG-006": "#version-numbers",
         "MIG-007": "#expand-and-contract"}
 VFILE = re.compile(r"^V(\d+)__.+\.sql$")
+# A file may waive MIG-001 with "-- migration-lint: allow MIG-001 <reason>": CONCURRENTLY cannot run in our Flyway
+# transaction (it hangs the migrate), so a plain index on a small/new-in-sprint table is a reviewed exception.
+WAIVABLE = {"MIG-001"}
+WAIVER = re.compile(r"--\s*migration-lint:\s*allow[ \t]+(MIG-\d{3})[ \t]+\S", re.I)
 
 
 def statements(sql):
@@ -28,6 +32,11 @@ def ident(n):
 
 def lint_sql(sql, contract=False):
     """Return [(rule, message)]."""
+    waived = {r.upper() for r in WAIVER.findall(sql)} & WAIVABLE
+    return [(r, m) for r, m in _lint_sql(sql, contract) if r not in waived]
+
+
+def _lint_sql(sql, contract):
     out, stmts = [], statements(sql)
     created = {ident(m.group(1)) for s in stmts for m in
                [re.match(r"create\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?([\w\".]+)", s, re.I)] if m}
