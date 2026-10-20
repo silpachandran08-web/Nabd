@@ -12,6 +12,7 @@ const ACCESS_KEY = "nabd_access_token";
 
 const REFRESH_KEY = "nabd_refresh_token";
 const RETURN_KEY = "nabd_return_to";
+const SIGNOUT_KEY = "nabd_signout_reason";
 const MUTEX_KEY = "nabd_refresh_mutex";
 const DEFAULT_TTL_S = 15 * 60;
 
@@ -43,9 +44,15 @@ export function takeReturnTo(): string | null {
   return safeReturnTo(q) ?? safeReturnTo(stored);
 }
 
+/** Login page: why the last forced sign-out happened ("access_changed" or null); cleared by the next sign-in. */
+export function signOutReason(): string | null {
+  return sessionStorage.getItem(SIGNOUT_KEY);
+}
+
 let leaving = false;
 /** Session is gone: clear tokens, remember where the user was, go to /login once (6 parallel 401s = 1 redirect). */
-export function goLogin(): void {
+export function goLogin(reason?: "access_changed"): void {
+  if (!leaving) { if (reason) sessionStorage.setItem(SIGNOUT_KEY, reason); else sessionStorage.removeItem(SIGNOUT_KEY); } // PLT-007 UI note: the login page names why
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
   void idbPair(null);
@@ -103,6 +110,7 @@ function idbPair(write: Pair | null | undefined): Promise<Pair | null> {
 export function storeTokens(pair: Pair): void {
   if (pair.accessToken) localStorage.setItem(ACCESS_KEY, pair.accessToken);
   if (pair.refreshToken) localStorage.setItem(REFRESH_KEY, pair.refreshToken);
+  if (typeof sessionStorage !== "undefined") sessionStorage.removeItem(SIGNOUT_KEY);
   schedule();
 }
 
@@ -213,14 +221,19 @@ export function onStorage(e: { key: string | null; newValue: string | null }): v
 /** PLT-007: revocation (suspension, role change, clinic suspended, 12 h cap) reaches an idle tab within 60 s. */
 export const PROBE_MS = 60_000;
 export async function probeSession(): Promise<void> {
-  if (!localStorage.getItem(ACCESS_KEY)) return;
-  try { if ((await apiFetch("/auth/sessions")).status === 401) goLogin(); } catch { /* offline: try again next tick */ }
+  // Hidden tabs make no requests (s8-rec8); onVisible() probes once when the tab comes back.
+  if (!localStorage.getItem(ACCESS_KEY) || (typeof document !== "undefined" && document.hidden)) return;
+  try { if ((await apiFetch("/auth/sessions")).status === 401) goLogin("access_changed"); } catch { /* offline: try again next tick */ }
+}
+export function onVisible(): void {
+  if (typeof document !== "undefined" && !document.hidden) void probeSession();
 }
 
 if (typeof window !== "undefined") {
   schedule();
   window.addEventListener("storage", onStorage);
   (setInterval(() => void probeSession(), PROBE_MS) as { unref?: () => void }).unref?.();
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
 }
 
 /** RFC 9562 UUIDv7: 48-bit ms timestamp, then random. */

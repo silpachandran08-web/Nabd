@@ -7,7 +7,7 @@ import styles from "./login.module.css";
 import { decodeAccessToken, landingPathFor } from "../lib/session";
 import { NEW_PIN_PATTERN, lockedMessage, needsPinChange } from "../lib/pinPolicy";
 import { useHasMounted } from "../lib/useHasMounted";
-import { safeReturnTo, storeTokens, takeReturnTo } from "../lib/apiClient";
+import { safeReturnTo, storeTokens, takeReturnTo, signOutReason } from "../lib/apiClient";
 import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../lib/loginFetch";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
@@ -50,6 +50,7 @@ export default function LoginPage() {
   const [newPin, setNewPin] = useState("");
   const mounted = useHasMounted();
   const signedOut = mounted && !!safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"));
+  const accessChanged = mounted && signOutReason() === "access_changed";
 
   function handleTokens(pair: TokenPair) {
     storeTokens(pair);
@@ -520,7 +521,7 @@ export default function LoginPage() {
         <h1 className={styles.title}>Sign in to Nabd</h1>
         <p className={styles.subtitle}>Enter your clinic, email and PIN.</p>
         <form onSubmit={submitLogin} noValidate>
-          {signedOut && !formError && <div className={styles.formError} role="status">Signed out. Your draft is saved. Sign in to continue.</div>}
+          {(signedOut || accessChanged) && !formError && <div className={styles.formError} role="status">{accessChanged ? "Your access changed, please sign in again" : "Signed out. Your draft is saved. Sign in to continue."}</div>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
           {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}
