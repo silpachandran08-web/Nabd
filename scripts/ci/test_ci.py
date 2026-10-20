@@ -21,7 +21,8 @@ class Pipeline(unittest.TestCase):
         j = self.wf["jobs"]["api-contract-report"]
         self.assertLessEqual(j["timeout-minutes"], 2)
         self.assertTrue(j["continue-on-error"])
-        self.assertFalse(any("api-contract" in c for c in json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"]))
+        # OPS-035: the report job stays non-blocking; the blocking contract gate is the separate stage5-api-contract job
+        self.assertNotIn("api-contract-report", json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"])
         self.assertIn("oasdiff", str(j["steps"]))
     def test_protection_rules(self):
         p = json.load(open(".github/branch-protection.json"))

@@ -1741,7 +1741,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - clinical
-      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve')"
+      x-required-permission: clinical:edit | clinical:approve
   /v1/clinical/drugs/search:
     get:
       operationId: PrescriptionController_searchDrugs
@@ -2974,8 +2974,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - clinical
-      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve',\
-        \ 'clinical:view')"
+      x-required-permission: clinical:edit | clinical:approve | clinical:view
   /v1/clinical/prescriptions/{queueEntryId}/signing-authority:
     get:
       operationId: PrescriptionController_signingAuthority
@@ -4180,7 +4179,8 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: setup:edit
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
+        \ #id.toString()"
   /v1/doctors/{id}/working-hours/{hoursId}:
     delete:
       operationId: ScheduleController_deleteWorkingHours
@@ -4220,7 +4220,8 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: setup:edit
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
+        \ #id.toString()"
     put:
       operationId: ScheduleController_updateWorkingHours
       parameters:
@@ -4269,7 +4270,8 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: setup:edit
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
+        \ #id.toString()"
   /v1/nursing/activity/today:
     get:
       operationId: NursingController_activityToday

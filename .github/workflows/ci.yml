@@ -195,6 +195,35 @@ jobs:
           if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@"$RUNNER_TEMP/report.md"
           else gh pr comment "$pr" --body-file "$RUNNER_TEMP/report.md"; fi
 
+  # OPS-035 stage 5 (blocking, required): spec drift, permission reflection, oasdiff breaking rule, generated client up to date.
+  # The api-contract-report job above stays the non-blocking PR comment.
+  stage5-api-contract:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "${{ env.JAVA_VERSION }}", cache: maven }
+      - name: undocumented / phantom operations and x-required-permission == @PreAuthorize (0 allowed)
+        working-directory: backend
+        run: mvn -B -q test -Dtest=ApiContractGateTest -Dsurefire.failIfNoSpecifiedTests=false
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: generated client (frontend/packages/api-client/src/generated) matches api/openapi/core.yaml
+        run: pip install -q pyyaml && python3 scripts/api/generate_client.py --check
+      - name: oasdiff breaking changes block unless deprecated with a Sunset (x-sunset)
+        if: github.event_name == 'pull_request'
+        env: { OASDIFF_VERSION: "1.10.23" }
+        shell: bash   # -eo pipefail: the tee below must not hide the gate's exit code
+        run: |
+          git show "origin/${{ github.base_ref }}:api/openapi/core.yaml" > "$RUNNER_TEMP/base.yaml" || { echo "no base spec yet"; exit 0; }
+          curl -sSfL "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz" | tar xz oasdiff
+          ./oasdiff breaking "$RUNNER_TEMP/base.yaml" api/openapi/core.yaml -f json > "$RUNNER_TEMP/breaking.json"
+          python3 scripts/ci/api_contract.py breaking "$RUNNER_TEMP/breaking.json" api/openapi/core.yaml | tee -a "$GITHUB_STEP_SUMMARY"
+
   # OPS-036 / FEF-049 stage 7: preview per PR + browser smoke and axe. Off until the preview cluster exists (vars.PREVIEW_ENABLED).
   preview:
     needs: stage6-build-and-scan
