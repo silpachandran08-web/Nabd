@@ -99,13 +99,20 @@ public class ProvisioningService {
     }
 
     public List<ProvisioningJobResponse> listJobs() {
-        return repo.listJobs().stream().map(j -> toResponse(j.id())).toList();
+        return repo.listJobsWithSteps().stream().map(j -> toResponse(j.job(), j.steps(), null, null)).toList();
     }
 
-    /** Runs the next incomplete step (a queued first attempt, or a retry of the step that last failed). Idempotent once done. */
+    /**
+     * Runs the next incomplete step (a queued first attempt, or a retry of the step that last failed). Idempotent once done.
+     * PLT-058: the step is claimed by compare-and-set, so of two concurrent calls exactly one runs it; the other gets 409.
+     */
     public ProvisioningJobResponse advance(UUID jobId, UUID operatorId, String ip) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
         realDataGuard.check();
+        if ("rolled_back".equals(job.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "JOB_TERMINAL", "Job is terminal",
+                    "This provisioning job was rolled back and cannot be advanced; create a new job.");
+        }
         if (job.isGatedAndUnapproved()) {
             return toResponse(jobId); // enterprise job awaiting approval — same no-op idiom as "already done"
         }
@@ -114,7 +121,10 @@ public class ProvisioningService {
             return toResponse(jobId); // every step already done
         }
 
-        repo.markStepRunning(next.id());
+        if (!repo.claimStep(next.id())) {
+            throw new ApiException(HttpStatus.CONFLICT, "STEP_ALREADY_RUNNING", "Step already running",
+                    "Step " + next.stepName() + " is already running for this job; refresh to see its result.");
+        }
         repo.updateJobStatus(jobId, "running");
         StepResult result = StepResult.NONE;
         try {
@@ -130,7 +140,7 @@ public class ProvisioningService {
             log.warn("provisioning job {} step {} failed", jobId, next.stepName(), e);  // log-phi-ok: workflow step name
             repo.markStepFailed(next.id(), summarize(e));
             if (e instanceof FatalProvisioningException) {
-                rollback(jobId, job);
+                rollback(jobId, job, operatorId, ip);
             } else {
                 repo.updateJobStatus(jobId, "failed"); // ordinary/transient failure — stays retryable via advance()
             }
@@ -165,16 +175,20 @@ public class ProvisioningService {
      * create_tenant's tenant row and must go first. The step that actually failed stays 'failed';
      * only the steps whose completed work gets undone become 'rolled_back'.
      */
-    private void rollback(UUID jobId, Job job) {
+    void rollback(UUID jobId, Job job, UUID operatorId, String ip) {
         List<JobStep> steps = repo.findSteps(jobId);
+        List<String> compensated = new java.util.ArrayList<>();
         for (int i = steps.size() - 1; i >= 0; i--) {
             JobStep step = steps.get(i);
             if ("done".equals(step.status())) {
                 stepRunner.undo(job, step.stepName());
                 repo.markStepRolledBack(step.id());
+                compensated.add(step.stepName());
             }
         }
         repo.updateJobStatus(jobId, "rolled_back");
+        audit.record(null, operatorId, ip, "platform_provisioning.job_rolled_back", "provisioning_job", jobId,
+                Map.of("compensated", compensated));
         log.warn("provisioning job {} rolled back after a fatal failure", jobId);
     }
 
@@ -192,7 +206,11 @@ public class ProvisioningService {
     /** Both tokens are reveal-once — only advance() ever has either to pass, right after verify_invite_owner runs. */
     private ProvisioningJobResponse toResponse(UUID jobId, String ownerInviteToken, String ownerAccountInviteToken) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
-        List<ProvisioningStepResponse> steps = repo.findSteps(jobId).stream()
+        return toResponse(job, repo.findSteps(jobId), ownerInviteToken, ownerAccountInviteToken);
+    }
+
+    private ProvisioningJobResponse toResponse(Job job, List<JobStep> jobSteps, String ownerInviteToken, String ownerAccountInviteToken) {
+        List<ProvisioningStepResponse> steps = jobSteps.stream()
                 .map(s -> new ProvisioningStepResponse(s.stepName(), s.stepOrder(), s.status(),
                         s.startedAt(), s.completedAt(), s.errorDetail()))
                 .toList();

@@ -65,6 +65,17 @@ class ProvisioningStepRunner {
     /** Returns both reveal-once invite tokens when this step is verify_invite_owner (StepResult.NONE otherwise, never persisted). */
     @Transactional
     StepResult run(Job job, String stepName) {
+        // PLT-058: the effect and its idempotency key commit together, so a retry after a crash never redoes the effect.
+        if (repo.effectCommitted(job.id(), stepName)) {
+            log.info("provisioning job {} step {} effect already committed; marking done without re-running", job.id(), stepName); // log-phi-ok: workflow step name
+            return StepResult.NONE;
+        }
+        StepResult result = execute(job, stepName);
+        repo.recordEffect(job.id(), stepName);
+        return result;
+    }
+
+    private StepResult execute(Job job, String stepName) {
         return switch (stepName) {
             case "create_tenant" -> {
                 createTenant(job);
