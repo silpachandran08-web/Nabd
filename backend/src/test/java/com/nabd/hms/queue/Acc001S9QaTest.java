@@ -46,7 +46,7 @@ class Acc001S9QaTest extends ApiTestBase {
     private String patient(Ctx c) {
         int n = SEQ.incrementAndGet();
         ResponseEntity<Map> r = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(c.token, Map.of("name", java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10) + " Zq",
-                "phone", "+9197" + (1000000 + n), "dob", (1940 + n % 50) + "-0" + (1 + n % 9) + "-1" + (n % 9), "gender", "male")), Map.class);
+                "phone", "+91997" + (1000000 + n), "dob", (1940 + n % 50) + "-0" + (1 + n % 9) + "-1" + (n % 9), "gender", "male")), Map.class);
         assertThat(r.getStatusCode()).as("patient create: " + r.getBody()).isEqualTo(HttpStatus.CREATED);
         return (String) r.getBody().get("id");
     }

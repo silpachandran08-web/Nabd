@@ -67,7 +67,7 @@ class S10QaSlotRulesTest extends ApiTestBase {
     private String patient(String token) {
         int n = SEQ.incrementAndGet();
         ResponseEntity<Map> p = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", UUID.randomUUID().toString().replace("-", "").substring(0, 10) + " Zq", "phone", "+9185" + (1000000 + n), "dob", (1940 + n % 50) + "-0" + (1 + n % 9) + "-1" + (n % 9), "gender", "female")), Map.class);
+                "name", UUID.randomUUID().toString().replace("-", "").substring(0, 10) + " Zq", "phone", "+91985" + (1000000 + n), "dob", (1940 + n % 50) + "-0" + (1 + n % 9) + "-1" + (n % 9), "gender", "female")), Map.class);
         assertThat(p.getStatusCode()).as("patient " + p.getBody()).isEqualTo(HttpStatus.CREATED);
         return (String) p.getBody().get("id");
     }

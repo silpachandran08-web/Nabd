@@ -55,7 +55,7 @@ class NoteSigningAuthorityApiTest extends ApiTestBase {
                 "dayOfWeek", pgDayOfWeek(LocalDate.now(ZoneOffset.UTC)),
                 "startTime", "00:00:00", "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
         ResponseEntity<Map> patient = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
-                "name", "P" + tag, "phone", "+91999996" + tag + "0", "dob", "1990-01-01", "gender", "female")), Map.class);
+                "name", "P" + tag, "phone", "+919999960" + tag + "0", "dob", "1990-01-01", "gender", "female")), Map.class);
         ResponseEntity<Map> entry = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(ownerToken, Map.of(
                 "patientId", patient.getBody().get("id"), "doctorId", doctor.id().toString())), Map.class);
         String queueEntryId = (String) entry.getBody().get("id");
