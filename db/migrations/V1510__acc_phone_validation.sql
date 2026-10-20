@@ -9,9 +9,11 @@ SET lock_timeout = '5s';
 ALTER TABLE patients ADD COLUMN IF NOT EXISTS phone_invalid boolean NOT NULL DEFAULT false;
 
 -- GET /v1/patients/data-quality?issue=phone pages these by id; tiny partial index (only flagged rows).
+-- migration-lint: allow MIG-001 partial index on the few flagged rows; CONCURRENTLY cannot run in the Flyway transaction
 CREATE INDEX IF NOT EXISTS idx_patients_phone_invalid ON patients (tenant_id, id) WHERE phone_invalid;
 
 -- 2. Clinic country for phone defaults: UAE (AE) and Qatar (QA) clinics are allowed at the data layer, next to IN and KSA.
 --    Expand only; provisioning still offers IN/KSA (provisioning_jobs keeps its own check) and the region stays immutable (V5).
 ALTER TABLE tenants DROP CONSTRAINT IF EXISTS tenants_region_check;
-ALTER TABLE tenants ADD CONSTRAINT tenants_region_check CHECK (region IN ('IN', 'KSA', 'AE', 'QA'));
+ALTER TABLE tenants ADD CONSTRAINT tenants_region_check CHECK (region IN ('IN', 'KSA', 'AE', 'QA')) NOT VALID;
+ALTER TABLE tenants VALIDATE CONSTRAINT tenants_region_check;

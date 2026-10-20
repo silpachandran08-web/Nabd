@@ -263,10 +263,10 @@ class AuthRepository {
                 Timestamp.class, tenantId, sessionId).toInstant();
     }
 
-    /** PLT-007: tenant suspended/offboarded, one UPDATE for every live session (partial index on tenant_id). */
+    /** PLT-007: tenant suspended/offboarded, one UPDATE for every live session (partial index on tenant_id); one staff id per revoked session. */
     List<UUID> revokeAllForTenant(UUID tenantId, String reason) {
         return jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
-                "WHERE tenant_id = ? AND revoked_at IS NULL RETURNING id", UUID.class, reason, tenantId);
+                "WHERE tenant_id = ? AND revoked_at IS NULL RETURNING staff_id", UUID.class, reason, tenantId);
     }
 
     /**

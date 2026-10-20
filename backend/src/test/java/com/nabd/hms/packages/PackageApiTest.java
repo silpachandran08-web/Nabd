@@ -25,7 +25,7 @@ class PackageApiTest extends ApiTestBase {
 
     private String registerPatient(String token, String name) {
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", name, "phone", "+9198" + (7000000 + DOB_YEAR.get()), "dob",
+                "name", name, "phone", "+91998" + (7000000 + DOB_YEAR.get()), "dob",
                 (DOB_YEAR.getAndIncrement()) + "-01-01", "gender", "female")), Map.class);
         return (String) resp.getBody().get("id");
     }

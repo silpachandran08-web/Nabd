@@ -75,7 +75,7 @@ public class AppointmentService {
                     id, callerStaffId, req.patientId(), req.doctorId(), req.startTime());
             published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), req.startTime(), "scheduled", Map.of());
             return toResponse(repo.findById(tenantId, id).orElseThrow());
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | org.springframework.dao.PessimisticLockingFailureException e) {
             log.warn("booking conflict: doctor {} already booked at {}", req.doctorId(), req.startTime());
             throw SlotValidator.slotTakenOrRethrow(e);
         }
@@ -130,7 +130,7 @@ public class AppointmentService {
                     Map.of("previousAppointmentId", id, "previousStartTime", current.startTime()));
             waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
             return toResponse(repo.findById(tenantId, newId).orElseThrow());
-        } catch (DataIntegrityViolationException e) {
+        } catch (DataIntegrityViolationException | org.springframework.dao.PessimisticLockingFailureException e) {
             // rolls back the cancel too — no reason to leave the old slot released if the new one failed
             log.warn("reschedule conflict: doctor {} already booked at {}", current.doctorId(), req.newStartTime());
             throw SlotValidator.slotTakenOrRethrow(e);

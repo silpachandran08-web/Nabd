@@ -176,20 +176,27 @@ class DayCloseRepository {
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", tenantId, closeId, action, expected, counted, variance, note, actorId);
     }
 
+    /** One history row; the actor's name is resolved through iam's ActorDirectory (billing does not read staff). */
+    record HistoryRow(UUID id, LocalDate date, String action, java.math.BigDecimal expectedCash, java.math.BigDecimal countedCash,
+                      java.math.BigDecimal variance, String note, UUID actorId, Instant at) {
+        DayCloseHistoryResponse.Item withActorName(String actorName) {
+            return new DayCloseHistoryResponse.Item(id, date, action, expectedCash, countedCash, variance, note, actorName, at);
+        }
+    }
+
     /** Newest first; (beforeAt, beforeId) is the keyset cursor of the previous page's last item, both null for page one. */
-    List<DayCloseHistoryResponse.Item> history(UUID tenantId, LocalDate from, LocalDate to, Instant beforeAt, UUID beforeId, int limit) {
+    List<HistoryRow> history(UUID tenantId, LocalDate from, LocalDate to, Instant beforeAt, UUID beforeId, int limit) {
         return jdbc.query("""
-                SELECT e.id, c.close_date, e.action, e.expected_cash, e.counted_cash, e.variance, e.note, s.name AS actor_name, e.created_at
+                SELECT e.id, c.close_date, e.action, e.expected_cash, e.counted_cash, e.variance, e.note, e.actor_id, e.created_at
                 FROM day_close_events e
                 JOIN day_closes c ON c.id = e.day_close_id
-                LEFT JOIN staff s ON s.id = e.actor_id
                 WHERE e.tenant_id = ? AND c.close_date >= ? AND c.close_date <= ?
                   AND (?::timestamptz IS NULL OR (e.created_at, e.id) < (?::timestamptz, ?::uuid))
                 ORDER BY e.created_at DESC, e.id DESC
                 LIMIT ?
-                """, (rs, i) -> new DayCloseHistoryResponse.Item(rs.getObject("id", UUID.class), rs.getDate("close_date").toLocalDate(),
+                """, (rs, i) -> new HistoryRow(rs.getObject("id", UUID.class), rs.getDate("close_date").toLocalDate(),
                         rs.getString("action"), rs.getBigDecimal("expected_cash"), rs.getBigDecimal("counted_cash"),
-                        rs.getBigDecimal("variance"), rs.getString("note"), rs.getString("actor_name"),
+                        rs.getBigDecimal("variance"), rs.getString("note"), rs.getObject("actor_id", UUID.class),
                         rs.getTimestamp("created_at").toInstant()),
                 tenantId, Date.valueOf(from), Date.valueOf(to), tsOrNull(beforeAt), tsOrNull(beforeAt), beforeId, limit);
     }

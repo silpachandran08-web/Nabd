@@ -94,10 +94,6 @@ class StaffRepository {
                 tenantId);
     }
 
-    String tenantRegion(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst().orElse("IN");
-    }
-
     void insertInvite(UUID id, UUID tenantId, UUID roleId, String email, String name, String mobilePhone,
                        String scope, String inviteTokenHash, Instant inviteExpiresAt, UUID invitedBy, UUID departmentId) {
         jdbc.update(

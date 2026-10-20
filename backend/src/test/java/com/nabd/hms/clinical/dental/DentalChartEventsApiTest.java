@@ -32,7 +32,7 @@ class DentalChartEventsApiTest extends ApiTestBase {
         SeededStaff dentist = seedStaff(tenant, seedFullAccessRole(tenant.id()), "dent" + tag + "@a.com", "+91980007" + tag + "0", false);
         String token = loginAndGetAccessToken(dentist);
         ResponseEntity<Map> p = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "DP" + tag, "phone", "+91999997" + tag + "0", "dob", "1990-01-01", "gender", "male")), Map.class);
+                "name", "DP" + tag, "phone", "+919999970" + tag + "0", "dob", "1990-01-01", "gender", "male")), Map.class);
         return new Chart(tenant, dentist, token, (String) p.getBody().get("id"));
     }
 

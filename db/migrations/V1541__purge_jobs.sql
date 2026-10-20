@@ -48,6 +48,7 @@ REVOKE ALL ON FUNCTION purge_whatsapp_messages(int, int) FROM PUBLIC;
 -- because the purge is one cross-tenant range.
 -- shortcut: plain CREATE INDEX (Flyway runs this in a transaction, so no CONCURRENTLY; V150/V311 precedent); on a
 -- large prod table run each by hand with CONCURRENTLY first, IF NOT EXISTS makes this a no-op afterwards.
+-- migration-lint: allow MIG-001 CONCURRENTLY cannot run in the Flyway transaction; see the shortcut above
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions (expires_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_attempted_at ON login_attempts (attempted_at);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_created_at ON whatsapp_messages (created_at);

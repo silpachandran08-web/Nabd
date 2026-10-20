@@ -2,7 +2,7 @@ package com.nabd.hms.patient;
 
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.PhoneNumbers;
-import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.common.TenantScope;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,13 +35,13 @@ public class PhoneRenormaliseJob implements ApplicationRunner {
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
-    private final TenantContext tenantContext;
+    private final TenantScope tenantScope;
     private final AuditService audit;
 
-    PhoneRenormaliseJob(JdbcTemplate jdbc, TransactionTemplate tx, TenantContext tenantContext, AuditService audit) {
+    PhoneRenormaliseJob(JdbcTemplate jdbc, TransactionTemplate tx, TenantScope tenantScope, AuditService audit) {
         this.jdbc = jdbc;
         this.tx = tx;
-        this.tenantContext = tenantContext;
+        this.tenantScope = tenantScope;
         this.audit = audit;
     }
 
@@ -58,8 +58,7 @@ public class PhoneRenormaliseJob implements ApplicationRunner {
         UUID after = new UUID(0, 0); // lowest uuid in Postgres byte order
         while (true) {
             UUID from = after;
-            Batch b = tx.execute(s -> {
-                tenantContext.set(tenantId);
+            Batch b = tenantScope.run(tenantId, () -> {
                 jdbc.execute("SET LOCAL nabd.skip_updated_at = 'on'");
                 List<Row> rows = jdbc.query("SELECT id, phone, phone_invalid FROM patients WHERE tenant_id = ? AND id > ? ORDER BY id LIMIT ?",
                         (rs, i) -> new Row(rs.getObject("id", UUID.class), rs.getString("phone"), rs.getBoolean("phone_invalid")),

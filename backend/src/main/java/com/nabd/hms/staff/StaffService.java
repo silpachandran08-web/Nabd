@@ -53,11 +53,14 @@ public class StaffService {
     private final EventPublisher eventPublisher;
 
     private final Clock clock;
+    private final com.nabd.hms.common.ClinicClock clinicClock;
 
     StaffService(StaffRepository staffRepo, RoleRepository roleRepo, TenantContext tenantContext,
                  PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService,
-                 GrantAuthority grantAuthority, EventPublisher eventPublisher, Clock clock) {
+                 GrantAuthority grantAuthority, EventPublisher eventPublisher, Clock clock,
+                 com.nabd.hms.common.ClinicClock clinicClock) {
         this.clock = clock;
+        this.clinicClock = clinicClock;
         this.staffRepo = staffRepo;
         this.roleRepo = roleRepo;
         this.tenantContext = tenantContext;
@@ -102,7 +105,7 @@ public class StaffService {
                     req.scopeOrDefault(), null);
         }
 
-        String mobile = com.nabd.hms.common.PhoneNumbers.require(req.mobilePhone(), staffRepo.tenantRegion(tenantId), "mobilePhone"); // ACC-028
+        String mobile = com.nabd.hms.common.PhoneNumbers.require(req.mobilePhone(), java.util.Objects.requireNonNullElse(clinicClock.region(tenantId), "IN"), "mobilePhone"); // ACC-028
         UUID id = UUID.randomUUID();
         String rawToken = OpaqueTokens.generate();
         Instant expiresAt = Instant.now(clock).plus(72, ChronoUnit.HOURS);

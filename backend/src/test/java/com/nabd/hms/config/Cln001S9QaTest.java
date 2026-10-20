@@ -112,7 +112,7 @@ class Cln001S9QaTest extends ApiTestBase {
     private String patient(String token, String gender, String dob) {
         int n = SEQ.incrementAndGet();
         ResponseEntity<Map> r = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of("name", java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10) + " Qz",
-                "phone", "+9196" + (1000000 + n), "dob", dob.substring(0, 5) + String.format("%02d-%02d", 1 + n % 12, 1 + n % 27), "gender", gender)), Map.class);
+                "phone", "+91996" + (1000000 + n), "dob", dob.substring(0, 5) + String.format("%02d-%02d", 1 + n % 12, 1 + n % 27), "gender", gender)), Map.class);
         assertThat(r.getStatusCode()).as("patient create: " + r.getBody()).isEqualTo(HttpStatus.CREATED);
         return (String) r.getBody().get("id");
     }
