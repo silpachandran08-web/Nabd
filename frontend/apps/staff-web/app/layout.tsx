@@ -4,6 +4,7 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import AppShell from "./AppShell";
 import IdleLockGuard from "./IdleLockGuard";
+import { QueryProvider } from "./lib/query";
 
 // DESIGN.md §2.1 — weights 400/500/600/700 only, Poppins is the only Latin family.
 const poppins = Poppins({
@@ -23,7 +24,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={poppins.variable}>
       <body>
         <IdleLockGuard>
-          <AppShell>{children}</AppShell>
+          <QueryProvider><AppShell>{children}</AppShell></QueryProvider>
         </IdleLockGuard>
       </body>
     </html>
