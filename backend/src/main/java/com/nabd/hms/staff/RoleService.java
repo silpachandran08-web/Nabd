@@ -84,7 +84,14 @@ public class RoleService {
         UUID id = UUID.randomUUID();
         repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), Boolean.TRUE.equals(req.mfaRequired()));
         log.info("role {} created by {} (tenant {})", id, callerStaffId, tenantId);
+        roleChanged(tenantId, id, "created");
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
+    }
+
+    /** OPS-015: the role id and what happened; consumers re-read grants (the role name is not carried). */
+    private void roleChanged(UUID tenantId, UUID roleId, String status) {
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.ROLE_CHANGED, roleId,
+                java.util.Map.of("roleId", roleId, "status", status));
     }
 
     @Transactional
@@ -100,6 +107,7 @@ public class RoleService {
         repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()),
                 req.mfaRequired() == null ? current.mfaRequired() : req.mfaRequired());
         log.info("role {} updated by {} (tenant {})", id, callerStaffId, tenantId);
+        roleChanged(tenantId, id, "updated");
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
@@ -115,6 +123,7 @@ public class RoleService {
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "not-a-preset", "NOT_A_PRESET",
                         "This is a custom role; only preset roles can be reset."));
         repo.resetToPreset(tenantId, id, writeGrantsJson(preset.grants()), RolePresets.VERSION);
+        roleChanged(tenantId, id, "reset_to_preset");
         RoleRow after = repo.findById(tenantId, id).orElseThrow();
         RoleRepository.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null, "role.reset_to_preset", "role", id,

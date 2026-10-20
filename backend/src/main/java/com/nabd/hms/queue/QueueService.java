@@ -2,6 +2,7 @@ package com.nabd.hms.queue;
 
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.DomainEventType;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.department.DepartmentService;
 import com.nabd.hms.queue.dto.CheckInRequest;
@@ -147,6 +148,11 @@ public class QueueService {
             }
             throw e;
         }
+        entryCreated(tenantId, id, req.doctorId(), today, "checked_in");
+        if (req.appointmentId() != null) {
+            events.publish(tenantId, DomainEventType.APPOINTMENT_ARRIVED, req.appointmentId(), java.util.Map.of(
+                    "appointmentId", req.appointmentId(), "doctorId", req.doctorId(), "queueEntryId", id, "status", "arrived"));
+        }
         var actor = repo.actor(tenantId, callerStaffId);
         auditService.record(tenantId, "staff", callerStaffId, (String) actor.get("name"), (String) actor.get("role"), null,
                 "queue.check_in", "queue_entry", id, null,
@@ -210,7 +216,24 @@ public class QueueService {
         payload.put("toStatus", nextStatus);
         payload.put("occurredAt", clock.now());
         payload.put("actorRole", role);
-        events.publish(tenantId, "visit.queue_entry.status_changed.v1", payload);
+        events.publish(tenantId, "visit.queue_entry.status_changed.v1", payload); // deprecated: superseded by visit.queue_entry.changed.v1
+        var changed = new java.util.LinkedHashMap<String, Object>();
+        changed.put("entryId", current.id());
+        changed.put("doctorId", current.doctorId());
+        changed.put("queueDate", current.queueDate());
+        changed.put("fromStatus", current.status());
+        changed.put("status", nextStatus);
+        events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CHANGED, current.id(), changed);
+        if ("completed".equals(nextStatus)) {
+            events.publish(tenantId, DomainEventType.VISIT_COMPLETED, current.encounterId(), java.util.Map.of("encounterId", current.encounterId(),
+                    "entryId", current.id(), "doctorId", current.doctorId(), "queueDate", current.queueDate(), "status", "completed"));
+        }
+    }
+
+    /** OPS-015: data is exactly { tenantId, entryId, doctorId, queueDate, status, version } (the publisher adds tenantId/version). */
+    private void entryCreated(UUID tenantId, UUID entryId, UUID doctorId, LocalDate queueDate, String status) {
+        events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CREATED, entryId,
+                java.util.Map.of("entryId", entryId, "doctorId", doctorId, "queueDate", queueDate, "status", status));
     }
 
     private ApiException stale(String currentStatus) {
@@ -262,6 +285,7 @@ public class QueueService {
                 current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null, req.reason(), blankToNull(req.reasonNote()), clock.now());
         log.info("queue entry {} opened by transfer from {} (doctor {}, department {})",
                 newId, id, req.doctorId(), req.toDepartmentId());
+        entryCreated(tenantId, newId, req.doctorId(), today, "waiting");
 
         var actor = repo.actor(tenantId, callerStaffId);
         auditService.record(tenantId, "staff", callerStaffId, (String) actor.get("name"), (String) actor.get("role"), null,
@@ -276,8 +300,10 @@ public class QueueService {
     @Transactional
     public QueueEntryResponse reorder(UUID tenantId, UUID callerStaffId, UUID id, QueueReorderRequest req) {
         tenantContext.set(tenantId);
-        repo.findById(tenantId, id).orElseThrow(this::notFound);
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
         repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null, callerStaffId);
+        events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CHANGED, id, java.util.Map.of("entryId", id, "doctorId", current.doctorId(),
+                "queueDate", current.queueDate(), "status", current.status(), "priority", req.priority()));
         log.info("queue entry {} priority set to {} by {}", id, req.priority(), callerStaffId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }

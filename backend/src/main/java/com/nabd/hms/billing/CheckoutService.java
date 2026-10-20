@@ -358,10 +358,16 @@ public class CheckoutService {
         auditService.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.payment_recorded", "invoice", invoiceId,
                 java.util.Map.of("paid", invoice.paid(), "status", invoice.status()),
                 java.util.Map.of("paymentId", paymentId, "method", req.method(), "amount", req.amount(), "paid", newPaid, "status", newStatus));
-        eventPublisher.publish(tenantId, PaymentRecordedHandler.TYPE, java.util.Map.of(
-                "tenantId", tenantId, "invoiceId", invoiceId, "paymentId", paymentId, "method", req.method(),
-                "amountMinor", req.amount().movePointRight(2).longValueExact(), "currency", currencyFor(tenantId),
+        String currency = currencyFor(tenantId);
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.PAYMENT_RECORDED, paymentId, java.util.Map.of(
+                "invoiceId", invoiceId, "paymentId", paymentId, "method", req.method(),
+                "amountMinor", req.amount().movePointRight(2).longValueExact(), "currency", currency,
                 "balanceMinor", newBalance.movePointRight(2).longValueExact(), "status", newStatus));
+        if ("paid".equals(newStatus) && !"paid".equals(invoice.status())) {
+            eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.INVOICE_PAID, invoiceId, java.util.Map.of(
+                    "invoiceId", invoiceId, "totalMinor", invoice.total().movePointRight(2).longValueExact(), "currency", currency,
+                    "status", "paid"));
+        }
         log.info("payment recorded on invoice {} by {}: {} {} (tenant {})", invoiceId, staffId, req.amount(), req.method(), tenantId);
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }

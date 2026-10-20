@@ -3,6 +3,8 @@ package com.nabd.hms.queue;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.Cursor;
+import com.nabd.hms.common.DomainEventType;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.queue.dto.AppointmentPage;
 import com.nabd.hms.queue.dto.AppointmentResponse;
@@ -24,6 +26,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,10 +46,12 @@ public class AppointmentService {
 
     private final ClinicClock clock;
     private final SlotValidator slotValidator;
+    private final EventPublisher events;
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
                         WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
-                        SlotValidator slotValidator) {
+                        SlotValidator slotValidator, EventPublisher events) {
+        this.events = events;
         this.slotValidator = slotValidator;
         this.clock = clock;
         this.repo = repo;
@@ -68,6 +73,7 @@ public class AppointmentService {
             UUID id = repo.insert(tenantId, req.patientId(), req.doctorId(), req.startTime(), end, req.isFollowUpOrDefault());
             log.info("appointment {} booked by {}: patient {} with doctor {} at {}",
                     id, callerStaffId, req.patientId(), req.doctorId(), req.startTime());
+            published(tenantId, DomainEventType.APPOINTMENT_BOOKED, id, req.doctorId(), req.startTime(), "scheduled", Map.of());
             return toResponse(repo.findById(tenantId, id).orElseThrow());
         } catch (DataIntegrityViolationException e) {
             log.warn("booking conflict: doctor {} already booked at {}", req.doctorId(), req.startTime());
@@ -103,6 +109,7 @@ public class AppointmentService {
         AppointmentRow current = requireScheduled(tenantId, id);
         repo.cancel(tenantId, id, req.reason());
         log.info("appointment {} cancelled by {}", id, callerStaffId);
+        published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, id, current.doctorId(), current.startTime(), "cancelled", Map.of());
         waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
         return toResponse(repo.findById(tenantId, id).orElseThrow());
     }
@@ -119,6 +126,8 @@ public class AppointmentService {
         try {
             UUID newId = repo.insert(tenantId, current.patientId(), current.doctorId(), req.newStartTime(), newEnd, current.isFollowUp());
             log.info("appointment {} rescheduled to {} (new id {}) by {}", id, req.newStartTime(), newId, callerStaffId);
+            published(tenantId, DomainEventType.APPOINTMENT_RESCHEDULED, newId, current.doctorId(), req.newStartTime(), "scheduled",
+                    Map.of("previousAppointmentId", id, "previousStartTime", current.startTime()));
             waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
             return toResponse(repo.findById(tenantId, newId).orElseThrow());
         } catch (DataIntegrityViolationException e) {
@@ -126,6 +135,18 @@ public class AppointmentService {
             log.warn("reschedule conflict: doctor {} already booked at {}", current.doctorId(), req.newStartTime());
             throw SlotValidator.slotTakenOrRethrow(e);
         }
+    }
+
+    /** OPS-015: ids, slot time and status only; the patient is never named in an event. */
+    private void published(UUID tenantId, DomainEventType type, UUID id, UUID doctorId, Instant startTime, String status,
+                           Map<String, Object> extra) {
+        var data = new java.util.LinkedHashMap<String, Object>();
+        data.put("appointmentId", id);
+        data.put("doctorId", doctorId);
+        data.put("startTime", startTime);
+        data.put("status", status);
+        data.putAll(extra);
+        events.publish(tenantId, type, id, data);
     }
 
     void markTerminal(UUID tenantId, UUID appointmentId, String status) {
