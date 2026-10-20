@@ -44,6 +44,7 @@ public class OutboxMetrics {
         }
     }
 
+    // OPS-013: no @SchedulerLock on purpose: per-replica gauges, every scraped pod must refresh its own
     @Scheduled(fixedDelayString = "${app.outbox.metrics-interval-ms:15000}")
     public void refresh() {
         try {

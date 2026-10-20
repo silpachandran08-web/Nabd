@@ -2,6 +2,7 @@ package com.nabd.hms.common;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -23,12 +24,9 @@ public class OutboxPurgeJob {
     }
 
     @Scheduled(cron = "${app.outbox.purge-cron:0 23 * * * *}")
+    @SchedulerLock(name = "outbox-purge", lockAtMostFor = "PT30M")
     public void scheduled() {
-        try {
-            purge(BATCH);
-        } catch (RuntimeException e) {
-            log.warn("outbox purge failed; retries next run", e);
-        }
+        purge(BATCH); // OPS-013: a failure propagates (Spring logs it, retries next run) so job_failures_total counts it
     }
 
     /** Returns rows deleted. Each batch is its own statement (auto-commit). */

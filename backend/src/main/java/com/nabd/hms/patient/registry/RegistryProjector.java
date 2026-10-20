@@ -4,6 +4,7 @@ import com.nabd.hms.common.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -43,6 +44,7 @@ public class RegistryProjector {
     }
 
     @Scheduled(fixedDelayString = "${app.registry.poll-interval-ms:1000}")
+    @SchedulerLock(name = "registry-projector", lockAtMostFor = "PT2M")
     public synchronized void drain() { // serialises the poller with explicit callers: SKIP LOCKED made a concurrent caller return before the poller's claim committed
         try {
             for (UUID tenantId : tx.execute(s -> repo.dirtyTenants(100))) {

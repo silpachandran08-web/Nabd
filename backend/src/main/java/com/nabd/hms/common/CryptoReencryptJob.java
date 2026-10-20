@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -76,6 +77,7 @@ public class CryptoReencryptJob {
     }
 
     @Scheduled(fixedDelayString = "${app.crypto.reencrypt.interval-ms:60000}", initialDelayString = "${app.crypto.reencrypt.interval-ms:60000}")
+    @SchedulerLock(name = "crypto-reencrypt", lockAtMostFor = "PT1H")
     public void scheduled() {
         if (!enabled) return;
         try {
