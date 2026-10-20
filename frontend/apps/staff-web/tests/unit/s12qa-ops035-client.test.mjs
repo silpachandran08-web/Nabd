@@ -40,8 +40,8 @@ function files(dir) {
   });
 }
 
-// known-defect-OPS-035: AC3 says "the FE build uses them"; nothing in staff-web imports the generated client (FEF-014, wave 2).
-test("staff-web app imports the generated client", { todo: "known-defect-OPS-035: app not wired to the generated client (FEF-014)" }, () => {
+// OPS-035 AC3 "the FE build uses them": was a todo until FEF-014 (wave 2) wired the app to the generated client.
+test("staff-web app imports the generated client", () => {
   const app = fileURLToPath(new URL("../../app", import.meta.url));
   const users = files(app).filter((f) => /api-client\/src\/generated|@nabd\/api-client\/generated/.test(readFileSync(f, "utf8")));
   assert.ok(users.length > 0, "no app module imports the generated client");

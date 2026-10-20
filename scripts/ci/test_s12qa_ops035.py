@@ -179,7 +179,7 @@ class GeneratedClient(unittest.TestCase):
 
     # known-defect-OPS-035 (AC3 "and the FE build uses them"): no app code imports the generated client (waits on FEF-014),
     # and the @nabd/api-client package exports neither ./src/generated nor declares msw.
-    @unittest.expectedFailure
+    # was expectedFailure (waited on FEF-014, now merged)
     def test_frontend_app_uses_the_generated_client(self):
         r = subprocess.run(["grep", "-rlE", "api-client/src/generated|@nabd/api-client/generated", "frontend/apps/staff-web/app"],
                            capture_output=True, text=True)
