@@ -4,7 +4,6 @@ import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.shared.security.Audience;
 import com.nabd.hms.shared.security.TokenType;
 import com.nabd.hms.support.ApiTestBase;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -206,7 +205,6 @@ class S12QaPlt007SessionsEndTest extends ApiTestBase {
      * longer works with the token issued before the edit.
      */
     @Test
-    @Tag("known-defect-PLT-007")
     void ac3_editingTheGrantsOfTheRoleTheReceptionistHoldsStopsTheRemovedPermissionWithin60s() {
         SeededTenant clinic = seedTenant();
         SeededStaff owner = seedStaff(clinic, seedFullAccessRole(clinic.id()), "qa2-own5@a.com", "+919310000025", true);
