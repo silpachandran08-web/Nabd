@@ -30,6 +30,8 @@ No 3.x line is supported, so the choice is 4.x. 4.0 ends in two months, so we ta
 1. **Jackson 3.** Boot 4 auto-configures Jackson 3 (`tools.jackson.*`). Our code moved mechanically:
    `com.fasterxml.jackson.databind.*` -> `tools.jackson.databind.*`, `com.fasterxml.jackson.core.type.TypeReference` -> `tools.jackson.core.type.TypeReference`,
    `JsonProcessingException` (checked) -> `tools.jackson.core.JacksonException` (unchecked), `JsonNode.asText(..)` -> `asString(..)`, `fieldNames()` -> `propertyNames()`.
+   `spring.jackson.use-jackson2-defaults=true` keeps the wire behaviour of the Boot 3 mapper (without it, a request that omits a primitive field such as `boolean active` is a 400).
+   `new ObjectMapper()` in our code gets plain Jackson 3 defaults (not Boot's); prefer injecting the Boot mapper.
    Annotations stay in `com.fasterxml.jackson.annotation`. `ObjectMapper` is immutable: configure through `JsonMapper.builder()`, not `enable(..)`.
    Jackson 2 jars are still on the classpath (swagger-core needs them), so **new code that imports `com.fasterxml.jackson.databind.ObjectMapper` still compiles but has no Spring bean and fails at context start.**
    The re-apply recipe for code written against the old tree:
