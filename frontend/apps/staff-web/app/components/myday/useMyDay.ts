@@ -4,7 +4,7 @@ import { decodeJwtPayload } from "../../lib/jwt";
 import { useCallback, useEffect, useState } from "react";
 import { can } from "../../lib/permissions";
 import { useLatestLoad } from "../../lib/useLatestLoad";
-import type { PatientDetail, QueueEntry } from "../consult/shared";
+import type { PatientSummary as PatientDetail, QueueEntry } from "@nabd/domain";
 import { apiFetch, goLogin } from "../../lib/apiClient";
 import { clinicTimeZoneReady, clinicToday } from "../../lib/clinicTime";
 

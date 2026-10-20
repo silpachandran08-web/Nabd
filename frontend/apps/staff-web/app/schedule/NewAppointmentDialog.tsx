@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { can } from "../lib/permissions";
 import styles from "./schedule.module.css";
 import { hijriLabel } from "../lib/hijri";
+import type { Problem } from "@nabd/api-client/types";
 
 type Patient = { id: string; mrn: string; name: string; phone: string };
-type Problem = { type?: string; title?: string; detail?: string };
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
 
 /** Plain-language booking refusals keyed by the problem type slug; anything unknown gets the generic line, never the raw server text. */

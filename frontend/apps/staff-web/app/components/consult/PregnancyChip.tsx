@@ -4,7 +4,7 @@ import { useState } from "react";
 import StatusPill, { type PillTone } from "../ui/StatusPill";
 import type { IconName } from "../ui/Icon";
 import type { ClinicalContext } from "./clinical";
-import { pregnancyPromptRelevant } from "./pregnancyPolicy";
+import { pregnancyPromptRelevant } from "@nabd/domain";
 import { age, type AuthedFetch, type PatientDetail } from "./shared";
 import s from "./consultParts.module.css";
 

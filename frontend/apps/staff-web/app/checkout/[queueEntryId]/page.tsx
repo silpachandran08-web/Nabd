@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
-import { formatMoney } from "../../lib/money";
+import { formatMoney, paymentMethodLabel } from "@nabd/domain";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
 import StatusPill from "../../components/ui/StatusPill";
 import { autoLink, rxErrorMessage, unlinkedRx } from "../../components/checkout/rxLink";
 import { getIdentity } from "../../lib/session";
 import { can } from "../../lib/permissions";
-import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
 import { api, ApiError, errorText, intentKeys } from "../../lib/api";

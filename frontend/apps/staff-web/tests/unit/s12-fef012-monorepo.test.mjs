@@ -21,8 +21,14 @@ test("AC2: real app feature folders: new cross-feature edge fails; own folder, s
   const at = "app/components/arrivals/X.tsx";
   const [bad] = await eslint.lintText('import { age } from "../consult/shared";\nexport const a = age;\n', { filePath: at });
   assert.equal(errs(bad, "boundaries/dependencies").length, 1, JSON.stringify(bad.messages));
+  // FEF-013 removed the frozen baseline: the three old edges fail like any other.
+  for (const [file, code] of [["app/components/arrivals/X.tsx", 'import { TenderRows } from "../checkout/TenderRows";'],
+    ["app/components/myday/X.tsx", 'import { age } from "../consult/shared";'], ["app/components/templates/X.tsx", 'import { RxPad } from "../consult/RxPad";']]) {
+    const [r] = await eslint.lintText(`${code}\nexport const v = 1;\n`, { filePath: file });
+    assert.equal(errs(r, "boundaries/dependencies").length, 1, file + JSON.stringify(r.messages));
+  }
   const okCode = [
-    'import { PAYMENT_METHODS } from "../checkout/paymentMethods";', // frozen baseline edge (FEF-013 removes it)
+    'import { PAYMENT_METHODS } from "@nabd/domain";', // FEF-013: shared rules come from packages/domain
     'import { CheckInDialog } from "./CheckInDialog";',
     'import { Button } from "../ui/Button";',
     'import { formatClinicDate } from "../../lib/clinicTime";',

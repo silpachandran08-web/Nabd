@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
 import { can } from "../../lib/permissions";
-import styles from "./rxSets.module.css";
-import { RxSetCard, RxSetDeleteDialog, RxSetEditDialog } from "./RxSetParts";
-import { SCOPE_LABEL, toWriteItem, useRxSets, type RxSet, type RxSetScope } from "./rxSets";
+import styles from "../ui/rxSets.module.css";
+import { RxSetCard, RxSetDeleteDialog, RxSetEditDialog } from "../ui/RxSetParts";
+import { SCOPE_LABEL, toWriteItem, type RxSet, type RxSetScope } from "@nabd/domain";
+import { useRxSets } from "../../lib/useRxSets";
 import type { AuthedFetch, Prescription, PrescriptionItem, Problem } from "./shared";
 
 // DOC-035: the pad's "Favourite Rx sets" block. Applying a set goes through the server's apply-set endpoint, which keeps

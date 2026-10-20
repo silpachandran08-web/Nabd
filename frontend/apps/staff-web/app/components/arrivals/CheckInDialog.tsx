@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Dialog from "../ui/Dialog";
 import { Skeleton } from "../ui/StateViews";
-import { PAYMENT_METHODS, paymentMethodLabel } from "../checkout/paymentMethods";
+import { PAYMENT_METHODS, paymentMethodLabel } from "@nabd/domain";
 import { getIdentity } from "../../lib/session";
 import { api, errorText, intentKeys } from "../../lib/api";
-import type { QueueEntry, StaffOption, WaitEstimate } from "@nabd/api-client/types";
+import type { StaffOption, WaitEstimate } from "@nabd/api-client/types";
+import type { QueueEntry } from "@nabd/domain";
 import styles from "./checkin.module.css";
 
 // One check-in overlay shared by Arrivals and Patients (REC-041, REC-017): confirm -> POST

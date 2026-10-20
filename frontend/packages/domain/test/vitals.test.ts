@@ -1,13 +1,13 @@
 // NUR-023: the vitals capture form (/nursing Capture vitals, /arrivals Record vitals) must never let a blank
 // or implausible save through, since a save moves the visit from vitals_pending to vitals_done.
-// Runs with plain Node (type stripping imports the .ts module directly): `npm run -s test:unit`.
-// The limits asserted here are the ones already in app/lib/vitals.ts (mirroring VitalsWriteRequest);
+// FEF-013: moved from staff-web tests/unit (node:test) to Vitest in packages/domain.
+// The limits asserted here are the ones already in src/vitals.ts (mirroring VitalsWriteRequest);
 // they await clinical sign-off (CLINICAL_SIGNOFF_PACK D14-D15) and this test does not add any.
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
-import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload } from "../../app/lib/vitals.ts";
+import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, type VitalsExtras, type VitalsForm } from "../src/vitals.ts";
 
-const form = (patch) => ({ ...EMPTY_VITALS, ...patch });
+const form = (patch: Partial<VitalsForm>): VitalsForm => ({ ...EMPTY_VITALS, ...patch });
 
 test("a completely blank form is blocked with a form-level error", () => {
   const errs = vitalsErrors(form({}));
@@ -64,7 +64,7 @@ test("payload sends blanks as null (server keeps the stored value) and numbers a
 });
 
 // NUR-021: combined BP box, blood sugar, pain score.
-import { parseBp, nurseVitalsErrors, nurseVitalsPayload, EMPTY_EXTRAS } from "../../app/lib/vitals.ts";
+import { parseBp, nurseVitalsErrors, nurseVitalsPayload, EMPTY_EXTRAS } from "../src/vitals.ts";
 
 test("parseBp accepts 120/80 and 120 / 80, blank, and rejects junk", () => {
   assert.deepEqual(parseBp("120/80"), { sys: "120", dia: "80" });
@@ -81,7 +81,7 @@ test("nurse form: BP errors land on the combined bp key; systolic must exceed di
 });
 
 test("nurse form: pain 0-10 whole numbers; a lone blood sugar or pain value is enough to save; blank is refused", () => {
-  const x = (o) => ({ ...EMPTY_EXTRAS, ...o });
+  const x = (o: Partial<VitalsExtras>): VitalsExtras => ({ ...EMPTY_EXTRAS, ...o });
   assert.ok(nurseVitalsErrors(EMPTY_VITALS, "", x({ painScore: "11" })).painScore);
   assert.ok(nurseVitalsErrors(EMPTY_VITALS, "", x({ painScore: "2.5" })).painScore);
   assert.deepEqual(nurseVitalsErrors(EMPTY_VITALS, "", x({ painScore: "0" })), {});
@@ -91,7 +91,7 @@ test("nurse form: pain 0-10 whole numbers; a lone blood sugar or pain value is e
 });
 
 test("nurse payload splits BP and sends nulls for blanks", () => {
-  const p = nurseVitalsPayload(EMPTY_VITALS, "120/80", { bloodSugar: "", painScore: "3" });
+  const p: Record<string, number | null> = nurseVitalsPayload(EMPTY_VITALS, "120/80", { bloodSugar: "", painScore: "3" });
   assert.equal(p.bpSystolic, 120); assert.equal(p.bpDiastolic, 80);
   assert.equal(p.bloodSugar, null); assert.equal(p.painScore, 3); assert.equal(p.pulseBpm, null);
 });

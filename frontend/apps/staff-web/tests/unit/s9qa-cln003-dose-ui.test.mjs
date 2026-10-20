@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { weightAge, rateError, weightError } from "../../app/components/consult/doseLogic.ts";
+import { weightAge, rateError, weightError } from "../../../../packages/domain/src/doseLogic.ts"; // FEF-013: moved to @nabd/domain
 
 const src = readFileSync(new URL("../../app/components/consult/DoseCalculator.tsx", import.meta.url), "utf8");
 const page = readFileSync(new URL("../../app/consult/page.tsx", import.meta.url), "utf8");

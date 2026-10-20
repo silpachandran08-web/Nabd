@@ -9,12 +9,12 @@ import { ErrorState, Skeleton } from "../../components/ui/StateViews";
 import { decodeAccessToken, regionLabel, signOut as endClinicSession } from "../../lib/session";
 import { storeTokens } from "../../lib/apiClient";
 import { COOKIE_AUTH } from "../../lib/bffShim";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches GET /v1/owners/me/workspaces and POST /v1/owners/workspaces/select (OwnerController).
 type Clinic = { id: string; name: string; slug: string; region: string; status: string };
 type Brand = { id: string; name: string; status: string; clinics: Clinic[] };
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
-type Problem = { title: string; detail: string };
 
 const STATUS_TONE: Record<string, PillTone> = {
   active: "ok", trialing: "info", provisioning: "sync", overdue: "warn", suspended: "danger", offboarding: "warn", offboarded: "neutral",

@@ -17,7 +17,7 @@ import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useHasMounted } from "../lib/useHasMounted";
 import { adminOrdersQuery, getter, key, live, prefix, useReload } from "../lib/query";
-import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras } from "../lib/vitals";
+import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, VISIT_LABEL, type VitalKey, type VitalsForm, type VitalsExtras } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { api, ApiError } from "../lib/api";
 import { staleMessage } from "../lib/queueMove";
@@ -92,10 +92,6 @@ function softWarning(key: VitalKey, raw: string, adult: boolean): string | null 
   if (!Number.isFinite(n) || n < d.min || n > d.max) return null;
   return n < d.soft[0] || n > d.soft[1] ? `Outside usual range (${d.soft[0]}–${d.soft[1]} ${d.unit}) — recheck` : null;
 }
-const VISIT_LABEL: Record<string, string> = {
-  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
-  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
-};
 // Same catalogue as arrivals' Mark priority — nursing can only acknowledge an existing flag
 // today, never raise one; this is the missing "Mark urgent" quick action from DESIGN.md's
 // Vitals Worklist toolbar, using the same POST /queue/{id}/reorder reception already drives.

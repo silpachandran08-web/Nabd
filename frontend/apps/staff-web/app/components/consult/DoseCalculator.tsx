@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
-import { rateError, weightAge, weightError, type DoseResult } from "./doseLogic";
+import { rateError, weightAge, weightError, type DoseResult } from "@nabd/domain";
 import type { AuthedFetch, Problem } from "./shared";
 import s from "./consultParts.module.css";
 import d from "./dose.module.css";

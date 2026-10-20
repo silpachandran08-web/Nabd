@@ -17,7 +17,7 @@ import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
 import { useHasMounted } from "../lib/useHasMounted";
 import { getter, key, live, prefix, queueQuery, useDebounced, useReload } from "../lib/query";
-import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, type VitalsForm } from "../lib/vitals";
+import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, VISIT_LABEL, type VitalsForm } from "@nabd/domain";
 import { staleMessage } from "../lib/queueMove";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, type CheckInResult } from "../components/arrivals/CheckInDialog";
 import { api, ApiError, errorText, intentKeys } from "../lib/api";
@@ -55,10 +55,6 @@ const failText = (e: unknown, fallback: string) =>
 const patientDetailQuery = (id: string) => ({ queryKey: key("patient", { id }), queryFn: getter<PatientDetailResponse>(`/patients/${id}`), staleTime: STALE.patient });
 const QUEUE_MOVE = ["queue-move"];
 
-const VISIT_LABEL: Record<string, string> = {
-  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
-  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
-};
 
 // REC-011: the table's Visit column (QueueRepository's visit_type), same labels as /schedule.
 const VISIT_TYPE_LABEL: Record<string, string> = {

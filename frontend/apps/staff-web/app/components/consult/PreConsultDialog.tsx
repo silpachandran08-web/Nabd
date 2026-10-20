@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
 import AllergyRegister from "./AllergyRegister";
-import { queueStatusLabel } from "./consultFlow";
+import { queueStatusLabel } from "@nabd/domain";
 import StatusPill from "../ui/StatusPill";
 import { Skeleton } from "../ui/StateViews";
 import { useClinicalContext } from "./clinical";

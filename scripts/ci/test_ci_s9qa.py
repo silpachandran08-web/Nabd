@@ -145,7 +145,8 @@ class Artefacts(unittest.TestCase):
     def test_frontend_typecheck_runs_typegen_first_and_consult_flow_is_in_npm_test(self):
         s = json.load(open("frontend/apps/staff-web/package.json"))["scripts"]
         self.assertRegex(s["typecheck"], r"^next typegen && tsc --noEmit")
-        self.assertIn("scripts/test-consult-flow.mjs", s["test:unit"])
+        # FEF-013: the consult-flow cases moved to Vitest in packages/domain (turbo runs its test script in CI)
+        self.assertIn("vitest run --coverage", json.load(open("frontend/packages/domain/package.json"))["scripts"]["test"])
         self.assertEqual(s["test"], "npm run -s test:unit")
         self.assertIn("turbo run typecheck", R(".github/workflows/ci.yml"))  # FEF-012: turbo runs the app's typecheck script
 

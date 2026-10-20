@@ -17,7 +17,7 @@ const gen = (...args) => spawnSync("python3", [join(REPO, "scripts/api/generate_
 const tmp = () => mkdtempSync(join(tmpdir(), "fef014-"));
 
 // Ratchet: may only go down. Lower it when a squad closes a gap; Phase 1 S5 target is 0 (AC4).
-const AUGMENTATION_BASELINE = 14;
+const AUGMENTATION_BASELINE = 13; // FEF-013: QueueEntry entry removed (domain owns the queue row shape)
 
 test("AC1: Permission union = every authority in x-required-permission (public/authenticated excluded, a|b and SpEL split)", () => {
   const values = [...readFileSync(SPEC, "utf8").matchAll(/x-required-permission: "?(.+?)"?$/gm)].map((m) => m[1]);

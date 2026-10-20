@@ -39,7 +39,7 @@ export type Invoice = Omit<Patch<G.InvoiceResponse, "id" | "invoiceNumber" | "pa
   | "paid" | "balanceDue" | "status">, "lineItems" | "payments"> & { lineItems: LineItem[]; payments: Payment[] };
 
 // ---- augmentation entries (owner: front-desk squad, QueueController / StaffController / PatientController) ----
-export type QueueEntry = Patch<G.QueueEntryResponse, "tokenNumber">;
+// FEF-013: queue rows (GET /queue, POST /queue/check-in) use the one QueueEntry in @nabd/domain.
 export type StaffOption = Patch<G.StaffRosterEntry, "id" | "name">;
 /** gap: POST /patients returns an untyped Map in the spec (Record<string, unknown>). */
 export type CreatedPatient = { id: string };

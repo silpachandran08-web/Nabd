@@ -10,11 +10,12 @@
     "check:permissions": "node scripts/check-permission-rendering.mjs",
     "typegen": "next typegen",
     "typecheck": "next typegen && tsc --noEmit",
-    "test:unit": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/unit/*.test.mjs scripts/test-consult-flow.mjs",
+    "test:unit": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/unit/*.test.mjs",
     "test": "npm run -s test:unit"
   },
   "dependencies": {
     "@nabd/api-client": "workspace:*",
+    "@nabd/domain": "workspace:*",
     "@tanstack/react-query": "5.104.1",
     "next": "16.4.2",
     "react": "19.2.8",
