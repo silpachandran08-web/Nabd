@@ -308,7 +308,8 @@ export const WaitlistJoinRequestSchema = z.object({ doctorId: z.string(), patien
 export const WithdrawConsentRequestSchema = z.object({ consentType: z.string().optional() });
 export const WorkingHoursResponseSchema = z.object({ dayOfWeek: z.number().int().optional(), endTime: z.string().optional(), id: z.string().optional(), maxPatients: z.number().int().optional(), slotMinutes: z.number().int().optional(), startTime: z.string().optional() });
 export const WorkingHoursWriteRequestSchema = z.object({ dayOfWeek: z.number().int().gte(0).lte(6), endTime: z.string(), maxPatients: z.number().int().gte(1).optional(), slotMinutes: z.number().int().optional(), startTime: z.string() });
-export const WorklistResponseSchema = z.object({ items: z.array(ItemSchema).optional() });
+export const WorklistItemSchema = z.object({ entry: QueueEntryResponseSchema.optional(), patient: PatientDetailResponseSchema.optional(), vitals: VitalsResponseSchema.optional() });
+export const WorklistResponseSchema = z.object({ items: z.array(WorklistItemSchema).optional() });
 export const WorkspaceSelectRequestSchema = z.object({ clinicId: z.string() });
 export const WorkspacesResponseSchema = z.object({ brands: z.array(BrandWorkspaceResponseSchema).optional() });
 

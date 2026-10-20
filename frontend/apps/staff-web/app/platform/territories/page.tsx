@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "./territories.module.css";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
-import { formatMoney } from "../../lib/money";
+import { formatMoney } from "@nabd/domain";
 import { usePlatformFetch } from "../platformApi";
 
 // Matches GET /v1/platform/territories (TerritoryController). Region-level, not state-level — tenants

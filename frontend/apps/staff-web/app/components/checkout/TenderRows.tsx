@@ -1,7 +1,7 @@
 "use client";
 
 import styles from "../../checkout/checkout.module.css";
-import { PAYMENT_METHODS, paymentMethodLabel } from "./paymentMethods";
+import { PAYMENT_METHODS, paymentMethodLabel } from "@nabd/domain";
 import { tenderTotalMinor, type Tender } from "./tender";
 
 // Split tender: one row per method. Presentational; the page owns the rows and the collecting.

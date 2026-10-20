@@ -49,7 +49,10 @@ Rules that decide the tier:
 - CI (`.github/workflows/migrations.yml`):
   - `python3 scripts/ci/classification_check.py --base <base>` fails when an added migration creates an untagged column;
   - after the migrate job, `classification_check.py --db <url>` compares the migrated schema with the file and fails on
-    untagged columns and on stale tags (a dropped column must lose its tag).
+    untagged columns and on stale tags (a dropped column must lose its tag). Flyway's own bookkeeping table
+    `public.flyway_schema_history` is excluded by name: it holds migration metadata, never product data.
+  - `CREATE TABLE ... AS SELECT` columns are read from the explicit column list or the select list's aliases/column
+    names; a column the scan cannot name (`SELECT *`, an unaliased expression) fails the gate until it is named.
 - Self-test: `python3 scripts/ci/test_classification_check.py` (failing and passing sample migrations under
   `scripts/ci/fixtures/classification/`).
 - Lines marked `# uncertain:` are judgement calls waiting for DPO review; resolve them by removing the comment or

@@ -7,9 +7,10 @@ import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
-import { RxSetCard, RxSetDeleteDialog, RxSetEditDialog } from "../consult/RxSetParts";
-import { useRxSets, type RxSet, type RxSetScope } from "../consult/rxSets";
-import type { AuthedFetch } from "../consult/shared";
+import { RxSetCard, RxSetDeleteDialog, RxSetEditDialog } from "../ui/RxSetParts";
+import type { RxSet, RxSetScope } from "@nabd/domain";
+import { useRxSets } from "../../lib/useRxSets";
+import type { AuthedFetch } from "../../lib/apiClient";
 import styles from "./templates.module.css";
 import { apiFetch, goLogin } from "../../lib/apiClient";
 

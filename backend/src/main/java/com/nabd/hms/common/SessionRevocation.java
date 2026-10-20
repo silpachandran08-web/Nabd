@@ -1,5 +1,6 @@
 package com.nabd.hms.common;
 
+import java.util.Collection;
 import java.util.Set;
 import java.util.UUID;
 
@@ -18,6 +19,15 @@ public final class SessionRevocation {
     /** Implemented by platform: is this operator session (master.sessions) still live. */
     public interface OperatorLiveness {
         boolean isActive(UUID sessionId);
+    }
+
+    /**
+     * OPS-020: implemented by iam's Valkey revocation cache. Every UPDATE that sets sessions.revoked_at passes the ids
+     * it revoked (RETURNING id), so every replica rejects them within a second (Ops020RevocationWriteThroughTest
+     * fails a new revoke statement that does not).
+     */
+    public interface RevokedSessions {
+        void revoked(Collection<UUID> sessionIds);
     }
 
     /** Implemented by iam: revoke every live staff session of a tenant in one UPDATE; returns the count. */

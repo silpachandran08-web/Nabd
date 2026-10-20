@@ -7,8 +7,9 @@ import styles from "./billing.module.css";
 import { getIdentity, getPermissions } from "../lib/session";
 import { can } from "../lib/permissions";
 import Icon, { type IconName } from "../components/ui/Icon";
-import { isKsa, paymentMethodLabel } from "../components/checkout/paymentMethods";
+import { isKsa, paymentMethodLabel } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import type { Problem } from "@nabd/api-client/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
@@ -35,7 +36,6 @@ type HistoryItem = {
   id: string; date: string; action: "close" | "reopen"; expectedCash: number | null; countedCash: number | null;
   variance: number | null; note: string | null; actorName: string | null; at: string;
 };
-type Problem = { title: string; detail: string };
 
 // The wireframe's unlock reasons; "Other" takes free text.
 const REOPEN_REASONS = ["Missing bill found afterwards", "Cash count entered incorrectly", "Payment method recorded wrongly"];

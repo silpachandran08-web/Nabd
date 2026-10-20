@@ -6,11 +6,11 @@ import styles from "./packages.module.css";
 import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
-import { PAYMENT_METHODS, paymentMethodLabel } from "../components/checkout/paymentMethods";
-import { formatMoney } from "../lib/money";
+import { PAYMENT_METHODS, paymentMethodLabel, formatMoney } from "@nabd/domain";
 import { getIdentity } from "../lib/session";
 import { eventLabel } from "./eventLabel";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches GET/POST/PATCH /v1/packages/** (PackageController) — E14 Treatment Packages.
 type PackageItem = { id: string; itemType: string; name: string; quantity: number; unitListPrice: number; taxRatePercent: number; listValue: number };
@@ -44,7 +44,6 @@ type LiabilityT = {
 type SettingsT = { priceFloorPercent: number };
 type StaffOption = { id: string; name: string };
 type PatientOption = { id: string; name: string; phone: string; mrn: string };
-type Problem = { title: string; detail: string };
 type ItemDraft = { itemType: string; name: string; quantity: string; unitListPrice: string; taxRatePercent: string };
 type Tab = "packages" | "active" | "sales" | "sessions" | "expiring" | "refunds" | "liability" | "settings";
 

@@ -39,6 +39,13 @@ def schema(root="."):
             tenant.add(norm(m.group(1)))
         for m in re.finditer(r"drop\s+table\s+(?:if\s+exists\s+)?([\w.\"]+)", sql, I):
             tables.discard(norm(m.group(1))); tenant.discard(norm(m.group(1)))
+        # PLT-033: ALTER TABLE x RENAME TO y moves the table (and its tenant flag) to the new name, in the old schema
+        for m in re.finditer(r"alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?([\w.\"]+)\s+rename\s+to\s+([\w\"]+)", sql, I):
+            old_t = norm(m.group(1)); new_t = norm(".".join(old_t.split(".")[:-1] + [m.group(2)]))
+            if old_t in tables:
+                tables.discard(old_t); tables.add(new_t)
+            if old_t in tenant:
+                tenant.discard(old_t); tenant.add(new_t)
     exempt = set()
     if os.path.exists(f"{root}/{EXEMPT}"):
         for ln in open(f"{root}/{EXEMPT}"):

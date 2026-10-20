@@ -66,7 +66,7 @@ public class RoleController {
     /** PLT-016: Owner only (checked in RoleService); 409 NOT_A_PRESET for a custom role. */
     @PostMapping("/{id}/reset-to-preset")
     @PreAuthorize("hasAuthority('staff:edit')")
-    @com.nabd.hms.shared.idempotency.Idempotent
+    @com.nabd.hms.shared.Idempotent
     public RoleResponse resetToPreset(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return service.resetToPreset(tenantId(jwt), staffId(jwt), id);
     }

@@ -1,5 +1,6 @@
-// Pure helpers for the consultation workspace (DOC-019, DOC-025, DOC-038, DOC-044). No React and no
-// imports, so the rules can be exercised directly (scripts/test-consult-flow.mjs).
+// Pure helpers for the consultation workspace (DOC-019, DOC-025, DOC-038, DOC-044). No React, so the rules
+// are exercised directly (packages/domain/test/consultFlow.test.ts).
+import type { QueueStatus } from "./status.ts";
 
 // ---- labels (DOC-044) -----------------------------------------------------------------------
 
@@ -9,7 +10,7 @@ export const QUEUE_STATUS_LABEL: Record<string, string> = {
   vitals_pending: "Vitals pending", vitals_done: "Ready for doctor", in_consult: "In consultation",
   procedures_pending: "Procedures pending", checkout_pending: "Checkout pending", completed: "Completed",
   no_show: "No-show", transferred_out: "Transferred",
-};
+} satisfies Record<QueueStatus, string>;
 export function queueStatusLabel(status: string): string {
   const known = QUEUE_STATUS_LABEL[status];
   if (known) return known;

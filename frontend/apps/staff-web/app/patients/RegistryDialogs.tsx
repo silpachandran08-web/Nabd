@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import styles from "./patients.module.css";
 import StatusPill from "../components/ui/StatusPill";
 import { fingerprint, submitKeyed } from "../lib/idempotency";
+import type { Problem } from "@nabd/api-client/types";
+import { age } from "@nabd/domain";
+import { clinicToday } from "../lib/clinicTime";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-type Problem = { title: string; detail: string; errors?: { field: string; message: string }[] };
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
 
 // PatientMatchCandidateResponse.matchScore is a 0-1 fraction (1.0 = exact phone match, else name similarity).
@@ -28,7 +30,7 @@ function useEscape(onClose: () => void) {
 }
 
 /** ACC-028: the server's field error for the phone (it names the clinic country), shown under the input. */
-function phoneFieldError(p: Problem | null): string | null {
+export function phoneFieldError(p: Problem | null): string | null {
   const e = p?.errors?.find((x) => x.field === "phone");
   return e ? `Mobile ${e.message}.` : null;
 }
@@ -53,14 +55,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
   const [saving, setSaving] = useState(false);
   useEscape(onClose);
 
-  const minor = (() => {
-    if (!form.dob) return false;
-    const [y, m, d] = form.dob.split("-").map(Number);
-    const now = new Date();
-    let age = now.getFullYear() - y;
-    if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age--;
-    return age < 18;
-  })();
+  const minor = !!form.dob && age(form.dob, clinicToday()) < 18;
 
   useEffect(() => {
     const q = guardianQuery.trim();

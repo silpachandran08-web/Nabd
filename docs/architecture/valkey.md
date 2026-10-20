@@ -3,6 +3,11 @@
 One Valkey connection for the whole API, owned by `com.nabd.hms.common.valkey`. Wave 2 stories (OPS-016 streams,
 OPS-017, OPS-020 revocation cache) reuse these beans. Never add a second Redis/Valkey config.
 
+**Persistence.** Since OPS-016 the event streams live here, and they are the only copy once the relay marked the outbox
+row done. So Valkey must persist: the cell's ElastiCache runs `durability = "sync"` (Terraform `valkey.tf`), a
+self-managed Valkey `appendonly yes` + `appendfsync always`. Never configure it as a cache-only store; the cache keys
+below still tolerate loss, the streams do not (recovery: the outbox redrive, events.md section 8).
+
 ## Configuration (`app.valkey.*`)
 
 | Property | Env | Default | Notes |
@@ -86,3 +91,32 @@ story in one class. Plain unit tests can build the production factory directly:
 - Valkey down: tenant/user/ip limits fail open; OTP limits are unaffected (Postgres).
 - At most one `shared.rate_limit.exceeded.v1` outbox event per bucket per minute (tenant and user dimensions).
 - The auth endpoints keep their own Postgres per-IP attempt limit (`app.auth.rate-limit-per-ip-per-minute`).
+
+## Session revocation and tenant config caches (OPS-020)
+
+| Cache | Where | Key / channel | Value | TTL | Invalidation |
+|---|---|---|---|---|---|
+| Session liveness | Valkey (`auth.SessionLivenessCache`, in front of `SessionLivenessChecker`) | `nabd:sess:g:<sid>` | `1` live, `0` revoked | live: min(60 s, token's remaining life); revoked: access-token life (15 min) | every `UPDATE sessions SET revoked_at` RETURNs the ids and calls `SessionRevocation.RevokedSessions.revoked` (after commit) |
+| Tenant zone/region | per instance (`common.ClinicClock`) | `nabd:tenant-zone:t:<tenant>:row` | `tenants.timezone`, `tenants.region` | `app.cache.tenant-config-ttl-seconds` (30) | `organization.config.changed.v1` -> relay -> `ev:<region>:organization` -> group `cache-invalidator` (one replica, `TenantConfigEvictions`; the outbox dispatcher where there is no Valkey) -> PUBLISH `nabd:cfg:changed` (tenant id) -> every instance evicts |
+| Tenant binding | per transaction (`common.TenantContext`) | ConnectionHolder | bound tenant id | the transaction | transaction end |
+
+- Keys come from `CacheKeyPolicy` (bean `shared.cache.CacheKeyPolicyConfig`, reads `classpath:db/classification.yaml`, which
+  `backend/pom.xml` packages from `db/`). `sessions.id`/`revoked_at` and `tenants.timezone`/`region` are operational, so a
+  global (session) key is allowed; a PHI column without a tenant key and an explicit allow is refused.
+- One Valkey per region cell (Terraform `infra/terraform/modules/cell/aws/valkey.tf`), so keys carry no region part.
+- A live marker is written `SET NX`, a revoked marker plain `SET`: a check racing a revocation cannot resurrect the session.
+- Valkey down: the DB check decides (fail closed for revoked sessions), `nabd_session_cache_fallback_total` goes up and
+  `session revocation cache unavailable` is logged at ERROR at most once a minute (alert `NabdSessionCacheFallback`,
+  `infra/observability/session-cache.rules.yml`). Revocations written while Valkey was down are retried on the next
+  successful call.
+- Fail closed across replicas (QA-7 D4): if the revoking pod cannot reach Valkey, its `0` never lands and the other
+  pods still hold a `1`. So every revocation also inserts its session ids into `session_cache_revocations` (V1700) in
+  the revoking transaction (rows older than 10 minutes are deleted on insert), and every pod re-reads the last 65 s of
+  ids every 250 ms (`app.cache.session-revocations-refresh-ms`), and on the request path when its copy is older than
+  750 ms. A `1` for such an id goes to the DB, which refuses it and re-writes the `0`; a pod that cannot read the table
+  trusts no `1`. So a revocation is refused on every replica within 1 s whatever Valkey does.
+- Platform operator sessions (`master.sessions`) are not cached.
+- Values never reach a log line or a metric tag: `scripts/ci/cache_values.py` (static, CI stage 1) and its `--samples`
+  mode on the logs and Prometheus scrape captured by `Ops020CacheApiTest` (CI stage 3).
+- Tests turn the zone cache off (`app.cache.tenant-config-ttl-seconds=0` in `src/test/resources/application.properties`)
+  because fixtures edit `tenants.timezone` with plain SQL; `Ops020CacheApiTest` turns it back on.

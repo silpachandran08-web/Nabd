@@ -6,8 +6,9 @@
 .chip { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding-inline: 8px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .yes { color: var(--nb-ok-500); background: var(--nb-ok-tint); }
 .no { color: var(--nb-text-tertiary); background: var(--nb-surface-3); }
-.na { color: var(--nb-text-disabled); border: 1px dashed var(--nb-border-default); }
+.na { color: var(--nb-text-tertiary); border: 1px dashed var(--nb-border-default); }
 .scroll { position: relative; overflow-x: auto; }
+.scroll:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th, .table td { padding: var(--nb-space-8) var(--nb-space-4); border-bottom: 1px solid var(--nb-border-subtle); text-align: center; }
 .table thead th { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--nb-text-tertiary); white-space: nowrap; }

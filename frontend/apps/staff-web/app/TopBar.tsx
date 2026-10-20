@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import styles from "./topBar.module.css";
 import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./lib/session";
 import { can } from "./lib/permissions";
+import type { AppPermission } from "@nabd/api-client/types";
 import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
 
 const SEARCH_INPUT_ID = "nb-global-search";
@@ -20,7 +21,8 @@ const SEARCH_INPUT_ID = "nb-global-search";
 // (clinical:create or clinical:edit, REC-060) for patients picked from the queue (queue:view); without the
 // queue the picker could only claim nobody is waiting. The walk-in dialog starts with a patient search
 // (GET /patients, patients:view) before check-in (queue:create), so both are needed (LIVE-04).
-const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?: string | string[] }> = {
+type Grant = AppPermission | `${AppPermission}|${AppPermission}`;
+const PRIMARY_ACTIONS: Record<string, { label: string; href: string; permission?: Grant | Grant[] }> = {
   "/nursing": { label: "Capture vitals", href: "/nursing?action=capture", permission: ["clinical:create|clinical:edit", "queue:view"] },
   "/schedule": { label: "Register walk-in", href: "/arrivals?action=walkin", permission: ["queue:create", "patients:view"] },
 };
@@ -95,12 +97,12 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
 
   // The owner's primary action on every owner page is "Start day close" (wireframe PRIMARY.owner);
   // /billing already carries its own button, and closing the day needs billing:approve.
-  const ownerAction: { label: string; href: string; permission?: string } | undefined = isOwner() && pathname !== "/billing" && getPermissions().includes("billing:approve")
+  const ownerAction: { label: string; href: string; permission?: Grant } | undefined = isOwner() && pathname !== "/billing" && getPermissions().includes("billing:approve")
     ? { label: "Start day close", href: "/billing?action=close" }
     : undefined;
   // The owner's day-close action wins over a page-level shortcut (wireframe PRIMARY.owner).
   const action = ownerAction ?? (pathname ? PRIMARY_ACTIONS[pathname] : undefined);
-  const primaryAction = action && [action.permission ?? []].flat().every((p) => p.split("|").some(can)) ? action : undefined;
+  const primaryAction = action && [action.permission ?? []].flat().every((p) => p.split("|").some((g) => can(g as AppPermission))) ? action : undefined; // Grant typed each part
 
   // Patient search lands on /patients, so a role without patients:view gets no search box at all.
   const canSearch = can("patients:view");

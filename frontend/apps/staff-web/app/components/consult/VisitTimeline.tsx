@@ -1,7 +1,7 @@
 "use client";
 
 import Icon, { type IconName } from "../ui/Icon";
-import type { TimelineEvent, TimelineKind } from "./consultFlow";
+import type { TimelineEvent, TimelineKind } from "@nabd/domain";
 import s from "./consultParts.module.css";
 
 const ICON: Record<TimelineKind, IconName> = { ok: "check", warn: "alert", info: "info", sync: "sync" };

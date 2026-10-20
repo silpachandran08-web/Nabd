@@ -6,11 +6,11 @@ import { decodeAccessToken, landingPathFor } from "../../lib/session";
 import { storeTokens } from "../../lib/apiClient";
 import styles from "../../login/login.module.css";
 import MfaEnrolCard from "../../components/MfaEnrolCard";
+import type { Problem } from "@nabd/api-client/types";
 
 // Matches POST /v1/staff/invitations/{token}/accept (StaffController.acceptInvite) — used by both
 // regular staff invites (staff/page.tsx) and the owner invite provisioning now sends (NB-353).
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
-type Problem = { title: string; detail: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 

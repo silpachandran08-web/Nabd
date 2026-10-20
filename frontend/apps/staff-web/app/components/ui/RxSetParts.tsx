@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Dialog from "../ui/Dialog";
-import StatusPill from "../ui/StatusPill";
+import Dialog from "./Dialog";
+import StatusPill from "./StatusPill";
 import { can } from "../../lib/permissions";
 import styles from "./rxSets.module.css";
 import {
   itemLine, lastUsedLabel, medCountLabel, SCOPE_LABEL, toWriteItem,
   type RxSet, type RxSetResult, type RxSetScope, type RxSetWriteItem,
-} from "./rxSets";
+} from "@nabd/domain";
 
 // DOC-035: one saved set, shared by the prescription pad panel and the Prescriptions & Templates screen.
 export function RxSetCard({ set, onApply, onEdit, onDelete, compact = false }: {

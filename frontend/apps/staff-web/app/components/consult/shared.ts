@@ -2,19 +2,12 @@
 // Shapes match GET /v1/queue, /patients/{id}, /clinical/* as already consumed by consult,
 // nursing and patients pages.
 
-import { queueStatusLabel } from "./consultFlow";
-
-export type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-
-export type QueueEntry = {
-  id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
-  queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
-  createdAt?: string; source?: string; presentingComplaint?: string | null;
-};
-export type PatientDetail = {
-  id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string;
-  allergies: string[]; chronicConditions: string[]; activePackages: number; outstandingBalance?: number; lastVisitAt: string | null;
-};
+// FEF-013: queue/patient shapes, status lists and age/initials/minutesSince live in @nabd/domain; re-exported for the consult files.
+import { queueStatusLabel, type PatientSummary as PatientDetail, type QueueEntry } from "@nabd/domain";
+export { age, DONE_STATUSES, initials, minutesSince, WAITING_STATUSES, type QueueEntry } from "@nabd/domain";
+export type { AuthedFetch } from "../../lib/apiClient";
+export type { Problem } from "@nabd/api-client/types";
+export type { PatientDetail };
 export type Row = QueueEntry & { patientName: string; patient: PatientDetail | null };
 
 // A safety warning on one prescription line (RxWarningResponse). Lines that requiresDecision block
@@ -47,7 +40,6 @@ export type Prescription = {
   /** CLN-004: dictionary version active at signing; null for drafts and older prescriptions. */
   safetyDictionaryVersion?: string | null;
 };
-export type Problem = { title: string; detail: string };
 
 export type Allergy = {
   id: string; substance: string; severity: string; reaction: string | null; active: boolean;
@@ -64,31 +56,9 @@ export type Vitals = {
   abnormalFlags: string[];
 };
 
-export const WAITING_STATUSES = ["checked_in", "waiting", "vitals_pending", "vitals_done"];
-export const DONE_STATUSES = ["checkout_pending", "completed", "no_show"];
-
 // DOC-044: one label map for queue statuses (consultFlow.QUEUE_STATUS_LABEL).
 export function statusLabel(status: string): string {
   return queueStatusLabel(status);
-}
-
-export function age(dob: string): number {
-  const d = new Date(dob);
-  const now = new Date();
-  let a = now.getFullYear() - d.getFullYear();
-  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) a--;
-  return a;
-}
-
-export function initials(name: string): string {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
-}
-
-export function minutesSince(iso: string | undefined | null, now: number): number | null {
-  if (!iso) return null;
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return null;
-  return Math.max(0, Math.round((now - t) / 60000));
 }
 
 export function daysAgoLabel(iso: string | null): string {

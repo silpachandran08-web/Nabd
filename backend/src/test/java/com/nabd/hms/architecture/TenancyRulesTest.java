@@ -32,6 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     TenantTransactionBinder); outbox handlers and the outbox processor never call it, baseline or not.</li>
  * <li>repository-outside-transaction: a *Repository is called only from a @Transactional method/class, a lambda
  *     (TransactionTemplate / TenantScope.run work) or a method that opens one of those itself.</li>
+ * <li>raw-tenant-guc: only TenantContext (and the test-only RepositoryTransactionGuard sentinel) may write
+ *     app.tenant_id / app.visible_tenant_ids (set_config or SET [LOCAL]); no baseline, main code has no other site.</li>
  * </ul>
  */
 class TenancyRulesTest {
@@ -120,6 +122,37 @@ class TenancyRulesTest {
     @Test
     void repositoriesOnlyInsideTransactionsOrFrozenBaseline() throws IOException {
         assertFrozen("repository-outside-tx-baseline.txt", repositoryCallsOutsideTransactions(main()));
+    }
+
+    static final java.util.regex.Pattern RAW_TENANT_GUC = java.util.regex.Pattern.compile(
+            "(?i)set_config\\s*\\(\\s*'app\\.(tenant_id|visible_tenant_ids)'|\\bset\\s+(local\\s+|session\\s+)?app\\.(tenant_id|visible_tenant_ids)\\s*(=|to\\b)");
+    static final Set<String> GUC_WRITERS = Set.of("com/nabd/hms/common/TenantContext.java", "com/nabd/hms/common/RepositoryTransactionGuard.java");
+
+    /** Source files (relative to root) that write a tenant GUC outside the tenancy core. */
+    static Set<String> rawTenantGucWriters(Path root) throws IOException {
+        Set<String> out = new TreeSet<>();
+        try (var files = Files.walk(root)) {
+            for (Path f : (Iterable<Path>) files.filter(x -> x.toString().endsWith(".java"))::iterator) {
+                String rel = root.relativize(f).toString().replace('\\', '/');
+                if (!GUC_WRITERS.contains(rel) && RAW_TENANT_GUC.matcher(Files.readString(f)).find()) out.add(rel);
+            }
+        }
+        return out;
+    }
+
+    @Test
+    void onlyTheTenancyCoreWritesTenantGucs() throws IOException {
+        assertThat(rawTenantGucWriters(Path.of("src/main/java")))
+                .as("raw set_config('app.tenant_id'/'app.visible_tenant_ids') bypasses the PLT-019 binding: use TenantContext.set / TenantScope.run")
+                .isEmpty();
+    }
+
+    @Test
+    void rawTenantGucRuleFlagsFixtures(@org.junit.jupiter.api.io.TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("Bad1.java"), "q(\"SELECT set_config( 'app.tenant_id', ?, true)\");");
+        Files.writeString(dir.resolve("Bad2.java"), "q(\"SET LOCAL app.visible_tenant_ids = 'x'\");");
+        Files.writeString(dir.resolve("Ok.java"), "q(\"SELECT current_setting('app.tenant_id', true)\"); // set app.tenant_id first");
+        assertThat(rawTenantGucWriters(dir)).containsExactly("Bad1.java", "Bad2.java");
     }
 
     @Test

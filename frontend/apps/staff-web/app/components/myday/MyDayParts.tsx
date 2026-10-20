@@ -5,7 +5,7 @@ import styles from "./myDay.module.css";
 import Icon from "../ui/Icon";
 import StatusPill from "../ui/StatusPill";
 import { EmptyState } from "../ui/StateViews";
-import { age, minutesSince, statusLabel } from "../consult/shared";
+import { age, minutesSince, queueStatusLabel as statusLabel } from "@nabd/domain";
 import { clinicToday, formatClinicDate, formatClinicTime } from "../../lib/clinicTime";
 import type { AppointmentPage, DayRow, DueCondition, MyDayData, Part } from "./useMyDay";
 

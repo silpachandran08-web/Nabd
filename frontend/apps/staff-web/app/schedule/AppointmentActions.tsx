@@ -5,8 +5,8 @@ import Dialog from "../components/ui/Dialog";
 import styles from "./schedule.module.css";
 import { clinicTime } from "./NewAppointmentDialog";
 import { hijriLabel } from "../lib/hijri";
+import type { Problem } from "@nabd/api-client/types";
 
-type Problem = { title: string; detail: string };
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 
 // Wireframe CANCEL_REASONS (NabdShell.html L5906). The chosen label is what gets sent.

@@ -5,7 +5,7 @@ import { clinicToday, formatClinicDate, formatClinicTime } from "../../lib/clini
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
 import StatusPill from "../ui/StatusPill";
 import { Skeleton } from "../ui/StateViews";
-import { upcomingFollowUp, type AppointmentLite } from "./consultFlow";
+import { upcomingFollowUp, type AppointmentLite } from "@nabd/domain";
 import type { AuthedFetch, Problem } from "./shared";
 import s from "./consultParts.module.css";
 

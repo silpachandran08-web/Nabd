@@ -306,7 +306,8 @@ export type WithdrawConsentRequest = { consentType?: string; };
 export type WorkflowTemplateResponse = { code?: string; name?: string; steps?: Array<string>; toggleKeys?: Array<string>; };
 export type WorkingHoursResponse = { dayOfWeek?: number; endTime?: string; id?: string; maxPatients?: number; slotMinutes?: number; startTime?: string; };
 export type WorkingHoursWriteRequest = { dayOfWeek: number; endTime: string; maxPatients?: number; slotMinutes?: number; startTime: string; };
-export type WorklistResponse = { items?: Array<Item>; };
+export type WorklistItem = { entry?: QueueEntryResponse; patient?: PatientDetailResponse; vitals?: VitalsResponse; };
+export type WorklistResponse = { items?: Array<WorklistItem>; };
 export type WorkspaceSelectRequest = { clinicId: string; };
 export type WorkspacesResponse = { brands?: Array<BrandWorkspaceResponse>; };
 
@@ -612,3 +613,59 @@ export type Operations = {
   WhatsAppWebhookController_receive: { method: "post"; path: "/v1/webhooks/whatsapp"; permission: "public"; pathParams: never; query: never; body: string; response: void };
 };
 export type OperationId = keyof Operations;
+
+/** Every authority an operation requires (x-required-permission; `a | b` and SpEL are split). FEF-014: can() takes this. */
+export type Permission =
+  | "audit_compliance:view"
+  | "billing:approve"
+  | "billing:create"
+  | "billing:edit"
+  | "billing:view"
+  | "billing_revenue:approve"
+  | "billing_revenue:edit"
+  | "billing_revenue:view"
+  | "clinical:approve"
+  | "clinical:breakGlass"
+  | "clinical:create"
+  | "clinical:edit"
+  | "clinical:view"
+  | "clinics_fleet:view"
+  | "departments:create"
+  | "departments:delete"
+  | "departments:edit"
+  | "departments:view"
+  | "nursing:create"
+  | "nursing:edit"
+  | "nursing:view"
+  | "onboarding_provisioning:view"
+  | "packages:approve"
+  | "packages:create"
+  | "packages:edit"
+  | "packages:view"
+  | "patients:create"
+  | "patients:delete"
+  | "patients:edit"
+  | "patients:view"
+  | "pharmacy:edit"
+  | "pharmacy:view"
+  | "pricing_packaging:view"
+  | "queue:create"
+  | "queue:edit"
+  | "queue:view"
+  | "reports:export"
+  | "reports:view"
+  | "safety_content:edit"
+  | "setup:edit"
+  | "setup:view"
+  | "specialty_dental:edit"
+  | "specialty_dental:view"
+  | "staff:create"
+  | "staff:delete"
+  | "staff:edit"
+  | "staff:view"
+  | "support_access:request"
+  | "support_access:view"
+  | "support_tickets:view"
+  | "tenant_detail:edit"
+  | "tenant_detail:view"
+  | "territories:view";

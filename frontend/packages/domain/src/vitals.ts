@@ -92,4 +92,4 @@ export type PreviousVitals = {
   bpSystolic?: number | null; bpDiastolic?: number | null; pulseBpm?: number | null; tempCelsius?: number | null;
   spo2Percent?: number | null; weightKg?: number | null; heightCm?: number | null; bloodSugar?: number | null; painScore?: number | null;
 };
-export const formatBp = (v: PreviousVitals) => (v.bpSystolic != null && v.bpDiastolic != null ? `${v.bpSystolic}/${v.bpDiastolic}` : "—");
+export const formatBp = (v: Pick<PreviousVitals, "bpSystolic" | "bpDiastolic">) => (v.bpSystolic != null && v.bpDiastolic != null ? `${v.bpSystolic}/${v.bpDiastolic}` : "—");

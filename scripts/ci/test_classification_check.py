@@ -37,6 +37,11 @@ class Gate(unittest.TestCase):
         self.assertEqual(cols, [("consent", "notices", "a"), ("consent", "notices", "b"), ("public", "t", "new"),
                                 ("public", "q", "id"), ("public", "q", "k")])
 
+    def test_create_table_as_select_columns(self):
+        self.assertEqual(cc.added_columns("CREATE TABLE c (a, b) AS SELECT x, y FROM t;"), [("public", "c", "a"), ("public", "c", "b")])
+        self.assertEqual([c for _, _, c in cc.added_columns("CREATE TABLE c AS SELECT p.name, count(*) AS n FROM patients p;")], ["name", "n"])
+        self.assertEqual([c for _, _, c in cc.added_columns("CREATE TABLE c AS SELECT * FROM patients;")], [cc.UNNAMED])  # fails closed
+
     def test_every_existing_migration_column_parses_to_a_tag_or_was_dropped_later(self):
         tags = cc.load()
         found = {f"{s}.{t}.{c}" for f in glob.glob("db/migrations/V*.sql") for s, t, c in cc.added_columns(open(f).read())}

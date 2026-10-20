@@ -38,8 +38,7 @@ resource "aws_cloudwatch_metric_alarm" "pitr_lag_heartbeat" {
   tags                = merge(var.tags, { data_class = "ops" })
 }
 
-# OPS-013: page the on-call when a retention purge job fails on 3 consecutive days (one run a night; the outbox purge
-# runs hourly, so "a day with any failure"). Source: the app's job_failures_total{job} counter on /actuator/prometheus,
+# OPS-013: page the on-call when a retention purge job fails on 3 consecutive days (one run a night, outbox included). Source: the app's job_failures_total{job} counter on /actuator/prometheus,
 # shipped per scrape as a delta into namespace Nabd/Jobs with the job label as dimension (cell CloudWatch agent).
 locals {
   purge_jobs = ["sessions-purge", "login-attempts-purge", "messages-purge", "outbox-purge"]

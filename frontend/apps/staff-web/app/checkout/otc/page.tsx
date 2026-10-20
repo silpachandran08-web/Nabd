@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
-import { formatMoney } from "../../lib/money";
+import { formatMoney, PAYMENT_METHODS, paymentMethodLabel } from "@nabd/domain";
 import { can } from "../../lib/permissions";
 import { getIdentity } from "../../lib/session";
-import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import AccessGate from "../../components/ui/AccessGate";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";

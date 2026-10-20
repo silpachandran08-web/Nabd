@@ -45,7 +45,9 @@ class Artefacts(unittest.TestCase):
     def test_frontend_scripts(self):
         s = json.load(open("frontend/apps/staff-web/package.json"))["scripts"]
         self.assertIn("next typegen && tsc --noEmit", s["typecheck"])
-        self.assertIn("scripts/test-consult-flow.mjs", s["test:unit"])
+        # FEF-013: the consult-flow cases moved to Vitest in packages/domain (turbo runs its test script in CI)
+        self.assertIn("vitest run --coverage", json.load(open("frontend/packages/domain/package.json"))["scripts"]["test"])
+        self.assertIn("test(", R("frontend/packages/domain/test/consultFlow.test.ts"))
         self.assertEqual(s["test"], "npm run -s test:unit")
     @unittest.skip("KNOWN GAP (Sprint 9 integration): Dockerfile kept as-is so Render keeps building; OPS-031 distroless jar-copy build needs a decision")
     def test_dockerfile(self):

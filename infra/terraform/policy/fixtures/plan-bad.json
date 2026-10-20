@@ -105,6 +105,29 @@
      }
     }
    }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_elasticache_replication_group.valkey",
+   "mode": "managed",
+   "type": "aws_elasticache_replication_group",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "transit_encryption_enabled": false,
+     "transit_encryption_mode": "preferred",
+     "at_rest_encryption_enabled": false,
+     "num_cache_clusters": 1,
+     "multi_az_enabled": false,
+     "automatic_failover_enabled": false,
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "ops"
+     }
+    }
+   }
   }
  ]
 }

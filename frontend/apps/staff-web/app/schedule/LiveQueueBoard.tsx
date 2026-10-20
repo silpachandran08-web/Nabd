@@ -5,14 +5,9 @@ import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
+import type { QueueEntry } from "@nabd/domain";
 import styles from "./schedule.module.css";
 
-// Matches GET /v1/queue (QueueController) — same shape the Arrivals page reads.
-type QueueEntry = {
-  id: string; appointmentId: string | null; patientId: string; doctorId: string; departmentId: string;
-  queueDate: string; tokenNumber: number; status: string; priority: boolean; priorityReason: string | null;
-  createdAt: string; source: string;
-};
 type BoardDoctor = { id: string; name: string; department: string | null; onLeave: boolean };
 
 const POLL_MS = 15_000;

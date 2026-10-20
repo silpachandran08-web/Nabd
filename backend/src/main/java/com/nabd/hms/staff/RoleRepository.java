@@ -17,9 +17,11 @@ import static com.nabd.hms.staff.StaffRoleModels.RoleRow;
 class RoleRepository {
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions;
 
-    RoleRepository(JdbcTemplate jdbc) {
+    RoleRepository(JdbcTemplate jdbc, com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions) {
         this.jdbc = jdbc;
+        this.revokedSessions = revokedSessions;
     }
 
     List<RoleRow> list(UUID tenantId) {
@@ -43,6 +45,13 @@ class RoleRepository {
     void update(UUID tenantId, UUID id, String name, String grantsJson, boolean mfaRequired) {
         jdbc.update("UPDATE roles SET name = ?, grants = ?::jsonb, mfa_required = ? WHERE tenant_id = ? AND id = ? AND built_in = false",
                 name, grantsJson, mfaRequired, tenantId, id);
+    }
+
+    /** PLT-007 AC3: grants live in the JWT, so a grant edit ends every live session of the role's holders; returns their staff ids. */
+    List<UUID> revokeHolderSessions(UUID tenantId, UUID roleId) {
+        return jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = 'role_changed' " +
+                "WHERE tenant_id = ? AND revoked_at IS NULL AND staff_id IN (SELECT id FROM staff WHERE tenant_id = ? AND role_id = ?) " +
+                "RETURNING staff_id", UUID.class, tenantId, tenantId, roleId).stream().distinct().toList();
     }
 
     /** PLT-016: back to the current preset definition; built_in is not filtered, so the Owner preset can move versions too. */
@@ -118,8 +127,8 @@ class RoleRepository {
     }
 
     void revokeSessions(UUID tenantId, UUID staffId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
-                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL", reason, tenantId, staffId);
+        revokedSessions.revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " + // OPS-020: Valkey cache
+                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL RETURNING id", UUID.class, reason, tenantId, staffId));
     }
 
     void revokeDelegation(UUID tenantId, UUID id) {

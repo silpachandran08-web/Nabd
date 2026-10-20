@@ -90,3 +90,33 @@ test("probe: signed-out tab makes no request", async () => {
   await m.probeSession();
   assert.deepEqual(calls, []);
 });
+
+test("probe: a hidden tab makes no request; becoming visible probes once (s8-rec8)", async () => {
+  const m = await fresh();
+  localStorage.setItem("nabd_access_token", jwt(now() + 600, now() - 100));
+  server(200, 200);
+  globalThis.document = { hidden: true };
+  try {
+    await m.probeSession();
+    m.onVisible();
+    assert.deepEqual(calls, []);
+    globalThis.document.hidden = false;
+    m.onVisible();
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(calls.filter((u) => u.endsWith("/auth/sessions")).length, 1);
+  } finally { delete globalThis.document; }
+});
+
+test("probe sign-out records 'access_changed'; a plain sign-out does not", async () => {
+  const m = await fresh();
+  localStorage.setItem("nabd_access_token", jwt(now() + 600, now() - 100));
+  localStorage.setItem("nabd_refresh_token", "r");
+  server(401, 401);
+  await m.probeSession();
+  assert.equal(m.signOutReason(), "access_changed");
+  const m2 = await fresh();
+  m2.goLogin();
+  assert.equal(m2.signOutReason(), null);
+  m.storeTokens({ accessToken: jwt(now() + 600, now()) });
+  assert.equal(m.signOutReason(), null);
+});

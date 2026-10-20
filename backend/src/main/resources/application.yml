@@ -140,7 +140,6 @@ app:
     # renewed before each event; OutboxProperties refuses to boot a config where a batch can outlive its lease.
     per-event-timeout-ms: 15000
     extend-lease-per-event: true
-    purge-cron: "0 23 * * * *"   # hourly: done rows after 7 days, dead after 90
     metrics-interval-ms: 15000
   # PLT-008 (docs/architecture/valkey.md): unset VALKEY_URL = no Valkey, the API limits nothing and still serves.
   # Under prod the URL must be rediss:// (TLS). Timeouts stay short: a slow Valkey must never slow the API.
@@ -148,6 +147,11 @@ app:
     url: ${VALKEY_URL:}
     connect-timeout-ms: 500
     command-timeout-ms: 250
+  # OPS-017 consumer groups on ev:<region>:<domain> (docs/architecture/events.md section 7). Inert without VALKEY_URL.
+  # Every replica runs every group; set false on pods that must not consume. Other knobs: ConsumerProperties.
+  events:
+    consumer:
+      enabled: ${EVENT_CONSUMERS_ENABLED:true}
   # PLT-008 token buckets (per minute, burst = bucket size). The tenant pair is the default when the tenant's plan
   # (master.plans.api_requests_per_minute / api_burst) has none; plan values are re-read every plan-refresh-seconds.
   rate-limit:

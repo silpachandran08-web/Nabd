@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Dialog from "../ui/Dialog";
-import { NOTE_FIELD_LABEL } from "./consultFlow";
+import { NOTE_FIELD_LABEL } from "@nabd/domain";
 import type { NoteFields } from "./draftStore";
 import s from "./consultParts.module.css";
 

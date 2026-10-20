@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import DrugCombobox from "./DrugCombobox";
-import { formatQty, formatSig, parseSig, ROUTES, SIG_STEPS, suggestQuantity, type SigSlots } from "./rxPadLogic";
+import { formatQty, formatSig, parseSig, ROUTES, SIG_STEPS, suggestQuantity, type SigSlots } from "@nabd/domain";
 import type { PrescriptionItem } from "./shared";
 import s from "./RxPad.module.css";
 

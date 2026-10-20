@@ -7,5 +7,6 @@ terraform {
       version               = "~> 5.81"
       configuration_aliases = [aws.dr]
     }
+    random = { source = "hashicorp/random", version = "~> 3.6" } # OPS-020: Valkey AUTH token
   }
 }

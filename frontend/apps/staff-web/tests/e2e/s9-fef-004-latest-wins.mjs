@@ -54,7 +54,8 @@ await run('arrivals', {
   handlers: [
     ['GET', /^\/schedule\/day/, { body: DAY }],
     ['GET', /^\/queue\/wait-estimate/, { body: { estimatedMinutes: 5 } }],
-    ['GET', /^\/queue(\?|$)/, seq([{ delay: 2000, body: [entry('p-old', 'q1')] }, { body: [entry('p-new', 'q2')] }], true)],
+    // FEF-015: the board and the sidebar badge now share one GET /queue (same query), so every /queue call is in the sequence.
+    ['GET', /^\/queue(\?|$)/, seq([{ delay: 2000, body: [entry('p-old', 'q1')] }, { body: [entry('p-new', 'q2')] }])],
     ['GET', /^\/patients\/p-old/, { body: patient('p-old', 'Stale Person') }],
     ['GET', /^\/patients\/p-new/, { body: patient('p-new', 'Fresh Person') }],
     ['GET', /./, { body: [] }],

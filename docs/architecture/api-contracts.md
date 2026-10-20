@@ -40,6 +40,12 @@ The response should also send the RFC 8594 `Sunset` header. To remove a whole op
 
 FEF-012 owns the package manifests (it must declare `zod`, and `msw` as a devDependency). FEF-014 moves the app's calls onto these types.
 
+FEF-014 additions:
+- `types.ts` also exports `Permission`, the union of every authority in `x-required-permission`; staff-web's `can()` takes it, so an unknown grant fails `tsc`.
+- Regenerate with `pnpm turbo run codegen` (or `pnpm --filter @nabd/api-client codegen`); CI stage 5 fails when committed output differs.
+- `packages/api-client/mocks/validating.ts` (`@nabd/api-client/mocks`, tests only): `createValidatingHandlers(baseUrl)` wraps the generated handlers so openapi-backend validates every request against `core.yaml`. A violation gets a 400 and is recorded. Call `assertNoSpecViolations()` in `afterEach`.
+- `packages/api-client/types.ts` is the augmentation file. A line `export type X = G.Y;` is wired. Every other export is one spec gap, and its owner is named in the comment above it. To close a gap, fix the backend DTO (`@Schema(requiredMode = REQUIRED)`, nullable) or the operation, regenerate, turn the entry into a plain alias, and lower `AUGMENTATION_BASELINE` in `apps/staff-web/tests/unit/s12-fef014-codegen.test.mjs`. The target is 0 entries by the end of Phase 1 S5.
+
 ## New modules: interface-first (openapi-generator `interfaceOnly`)
 A new module or service writes its operations in a spec file first and implements generated interfaces. Add this to `backend/pom.xml` when the first such module lands. No module needs it yet, so it is not wired:
 

@@ -2,6 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { STALE } from "@nabd/api-client/queries";
+import type { ActivityEntryResponse, AdministrationOrderResponse, FlowStepResponse, ProcedureOrderResponse, StaffRosterEntry, VitalsHistoryResponse, VitalsResponse, WorklistResponse } from "@nabd/api-client/generated";
 import styles from "./nursing.module.css";
 import Icon from "../components/ui/Icon";
 import Dialog from "../components/ui/Dialog";
@@ -12,24 +15,22 @@ import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
-import { useLatestLoad } from "../lib/useLatestLoad";
-import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "../lib/vitals";
+import { useHasMounted } from "../lib/useHasMounted";
+import { adminOrdersQuery, getter, key, live, prefix, useReload } from "../lib/query";
+import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, VISIT_LABEL, age, type QueueEntry, type VitalKey, type VitalsForm, type VitalsExtras } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
-import { moveBody, moveErrorMessage } from "../lib/queueMove";
+import { api, ApiError } from "../lib/api";
+import { staleMessage } from "../lib/queueMove";
+import { clinicToday } from "../lib/clinicTime";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
 // WhatsApp inbox, which doesn't exist. NB-147 (package sessions) is a link to /packages, which
 // already has the redeem action — no new UI needed for it.
-type QueueEntry = {
-  id: string; patientId: string; doctorId: string; departmentId: string; tokenNumber: number; status: string; createdAt: string;
-  priority: boolean; priorityReason: string | null; priorityFlaggedBy: string | null; priorityFlaggedAt: string | null;
-  priorityAcknowledgedBy: string | null; priorityAcknowledgedAt: string | null;
-  source: string; presentingComplaint: string | null; appointmentId: string | null;
-  // NUR-012 (S4 contract): optional until the backend ships them; the UI falls back to the worklist's patient / roster.
-  ageYears?: number | null; gender?: string | null; doctorName?: string | null; waitMinutes?: number | null; visitType?: string | null;
-};
-type Row = QueueEntry & {
+// FEF-015: response types are generated from the API spec; a row's queue fields are the one domain QueueEntry
+// (derived from the generated QueueEntryResponse, so a spec rename breaks here).
+type Entry = Omit<QueueEntry, "gender" | "ageYears">;
+type Row = Entry & {
   patientName: string; patientMrn: string; doctorName: string;
   allergies: string[]; chronicConditions: string[];
   lastVitalsAt: string | null; vitalsOutOfRange: boolean;
@@ -41,7 +42,7 @@ type Row = QueueEntry & {
 // complaint (neutral info). "Urgent" is reserved for the queue's priority flag (rendered
 // separately) — a routine complaint such as "cough" must never look urgent.
 type Flag = { kind: "danger" | "warn" | "info"; text: string };
-function flagsFor(r: { allergies: string[]; chronicConditions: string[]; presentingComplaint: string | null; priorityReason: string | null }): Flag[] {
+function flagsFor(r: { allergies: string[]; chronicConditions: string[]; presentingComplaint?: string | null; priorityReason?: string | null }): Flag[] {
   return [
     ...r.allergies.map((a): Flag => ({ kind: "danger", text: `Allergy: ${a}` })),
     ...r.chronicConditions.map((c): Flag => ({ kind: "warn", text: c })),
@@ -55,13 +56,8 @@ function ageSex(dob: string | null, gender: string | null, ageYears?: number | n
   const parts: string[] = [];
   if (ageYears != null) parts.push(String(ageYears));
   else if (dob) {
-    const d = new Date(dob);
-    if (!Number.isNaN(d.getTime())) {
-      const now = new Date();
-      let age = now.getFullYear() - d.getFullYear();
-      if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) age -= 1;
-      parts.push(age >= 0 ? String(age) : "");
-    }
+    const a = age(dob, clinicToday());
+    if (a >= 0) parts.push(String(a));
   }
   const g = (gender ?? "").trim().charAt(0).toUpperCase();
   if (g) parts.push(g);
@@ -78,9 +74,7 @@ const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: 
 // The soft ranges are adult ranges: for a child (or when the age is unknown) showing "outside usual
 // range" would mislead, so no hint is given; the server's age-banded flags still appear after save.
 function isAdult(dob: string | null): boolean {
-  if (!dob) return false;
-  const born = new Date(dob).getTime();
-  return Number.isFinite(born) && Date.now() - born >= 18 * 365.25 * 86_400_000;
+  return !!dob && age(dob, clinicToday()) >= 18;
 }
 
 function softWarning(key: VitalKey, raw: string, adult: boolean): string | null {
@@ -90,10 +84,6 @@ function softWarning(key: VitalKey, raw: string, adult: boolean): string | null 
   if (!Number.isFinite(n) || n < d.min || n > d.max) return null;
   return n < d.soft[0] || n > d.soft[1] ? `Outside usual range (${d.soft[0]}–${d.soft[1]} ${d.unit}) — recheck` : null;
 }
-const VISIT_LABEL: Record<string, string> = {
-  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
-  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
-};
 // Same catalogue as arrivals' Mark priority — nursing can only acknowledge an existing flag
 // today, never raise one; this is the missing "Mark urgent" quick action from DESIGN.md's
 // Vitals Worklist toolbar, using the same POST /queue/{id}/reorder reception already drives.
@@ -102,27 +92,18 @@ const URGENT_REASON_CODES = [
   "High fever in infant", "Post-operative complication", "Severe pain", "Other",
 ] as const;
 type VitalsFilter = "due" | "recorded" | "all";
-type StaffOption = { id: string; name: string };
-type AdministrationOrder = {
-  id: string; queueEntryId: string; patientId: string; patientName: string; orderedByName: string; drugName: string;
-  dose: string; route: string; site: string | null; status: string; recordedByName: string | null;
-  witnessedByName: string | null; refuseReason: string | null; recordedAt: string | null; createdAt: string;
-};
-type ProcedureOrder = {
-  id: string; queueEntryId: string; patientId: string; patientName: string; orderedByName: string; chargeCode: string;
-  chargeName: string; baseAmount: number; taxRatePercent: number; prepNotes: string | null; consentNote: string | null;
-  status: string; billed: boolean; completedByName: string | null; completedAt: string | null; createdAt: string;
-  consentSignedName: string | null; consentRecordedByName: string | null; consentSignedAt: string | null;
-};
-type ActivityEntry = { kind: string; activity: string; patientName: string; occurredAt: string };
-type Problem = { title: string; detail: string };
+type StaffOption = StaffRosterEntry & { id: string; name: string };
+type AdministrationOrder = AdministrationOrderResponse & { id: string };
+type ProcedureOrder = ProcedureOrderResponse & { id: string };
+type ActivityEntry = ActivityEntryResponse & { occurredAt: string };
+/** The Problem detail of a failed call, else the fallback (network errors included). */
+const detailOf = (e: unknown, fallback: string) => (e instanceof ApiError && e.detail) || fallback;
 // REC-060: recording vitals (blank fields go out as null, so the server keeps stored values) needs
 // clinical:create or clinical:edit; the server 403s (vitals-correction-forbidden) a changed recorded value
 // without clinical:edit, and the capture form never pre-fills or offers to change recorded values.
 const PERM = { vitalsCreate: "clinical:create", vitalsWrite: "clinical:edit", vitalsRead: "clinical:view", create: "nursing:create", edit: "nursing:edit", packages: "packages:view", queueView: "queue:view", queueEdit: "queue:edit" } as const;
 type Tab = "vitals" | "priority" | "administration" | "procedures" | "activity";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const POLL_MS = 15_000;
 const TABS: { key: Tab; label: string }[] = [
   { key: "vitals", label: "Arrivals & Vitals" },
@@ -177,29 +158,18 @@ export default function NursingPage() {
 function NursingWorklist() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => validTab(searchParams.get("tab")));
-  const [rows, setRows] = useState<Row[]>([]);
-  const [recordedRows, setRecordedRows] = useState<Row[]>([]);
-  const [vitalsFilter, setVitalsFilter] = useState<VitalsFilter>(() => validFilter(searchParams.get("filter")));
+  const qc = useQueryClient();
+  // ClinicNav's nurse sub-items (Today, Waiting Patients, Vitals, ...) are all deep links into this one
+  // page via ?tab=/?filter=, so the URL is the only state for both.
+  const tab = validTab(searchParams.get("tab"));
+  const vitalsFilter = validFilter(searchParams.get("filter"));
 
   function changeFilter(f: VitalsFilter) {
     router.replace(f === "due" ? "/nursing" : `/nursing?filter=${f}`);
   }
-  const [proceduresPendingRows, setProceduresPendingRows] = useState<Row[]>([]);
-  const [priorityRows, setPriorityRows] = useState<Row[]>([]);
-  const [administrationOrders, setAdministrationOrders] = useState<AdministrationOrder[]>([]);
-  const [procedureOrders, setProcedureOrders] = useState<ProcedureOrder[]>([]);
-  const [activity, setActivity] = useState<ActivityEntry[]>([]);
-  const [staff, setStaff] = useState<StaffOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loaded, setLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sectionFailed, setSectionFailed] = useState(false);
-  const [dateLine, setDateLine] = useState("");
-  // The worklist, priority and procedures-pending lists come from GET /queue (queue:view). A nurse role
-  // without it still has the nursing:view sections (orders, procedures, activity), so a 403 there
-  // only closes the queue-backed sections instead of the whole page.
-  const [queueForbidden, setQueueForbidden] = useState(false);
+  // Permissions, the clock and the token's region live in the browser: read only after hydration.
+  const mounted = useHasMounted();
+  const queueView = mounted && can(PERM.queueView);
   const [actionError, setActionError] = useState<string | null>(null);
   const [, setNow] = useState(() => Date.now());
 
@@ -208,15 +178,10 @@ function NursingWorklist() {
   const [vitalsTouched, setVitalsTouched] = useState<Partial<Record<string, boolean>>>({});
   const [bpInput, setBpInput] = useState("");
   const [vitalsExtras, setVitalsExtras] = useState<VitalsExtras>(EMPTY_EXTRAS);
-  // NUR-022: previous measurements for the open visit's patient (null = loading).
-  const [prevVitals, setPrevVitals] = useState<PreviousVitals[] | null>(null);
-  const [prevError, setPrevError] = useState(false);
   const [vitalsAttempted, setVitalsAttempted] = useState(false);
   const [vitalsError, setVitalsError] = useState<string | null>(null);
   // NUR-012: read-only view of a recorded visit's vitals (GET /clinical/vitals/{queueEntryId}).
   const [viewRow, setViewRow] = useState<Row | null>(null);
-  const [viewVitals, setViewVitals] = useState<(PreviousVitals & { abnormalFlags?: string[] }) | null>(null);
-  const [viewError, setViewError] = useState(false);
   const [vitalsFlags, setVitalsFlags] = useState<string[] | null>(null);
   const [vitalsSubmitting, setVitalsSubmitting] = useState(false);
 
@@ -233,41 +198,27 @@ function NursingWorklist() {
   const [urgentSubmitting, setUrgentSubmitting] = useState(false);
   const [urgentError, setUrgentError] = useState<string | null>(null);
 
-  // ClinicNav's nurse sub-items (Today, Waiting Patients, Vitals, ...) are all deep links into
-  // this one page via ?tab=/?filter= — a click while already here changes the URL but doesn't
-  // remount the page, so this re-syncs local state whenever the query string changes.
+  // TopBar's "Capture vitals" button (DESIGN.md's top-bar primary action) signals through
+  // ?action=capture rather than a cross-component callback, since TopBar is mounted above
+  // and outside this page. Strip it once consumed so back/refresh doesn't reopen the picker.
   useEffect(() => {
-    // Deferred to a microtask so the effect body itself never calls setState synchronously.
-    void Promise.resolve().then(() => {
-      setTab(validTab(searchParams.get("tab")));
-      setVitalsFilter(validFilter(searchParams.get("filter")));
-      // TopBar's "Capture vitals" button (DESIGN.md's top-bar primary action) signals through
-      // ?action=capture rather than a cross-component callback, since TopBar is mounted above
-      // and outside this page. Strip it once consumed so back/refresh doesn't reopen the picker.
-      if (searchParams.get("action") === "capture") {
-        setShowCapturePicker(true);
-        router.replace("/nursing");
-      }
-    });
+    if (searchParams.get("action") !== "capture") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot URL signal, consumed and stripped
+    setShowCapturePicker(true);
+    router.replace("/nursing");
   }, [searchParams, router]);
 
   // Day label (client-only: depends on the clock and the token's region). Saudi tenants show Hijri
   // primary + Gregorian secondary (DESIGN.md); everyone else Gregorian.
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      const now = new Date();
-      const greg = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-      if (getIdentity()?.tenantRegion === "KSA") {
-        const hijri = new Intl.DateTimeFormat("en-SA-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now);
-        setDateLine(`${hijri} · ${greg}`);
-      } else {
-        setDateLine(greg);
-      }
-    });
-  }, []);
+  const dateLine = (() => {
+    if (!mounted) return "";
+    const now = new Date();
+    const greg = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    if (getIdentity()?.tenantRegion !== "KSA") return greg;
+    return `${new Intl.DateTimeFormat("en-SA-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now)} · ${greg}`;
+  })();
 
-  const newSignal = useLatestLoad();
-
+  // VaccinePanel / RecordVaccineDialog still take a Response-returning fetcher (not part of this page's queries).
   const authedFetch = useCallback(
     async (path: string, init?: RequestInit) => {
       const token = localStorage.getItem("nabd_access_token");
@@ -286,82 +237,63 @@ function NursingWorklist() {
       }
       return res;
     },
-    [router]
+    []
   );
 
-  const load = useCallback(async () => {
-    const signal = newSignal();
-    try {
-      // NUR-019: one worklist call (queue entry + patient + vitals per row) replaces GET /queue,
-      // GET /queue?priority=true and the per-row /patients/{id} + /clinical/vitals/{id} fan-out.
-      const [queueRes, staffRes, adminRes, procRes, activityRes] = await Promise.all([
-        can(PERM.queueView) ? authedFetch("/nursing/worklist", { signal }) : null, can(PERM.queueView) ? authedFetch("/staff/roster", { signal }) : null,
-        authedFetch("/nursing/administration-orders/today", { signal }), authedFetch("/nursing/procedure-orders/today", { signal }),
-        authedFetch("/nursing/activity/today", { signal }),
-      ]);
-      if (signal.aborted) return;
-      // LIVE-09: without queue:view the worklist is never requested; treat it like the server's 403.
-      if (!queueRes && can(PERM.queueView)) return; // authedFetch returned null: session redirect
-      const noQueue = !queueRes || queueRes.status === 403;
-      if (!noQueue && !queueRes.ok) {
-        setError("Couldn't load the nursing worklist. Try again.");
-        return;
-      }
-      setQueueForbidden(noQueue);
-      type WorklistItem = {
-        entry: QueueEntry;
-        patient: { name?: string; mrn?: string; dob?: string; gender?: string; allergies?: string[]; chronicConditions?: string[] } | null;
-        // null = none recorded yet, or the caller lacks clinical:view.
-        vitals: { recordedAt: string; abnormalFlags?: string[] } | null;
-      };
-      const items: WorklistItem[] = noQueue || !queueRes ? [] : ((await queueRes.json())?.items ?? []);
-      const [admin, proc, act] = await Promise.all([adminRes, procRes, activityRes].map((r) => (r?.ok ? r.json() : null)));
-      if (signal.aborted) return;
-      const staffMap = new Map<string, string>();
-      if (staffRes?.ok) {
-        const options: StaffOption[] = await staffRes.json();
-        setStaff(options);
-        options.forEach((s) => staffMap.set(s.id, s.name));
-      }
-      const all: Row[] = items.map(({ entry: e, patient: p, vitals: v }) => ({
-        ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
-        allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
-        lastVitalsAt: v?.recordedAt ?? null, vitalsOutOfRange: (v?.abnormalFlags?.length ?? 0) > 0,
-        dob: p?.dob ?? null, gender: e.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
-        ageYears: e.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
-      }));
-      // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today. Rows
-      // without vitals (flow skips the vitals step, or no clinical:view) stay, shown as not recorded.
-      const RECORDED_STATUSES = ["vitals_done", "in_consult", "procedures_pending", "checkout_pending", "completed"];
-      setRows(all.filter((r) => r.status === "vitals_pending"));
-      setRecordedRows(all.filter((r) => RECORDED_STATUSES.includes(r.status)));
-      setProceduresPendingRows(all.filter((r) => r.status === "procedures_pending"));
-      setPriorityRows(all.filter((r) => r.priority));
-      if (admin) setAdministrationOrders(admin);
-      if (proc) setProcedureOrders(proc);
-      if (act) setActivity(act);
-      // A 403 on a secondary list just means that section isn't theirs; anything else is a failure
-      // the nurse should hear about rather than see as a silently empty tab.
-      setSectionFailed([adminRes, procRes, activityRes, staffRes].some((r) => r && !r.ok && r.status !== 403));
-      setError(null);
-      setLoaded(true);
-    } catch {
-      if (signal.aborted) return;
-      // Keep whatever was last loaded on screen (and any open dialog mounted); the page shows an
-      // inline banner with Retry instead of replacing the worklist.
-      setError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [authedFetch, newSignal]);
-
-  useEffect(() => {
-    void Promise.resolve().then(load);
-  }, [load]);
-
+  // ---- server state (FEF-015) ---------------------------------------------------------------------
+  // NUR-019: one worklist call (queue entry + patient + vitals per row) instead of a per-row fan-out, so a
+  // 40-row worklist is still one request. The worklist, priority and procedures-pending lists need queue:view;
+  // a nurse role without it still has the nursing:view sections (orders, procedures, activity).
+  const worklistQ = useQuery({
+    ...live, queryKey: key("nursing", { list: "worklist" }), queryFn: getter<WorklistResponse>("/nursing/worklist"), enabled: queueView,
+  });
+  const rosterQ = useQuery({ queryKey: key("roster"), queryFn: getter<StaffOption[]>("/staff/roster"), staleTime: STALE.roster, enabled: queueView });
+  const adminQ = useQuery({ ...adminOrdersQuery(), enabled: mounted }); // shared with the sidebar badge
+  const procQ = useQuery({
+    ...live, queryKey: key("nursing", { list: "procedure-orders" }), queryFn: getter<ProcedureOrder[]>("/nursing/procedure-orders/today"), enabled: mounted,
+  });
+  const activityQ = useQuery({
+    ...live, queryKey: key("nursing", { list: "activity" }), queryFn: getter<ActivityEntry[]>("/nursing/activity/today"), enabled: mounted,
+  });
+  const reload = useReload("nursing");
   // "updates live with queue state" (NB-142's acceptance bar) — polling, same as /arrivals (NB-095);
   // push-based sync is NB-096, a separate ticket.
-  usePolling(load, POLL_MS);
+  usePolling(reload, POLL_MS);
+  // Every write here changes the worklist or the queue (and the sidebar badges reading them).
+  const invalidateAll = () => Promise.all([qc.invalidateQueries({ queryKey: prefix("nursing") }), qc.invalidateQueries({ queryKey: prefix("queue") })]);
+
+  const wErr = worklistQ.error;
+  const queueForbidden = mounted && (!can(PERM.queueView) || (wErr instanceof ApiError && wErr.status === 403));
+  // Keep whatever was last loaded on screen (and any open dialog mounted); a failed refresh shows an
+  // inline banner with Retry instead of replacing the worklist.
+  const error = !wErr || queueForbidden ? null : wErr instanceof ApiError ? "Couldn't load the nursing worklist. Try again." : "Couldn't reach the server. Check your connection and try again.";
+  const loaded = mounted && (queueForbidden || worklistQ.data !== undefined) && [adminQ, procQ, activityQ].every((q) => !q.isPending);
+  // A 403 on a secondary list just means that section isn't theirs; anything else is a failure
+  // the nurse should hear about rather than see as a silently empty tab.
+  const sectionFailed = [adminQ, procQ, activityQ, rosterQ].some((q) => q.isError && !(q.error instanceof ApiError && q.error.status === 403));
+  const list = <T,>(d: T[] | undefined): T[] => (Array.isArray(d) ? d : []);
+  const staff = list(rosterQ.data);
+  const administrationOrders = list(adminQ.data) as AdministrationOrder[];
+  const procedureOrders = list(procQ.data);
+  const activity = list(activityQ.data);
+  const staffMap = new Map(staff.map((s) => [s.id, s.name]));
+  const all: Row[] = (queueForbidden ? [] : list(worklistQ.data?.items)).map(({ entry, patient: p, vitals: v }) => {
+    const e = entry as Entry;
+    return {
+      ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "", doctorName: e.doctorName || (staffMap.get(e.doctorId) ?? "—"),
+      allergies: p?.allergies ?? [], chronicConditions: p?.chronicConditions ?? [],
+      lastVitalsAt: v?.recordedAt ?? null, vitalsOutOfRange: (v?.abnormalFlags?.length ?? 0) > 0,
+      dob: p?.dob ?? null, gender: entry?.gender ?? p?.gender ?? null, hasAppointment: !!e.appointmentId, flagsUnknown: !p,
+      ageYears: entry?.ageYears ?? null, wait: e.waitMinutes ?? waitMinutes(e.createdAt),
+    };
+  });
+  // "Recorded" (Vitals Worklist filter pill): anyone who has moved past vitals_pending today. Rows
+  // without vitals (flow skips the vitals step, or no clinical:view) stay, shown as not recorded.
+  const RECORDED_STATUSES = ["vitals_done", "in_consult", "procedures_pending", "checkout_pending", "completed"];
+  const rows = all.filter((r) => r.status === "vitals_pending");
+  const recordedRows = all.filter((r) => RECORDED_STATUSES.includes(r.status));
+  const proceduresPendingRows = all.filter((r) => r.status === "procedures_pending");
+  const priorityRows = all.filter((r) => r.priority);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -369,26 +301,14 @@ function NursingWorklist() {
   }, []);
 
   function retryLoad() {
-    setLoading(true);
-    void load();
+    void reload();
+    if (rosterQ.isError) void rosterQ.refetch();
   }
-
-  const loadPrevious = useCallback(async (patientId: string, currentEntryId: string) => {
-    try {
-      // One extra row requested because the current visit is excluded client-side (contract: server excludes nothing).
-      const res = await authedFetch(`/clinical/vitals/patient/${patientId}/previous?limit=6`);
-      if (!res?.ok) throw new Error("load");
-      const body = await res.json();
-      const items: PreviousVitals[] = Array.isArray(body?.items) ? body.items : [];
-      setPrevVitals(items.filter((v) => v.queueEntryId !== currentEntryId).slice(0, 5));
-    } catch { setPrevError(true); }
-  }, [authedFetch]);
 
   function openVitalsModal(entryId: string) {
     setVitalsEntryId(entryId);
     setVitalsForm(EMPTY_VITALS);
     setBpInput("");
-    setPrevVitals(null); setPrevError(false);
     setVitalsExtras(EMPTY_EXTRAS);
     setVitalsTouched({});
     setVitalsAttempted(false);
@@ -396,23 +316,22 @@ function NursingWorklist() {
     setVitalsFlags(null);
   }
 
-  async function openViewVitals(r: Row) {
-    setViewRow(r); setViewVitals(null); setViewError(false);
-    try {
-      const res = await authedFetch(`/clinical/vitals/${r.id}`);
-      if (!res?.ok) throw new Error("load");
-      setViewVitals(await res.json());
-    } catch { setViewError(true); }
+  // Read-only view: the query below fetches it while the dialog is open.
+  function openViewVitals(r: Row) {
+    setViewRow(r);
   }
+  const viewQ = useQuery({ queryKey: key("vitals", { queueEntryId: viewRow?.id }), queryFn: getter<VitalsResponse>(`/clinical/vitals/${viewRow?.id}`), enabled: !!viewRow });
+  const viewVitals = viewQ.data ?? null;
+  const viewError = viewQ.isError;
   const canViewVitals = can(PERM.vitalsRead);
   // Row click / Enter / Space: capture for a waiting visit, read-only view for a recorded one.
-  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureVitals) openVitalsModal(r.id); } else if (canViewVitals && r.lastVitalsAt) void openViewVitals(r); };
+  const openRow = (r: Row) => { if (r.status === "vitals_pending") { if (canCaptureVitals) openVitalsModal(r.id); } else if (canViewVitals && r.lastVitalsAt) openViewVitals(r); };
   const rowActionable = (r: Row) => (r.status === "vitals_pending" ? canCaptureVitals : canViewVitals && !!r.lastVitalsAt);
 
   function closeVitalsModal() {
     setVitalsEntryId(null);
     setVitalsFlags(null);
-    load();
+    void invalidateAll();
   }
 
   async function submitVitals(e: React.FormEvent) {
@@ -424,22 +343,15 @@ function NursingWorklist() {
     if (Object.keys(nurseVitalsErrors(vitalsForm, bpInput, vitalsExtras)).length > 0) return;
     setVitalsSubmitting(true);
     try {
-      const res = await authedFetch(`/clinical/vitals/${vitalsEntryId}`, {
-        method: "PATCH",
-        body: JSON.stringify(nurseVitalsPayload(vitalsForm, bpInput, vitalsExtras)),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save vitals." }));
-        setVitalsError(p.detail || "Couldn't save vitals.");
-        return;
-      }
-      const saved: { abnormalFlags: string[] } = await res.json();
-      if (saved.abnormalFlags.length > 0) {
-        setVitalsFlags(saved.abnormalFlags);
+      const saved = await api.patch<VitalsResponse>(`/clinical/vitals/${vitalsEntryId}`, nurseVitalsPayload(vitalsForm, bpInput, vitalsExtras));
+      const flags = saved?.abnormalFlags ?? [];
+      if (flags.length > 0) {
+        setVitalsFlags(flags);
       } else {
         closeVitalsModal();
       }
+    } catch (err) {
+      setVitalsError(detailOf(err, "Couldn't save vitals."));
     } finally {
       setVitalsSubmitting(false);
     }
@@ -448,12 +360,8 @@ function NursingWorklist() {
   // ── NB-143: priority ────────────────────────────────────────────────────
   async function acknowledgePriority(id: string) {
     setActionError(null);
-    const res = await authedFetch(`/queue/${id}/priority/acknowledge`, { method: "POST" });
-    if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't acknowledge." }));
-      setActionError(p.detail || "Couldn't acknowledge.");
-    }
-    load();
+    await api.post(`/queue/${id}/priority/acknowledge`).catch((err) => setActionError(detailOf(err, "Couldn't acknowledge.")));
+    void invalidateAll();
   }
 
   function openUrgentPicker(entryId = "") {
@@ -472,15 +380,11 @@ function NursingWorklist() {
     setUrgentSubmitting(true);
     setUrgentError(null);
     try {
-      const res = await authedFetch(`/queue/${urgentEntryId}/reorder`, { method: "POST", body: JSON.stringify({ priority: true, reason }) });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't flag this patient." }));
-        setUrgentError(p.detail || "Couldn't flag this patient.");
-        return;
-      }
+      await api.post(`/queue/${urgentEntryId}/reorder`, { priority: true, reason });
       setShowUrgentPicker(false);
-      load();
+      void invalidateAll();
+    } catch (err) {
+      setUrgentError(detailOf(err, "Couldn't flag this patient."));
     } finally {
       setUrgentSubmitting(false);
     }
@@ -496,44 +400,33 @@ function NursingWorklist() {
   async function submitAdminOrder(e: React.FormEvent) {
     e.preventDefault();
     setAdminFormError(null);
-    const res = await authedFetch("/nursing/administration-orders", { method: "POST", body: JSON.stringify(adminForm) });
-    if (!res) return;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't create the order." }));
-      setAdminFormError(p.detail || "Couldn't create the order.");
+    try {
+      await api.post("/nursing/administration-orders", adminForm);
+    } catch (err) {
+      setAdminFormError(detailOf(err, "Couldn't create the order."));
       return;
     }
     setShowAdminForm(false);
     setAdminForm({ queueEntryId: "", drugName: "", dose: "", route: "IM", site: "" });
-    load();
+    void invalidateAll();
   }
 
   async function submitAdminister() {
     if (!witnessModal) return;
     setActionError(null);
-    const res = await authedFetch(`/nursing/administration-orders/${witnessModal.orderId}/administer`, {
-      method: "POST", body: JSON.stringify({ witnessedByStaffId: witnessModal.witnessId }),
-    });
-    if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record administration." }));
-      setActionError(p.detail || "Couldn't record administration.");
-    }
+    await api.post(`/nursing/administration-orders/${witnessModal.orderId}/administer`, { witnessedByStaffId: witnessModal.witnessId })
+      .catch((err) => setActionError(detailOf(err, "Couldn't record administration.")));
     setWitnessModal(null);
-    load();
+    void invalidateAll();
   }
 
   async function submitRefuse() {
     if (!refuseModal) return;
     setActionError(null);
-    const res = await authedFetch(`/nursing/administration-orders/${refuseModal.orderId}/refuse`, {
-      method: "POST", body: JSON.stringify({ reason: refuseModal.reason }),
-    });
-    if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record refusal." }));
-      setActionError(p.detail || "Couldn't record refusal.");
-    }
+    await api.post(`/nursing/administration-orders/${refuseModal.orderId}/refuse`, { reason: refuseModal.reason })
+      .catch((err) => setActionError(detailOf(err, "Couldn't record refusal.")));
     setRefuseModal(null);
-    load();
+    void invalidateAll();
   }
 
   // ── NB-355: the procedures_pending queue checkpoint — a coordination stop, not itself a
@@ -541,19 +434,19 @@ function NursingWorklist() {
   // status PATCH, same as vitals_done -> in_consult on the consult page. ────────────────────
   async function continueAfterProcedures(entry: Row) {
     setActionError(null);
-    const flowRes = await authedFetch(`/departments/${entry.departmentId}/flow`);
-    const steps: { stepType: string }[] = flowRes?.ok ? await flowRes.json() : [];
-    const sequence = resolveSequence(steps);
+    const steps = await qc.fetchQuery({
+      queryKey: key("department-flow", { id: entry.departmentId }), staleTime: STALE.departments,
+      queryFn: getter<FlowStepResponse[]>(`/departments/${entry.departmentId}/flow`),
+    }).catch(() => []);
+    const sequence = resolveSequence((Array.isArray(steps) ? steps : []).map((s) => ({ stepType: s.stepType ?? "" })));
     const next = sequence[sequence.indexOf(entry.status) + 1];
     if (!next) {
       setActionError("Couldn't determine the next stage.");
       return;
     }
-    const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: moveBody(next, entry.status) });
-    if (res && !res.ok) {
-      setActionError(await moveErrorMessage(res, "Couldn't continue the visit."));
-    }
-    load();
+    await api.patch(`/queue/${entry.id}/status`, { status: next, expectedStatus: entry.status })
+      .catch((err) => setActionError((err instanceof ApiError && staleMessage(err.problem)) || detailOf(err, "Couldn't continue the visit.")));
+    void invalidateAll();
   }
 
   // ── NB-146: procedure orders ─────────────────────────────────────────────
@@ -564,28 +457,24 @@ function NursingWorklist() {
   async function submitProcOrder(e: React.FormEvent) {
     e.preventDefault();
     setProcFormError(null);
-    const res = await authedFetch("/nursing/procedure-orders", { method: "POST", body: JSON.stringify(procForm) });
-    if (!res) return;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't create the order." }));
-      setProcFormError(p.detail || "Couldn't create the order.");
+    try {
+      await api.post("/nursing/procedure-orders", procForm);
+    } catch (err) {
+      setProcFormError(detailOf(err, "Couldn't create the order."));
       return;
     }
     setShowProcForm(false);
     setProcForm({ queueEntryId: "", chargeCode: "", prepNotes: "", consentNote: "" });
-    load();
+    void invalidateAll();
   }
 
   const [procRowError, setProcRowError] = useState<Record<string, string>>({});
 
   async function setProcedureStatus(id: string, status: string) {
     setProcRowError((prev) => { const n = { ...prev }; delete n[id]; return n; });
-    const res = await authedFetch(`/nursing/procedure-orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-    if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't update the procedure." }));
-      setProcRowError((prev) => ({ ...prev, [id]: p.detail || "Couldn't update the procedure." }));
-    }
-    load();
+    await api.patch(`/nursing/procedure-orders/${id}/status`, { status })
+      .catch((err) => setProcRowError((prev) => ({ ...prev, [id]: detailOf(err, "Couldn't update the procedure.") })));
+    void invalidateAll();
   }
 
   // ── NB-119: signed consent gates starting the procedure ────────────────────
@@ -595,17 +484,15 @@ function NursingWorklist() {
   async function submitConsent() {
     if (!consentModal || !consentModal.signedName.trim()) return;
     setConsentError(null);
-    const res = await authedFetch(`/nursing/procedure-orders/${consentModal.orderId}/consent`, {
-      method: "POST", body: JSON.stringify({ signedName: consentModal.signedName }),
-    });
-    if (res && !res.ok) {
+    try {
+      await api.post(`/nursing/procedure-orders/${consentModal.orderId}/consent`, { signedName: consentModal.signedName });
+    } catch (err) {
       // Stay open: consent that failed to record must not look recorded.
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record consent." }));
-      setConsentError(p.detail || "Couldn't record consent.");
+      setConsentError(detailOf(err, "Couldn't record consent."));
       return;
     }
     setConsentModal(null);
-    load();
+    void invalidateAll();
   }
 
   // ── NB-148: export ────────────────────────────────────────────────────────
@@ -621,13 +508,13 @@ function NursingWorklist() {
     URL.revokeObjectURL(url);
   }
 
-  const allow = (permission: string) => !loading && can(permission);
+  const allow = (permission: Parameters<typeof can>[0]) => mounted && can(permission);
 
   const visibleVitalsRows = vitalsFilter === "due" ? rows : vitalsFilter === "recorded" ? recordedRows : [...rows, ...recordedRows];
   const urgentCandidates = [...rows, ...recordedRows].filter((r) => !r.priority);
   const recordedCount = recordedRows.filter((r) => r.lastVitalsAt).length;
   const outOfRangeCount = recordedRows.filter((r) => r.vitalsOutOfRange).length;
-  const staffName = (id: string | null) => (id ? staff.find((s) => s.id === id)?.name ?? null : null);
+  const staffName = (id: string | null | undefined) => (id ? staff.find((s) => s.id === id)?.name ?? null : null);
   const canCaptureVitals = allow(PERM.vitalsCreate) || allow(PERM.vitalsWrite);
   const canCreateOrders = allow(PERM.create);
   const canEditOrders = allow(PERM.edit);
@@ -646,11 +533,15 @@ function NursingWorklist() {
   const vErrors = nurseVitalsErrors(vitalsForm, bpInput, vitalsExtras);
   const vitalsRow = vitalsEntryId ? [...rows, ...recordedRows].find((r) => r.id === vitalsEntryId) : undefined;
   const vitalsPatientId = vitalsRow?.patientId;
-  useEffect(() => {
-    // Fetch-on-open; state resets happen in openVitalsModal. Same pattern as useMySchedule.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (vitalsEntryId && vitalsPatientId && can(PERM.vitalsRead)) void loadPrevious(vitalsPatientId, vitalsEntryId);
-  }, [vitalsEntryId, vitalsPatientId, loadPrevious]);
+  // NUR-022: previous measurements for the open visit's patient (null = loading). One extra row is requested
+  // because the current visit is excluded client-side (contract: server excludes nothing).
+  const prevQ = useQuery({
+    queryKey: key("vitals-previous", { patientId: vitalsPatientId }),
+    queryFn: getter<VitalsHistoryResponse>(`/clinical/vitals/patient/${vitalsPatientId}/previous?limit=6`),
+    enabled: !!vitalsEntryId && !!vitalsPatientId && can(PERM.vitalsRead),
+  });
+  const prevVitals = prevQ.data ? list(prevQ.data.items).filter((v) => v.queueEntryId !== vitalsEntryId).slice(0, 5) : null;
+  const prevError = prevQ.isError;
   const vitalsFormEmpty = VITAL_FIELDS.every((d) => vitalsForm[d.key].trim() === "") && !bpInput.trim() && !vitalsExtras.bloodSugar.trim() && !vitalsExtras.painScore.trim();
   // ClinicNav's "Vaccines & Injections" sidebar item deep-links here (?tab=vaccines) even though
   // no backend exists for it — not one of the 5 real tabs, so it's checked from the raw query
@@ -1085,7 +976,7 @@ function NursingWorklist() {
               {prevError ? (
                 <div className={styles.formError} role="alert">
                   Couldn&apos;t load previous measurements.{" "}
-                  {vitalsPatientId && vitalsEntryId && <button type="button" className={styles.smallBtn} onClick={() => { setPrevError(false); setPrevVitals(null); void loadPrevious(vitalsPatientId, vitalsEntryId); }}>Retry</button>}
+                  {vitalsPatientId && vitalsEntryId && <button type="button" className={styles.smallBtn} onClick={() => void prevQ.refetch()}>Retry</button>}
                 </div>
               ) : prevVitals === null ? (
                 <Skeleton rows={3} label="Loading previous measurements" />
@@ -1118,7 +1009,7 @@ function NursingWorklist() {
           <div className={styles.vitalsPatient}>
             <span className={styles.muted}>T-{viewRow.tokenNumber}{ageSex(viewRow.dob, viewRow.gender, viewRow.ageYears) ? ` · ${ageSex(viewRow.dob, viewRow.gender, viewRow.ageYears)}` : ""}{viewRow.patientMrn ? ` · ${viewRow.patientMrn}` : ""}</span>
           </div>
-          {viewError ? <div className={styles.formError} role="alert">Couldn&apos;t load vitals. <button type="button" className={styles.smallBtn} onClick={() => void openViewVitals(viewRow)}>Retry</button></div>
+          {viewError ? <div className={styles.formError} role="alert">Couldn&apos;t load vitals. <button type="button" className={styles.smallBtn} onClick={() => void viewQ.refetch()}>Retry</button></div>
             : !viewVitals ? <Skeleton rows={3} label="Loading vitals" /> : (
               <>
                 <p className={styles.muted}>Recorded {viewVitals.recordedAt ? `${new Date(viewVitals.recordedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} ${hhmm(viewVitals.recordedAt)}` : "—"}</p>

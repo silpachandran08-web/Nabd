@@ -33,8 +33,8 @@ import { signBlockMessage, type SignAuthority } from "../components/consult/sign
 import VisitOutputs from "../components/consult/VisitOutputs";
 import VisitTimeline from "../components/consult/VisitTimeline";
 import {
-  buildTimeline, DEFAULT_START_STATUS, NOTE_FIELD_LABEL, NOTE_TITLE, nextPatient, queueStatusLabel, statusBeforeConsult, statusSequence,
-} from "../components/consult/consultFlow";
+  buildTimeline, DEFAULT_START_STATUS, NOTE_FIELD_LABEL, NOTE_TITLE, nextPatient, queueStatusLabel, statusBeforeConsult, statusSequence, VISIT_LABEL,
+} from "@nabd/domain";
 import VitalsCard from "../components/consult/VitalsCard";
 import {
   age, DONE_STATUSES, initials, minutesSince, rxItemLine, WAITING_STATUSES,
@@ -82,10 +82,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/
 const AUTOSAVE_MS = 10_000;
 const LOCAL_DRAFT_MS = 800;
 const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
-const VISIT_LABEL: Record<string, string> = {
-  walk_in: "Walk-in", referral: "Referral", online: "Online", social_media: "Social media",
-  returning: "Returning", other: "Other", internal_transfer: "Internal transfer",
-};
 
 const STATUS_TONE: Record<string, { tone: PillTone; icon?: Parameters<typeof StatusPill>[0]["icon"] }> = {
   checked_in: { tone: "neutral", icon: "clock" },

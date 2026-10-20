@@ -35,10 +35,8 @@ const eslintConfig = defineConfig([
       ],
     },
     rules: { "boundaries/dependencies": ["error", { default: "allow", policies: [
+      // FEF-013 moved the last cross-feature edges (arrivals->checkout, myday->consult, templates->consult) to @nabd/domain / app/lib; no exceptions.
       { from: { element: { type: "feature" } }, disallow: { to: { element: { type: "feature" } } } },
-      // shortcut: frozen baseline of the cross-feature edges that existed at FEF-012; FEF-013 moves them into packages/domain, then delete these.
-      ...[["arrivals", "checkout"], ["myday", "consult"], ["templates", "consult"]].map(([from, to]) => (
-        { from: { element: { type: "feature", captured: { name: from } } }, allow: { to: { element: { type: "feature", captured: { name: to } } } } })),
     ] }] } },
 ]);
 
