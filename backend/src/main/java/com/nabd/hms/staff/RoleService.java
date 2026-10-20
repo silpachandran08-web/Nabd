@@ -99,8 +99,8 @@ public class RoleService {
     }
 
     /** PLT-007 AC3: same mechanism as StaffService's role reassignment (revoke + iam.session.revoked.v1 per holder). */
-    private void revokeHolderSessions(UUID tenantId, UUID roleId) {
-        for (UUID staffId : repo.revokeHolderSessions(tenantId, roleId)) {
+    private void sessionsRevoked(UUID tenantId, List<UUID> staffIds) {
+        for (UUID staffId : staffIds) {
             eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.SESSION_REVOKED, staffId,
                     Map.of("staffId", staffId, "scope", "all_sessions", "reasonCode", "role_changed", "status", "revoked"));
         }
@@ -120,7 +120,7 @@ public class RoleService {
                 req.mfaRequired() == null ? current.mfaRequired() : req.mfaRequired());
         log.info("role {} updated by {} (tenant {})", id, callerStaffId, tenantId);
         roleChanged(tenantId, id, "updated");
-        revokeHolderSessions(tenantId, id);
+        sessionsRevoked(tenantId, repo.revokeHolderSessions(tenantId, id));
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
@@ -137,7 +137,7 @@ public class RoleService {
                         "This is a custom role; only preset roles can be reset."));
         repo.resetToPreset(tenantId, id, writeGrantsJson(preset.grants()), RolePresets.VERSION);
         roleChanged(tenantId, id, "reset_to_preset");
-        revokeHolderSessions(tenantId, id);
+        sessionsRevoked(tenantId, repo.revokeHolderSessions(tenantId, id));
         RoleRow after = repo.findById(tenantId, id).orElseThrow();
         ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null, "role.reset_to_preset", "role", id,
