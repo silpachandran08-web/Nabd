@@ -2,7 +2,10 @@
 *                                  @nabd/engineering
 /backend/src/main/java/com/nabd/hms/clinical/  @nabd/clinical-owners
 /backend/src/test/java/com/nabd/hms/clinical/  @nabd/clinical-owners
-/frontend/app/components/consult/  @nabd/clinical-owners
+/frontend/apps/staff-web/app/components/consult/  @nabd/clinical-owners
+# FEF-012: shared design system and tokens need the Frontend squad (code-owner review is required, see branch-protection.json)
+/frontend/packages/ui/             @nabd/frontend
+/frontend/packages/tokens/         @nabd/frontend
 /backend/src/main/java/com/nabd/hms/auth/      @nabd/security-owners
 /db/migrations/                    @nabd/db-owners
 /db/classification.yaml            @nabd/db-owners @nabd/security-owners

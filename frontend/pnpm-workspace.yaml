@@ -1,0 +1,7 @@
+# FEF-012 (doc 06 s5.2): staff-web now; patient-web and the Expo patient app join under apps/ later.
+packages:
+  - "apps/*"
+  - "packages/*"
+overrides:
+  # eslint-plugin-boundaries 7.2.0 pins handlebars 4.7.9 (GHSA-8r5x-fm3f-whwj, critical); 4.7.10 is the patch release.
+  handlebars: 4.7.10

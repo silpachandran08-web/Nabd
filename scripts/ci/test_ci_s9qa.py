@@ -143,11 +143,11 @@ class Artefacts(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_frontend_typecheck_runs_typegen_first_and_consult_flow_is_in_npm_test(self):
-        s = json.load(open("frontend/package.json"))["scripts"]
+        s = json.load(open("frontend/apps/staff-web/package.json"))["scripts"]
         self.assertRegex(s["typecheck"], r"^next typegen && tsc --noEmit")
         self.assertIn("scripts/test-consult-flow.mjs", s["test:unit"])
         self.assertEqual(s["test"], "npm run -s test:unit")
-        self.assertIn("npm run -s typecheck", R(".github/workflows/ci.yml"))
+        self.assertIn("turbo run typecheck", R(".github/workflows/ci.yml"))  # FEF-012: turbo runs the app's typecheck script
 
     def test_every_workflow_parses_and_each_job_has_a_timeout(self):
         for f in ("ci.yml", "ci-selftest.yml", "prod-config.yml"):  # OPS-031 / OPS-003 workflows only

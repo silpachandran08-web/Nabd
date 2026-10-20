@@ -46,6 +46,6 @@ exec 3<&- 3>&-
 echo "Backend up."
 
 # 4. Frontend, foreground
-cd "$ROOT/frontend"
+cd "$ROOT/frontend/apps/staff-web"
 [ -f .env.local ] || cp .env.local.example .env.local
-npm run dev
+pnpm run dev

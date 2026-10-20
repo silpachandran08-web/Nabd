@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nabd frontend (pnpm workspace + Turborepo)
 
-## Getting Started
+FEF-012, doc 06 s5.2. Run everything from this folder (`frontend/`).
 
-First, run the development server:
+| Path | What |
+|---|---|
+| `apps/staff-web` | Clinic + platform console Next.js app (was `frontend/` before Sprint 12) |
+| `packages/api-client` (`@nabd/api-client`) | The only code that calls `fetch`. OPS-035 writes the generated client to `src/generated/` |
+| `packages/domain` | Framework-free domain logic (skeleton; FEF-013) |
+| `packages/ui` | Design-system components. No fetching, no `@nabd/api-client` (lint fails) |
+| `packages/tokens` | Design tokens (`--nb-*`) |
 
+Owners: `packages/ui` and `packages/tokens` need a Frontend squad review (`.github/CODEOWNERS`).
+
+## Commands
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install                                   # Node 22, pnpm 10 (corepack enable)
+pnpm turbo run build lint typecheck test       # whole pipeline; unchanged packages are cache hits
+pnpm --filter staff-web dev                    # dev server on :3000 (copy apps/staff-web/.env.local.example to .env.local)
+pnpm --filter staff-web run check:permissions  # permission rendering check
 ```
+Inside `apps/staff-web`: `pnpm run test:unit`, `pnpm run typecheck` (`next typegen && tsc --noEmit`), `pnpm exec eslint .`, `pnpm exec next build`.
+Browser scripts: `cd apps/staff-web && NODE_PATH=<playwright node_modules> APP=http://localhost:<port> node tests/e2e/<script>.mjs`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Lint boundaries (eslint-plugin-boundaries, rule `boundaries/dependencies`)
+- `apps/staff-web/eslint.config.mjs`: a feature folder (`app/components/<name>`) imports only `packages/*`, shared app code and itself.
+  Three existing cross-feature edges are a frozen baseline (FEF-013 moves them to `packages/domain`).
+- `eslint.config.mjs` (this folder, used by `packages/*`): only `api-client` imports `@nabd/api-client` or calls `fetch`.
+- Must-fail samples live in `lint-fixtures/` and are checked by `apps/staff-web/tests/unit/s12-fef012-monorepo.test.mjs`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Turborepo cache
+Local cache in `.turbo/cache`; CI keeps it on the runner with `actions/cache` (no remote SaaS cache).
+Unit tests also read repo files outside `frontend/` (`api/`, `.github/`, `perf/`, `renovate.json`); CI passes their git hashes in
+`NABD_REPO_INPUTS` so a change there invalidates the `test` cache.

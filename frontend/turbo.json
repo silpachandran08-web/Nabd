@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["tsconfig.base.json", "eslint.config.mjs"],
+  // Cache inside frontend/ (the default follows git and lands in the main checkout when run from a git worktree).
+  "cacheDir": ".turbo/cache",
+  "tasks": {
+    "typegen": { "outputs": [".next/types/**"] },
+    "typecheck": { "dependsOn": ["^typecheck"] },
+    "lint": {},
+    "check:permissions": {},
+    "test": { "env": ["NABD_REPO_INPUTS"] },
+    // build waits for typecheck (doc 04 s9 order; both write .next/).
+    "build": {
+      "dependsOn": ["^build", "typecheck"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": ["NEXT_PUBLIC_*", "NABD_CSP_MODE"],
+      "passThroughEnv": ["NEXT_FONT_GOOGLE_MOCKED_RESPONSES", "NEXT_TELEMETRY_DISABLED"]
+    },
+    "e2e": { "dependsOn": ["build"], "cache": false }
+  }
+}

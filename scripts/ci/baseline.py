@@ -30,6 +30,9 @@ def new_npm_findings(audit, entries, today=None):
         if v.get("severity") not in ("high", "critical"): continue
         ids = {str(x["source"]) for x in v.get("via", []) if isinstance(x, dict)} or {name}
         if not ids <= ok: out.add(name)
+    for a in audit.get("advisories", {}).values():  # FEF-012: `pnpm audit --json` shape
+        if a.get("severity") in ("high", "critical") and not {str(a.get("id")), a.get("github_advisory_id")} & ok:
+            out.add(a.get("module_name", "?"))
     return sorted(out)
 
 if __name__ == "__main__":

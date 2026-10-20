@@ -43,7 +43,7 @@ class Artefacts(unittest.TestCase):
         v = re.search(r"<testcontainers.version>([\d.]+)<", R("backend/pom.xml")).group(1)
         self.assertGreaterEqual(tuple(map(int, v.split("."))), (1, 21, 0))
     def test_frontend_scripts(self):
-        s = json.load(open("frontend/package.json"))["scripts"]
+        s = json.load(open("frontend/apps/staff-web/package.json"))["scripts"]
         self.assertIn("next typegen && tsc --noEmit", s["typecheck"])
         self.assertIn("scripts/test-consult-flow.mjs", s["test:unit"])
         self.assertEqual(s["test"], "npm run -s test:unit")
@@ -81,6 +81,13 @@ class Baseline(unittest.TestCase):
         self.assertEqual(baseline.new_npm_findings(a, [self.ok], D), ["y"])
         self.assertEqual(baseline.new_npm_findings(a, [], D), ["x", "y"])
         self.assertEqual(baseline.new_npm_findings(a, [{**self.ok, "expires": "2026-10-02"}], dt.date(2026, 11, 1)), ["x", "y"])
+    def test_pnpm_audit_new_vs_baselined(self):  # FEF-012: pnpm audit --json shape
+        a = {"advisories": {"1": {"id": 1, "module_name": "x", "severity": "high", "github_advisory_id": "GHSA-x"},
+                            "2": {"id": 2, "module_name": "y", "severity": "critical", "github_advisory_id": "GHSA-y"},
+                            "3": {"id": 3, "module_name": "z", "severity": "moderate", "github_advisory_id": "GHSA-z"}}}
+        self.assertEqual(baseline.new_npm_findings(a, [self.ok], D), ["y"])
+        self.assertEqual(baseline.new_npm_findings(a, [{**self.ok, "id": "GHSA-y"}], D), ["x"])
+        self.assertEqual(baseline.new_npm_findings(a, [], D), ["x", "y"])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -59,16 +59,21 @@ jobs:
           semgrep scan --config p/ci --config p/java --config p/typescript --severity ERROR --error --metrics=off \
             --baseline-commit "$base" --exclude node_modules --exclude target
       - if: needs.changes.outputs.frontend == 'true'
-        uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+        uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
       - if: needs.changes.outputs.frontend == 'true'
-        name: next typegen, tsc, ESLint, permission rendering
+        uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      # FEF-012: Turborepo cache stays on the CI runner (actions/cache), no SaaS remote cache holds build output.
+      - if: needs.changes.outputs.frontend == 'true'
+        uses: actions/cache@v4
+        with: { path: frontend/.turbo/cache, key: "turbo-static-${{ github.sha }}", restore-keys: "turbo-static-" }
+      - if: needs.changes.outputs.frontend == 'true'
+        name: next typegen, tsc, ESLint (incl. boundaries), permission rendering (turbo; unchanged packages hit the cache)
         working-directory: frontend
         run: |
-          npm ci --no-audit --no-fund
-          npm run -s typecheck
-          npx eslint .
-          npm run -s check:permissions
+          pnpm install --frozen-lockfile
+          pnpm turbo run typecheck lint check:permissions
       - name: OpenAPI valid
         run: pip install -q openapi-spec-validator && python3 -m openapi_spec_validator api/openapi.yaml
       - name: Event schemas (OPS-015 catalogue, PHI denylist, envelope < 2 KB) and the gate's own tests
@@ -84,12 +89,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - if: needs.changes.outputs.frontend == 'true'
+        uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
+      - if: needs.changes.outputs.frontend == 'true'
         uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      # FEF-012: Turborepo cache stays on the CI runner (actions/cache), no SaaS remote cache holds build output.
+      - if: needs.changes.outputs.frontend == 'true'
+        uses: actions/cache@v4
+        with: { path: frontend/.turbo/cache, key: "turbo-unit-${{ github.sha }}", restore-keys: "turbo-unit-" }
       - if: needs.changes.outputs.frontend == 'true'
         name: unit tests incl. consult flow
         working-directory: frontend
-        run: npm ci --no-audit --no-fund && npm test
+        run: |
+          # staff-web unit tests also read api/, .github/, perf/ and renovate.json: their git hashes key the turbo cache
+          export NABD_REPO_INPUTS="$(git rev-parse HEAD:api HEAD:.github HEAD:perf HEAD:renovate.json | tr '\n' ' ')"
+          pnpm install --frozen-lockfile && pnpm turbo run test
       - if: needs.changes.outputs.backend == 'true'
         uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "${{ env.JAVA_VERSION }}", cache: maven }
@@ -290,17 +305,19 @@ jobs:
           path: backend
           format: HTML
           args: --failOnCVSS 7 --suppression ci/dependency-check-suppressions.xml --nvdApiKey ${{ secrets.NVD_API_KEY }}
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
       - uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
-      - name: npm audit (new High/Critical only, baseline with owners)
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: pnpm audit (new High/Critical only, baseline with owners)
         working-directory: frontend
         run: |
-          npm audit --audit-level=high --json > "$RUNNER_TEMP/audit.json" || true
+          pnpm audit --audit-level=high --json > "$RUNNER_TEMP/audit.json" || true
           python3 ../scripts/ci/baseline.py npm-audit "$RUNNER_TEMP/audit.json" ../.github/security-baseline.json
       - name: CycloneDX SBOMs
         run: |
           mvn -B -q -f backend/pom.xml org.cyclonedx:cyclonedx-maven-plugin:2.8.1:makeAggregateBom -DoutputFormat=json -DoutputName=sbom-backend
-          (cd frontend && npm ci --no-audit --no-fund -q && npx --yes @cyclonedx/cyclonedx-npm@1.19.3 --output-file ../sbom-frontend.json)
+          (cd frontend && pnpm install --frozen-lockfile && npx --yes @cyclonedx/cdxgen@12.8.5 -t pnpm -o ../sbom-frontend.json .)
       # Publish only on merge to main: push, sign, attach SBOM, expose digest. Deploys must reference the digest.
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3

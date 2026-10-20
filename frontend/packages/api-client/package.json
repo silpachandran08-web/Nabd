@@ -1,0 +1,11 @@
+{
+  "name": "@nabd/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./index.ts", "./types": "./types.ts" },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p ."
+  }
+}
