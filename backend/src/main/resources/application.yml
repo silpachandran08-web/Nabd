@@ -3,6 +3,9 @@ spring:
     timeout-per-shutdown-phase: 25s
   application:
     name: hms-backend
+  # PLT-008: Valkey is wired only by com.nabd.hms.common.valkey (app.valkey.*), never Boot's localhost default
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration,org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
   mvc:
     problemdetails:
       enabled: true
@@ -129,6 +132,22 @@ app:
     extend-lease-per-event: true
     purge-cron: "0 23 * * * *"   # hourly: done rows after 7 days, dead after 90
     metrics-interval-ms: 15000
+  # PLT-008 (docs/architecture/valkey.md): unset VALKEY_URL = no Valkey, the API limits nothing and still serves.
+  # Under prod the URL must be rediss:// (TLS). Timeouts stay short: a slow Valkey must never slow the API.
+  valkey:
+    url: ${VALKEY_URL:}
+    connect-timeout-ms: 500
+    command-timeout-ms: 250
+  # PLT-008 token buckets (per minute, burst = bucket size). The tenant pair is the default when the tenant's plan
+  # (master.plans.api_requests_per_minute / api_burst) has none; plan values are re-read every plan-refresh-seconds.
+  rate-limit:
+    tenant-per-minute: 600
+    tenant-burst: 1200
+    user-per-minute: 120
+    user-burst: 120
+    ip-per-minute: 20
+    ip-burst: 20
+    plan-refresh-seconds: 30
   # OPS-012: every outbound HTTP call goes through shared.integration.ResilientHttpClient. Defaults: connect 2 s,
   # read 5 s. Per-provider overrides: app.integration.providers.<name>.connect-timeout-ms / read-timeout-ms
   # (providers today: meta-whatsapp, on the defaults). Keep connect + read of the slowest provider at or below
