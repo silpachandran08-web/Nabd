@@ -1,5 +1,5 @@
-# OPS-031: stages 1 (static), 2 (unit), 3 (integration), 6 (build and scan). Required checks on main:
-# stage1-static, stage2-unit, stage3-integration, stage6-build-and-scan (see .github/branch-protection.json).
+# OPS-031: stages 1 (static), 2 (unit), 3 (integration), 6 (build and scan); OPS-036: stage 7 (preview + smoke). Required checks on main:
+# stage1-static, stage2-unit, stage3-integration, stage6-build-and-scan, stage7-preview-e2e (see .github/branch-protection.json).
 name: ci
 on:
   pull_request:
@@ -30,6 +30,7 @@ jobs:
             backend:
               - 'backend/**'
               - 'db/**'
+              - 'api/**'
               - 'Dockerfile'
               - '.github/**'
             frontend:
@@ -75,6 +76,9 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: write   # OPS-033 architecture report comment
     steps:
       - uses: actions/checkout@v4
       - if: needs.changes.outputs.frontend == 'true'
@@ -91,6 +95,29 @@ jobs:
         name: JUnit unit tests (no Docker; ApiTestBase classes run in stage 3)
         working-directory: backend
         run: mvn -B -q test -Dtest='!*ApiTest,!*IT' -Dsurefire.failIfNoSpecifiedTests=false
+      # OPS-033: ArchitectureRulesTest (above) writes Modulith + ArchUnit findings; arch.py adds the SQL scans and the gate
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        name: architecture report (Modulith, ArchUnit, SQL ownership, tenant predicate; counts by module)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          pip install -q pyyaml
+          python3 scripts/ci/arch.py summary backend/target/architecture-violations.json architecture-report.json > arch.md
+          cat arch.md >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            pr="${{ github.event.pull_request.number }}"
+            id=$(gh api "repos/${{ github.repository }}/issues/$pr/comments" --paginate --jq '[.[] | select(.body | startswith("<!-- architecture-report -->"))] | last | .id // empty') || true
+            if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@arch.md || true
+            else gh pr comment "$pr" --body-file arch.md || true; fi
+          fi
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        uses: actions/upload-artifact@v4
+        with: { name: architecture-report, path: "architecture-report.json\narch.md" }
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        name: architecture gate (mode from ci/architecture-gate.json; report only until its dates are set)
+        run: python3 scripts/ci/arch.py gate backend/target/architecture-violations.json
 
   stage3-integration:
     needs: changes
@@ -111,6 +138,84 @@ jobs:
       - if: needs.changes.outputs.backend == 'true'
         uses: actions/upload-artifact@v4
         with: { name: jacoco, path: backend/target/site/jacoco }
+      # OPS-032: coverage comment + gates (ci/quality-gates.json; gates stay report-only until enabled_from is set)
+      - if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request'
+        name: JaCoCo summary comment and coverage gates
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          git fetch -q origin ${{ github.base_ref }} --depth=200
+          base=$(git merge-base HEAD origin/${{ github.base_ref }})
+          python3 scripts/ci/quality.py summary backend/target/site/jacoco/jacoco.xml "$base" | tee cov.md >> "$GITHUB_STEP_SUMMARY"
+          gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body-file cov.md || true
+          python3 scripts/ci/quality.py gate backend/target/site/jacoco/jacoco.xml "$base"
+      - if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request' && vars.PIT_BLOCKED == 'true'
+        name: PIT drop gate (nightly mutation score fell more than 2 points)
+        run: |
+          git fetch -q origin ${{ github.base_ref }} --depth=200
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -qE '^backend/src/main/java/com/nabd/hms/(clinical|billing|auth)/'; then
+            echo "Blocked: nightly PIT score dropped by more than 2 points; restore mutation tests (see docs/ops/ci.md)"; exit 1
+          fi
+
+  # OPS-034 stage 5: report only. Never a required check (test_ci.py: required contexts = stage* jobs), failures never block the PR.
+  api-contract-report:
+    name: stage5-api-contract (report only)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: oasdiff base vs head (api/openapi/core.yaml)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OASDIFF_VERSION: "1.10.23"
+        run: |
+          curl -sSfL "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz" | tar xz oasdiff
+          git show "origin/${{ github.base_ref }}:api/openapi/core.yaml" > "$RUNNER_TEMP/base.yaml" || { echo "no base spec yet"; exit 0; }
+          {
+            echo "<!-- api-contract-report -->"
+            echo "### API contract report (oasdiff, non-blocking)"
+            echo '```'
+            ./oasdiff changelog "$RUNNER_TEMP/base.yaml" api/openapi/core.yaml | head -c 60000
+            echo '```'
+            echo "Breaking changes only:"
+            echo '```'
+            ./oasdiff breaking "$RUNNER_TEMP/base.yaml" api/openapi/core.yaml | head -c 20000
+            echo '```'
+          } > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+          # own marker, so this report never overwrites the coverage comment (which uses --edit-last)
+          sed -i '1i <!-- oasdiff-report -->' "$RUNNER_TEMP/report.md"
+          pr="${{ github.event.pull_request.number }}"
+          id=$(gh api "repos/${{ github.repository }}/issues/$pr/comments" --paginate --jq '[.[] | select(.body | startswith("<!-- oasdiff-report -->"))] | last | .id // empty')
+          if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@"$RUNNER_TEMP/report.md"
+          else gh pr comment "$pr" --body-file "$RUNNER_TEMP/report.md"; fi
+
+  # OPS-036 / FEF-049 stage 7: preview per PR + browser smoke and axe. Off until the preview cluster exists (vars.PREVIEW_ENABLED).
+  preview:
+    needs: stage6-build-and-scan
+    if: github.event_name == 'pull_request' && vars.PREVIEW_ENABLED == 'true'
+    uses: ./.github/workflows/preview.yml
+    secrets: inherit
+    permissions:           # a called workflow can only narrow these; exactly what preview.yml requests
+      contents: read
+      packages: write      # GHCR preview images
+      id-token: write      # OIDC login to the preview cluster
+      pull-requests: write # URL + logins comment
+  stage7-preview-e2e:
+    needs: preview
+    if: always() && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: preview deploy, smoke journeys and axe must pass
+        run: |
+          if [ "${{ vars.PREVIEW_ENABLED }}" != true ]; then echo "::notice::stage 7 preview disabled (vars.PREVIEW_ENABLED); see docs/ops/preview.md"; exit 0; fi
+          [ "${{ needs.preview.result }}" = success ] || { echo "stage 7 failed: preview ${{ needs.preview.result }}"; exit 1; }
 
   stage6-build-and-scan:
     needs: [changes, stage1-static, stage2-unit, stage3-integration]
@@ -130,7 +235,11 @@ jobs:
         run: mvn -B -q -f backend/pom.xml package -Dmaven.test.skip=true
       - uses: docker/setup-buildx-action@v3
       - name: build image once
-        run: docker build -t "$IMAGE:${{ github.sha }}" .
+        run: |
+          docker build -t "$IMAGE:${{ github.sha }}" .
+          docker build --target migrate -t "$IMAGE-migrate:${{ github.sha }}" .
+      - name: Container structure test (non-root, no shell, JVM flags, migrate entrypoint)
+        run: infra/ci/check-image.sh "$IMAGE:${{ github.sha }}" "$IMAGE-migrate:${{ github.sha }}"
       - name: Trivy image scan (fail on new High/Critical)
         uses: aquasecurity/trivy-action@0.28.0
         with:
@@ -168,6 +277,7 @@ jobs:
         name: push, sign, attach SBOM
         run: |
           docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE-migrate:${{ github.sha }}"   # deploys run the migrate image to completion before rolling out the API
           digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:${{ github.sha }}")
           cosign sign --yes "$digest"
           cosign attach sbom --sbom backend/target/sbom-backend.json --type cyclonedx "$digest"

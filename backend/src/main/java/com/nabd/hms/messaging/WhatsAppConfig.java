@@ -1,5 +1,6 @@
 package com.nabd.hms.messaging;
 
+import com.nabd.hms.shared.integration.ResilientHttpClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -7,9 +8,9 @@ import org.springframework.context.annotation.Configuration;
 class WhatsAppConfig {
 
     @Bean
-    WhatsAppClient whatsAppClient(WhatsAppProperties props) {
+    WhatsAppClient whatsAppClient(WhatsAppProperties props, ResilientHttpClient integration) {
         return props.accessToken() == null || props.accessToken().isBlank()
                 ? new LoggingWhatsAppClient()
-                : new MetaWhatsAppClient(props);
+                : new MetaWhatsAppClient(props, integration);
     }
 }

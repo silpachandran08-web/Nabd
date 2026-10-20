@@ -554,3 +554,6 @@
   .allergyForm { grid-template-columns: 1fr; }
   .fieldRow { grid-template-columns: 1fr; }
 }
+/* OPS-008: registry infinite-scroll footer */
+.moreRow { display: flex; align-items: center; justify-content: space-between; gap: var(--nb-space-12); padding-block: var(--nb-space-12); padding-inline: var(--nb-space-16); flex-wrap: wrap; }
+.moreRow .secondaryBtn { min-block-size: 44px; }

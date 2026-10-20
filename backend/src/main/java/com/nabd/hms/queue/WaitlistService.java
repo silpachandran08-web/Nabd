@@ -54,9 +54,12 @@ public class WaitlistService {
     private final AuditService auditService;
 
     private final ClinicClock clock;
+    private final SlotValidator slotValidator;
 
     WaitlistService(WaitlistRepository repo, AppointmentRepository appointmentRepo, ScheduleRepository scheduleRepo,
-                     QueueRepository queueRepo, TenantContext tenantContext, AuditService auditService, ClinicClock clock) {
+                     QueueRepository queueRepo, TenantContext tenantContext, AuditService auditService, ClinicClock clock,
+                     SlotValidator slotValidator) {
+        this.slotValidator = slotValidator;
         this.clock = clock;
         this.repo = repo;
         this.appointmentRepo = appointmentRepo;
@@ -92,7 +95,7 @@ public class WaitlistService {
     void onSlotFreed(UUID tenantId, UUID doctorId, Instant freedSlotStart) {
         expireAndCascade(tenantId, doctorId);
         repo.findOldestWaiting(tenantId, doctorId).ifPresent(entry -> {
-            Instant expiresAt = Instant.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
+            Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
             repo.offer(tenantId, entry.id(), freedSlotStart, expiresAt);
             log.info("waitlist entry {} (patient {}) offered freed slot {} for doctor {}, expires {}",
                     entry.id(), entry.patientId(), freedSlotStart, doctorId, expiresAt);
@@ -105,7 +108,7 @@ public class WaitlistService {
             repo.markExpired(tenantId, stale.id());
             log.info("waitlist offer {} expired unaccepted (patient {}, slot {})", stale.id(), stale.patientId(), stale.offeredSlotStart());
             repo.findOldestWaiting(tenantId, doctorId).ifPresent(next -> {
-                Instant expiresAt = Instant.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
+                Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
                 repo.offer(tenantId, next.id(), stale.offeredSlotStart(), expiresAt);
                 log.info("waitlist entry {} (patient {}) re-offered slot {} for doctor {}, expires {}",
                         next.id(), next.patientId(), stale.offeredSlotStart(), doctorId, expiresAt);
@@ -146,8 +149,7 @@ public class WaitlistService {
             appointmentId = appointmentRepo.insert(tenantId, entry.patientId(), entry.doctorId(), entry.offeredSlotStart(), end, false);
         } catch (DataIntegrityViolationException e) {
             // vanishingly unlikely (the slot was free the moment it was offered) but never silently drop the claim
-            throw new ApiException(HttpStatus.CONFLICT, "slot-unavailable", "Slot no longer available",
-                    "This slot was booked through another path just now.");
+            throw SlotValidator.slotTakenOrRethrow(e);
         }
         if (!repo.claimOffer(tenantId, id, appointmentId)) {
             // lost the race against expiry between the check above and this claim — undo the booking
@@ -163,7 +165,7 @@ public class WaitlistService {
     /**
      * REC-028: the front desk books a waitlisted patient into a slot it chose. Same rules as
      * AppointmentService.book() (clinic holiday 400, session cap 409 session-full, the DB unique index for a taken
-     * slot 409 slot-unavailable), duplicated here because this class cannot depend on AppointmentService (it
+     * slot 409 slot-taken), duplicated here because this class cannot depend on AppointmentService (it
      * calls onSlotFreed()). On top of those: the slot must be in the future, and a slot currently offered to
      * someone else on the waitlist is refused (409 slot-on-offer) so the single-accept rule holds. If this
      * entry itself held a live offer of a different slot, that slot passes to the next waiting patient.
@@ -173,32 +175,22 @@ public class WaitlistService {
             throw new ApiException(HttpStatus.CONFLICT, "waitlist-entry-closed", "Waitlist entry closed",
                     "This waitlist entry was already booked or removed.");
         }
-        if (!slotStart.isAfter(Instant.now())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "slot-in-past", "Slot in the past",
-                    "slotStart must be in the future.");
-        }
         UUID doctorId = entry.doctorId();
         ZoneId zone = clock.zone(tenantId);
-        LocalDate date = slotStart.atZone(zone).toLocalDate();
-        if (scheduleRepo.isClinicHoliday(tenantId, date)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "clinic-holiday", "Clinic closed",
-                    "The clinic is closed on " + date + ".");
-        }
+        int slotMinutes = slotValidator.validate(tenantId, doctorId, slotStart, clock.now());
         if (repo.isSlotOnLiveOffer(tenantId, doctorId, slotStart, entry.id())) {
             throw new ApiException(HttpStatus.CONFLICT, "slot-on-offer", "Slot is on offer",
                     "This slot is currently offered to another patient on the waitlist.");
         }
         enforceSessionCapacity(tenantId, doctorId, slotStart, zone);
 
-        int slotMinutes = resolveSlotMinutes(tenantId, doctorId, slotStart);
         Instant end = slotStart.plus(slotMinutes, ChronoUnit.MINUTES);
         UUID appointmentId;
         try {
             appointmentId = appointmentRepo.insert(tenantId, entry.patientId(), doctorId, slotStart, end, false);
         } catch (DataIntegrityViolationException e) {
             log.warn("waitlist chosen-slot conflict: doctor {} already booked at {}", doctorId, slotStart);
-            throw new ApiException(HttpStatus.CONFLICT, "slot-unavailable", "Slot no longer available",
-                    "This doctor already has an appointment at that time.");
+            throw SlotValidator.slotTakenOrRethrow(e);
         }
         if (!repo.claimForChosenSlot(tenantId, entry.id(), appointmentId)) {
             appointmentRepo.cancel(tenantId, appointmentId, "waitlist-entry-closed");
@@ -209,7 +201,7 @@ public class WaitlistService {
             // the slot this entry was holding is free again: offer it on, exactly as an expiry would
             Instant releasedSlot = entry.offeredSlotStart();
             repo.findOldestWaiting(tenantId, doctorId).ifPresent(next -> {
-                Instant expiresAt = Instant.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
+                Instant expiresAt = clock.now().plus(OFFER_WINDOW_MINUTES, ChronoUnit.MINUTES);
                 repo.offer(tenantId, next.id(), releasedSlot, expiresAt);
                 log.info("waitlist entry {} (patient {}) offered released slot {} for doctor {}, expires {}",
                         next.id(), next.patientId(), releasedSlot, doctorId, expiresAt);
@@ -237,11 +229,11 @@ public class WaitlistService {
         if (block.isEmpty() || block.get().maxPatients() == null) {
             return;
         }
-        queueRepo.lockDoctorDay(doctorId, date);
+        queueRepo.lockDoctorDay(tenantId, doctorId, date);
         int occupancy = scheduleRepo.countSessionOccupancy(tenantId, doctorId, date, block.get().startTime(), block.get().endTime(), zone);
         if (occupancy >= block.get().maxPatients()) {
             throw new ApiException(HttpStatus.CONFLICT, "session-full", "Session is full",
-                    "This session has reached its patient cap (walk-ins and bookings counted together).");
+                    "This session has reached its patient cap (walk-ins and bookings counted together).", Map.of("code", "SESSION_FULL"));
         }
     }
 

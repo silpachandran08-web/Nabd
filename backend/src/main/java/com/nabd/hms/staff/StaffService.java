@@ -3,12 +3,14 @@ package com.nabd.hms.staff;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.Cursor;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.staff.dto.AcceptInviteRequest;
 import com.nabd.hms.staff.dto.AcceptedStaffIdentity;
 import com.nabd.hms.staff.dto.CallerInfo;
+import com.nabd.hms.staff.dto.MfaResetRequest;
 import com.nabd.hms.staff.dto.PageMeta;
 import com.nabd.hms.staff.dto.StaffInviteRequest;
 import com.nabd.hms.staff.dto.StaffInviteResponse;
@@ -24,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
@@ -31,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.nabd.hms.staff.StaffRoleModels.RoleRow;
 import static com.nabd.hms.staff.StaffRoleModels.StaffRow;
 
 @Service
@@ -44,15 +48,23 @@ public class StaffService {
     private final PasswordEncoder pinEncoder;
     private final StepUpVerifier stepUpVerifier;
     private final AuditService auditService;
+    private final GrantAuthority grantAuthority;
+    private final EventPublisher eventPublisher;
+
+    private final Clock clock;
 
     StaffService(StaffRepository staffRepo, RoleRepository roleRepo, TenantContext tenantContext,
-                 PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService) {
+                 PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService,
+                 GrantAuthority grantAuthority, EventPublisher eventPublisher, Clock clock) {
+        this.clock = clock;
         this.staffRepo = staffRepo;
         this.roleRepo = roleRepo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
         this.stepUpVerifier = stepUpVerifier;
         this.auditService = auditService;
+        this.grantAuthority = grantAuthority;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -82,13 +94,16 @@ public class StaffService {
     @Transactional
     public StaffInviteResponse invite(UUID tenantId, UUID invitedBy, StaffInviteRequest req) {
         tenantContext.set(tenantId);
-        if (roleRepo.findById(tenantId, req.roleId()).isEmpty()) {
-            throw notFound();
+        // invitedBy == null is the provisioning bootstrap (system issues the first Owner invite); no caller to bound
+        if (invitedBy != null) {
+            StaffRow caller = staffRepo.findById(tenantId, invitedBy).orElseThrow(this::notFound);
+            grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound),
+                    req.scopeOrDefault(), null);
         }
 
         UUID id = UUID.randomUUID();
         String rawToken = OpaqueTokens.generate();
-        Instant expiresAt = Instant.now().plus(72, ChronoUnit.HOURS);
+        Instant expiresAt = Instant.now(clock).plus(72, ChronoUnit.HOURS);
         try {
             staffRepo.insertInvite(id, tenantId, req.roleId(), req.email().toLowerCase(), req.name(),
                     req.mobilePhone(), req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy, req.departmentId());
@@ -112,17 +127,38 @@ public class StaffService {
         tenantContext.set(tenantId);
         StaffRow current = staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
 
-        if (req.roleId() != null && roleRepo.findById(tenantId, req.roleId()).isEmpty()) {
-            throw notFound();
+        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElseThrow(this::notFound);
+        RoleRow newRole = req.roleId() == null ? null : roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound);
+        boolean roleChanged = newRole != null && !newRole.id().equals(current.roleId());
+        boolean scopeChanged = req.scope() != null && !req.scope().equals(current.scope());
+        boolean fieldsChanged = req.fieldGrants() != null
+                && !new java.util.HashSet<>(req.fieldGrants()).equals(new java.util.HashSet<>(current.fieldGrants()));
+        if (roleChanged) { // moving someone off the Owner role needs Owner too; then the new role must fit the caller
+            grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, current.roleId()).orElseThrow(), null, null);
+            grantAuthority.requireAssignable(tenantId, caller, newRole, null, null);
         }
+        grantAuthority.requireAssignable(tenantId, caller, null, scopeChanged ? req.scope() : null, fieldsChanged ? req.fieldGrants() : null);
 
         UUID roleId = req.roleId() != null ? req.roleId() : current.roleId();
         String scope = req.scope() != null ? req.scope() : current.scope();
         List<String> fieldGrants = req.fieldGrants() != null ? req.fieldGrants() : current.fieldGrants();
         UUID departmentId = req.departmentId() != null ? req.departmentId() : current.departmentId();
+        String registrationAfter = req.professionalRegistrationNo() == null ? current.professionalRegistrationNo()
+                : req.professionalRegistrationNo().trim().isEmpty() ? null : req.professionalRegistrationNo().trim();
+        // PLT-016: a clinician is set when a registration is recorded; an explicit toggle wins, but "on" needs a number.
+        boolean registrationSet = registrationAfter != null && !registrationAfter.equals(current.professionalRegistrationNo());
+        boolean clinicianAfter = req.clinician() != null ? req.clinician() : registrationSet || current.clinician();
+        if (clinicianAfter && !current.clinician() && registrationAfter == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "clinician-needs-registration", "Registration number required",
+                    "Record a professional registration number before marking this person as a clinician.");
+        }
 
         staffRepo.update(tenantId, id, roleId, scope, fieldGrants, departmentId);
         log.info("staff {} updated by {} (role {}, scope {})", id, callerStaffId, roleId, scope);
+
+        if (roleChanged || scopeChanged || fieldsChanged) {
+            auditRoleChange(tenantId, caller, id, current, roleId, scope, fieldGrants, scopeChanged, ipAddress);
+        }
 
         // DOC-N1: the registration number is printed on prescriptions, so a change is audited. The audit row records
         // that it was set / changed / cleared, not the number itself, and the number is never written to the log.
@@ -133,16 +169,45 @@ public class StaffService {
             if (!java.util.Objects.equals(previous, normalised)) {
                 staffRepo.updateProfessionalRegistrationNo(tenantId, id, normalised);
                 String change = previous == null ? "set" : normalised == null ? "cleared" : "changed";
-                StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
-                String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+                String callerRole = roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
                 Map<String, Object> detail = new LinkedHashMap<>();
                 detail.put("field", "professionalRegistrationNo");
                 detail.put("change", change);
-                auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,
+                auditService.record(tenantId, "staff", callerStaffId, caller.name(), callerRole,
                         ipAddress, "staff.registration_no_" + change, "staff", id, null, detail);
             }
         }
+        if (clinicianAfter != current.clinician() || req.clinician() != null) {
+            staffRepo.updateClinician(tenantId, id, clinicianAfter); // an explicit confirm also clears the backfill review row
+        }
+        if (clinicianAfter != current.clinician()) {
+            String callerRole = roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+            auditService.record(tenantId, "staff", callerStaffId, caller.name(), callerRole, ipAddress,
+                    clinicianAfter ? "staff.clinician_set" : "staff.clinician_cleared", "staff", id,
+                    Map.of("clinician", current.clinician()), Map.of("clinician", clinicianAfter));
+        }
         return staffRepo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);
+    }
+
+    /** PLT-016: the clinician backfill's ambiguous rows still waiting for the owner. */
+    @Transactional
+    public List<com.nabd.hms.staff.dto.ClinicianReviewEntry> clinicianReview(UUID tenantId) {
+        tenantContext.set(tenantId);
+        return staffRepo.listClinicianReview(tenantId);
+    }
+
+    /** PLT-015: before/after audit, sessions killed so the new grants apply on the next request, event published. */
+    private void auditRoleChange(UUID tenantId, StaffRow caller, UUID id, StaffRow before, UUID roleId, String scope,
+                                 List<String> fieldGrants, boolean scopeChanged, String ipAddress) {
+        String callerRole = roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+        auditService.record(tenantId, "staff", caller.id(), caller.name(), callerRole, ipAddress, "staff.role_changed", "staff", id,
+                Map.of("roleId", before.roleId(), "scope", before.scope(), "fieldGrants", before.fieldGrants()),
+                Map.of("roleId", roleId, "scope", scope, "fieldGrants", fieldGrants));
+        // ponytail: 'role_changed' is not in sessions.revoked_reason's CHECK yet (PLT-007 adds it); admin_revoke until then
+        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        eventPublisher.publish(tenantId, StaffRoleChangedHandler.TYPE, Map.of("tenantId", tenantId.toString(),
+                "staffId", id.toString(), "fromRoleId", before.roleId().toString(), "toRoleId", roleId.toString(),
+                "scopeChanged", scopeChanged));
     }
 
     @Transactional
@@ -153,6 +218,21 @@ public class StaffService {
         staffRepo.suspend(tenantId, id);
         staffRepo.revokeAllSessions(tenantId, id, "suspended");
         log.warn("staff {} suspended by {} (tenant {}) — all sessions killed", id, callerStaffId, tenantId);
+    }
+
+    /** PLT-004: idempotent; the audit row is written on every call. */
+    @Transactional
+    public void resetMfa(UUID tenantId, UUID id, UUID callerStaffId, String stepUpToken, MfaResetRequest req, String ipAddress) {
+        stepUpVerifier.require(stepUpToken, callerStaffId);
+        tenantContext.set(tenantId);
+        staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
+        staffRepo.resetMfa(tenantId, id);
+        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
+        String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
+        auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,
+                ipAddress, "staff.mfa_reset", "staff", id, null, Map.of("reasonCode", req.reasonCode()));
+        log.warn("MFA of staff {} reset by {} (tenant {}), sessions revoked", id, callerStaffId, tenantId);
     }
 
     @Transactional
@@ -176,7 +256,7 @@ public class StaffService {
     private StaffResponse toResponse(StaffRow row) {
         return new StaffResponse(row.id(), row.email(), row.name(), row.mobilePhone(), row.roleId(), row.status(),
                 row.scope(), row.emailVerified(), row.mobileVerified(), row.fieldGrants(), row.departmentId(), row.lastSeenAt(),
-                row.professionalRegistrationNo(), loginMethod(row), loginFactors(row));
+                row.professionalRegistrationNo(), loginMethod(row), loginFactors(row), row.clinician());
     }
 
     /**

@@ -5,7 +5,6 @@ import com.nabd.hms.billing.dto.CheckoutContextResponse;
 import com.nabd.hms.billing.dto.CheckoutRequest;
 import com.nabd.hms.billing.dto.ChargeResponse;
 import com.nabd.hms.billing.dto.InvoiceResponse;
-import com.nabd.hms.billing.dto.LineItemRequest;
 import com.nabd.hms.billing.dto.LineItemResponse;
 import com.nabd.hms.billing.dto.OtcChargesResponse;
 import com.nabd.hms.billing.dto.PaymentRequest;
@@ -14,6 +13,7 @@ import com.nabd.hms.billing.dto.PrescribedItemResponse;
 import com.nabd.hms.billing.dto.VoidInvoiceRequest;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.department.DepartmentService;
 import com.nabd.hms.queue.QueueService;
@@ -36,7 +36,6 @@ import static com.nabd.hms.billing.CheckoutModels.ChargeRow;
 import static com.nabd.hms.billing.CheckoutModels.InvoiceRow;
 import static com.nabd.hms.billing.CheckoutModels.LineItemInput;
 import static com.nabd.hms.billing.CheckoutModels.LineItemRow;
-import static com.nabd.hms.billing.CheckoutModels.PharmacyChargeRow;
 import static com.nabd.hms.billing.CheckoutModels.QueueEntryContext;
 
 /**
@@ -58,16 +57,25 @@ public class CheckoutService {
     private final CheckoutRepository repo;
     private final TenantContext tenantContext;
     private final QueueService queueService;
+    private final com.nabd.hms.queue.VisitCommands visitCommands;
     private final DepartmentService departmentService;
 
     private final ClinicClock clock;
 
     private final DayCloseService dayClose;
     private final AuditService auditService;
+    private final EventPublisher eventPublisher;
+    private final BillingPricing pricing;
+    private final com.nabd.hms.pharmacy.RxGate rxGate;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      DepartmentService departmentService, ClinicClock clock, DayCloseService dayClose,
-                     AuditService auditService) {
+                     AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
+                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate) {
+        this.rxGate = rxGate;
+        this.visitCommands = visitCommands;
+        this.eventPublisher = eventPublisher;
+        this.pricing = pricing;
         this.auditService = auditService;
         this.dayClose = dayClose;
         this.clock = clock;
@@ -89,11 +97,17 @@ public class CheckoutService {
         List<ChargeResponse> pendingProcedures = repo.listPendingProcedures(tenantId, queueEntryId).stream()
                 .map(this::toChargeResponse).toList();
         List<PrescribedItemResponse> prescribedItems = repo.findSignedPrescriptionItems(tenantId, queueEntryId).stream()
-                .map(p -> new PrescribedItemResponse(p.drugName(), p.dosage(), p.frequency(), p.duration(), p.instructions()))
+                .map(p -> new PrescribedItemResponse(p.id(), p.drugName(), p.dosage(), p.frequency(), p.duration(), p.instructions(),
+                        p.quantity(), p.quantity() == null ? BigDecimal.ZERO : p.quantity().subtract(p.dispensed()).max(BigDecimal.ZERO)))
                 .toList();
         return new CheckoutContextResponse(queueEntryId, patientName, doctorName,
                 ctx.hasAppointment() ? "Appointment" : "Walk-in", followUpEligible, currencyFor(tenantId), charges,
-                pendingProcedures, prescribedItems, ctx.departmentId(), ctx.queueStatus());
+                pendingProcedures, prescribedItems, ctx.departmentId(), ctx.queueStatus(),
+                charges.stream().filter(c -> "Consultation".equals(c.category()))
+                        .map(c -> followUpEligible && c.followUpAmount() != null
+                                ? new CheckoutContextResponse.SuggestedLine(c.code(), c.name(), "follow_up", c.followUpAmount())
+                                : new CheckoutContextResponse.SuggestedLine(c.code(), c.name(), "normal", c.baseAmount()))
+                        .toList());
     }
 
     @Transactional
@@ -113,7 +127,7 @@ public class CheckoutService {
      * "checkout with 0 payment"); it must be non-empty the first time a visit is billed.
      */
     @Transactional
-    public InvoiceResponse checkout(UUID tenantId, UUID queueEntryId, UUID staffId, CheckoutRequest req) {
+    public InvoiceResponse checkout(UUID tenantId, UUID queueEntryId, UUID staffId, boolean canDiscount, String ip, CheckoutRequest req) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
         QueueEntryContext ctx = repo.findQueueEntryContext(tenantId, queueEntryId).orElseThrow(this::notFound);
@@ -127,7 +141,9 @@ public class CheckoutService {
 
         boolean followUp = repo.hasRecentCompletedVisit(tenantId, ctx.patientId(), ctx.doctorId(),
                 clock.today(tenantId).minusDays(FOLLOW_UP_WINDOW_DAYS));
-        List<LineItemRequest> lineItems = resolveCatalogueLines(tenantId, req.lineItems(), followUp);
+        if (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty()) BillingPricing.requireDiscountRight(canDiscount);
+        List<LineItemInput> lineItems = pricing.resolveLines(tenantId, req.lineItems(), followUp, canDiscount, false, staffId);
+        rxGate.check(tenantId, ctx.patientId(), rxLines(lineItems), staffId, ip); // PHL-001: before anything is written
         Optional<InvoiceRow> existing = repo.findInvoiceByQueueEntry(tenantId, queueEntryId);
         existing.ifPresent(CheckoutService::rejectVoid);
         UUID invoiceId;
@@ -136,21 +152,31 @@ public class CheckoutService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
                         "Add at least one charge before checking out.");
             }
-            Totals t = computeTotals(lineItems, List.of(), req.discountOrZero());
+            Totals t = computeTotals(lineItems, List.of(), BigDecimal.ZERO, req, canDiscount);
             invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
                     t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId);
-            repo.insertLineItems(tenantId, invoiceId, lineItems.stream().map(this::toLineItemInput).toList());
+            repo.insertLineItems(tenantId, invoiceId, lineItems);
+            repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
+            auditPricing(tenantId, staffId, ip, invoiceId, lineItems, t.newDiscounts(), BigDecimal.ZERO);
             log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         } else {
             invoiceId = existing.get().id();
+            InvoiceRow locked = repo.lockInvoice(tenantId, invoiceId).orElseThrow(this::notFound); // serialises with payments
             List<LineItemRow> existingItems = repo.findLineItems(tenantId, invoiceId);
-            Totals t = computeTotals(lineItems, existingItems, req.discountOrZero());
+            BigDecimal earlier = repo.sumDiscounts(tenantId, invoiceId);
+            Totals t = computeTotals(lineItems, existingItems, earlier, req, canDiscount);
             if (!lineItems.isEmpty()) {
-                repo.appendLineItems(tenantId, invoiceId, lineItems.stream().map(this::toLineItemInput).toList(),
-                        repo.nextLineItemOrder(tenantId, invoiceId));
+                repo.appendLineItems(tenantId, invoiceId, lineItems, repo.nextLineItemOrder(tenantId, invoiceId));
             }
-            repo.updateInvoiceTotals(tenantId, invoiceId, t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total());
+            if (locked.paid().compareTo(t.total()) > 0) {
+                throw new ApiException(HttpStatus.CONFLICT, "total-below-paid", "Total is below what was paid",
+                        "This invoice already has " + locked.paid().toPlainString() + " paid, which is more than the new total.");
+            }
+            repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
+            auditPricing(tenantId, staffId, ip, invoiceId, lineItems, t.newDiscounts(), earlier);
+            repo.updateInvoiceTotals(tenantId, invoiceId, t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(),
+                    InvoiceStatus.derive(locked.status(), t.total(), locked.paid()));
             log.info("invoice {} extended at queue entry {} by {} (tenant {}, new total {})",
                     invoiceId, queueEntryId, staffId, tenantId, t.total());
         }
@@ -161,7 +187,11 @@ public class CheckoutService {
         // to completed. An interim (billing_pending) checkpoint advances to whatever this
         // department's configured flow puts next — the visit continues, it doesn't end here.
         String nextStatus = sequence.get(currentIndex + 1);
-        queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest(nextStatus));
+        if ("completed".equals(nextStatus)) {
+            visitCommands.completeAfterPayment(tenantId, staffId, queueEntryId, ctx.queueStatus());
+        } else {
+            queueService.updateStatus(tenantId, staffId, queueEntryId, new QueueStatusUpdateRequest(nextStatus, ctx.queueStatus()));
+        }
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }
@@ -177,49 +207,65 @@ public class CheckoutService {
     }
 
     @Transactional
-    public InvoiceResponse otcCheckout(UUID tenantId, UUID staffId, CheckoutRequest req) {
+    public InvoiceResponse otcCheckout(UUID tenantId, UUID staffId, boolean canDiscount, String ip, CheckoutRequest req) {
         tenantContext.set(tenantId);
         requireOtcAvailable(tenantId);
-        return standaloneInvoice(tenantId, staffId, null, req, "OTC");
+        return standaloneInvoice(tenantId, staffId, null, req, "OTC", canDiscount, false, ip);
     }
 
     /** E14 Treatment Packages: a package sale is also a standalone invoice — no queue entry, but
      * (unlike an OTC sale) a real patient. Reuses the same total/tax/round-off computation. */
     @Transactional
     public InvoiceResponse sellPackageInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req) {
-        return standaloneInvoice(tenantId, staffId, patientId, req, "package");
+        return standaloneInvoice(tenantId, staffId, patientId, req, "package", true, true, null);
     }
 
-    private InvoiceResponse standaloneInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req, String kind) {
+    private InvoiceResponse standaloneInvoice(UUID tenantId, UUID staffId, UUID patientId, CheckoutRequest req, String kind,
+                                              boolean canDiscount, boolean trusted, String ip) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
         if (req.lineItems().isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
                     "Add at least one charge before checking out.");
         }
-        List<LineItemRequest> lineItems = resolveCatalogueLines(tenantId, req.lineItems(), false);
-        Totals t = computeTotals(lineItems, List.of(), req.discountOrZero());
-        List<LineItemInput> items = lineItems.stream().map(this::toLineItemInput).toList();
+        if (!trusted && (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty())) BillingPricing.requireDiscountRight(canDiscount);
+        List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), false, canDiscount, trusted, staffId);
+        // H-04: a free-text line has no is_rx flag, so an Rx-only drug typed in by name would skip the gate. The counter sells catalogue items only.
+        if (!trusted && items.stream().anyMatch(i -> i.catalogueId() == null)) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "free-text-not-allowed", "Only price-list items at the counter",
+                    "Counter sales can only bill items from the price list. Add the item to the price list first.");
+        }
+        // PHL-001: a counter sale of an Rx line needs a signed in-system prescription; the invoice then carries that patient.
+        UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
+        Totals t = computeTotals(items, List.of(), BigDecimal.ZERO, req, canDiscount);
 
-        UUID invoiceId = repo.insertInvoice(tenantId, null, patientId, null, t.subtotal(), t.discount(), t.tax(),
+        UUID invoiceId = repo.insertInvoice(tenantId, null, patientId != null ? patientId : rxPatient, null, t.subtotal(), t.discount(), t.tax(),
                 t.roundOff(), t.total(), staffId);
         repo.insertLineItems(tenantId, invoiceId, items);
+        repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
+        if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
         log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
 
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }
 
-    private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total) {
+    private static List<com.nabd.hms.pharmacy.RxGate.Line> rxLines(List<LineItemInput> items) {
+        return items.stream().map(i -> new com.nabd.hms.pharmacy.RxGate.Line(i.chargeCode(), i.catalogueId(), i.isRx(), i.quantity(),
+                i.prescriptionItemId())).toList();
+    }
+
+    private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,
+                          List<BillingPricing.DiscountInput> newDiscounts) {
     }
 
     /** NB-355: totals over new (not-yet-persisted) line items plus, when extending an
-     * already-created invoice, whatever's already on it — one combined subtotal/tax/total either
-     * way, so a visit billed across more than one checkpoint still has exactly one number that
-     * "can never be typed over" per the class doc, just recomputed as more gets added. */
-    private Totals computeTotals(List<LineItemRequest> newItems, List<LineItemRow> existingItems, BigDecimal discount) {
+     * already-created invoice, whatever's already on it. FIN-003: the invoice discount is the ledger sum —
+     * {@code earlierDiscount} (rows from earlier checkpoints) plus this request's new rows, capped by the combined subtotal. */
+    private Totals computeTotals(List<LineItemInput> newItems, List<LineItemRow> existingItems, BigDecimal earlierDiscount,
+                                 CheckoutRequest req, boolean canDiscount) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal tax = BigDecimal.ZERO;
-        for (LineItemRequest li : newItems) {
+        for (LineItemInput li : newItems) {
             BigDecimal lineAmount = li.unitPrice().multiply(BigDecimal.valueOf(li.quantity()));
             subtotal = subtotal.add(lineAmount);
             tax = tax.add(lineAmount.multiply(li.taxRatePercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
@@ -229,15 +275,34 @@ public class CheckoutService {
             tax = tax.add(li.lineTotal().multiply(li.taxRatePercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
         }
 
-        if (discount.compareTo(subtotal) > 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "discount-exceeds-subtotal", "Discount too large",
-                    "The discount can't be more than the subtotal.");
-        }
+        var newDiscounts = pricing.resolveDiscounts(req.discountOrZero(), req.discountsOrEmpty(), canDiscount, subtotal.subtract(earlierDiscount));
+        BigDecimal discount = newDiscounts.stream().map(BillingPricing.DiscountInput::amount).reduce(earlierDiscount, BigDecimal::add);
 
         BigDecimal rawTotal = subtotal.subtract(discount).add(tax);
         BigDecimal total = rawTotal.setScale(0, RoundingMode.HALF_UP);
         BigDecimal roundOff = total.subtract(rawTotal);
-        return new Totals(subtotal, discount, tax, roundOff, total);
+        return new Totals(subtotal, discount, tax, roundOff, total, newDiscounts);
+    }
+
+    /** FIN-003: one audit row per price override / free-text line and per discount (before/after). */
+    private void auditPricing(UUID tenantId, UUID staffId, String ip, UUID invoiceId, List<LineItemInput> items,
+                              List<BillingPricing.DiscountInput> discounts, BigDecimal earlierDiscount) {
+        var changed = items.stream().filter(i -> i.overriddenBy() != null).toList();
+        if (changed.isEmpty() && discounts.isEmpty()) return;
+        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        for (LineItemInput i : changed) {
+            auditService.record(tenantId, "staff", staffId, actor[0], actor[1], ip, "billing.price_overridden", "invoice", invoiceId,
+                    java.util.Map.of("chargeCode", i.chargeCode(), "unitPrice", i.listUnitPrice()),
+                    java.util.Map.of("chargeCode", i.chargeCode(), "unitPrice", i.unitPrice(), "tier", i.tier(),
+                            "reasonCode", i.overrideReasonCode() == null ? "" : i.overrideReasonCode()));
+        }
+        BigDecimal running = earlierDiscount;
+        for (var d : discounts) {
+            auditService.record(tenantId, "staff", staffId, actor[0], actor[1], ip, "billing.discount_applied", "invoice", invoiceId,
+                    java.util.Map.of("discount", running),
+                    java.util.Map.of("discount", running.add(d.amount()), "kind", d.kind(), "value", d.value(), "reasonCode", d.reasonCode()));
+            running = running.add(d.amount());
+        }
     }
 
     private static void rejectVoid(InvoiceRow invoice) {
@@ -249,18 +314,54 @@ public class CheckoutService {
 
     @Transactional
     public InvoiceResponse recordPayment(UUID tenantId, UUID invoiceId, UUID staffId, PaymentRequest req) {
+        return recordPayment(tenantId, invoiceId, staffId, req, null);
+    }
+
+    /**
+     * FIN-001: the invoice row is locked first, so two cashiers queue up and each sees the other's payment. The
+     * amount is checked against the locked balance, the payment row is inserted, and paid + status are re-derived
+     * from the payment rows in the same transaction. A repeated Idempotency-Key returns the invoice unchanged.
+     */
+    @Transactional
+    public InvoiceResponse recordPayment(UUID tenantId, UUID invoiceId, UUID staffId, PaymentRequest req, String idempotencyKey) {
         tenantContext.set(tenantId);
         dayClose.requireTodayOpen(tenantId);
-        InvoiceRow invoice = repo.findInvoice(tenantId, invoiceId).orElseThrow(this::notFound);
-        rejectVoid(invoice);
-        if ("paid".equals(invoice.status())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "invoice-already-paid", "Invoice already paid",
-                    "This invoice has no outstanding balance.");
+        InvoiceRow invoice = repo.lockInvoice(tenantId, invoiceId).orElseThrow(this::notFound);
+        if (idempotencyKey != null) {
+            Optional<UUID> prior = repo.findInvoiceByPaymentKey(tenantId, idempotencyKey);
+            if (prior.isPresent()) {
+                if (!prior.get().equals(invoiceId)) {
+                    throw new ApiException(HttpStatus.CONFLICT, "idempotency-key-reused", "Idempotency key reused",
+                            "That Idempotency-Key was already used for a different invoice.");
+                }
+                return toInvoiceResponse(tenantId, invoice);
+            }
         }
-        repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId);
-        BigDecimal newPaid = invoice.paid().add(req.amount());
-        String newStatus = newPaid.compareTo(invoice.total()) >= 0 ? "paid" : "partial";
-        repo.updateInvoicePaidStatus(tenantId, invoiceId, newPaid, newStatus);
+        if (InvoiceStatus.CLOSED.contains(invoice.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "invoice-not-payable", "Invoice can't take payments",
+                    "This invoice is " + invoice.status() + "; it can't take payments.");
+        }
+        BigDecimal balance = invoice.total().subtract(invoice.paid());
+        if (req.amount().compareTo(balance) > 0) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "overpayment", "Payment is more than the balance",
+                    "The balance due is " + balance.toPlainString() + "; a payment can't be more than that.",
+                    java.util.Map.of("balance", balance));
+        }
+        String reference = req.reference() == null || req.reference().isBlank() ? null : req.reference().trim();
+        UUID paymentId = repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId, reference, idempotencyKey);
+        BigDecimal newPaid = repo.sumPayments(tenantId, invoiceId);
+        String newStatus = InvoiceStatus.derive(invoice.status(), invoice.total(), newPaid);
+        repo.syncInvoicePaid(tenantId, invoiceId, newStatus);
+        BigDecimal newBalance = invoice.total().subtract(newPaid);
+
+        String[] actor = repo.findActor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        auditService.record(tenantId, "staff", staffId, actor[0], actor[1], null, "billing.payment_recorded", "invoice", invoiceId,
+                java.util.Map.of("paid", invoice.paid(), "status", invoice.status()),
+                java.util.Map.of("paymentId", paymentId, "method", req.method(), "amount", req.amount(), "paid", newPaid, "status", newStatus));
+        eventPublisher.publish(tenantId, PaymentRecordedHandler.TYPE, java.util.Map.of(
+                "tenantId", tenantId, "invoiceId", invoiceId, "paymentId", paymentId, "method", req.method(),
+                "amountMinor", req.amount().movePointRight(2).longValueExact(), "currency", currencyFor(tenantId),
+                "balanceMinor", newBalance.movePointRight(2).longValueExact(), "status", newStatus));
         log.info("payment recorded on invoice {} by {}: {} {} (tenant {})", invoiceId, staffId, req.amount(), req.method(), tenantId);
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow());
     }
@@ -308,10 +409,10 @@ public class CheckoutService {
     private InvoiceResponse toInvoiceResponse(UUID tenantId, InvoiceRow row) {
         List<LineItemResponse> lineItems = repo.findLineItems(tenantId, row.id()).stream()
                 .map(li -> new LineItemResponse(li.chargeCode(), li.chargeName(), li.category(), li.quantity(),
-                        li.unitPrice(), li.taxRatePercent(), li.lineTotal()))
+                        li.unitPrice(), li.taxRatePercent(), li.lineTotal(), li.listUnitPrice(), li.tier(), li.overrideReasonCode()))
                 .toList();
         List<PaymentResponse> payments = repo.findPayments(tenantId, row.id()).stream()
-                .map(p -> new PaymentResponse(p.id(), p.method(), p.amount(), p.recordedAt()))
+                .map(p -> new PaymentResponse(p.id(), p.method(), p.amount(), p.recordedAt(), p.idempotencyKey()))
                 .toList();
         String patientName = row.patientId() == null ? "Walk-in customer"
                 : repo.findPatientName(tenantId, row.patientId()).orElse("Unknown patient");
@@ -324,40 +425,7 @@ public class CheckoutService {
     }
 
     private ChargeResponse toChargeResponse(ChargeRow c) {
-        return new ChargeResponse(c.id(), c.code(), c.name(), c.category(), c.baseAmount(), c.followUpAmount(), c.taxRatePercent(), c.stockQty());
-    }
-
-    /**
-     * V3-004 / QA-OI-2: a line whose chargeCode is in the tenant's catalogue is priced SERVER-side: name, category, tax
-     * and unit price come from the catalogue and the client's values are silently ignored (not a 400: the UI sends the
-     * price it displayed, so a stale price just gets corrected; the invoice response shows what was charged). The price
-     * is base_amount, or follow_up_amount for a Consultation when the visit is follow-up eligible. A catalogue entry
-     * flagged doctor_override keeps the client's price (that is what the flag means). An inactive stocked item is a 409.
-     * Lines with no catalogue entry (procedures, packages, free text) keep the client's values; bean validation already
-     * guarantees a name and unitPrice/tax >= 0.
-     */
-    private List<LineItemRequest> resolveCatalogueLines(UUID tenantId, List<LineItemRequest> lines, boolean followUpEligible) {
-        List<LineItemRequest> resolved = new java.util.ArrayList<>(lines.size());
-        for (LineItemRequest li : lines) {
-            var found = repo.findCatalogueCharge(tenantId, li.chargeCode());
-            if (found.isEmpty()) {
-                resolved.add(li);
-                continue;
-            }
-            PharmacyChargeRow item = found.get();
-            if (item.stocked() && !item.active()) {
-                throw new ApiException(HttpStatus.CONFLICT, "item-inactive", "Item no longer sold",
-                        item.name() + " has been deactivated and can't be billed. Remove it from the bill.");
-            }
-            BigDecimal price = followUpEligible && "Consultation".equals(item.category()) && item.followUpAmount() != null
-                    ? item.followUpAmount() : item.baseAmount();
-            if (item.doctorOverride()) {
-                price = li.unitPrice();
-            }
-            resolved.add(new LineItemRequest(li.chargeCode(), item.name(), item.category(), li.quantity(),
-                    price, item.taxRatePercent()));
-        }
-        return resolved;
+        return new ChargeResponse(c.id(), c.code(), c.name(), c.category(), c.baseAmount(), c.followUpAmount(), c.taxRatePercent(), c.stockQty(), c.isRx());
     }
 
     private void requireOtcAvailable(UUID tenantId) {
@@ -365,10 +433,6 @@ public class CheckoutService {
             throw new ApiException(HttpStatus.CONFLICT, "otc-not-available", "Counter sales not available",
                     "Counter sales aren't available while the pharmacy is external. Switch the pharmacy mode to Hybrid or In-house in Clinic Setup.");
         }
-    }
-
-    private LineItemInput toLineItemInput(LineItemRequest li) {
-        return new LineItemInput(li.chargeCode(), li.chargeName(), li.category(), li.quantity(), li.unitPrice(), li.taxRatePercent());
     }
 
     private String currencyFor(UUID tenantId) {

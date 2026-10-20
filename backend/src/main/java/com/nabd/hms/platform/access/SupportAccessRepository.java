@@ -22,12 +22,19 @@ class SupportAccessRepository {
         this.jdbc = jdbc;
     }
 
-    void insert(Grant g) {
+    /** expires_at on the DB clock, from the same now() as granted_at, so the 60-minute CHECK (V1410) holds exactly. */
+    void insert(UUID id, UUID tenantId, UUID ticketId, String scope, UUID operatorId, String reason, int minutes) {
         jdbc.update("""
-                INSERT INTO master.support_access_grants (id, tenant_id, operator_id, reason, expires_at)
-                VALUES (?,?,?,?,?)
+                INSERT INTO master.support_access_grants (id, tenant_id, ticket_id, scope, operator_id, reason, expires_at)
+                VALUES (?,?,?,?,?,?, now() + make_interval(mins => ?))
                 """,
-                g.id(), g.tenantId(), g.operatorId(), g.reason(), Timestamp.from(g.expiresAt()));
+                id, tenantId, ticketId, scope, operatorId, reason, minutes);
+    }
+
+    boolean ticketBelongsToTenant(UUID ticketId, UUID tenantId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM master.support_tickets WHERE id = ? AND tenant_id = ?)",
+                Boolean.class, ticketId, tenantId));
     }
 
     Optional<Grant> findById(UUID id) {
@@ -65,6 +72,8 @@ class SupportAccessRepository {
         return (rs, i) -> new Grant(
                 UUID.fromString(rs.getString("id")),
                 UUID.fromString(rs.getString("tenant_id")),
+                rs.getObject("ticket_id", UUID.class),
+                rs.getString("scope"),
                 UUID.fromString(rs.getString("operator_id")),
                 rs.getString("reason"),
                 rs.getTimestamp("granted_at").toInstant(),

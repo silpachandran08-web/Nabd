@@ -36,6 +36,7 @@ public class QueueController {
         this.service = service;
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/check-in")
     @PreAuthorize("hasAuthority('queue:create')")
     public ResponseEntity<QueueEntryResponse> checkIn(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody CheckInRequest req) {

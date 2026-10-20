@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,14 +37,16 @@ public class RoleController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('staff:view')")
-    public List<RoleResponse> list(@AuthenticationPrincipal Jwt jwt) {
-        return service.list(tenantId(jwt));
+    public List<RoleResponse> list(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) Integer limit) {
+        // shortcut: PLT-027 cap applied after the read (a tenant has tens of roles); the bare list shape the shell relies on stays, default is the max
+        int cap = limit == null ? com.nabd.hms.common.PageRequest.MAX : com.nabd.hms.common.PageRequest.limit(limit);
+        return service.list(tenantId(jwt)).stream().limit(cap).toList();
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('staff:create')")
     public ResponseEntity<RoleResponse> create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RoleWriteRequest req) {
-        RoleResponse created = service.create(tenantId(jwt), staffId(jwt), req, permissions(jwt));
+        RoleResponse created = service.create(tenantId(jwt), staffId(jwt), req);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -57,7 +60,15 @@ public class RoleController {
     @PreAuthorize("hasAuthority('staff:edit')")
     public RoleResponse update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                 @Valid @RequestBody RoleWriteRequest req) {
-        return service.update(tenantId(jwt), staffId(jwt), id, req, permissions(jwt));
+        return service.update(tenantId(jwt), staffId(jwt), id, req);
+    }
+
+    /** PLT-016: Owner only (checked in RoleService); 409 NOT_A_PRESET for a custom role. */
+    @PostMapping("/{id}/reset-to-preset")
+    @PreAuthorize("hasAuthority('staff:edit')")
+    @com.nabd.hms.shared.idempotency.Idempotent
+    public RoleResponse resetToPreset(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        return service.resetToPreset(tenantId(jwt), staffId(jwt), id);
     }
 
     @PostMapping("/delegations")
@@ -87,10 +98,5 @@ public class RoleController {
 
     private UUID staffId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
-    }
-
-    private List<String> permissions(Jwt jwt) {
-        List<String> permissions = jwt.getClaimAsStringList("permissions");
-        return permissions == null ? List.of() : permissions;
     }
 }

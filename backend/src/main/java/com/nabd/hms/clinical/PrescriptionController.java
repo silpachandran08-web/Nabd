@@ -33,15 +33,21 @@ import java.util.UUID;
 public class PrescriptionController {
 
     private final PrescriptionService service;
+    private final ClinicalReadScope scopes;
 
-    PrescriptionController(PrescriptionService service) {
+    PrescriptionController(PrescriptionService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("prescription")
     @GetMapping("/prescriptions/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public PrescriptionResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.get(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return service.get(scope.tenantId(), queueEntryId);
     }
 
     @PatchMapping("/prescriptions/{queueEntryId}")
@@ -51,27 +57,50 @@ public class PrescriptionController {
         return service.upsert(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http), req.items());
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/prescriptions/{queueEntryId}/sign")
-    @PreAuthorize("hasAuthority('clinical:edit')")
+    // CLN-005: callers without clinical:edit (the Owner preset has view only) reach the service so they get
+    // not-licensed-clinician / not-prescriber, not a bare 403; ClinicalAuthority still requires clinical:edit to sign.
+    @PreAuthorize("hasAnyAuthority('clinical:edit', 'clinical:approve', 'clinical:view')")
     public PrescriptionResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId, HttpServletRequest http) {
         return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt), RequestMeta.clientIp(http));
     }
 
+    /** CLN-005: whether the caller may sign this visit's prescription; reason is the 403 code sign would return. */
+    @GetMapping("/prescriptions/{queueEntryId}/signing-authority")
+    @PreAuthorize("hasAuthority('clinical:view')")
+    public java.util.Map<String, Object> signingAuthority(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
+        scopes.requireVisit(scopes.resolve(jwt), queueEntryId);
+        if (jwt.hasClaim("bg")) {
+            return java.util.Map.of("canSign", false, "reason", ClinicalAuthority.BREAK_GLASS);
+        }
+        return service.signingAuthority(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
+    }
+
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("prescription_history")
     @GetMapping("/patients/{patientId}/prescriptions")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<PrescriptionResponse> previousForPatient(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.previousForPatient(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.previousForPatient(scope.tenantId(), patientId);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("dose_calculation")
     @GetMapping("/patients/{patientId}/dose-calculator")
     @PreAuthorize("hasAuthority('clinical:view')")
     public DoseCalculationResponse calculateDose(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
                                                   @RequestParam BigDecimal mgPerKg) {
-        return service.calculateDose(tenantId(jwt), patientId, mgPerKg);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.calculateDose(scope.tenantId(), patientId, mgPerKg);
     }
 
     /** DOC-033: drug type-ahead from the tenant's own pharmacy item master and prescribing history (names only). */
     @GetMapping("/drugs/search")
+    @ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view') or hasAuthority('clinical:edit')")
     public List<DrugSuggestionResponse> searchDrugs(@AuthenticationPrincipal Jwt jwt, @RequestParam String q,
                                                      @RequestParam(defaultValue = "8") int limit) {
@@ -86,6 +115,7 @@ public class PrescriptionController {
     }
 
     @GetMapping("/rx-sets")
+    @ClinicalReadScope.NoPatientData
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<FavouriteRxSetResponse> listSets(@AuthenticationPrincipal Jwt jwt) {
         return service.listSets(tenantId(jwt), staffId(jwt), canApprove(jwt));

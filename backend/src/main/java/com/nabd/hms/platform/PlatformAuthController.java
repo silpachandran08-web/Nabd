@@ -45,6 +45,19 @@ public class PlatformAuthController {
         return service.verifyMfa(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
     }
 
+    /** PLT-005: forced enrolment for an operator without MFA; the platform mfa_setup token travels in the body. */
+    @PostMapping("/mfa/enroll")
+    public com.nabd.hms.auth.dto.MfaEnrollResponse enrollMfa(@RequestBody(required = false) com.nabd.hms.auth.dto.MfaEnrollRequest req,
+                                                           HttpServletRequest http) {
+        return service.enrollMfa(req == null ? null : req.setupToken(), RequestMeta.clientIp(http));
+    }
+
+    @PostMapping("/mfa/confirm")
+    public ResponseEntity<Void> confirmMfa(@Valid @RequestBody com.nabd.hms.auth.dto.MfaConfirmRequest req, HttpServletRequest http) {
+        service.confirmMfa(req.setupToken(), req.code(), RequestMeta.clientIp(http));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/refresh")
     public TokenPairResponse refresh(@Valid @RequestBody RefreshRequest req, HttpServletRequest http) {
         return service.refresh(req, RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));

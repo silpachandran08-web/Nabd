@@ -1,0 +1,70 @@
+# OPS-052: Terraform/OpenTofu checks for the cells. No static cloud credentials anywhere: plans assume a role through GitHub OIDC.
+# The plan job runs only once the platform team has set repo variable AWS_PLAN_ROLE_ARN (output of infra/terraform/bootstrap/aws).
+name: infra
+on:
+  pull_request:
+    paths: ["infra/terraform/**", ".github/workflows/infra.yml"]
+  push:
+    branches: [main]
+    paths: ["infra/terraform/**", ".github/workflows/infra.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  TOFU_VERSION: "1.8.8"
+  TFLINT_VERSION: "v0.54.0"
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults: { run: { working-directory: infra/terraform } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Static rules (tags, creds, regions, safety)
+        run: pip install python-hcl2 && python3 check-terraform.py && python3 check-terraform.py --selftest
+      - uses: opentofu/setup-opentofu@v1
+        with: { tofu_version: "${{ env.TOFU_VERSION }}" }
+      - run: tofu fmt -recursive -check -diff
+      - name: validate
+        run: for d in cells/in bootstrap/aws; do (cd "$d" && tofu init -backend=false -input=false && tofu validate); done
+      - name: Plan-only reuse test (mocked providers, second region)
+        run: cd modules/cell && tofu init -backend=false -input=false && tofu test
+      - uses: terraform-linters/setup-tflint@v4
+        with: { tflint_version: "${{ env.TFLINT_VERSION }}" }
+      - run: tflint --init --config "$PWD/.tflint.hcl" && tflint --recursive --config "$PWD/.tflint.hcl"
+        env: { GITHUB_TOKEN: "${{ github.token }}" }
+      - name: Policy self-test (good plan passes, bad plan fails)
+        run: |
+          curl -sSL https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/conftest_0.56.0_Linux_x86_64.tar.gz | tar -xz conftest
+          ./conftest test --policy policy policy/fixtures/plan-good.json
+          if ./conftest test --policy policy policy/fixtures/plan-bad.json; then echo "bad plan passed policy"; exit 1; fi
+
+  plan-in:
+    needs: static
+    if: vars.AWS_PLAN_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # OIDC token for sts:AssumeRoleWithWebIdentity; no access keys exist
+    strategy:
+      matrix: { environment: [staging, prod] }
+    defaults: { run: { working-directory: infra/terraform/cells/in } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ap-south-1
+      - uses: opentofu/setup-opentofu@v1
+        with: { tofu_version: "${{ env.TOFU_VERSION }}" }
+      - run: tofu init -input=false -backend-config=backend-${{ matrix.environment }}.hcl
+      - run: tofu plan -input=false -lock-timeout=5m -var-file=${{ matrix.environment }}.tfvars -out=plan.out
+      - run: tofu show -json plan.out > plan.json
+      - name: Policy-as-code on the real plan
+        run: |
+          curl -sSL https://github.com/open-policy-agent/conftest/releases/download/v0.56.0/conftest_0.56.0_Linux_x86_64.tar.gz | tar -xz conftest
+          ./conftest test --policy ../../policy plan.json

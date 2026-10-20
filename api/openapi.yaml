@@ -116,9 +116,24 @@ paths:
               required: [tenantSlug, mobilePhone]
               properties:
                 tenantSlug: { type: string }
-                mobilePhone: { type: string }
+                mobilePhone: { type: string, pattern: "^\\+?[0-9](?:[ ()-]?[0-9]){7,14}$", description: "8-15 digits; local formats take the clinic's country code" }
       responses:
-        "202": { description: "Always 202 regardless of whether the tenant/mobile is known — no enumeration" }
+        "202":
+          description: >
+            PLT-006: the same body for every outcome (sent, limited, unknown clinic or number). Limits per number
+            (HMAC of the normalised number): 3 sends per 15 min, 10 per 24 h, 60 s between sends; per tenant: the
+            plan's otp_hourly_cap, else 200 per hour (hitting it publishes iam.otp_abuse.detected.v1). The code is
+            generated and sent by the outbox (iam.otp.send.v1), so latency does not depend on the number existing.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [sent_if_eligible] }
+                  resendAfterSeconds: { type: integer, example: 60 }
+        "400":
+          description: VALIDATION - malformed phone only
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /auth/otp/verify:
     post:
@@ -201,12 +216,53 @@ paths:
               type: object
               properties:
                 setupToken: { type: string, description: "typ=mfa_setup token from login; omit when signed in" }
+                currentCode: { type: string, description: "PLT-004: live TOTP of the active authenticator; required to re-enrol when MFA is on (or send X-Step-Up-Token)" }
+      parameters:
+        - { name: X-Step-Up-Token, in: header, required: false, schema: { type: string } }
       responses:
         "200":
-          description: Secret and otpauth URI
+          description: Secret and otpauth URI; stored as a pending secret, the active one keeps working until /auth/mfa/confirm
           content: { application/json: { schema: { type: object } } }
+        "403":
+          description: step-up-required - MFA is on and neither a valid current code nor a step-up token was sent; active secret unchanged
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "401":
           description: No valid setup token or access session (token-type-not-allowed)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /auth/mfa/recovery-verify:
+    post:
+      tags: [Auth]
+      summary: Complete an MFA challenge with a single-use recovery code (PLT-004)
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, recoveryCode]
+              properties:
+                challengeToken: { type: string, description: "mfa_pending token from login" }
+                recoveryCode: { type: string, maxLength: 32 }
+      responses:
+        "200":
+          description: Session issued, code consumed, audit auth.recovery_code_used written
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  refreshToken: { type: string }
+                  expiresIn: { type: integer }
+                  remainingCodes: { type: integer }
+        "401":
+          description: challenge-invalid or recovery-code-invalid
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /auth/mfa/confirm:
@@ -384,6 +440,32 @@ paths:
                         message: { type: string }
                         createdAt: { type: string, format: date-time }
 
+  /phi-read/alerts:
+    get:
+      tags: [Auth]
+      summary: PLT-039 Owner's in-app read-volume alerts (one actor read more distinct patients in an hour than the limit; no patient data)
+      x-required-permission: owner
+      responses:
+        "200":
+          description: Alerts for the caller's clinic, newest first (max 50)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        actorId: { type: string, format: uuid }
+                        distinctPatients: { type: integer }
+                        windowMinutes: { type: integer }
+                        createdAt: { type: string, format: date-time }
+        "403":
+          description: Caller is not the clinic Owner
+
   # NB-046 (PIN reset & account recovery): specced, not yet implemented in the backend.
   /auth/pin-reset/request:
     post:
@@ -490,15 +572,139 @@ paths:
                 pin: { type: string, pattern: "^[0-9]{4,8}$" }
       responses:
         "200":
-          description: PIN accepted; pendingToken can now list/select a workspace
+          description: >
+            PIN accepted. PLT-005: an owner with MFA gets an MfaChallenge (answer at /owners/auth/mfa/verify); one without
+            MFA gets an MfaSetupRequired token (enrol at /owners/auth/mfa/enroll + confirm). A PendingWorkspaceToken comes
+            straight back only where app.auth.mfa.enforce-privileged=false (never in prod).
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/PendingWorkspaceToken" }
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/MfaChallenge"
+                  - $ref: "#/components/schemas/MfaSetupRequired"
+                  - $ref: "#/components/schemas/PendingWorkspaceToken"
         "401":
           description: Invalid credentials (identical shape for unknown vs. wrong-PIN — no enumeration)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "423":
           description: Account locked (exponential backoff in effect)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/verify:
+    post:
+      tags: [Owners]
+      summary: Owner second factor before workspace selection (PLT-005)
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, code]
+              properties:
+                challengeToken: { type: string, description: "challengeId from /owners/auth/login (owner mfa_pending token)" }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200":
+          description: workspaceToken (the owner_select token used by /owners/me/workspaces and /owners/workspaces/select)
+          content: { application/json: { schema: { $ref: "#/components/schemas/OwnerWorkspaceToken" } } }
+        "401":
+          description: mfa-failed (wrong or replayed code, expired or foreign challenge)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/recovery-verify:
+    post:
+      tags: [Owners]
+      summary: Answer the owner challenge with a single-use recovery code (PLT-005)
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challengeToken, recoveryCode]
+              properties:
+                challengeToken: { type: string }
+                recoveryCode: { type: string, maxLength: 32 }
+      responses:
+        "200":
+          description: workspaceToken plus remainingRecoveryCodes; audit owner_auth.recovery_code_used
+          content: { application/json: { schema: { $ref: "#/components/schemas/OwnerWorkspaceToken" } } }
+        "401":
+          description: mfa-failed (challenge) or recovery-code-invalid
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/enroll:
+    post:
+      tags: [Owners]
+      summary: Owner enrolment, step 1 (PLT-005) - setupToken from login or invite accept
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [setupToken]
+              properties:
+                setupToken: { type: string }
+      responses:
+        "200":
+          description: Pending secret stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secretBase32: { type: string }
+                  otpauthUri: { type: string }
+        "401":
+          description: token-type-not-allowed
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /owners/auth/mfa/confirm:
+    post:
+      tags: [Owners]
+      summary: Owner enrolment, step 2 (PLT-005) - a code from the new secret turns MFA on
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [setupToken, code]
+              properties:
+                setupToken: { type: string }
+                code: { type: string, pattern: "^[0-9]{6}$" }
+      responses:
+        "200":
+          description: 8 single-use recovery codes (shown once, stored hashed) and a workspaceToken to continue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recoveryCodes: { type: array, items: { type: string } }
+                  workspaceToken: { type: string }
+                  expiresIn: { type: integer }
+        "401":
+          description: token-type-not-allowed or mfa-failed
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "423":
+          description: account-locked
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /owners/me/workspaces:
@@ -569,12 +775,13 @@ paths:
             schema: { $ref: "#/components/schemas/StaffInviteRequest" }
       responses:
         "201": { $ref: "#/components/responses/StaffCreated" }
+        "403": { description: "GRANT_EXCEEDS_CALLER (type grant-exceeds-caller) or OWNER_ROLE_RESTRICTED (type owner-role-restricted): the role, scope or field grants are richer than the caller holds (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Email already on this tenant, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /staff/roster:
     get:
       tags: [Staff]
-      summary: Active doctors (role named "Doctor") for queue/consult pickers — id, name and department name only
+      summary: Active clinicians (staff.clinician, PLT-016; never a role name) for queue/consult pickers — id, name and department name only
       x-required-permission: queue:view
       responses:
         "200":
@@ -590,6 +797,28 @@ paths:
                     id: { type: string, format: uuid }
                     name: { type: string }
                     departmentName: { type: [string, "null"], description: "REC-023: name of the doctor's department (staff.department_id); null when none is assigned" }
+
+  /staff/clinician-review:
+    get:
+      tags: [Staff]
+      summary: "PLT-016: staff the clinician backfill could not decide (registration number without a doctor-named role, or the reverse), for the owner to confirm with PATCH /staff/{id} clinician"
+      x-required-permission: staff:view
+      responses:
+        "200":
+          description: Unconfirmed rows ordered by name (a PATCH that sends clinician resolves the row)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [staffId, name, roleName, reason, clinician]
+                  properties:
+                    staffId: { type: string, format: uuid }
+                    name: { type: string }
+                    roleName: { type: string }
+                    reason: { type: string, enum: [registration_without_doctor_role, doctor_role_without_registration] }
+                    clinician: { type: boolean, description: "Current value, as the backfill set it" }
 
   /staff/{id}:
     get:
@@ -609,8 +838,58 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/StaffPatch" } } }
       responses:
         "200": { description: "Staff", content: { application/json: { schema: { $ref: "#/components/schemas/Staff" } } } }
+        "400": { description: "clinician-needs-registration: clinician=true without a registration number (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "GRANT_EXCEEDS_CALLER (type grant-exceeds-caller) or OWNER_ROLE_RESTRICTED (type owner-role-restricted): the role, scope or field grants are richer than the caller holds (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /staff/{id}/clinical-licence:
+    get:
+      tags: [Staff]
+      summary: CLN-005. Whether this staff member is a registered clinician who may sign, and their licence dates. The registration number itself is on the staff record (hasRegistrationNo says whether one is on file).
+      x-required-permission: staff:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Staff]
+      summary: CLN-005. Mark (or unmark) a staff member as a registered clinician and record the licence expiry date (null = none recorded). isClinician true needs a registration number on file (400 registration-no-required). Audited (staff.clinical_licence_updated, the number is never in the audit row).
+      x-required-permission: staff:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isClinician]
+              properties:
+                isClinician: { type: boolean }
+                licenceExpiresOn: { type: [string, "null"], format: date }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /staff/{id}/clinical-licence/override:
+    post:
+      tags: [Staff]
+      summary: CLN-005. The clinic Owner lets an expired licence keep signing until `until` (in the future, at most 30 days ahead, else 400 invalid-override-window). Owner only (403 owner-only). Audited (staff.licence_override_granted).
+      x-required-permission: staff:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [until]
+              properties:
+                until: { type: string, format: date-time }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/StaffClinicalLicence" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden. owner-only (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
   /staff/{id}/suspend:
     post:
       tags: [Staff]
@@ -629,6 +908,30 @@ paths:
       responses:
         "204": { description: "Suspended; sessions killed < 30s, audit event written" }
 
+  /staff/{id}/mfa/reset:
+    post:
+      tags: [Staff]
+      summary: Owner resets a staff member's authenticator (PLT-004) - revokes sessions, forces enrolment at next sign-in, audit staff.mfa_reset
+      x-required-permission: staff:edit
+      x-step-up: true
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: X-Step-Up-Token, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reasonCode]
+              properties:
+                reasonCode: { type: string, enum: [lost_device, left_clinic, other] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "204": { description: "Reset; sessions revoked, recovery codes revoked" }
+        "403": { description: "forbidden or step-up-required", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /staff/invitations/{token}/accept:
     post:
       tags: [Staff]
@@ -645,7 +948,14 @@ paths:
               required: [pin]
               properties: { pin: { type: string, pattern: "^[0-9]{6,8}$" } }
       responses:
-        "200": { description: "TokenPair", content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+        "200":
+          description: TokenPair, or (PLT-005) MfaSetupRequired when the role requires MFA - enrol at /auth/mfa/enroll before any session
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TokenPair"
+                  - $ref: "#/components/schemas/MfaSetupRequired"
         "410": { description: "Invite expired (>72h) or already used", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   # --------------------------------------------------------------- Roles
@@ -723,6 +1033,26 @@ paths:
         "400":
           description: Attempted edit of a built-in role, or a grant beyond the editor's own permissions (privilege escalation blocked)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "422":
+          description: mfa-required-by-policy (PLT-005) - mfaRequired=false on a role holding :approve or :refundDiscount
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /roles/{id}/reset-to-preset:
+    post:
+      tags: [Roles]
+      summary: "PLT-016: reset a preset role to its current definition (grants and presetVersion); Owner only; audited (role.reset_to_preset)"
+      x-required-permission: staff:edit
+      parameters:
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: "Role", content: { application/json: { schema: { $ref: "#/components/schemas/Role" } } } }
+        "403": { description: "OWNER_ONLY (type owner-only): the caller is not the Owner (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_A_PRESET (type not-a-preset): a custom role (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   # ------------------------------------------------------------ Tenants
   /tenants/{id}:
@@ -853,6 +1183,7 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PolicyWrite" } } }
       responses:
         "200": { description: "Updated policy", content: { application/json: { schema: { $ref: "#/components/schemas/Policy" } } } }
+        "422": { description: "Value out of range (session.idle_lock_minutes must be a whole number 2-30)" }
 
   /setup/consent-contact:
     get:
@@ -1051,6 +1382,7 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/PatientPage" }
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Patients]
       summary: Register a patient
       x-required-permission: patients:create
@@ -1075,14 +1407,15 @@ paths:
         Rows for the selected filter, narrowed by `q` (name, MRN, 3+ mobile digits, or today's token
         such as `T-12`), ordered by name then id. Consent- and row-scope-gated like every patient read.
         `total` and `counts` ignore `q` and paging; `matchedTotal` is the number of rows matching filter + q
-        before paging. Paging is additive: a call without `limit`/`cursor` returns the first 200 rows exactly
-        as before. `cursor` is opaque (an offset into the ordered result); pass `page.nextCursor` back
-        unchanged with the same `q`/`filter`. Flags and counts are computed for at most 3000 patients per clinic.
+        before paging. A call without `limit`/`cursor` returns the first 200 rows. `cursor` is an opaque keyset
+        on (name, id) (OPS-008): pass `page.nextCursor` back unchanged with the same `q`/`filter`; rows registered
+        between pages are never repeated or skipped. Read from the patient_registry_summary read model (no cap):
+        a write shows within seconds; a duplicate partner's flag is set by the nightly duplicate job.
       x-required-permission: patients:view
       parameters:
         - { name: q, in: query, required: false, schema: { type: string } }
         - { name: filter, in: query, required: false, schema: { type: string, enum: [all, recent, followup, package, balance, duplicate, archived], default: all } }
-        - { name: limit, in: query, required: false, description: "Clamped to 1..200", schema: { type: integer, minimum: 1, maximum: 200, default: 200 } }
+        - { name: limit, in: query, required: false, description: "1..200, default 200; out of range is a 400 validation problem with code INVALID_LIMIT", schema: { type: integer, minimum: 1, maximum: 200, default: 200 } }
         - { name: cursor, in: query, required: false, schema: { type: string } }
       responses:
         "200":
@@ -1099,7 +1432,7 @@ paths:
                   hasMore: { type: boolean, description: "True when page.nextCursor fetches another page (REC-040)" }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400":
-          description: Invalid filter (`invalid-filter`) or malformed cursor (`invalid-cursor`)
+          description: Invalid filter (`invalid-filter`), limit outside 1..200 (`validation`, code `INVALID_LIMIT`) or malformed cursor (`invalid-cursor`)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /patients/{id}:
@@ -1355,6 +1688,7 @@ paths:
                   data: { type: array, items: { $ref: "#/components/schemas/Appointment" } }
                   page: { $ref: "#/components/schemas/PageMeta" }
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Queue]
       summary: "Book a slot — concurrency-safe: a DB constraint, not an app-level check, prevents double-booking (NB-067)"
       x-required-permission: queue:create
@@ -1364,7 +1698,8 @@ paths:
       responses:
         "201": { description: "Booked", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
         "404": { description: "patient-not-found or doctor-not-found (unknown id or another clinic's)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-        "409": { description: "Slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "Problem `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours` or `off-grid` (each also carries code IN_PAST, CLINIC_CLOSED, DOCTOR_ON_LEAVE, OUTSIDE_HOURS, OFF_GRID)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `slot-taken` (code SLOT_TAKEN; overlapping range, DB exclusion constraint) or `session-full`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/{id}:
     get:
@@ -1389,6 +1724,7 @@ paths:
       responses:
         "200": { description: "Cancelled", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Problem `appointment-arrived` (code APPOINTMENT_ARRIVED, ACC-003): the patient has checked in", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/{id}/reschedule:
     post:
@@ -1404,7 +1740,8 @@ paths:
       responses:
         "200": { description: "New appointment", content: { application/json: { schema: { $ref: "#/components/schemas/Appointment" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: "New slot no longer available", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "Problem `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours` or `off-grid` (each also carries code IN_PAST, CLINIC_CLOSED, DOCTOR_ON_LEAVE, OUTSIDE_HOURS, OFF_GRID)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "Problem `slot-taken` (code SLOT_TAKEN) or `session-full`", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /departments/{id}/flow:
     get:
@@ -1453,8 +1790,8 @@ paths:
         Without a body (or with slotStart null) this accepts the slot the entry was offered, exactly as
         before: 409 `offer-expired` if the 15-minute offer lapsed or was used. With `slotStart` set, the
         entry (status waiting, offered or expired) is booked into that slot after the same checks as
-        POST /appointments: 400 `slot-in-past`, 400 `clinic-holiday`, 409 `session-full`, 409
-        `slot-unavailable` (doctor already booked then). A slot currently offered to another waitlisted
+        POST /appointments: 400 `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours`, `off-grid`, 409 `session-full`, 409
+        `slot-taken` (doctor already booked then). A slot currently offered to another waitlisted
         patient is refused with 409 `slot-on-offer`; a booked/removed entry is 409 `waitlist-entry-closed`.
         slotStart equal to the entry's own live offer is the plain accept. If the entry held a live offer of
         a different slot, that slot is offered to the next waiting patient. Audited as
@@ -1471,9 +1808,9 @@ paths:
                 slotStart: { type: [string, "null"], format: date-time, description: "Chosen slot start; omit to accept the offered slot" }
       responses:
         "200": { description: "Booked entry (status booked, bookedAppointmentId set)", content: { application/json: { schema: { $ref: "#/components/schemas/WaitlistEntry" } } } }
-        "400": { description: "slot-in-past or clinic-holiday", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "in-past, clinic-closed, doctor-on-leave, outside-hours or off-grid", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: "offer-expired, slot-unavailable, slot-on-offer, session-full or waitlist-entry-closed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "offer-expired, slot-taken, slot-on-offer, session-full or waitlist-entry-closed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /waitlist/{id}:
     delete:
@@ -1487,6 +1824,7 @@ paths:
 
   /queue/check-in:
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Queue]
       summary: "Issues a token — scheduled (appointmentId given) or walk-in (patientId + doctorId only) (NB-068)"
       x-required-permission: queue:create
@@ -1495,8 +1833,8 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/CheckInRequest" } } }
       responses:
         "201": { description: "Queue entry created", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
-        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch, resolved, or already checked in)" }
-        "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking. Also `appointment-not-today` (scheduled only): the appointment's date in the clinic timezone is not today's clinic date (ACC-001); nothing is created.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch, cancelled/completed)" }
+        "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + arrived + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking. Also `already-checked-in` (code ALREADY_CHECKED_IN, ACC-003): the appointment is already arrived (a second desk or a retry); extra members tokenNumber, queueEntryId, checkedInAt name the first check-in; no second token is issued. Also `appointment-not-today` (scheduled only): the appointment's date in the clinic timezone is not today's clinic date (ACC-001); nothing is created.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue:
     get:
@@ -1526,11 +1864,15 @@ paths:
             schema:
               type: object
               required: [status]
-              properties: { status: { type: string, enum: [waiting, vitals_pending, vitals_done, in_consult, checkout_pending, completed, no_show] } }
+              properties:
+                status: { type: string, enum: [waiting, vitals_pending, vitals_done, in_consult, checkout_pending, no_show], description: "completed is not accepted here: only billing checkout completes a visit" }
+                expectedStatus: { type: string, description: "The status the caller's screen shows (compare-and-set). Omitted only by legacy clients; the server then guards against the row it just read." }
       responses:
         "200": { description: "Updated", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
-        "400": { description: "Illegal transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "Illegal transition (type illegal-transition), e.g. no_show from in_consult", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "status=completed (type completion-reserved-for-billing)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Stale screen (type stale-status): the visit is no longer in expectedStatus; the Problem carries currentStatus", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue/{id}/transfer:
     post:
@@ -1627,12 +1969,13 @@ paths:
         filters on the clinical note (none = no note yet, draft, signed, unsigned = none or draft).
         `from`/`to` filter on the clinic calendar day of the visit. Outputs are derived from the note,
         prescription and clinical documents tables; no clinical free text is returned.
+        IDC-001: patients with withdrawn data_processing consent are excluded in the SQL; an unverified caller gets 403 verification-required.
       x-required-permission: clinical:view
       parameters:
         - { name: state, in: query, required: false, schema: { type: string, enum: [none, draft, signed, unsigned] } }
         - { name: from, in: query, required: false, schema: { type: string, format: date } }
         - { name: to, in: query, required: false, schema: { type: string, format: date } }
-        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 25, minimum: 1, maximum: 100 } }
         - { name: cursor, in: query, required: false, schema: { type: string } }
       responses:
         "200":
@@ -1663,6 +2006,7 @@ paths:
                         documentsIssued: { type: integer }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "verification-required (caller email or mobile not verified) or missing permission (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /appointments/follow-ups:
     get:
@@ -1673,10 +2017,10 @@ paths:
         the schema; `cancelReason` is set on cancelled rows (QA-06). `from`/`to` filter on the clinic calendar day of the start time.
       x-required-permission: queue:view
       parameters:
-        - { name: status, in: query, required: false, schema: { type: string, enum: [scheduled, cancelled, completed, no_show] } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [scheduled, arrived, cancelled, completed, no_show] } }
         - { name: from, in: query, required: false, schema: { type: string, format: date } }
         - { name: to, in: query, required: false, schema: { type: string, format: date } }
-        - { name: limit, in: query, required: false, schema: { type: integer, default: 20, minimum: 1, maximum: 100 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 25, minimum: 1, maximum: 100 } }
         - { name: cursor, in: query, required: false, schema: { type: string } }
       responses:
         "200":
@@ -1696,10 +2040,70 @@ paths:
                         patientName: { type: string }
                         patientMrn: { type: string }
                         startTime: { type: string, format: date-time }
-                        status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+                        status: { type: string, enum: [scheduled, arrived, cancelled, completed, no_show] }
                         cancelReason: { type: string, nullable: true, description: "QA-06: set only when cancelled" }
                   page: { $ref: "#/components/schemas/PageMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /clinical/patients/{patientId}/timeline:
+    get:
+      tags: [Clinical]
+      summary: "Completed visits of a patient, newest first, 5-year window (NB-115). IDC-001: consent, verification and own-patients gated"
+      description: >
+        Gated in SQL by ClinicalReadScope (withdrawn data_processing consent, own_patients_only via appointments OR queue
+        entries). staff.field_grants without `diagnosis` return diagnosis: null on every item.
+      x-required-permission: clinical:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 25, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        queueEntryId: { type: string, format: uuid }
+                        occurredAt: { type: string, format: date-time }
+                        doctorId: { type: string, format: uuid }
+                        diagnosis: { type: [string, "null"], description: "null when field_grants exclude diagnosis" }
+                        assessment: { type: [string, "null"] }
+                        medications: { type: [string, "null"] }
+                  page: { $ref: "#/components/schemas/PageMeta" }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
+  /clinical/notes/{queueEntryId}:
+    get:
+      tags: [Clinical]
+      summary: "SOAP note of a visit (NB-103). IDC-001: gated through queue_entries.patient_id; diagnosis null when field_grants exclude it"
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  queueEntryId: { type: string, format: uuid }
+                  patientId: { type: string, format: uuid }
+                  doctorId: { type: string, format: uuid }
+                  subjective: { type: [string, "null"] }
+                  objective: { type: [string, "null"] }
+                  assessment: { type: [string, "null"] }
+                  plan: { type: [string, "null"] }
+                  diagnosis: { type: [string, "null"] }
+                  status: { type: string, enum: [draft, signed] }
+                  signedAt: { type: [string, "null"], format: date-time }
+                  updatedAt: { type: string, format: date-time }
+        "404": { description: "patient-not-found (gated, see PatientNotFound) or not-found (no note yet for a visible visit)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/patients/{patientId}/allergies:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1709,6 +2113,7 @@ paths:
       parameters: [{ name: includeInactive, in: query, required: false, schema: { type: boolean, default: false } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Allergy" } } } } }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
     post:
       tags: [Clinical]
       summary: Add an allergy (fast add). Severity is mandatory; audited.
@@ -1751,6 +2156,7 @@ paths:
       parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AllergyEvent" } } } } }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
   /clinical/patients/{patientId}/allergies/status:
     parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
     get:
@@ -1759,6 +2165,7 @@ paths:
       x-required-permission: clinical:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/AllergyStatus" } } } }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
     put:
       tags: [Clinical]
       summary: Document "no known allergies" (who and when are stamped by the server; audited)
@@ -1773,7 +2180,7 @@ paths:
       x-required-permission: clinical:view
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PregnancyStatus" } } } }
-        "404": { description: Patient not found }
+        "404": { $ref: "#/components/responses/PatientNotFound" }
     put:
       tags: [Clinical]
       summary: Record an explicit status (who and when are stamped by the server; appended to the history and audited). Never set automatically. A recorded pregnant or lactating status escalates the prescription pregnancy warning (severity severe, a fresh decision is required); other statuses leave the existing rule unchanged. Re-sending the status and date already recorded is a no-op (no history event, no audit row, recorded by / at unchanged; the current state is returned).
@@ -1939,14 +2346,122 @@ paths:
   /clinical/prescriptions/{queueEntryId}/sign:
     post:
       tags: [Clinical]
-      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
+      summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). CLN-005 - the caller must also be a registered clinician (staff isClinician + a registration number on file, else 403 not-licensed-clinician) with an in-date licence or an owner's unexpired override (else 403 licence-expired) and hold clinical:edit (else not-prescriber; an approve-only caller is let past the permission check so it gets the specific code). A break-glass session is refused with 403 break-glass-cannot-sign and an audit row (prescription.sign_refused). The signer and the registration number signed under are stored (signedBy, signedByRegistrationNo) and clinical.prescription.signed.v1 is published. Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
       x-required-permission: clinical:edit
-      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Signed, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { description: "Forbidden. 403 not-prescriber: caller is neither the visit's doctor nor a clinical:approve holder (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Forbidden (problem+json). not-prescriber, not-licensed-clinician, licence-expired or break-glass-cannot-sign, see summary", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: Conflict (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/safety-dictionary:
+    get:
+      tags: [Clinical]
+      summary: "CLN-004. The safety dictionary version active for the caller's tenant region (shown under Rx warnings as 'Source - <source> <label>'). No PHI. source is 'Nabd CSO dictionary' when a CSO approval is recorded for the version, else 'Nabd baseline dictionary (no CSO approval recorded)' (the v0 seed of the pre-CLN-004 code lists)."
+      x-required-permission: clinical:view
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryActive" } } } }
+        "503": { description: "No active dictionary for the region (safety-dictionary-unavailable, problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /safety-dictionaries/{region}/versions:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    parameters: [{ name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }]
+    get:
+      tags: [Clinical]
+      summary: "CLN-004. All versions of a region's dictionary, newest first (operator)."
+      x-required-permission: safety_content:edit
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryVersion" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [Clinical]
+      summary: "CLN-004. Upload a draft dictionary version (JSON bundle). Validated (terms and stems at least 4 characters except the stem 'cef'; known classes; matchKind on pregnancyRisk/controlled; labels.controlled.en). Re-uploading content identical to an existing version returns that version (created=false). diffSummary compares with the active version. Audited (safety_dictionary.uploaded, platform chain)."
+      x-required-permission: safety_content:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryBundle" } } }
+      responses:
+        "201": { description: Draft created (or the identical existing version), content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryUpload" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Operator lacks safety_content:edit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "BUNDLE_INVALID; errors[] lists every problem (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /safety-dictionaries/{region}/versions/{versionId}/approve:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-004. Record the CSO approval (reference to the signed approval record and the approver's name) for a version. Once per version; a draft becomes 'approved', a retired version keeps its status (so it can be rolled back to). Audited."
+      x-required-permission: safety_content:edit
+      parameters:
+        - { name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csoApprovalRef, approvedBy]
+              properties:
+                csoApprovalRef: { type: string, maxLength: 200 }
+                approvedBy: { type: string, maxLength: 200 }
+      responses:
+        "200": { description: Approved, content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryVersion" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "ALREADY_APPROVED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /safety-dictionaries/{region}/versions/{versionId}/activate:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-004. Activate an approved version, or roll back to an earlier approved one (same call). csoApprovalRef must equal the recorded approval. The previous active version is retired in the same transaction; every pod reloads within app.safety-dictionary.refresh-ms (default 60 s). Audited (safety_dictionary.activated with previousVersion and reason)."
+      x-required-permission: safety_content:edit
+      parameters:
+        - { name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }
+        - { name: versionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [csoApprovalRef, reason]
+              properties:
+                csoApprovalRef: { type: string, maxLength: 200 }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Active
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  region: { type: string }
+                  activeVersion: { type: integer }
+                  previousVersion: { type: [integer, "null"] }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "NOT_APPROVED (no matching CSO approval record) or ALREADY_ACTIVE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /clinical/prescriptions/{queueEntryId}/signing-authority:
+    get:
+      tags: [Clinical]
+      summary: CLN-005. Whether the caller may sign this visit's prescription right now. reason is the 403 code sign would return (not-prescriber, not-licensed-clinician, licence-expired, break-glass-cannot-sign), null when canSign. The consult screen uses it to show or hide Sign.
+      x-required-permission: clinical:view
+      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [canSign, reason]
+                properties:
+                  canSign: { type: boolean }
+                  reason: { type: [string, "null"], enum: [not-prescriber, not-licensed-clinician, licence-expired, break-glass-cannot-sign, null] }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /clinical/visits/{queueEntryId}/documents:
     get:
@@ -2006,13 +2521,13 @@ paths:
   /clinical/documents/{id}/issue:
     post:
       tags: [Clinical]
-      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
+      summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; CLN-005 - the same licence rule applies (403 not-licensed-clinician, licence-expired; a break-glass session gets break-glass-cannot-sign with an audit row). Creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
       x-required-permission: clinical:edit
-      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Issued, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { description: "Forbidden. not-prescriber: caller is neither the visit's doctor nor holds clinical:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Forbidden (problem+json). not-prescriber, not-licensed-clinician, licence-expired or break-glass-cannot-sign", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "Conflict. 409 document-issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
@@ -2169,6 +2684,36 @@ paths:
         "200": { description: The item, content: { application/json: { schema: { $ref: "#/components/schemas/PharmacyItem" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /pharmacy/rx-lines/search:
+    post:
+      tags: [Pharmacy]
+      summary: >
+        PHL-001 counter "Link prescription" picker: signed prescription lines with quantity left for the patients whose phone matches
+        (last 10 digits; POST so the number is never in a URL). At most 50, newest first. Fewer than 6 digits is 400 validation-failed.
+      x-required-permission: billing:create
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [phone], properties: { phone: { type: string } } } } }
+      responses:
+        "200":
+          description: Matching lines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    prescriptionItemId: { type: string, format: uuid }
+                    patientId: { type: string, format: uuid }
+                    patientName: { type: string }
+                    drugName: { type: string }
+                    dosage: { type: string, nullable: true }
+                    quantity: { type: number, nullable: true }
+                    remainingQty: { type: number }
+                    signedAt: { type: string, format: date-time, nullable: true }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
   /pharmacy/dispensing-queue:
     get:
       tags: [Pharmacy]
@@ -2188,6 +2733,7 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { type: object, properties: { currency: { type: string }, charges: { type: array, items: { $ref: "#/components/schemas/BillingCharge" } } } } } } }
   /billing/otc-checkout:
     post:
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Billing]
       summary: >
         Counter sale (standalone invoice, no patient/queue entry). 409 `otc-not-available` when the pharmacy mode is `external`
@@ -2195,26 +2741,51 @@ paths:
         come from the catalogue and the client's values are silently ignored (no 400 on mismatch); a catalogue entry flagged
         doctorOverride keeps the client's unitPrice. Lines with no catalogue entry use the client's values (chargeName required,
         unitPrice and taxRatePercent >= 0, else 400 validation-failed). Non-zero discount needs billing.discount (403 discount-not-permitted).
+        PHL-001: a line whose catalogue item is prescription-only (`isRx`, the clinic's flag) needs `prescriptionItemId` (uuid) pointing at a
+        signed prescription line of the same tenant and patient with quantity left (prescribed quantity minus units on non-void invoices;
+        a line with no prescribed quantity has none left). Refusals are 422 Problem+JSON: rx-required (no link, or the id is unknown in this
+        tenant), rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted. Each refusal writes audit `pharmacy.rx_gate_blocked` and event
+        `pharmacy.rx_gate.blocked.v1` { tenantId, itemId, reason, actorId }; nothing else is written and stock is unchanged.
+        A counter sale with linked Rx lines is recorded against that prescription's patient (patientId set); lines from two patients are
+        rx-patient-mismatch. Sales against an outside (paper/photo) prescription are PHL-020.
       x-required-permission: billing:create
       responses:
         "200": { description: The invoice (lineItems show the price actually charged), content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: Forbidden }
-        "409": { description: otc-not-available, item-inactive, insufficient-stock or day-closed }
+        "409": { description: "otc-not-available, item-inactive, insufficient-stock or day-closed" }
+        "422": { description: "rx-required, rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted (PHL-001), unknown-charge, reason-required" }
   /billing/checkout/{queueEntryId}:
     post:
       tags: [Billing]
       summary: >
-        Bill a visit at a billing checkpoint. Catalogue lines are priced server-side exactly as in otc-checkout (QA-OI-2); a
-        Consultation line uses the catalogue followUpAmount instead of baseAmount when the patient had a completed visit with the
-        same doctor in the last 14 days (the same rule as `followUpEligible` in the checkout context). Not gated by pharmacy mode.
+        Bill a visit at a billing checkpoint (FIN-003). The client sends `lineItems: [{ chargeCode, quantity, override?: { unitPrice,
+        reasonCode, note? } }]` and optionally `discounts: [{ kind: amount|percent, value, reasonCode, note? }]`; the server resolves name,
+        category, price and tax from charge_catalogue and ignores any client chargeName/category/unitPrice/taxRatePercent on a catalogue line.
+        A Consultation uses followUpAmount when the patient had a completed visit with the same doctor in the last 14 days; the client
+        cannot choose the tier. Each line in the response carries `unitPrice` (charged), `listUnitPrice` (catalogue), `tier`
+        (normal|follow_up|custom) and `overrideReason`. An override, a free-text line (a chargeCode that is not an active catalogue row,
+        which then needs chargeName + unitPrice) or any discount needs the billing.discount grant (403 discount-not-permitted); an
+        override or discount also needs a reason code (422 reason-required, 422 invalid-reason; goodwill, staff, price_match, waiver,
+        pricing_error, other). Without billing.discount an unknown code is 422 unknown-charge. Each discount is a row in invoice_discounts and
+        invoices.discount is their sum across checkpoints; more than the remaining subtotal is 422 discount-exceeds-subtotal. The legacy scalar
+        `discount` still works and is booked with reason `unspecified`. Every override and discount writes an audit row. Not gated by pharmacy mode.
+        Not done here: Idempotency-Key, an `emergency` tier (no catalogue column), the billing.invoice.issued.v1 event (no consumer yet).
+        PHL-001: a line whose catalogue item is prescription-only (`isRx`, the clinic's flag) needs `prescriptionItemId` (uuid) pointing at a
+        signed prescription line of the same tenant and patient with quantity left (prescribed quantity minus units on non-void invoices;
+        a line with no prescribed quantity has none left). Refusals are 422 Problem+JSON: rx-required (no link, or the id is unknown in this
+        tenant), rx-not-signed, rx-patient-mismatch, rx-quantity-exhausted. Each refusal writes audit `pharmacy.rx_gate_blocked` and event
+        `pharmacy.rx_gate.blocked.v1` { tenantId, itemId, reason, actorId }; nothing else is written and stock is unchanged.
+        The checkout context (GET) lists the visit's signed lines in `prescribedItems` with `prescriptionItemId`, `quantity` and
+        `remainingQty`, and every charge carries `isRx`, so the screen can pre-link Rx lines.
       x-required-permission: billing:create
-      parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { description: Forbidden }
+        "403": { description: "Forbidden (including discount-not-permitted)" }
         "409": { description: Conflict }
+        "422": { description: "unknown-charge, reason-required, invalid-reason, discount-exceeds-subtotal, rx-required, rx-not-signed, rx-patient-mismatch or rx-quantity-exhausted" }
   /billing/day-close:
     get:
       tags: [Billing]
@@ -2240,6 +2811,47 @@ paths:
                   voidedTotal: { type: number, description: "Sum of those invoices' total" }
                 additionalProperties: true
         "403": { description: Forbidden }
+  /billing/invoices/{id}:
+    get:
+      tags: [Billing]
+      summary: >
+        An invoice with its derived balance (`balanceDue`), status (`unpaid` / `partial` / `paid`, or `void` / `cancelled` / `refunded`)
+        and payments. Status is recomputed from paid vs total in the same transaction as every payment or totals change (FIN-001).
+      x-required-permission: billing:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: The invoice, content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /billing/invoices/{id}/payments:
+    post:
+      tags: [Billing]
+      summary: >
+        Record a payment against an invoice (FIN-001). The invoice row is locked, so simultaneous payments each add exactly once;
+        `paid` is the sum of the payment rows and status is re-derived in the same transaction. Audit `billing.payment_recorded`;
+        outbox event `billing.payment.recorded.v1`. An optional `Idempotency-Key` header makes a retry return the invoice without a
+        second payment (the same key on another invoice is 409 idempotency-key-reused). 422 overpayment (body carries `balance`);
+        409 invoice-not-payable (void, cancelled or refunded); 409 day-closed; 404 not-found.
+      x-required-permission: billing:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [method, amount]
+              properties:
+                method: { type: string, enum: [cash, card, upi, other] }
+                amount: { type: number, minimum: 0.01, description: "At most 2 decimals, not more than the balance" }
+                reference: { type: string, maxLength: 100 }
+      responses:
+        "201": { description: "The invoice with its new paid, balanceDue, status and payments", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "day-closed, invoice-not-payable or idempotency-key-reused" }
+        "422": { description: "overpayment: amount is more than the balance (Problem with a numeric `balance` member)" }
   /billing/invoices/{id}/void:
     post:
       tags: [Billing]
@@ -2468,6 +3080,54 @@ paths:
       responses:
         "200": { description: "Package instances (InstanceResponse, without per-item lines)", content: { application/json: { schema: { type: array, items: { type: object } } } } }
         "403": { description: "Forbidden: no packages:view" }
+  # ------------------------------------------------- Packages: refund integrity (FIN-004)
+  /packages/instances/{id}/refund:
+    post:
+      tags: [Packages]
+      summary: Request a refund. One open (pending) refund per instance; the instance row is locked while checking.
+      x-required-permission: packages:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } }
+      responses:
+        "201": { description: "RefundResponse (status pending)", content: { application/json: { schema: { $ref: "#/components/schemas/PackageRefund" } } } }
+        "404": { description: Instance not found }
+        "409": { description: "refund-already-open (a pending refund exists) or instance-not-refundable (refunded/cancelled)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /packages/refunds/{id}/approve:
+    post:
+      tags: [Packages]
+      summary: >-
+        Approve a pending refund (maker != checker). The amount is recomputed under the instance lock (used sessions at full
+        list price). expectedAmount is the amount the approver saw; it may be omitted only when the amount is unchanged since the request.
+        Publishes billing.package_refund.approved.v1.
+      x-required-permission: packages:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { expectedAmount: { type: number } } } } }
+      responses:
+        "200": { description: "RefundResponse with creditNoteNumber and recomputedAmount", content: { application/json: { schema: { $ref: "#/components/schemas/PackageRefund" } } } }
+        "403": { description: "same-user (requester cannot approve) or no packages:approve", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "already-decided, or amount-changed (extras requestedAmount, currentAmount, currentAmountOwed)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /packages/refunds/{id}/reject:
+    post:
+      tags: [Packages]
+      summary: Reject a pending refund.
+      x-required-permission: packages:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string } } } } }
+      responses:
+        "200": { description: "RefundResponse (status rejected)", content: { application/json: { schema: { $ref: "#/components/schemas/PackageRefund" } } } }
+        "409": { description: already-decided, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   # ------------------------------------------------- Platform console: fleet summary (LIVE-07)
   /platform/tenants/summary:
     get:
@@ -2488,6 +3148,36 @@ paths:
                   byStatus: { type: object, additionalProperties: { type: integer } }
                   regions: { type: array, items: { type: string } }
         "403": { description: "Forbidden: no clinics_fleet:view (sre)" }
+  # ------------------------------------------------- Platform console: support access (PLT-056)
+  /platform/support-access/grants:
+    post:
+      tags: [Platform]
+      summary: >
+        Request a support grant for one tenant, one support ticket of that tenant and one scope, for 1-60 minutes
+        (default 60). Errors 400 with code TICKET_REQUIRED, SCOPE_INVALID, DURATION_OUT_OF_RANGE, TICKET_INVALID
+        (ticket missing or of another tenant). A config_only grant never opens patient records (403 scope-not-permitted).
+      x-required-permission: support_access:request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenantId, ticketId, scope, reason]
+              properties:
+                tenantId: { type: string, format: uuid }
+                ticketId: { type: string, format: uuid }
+                scope: { type: string, enum: [config_only, redacted_patient_view] }
+                reason: { type: string, maxLength: 500 }
+                minutes: { type: integer, minimum: 1, maximum: 60, default: 60 }
+      responses:
+        "201":
+          description: The grant (id, tenantId, ticketId, scope, operatorId, operatorName, operatorRole, reason, grantedAt, expiresAt, revokedAt, active)
+          content:
+            application/json:
+              schema: { type: object }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no support_access:request (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:
@@ -2506,6 +3196,12 @@ paths:
         only), support_access.grant, support_access.revoke, patient.support_view, audit_log.export.
       summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
       x-required-permission: audit_compliance:view
+      x-plt-056: >
+        super_admin and compliance_dpo only (sre no longer holds audit_compliance:view). Every search and export writes
+        a master.operator_audit_log row (operator, action audit_log.search|audit_log.export, target tenant, filters,
+        row count, reason, ip) and, with a tenantId filter, an operator.audit_search event in that tenant's audit_log.
+        before/after are null (CSV columns empty) unless includeValues=true is sent by compliance_dpo with a reason:
+        another role gets 403 values-not-permitted, a missing reason 400 reason-required (code REASON_REQUIRED).
       parameters:
         - $ref: "#/components/parameters/PlatformAuditTenantId"
         - $ref: "#/components/parameters/PlatformAuditAction"
@@ -2518,8 +3214,11 @@ paths:
         - $ref: "#/components/parameters/PlatformAuditActorName"
         - name: limit
           in: query
-          schema: { type: integer, minimum: 1, default: 50 }
+          description: PLT-056. Outside 1..100 is 400 validation problem naming limit (code LIMIT_OUT_OF_RANGE).
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/PlatformAuditIncludeValues"
+        - $ref: "#/components/parameters/PlatformAuditReason"
       responses:
         "200":
           description: Page of audit entries
@@ -2545,6 +3244,12 @@ paths:
         Platform-scope rows (tenantId null) in the file, and an export matching no rows, are recorded once in the
         platform chain (V126).
       x-required-permission: audit_compliance:view
+      x-plt-056: >
+        super_admin and compliance_dpo only (sre no longer holds audit_compliance:view). Every search and export writes
+        a master.operator_audit_log row (operator, action audit_log.search|audit_log.export, target tenant, filters,
+        row count, reason, ip) and, with a tenantId filter, an operator.audit_search event in that tenant's audit_log.
+        before/after are null (CSV columns empty) unless includeValues=true is sent by compliance_dpo with a reason:
+        another role gets 403 values-not-permitted, a missing reason 400 reason-required (code REASON_REQUIRED).
       parameters:
         - $ref: "#/components/parameters/PlatformAuditTenantId"
         - $ref: "#/components/parameters/PlatformAuditAction"
@@ -2555,6 +3260,8 @@ paths:
         - $ref: "#/components/parameters/PlatformAuditActorType"
         - $ref: "#/components/parameters/PlatformAuditActorRole"
         - $ref: "#/components/parameters/PlatformAuditActorName"
+        - $ref: "#/components/parameters/PlatformAuditIncludeValues"
+        - $ref: "#/components/parameters/PlatformAuditReason"
       responses:
         "200":
           description: >
@@ -2578,6 +3285,29 @@ components:
         tenant/role headers.
 
   parameters:
+    PlatformAuditIncludeValues:
+      name: includeValues
+      in: query
+      description: PLT-056. true returns before/after; compliance_dpo only, needs reason.
+      schema: { type: boolean, default: false }
+    PlatformAuditReason:
+      name: reason
+      in: query
+      description: PLT-056. Why the values are needed (1-500 chars); stored in master.operator_audit_log.reason.
+      schema: { type: string, maxLength: 500 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >-
+        PLT-026. A UUID (the web client sends a UUIDv7) that is new for each user action and reused unchanged when that action is
+        retried. Same key + same request replays the stored 2xx response with `Idempotent-Replayed: true` (no second side effect);
+        same key + different request: 422 `IDEMPOTENCY_KEY_REUSED`; the first attempt still running: 409 `IDEMPOTENCY_IN_PROGRESS`;
+        header missing or not a UUID: 400 `IDEMPOTENCY_KEY_REQUIRED`. Scoped to (tenant, staff member); only 2xx responses are kept
+        (a 4xx/5xx releases the key so the retry runs again); stored responses are encrypted and purged after 24 h.
+        Also required on POST /billing/invoices/{id}/payments, POST /packages/instances/items/{itemId}/book,
+        POST /packages/instances/{id}/refund and POST /packages/refunds/{id}/approve.
+      schema: { type: string, format: uuid }
     PlatformAuditTenantId:
       name: tenantId
       in: query
@@ -2634,7 +3364,7 @@ components:
     Limit:
       name: limit
       in: query
-      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
     Cursor:
       name: cursor
       in: query
@@ -2647,6 +3377,13 @@ components:
         timeout 5 s / lock timeout 3 s) or no connection was free within 3 s (code DB_UNAVAILABLE). Safe to retry.
       headers:
         Retry-After: { schema: { type: integer } }
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    PatientNotFound:
+      description: >-
+        IDC-001. type .../patient-not-found. The patient (or the visit/document's patient) is unknown, has withdrawn
+        data_processing consent, or is outside an own_patients_only caller's scope (no appointment or queue entry with her).
+        Same body in every case; no patient data. An unverified caller (email or mobile) gets 403 verification-required first,
+        exactly as on /patients/registry.
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
     NotFound:
       description: Not found (or out of scope — see per-endpoint note)
@@ -3122,6 +3859,15 @@ components:
         prescriberId: { type: [string, "null"], format: uuid, description: "Who signed (the visit's doctor or a clinical:approve holder)" }
         prescriberName: { type: [string, "null"] }
         professionalRegistrationNo: { type: [string, "null"], description: "From the staff record; null when not set" }
+    StaffClinicalLicence:
+      type: object
+      required: [staffId, isClinician, hasRegistrationNo]
+      properties:
+        staffId: { type: string, format: uuid }
+        isClinician: { type: boolean }
+        hasRegistrationNo: { type: boolean }
+        licenceExpiresOn: { type: [string, "null"], format: date }
+        licenceOverrideUntil: { type: [string, "null"], format: date-time }
     Prescription:
       type: object
       properties:
@@ -3132,6 +3878,8 @@ components:
         status: { type: string }
         createdAt: { type: string, format: date-time }
         signedAt: { type: [string, "null"], format: date-time }
+        signedBy: { type: [string, "null"], format: uuid, description: "CLN-005: staff id of the signer; null on a draft" }
+        signedByRegistrationNo: { type: [string, "null"], description: "CLN-005: the registration number the signer signed under" }
         items: { type: array, items: { $ref: "#/components/schemas/PrescriptionItem" } }
         unresolvedWarnings: { type: integer }
         warnings:
@@ -3151,6 +3899,71 @@ components:
           oneOf:
             - { $ref: "#/components/schemas/PrescriptionAllergySnapshot" }
             - { type: "null" }
+        safetyDictionaryVersion:
+          type: [string, "null"]
+          description: "CLN-004. Safety dictionary version active when the prescription was signed (e.g. 'IN v1'); null for a draft or a prescription signed before V1211."
+    SafetyDictionaryActive:
+      type: object
+      properties:
+        region: { type: string, enum: [IN, SA, AE, QA] }
+        version: { type: integer }
+        label: { type: string, description: "e.g. 'IN v1'" }
+        approvedBy: { type: [string, "null"] }
+        approvedAt: { type: [string, "null"], format: date-time }
+        source: { type: string }
+        controlledLabel: { type: object, additionalProperties: { type: string }, description: "Controlled-substance warning label per language (en always; ar/hi when supplied by the CSO)" }
+    SafetyDictionaryVersion:
+      type: object
+      properties:
+        versionId: { type: string, format: uuid }
+        region: { type: string }
+        version: { type: integer }
+        status: { type: string, enum: [draft, approved, active, retired] }
+        checksum: { type: string }
+        csoApprovalRef: { type: [string, "null"] }
+        approvedBy: { type: [string, "null"] }
+        approvedAt: { type: [string, "null"], format: date-time }
+        activatedAt: { type: [string, "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+    SafetyDictionaryUpload:
+      type: object
+      properties:
+        versionId: { type: string, format: uuid }
+        region: { type: string }
+        version: { type: integer }
+        status: { type: string }
+        checksum: { type: string }
+        created: { type: boolean }
+        diffSummary: { type: object, description: "comparedTo, added/removed counts per kind, addedEntries/removedEntries (up to 200 each)" }
+    SafetyDictionaryItem:
+      type: object
+      required: [value]
+      properties:
+        classId: { type: [string, "null"], description: "terms and stems only" }
+        value: { type: string, minLength: 3, maxLength: 100 }
+        lang: { type: [string, "null"], description: "e.g. en, ar, hi" }
+        matchKind: { type: [string, "null"], enum: [term, stem, null], description: "pregnancyRisk and controlled only (required there)" }
+    SafetyDictionaryBundle:
+      type: object
+      required: [classes, labels]
+      properties:
+        classes:
+          type: array
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: string }
+              crossReactsTo: { type: array, items: { type: string }, description: "one direction only" }
+        terms: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" }, description: "whole words" }
+        stems: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" }, description: "fragments matched anywhere in a word" }
+        exclusions: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" }, description: "not-the-stem words blanked before stem matching" }
+        pregnancyRisk: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" } }
+        controlled: { type: array, items: { $ref: "#/components/schemas/SafetyDictionaryItem" } }
+        labels:
+          type: object
+          properties:
+            controlled: { type: object, additionalProperties: { type: string }, description: "lang -> label; en required" }
     PrescriptionAllergySnapshot:
       type: object
       required: [state, allergies]
@@ -3171,6 +3984,22 @@ components:
         documentedBy: { type: [string, "null"], format: uuid, description: "Who documented no known allergies; null unless none_documented" }
         documentedByName: { type: [string, "null"] }
         documentedAt: { type: [string, "null"], format: date-time }
+    PackageRefund:
+      type: object
+      description: FIN-004 RefundResponse. refundAmount is the request-time amount; recomputedAmount is set at approval.
+      properties:
+        id: { type: string, format: uuid }
+        instanceId: { type: string, format: uuid }
+        patientName: { type: string }
+        packageName: { type: string }
+        reason: { type: string }
+        usedListValue: { type: number }
+        refundAmount: { type: number }
+        amountOwed: { type: number }
+        status: { type: string, enum: [pending, approved, rejected] }
+        creditNoteNumber: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+        recomputedAmount: { type: [number, "null"] }
     Problem:
       type: object
       description: RFC 7807
@@ -3221,6 +4050,7 @@ components:
         accessToken: { type: string }
         refreshToken: { type: string }
         expiresIn: { type: integer, example: 900 }
+        refreshExpiresIn: { type: integer, example: 2592000, description: "FEF-009: seconds until the refresh token (session) expires; the BFF uses it as the refresh cookie's Max-Age" }
 
     PendingWorkspaceToken:
       type: object
@@ -3250,6 +4080,20 @@ components:
       type: object
       properties:
         brands: { type: array, items: { $ref: "#/components/schemas/BrandWorkspace" } }
+
+    MfaSetupRequired:
+      type: object
+      description: PLT-005 / NB-042 - policy requires MFA and none is enrolled; the token only reaches the enrol/confirm endpoints.
+      properties:
+        setupToken: { type: string }
+        expiresIn: { type: integer, example: 300 }
+
+    OwnerWorkspaceToken:
+      type: object
+      properties:
+        workspaceToken: { type: string, description: "owner_select token for /owners/me/workspaces and /owners/workspaces/select" }
+        expiresIn: { type: integer, example: 300 }
+        remainingRecoveryCodes: { type: integer, nullable: true }
 
     MfaChallenge:
       type: object
@@ -3296,6 +4140,9 @@ components:
           type: [string, "null"]
           pattern: "^$|^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$"
           description: "DOC-N1. Omitted/null = unchanged; empty string = clear; otherwise 1-40 characters of letters, digits, space . / -. Audited (the audit row records set/changed/cleared, not the value). Requires staff:edit."
+        clinician:
+          type: [boolean, "null"]
+          description: "PLT-016. Omitted/null = unchanged, except that recording a new registration number sets it. true needs a registration number (400 clinician-needs-registration). Audited (staff.clinician_set / staff.clinician_cleared)."
 
     Staff:
       type: object
@@ -3327,6 +4174,7 @@ components:
           readOnly: true
           items: { type: string, enum: [pin, whatsapp_otp, authenticator] }
           description: "OWN-034. Factors this staff row can use: pin (PIN set), whatsapp_otp (mobile on file), authenticator (MFA enrolled). Empty for invite_pending and owner_account."
+        clinician: { type: boolean, description: "PLT-016 (staff.is_clinician): drives doctor pickers, schedules and queue assignment instead of role names" }
 
     RoleWrite:
       type: object
@@ -3337,6 +4185,12 @@ components:
           type: array
           description: One entry per module the role touches
           items: { $ref: "#/components/schemas/ModuleGrant" }
+        mfaRequired:
+          type: boolean
+          description: >
+            Optional; omitted keeps the current value (false on create). PLT-005: on a Role this is the effective value,
+            always true for the built-in Owner role and any role with :approve or :refundDiscount; sending false for such
+            a role is 422 mfa-required-by-policy.
 
     Role:
       allOf:
@@ -3345,6 +4199,8 @@ components:
           properties:
             id: { type: string, format: uuid }
             builtIn: { type: boolean }
+            presetCode: { type: [string, "null"], enum: [owner, owner_doctor, doctor, nurse, receptionist, frontdesk_vitals, null], description: "PLT-016: null for a custom role" }
+            presetVersion: { type: [integer, "null"], description: "PLT-016: preset definition version the grants were last set from" }
 
     ModuleGrant:
       type: object
@@ -3567,7 +4423,7 @@ components:
         doctorId: { type: string, format: uuid }
         startTime: { type: string, format: date-time }
         endTime: { type: string, format: date-time }
-        status: { type: string, enum: [scheduled, cancelled, completed, no_show] }
+        status: { type: string, enum: [scheduled, arrived, cancelled, completed, no_show] }
         isFollowUp: { type: boolean }
         cancelReason: { type: [string, "null"], description: "QA-06: the reason given on cancel (\"rescheduled\" for the old slot of a reschedule); null unless cancelled" }
 
@@ -3622,6 +4478,7 @@ components:
         doctorName: { type: [string, "null"] }
         waitMinutes: { type: integer, description: "Minutes since check-in on the server clock, >= 0" }
         visitType: { type: string, enum: [appointment, follow_up, walk_in, transfer] }
+        appointmentStatus: { type: [string, "null"], description: "Status of the linked appointment (arrived after check-in); null for walk-ins (ACC-003)" }
         transferReason: { type: [string, "null"], enum: [wrong_department, doctor_unavailable, patient_request, other, null], description: "Set on legs opened by a transfer (REC-021)" }
         transferReasonNote: { type: [string, "null"], maxLength: 200 }
 

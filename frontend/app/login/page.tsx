@@ -35,6 +35,7 @@ export default function LoginPage() {
   const [challenge, setChallenge] = useState<MfaChallenge | null>(null);
   const [setupRequired, setSetupRequired] = useState<MfaSetupRequired | null>(null);
   const [code, setCode] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false); // PLT-004: sign in with a one-time recovery code
   const [secretBase32, setSecretBase32] = useState("");
   const [otpauthUri, setOtpauthUri] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
@@ -143,7 +144,7 @@ export default function LoginPage() {
         body: JSON.stringify({ tenantSlug, mobilePhone }),
       });
       if (!res.ok) {
-        // Unknown clinic code / mobile (404), rate limit (429), etc. — say why instead of moving on.
+        // PLT-006: unknown clinic/mobile and per-number limits are a silent 202; only a malformed phone (400) or the IP limit (429) lands here.
         const p = await res.json().catch(() => null);
         setFormError(p?.detail || "Couldn't send the code. Try again.");
         return;
@@ -194,10 +195,12 @@ export default function LoginPage() {
     setFormError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/mfa/verify`, {
+      const res = await fetch(`${API_BASE}/auth/mfa/${useRecovery ? "recovery-verify" : "verify"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.challengeId, code }),
+        body: JSON.stringify(useRecovery
+          ? { challengeToken: challenge.challengeId, recoveryCode: code.trim() }
+          : { challengeId: challenge.challengeId, code }),
       });
       const body = await res.json();
       if (res.ok) {
@@ -398,25 +401,30 @@ export default function LoginPage() {
       <main className={styles.page}>
         <div className={styles.card}>
           <h1 className={styles.title}>Enter your code</h1>
-          <p className={styles.subtitle}>6-digit code from your authenticator app.</p>
+          <p className={styles.subtitle}>{useRecovery ? "One of your saved recovery codes. Each works once." : "6-digit code from your authenticator app."}</p>
           <form onSubmit={submitMfa} noValidate>
             {formError && <div className={styles.formError} role="alert">{formError}</div>}
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="code">Authentication code</label>
+              <label className={styles.label} htmlFor="code">{useRecovery ? "Recovery code" : "Authentication code"}</label>
               <input
                 id="code"
                 className={styles.input}
-                inputMode="numeric"
-                pattern="[0-9]{6}"
-                maxLength={6}
+                inputMode={useRecovery ? "text" : "numeric"}
+                pattern={useRecovery ? undefined : "[0-9]{6}"}
+                maxLength={useRecovery ? 32 : 6}
                 autoFocus
+                autoComplete="off"
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => setCode(useRecovery ? e.target.value : e.target.value.replace(/\D/g, ""))}
                 required
               />
             </div>
-            <button className={styles.submit} type="submit" disabled={loading || code.length !== 6}>
+            <button className={styles.submit} type="submit" disabled={loading || (useRecovery ? code.trim().length < 6 : code.length !== 6)}>
               {loading ? "Verifying…" : "Verify"}
+            </button>
+            <button type="button" className={styles.submit} style={{ background: "transparent", color: "inherit", border: "1px solid currentColor", marginBlockStart: 8 }}
+              onClick={() => { setUseRecovery(!useRecovery); setCode(""); setFormError(null); }}>
+              {useRecovery ? "Use authenticator code" : "Use a recovery code"}
             </button>
           </form>
         </div>

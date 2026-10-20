@@ -18,6 +18,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** DOC-005. Written to the TimelineApiTest conventions; NOT executed (no Docker/Postgres in this environment). */
 class EncounterListApiTest extends ApiTestBase {
 
+    // CLN-005 via CLN-006: signing/amending a note needs a registered clinician; every staff member seeded here is one.
+    @Override
+    protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
+                                    boolean emailVerified, boolean mobileVerified) {
+        return com.nabd.hms.support.ClinicianFixture.licensed(
+                super.seedStaff(tenant, roleId, email, mobilePhone, mfaEnabled, emailVerified, mobileVerified));
+    }
+
     private String registerPatient(String token, String name, String phone) {
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", name, "phone", phone, "dob", "1990-01-01", "gender", "male")), Map.class);

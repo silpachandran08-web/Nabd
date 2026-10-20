@@ -23,6 +23,8 @@ type Grant = {
 };
 
 type TenantOption = { id: string; name: string; slug: string };
+// PLT-056: a grant names one of the clinic's support tickets (GET /v1/platform/support/tickets).
+type TicketOption = { id: string; tenantId: string; subject: string; status: string };
 
 function grantState(g: Grant): "active" | "expired" | "revoked" {
   if (g.revokedAt) return "revoked";
@@ -38,6 +40,10 @@ export default function SupportAccessPage() {
   const [forbidden, setForbidden] = useState(false);
   const [tenantId, setTenantId] = useState("");
   const [reason, setReason] = useState("");
+  const [tickets, setTickets] = useState<TicketOption[]>([]);
+  const [ticketId, setTicketId] = useState("");
+  const [scope, setScope] = useState("config_only");
+  const [minutes, setMinutes] = useState("60");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actingOn, setActingOn] = useState<string | null>(null);
@@ -59,11 +65,13 @@ export default function SupportAccessPage() {
       }
       setGrants(await grantsRes.json());
 
-      const tenantsRes = await authedFetch("/platform/tenants?limit=200");
+      const tenantsRes = await authedFetch("/platform/tenants?limit=100");
       if (tenantsRes?.ok) {
         const body: { data: TenantOption[] } = await tenantsRes.json();
         setTenants(body.data);
       }
+      const ticketsRes = await authedFetch("/platform/support/tickets");
+      if (ticketsRes?.ok) setTickets(await ticketsRes.json());
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
@@ -94,11 +102,20 @@ export default function SupportAccessPage() {
       setFormError("Pick a clinic first.");
       return;
     }
+    const mins = Number(minutes);
+    if (!ticketId) {
+      setFormError("Pick the support ticket this access is for.");
+      return;
+    }
+    if (!Number.isInteger(mins) || mins < 1 || mins > 60) {
+      setFormError("Duration must be 1 to 60 minutes.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await authedFetch("/platform/support-access/grants", {
         method: "POST",
-        body: JSON.stringify({ tenantId, reason }),
+        body: JSON.stringify({ tenantId, ticketId, scope, minutes: mins, reason }),
       });
       if (!res) return;
       if (!res.ok) {
@@ -137,7 +154,7 @@ export default function SupportAccessPage() {
     <main className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Support Access</h1>
-        <p className={styles.subtitle}>Consented, time-boxed and audited — 60 minutes, no clinical fields.</p>
+        <p className={styles.subtitle}>Consented, time-boxed and audited — one clinic, one ticket, one scope, at most 60 minutes, no clinical fields.</p>
       </div>
 
       {!forbidden && (
@@ -149,13 +166,33 @@ export default function SupportAccessPage() {
                 id="tenant"
                 className={styles.select}
                 value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
+                onChange={(e) => { setTenantId(e.target.value); setTicketId(""); }}
               >
                 <option value="">Select a clinic…</option>
                 {tenants.map((t) => (
                   <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>
                 ))}
               </select>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="ticket">Ticket</label>
+              <select id="ticket" className={styles.select} value={ticketId} onChange={(e) => setTicketId(e.target.value)}>
+                <option value="">{tenantId ? "Select a ticket…" : "Pick a clinic first"}</option>
+                {tickets.filter((t) => t.tenantId === tenantId && t.status !== "closed").map((t) => (
+                  <option key={t.id} value={t.id}>{t.subject} ({t.status})</option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="scope">Scope</label>
+              <select id="scope" className={styles.select} value={scope} onChange={(e) => setScope(e.target.value)}>
+                <option value="config_only">Configuration only</option>
+                <option value="redacted_patient_view">Redacted patient view</option>
+              </select>
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="minutes">Minutes (max 60)</label>
+              <input id="minutes" type="number" min={1} max={60} className={styles.input} value={minutes} onChange={(e) => setMinutes(e.target.value)} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="reason">Reason</label>

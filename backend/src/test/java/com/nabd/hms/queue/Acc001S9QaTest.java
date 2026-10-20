@@ -61,7 +61,7 @@ class Acc001S9QaTest extends ApiTestBase {
             ps.setObject(3, UUID.fromString(patientId));
             ps.setObject(4, c.doctor.id());
             ps.setTimestamp(5, Timestamp.from(start));
-            ps.setTimestamp(6, Timestamp.from(start.plusSeconds(900)));
+            ps.setTimestamp(6, Timestamp.from(start.plusSeconds(1))); // 1s so boundary rows never overlap (ACC-004 exclusion)
             ps.setString(7, status);
             ps.setString(8, "cancelled".equals(status) ? "x" : null);
             ps.executeUpdate();
@@ -218,7 +218,7 @@ class Acc001S9QaTest extends ApiTestBase {
         assertThat(checkIn(other.token, other.doctor.id(), p, ok).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(count(c, "queue_entries")).isZero();
         assertThat(checkIn(c.token, c.doctor.id(), p, ok).getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(checkIn(c.token, c.doctor.id(), p, ok).getStatusCode()).as("double submit").isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(checkIn(c.token, c.doctor.id(), p, ok).getStatusCode()).as("double submit").isEqualTo(HttpStatus.CONFLICT);
         assertThat(count(c, "queue_entries")).isEqualTo(1);
     }
 

@@ -1,7 +1,6 @@
 package com.nabd.hms.staff;
 
 import com.nabd.hms.auth.AuthService;
-import com.nabd.hms.auth.dto.TokenPairResponse;
 import com.nabd.hms.common.RequestMeta;
 import com.nabd.hms.staff.dto.AcceptInviteRequest;
 import com.nabd.hms.staff.dto.AcceptedStaffIdentity;
@@ -46,9 +45,9 @@ public class StaffController {
     @GetMapping
     @PreAuthorize("hasAuthority('staff:view')")
     public StaffPage list(@AuthenticationPrincipal Jwt jwt,
-                           @RequestParam(defaultValue = "20") int limit,
+                           @RequestParam(required = false) Integer limit,
                            @RequestParam(required = false) String cursor) {
-        return staffService.list(tenantId(jwt), limit, cursor);
+        return staffService.list(tenantId(jwt), com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     /** Queue/consult doctor pickers need id+name only — gated on queue:view (not staff:view) so
@@ -57,6 +56,13 @@ public class StaffController {
     @PreAuthorize("hasAuthority('queue:view')")
     public List<StaffRosterEntry> roster(@AuthenticationPrincipal Jwt jwt) {
         return staffService.roster(tenantId(jwt));
+    }
+
+    /** PLT-016: staff the clinician backfill could not decide; the owner confirms each with PATCH clinician. */
+    @GetMapping("/clinician-review")
+    @PreAuthorize("hasAuthority('staff:view')")
+    public List<com.nabd.hms.staff.dto.ClinicianReviewEntry> clinicianReview(@AuthenticationPrincipal Jwt jwt) {
+        return staffService.clinicianReview(tenantId(jwt));
     }
 
     @PostMapping
@@ -88,11 +94,21 @@ public class StaffController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/mfa/reset")
+    @PreAuthorize("hasAuthority('staff:edit')")
+    public ResponseEntity<Void> resetMfa(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                          @Valid @RequestBody com.nabd.hms.staff.dto.MfaResetRequest req,
+                                          @RequestHeader(value = "X-Step-Up-Token", required = false) String stepUpToken,
+                                          HttpServletRequest http) {
+        staffService.resetMfa(tenantId(jwt), id, staffId(jwt), stepUpToken, req, RequestMeta.clientIp(http));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/invitations/{token}/accept")
-    public TokenPairResponse acceptInvite(@PathVariable String token, @Valid @RequestBody AcceptInviteRequest req,
-                                           HttpServletRequest http) {
+    public Object acceptInvite(@PathVariable String token, @Valid @RequestBody AcceptInviteRequest req,
+                               HttpServletRequest http) {
         AcceptedStaffIdentity identity = staffService.acceptInvite(token, req);
-        return authService.issueTokensForStaff(identity.tenantId(), identity.staffId(),
+        return authService.sessionAfterInviteAccept(identity.tenantId(), identity.staffId(),
                 RequestMeta.clientIp(http), RequestMeta.userAgent(http), RequestMeta.userAgent(http));
     }
 

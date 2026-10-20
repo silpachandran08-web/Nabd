@@ -23,10 +23,18 @@ const blank = (key: string): ClinicalContext => ({
   key, allergies: loading(), allergyStatus: loading(), pregnancyStatus: loading(), conditions: loading(), timeline: loading(), prescriptions: loading(), vitals: loading(),
 });
 
+/** IDC-001: the server's 404 for a gated read (consent withdrawn / outside the caller's scope), as opposed to "nothing recorded yet". */
+export async function isPatientNotFound(res: Response): Promise<boolean> {
+  if (res.status !== 404) return false;
+  const body = await res.clone().json().catch(() => null) as { type?: unknown } | null;
+  return typeof body?.type === "string" && body.type.endsWith("/patient-not-found");
+}
+
 async function part<T>(authedFetch: AuthedFetch, path: string, pick: (j: unknown) => T): Promise<Part<T>> {
   try {
     const res = await authedFetch(path);
     if (!res) return { status: "error", data: null };
+    if (await isPatientNotFound(res)) return { status: "error", data: null }; // never shown as an empty, reassuring list
     if (res.status === 404) return { status: "none", data: null };
     if (!res.ok) return { status: "error", data: null };
     return { status: "ok", data: pick(await res.json()) };

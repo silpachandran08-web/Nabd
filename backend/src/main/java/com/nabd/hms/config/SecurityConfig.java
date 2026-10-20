@@ -62,6 +62,27 @@ public class SecurityConfig {
                 ? null : delegate.resolve(req);
     }
 
+    /** PLT-027: security-layer 401/403 get the same Problem+JSON shape as GlobalExceptionHandler; no token detail is echoed. */
+    private static void unauthenticated(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res,
+            org.springframework.security.core.AuthenticationException ex) throws java.io.IOException {
+        new org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint().commence(req, res, ex); // sets 401 + WWW-Authenticate
+        problem(res, 401, "unauthenticated", "Unauthenticated", "Authentication is required or the access token is not valid.");
+    }
+
+    private static void forbidden(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res,
+            org.springframework.security.access.AccessDeniedException ex) throws java.io.IOException {
+        problem(res, 403, "forbidden", "Forbidden", "You do not have permission to do this.");
+    }
+
+    private static void problem(jakarta.servlet.http.HttpServletResponse res, int status, String slug, String title, String detail) throws java.io.IOException {
+        String traceId = org.slf4j.MDC.get(com.nabd.hms.common.RequestCorrelationFilter.MDC_KEY);
+        res.setStatus(status);
+        res.setCharacterEncoding("UTF-8");
+        res.setContentType("application/problem+json");
+        res.getWriter().write("{\"type\":\"https://api.nabd.health/errors/" + slug + "\",\"title\":\"" + title + "\",\"status\":" + status
+                + ",\"detail\":\"" + detail + "\",\"traceId\":\"" + (traceId != null ? traceId : java.util.UUID.randomUUID()) + "\"}");
+    }
+
     /** Dev default is the Next.js dev server; real deployments set app.cors.allowed-origins to the actual web app origin(s). */
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
@@ -69,8 +90,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); // PUT: DOC-R7 working hours and the allergy/pregnancy safety writes (CLN-001)
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id", "X-Step-Up-Token"));
-        config.setExposedHeaders(List.of("X-Request-Id"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id", "X-Step-Up-Token", "Idempotency-Key"));
+        config.setExposedHeaders(List.of("X-Request-Id", "Idempotent-Replayed"));
         config.setMaxAge(600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/v1/**", config);
@@ -80,17 +101,28 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
             Converter<org.springframework.security.oauth2.jwt.Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
-            CorsConfigurationSource corsConfigurationSource) throws Exception {
+            CorsConfigurationSource corsConfigurationSource,
+            com.nabd.hms.shared.idempotency.IdempotencyFilter idempotencyFilter) throws Exception {
         http
+                .addFilterAfter(idempotencyFilter, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class) // PLT-026
                 .csrf(csrf -> csrf.disable()) // stateless bearer-token API, no cookies to forge
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // PLT-027: API responses (any status) are never cached, sniffed, framed or sent with a referrer
+                .headers(h -> h
+                        .cacheControl(c -> { })
+                        .contentTypeOptions(c -> { })
+                        .referrerPolicy(r -> r.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                        .httpStrictTransportSecurity(x -> x.maxAgeInSeconds(31536000).includeSubDomains(true)
+                                .requestMatcher(org.springframework.security.web.util.matcher.AnyRequestMatcher.INSTANCE))
+                        .contentSecurityPolicy(c -> c.policyDirectives("default-src 'none'; frame-ancestors 'none'")))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/v1/auth/login",
                                 "/v1/auth/otp/request",
                                 "/v1/auth/otp/verify",
                                 "/v1/auth/mfa/verify",
+                                "/v1/auth/mfa/recovery-verify",
                                 "/v1/auth/pin/reset-request",
                                 "/v1/auth/pin/reset-confirm",
                                 "/v1/auth/refresh",
@@ -102,6 +134,9 @@ public class SecurityConfig {
                                 "/v1/owners/workspaces/select",
                                 "/v1/staff/invitations/*/accept",
                                 "/v1/owners/auth/login",
+                                "/v1/owners/auth/mfa/*", // PLT-005: owner challenge / setup tokens in the body
+                                "/v1/platform/auth/mfa/enroll", // PLT-005: platform mfa_setup token in the body
+                                "/v1/platform/auth/mfa/confirm",
                                 "/v1/owners/invitations/*/accept",
                                 "/v1/platform/auth/login",
                                 "/v1/platform/auth/mfa/verify",
@@ -118,6 +153,7 @@ public class SecurityConfig {
                             return new AuthorizationDecision(ok);
                         })
                 )
+                .exceptionHandling(e -> e.authenticationEntryPoint(SecurityConfig::unauthenticated).accessDeniedHandler(SecurityConfig::forbidden))
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .bearerTokenResolver(ownerSelectAwareResolver())
                         .authenticationEntryPoint((req, res, ex) -> {
@@ -125,9 +161,10 @@ public class SecurityConfig {
                             if (dbCode != null) {
                                 com.nabd.hms.common.DbFailureAdvice.write(res, dbCode);
                             } else {
-                                new org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint().commence(req, res, ex);
+                                unauthenticated(req, res, ex);
                             }
                         })
+                        .accessDeniedHandler(SecurityConfig::forbidden)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)));
         return http.build();
     }

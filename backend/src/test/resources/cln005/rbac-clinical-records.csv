@@ -1,0 +1,8 @@
+# RBAC Matrix, module "Clinical Records", copied verbatim from "Nabd HMS - Implementation Task Plan v2.xlsx" (sheet RBAC Matrix).
+# Y granted, N not granted, - not applicable (treated as not granted). Check with scripts/check-cln005-rbac-fixture.py.
+role,view,create,edit,delete,approve,refundDiscount,export
+Owner / Manager,Y,N,N,Y,Y,-,Y
+Doctor,Y,Y,Y,Y,N,-,-
+Receptionist,N,-,-,-,-,-,-
+Nurse,Y,Y,Y,-,N,-,-
+Custom (Front Desk + Vitals),Y,Y,N,-,N,-,-

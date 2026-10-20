@@ -1,0 +1,19 @@
+# OPS-036: applied by deploy.sh after infra/db/bootstrap-roles.sql has created the roles (same envsubst variables as preview.yaml).
+# Migrations run once, as the migrator role, before Core serves traffic (same image the deploy uses).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: migrate, namespace: "${NS}" }
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: preview
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ${IMAGE_MIGRATE}
+          env:
+            - { name: MIGRATE_DB_URL, value: "jdbc:postgresql://postgres:5432/nabd" }
+            - { name: MIGRATE_DB_USER, value: nabd_migrator }
+            - { name: MIGRATE_DB_PASSWORD, valueFrom: { secretKeyRef: { name: preview-secrets, key: db-migrator-password } } }
+          resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { cpu: "1", memory: 1Gi } }

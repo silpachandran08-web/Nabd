@@ -378,7 +378,7 @@ class PackageRepository {
 
     private static final String REFUND_SELECT =
             "SELECT r.id, r.instance_id, p.name AS patient_name, i.package_name, r.reason, r.used_list_value, " +
-                    "r.refund_amount, r.amount_owed, r.status, r.credit_note_number, r.requested_by, r.created_at " +
+                    "r.refund_amount, r.amount_owed, r.status, r.credit_note_number, r.requested_by, r.created_at, r.recomputed_amount " +
                     "FROM package_refunds r JOIN package_instances i ON i.id = r.instance_id " +
                     "JOIN patients p ON p.id = i.patient_id ";
 
@@ -387,7 +387,8 @@ class PackageRepository {
                 rs.getString("patient_name"), rs.getString("package_name"), rs.getString("reason"),
                 rs.getBigDecimal("used_list_value"), rs.getBigDecimal("refund_amount"),
                 rs.getBigDecimal("amount_owed"), rs.getString("status"), rs.getString("credit_note_number"),
-                UUID.fromString(rs.getString("requested_by")), rs.getTimestamp("created_at").toInstant());
+                UUID.fromString(rs.getString("requested_by")), rs.getTimestamp("created_at").toInstant(),
+                rs.getBigDecimal("recomputed_amount"));
     }
 
     long countPendingRefunds(UUID tenantId) {
@@ -408,9 +409,27 @@ class PackageRepository {
                 tenantId, staffId).stream().findFirst();
     }
 
-    void approveRefund(UUID tenantId, UUID id, UUID approvedBy, String creditNoteNumber) {
-        jdbc.update("UPDATE package_refunds SET status = 'approved', approved_by = ?, credit_note_number = ?, " +
-                "approved_at = now() WHERE tenant_id = ? AND id = ?", approvedBy, creditNoteNumber, tenantId, id);
+    /** FIN-004: compare-and-set on 'pending'; the caller already holds the instance row lock. */
+    int approveRefund(UUID tenantId, UUID id, UUID approvedBy, String creditNoteNumber, BigDecimal recomputedAmount) {
+        return jdbc.update("UPDATE package_refunds SET status = 'approved', approved_by = ?, credit_note_number = ?, " +
+                "recomputed_amount = ?, approved_at = now() WHERE tenant_id = ? AND id = ? AND status = 'pending'",
+                approvedBy, creditNoteNumber, recomputedAmount, tenantId, id);
+    }
+
+    int rejectRefund(UUID tenantId, UUID id, UUID rejectedBy, String reason) {
+        return jdbc.update("UPDATE package_refunds SET status = 'rejected', rejected_by = ?, reject_reason = ?, " +
+                "rejected_at = now() WHERE tenant_id = ? AND id = ? AND status = 'pending'", rejectedBy, reason, tenantId, id);
+    }
+
+    /** FIN-004: serialises refund request/approve/reject and book/redeem on one package instance. */
+    boolean lockInstance(UUID tenantId, UUID id) {
+        return !jdbc.queryForList("SELECT id FROM package_instances WHERE tenant_id = ? AND id = ? FOR UPDATE",
+                tenantId, id).isEmpty();
+    }
+
+    boolean hasPendingRefund(UUID tenantId, UUID instanceId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM package_refunds " +
+                "WHERE tenant_id = ? AND instance_id = ? AND status = 'pending')", Boolean.class, tenantId, instanceId));
     }
 
     private PackageRow mapPackage(java.sql.ResultSet rs, int i) throws java.sql.SQLException {

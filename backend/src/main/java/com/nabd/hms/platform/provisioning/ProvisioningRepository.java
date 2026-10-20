@@ -111,6 +111,11 @@ class ProvisioningRepository {
                 errorDetail, stepId);
     }
 
+    /** OPS-012: keeps a done step done but records why something best-effort (the invite email) did not happen. */
+    void recordStepNote(UUID stepId, String note) {
+        jdbc.update("UPDATE master.provisioning_job_steps SET error_detail = ? WHERE id = ?", note, stepId);
+    }
+
     void markStepRolledBack(UUID stepId) {
         jdbc.update("UPDATE master.provisioning_job_steps SET status = 'rolled_back' WHERE id = ?", stepId);
     }
@@ -157,9 +162,10 @@ class ProvisioningRepository {
     }
 
     /** Mirrors ApiTestBase's seedFullAccessRole shape — full grants on every module an Owner's shadow staff row needs. */
-    void insertBuiltInOwnerRole(UUID tenantId, String grantsJson) {
-        jdbc.update("INSERT INTO roles (id, tenant_id, name, built_in, grants) VALUES (?,?,?,true,?::jsonb)",
-                UUID.randomUUID(), tenantId, "Owner", grantsJson);
+    /** PLT-016: one preset role from RolePresets (only the Owner preset is built_in). */
+    void insertPresetRole(UUID tenantId, String name, boolean builtIn, String grantsJson, String presetCode, int presetVersion) {
+        jdbc.update("INSERT INTO roles (id, tenant_id, name, built_in, grants, preset_code, preset_version) VALUES (?,?,?,?,?::jsonb,?,?)",
+                UUID.randomUUID(), tenantId, name, builtIn, grantsJson, presetCode, presetVersion);
     }
 
     boolean hasBuiltInRole(UUID tenantId) {
@@ -196,7 +202,7 @@ class ProvisioningRepository {
     // ---- rollback (NB-259) — reverse of the creates above, same FK-ordering constraints ----
 
     void deleteBuiltInRole(UUID tenantId) {
-        jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND built_in = true", tenantId);
+        jdbc.update("DELETE FROM roles WHERE tenant_id = ? AND (built_in = true OR preset_code IS NOT NULL)", tenantId);
     }
 
     /** Reverses seedDefaultDepartment — departments.tenant_id references tenants(id), so this must

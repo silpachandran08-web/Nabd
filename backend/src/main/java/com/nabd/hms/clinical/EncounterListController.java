@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
-import java.util.UUID;
 
 import static com.nabd.hms.clinical.EncounterListModels.EncounterListPage;
 
@@ -19,20 +18,24 @@ import static com.nabd.hms.clinical.EncounterListModels.EncounterListPage;
 public class EncounterListController {
 
     private final EncounterListService service;
+    private final ClinicalReadScope scopes;
 
-    EncounterListController(EncounterListService service) {
+    EncounterListController(EncounterListService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("encounter_list")
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
     public EncounterListPage list(@AuthenticationPrincipal Jwt jwt,
                                   @RequestParam(required = false) String state,
                                   @RequestParam(required = false) LocalDate from,
                                   @RequestParam(required = false) LocalDate to,
-                                  @RequestParam(defaultValue = "20") int limit,
+                                  @RequestParam(required = false) Integer limit,
                                   @RequestParam(required = false) String cursor) {
-        return service.list(UUID.fromString(jwt.getClaimAsString("tenantId")), UUID.fromString(jwt.getSubject()),
-                state, from, to, limit, cursor);
+        // Selects no diagnosis or other clinical free text, so there is nothing for FieldGrantMasker to drop.
+        return service.list(scopes.resolve(jwt), state, from, to, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 }

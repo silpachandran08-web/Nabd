@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.provisioning;
 
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.EmailSender;
 import com.nabd.hms.platform.PlatformAudit;
 import com.nabd.hms.platform.provisioning.dto.CreateProvisioningJobRequest;
 import com.nabd.hms.platform.provisioning.dto.ProvisioningJobResponse;
@@ -41,14 +42,20 @@ public class ProvisioningService {
     private final ProvisioningRepository repo;
     private final ProvisioningStepRunner stepRunner;
     private final PlatformAudit audit;
+    private final RealDataOnboardingGuard realDataGuard;
+    private final EmailSender emailSender;
 
-    ProvisioningService(ProvisioningRepository repo, ProvisioningStepRunner stepRunner, PlatformAudit audit) {
+    ProvisioningService(ProvisioningRepository repo, ProvisioningStepRunner stepRunner, PlatformAudit audit,
+                        RealDataOnboardingGuard realDataGuard, EmailSender emailSender) {
         this.repo = repo;
         this.stepRunner = stepRunner;
         this.audit = audit;
+        this.realDataGuard = realDataGuard;
+        this.emailSender = emailSender;
     }
 
     public ProvisioningJobResponse createJob(CreateProvisioningJobRequest req, UUID requestedBy, String ip) {
+        realDataGuard.check();
         UUID jobId = UUID.randomUUID();
         repo.insertJob(jobId, requestedBy, req.tenantSlug().toLowerCase(), req.tenantName(), req.region(),
                 req.ownerEmail().toLowerCase(), req.ownerName(), req.ownerMobile(), req.brandName(), req.path());
@@ -98,6 +105,7 @@ public class ProvisioningService {
     /** Runs the next incomplete step (a queued first attempt, or a retry of the step that last failed). Idempotent once done. */
     public ProvisioningJobResponse advance(UUID jobId, UUID operatorId, String ip) {
         Job job = repo.findJob(jobId).orElseThrow(this::notFound);
+        realDataGuard.check();
         if (job.isGatedAndUnapproved()) {
             return toResponse(jobId); // enterprise job awaiting approval — same no-op idiom as "already done"
         }
@@ -112,6 +120,7 @@ public class ProvisioningService {
         try {
             result = stepRunner.run(job, next.stepName());
             repo.markStepDone(next.id());
+            sendEmails(next, result);
             boolean allDone = !repo.hasIncompleteSteps(jobId);
             repo.updateJobStatus(jobId, allDone ? "done" : "running");
             if (allDone) {
@@ -132,6 +141,22 @@ public class ProvisioningService {
         after.put("jobStatus", repo.findJob(jobId).map(Job::status).orElse(null));
         audit.record(null, operatorId, ip, "platform_provisioning.step_run", "provisioning_job", jobId, after);
         return toResponse(jobId, result.staffInviteToken(), result.ownerAccountInviteToken());
+    }
+
+    /**
+     * OPS-012: the step's transaction has committed, so SMTP runs with no transaction open (ExternalCallGuard
+     * enforces it). Best-effort per NB-353: the reveal-once tokens in the response are the manual-relay fallback,
+     * so a send failure never fails the step; it is recorded on the step in its own short statement instead.
+     */
+    private void sendEmails(JobStep step, StepResult result) {
+        for (ProvisioningModels.Email email : result.emails()) {
+            try {
+                emailSender.send(email.to(), email.subject(), email.body());
+            } catch (Exception e) {
+                log.warn("{} email failed to send for step {}; falling back to manual relay", email.what(), step.stepName(), e); // log-phi-ok: no address logged
+                repo.recordStepNote(step.id(), email.what() + " email not sent (" + e.getClass().getSimpleName() + "); relay the invite link manually");
+            }
+        }
     }
 
     /**

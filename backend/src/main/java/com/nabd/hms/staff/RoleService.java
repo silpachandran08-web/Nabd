@@ -3,6 +3,7 @@ package com.nabd.hms.staff;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nabd.hms.auth.MfaPolicy;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
@@ -13,15 +14,19 @@ import com.nabd.hms.staff.dto.DelegationRequest;
 import com.nabd.hms.staff.dto.DelegationResponse;
 import com.nabd.hms.staff.dto.RoleResponse;
 import com.nabd.hms.staff.dto.RoleWriteRequest;
+import com.nabd.hms.staff.presets.RolePresets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.staff.StaffRoleModels.DelegationRow;
@@ -45,8 +50,11 @@ public class RoleService {
 
     static final String DELEGATION_EVENT = "iam.delegation.changed.v1";
 
+    private final Clock clock;
+
     RoleService(RoleRepository repo, TenantContext tenantContext, ObjectMapper objectMapper, AuditService auditService,
-                DelegationGuard delegationGuard, EventPublisher eventPublisher) {
+                DelegationGuard delegationGuard, EventPublisher eventPublisher, Clock clock) {
+        this.clock = clock;
         this.delegationGuard = delegationGuard;
         this.eventPublisher = eventPublisher;
         this.repo = repo;
@@ -68,35 +76,71 @@ public class RoleService {
     }
 
     @Transactional
-    public RoleResponse create(UUID tenantId, UUID callerStaffId, RoleWriteRequest req, List<String> callerPermissions) {
+    public RoleResponse create(UUID tenantId, UUID callerStaffId, RoleWriteRequest req) {
         tenantContext.set(tenantId);
-        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
+        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants());
+        requireMfaInvariant(req);
 
         UUID id = UUID.randomUUID();
-        repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
+        repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), Boolean.TRUE.equals(req.mfaRequired()));
         log.info("role {} created by {} (tenant {})", id, callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
     @Transactional
-    public RoleResponse update(UUID tenantId, UUID callerStaffId, UUID id, RoleWriteRequest req, List<String> callerPermissions) {
+    public RoleResponse update(UUID tenantId, UUID callerStaffId, UUID id, RoleWriteRequest req) {
         tenantContext.set(tenantId);
         RoleRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
         if (current.builtIn()) {
             throw builtInImmutable();
         }
-        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants(), callerPermissions);
+        requireNoPrivilegeEscalation(tenantId, callerStaffId, req.grants());
+        requireMfaInvariant(req);
 
-        repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()), req.mfaRequired());
+        repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()),
+                req.mfaRequired() == null ? current.mfaRequired() : req.mfaRequired());
         log.info("role {} updated by {} (tenant {})", id, callerStaffId, tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
+    /** PLT-016: grants back to the current RolePresets definition; Owner only; audited with before/after. */
+    @Transactional
+    public RoleResponse resetToPreset(UUID tenantId, UUID callerStaffId, UUID id) {
+        tenantContext.set(tenantId);
+        if (!repo.isOwner(tenantId, callerStaffId)) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "owner-only", "OWNER_ONLY", "Only the Owner can reset a role to its preset.");
+        }
+        RoleRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        RolePresets.Preset preset = Optional.ofNullable(current.presetCode()).flatMap(RolePresets::byCode)
+                .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "not-a-preset", "NOT_A_PRESET",
+                        "This is a custom role; only preset roles can be reset."));
+        repo.resetToPreset(tenantId, id, writeGrantsJson(preset.grants()), RolePresets.VERSION);
+        RoleRow after = repo.findById(tenantId, id).orElseThrow();
+        RoleRepository.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null, "role.reset_to_preset", "role", id,
+                Map.of("presetVersion", String.valueOf(current.presetVersion()), "grants", readGrants(current.grantsJson())),
+                Map.of("presetVersion", String.valueOf(after.presetVersion()), "grants", readGrants(after.grantsJson())));
+        log.info("role {} reset to preset {} v{} by {} (tenant {})", id, preset.code(), RolePresets.VERSION, callerStaffId, tenantId);
+        return toResponse(after);
+    }
+
+    /** PLT-005: a role holding :approve or :refundDiscount always requires MFA; asking for false is refused, not ignored. */
+    private void requireMfaInvariant(RoleWriteRequest req) {
+        if (Boolean.FALSE.equals(req.mfaRequired()) && MfaPolicy.privilegedGrants(GrantsFlattener.flatten(req.grants()))) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "mfa-required-by-policy", "MFA required by policy",
+                    "Roles that can approve, refund or discount always require MFA; mfaRequired cannot be false.");
+        }
+    }
+
     /** "Attempted edit of a built-in role, or a grant beyond the editor's own permissions... blocked" — api/openapi.yaml. */
-    private void requireNoPrivilegeEscalation(UUID tenantId, UUID callerStaffId, List<ModuleGrant> requestedGrants,
-                                               List<String> callerPermissions) {
-        List<String> requested = GrantsFlattener.flatten(requestedGrants);
-        if (!callerPermissions.containsAll(requested)) {
+    private void requireNoPrivilegeEscalation(UUID tenantId, UUID callerStaffId, List<ModuleGrant> requestedGrants) {
+        // PLT-016: the Owner holds every grant (as in GrantAuthority), even though its MF-52 preset lacks clinical:create/edit/approve
+        if (repo.isOwner(tenantId, callerStaffId)) {
+            return;
+        }
+        // PLT-015: judged on the permanent role, never token grants (a delegation loan must not be baked into a role)
+        List<String> permanent = GrantsFlattener.flatten(readGrants(repo.findBaseRoleGrants(tenantId, callerStaffId)));
+        if (GrantAuthority.exceeds(GrantsFlattener.flatten(requestedGrants), permanent)) {
             log.warn("privilege escalation blocked: staff {} (tenant {}) requested grants beyond their own permissions",
                     callerStaffId, tenantId);
             throw new ApiException(HttpStatus.BAD_REQUEST, "privilege-escalation", "Grant exceeds your own permissions",
@@ -110,7 +154,7 @@ public class RoleService {
     public DelegationResponse createDelegation(UUID tenantId, UUID callerStaffId, DelegationRequest req, String stepUpToken) {
         tenantContext.set(tenantId);
         RoleRow delegatedRole = repo.findById(tenantId, req.delegatedRoleId()).orElseThrow(this::notFound);
-        if (req.expiresAt().isAfter(Instant.now().plus(MAX_DELEGATION_WINDOW))) {
+        if (req.expiresAt().isAfter(Instant.now(clock).plus(MAX_DELEGATION_WINDOW))) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "delegation-window-too-long", "Window too long",
                     "A delegation can't run longer than 30 days — create a new one if the cover extends past that.");
         }
@@ -154,7 +198,7 @@ public class RoleService {
 
     private DelegationResponse toDelegationResponse(DelegationRow row) {
         return new DelegationResponse(row.id(), row.staffId(), row.delegatedRoleId(), row.delegatedRoleName(),
-                row.grantedBy(), row.reason(), row.startsAt(), row.expiresAt(), row.active(), row.revokedAt(), row.revokedReason());
+                row.grantedBy(), row.reason(), row.startsAt(), row.expiresAt(), row.active(Instant.now(clock)), row.revokedAt(), row.revokedReason());
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
@@ -164,7 +208,9 @@ public class RoleService {
     }
 
     private RoleResponse toResponse(RoleRow row) {
-        return new RoleResponse(row.id(), row.name(), row.builtIn(), readGrants(row.grantsJson()), row.mfaRequired());
+        List<ModuleGrant> grants = readGrants(row.grantsJson());
+        boolean effective = row.mfaRequired() || MfaPolicy.privilegedRole(row.builtIn(), GrantsFlattener.flatten(grants));
+        return new RoleResponse(row.id(), row.name(), row.builtIn(), grants, effective, row.presetCode(), row.presetVersion());
     }
 
     private List<ModuleGrant> readGrants(String json) {

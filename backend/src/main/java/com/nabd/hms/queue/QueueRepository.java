@@ -5,6 +5,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Date;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -21,7 +23,7 @@ class QueueRepository {
                     "q.current_stage, q.workflow_definition_id, q.queue_date, q.token_number, " +
                     "q.status, q.priority, q.priority_reason, q.priority_flagged_by, q.priority_flagged_at, q.priority_acknowledged_by, " +
                     "q.priority_acknowledged_at, q.source, q.presenting_complaint, q.payment_mode, q.created_at, " +
-                    "q.transfer_reason, q.transfer_reason_note, " +
+                    "q.transfer_reason, q.transfer_reason_note, a.status AS appointment_status, " +
                     "date_part('year', age(q.queue_date, p.dob))::int AS age_years, p.gender, d.name AS doctor_name, " +
                     "GREATEST(0, floor(extract(epoch FROM (now() - q.created_at)) / 60))::int AS wait_minutes, " +
                     "CASE WHEN a.is_follow_up THEN 'follow_up' WHEN q.appointment_id IS NOT NULL THEN 'appointment' " +
@@ -42,8 +44,9 @@ class QueueRepository {
      * The UNIQUE(tenant_id, doctor_id, queue_date, token_number) constraint is the backstop if this
      * were ever skipped, but the lock means it should never actually fire.
      */
-    void lockDoctorDay(UUID doctorId, LocalDate date) {
-        jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?))", Object.class, doctorId + ":" + date);
+    void lockDoctorDay(UUID tenantId, UUID doctorId, LocalDate date) {
+        // T-201: two-key lock (hash(tenant:doctor), clinic epoch day) instead of one 32-bit hash of the whole string
+        jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?), ?)", Object.class, tenantId + ":" + doctorId, (int) date.toEpochDay());
     }
 
     int nextTokenNumber(UUID tenantId, UUID doctorId, LocalDate date) {
@@ -58,13 +61,13 @@ class QueueRepository {
      * transfer() — propagating one visit's identity across however many department legs it takes. */
     UUID insert(UUID tenantId, UUID appointmentId, UUID patientId, UUID doctorId, UUID departmentId,
                 UUID parentQueueEntryId, UUID encounterId, LocalDate queueDate, int tokenNumber, String source, String status,
-                String presentingComplaint, String paymentMode, String transferReason, String transferReasonNote) {
+                String presentingComplaint, String paymentMode, String transferReason, String transferReasonNote, Instant createdAt) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO queue_entries (id, tenant_id, appointment_id, patient_id, doctor_id, department_id, " +
-                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode, transfer_reason, transfer_reason_note) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "parent_queue_entry_id, encounter_id, queue_date, token_number, source, status, presenting_complaint, payment_mode, transfer_reason, transfer_reason_note, created_at) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", // PLT-028: created_at from the injected clock, so session-time checks see the same "now"
                 id, tenantId, appointmentId, patientId, doctorId, departmentId, parentQueueEntryId, encounterId,
-                Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode, transferReason, transferReasonNote);
+                Date.valueOf(queueDate), tokenNumber, source, status, presentingComplaint, paymentMode, transferReason, transferReasonNote, Timestamp.from(createdAt));
         return id;
     }
 
@@ -73,9 +76,19 @@ class QueueRepository {
                 "SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, patientId));
     }
 
-    boolean appointmentCheckedIn(UUID tenantId, UUID appointmentId) {
-        return Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM queue_entries WHERE tenant_id = ? AND appointment_id = ?)", Boolean.class, tenantId, appointmentId));
+    /** The live check-in of an appointment: {tokenNumber, queueEntryId, checkedInAt}; empty if none. */
+    Optional<java.util.Map<String, Object>> findCheckInOf(UUID tenantId, UUID appointmentId) {
+        return jdbc.query("SELECT id, token_number, created_at FROM queue_entries " +
+                        "WHERE tenant_id = ? AND appointment_id = ? AND NOT legacy_duplicate",
+                (rs, i) -> java.util.Map.<String, Object>of("queueEntryId", rs.getString("id"),
+                        "tokenNumber", rs.getInt("token_number"), "checkedInAt", rs.getTimestamp("created_at").toInstant().toString()),
+                tenantId, appointmentId).stream().findFirst();
+    }
+
+    /** Encounter-wide lookup: a transferred leg has no appointment of its own, its first leg does. */
+    Optional<UUID> appointmentOfEncounter(UUID tenantId, UUID encounterId) {
+        return jdbc.query("SELECT appointment_id FROM queue_entries WHERE tenant_id = ? AND encounter_id = ? AND appointment_id IS NOT NULL LIMIT 1",
+                (rs, i) -> UUID.fromString(rs.getString(1)), tenantId, encounterId).stream().findFirst();
     }
 
     boolean staffExists(UUID tenantId, UUID staffId) {
@@ -126,8 +139,9 @@ class QueueRepository {
                 mapper(), tenantId, Date.valueOf(date));
     }
 
-    void updateStatus(UUID tenantId, UUID id, String status) {
-        jdbc.update("UPDATE queue_entries SET status = ? WHERE tenant_id = ? AND id = ?", status, tenantId, id);
+    /** Compare-and-set (ACC-002): returns 0 when the row is no longer in {@code expected}. */
+    int updateStatus(UUID tenantId, UUID id, String expected, String status) {
+        return jdbc.update("UPDATE queue_entries SET status = ? WHERE tenant_id = ? AND id = ? AND status = ?", status, tenantId, id, expected);
     }
 
     /** NB-143: (re-)flagging resets any earlier acknowledgement — a fresh flag needs a fresh
@@ -223,7 +237,7 @@ class QueueRepository {
                     rs.getTimestamp("created_at").toInstant(),
                     rs.getString("transfer_reason"), rs.getString("transfer_reason_note"),
                     (Integer) rs.getObject("age_years"), rs.getString("gender"), rs.getString("doctor_name"),
-                    rs.getInt("wait_minutes"), rs.getString("visit_type"));
+                    rs.getInt("wait_minutes"), rs.getString("visit_type"), rs.getString("appointment_status"));
         };
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,7 +39,10 @@ public class DiscountService {
     private final BillingRepository repo;
     private final AuditService auditService;
 
-    DiscountService(BillingRepository repo, AuditService auditService) {
+    private final Clock clock;
+
+    DiscountService(BillingRepository repo, AuditService auditService, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.auditService = auditService;
     }
@@ -48,7 +52,7 @@ public class DiscountService {
         SubscriptionRow subscription = repo.findByTenant(req.tenantId()).orElseThrow(this::noSubscription);
 
         boolean autoApprove = req.percent().compareTo(AUTO_APPROVE_CAP_PERCENT) <= 0;
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         UUID id = repo.insertDiscount(req.tenantId(), operatorId, req.percent(), req.reason(),
                 autoApprove ? "auto_approved" : "pending", null, autoApprove ? now : null);
 
@@ -70,7 +74,7 @@ public class DiscountService {
         SubscriptionRow subscription = repo.findByTenant(row.tenantId()).orElseThrow(this::noSubscription);
         // Claim the review first (guarded on status = 'pending'), then apply: a racing second reviewer gets 0 rows
         // and the discount is applied exactly once.
-        if (repo.updateDiscountStatus(id, "approved", operatorId, Instant.now()) == 0) {
+        if (repo.updateDiscountStatus(id, "approved", operatorId, Instant.now(clock)) == 0) {
             throw alreadyReviewed();
         }
         applyDiscount(subscription, row.percent());
@@ -84,7 +88,7 @@ public class DiscountService {
     public DiscountResponse reject(UUID id, UUID operatorId, String ipAddress) {
         DiscountRow row = pendingOrThrow(id);
         requireNotSelfReview(row, operatorId);
-        if (repo.updateDiscountStatus(id, "rejected", operatorId, Instant.now()) == 0) {
+        if (repo.updateDiscountStatus(id, "rejected", operatorId, Instant.now(clock)) == 0) {
             throw alreadyReviewed();
         }
         DiscountRow reviewed = repo.findDiscountById(id).orElseThrow();

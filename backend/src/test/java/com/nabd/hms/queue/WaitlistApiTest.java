@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -22,16 +21,28 @@ class WaitlistApiTest extends ApiTestBase {
         return date.getDayOfWeek().getValue() % 7;
     }
 
-    private static Instant nearFutureSlot() {
-        Instant now = Instant.now();
-        Instant candidate = now.plus(2, ChronoUnit.HOURS).truncatedTo(ChronoUnit.HOURS);
-        Instant capAt = LocalDate.now(ZoneOffset.UTC).atTime(23, 30).toInstant(ZoneOffset.UTC);
-        return candidate.isAfter(capAt) ? now.plus(5, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.MINUTES) : candidate;
+    @org.springframework.beans.factory.annotation.Autowired
+    com.nabd.hms.common.ClinicClock clinicClock;
+
+    /** The doctor's clinic zone (tenants.timezone via ClinicClock), so slot times are clinic wall-clock times, not UTC. */
+    private java.time.ZoneId zone(UUID doctorId) {
+        return clinicClock.zone(new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource())
+                .queryForObject("SELECT tenant_id FROM staff WHERE id = ?", UUID.class, doctorId));
+    }
+
+    /** The day the working hours below cover: tomorrow on the clinic's calendar, so no slot is ever past or across midnight. */
+    private LocalDate slotDay(UUID doctorId) {
+        return clinicClock.today(zone(doctorId)).plusDays(1);
+    }
+
+    /** Tomorrow 10:00 clinic time: on the 15-minute grid and inside the 00:00-23:45 working hours, with room for +90 min. */
+    private Instant nearFutureSlot(UUID doctorId) {
+        return slotDay(doctorId).atTime(10, 0).atZone(zone(doctorId)).toInstant();
     }
 
     private void addWorkingHours(String token, UUID doctorId) {
         exchange("/v1/doctors/" + doctorId + "/working-hours", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "dayOfWeek", pgDayOfWeek(LocalDate.now(ZoneOffset.UTC)), "startTime", "00:00:00",
+                "dayOfWeek", pgDayOfWeek(slotDay(doctorId)), "startTime", "00:00:00",
                 "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
     }
 
@@ -59,7 +70,7 @@ class WaitlistApiTest extends ApiTestBase {
         addWorkingHours(token, doctor.id());
 
         String bookedPatient = registerPatient(token, "Booked", "+919700000101");
-        Instant slot = nearFutureSlot();
+        Instant slot = nearFutureSlot(doctor.id());
         String appointmentId = bookAppointment(token, doctor.id(), bookedPatient, slot);
 
         String waiter1 = registerPatient(token, "Waiter1", "+919700000102");
@@ -92,7 +103,7 @@ class WaitlistApiTest extends ApiTestBase {
         addWorkingHours(token, doctor.id());
 
         String bookedPatient = registerPatient(token, "Booked2", "+919700000201");
-        Instant slot = nearFutureSlot();
+        Instant slot = nearFutureSlot(doctor.id());
         String appointmentId = bookAppointment(token, doctor.id(), bookedPatient, slot);
         String waiter = registerPatient(token, "Waiter3", "+919700000202");
         ResponseEntity<Map> join = exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
@@ -126,7 +137,7 @@ class WaitlistApiTest extends ApiTestBase {
         addWorkingHours(token, doctor.id());
 
         String bookedPatient = registerPatient(token, "Booked3", "+919700000301");
-        Instant slot = nearFutureSlot();
+        Instant slot = nearFutureSlot(doctor.id());
         String appointmentId = bookAppointment(token, doctor.id(), bookedPatient, slot);
         String waiter1 = registerPatient(token, "Waiter4", "+919700000302");
         String waiter2 = registerPatient(token, "Waiter5", "+919700000303");
@@ -183,7 +194,7 @@ class WaitlistApiTest extends ApiTestBase {
         SeededStaff doctor = seedStaff(tenant, roleId, "doc28@a.com", "+919700000028", false);
         String token = loginAndGetAccessToken(doctor);
         addWorkingHours(token, doctor.id());
-        Instant base = nearFutureSlot();
+        Instant base = nearFutureSlot(doctor.id());
 
         String waiterA = registerPatient(token, "WaiterA", "+919700002801");
         String waiterB = registerPatient(token, "WaiterB", "+919700002802");
@@ -192,13 +203,13 @@ class WaitlistApiTest extends ApiTestBase {
         String entryB = (String) exchange("/v1/waitlist", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "doctorId", doctor.id().toString(), "patientId", waiterB)), Map.class).getBody().get("id");
 
-        // a slot already booked by someone else: 409 slot-unavailable, entry stays waiting
+        // a slot already booked by someone else: 409 slot-taken, entry stays waiting
         String other = registerPatient(token, "Taken", "+919700002803");
         bookAppointment(token, doctor.id(), other, base);
         ResponseEntity<Map> taken = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,
                 authedJsonBody(token, Map.of("slotStart", base.toString())), Map.class);
         assertThat(taken.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(taken.getBody().get("type")).asString().contains("slot-unavailable");
+        assertThat(taken.getBody().get("type")).asString().contains("slot-taken");
 
         // a slot in the past: 400
         ResponseEntity<Map> past = exchange("/v1/waitlist/" + entryA + "/accept", HttpMethod.POST,

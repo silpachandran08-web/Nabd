@@ -6,32 +6,16 @@ import styles from "../checkout.module.css";
 import { formatMoney } from "../../lib/money";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
+import StatusPill from "../../components/ui/StatusPill";
+import { autoLink, rxErrorMessage, unlinkedRx } from "../../components/checkout/rxLink";
 import { getIdentity } from "../../lib/session";
 import { can } from "../../lib/permissions";
 import { paymentMethodLabel } from "../../components/checkout/paymentMethods";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
-import { apiFetch, goLogin } from "../../lib/apiClient";
-
-// Matches GET/POST /v1/billing/checkout/{queueEntryId} and /v1/billing/invoices/{id} (CheckoutController).
-type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
-type PrescribedItem = { drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null };
-type CheckoutContext = {
-  queueEntryId: string; patientName: string; doctorName: string; visitType: string;
-  followUpEligible: boolean; currency: string; charges: Charge[]; pendingProcedures: Charge[];
-  prescribedItems: PrescribedItem[]; departmentId: string; queueStatus: string;
-};
-type FlowStep = { stepType: string };
-type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
-type Payment = { id: string; method: string; amount: number; recordedAt: string };
-type Invoice = {
-  id: string; invoiceNumber: string; patientName: string; doctorName: string; currency: string;
-  subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
-  balanceDue: number; status: string; lineItems: LineItem[]; payments: Payment[];
-};
-type Problem = { type?: string; title: string; detail: string };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+import { api, ApiError, errorText, intentKeys } from "../../lib/api";
+import type { Charge, CheckoutContext, FlowStep, Invoice, LineItem } from "../../../packages/api-client/types.ts";
+import { PRICE_REASONS, reasonLabel } from "../../components/checkout/priceReasons";
 
 
 // Mirrors DepartmentService.resolveStatusSequence on the backend — checked_in/waiting always
@@ -57,6 +41,7 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+
 export default function CheckoutPage() {
   const router = useRouter();
   const region = getIdentity()?.tenantRegion;
@@ -77,6 +62,10 @@ export default function CheckoutPage() {
   const [items, setItems] = useState<LineItem[]>([]);
   const [category, setCategory] = useState("All");
   const [discount, setDiscount] = useState("0");
+  const [discountReason, setDiscountReason] = useState("");
+  const [editing, setEditing] = useState<string | null>(null); // chargeCode whose override editor is open
+  const [ovPrice, setOvPrice] = useState("");
+  const [ovReason, setOvReason] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -90,42 +79,13 @@ export default function CheckoutPage() {
   const [continueError, setContinueError] = useState<string | null>(null);
   const [showAddMore, setShowAddMore] = useState(false);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  const keys = useRef(intentKeys()); // Idempotency-Key per user intent: reused on a retry of the same bill/payment/step
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const ctxRes = await authedFetch(`/billing/checkout/${queueEntryId}`);
-      if (!ctxRes) return;
-      if (ctxRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!ctxRes.ok) {
-        setError("Couldn't load checkout details. Try again.");
-        return;
-      }
-      const ctx: CheckoutContext = await ctxRes.json();
+      const ctx = await api.get<CheckoutContext>(`/billing/checkout/${queueEntryId}`);
       setContext(ctx);
       if (ctx.pendingProcedures.length > 0) {
         setItems(ctx.pendingProcedures.map((c) => ({
@@ -133,20 +93,17 @@ export default function CheckoutPage() {
           unitPrice: c.baseAmount, taxRatePercent: c.taxRatePercent,
         })));
       }
-
-      const flowRes = await authedFetch(`/departments/${ctx.departmentId}/flow`);
-      if (flowRes?.ok) setFlowSteps(await flowRes.json());
-
-      const invRes = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`);
-      if (invRes?.status === 200) {
-        setInvoice(await invRes.json());
-      }
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      // Best-effort reads: a failure leaves the defaults (no flow steps / no invoice yet).
+      setFlowSteps(await api.get<FlowStep[]>(`/departments/${ctx.departmentId}/flow`).catch(() => []));
+      const inv = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+      if (inv) setInvoice(inv);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      else setError(e instanceof ApiError ? "Couldn't load checkout details. Try again." : "Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, queueEntryId]);
+  }, [queueEntryId]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -165,8 +122,21 @@ export default function CheckoutPage() {
         if (charge.stockQty != null && existing.quantity >= charge.stockQty) return prev; // PHA-011: cap at stock
         return prev.map((i) => (i.chargeCode === charge.code ? { ...i, quantity: i.quantity + 1 } : i));
       }
-      return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice, taxRatePercent: charge.taxRatePercent }];
+      // PHL-001: an Rx item is pre-linked to the visit's signed line for it; otherwise the row asks for one.
+      const prescriptionItemId = charge.isRx ? autoLink(charge.name, context?.prescribedItems ?? []) ?? undefined : undefined;
+      return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice, taxRatePercent: charge.taxRatePercent, prescriptionItemId }];
     });
+  }
+
+  function linkRx(code: string, prescriptionItemId: string) {
+    setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, prescriptionItemId } : i)));
+  }
+
+  function applyOverride(code: string) {
+    const price = Number(ovPrice);
+    if (ovPrice === "" || !Number.isFinite(price) || price < 0 || !ovReason) return;
+    setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, unitPrice: price, override: { unitPrice: price, reasonCode: ovReason } } : i)));
+    setEditing(null);
   }
 
   function setQty(code: string, qty: number) {
@@ -185,6 +155,8 @@ export default function CheckoutPage() {
   const rawTotal = subtotal - discountNum + tax;
   const previewTotal = Math.round(rawTotal);
   const roundOff = round2(previewTotal - rawTotal);
+  const waitingForRx = unlinkedRx(items, context?.charges ?? []);
+  const rxChoices = (context?.prescribedItems ?? []).filter((p) => p.remainingQty > 0);
 
   // Bills the visit (creates or extends the invoice). Returns the invoice, or null when it failed.
   async function billVisit(): Promise<Invoice | null> {
@@ -196,29 +168,29 @@ export default function CheckoutPage() {
       setCreateError("Add at least one charge.");
       return null;
     }
+    if (discountNum > 0 && !discountReason) {
+      setCreateError("Pick a reason for the discount.");
+      return null;
+    }
     setCreating(true);
     try {
-      const res = await authedFetch(`/billing/checkout/${queueEntryId}`, {
-        method: "POST",
-        body: JSON.stringify({
-          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          ...(canDiscount ? { discount: discountNum } : {}),
-        }),
-      });
-      if (!res) return null;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
-        setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
-        return null;
-      }
-      const inv: Invoice = await res.json();
+      const body = {
+        // codes only: the server prices every line from the catalogue (FIN-003)
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, quantity: i.quantity, ...(canDiscount && i.override ? { override: i.override } : {}),
+          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
+        ...(canDiscount && discountNum > 0 ? { discounts: [{ kind: "amount", value: discountNum, reasonCode: discountReason }] } : {}),
+      };
+      const inv = await api.post<Invoice>(`/billing/checkout/${queueEntryId}`, body, { idempotencyKey: keys.current.get("bill", body) });
+      keys.current.done("bill");
       setInvoice(inv);
       setItems([]); // picker resets — a later billing checkpoint starts its "add more" list fresh
       setDiscount("0");
+      setDiscountReason("");
       setShowAddMore(false);
       return inv;
-    } catch {
-      setCreateError("Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
+    } catch (e) {
+      // A server answer is a refusal; no answer (or a timeout) leaves the outcome unknown.
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, e.detail || "Couldn't generate the invoice.") : "Couldn't confirm the invoice. Reload this page to see whether it was created before trying again.");
       return null;
     } finally {
       setCreating(false);
@@ -248,27 +220,31 @@ export default function CheckoutPage() {
         const before = inv.payments.length;
         let next: Invoice;
         try {
-          const res = await authedFetch(`/billing/invoices/${inv.id}/payments`, { method: "POST", body: JSON.stringify({ method: row.method, amount: amt / 100 }) });
-          if (!res) return;
-          if (!res.ok) {
-            const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
-            setPaymentError(p.detail || "Couldn't record payment.");
+          const body = { method: row.method, amount: amt / 100 };
+          next = await api.post<Invoice>(`/billing/invoices/${inv.id}/payments`, body, { idempotencyKey: keys.current.get(`pay:${inv.id}`, body) });
+          keys.current.done(`pay:${inv.id}`);
+        } catch (e) {
+          if (e instanceof ApiError) {
+            setPaymentError(e.detail || "Couldn't record payment.");
+            if (e.status === 422) { // FIN-001: overpayment names the balance; refresh the one shown
+              const r = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+              if (r) setInvoice(r);
+            }
             return;
           }
-          next = await res.json();
-        } catch {
           // Outcome unknown: read the invoice back instead of guessing, so a payment that landed is never re-sent.
-          const r = await authedFetch(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
-          if (!r?.ok) {
+          const r = await api.get<Invoice>(`/billing/checkout/${queueEntryId}/invoice`).catch(() => null);
+          if (!r) {
             setPaymentError("Couldn't confirm whether that payment was recorded. Reload this page and check the Payments list before collecting again.");
             return;
           }
-          next = await r.json();
+          next = r;
           if (next.payments.length <= before) {
             setInvoice(next);
             setPaymentError("That payment did not go through and nothing was recorded. Try again.");
             return;
           }
+          keys.current.done(`pay:${inv.id}`);
         }
         setInvoice(next);
         inv = next;
@@ -311,17 +287,10 @@ export default function CheckoutPage() {
         setContinueError("This visit has no next step to continue to.");
         return;
       }
-      const res = await authedFetch(`/queue/${queueEntryId}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: next }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't continue the visit." }));
-        setContinueError(p.detail || "Couldn't continue the visit.");
-        return;
-      }
+      await api.patch(`/queue/${queueEntryId}/status`, { status: next, expectedStatus: context.queueStatus }, { idempotencyKey: keys.current.get("advance", next) });
       router.push("/arrivals");
+    } catch (e) {
+      setContinueError(errorText(e, "Couldn't continue the visit."));
     } finally {
       setContinuing(false);
     }
@@ -348,7 +317,7 @@ export default function CheckoutPage() {
           const isFollowUp = price !== c.baseAmount;
           const body = (
             <>
-              <span className={styles.chargeName}>{c.name} <StockPill qty={c.stockQty} /></span>
+              <span className={styles.chargeName}>{c.name} {c.isRx && <StatusPill tone="danger" label="Rx" />} <StockPill qty={c.stockQty} /></span>
               <span className={styles.chargePrice}>
                 {isFollowUp && <span className={styles.muted} style={{ textDecoration: "line-through", marginRight: 6 }}>{formatMoney(c.baseAmount, context.currency)}</span>}
                 {formatMoney(price, context.currency)}
@@ -372,7 +341,19 @@ export default function CheckoutPage() {
             <tbody>
               {items.map((i) => (
                 <tr key={i.chargeCode}>
-                  <td>{i.chargeName}<div className={styles.muted}>{i.category}</div></td>
+                  <td>
+                    {i.chargeName}<div className={styles.muted}>{i.category}</div>
+                    {/* PHL-001: an Rx line is linked to one signed line of this visit's prescription; no "unlink" choice once linked */}
+                    {(i.prescriptionItemId || waitingForRx.includes(i.chargeCode)) && (
+                      <select aria-label={`Prescription line for ${i.chargeName}`} className={styles.rxPickerInput} value={i.prescriptionItemId ?? ""}
+                        onChange={(e) => e.target.value && linkRx(i.chargeCode, e.target.value)}>
+                        {!i.prescriptionItemId && <option value="">{rxChoices.length ? "Choose prescription line…" : "No signed prescription line left"}</option>}
+                        {(context.prescribedItems ?? []).filter((p) => p.remainingQty > 0 || p.prescriptionItemId === i.prescriptionItemId).map((p) => (
+                          <option key={p.prescriptionItemId} value={p.prescriptionItemId}>Rx: {p.drugName}{p.dosage ? ` ${p.dosage}` : ""} · {p.remainingQty} left</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
                   <td>
                     <span className={styles.qtyStepper}>
                       <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity - 1)}>−</button>
@@ -380,7 +361,24 @@ export default function CheckoutPage() {
                       <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity + 1)}>+</button>
                     </span>
                   </td>
-                  <td>{formatMoney(i.unitPrice, context.currency)}</td>
+                  <td>
+                    {formatMoney(i.unitPrice, context.currency)}
+                    {i.override && <div className={styles.muted}>Override: {reasonLabel(i.override.reasonCode)}</div>}
+                    {canDiscount && editing !== i.chargeCode && (
+                      <button type="button" className={styles.removeBtn} onClick={() => { setEditing(i.chargeCode); setOvPrice(String(i.unitPrice)); setOvReason(i.override?.reasonCode ?? ""); }}>Override price</button>
+                    )}
+                    {canDiscount && editing === i.chargeCode && (
+                      <div>
+                        <input aria-label="Override unit price" className={styles.discountInput} type="number" step="0.01" min="0" value={ovPrice} onChange={(e) => setOvPrice(e.target.value)} />
+                        <select aria-label="Override reason" className={styles.discountInput} value={ovReason} onChange={(e) => setOvReason(e.target.value)}>
+                          <option value="">Reason…</option>
+                          {PRICE_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                        </select>
+                        <button type="button" className={styles.removeBtn} disabled={!ovReason || ovPrice === ""} onClick={() => applyOverride(i.chargeCode)}>Apply</button>
+                        <button type="button" className={styles.removeBtn} onClick={() => setEditing(null)}>Cancel</button>
+                      </div>
+                    )}
+                  </td>
                   <td>{i.taxRatePercent}%</td>
                   <td>{formatMoney(i.unitPrice * i.quantity, context.currency)}</td>
                   <td><button type="button" className={styles.removeBtn} onClick={() => setQty(i.chargeCode, 0)}>Remove</button></td>
@@ -397,7 +395,16 @@ export default function CheckoutPage() {
           {canDiscount && (
             <div className={styles.totalsRow}>
               <span>Discount</span>
-              <input className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+              <input aria-label="Discount amount" className={styles.discountInput} type="number" step="0.01" min="0" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            </div>
+          )}
+          {canDiscount && Number(discount) > 0 && (
+            <div className={styles.totalsRow}>
+              <span>Discount reason</span>
+              <select aria-label="Discount reason" className={styles.discountInput} value={discountReason} onChange={(e) => setDiscountReason(e.target.value)}>
+                <option value="">Reason…</option>
+                {PRICE_REASONS.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+              </select>
             </div>
           )}
           <div className={styles.totalsRow}><span>Tax</span><span>{formatMoney(tax, context.currency)}</span></div>
@@ -405,7 +412,10 @@ export default function CheckoutPage() {
           <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
         </div>
         <p className={styles.muted}>The total is computed from line items and can never be typed over.</p>
-        {createError && <div className={styles.errorState}>{createError}</div>}
+        {waitingForRx.length > 0 && (
+          <div className={styles.errorState} data-testid="rx-wait">Link every Rx item to a line of the signed prescription before checkout.</div>
+        )}
+        {createError && <div className={styles.errorState} role="alert">{createError}</div>}
         {canPay && !invoice && (
           <>
             <TenderRows rows={tenders} onChange={setTenders} region={region} balanceMinor={previewTotal * 100} disabled={creating || recording} />
@@ -423,7 +433,7 @@ export default function CheckoutPage() {
         <span>Total <b>{formatMoney(previewTotal, context.currency)}</b></span>
         {canPay && !invoice && <span>Balance due <b data-testid="balance-due">{formatMoney(Math.max(0, previewTotal * 100 - tenderedMinor) / 100, context.currency)}</b></span>}
       </div>
-      <button className={styles.collectBtn} onClick={invoice ? submitCheckout : collect} disabled={creating || recording || (!invoice && items.length === 0)}>
+      <button className={styles.collectBtn} onClick={invoice ? submitCheckout : collect} disabled={creating || recording || (!invoice && items.length === 0) || waitingForRx.length > 0}>
         {creating || recording ? "Working…" : invoice ? "Add to invoice" : canPay && tenderedMinor > 0 ? `Collect ${formatMoney(tenderedMinor / 100, context.currency)}` : "Checkout"}
       </button>
     </div>
@@ -450,7 +460,7 @@ export default function CheckoutPage() {
       {context.prescribedItems.length > 0 && (
         <div className={styles.banner}>
           Prescription ready: {context.prescribedItems.length} {context.prescribedItems.length === 1 ? "item" : "items"}
-          <span className={styles.bannerSub}>No separate dispense screen — add matching Pharmacy charges below if in stock.</span>
+          <span className={styles.bannerSub}>No separate dispense screen — add matching Pharmacy charges below if in stock. Rx items link to these lines.</span>
         </div>
       )}
 
@@ -465,7 +475,12 @@ export default function CheckoutPage() {
                   <tr key={li.chargeCode}>
                     <td>{li.chargeName}<div className={styles.muted}>{li.category}</div></td>
                     <td>{li.quantity}</td>
-                    <td>{formatMoney(li.unitPrice, invoice.currency)}</td>
+                    <td>
+                      {formatMoney(li.unitPrice, invoice.currency)}
+                      {li.overrideReason && li.listUnitPrice != null && (
+                        <div className={styles.muted}>List {formatMoney(li.listUnitPrice, invoice.currency)} · {reasonLabel(li.overrideReason)}</div>
+                      )}
+                    </td>
                     <td>{li.taxRatePercent}</td>
                     <td>{formatMoney(li.lineTotal ?? li.unitPrice * li.quantity, invoice.currency)}</td>
                   </tr>

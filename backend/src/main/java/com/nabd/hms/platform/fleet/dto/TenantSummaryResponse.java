@@ -12,6 +12,10 @@ public record TenantSummaryResponse(
         String brandName,
         String ownerName,
         String ownerEmail,
-        Instant createdAt
+        Instant createdAt,
+        // PLT-005: privileged identities (Owner role, mfa_required, approve/refundDiscount) and how many have MFA; target 100%
+        int privilegedUsers,
+        int privilegedMfaEnrolled,
+        Integer privilegedMfaPercent // null when the clinic has no privileged users yet
 ) {
 }

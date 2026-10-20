@@ -40,11 +40,12 @@ public class AppointmentController {
                                  @RequestParam(required = false) UUID doctorId,
                                  @RequestParam(required = false) UUID patientId,
                                  @RequestParam(required = false) LocalDate date,
-                                 @RequestParam(defaultValue = "20") int limit,
+                                 @RequestParam(required = false) Integer limit,
                                  @RequestParam(required = false) String cursor) {
-        return service.list(tenantId(jwt), doctorId, patientId, date, limit, cursor);
+        return service.list(tenantId(jwt), doctorId, patientId, date, com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping
     @PreAuthorize("hasAuthority('queue:create')")
     public ResponseEntity<AppointmentResponse> book(@AuthenticationPrincipal Jwt jwt,

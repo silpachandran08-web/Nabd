@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -29,21 +30,33 @@ public class ClinicClock {
     private static final ZoneId UTC = ZoneId.of("UTC"); // id "UTC", not "Z" — it is passed to SQL AT TIME ZONE
 
     private final JdbcTemplate jdbc;
+    private final Clock clock;
 
-    ClinicClock(JdbcTemplate jdbc) {
+    ClinicClock(JdbcTemplate jdbc, Clock clock) {
         this.jdbc = jdbc;
+        this.clock = clock;
+    }
+
+    /** The current instant from the injected Clock (PLT-028), so tests can freeze it. */
+    public Instant now() {
+        return clock.instant();
     }
 
     /** tenants carries no RLS (V6), so this works before or after TenantContext.set. */
     public ZoneId zone(UUID tenantId) {
         // ponytail: one PK lookup per call; cache per request if it ever shows in a profile.
-        String tz = jdbc.query("SELECT timezone FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId)
-                .stream().findFirst().orElse(null);
-        return parse(tz, tenantId);
+        // a list of String[] because a null timezone in a List<String> made findFirst() throw (500 on /schedule/day)
+        String[] row = jdbc.query("SELECT timezone, region FROM tenants WHERE id = ?",
+                (rs, i) -> new String[] {rs.getString(1), rs.getString(2)}, tenantId).stream().findFirst().orElse(new String[2]);
+        return resolve(row[0], row[1], tenantId);
     }
 
     public LocalDate today(UUID tenantId) {
-        return LocalDate.now(zone(tenantId));
+        return today(zone(tenantId));
+    }
+
+    public LocalDate today(ZoneId zone) {
+        return LocalDate.now(clock.withZone(zone));
     }
 
     /** The instant a clinic day starts — the lower bound of a "that day" timestamptz range. */
@@ -64,23 +77,29 @@ public class ClinicClock {
         }
     }
 
-    /** IANA zone for a new clinic's region; existing clinics keep whatever is stored. */
+    /** IANA zone for a region; same map as the UI's REGION_DEFAULT_TZ (frontend/app/lib/clinicTime.ts). */
     public static String defaultZoneFor(String region) {
         return switch (region == null ? "" : region) {
             case "IN" -> "Asia/Kolkata";
-            case "KSA" -> "Asia/Riyadh";
+            case "KSA", "SA" -> "Asia/Riyadh";
+            case "AE" -> "Asia/Dubai";
+            case "QA" -> "Asia/Qatar";
             default -> "UTC";
         };
     }
 
-    /** Legacy rows predate validation, so a bad value degrades to UTC (today's behaviour) rather than failing requests. */
-    private static ZoneId parse(String tz, UUID tenantId) {
+    /**
+     * No timezone stored: the region default, as the UI does (FEF-011), so both agree on the clinic day.
+     * Legacy rows predate validation, so a bad value degrades to UTC (today's behaviour) rather than failing requests.
+     */
+    static ZoneId resolve(String tz, String region, UUID tenantId) {
         if (isValidZone(tz)) {
             return ZoneId.of(tz);
         }
-        if (tz != null && !tz.isBlank()) {
-            log.warn("tenant {} has unusable timezone '{}', using UTC", tenantId, tz);
+        if (tz == null || tz.isBlank()) {
+            return ZoneId.of(defaultZoneFor(region));
         }
+        log.warn("tenant {} has unusable timezone '{}', using UTC", tenantId, tz);
         return UTC;
     }
 }

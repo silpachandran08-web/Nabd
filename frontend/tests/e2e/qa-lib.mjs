@@ -1,5 +1,6 @@
 // Shared E2E helpers: browser launch, session seeding, API mocking with request log. Set APP (base URL) and SHOTS (screenshot dir) via env.
-import { chromium } from '/home/claude/ws/qa/node_modules/playwright/index.mjs';
+// FEF-049: CI overrides the Playwright module and browser (PLAYWRIGHT_MODULE, PW_CHROMIUM=''); defaults are the sandbox paths.
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? '/home/claude/ws/qa/node_modules/playwright/index.mjs');
 export const APP = process.env.APP ?? 'http://localhost:3000';
 export const API = 'http://localhost:8080/v1';
 export const SHOTS = process.env.SHOTS ?? '/tmp/e2e-shots';
@@ -14,7 +15,7 @@ export function clinicToken(permissions, extra = {}) {
 }
 
 export async function launch(opts = {}) {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const browser = await chromium.launch({ executablePath: (process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium') || undefined });
   const context = await browser.newContext({ viewport: opts.viewport ?? { width: 1280, height: 900 }, timezoneId: opts.timezoneId ?? 'Asia/Riyadh' });
   const page = await context.newPage();
   const log = { requests: [], console: [], pageErrors: [], unmatched: [] };
@@ -33,6 +34,7 @@ export async function seedPlatform(page, access = 'pa1', refresh = 'pr1') {
 
 export const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS', 'access-control-expose-headers': '*' };
 const wrap = (route) => ({ fulfill: (o) => route.fulfill({ ...o, headers: { ...CORS, ...(o.headers || {}) } }), abort: (e) => route.abort(e), request: () => route.request() });
+const ZONE_PATH = /^\/setup\/profile$|^\/schedule\/day$/;
 /** handlers: array of [method, RegExp on path+query (after /v1), fn(route, req, match) | {status, body, delay}] */
 export async function mockApi(page, log, handlers) {
   await page.route(/^(http:\/\/localhost:8080|https:\/\/nabd-f0zb\.onrender\.com)\/v1\//, async (route) => {
@@ -46,11 +48,17 @@ export async function mockApi(page, log, handlers) {
       if (method !== '*' && method !== req.method()) continue;
       const m = path.match(re);
       if (!m) continue;
+      // FEF-011: a 2xx catch-all ("anything else: []") is not a clinic-zone answer; give shell boot the configured-zone default.
+      if ((re.source === '.' || re.source === '.*') && typeof h === 'object' && !h.abort && (h.status ?? 200) < 400 && req.method() === 'GET' && ZONE_PATH.test(path)) break;
       if (typeof h === 'function') return h(wrap(route), req, m);
       if (h.abort) return route.abort('failed');
       if (h.delay) await new Promise((r) => setTimeout(r, h.delay));
       return route.fulfill({ headers: CORS, status: h.status ?? 200, contentType: h.status >= 400 ? 'application/problem+json' : 'application/json', body: h.body === undefined ? '' : JSON.stringify(h.body) });
     }
+    // FEF-005 idle lock reads the clinic idle policy on every page; default to "no policy row" unless a script mocks it.
+    if (req.method() === 'GET' && /^\/setup\/policies/.test(path)) return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: '[]' });
+    // FEF-011 shell boot loads the clinic zone (/setup/profile, or the bare /schedule/day on 403); default to the token's IN clinic.
+    if (req.method() === 'GET' && ZONE_PATH.test(path)) return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: JSON.stringify({ timezone: 'Asia/Kolkata', region: 'IN' }) });
     log.unmatched.push(`${req.method()} ${path}`);
     return route.fulfill({ headers: CORS, status: 404, contentType: 'application/problem+json', body: JSON.stringify({ type: 'not-found', title: 'Not found', detail: 'The requested resource was not found.' }) });
   });

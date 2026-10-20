@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../checkout.module.css";
 import { formatMoney } from "../../lib/money";
@@ -10,23 +10,13 @@ import { PAYMENT_METHODS, paymentMethodLabel } from "../../components/checkout/p
 import AccessGate from "../../components/ui/AccessGate";
 import BillingStatePill from "../../components/ui/BillingStatePill";
 import StockPill, { stockErrorMessage } from "../../components/ui/StockPill";
-import { apiFetch, goLogin } from "../../lib/apiClient";
+import StatusPill from "../../components/ui/StatusPill";
+import RxLinkPicker from "../../components/checkout/RxLinkPicker";
+import { rxErrorMessage, unlinkedRx } from "../../components/checkout/rxLink";
+import { api, ApiError, errorText, intentKeys } from "../../lib/api";
+import type { Charge, Invoice, LineItem, OtcContext, RxLine } from "../../../packages/api-client/types.ts";
 
-// NB-186: a counter sale — no patient record, no queue token. Matches GET/POST
-// /v1/billing/otc-charges and /v1/billing/otc-checkout (CheckoutController).
-type Charge = { id: string; code: string; name: string; category: string; baseAmount: number; followUpAmount: number | null; taxRatePercent: number; stockQty?: number | null };
-type OtcContext = { currency: string; charges: Charge[] };
-type LineItem = { chargeCode: string; chargeName: string; category: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal?: number };
-type Payment = { id: string; method: string; amount: number; recordedAt: string };
-type Invoice = {
-  id: string; invoiceNumber: string; patientName: string; currency: string;
-  subtotal: number; discount: number; tax: number; roundOff: number; total: number; paid: number;
-  balanceDue: number; status: string; lineItems: LineItem[]; payments: Payment[];
-};
-type Problem = { type?: string; title: string; detail: string };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
+// NB-186: a counter sale — no patient record, no queue token (GET /billing/otc-charges, POST /billing/otc-checkout).
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -61,60 +51,30 @@ function OtcCheckoutInner() {
   const [discount, setDiscount] = useState("0");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [linking, setLinking] = useState<string | null>(null); // PHL-001: chargeCode whose prescription picker is open
+  const [links, setLinks] = useState<Record<string, RxLine>>({}); // chargeCode -> the signed line it is billed against
 
   const [method, setMethod] = useState("cash");
   const [amount, setAmount] = useState("");
   const [recording, setRecording] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  const keys = useRef(intentKeys()); // Idempotency-Key per user intent: reused when the same sale/payment is re-sent
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await authedFetch("/billing/otc-charges");
-      if (!res) return;
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (res.status === 409) {
-        // PHA-010: 409 otc-not-available (pharmacy mode is external) - show the server detail.
-        const p: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
-        setError(p.detail || "Counter sales aren't available for this pharmacy mode.");
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load charges. Try again.");
-        return;
-      }
-      setContext(await res.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setContext(await api.get<OtcContext>("/billing/otc-charges"));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      // PHA-010: 409 otc-not-available (pharmacy mode is external) - show the server detail.
+      else if (e instanceof ApiError && e.status === 409) setError(e.detail || "Counter sales aren't available for this pharmacy mode.");
+      else setError(e instanceof ApiError ? "Couldn't load charges. Try again." : "Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -129,6 +89,13 @@ function OtcCheckoutInner() {
       }
       return [...prev, { chargeCode: charge.code, chargeName: charge.name, category: charge.category, quantity: 1, unitPrice: charge.baseAmount, taxRatePercent: charge.taxRatePercent }];
     });
+    if (charge.isRx && !links[charge.code]) setLinking(charge.code); // PHL-001: adding an Rx item opens the picker
+  }
+
+  function link(code: string, line: RxLine) {
+    setLinks((prev) => ({ ...prev, [code]: line }));
+    setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, prescriptionItemId: line.prescriptionItemId } : i)));
+    setLinking(null);
   }
 
   function setQty(code: string, qty: number) {
@@ -136,6 +103,8 @@ function OtcCheckoutInner() {
     if (stock != null && qty > stock) return; // PHA-011: cap at stock
     if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.chargeCode !== code));
+      setLinks((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== code)));
+      if (linking === code) setLinking(null);
       return;
     }
     setItems((prev) => prev.map((i) => (i.chargeCode === code ? { ...i, quantity: qty } : i)));
@@ -147,6 +116,7 @@ function OtcCheckoutInner() {
   const rawTotal = subtotal - discountNum + tax;
   const previewTotal = Math.round(rawTotal);
   const roundOff = round2(previewTotal - rawTotal);
+  const waitingForRx = unlinkedRx(items, context?.charges ?? []);
 
   async function submitCheckout() {
     setCreateError(null);
@@ -156,20 +126,15 @@ function OtcCheckoutInner() {
     }
     setCreating(true);
     try {
-      const res = await authedFetch("/billing/otc-checkout", {
-        method: "POST",
-        body: JSON.stringify({
-          lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent })),
-          ...(canDiscount ? { discount: discountNum } : {}),
-        }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't generate the invoice." }));
-        setCreateError(stockErrorMessage(p, "Couldn't generate the invoice."));
-        return;
-      }
-      setInvoice(await res.json());
+      const body = {
+        lineItems: items.map((i) => ({ chargeCode: i.chargeCode, chargeName: i.chargeName, category: i.category, quantity: i.quantity, unitPrice: i.unitPrice, taxRatePercent: i.taxRatePercent,
+          ...(i.prescriptionItemId ? { prescriptionItemId: i.prescriptionItemId } : {}) })),
+        ...(canDiscount ? { discount: discountNum } : {}),
+      };
+      setInvoice(await api.post<Invoice>("/billing/otc-checkout", body, { idempotencyKey: keys.current.get("sale", body) }));
+      keys.current.done("sale");
+    } catch (e) {
+      setCreateError(e instanceof ApiError ? rxErrorMessage(e.problem) ?? stockErrorMessage(e.problem, "Couldn't generate the invoice.") : errorText(e, ""));
     } finally {
       setCreating(false);
     }
@@ -185,18 +150,12 @@ function OtcCheckoutInner() {
     }
     setRecording(true);
     try {
-      const res = await authedFetch(`/billing/invoices/${invoice.id}/payments`, {
-        method: "POST",
-        body: JSON.stringify({ method, amount: amt }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't record payment." }));
-        setPaymentError(p.detail || "Couldn't record payment.");
-        return;
-      }
-      setInvoice(await res.json());
+      const body = { method, amount: amt };
+      setInvoice(await api.post<Invoice>(`/billing/invoices/${invoice.id}/payments`, body, { idempotencyKey: keys.current.get(`pay:${invoice.id}`, body) }));
+      keys.current.done(`pay:${invoice.id}`);
       setAmount("");
+    } catch (e) {
+      setPaymentError(e instanceof ApiError ? e.detail || "Couldn't record payment." : errorText(e, ""));
     } finally {
       setRecording(false);
     }
@@ -296,7 +255,7 @@ function OtcCheckoutInner() {
             {visibleCharges.map((c) => {
               const body = (
                 <>
-                  <span className={styles.chargeName}>{c.name} <StockPill qty={c.stockQty} /></span>
+                  <span className={styles.chargeName}>{c.name} {c.isRx && <StatusPill tone="danger" icon="alert" label="Rx" />} <StockPill qty={c.stockQty} /></span>
                   <span className={styles.chargePrice}>{formatMoney(c.baseAmount, context.currency)}</span>
                 </>
               );
@@ -317,7 +276,20 @@ function OtcCheckoutInner() {
                 <tbody>
                   {items.map((i) => (
                     <tr key={i.chargeCode}>
-                      <td>{i.chargeName}<div className={styles.muted}>{i.category}</div></td>
+                      <td>
+                        {i.chargeName}<div className={styles.muted}>{i.category}</div>
+                        {links[i.chargeCode] && (
+                          <div className={styles.muted} data-testid={`rx-linked-${i.chargeCode}`}>
+                            Rx: {links[i.chargeCode].drugName} · {links[i.chargeCode].patientName} · {links[i.chargeCode].remainingQty} left
+                          </div>
+                        )}
+                        {waitingForRx.includes(i.chargeCode) && linking !== i.chargeCode && (
+                          <button type="button" className={styles.rxLinkBtn} onClick={() => setLinking(i.chargeCode)}>Link prescription</button>
+                        )}
+                        {linking === i.chargeCode && (
+                          <RxLinkPicker itemName={i.chargeName} onPick={(l) => link(i.chargeCode, l)} onCancel={() => setLinking(null)} />
+                        )}
+                      </td>
                       <td>
                         <span className={styles.qtyStepper}>
                           <button type="button" className={styles.stepBtn} onClick={() => setQty(i.chargeCode, i.quantity - 1)}>−</button>
@@ -350,9 +322,12 @@ function OtcCheckoutInner() {
               <div className={styles.totalsRowMain}><span>Total</span><span>{formatMoney(previewTotal, context.currency)}</span></div>
             </div>
             <p className={styles.muted}>No patient record or queue token is created for a counter sale.</p>
-            {createError && <div className={styles.errorState}>{createError}</div>}
+            {waitingForRx.length > 0 && (
+              <div className={styles.errorState} data-testid="rx-wait">Link a signed prescription to every Rx item before checkout.</div>
+            )}
+            {createError && <div className={styles.errorState} role="alert">{createError}</div>}
             {canCheckout && (
-              <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0}>
+              <button className={styles.checkoutBtn} onClick={submitCheckout} disabled={creating || items.length === 0 || waitingForRx.length > 0}>
                 {creating ? "Generating…" : "Checkout"}
               </button>
             )}

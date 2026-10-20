@@ -32,8 +32,9 @@ public class EncounterListService {
     }
 
     @Transactional
-    public EncounterListPage list(UUID tenantId, UUID doctorId, String state, LocalDate from, LocalDate to,
+    public EncounterListPage list(ReadScope scope, String state, LocalDate from, LocalDate to,
                                   int limit, String cursor) {
+        UUID tenantId = scope.tenantId();
         if (state != null && !STATES.contains(state)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-state", "Invalid state",
                     "state must be one of none, draft, signed, unsigned.");
@@ -45,7 +46,7 @@ public class EncounterListService {
         int size = Math.max(1, Math.min(limit, MAX_LIMIT));
         tenantContext.set(tenantId);
         Cursor after = cursor == null ? null : Cursor.decode(cursor);
-        List<EncounterListItem> rows = repo.find(tenantId, doctorId, state, from, to, size + 1,
+        List<EncounterListItem> rows = repo.find(scope, state, from, to, size + 1,
                 after == null ? null : after.createdAt(), after == null ? null : after.id());
         boolean hasMore = rows.size() > size;
         List<EncounterListItem> page = hasMore ? rows.subList(0, size) : rows;

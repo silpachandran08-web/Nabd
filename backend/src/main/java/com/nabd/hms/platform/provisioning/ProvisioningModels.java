@@ -1,5 +1,7 @@
 package com.nabd.hms.platform.provisioning;
 
+import java.util.List;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -27,7 +29,12 @@ final class ProvisioningModels {
      * separate invites now exist for the same real-world owner: the per-tenant staff row (accept at
      * /accept-invite) and the top-level Owner account PIN (accept at /owner/accept-invite) that lets
      * the same person log into every clinic they own from one place (NB-350). */
-    record StepResult(String staffInviteToken, String ownerAccountInviteToken) {
-        static final StepResult NONE = new StepResult(null, null);
+    record StepResult(String staffInviteToken, String ownerAccountInviteToken, List<Email> emails) {
+        static final StepResult NONE = new StepResult(null, null, List.of());
+    }
+
+    /** OPS-012: an email a step wants sent. The step only returns it; ProvisioningService sends it after the step's
+     * transaction committed, so a slow or blocked SMTP server never holds a DB connection. */
+    record Email(String to, String subject, String body, String what) {
     }
 }

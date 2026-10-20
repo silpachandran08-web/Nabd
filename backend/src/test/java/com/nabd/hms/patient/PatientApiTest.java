@@ -1,8 +1,10 @@
 package com.nabd.hms.patient;
 
 import com.nabd.hms.common.ModuleGrant;
+import com.nabd.hms.patient.registry.RegistryReconciler;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -17,6 +19,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PatientApiTest extends ApiTestBase {
+
+    @Autowired RegistryReconciler reconciler;
 
     @Test
     void registerAdultPatientSucceeds() {
@@ -278,6 +282,7 @@ class PatientApiTest extends ApiTestBase {
                 "patientId", patientId, "doctorId", doc.id().toString())), Map.class);
 
         Map<String, Object> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody();
+        reconciler.reconcileTenant(tenant.id()); // OPS-008: registry reads the summary read model
         Map<String, Object> registryRow = ((List<Map<String, Object>>) exchange("/v1/patients/registry", HttpMethod.GET,
                 authed(token), Map.class).getBody().get("rows")).stream()
                 .filter(r -> patientId.equals(r.get("id"))).findFirst().orElseThrow();
@@ -302,9 +307,13 @@ class PatientApiTest extends ApiTestBase {
         ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "patientId", patientId, "doctorId", doc.id().toString())), Map.class);
         String queueEntryId = (String) checkIn.getBody().get("id");
-        for (String next : new String[]{"waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending", "completed"}) {
+        for (String next : new String[]{"waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending"}) {
             exchange("/v1/queue/" + queueEntryId + "/status", HttpMethod.PATCH, authedJsonBody(token, Map.of("status", next)), Map.class);
         }
+        // ACC-002: 'completed' is reached only through checkout, never a PATCH
+        exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
+                        "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         ResponseEntity<Map> visited = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class);
         assertThat(visited.getBody().get("lastVisitAt")).isNotNull();
@@ -525,7 +534,7 @@ class PatientApiTest extends ApiTestBase {
                 "SELECT national_id_enc FROM patients WHERE id = ?", byte[].class, patientId));
         assertThat(address).isEqualTo("12 Test Street");
         assertThat(nationalIdEnc).isNotNull();
-        assertThat(new String(cipher.decrypt(nationalIdEnc), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("123456789012");
+        assertThat(new String(cipher.decrypt(nationalIdEnc, com.nabd.hms.common.FieldCipher.Aad.of(tenant.id(), "patients", "national_id_enc", patientId)), java.nio.charset.StandardCharsets.UTF_8)).isEqualTo("123456789012");
         assertThat(exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody().get("guardianId")).isNull();
     }
 
@@ -549,7 +558,7 @@ class PatientApiTest extends ApiTestBase {
                 "SELECT address, national_id_enc, guardian_id FROM patients WHERE id = ?", patientId));
         assertThat(row.get("guardian_id")).isNull();
         assertThat(row.get("address")).isEqualTo("34 Test Lane");
-        assertThat(new String(cipher.decrypt((byte[]) row.get("national_id_enc")), java.nio.charset.StandardCharsets.UTF_8))
+        assertThat(new String(cipher.decrypt((byte[]) row.get("national_id_enc"), com.nabd.hms.common.FieldCipher.Aad.of(tenant.id(), "patients", "national_id_enc", patientId)), java.nio.charset.StandardCharsets.UTF_8))
                 .isEqualTo("555566667777");
         // append-only consents: the grant row stays, a later withdrawn row supersedes it; the API view must show no guardian
         Map<?, ?> detail = exchange("/v1/patients/" + patientId, HttpMethod.GET, authed(token), Map.class).getBody();

@@ -1,12 +1,15 @@
 package com.nabd.hms.platform;
 
+import com.nabd.hms.auth.MfaPolicy;
 import com.nabd.hms.auth.TotpService;
 import com.nabd.hms.auth.dto.MfaChallengeResponse;
+import com.nabd.hms.auth.dto.MfaEnrollResponse;
+import com.nabd.hms.auth.dto.MfaSetupRequiredResponse;
 import com.nabd.hms.auth.dto.MfaVerifyRequest;
 import com.nabd.hms.auth.dto.RefreshRequest;
 import com.nabd.hms.auth.dto.SessionResponse;
 import com.nabd.hms.auth.dto.TokenPairResponse;
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.OpaqueTokens;
@@ -29,6 +32,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -55,16 +59,21 @@ public class PlatformAuthService {
     private final PlatformAuthRepository repo;
     private final PasswordEncoder pinEncoder;
     private final TotpService totpService;
-    private final AesGcmCipher cipher;
+    private final FieldCipher cipher;
     private final JwtEncoder jwtEncoder;
     private final ChallengeTokenDecoder jwtDecoder;
     private final AuthProperties props;
     private final PlatformAudit audit;
     private final AuditService auditService;
+    private final MfaPolicy mfaPolicy;
+
+    private final Clock clock;
 
     PlatformAuthService(PlatformAuthRepository repo, PasswordEncoder pinEncoder, TotpService totpService,
-                         AesGcmCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder, AuthProperties props,
-                         PlatformAudit audit, AuditService auditService) {
+                         FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder, AuthProperties props,
+                         PlatformAudit audit, AuditService auditService, MfaPolicy mfaPolicy, Clock clock) {
+        this.clock = clock;
+        this.mfaPolicy = mfaPolicy;
         this.audit = audit;
         this.auditService = auditService;
         this.repo = repo;
@@ -112,6 +121,10 @@ public class PlatformAuthService {
             audit.record(null, operator.id(), ip, "platform_auth.mfa_challenged", "operator", operator.id(), null);
             return issueMfaChallenge(operator);
         }
+        if (mfaPolicy.requiredForOperator()) { // PLT-005: every operator role, super_admin included
+            audit.record(null, operator.id(), ip, "platform_auth.mfa_setup_required", "operator", operator.id(), null);
+            return issueMfaSetup(operator);
+        }
         audit.record(null, operator.id(), ip, "platform_auth.signed_in", "operator", operator.id(), Map.of("mfa", false));
         return mintTokenPair(operator, UUID.randomUUID(), ip, device, userAgent);
     }
@@ -139,8 +152,9 @@ public class PlatformAuthService {
             throw mfaFailed();
         }
         enforceAccountLockout(operator);
-        byte[] secret = cipher.decrypt(operator.mfaSecretEnc());
-        long step = totpService.matchStep(secret, req.code(), Instant.now());
+        byte[] secret = cipher.tryDecrypt(operator.mfaSecretEnc(),
+                FieldCipher.Aad.of("platform", "master.operators", "mfa_secret", operator.id())).orElseThrow(this::mfaFailed);
+        long step = totpService.matchStep(secret, req.code(), Instant.now(clock));
         if (step < 0 || !repo.claimTotpStep(operator.id(), step)) { // claim = replay guard
             repo.recordLoginAttempt(operator.id(), operator.email(), ip, false);
             log.warn("MFA verification failed for operator {}", operator.id());
@@ -151,6 +165,63 @@ public class PlatformAuthService {
         log.info("operator {} completed MFA", operator.id());
         audit.record(null, operator.id(), ip, "platform_auth.signed_in", "operator", operator.id(), Map.of("mfa", true));
         return mintTokenPair(operator, UUID.randomUUID(), ip, device, userAgent);
+    }
+
+    /** PLT-005: forced enrolment, step 1 — only a platform mfa_setup token from login reaches it. */
+    @Transactional
+    public MfaEnrollResponse enrollMfa(String setupToken, String ip) {
+        Operator operator = repo.findById(requireSetupToken(setupToken)).orElseThrow(this::setupNotAllowed);
+        byte[] secret = totpService.generateSecret();
+        repo.setPendingMfaSecret(operator.id(), cipher.encrypt(secret, FieldCipher.Aad.of("platform", "master.operators", "mfa_secret", operator.id())));
+        audit.record(null, operator.id(), ip, "platform_auth.mfa_enrollment_started", "operator", operator.id(), null);
+        return new MfaEnrollResponse(totpService.toBase32(secret), totpService.otpauthUri(secret, "Nabd Platform", operator.email()));
+    }
+
+    /** PLT-005: forced enrolment, step 2 — a code from the new secret switches MFA on; the operator then signs in again. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public void confirmMfa(String setupToken, String code, String ip) {
+        Operator operator = repo.findById(requireSetupToken(setupToken)).orElseThrow(this::setupNotAllowed);
+        enforceAccountLockout(operator);
+        byte[] pending = repo.findPendingMfaSecret(operator.id()).orElseThrow(this::mfaFailed);
+        long step = totpService.matchStep(cipher.decrypt(pending, FieldCipher.Aad.of("platform", "master.operators", "mfa_secret", operator.id())), code, Instant.now(clock));
+        if (step < 0 || !repo.claimTotpStep(operator.id(), step)) {
+            repo.recordLoginAttempt(operator.id(), operator.email(), ip, false);
+            audit.record(null, operator.id(), ip, "platform_auth.mfa_failed", "operator", operator.id(), null);
+            throw mfaFailed();
+        }
+        repo.confirmPendingMfa(operator.id());
+        repo.recordLoginAttempt(operator.id(), operator.email(), ip, true);
+        audit.record(null, operator.id(), ip, "platform_auth.mfa_enrolled", "operator", operator.id(), null);
+    }
+
+    private UUID requireSetupToken(String setupToken) {
+        try {
+            Jwt jwt = jwtDecoder.decode(setupToken == null ? "" : setupToken, TokenType.MFA_SETUP);
+            if (!"platform_mfa_setup".equals(jwt.getClaimAsString("purpose"))) {
+                throw setupNotAllowed();
+            }
+            return UUID.fromString(jwt.getSubject());
+        } catch (JwtException | IllegalArgumentException e) {
+            throw setupNotAllowed();
+        }
+    }
+
+    private ApiException setupNotAllowed() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "token-type-not-allowed", "Token type not allowed",
+                "This action needs the MFA setup token from sign-in.");
+    }
+
+    private MfaSetupRequiredResponse issueMfaSetup(Operator operator) {
+        Instant now = Instant.now(clock);
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
+                .issuer(ISSUER)
+                .issuedAt(now)
+                .expiresAt(now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES))
+                .subject(operator.id().toString())
+                .claim("purpose", "platform_mfa_setup");
+        TokenType.MFA_SETUP.stamp(claimsB, Audience.PLATFORM_MFA);
+        String token = jwtEncoder.encode(JwtEncoderParameters.from(claimsB.build())).getTokenValue();
+        return new MfaSetupRequiredResponse(token, props.mfaChallengeTtlMinutes() * 60L);
     }
 
     // noRollbackFor: reuse detection's revokeFamily() write must survive the ApiException thrown
@@ -168,12 +239,16 @@ public class PlatformAuthService {
                     session.familyId(), null);
             throw invalidRefresh();
         }
-        if (session.expiresAt().isBefore(Instant.now())) {
+        if (session.expiresAt().isBefore(Instant.now(clock))) {
             throw invalidRefresh();
         }
 
         Operator operator = repo.findById(session.operatorId()).orElseThrow(this::invalidRefresh);
         if (!"active".equals(operator.status())) {
+            throw invalidRefresh();
+        }
+        if (!operator.mfaEnabled() && mfaPolicy.requiredForOperator()) { // PLT-005: checked at every mint
+            repo.revokeFamily(session.familyId(), "admin_revoke");
             throw invalidRefresh();
         }
 
@@ -215,7 +290,7 @@ public class PlatformAuthService {
     // ---- internals ----
 
     private void enforceIpRateLimit(String ip) {
-        int recent = repo.countAttemptsFromIpSince(ip, Instant.now().minus(1, ChronoUnit.MINUTES));
+        int recent = repo.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
         if (recent >= props.rateLimitPerIpPerMinute()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate-limited", "Too many attempts", "Try again shortly.");
         }
@@ -230,7 +305,7 @@ public class PlatformAuthService {
         }
         Instant lastFailedAt = repo.lastFailedAttemptAt(operator.id()).orElse(Instant.EPOCH);
         Instant lockedUntil = lastFailedAt.plus(backoffDuration(failures));
-        if (Instant.now().isBefore(lockedUntil)) {
+        if (Instant.now(clock).isBefore(lockedUntil)) {
             log.warn("account locked: operator {} has {} failed attempts, locked until {}", operator.id(), failures, lockedUntil);
             throw accountLocked();
         }
@@ -243,7 +318,7 @@ public class PlatformAuthService {
     }
 
     private MfaChallengeResponse issueMfaChallenge(Operator operator) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -259,7 +334,7 @@ public class PlatformAuthService {
 
     private TokenPairResponse mintTokenPair(Operator operator, UUID familyId, String ip, String device, String userAgent) {
         UUID sessionId = UUID.randomUUID();
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant accessExp = now.plus(props.accessTokenTtlMinutes(), ChronoUnit.MINUTES);
 
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
@@ -279,7 +354,8 @@ public class PlatformAuthService {
         repo.insertSession(sessionId, operator.id(), familyId,
                 OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent);
 
-        return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds());
+        return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds(),
+                Duration.between(now, refreshExp).toSeconds());
     }
 
     private ApiException invalidCredentials() {

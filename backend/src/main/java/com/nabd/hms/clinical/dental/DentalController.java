@@ -1,5 +1,7 @@
 package com.nabd.hms.clinical.dental;
 
+import com.nabd.hms.clinical.ClinicalReadScope;
+import com.nabd.hms.clinical.ReadScope;
 import com.nabd.hms.clinical.dental.dto.SupernumeraryToothRequest;
 import com.nabd.hms.clinical.dental.dto.ToothHistoryEntryResponse;
 import com.nabd.hms.clinical.dental.dto.ToothResponse;
@@ -29,15 +31,21 @@ import java.util.UUID;
 public class DentalController {
 
     private final DentalService service;
+    private final ClinicalReadScope scopes;
 
-    DentalController(DentalService service) {
+    DentalController(DentalService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("dental_chart")
     @GetMapping
     @PreAuthorize("hasAuthority('specialty_dental:view')")
     public List<ToothResponse> chart(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.chart(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.chart(scope.tenantId(), patientId);
     }
 
     @PatchMapping("/{toothNumber}")
@@ -74,11 +82,15 @@ public class DentalController {
         service.removeSupernumerary(tenantId(jwt), patientId, id, staffId(jwt), RequestMeta.clientIp(http));
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("dental_history")
     @GetMapping("/entries/{id}/history")
     @PreAuthorize("hasAuthority('specialty_dental:view')")
     public List<ToothHistoryEntryResponse> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
                                                      @PathVariable UUID id) {
-        return service.history(tenantId(jwt), patientId, id);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.history(scope.tenantId(), patientId, id);
     }
 
     private UUID tenantId(Jwt jwt) {

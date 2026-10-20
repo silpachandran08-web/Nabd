@@ -7,3 +7,5 @@ target/
 *.log
 .env.dev
 .vercel
+perf/out/
+__pycache__/

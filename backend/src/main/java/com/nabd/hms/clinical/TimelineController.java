@@ -17,15 +17,22 @@ import java.util.UUID;
 public class TimelineController {
 
     private final TimelineService service;
+    private final ClinicalReadScope scopes;
 
-    TimelineController(TimelineService service) {
+    TimelineController(TimelineService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("timeline")
     @GetMapping
     @PreAuthorize("hasAuthority('clinical:view')")
     public EncounterPage get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
-                              @RequestParam(defaultValue = "20") int limit, @RequestParam(required = false) String cursor) {
-        return service.get(UUID.fromString(jwt.getClaimAsString("tenantId")), patientId, limit, cursor);
+                              @RequestParam(required = false) Integer limit, @RequestParam(required = false) String cursor) {
+        int pageLimit = com.nabd.hms.common.PageRequest.limit(limit); // a bad limit is a 400 before the patient gate
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return FieldGrantMasker.timeline(scope, service.get(scope.tenantId(), patientId, pageLimit, cursor));
     }
 }

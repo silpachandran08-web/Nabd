@@ -133,6 +133,19 @@ class SetupApiTest extends ApiTestBase {
     }
 
     @Test
+    void idleLockPolicyRejectsOutOfRange() { // FEF-005: 2-30 only; valid values need the policy_key CHECK widened (migration pending)
+        SeededTenant tenant = seedTenant();
+        UUID roleId = seedFullAccessRole(tenant.id());
+        SeededStaff staff = seedStaff(tenant, roleId, "owner@a.com", "+919400000001", false);
+        String token = loginAndGetAccessToken(staff);
+        for (String bad : new String[]{"1", "31", "0", "abc", "5.5", "-3"}) {
+            ResponseEntity<Map> r = exchange("/v1/setup/policies/session.idle_lock_minutes", HttpMethod.PATCH,
+                    authedJsonBody(token, Map.of("value", bad)), Map.class);
+            assertThat(r.getStatusCode()).as(bad).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+    }
+
+    @Test
     void consentContactCrud() {
         SeededTenant tenant = seedTenant();
         UUID roleId = seedFullAccessRole(tenant.id());
@@ -332,7 +345,7 @@ class SetupApiTest extends ApiTestBase {
         SeededStaff staff = seedStaff(tenant, limitedRole, "reception@a.com", "+919400000002", false);
         String token = loginAndGetAccessToken(staff);
 
-        ResponseEntity<List> resp = exchange("/v1/setup/checklist", HttpMethod.GET, authed(token), List.class);
+        ResponseEntity<String> resp = exchange("/v1/setup/checklist", HttpMethod.GET, authed(token), String.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

@@ -21,9 +21,9 @@ public class FleetController {
     }
 
     @GetMapping
-    public FleetPage list(@RequestParam(defaultValue = "50") int limit,
+    public FleetPage list(@RequestParam(required = false) Integer limit,
                            @RequestParam(required = false) String cursor) {
-        return service.list(limit, cursor);
+        return service.list(com.nabd.hms.common.PageRequest.limit(limit), cursor);
     }
 
     @GetMapping("/summary")

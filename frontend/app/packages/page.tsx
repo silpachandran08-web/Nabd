@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./packages.module.css";
 import { can } from "../lib/permissions";
@@ -31,6 +31,7 @@ type InstanceT = {
 type RefundT = {
   id: string; instanceId: string; patientName: string; packageName: string; reason: string;
   usedListValue: number; refundAmount: number; amountOwed: number; status: string; creditNoteNumber: string | null; createdAt: string;
+  recomputedAmount?: number | null;
 };
 type ExpiringT = {
   instanceId: string; patientName: string; packageName: string; quantityConsumed: number; quantityTotal: number;
@@ -62,7 +63,7 @@ const STATUS_PILL: Record<string, string> = {
   active: styles.pillActive, grace: styles.pillWarn, expired: styles.pillDanger,
   completed: styles.pillDone, refunded: styles.pillInactive, cancelled: styles.pillInactive,
   on_sale: styles.pillActive, draft: styles.pillWarn, inactive: styles.pillInactive,
-  pending: styles.pillWarn, approved: styles.pillDone,
+  pending: styles.pillWarn, approved: styles.pillDone, rejected: styles.pillInactive,
 };
 // Sell-package wizard (wireframe pksell SELLSTEPS).
 const SELL_STEPS = ["Patient", "Package", "Eligibility", "Review", "Payment", "Invoice & card"];
@@ -405,11 +406,50 @@ export default function PackagesPage() {
     }
   }
 
-  async function approveRefund(id: string) {
-    setActionError(null);
-    const res = await authedFetch(`/packages/refunds/${id}/approve`, { method: "POST" });
-    await afterInstanceAction(res);
+  // FIN-004: the approver sees request-time vs current amount and confirms the current one (expectedAmount).
+  const [deciding, setDeciding] = useState<{ refund: RefundT; current: number; owed: number; changed: boolean } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  async function openDecision(r: RefundT) {
+    setActionError(null); setRejectReason("");
+    const res = await authedFetch(`/packages/instances/${r.instanceId}/refund-preview`);
+    if (!res?.ok) { setActionError("Could not load the current refund amount. Try again."); return; }
+    const p = await res.json();
+    setDeciding({ refund: r, current: p.refundAmount, owed: p.amountOwed, changed: p.refundAmount !== r.refundAmount });
   }
+  const decideLock = useRef(false); // synchronous guard (as in checkout): a double-click must never send a second decision
+  async function decide(fn: () => Promise<void>) {
+    if (decideLock.current) return;
+    decideLock.current = true;
+    try { await fn(); } catch {
+      setActionError("Could not reach the server. Check your connection and try again."); // fetch rejects on network failure
+    } finally { decideLock.current = false; }
+  }
+  const approveRefund = () => decide(async () => {
+    if (!deciding) return;
+    setActionError(null);
+    const res = await authedFetch(`/packages/refunds/${deciding.refund.id}/approve`, {
+      method: "POST", body: JSON.stringify({ expectedAmount: deciding.current }),
+    });
+    if (res?.status === 409) {
+      const p = await res.clone().json().catch(() => null);
+      if (p && String(p.type).endsWith("amount-changed")) {
+        setDeciding({ ...deciding, current: p.currentAmount, owed: p.currentAmountOwed ?? deciding.owed, changed: true });
+        return;
+      }
+    }
+    if (res?.ok) setDeciding(null);
+    await afterInstanceAction(res);
+  });
+  const rejectRefund = () => decide(async () => {
+    if (!deciding) return;
+    if (!rejectReason.trim()) { setActionError("Give a reason to reject."); return; }
+    setActionError(null);
+    const res = await authedFetch(`/packages/refunds/${deciding.refund.id}/reject`, {
+      method: "POST", body: JSON.stringify({ reason: rejectReason }),
+    });
+    if (res?.ok) setDeciding(null);
+    await afterInstanceAction(res);
+  });
 
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   async function sendReminder(instanceId: string) {
@@ -883,6 +923,26 @@ export default function PackagesPage() {
             </div>
           )}
 
+          {tab === "refunds" && deciding && canApprove && (
+            <section className={styles.card} aria-label="Review refund">
+              <h2 className={styles.cardTitle}>Refund · {deciding.refund.patientName} · {deciding.refund.packageName}</h2>
+              {deciding.changed && <div className={styles.bannerWarn} role="alert">The amount changed since the request because sessions were used. Check the new amount before approving.</div>}
+              <div className={styles.itemLine}><span>Amount at request</span><span data-testid="refund-requested">{money(deciding.refund.refundAmount)}</span></div>
+              <div className={styles.itemLine}><strong>Amount now</strong><strong data-testid="refund-current">{money(deciding.current)}</strong></div>
+              {deciding.owed > 0 && <div className={styles.bannerWarn}>Used sessions exceed the amount paid by {money(deciding.owed)}. No refund; the difference must be collected.</div>}
+              <div className={styles.cardActions}>
+                <button className={styles.decisionBtn} onClick={() => void approveRefund()}>Approve {money(deciding.current)}</button>
+                <button className={styles.decisionBtn} onClick={() => setDeciding(null)}>Cancel</button>
+              </div>
+              <div className={styles.field}>
+                <label className={styles.label} htmlFor="refund-reject-reason">Reason to reject</label>
+                <input id="refund-reject-reason" className={styles.input} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+              </div>
+              <div className={styles.cardActions}>
+                <button className={styles.decisionBtn} onClick={() => void rejectRefund()}>Reject</button>
+              </div>
+            </section>
+          )}
           {tab === "refunds" && (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
@@ -893,10 +953,10 @@ export default function PackagesPage() {
                       <td>{r.patientName}</td>
                       <td>{r.packageName}</td>
                       <td>{r.reason}</td>
-                      <td>{money(r.refundAmount)}</td>
+                      <td>{money(r.recomputedAmount ?? r.refundAmount)}</td>
                       <td>{money(r.amountOwed)}</td>
                       <td><span className={`${styles.pill} ${STATUS_PILL[r.status]}`}>{r.status}{r.creditNoteNumber ? ` · ${r.creditNoteNumber}` : ""}</span></td>
-                      <td>{canApprove && r.status === "pending" && <button className={styles.btnSmall} onClick={() => approveRefund(r.id)}>Approve</button>}</td>
+                      <td>{canApprove && r.status === "pending" && <button className={styles.btnSmall} onClick={() => void openDecision(r)}>Review</button>}</td>
                     </tr>
                   ))}
                 </tbody>

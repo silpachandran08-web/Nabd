@@ -14,6 +14,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TimelineApiTest extends ApiTestBase {
 
+    // CLN-005: signing needs a registered clinician. Every staff member these tests seed is one, so they keep testing what
+    // they were written for; the licence refusals themselves are covered in ClinicalLicenceApiTest.
+    @Override
+    protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
+                                    boolean emailVerified, boolean mobileVerified) {
+        return com.nabd.hms.support.ClinicianFixture.licensed(
+                super.seedStaff(tenant, roleId, email, mobilePhone, mfaEnabled, emailVerified, mobileVerified));
+    }
+
     private String registerPatient(String token, String name, String phone) {
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", name, "phone", phone, "dob", "1990-01-01", "gender", "male")), Map.class);
@@ -49,7 +58,7 @@ class TimelineApiTest extends ApiTestBase {
         exchange("/v1/clinical/prescriptions/" + queueEntryId + "/sign", HttpMethod.POST, authed(token), Map.class);
         moveTo(token, queueEntryId, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
         exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
 
         ResponseEntity<Map> timeline = exchange("/v1/clinical/patients/" + patientId + "/timeline", HttpMethod.GET, authed(token), Map.class);
@@ -90,7 +99,7 @@ class TimelineApiTest extends ApiTestBase {
                     "diagnosis", "Visit " + i)), Map.class);
             moveTo(token, queueEntryId, "waiting", "vitals_pending", "vitals_done", "in_consult", "checkout_pending");
             exchange("/v1/billing/checkout/" + queueEntryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                    "lineItems", List.of(Map.of("chargeCode", "X", "chargeName", "X", "category", "Service",
+                    "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "X", "chargeName", "X", "category", "Service",
                             "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)))), Map.class);
         }
 

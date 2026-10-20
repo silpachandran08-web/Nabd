@@ -17,6 +17,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** DOC-030. Written to the NoteApiTest conventions; NOT executed in the authoring environment (no Docker/Testcontainers). */
 class ClinicalDocumentApiTest extends ApiTestBase {
 
+    // CLN-005: signing needs a registered clinician. Every staff member these tests seed is one, so they keep testing what
+    // they were written for; the licence refusals themselves are covered in ClinicalLicenceApiTest.
+    @Override
+    protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
+                                    boolean emailVerified, boolean mobileVerified) {
+        return com.nabd.hms.support.ClinicianFixture.licensed(
+                super.seedStaff(tenant, roleId, email, mobilePhone, mfaEnabled, emailVerified, mobileVerified));
+    }
+
     private record Visit(String token, String queueEntryId, String patientId, SeededStaff doctor) {
     }
 
@@ -143,9 +152,13 @@ class ClinicalDocumentApiTest extends ApiTestBase {
     void theIssuedHeaderSnapshotsTheDoctorRegistrationNumberOrNullWhenUnset() {
         SeededTenant tenant = seedTenant();
         Visit v = seedVisit(tenant);
+        // CLN-005: a doctor with no registration number can no longer issue, so a registered cover with clinical:approve
+        // issues on their visit; the header still snapshots the VISIT doctor's number, null when they have none.
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET professional_registration_no = NULL WHERE id = ?", v.doctor().id()));
+        String coverToken = loginAndGetAccessToken(seedStaff(tenant, v.doctor().roleId(), "docs-cover@a.com", "+919600030099", false));
         String unset = (String) createReferral(v, Map.of("referredTo", "ENT", "reason", "Hearing loss")).getBody().get("id");
         Map<?, ?> noReg = (Map<?, ?>) ((Map<?, ?>) exchange("/v1/clinical/documents/" + unset + "/issue", HttpMethod.POST,
-                authed(v.token()), Map.class).getBody().get("header")).get("doctor");
+                authed(coverToken), Map.class).getBody().get("header")).get("doctor");
         assertThat(noReg.containsKey("registrationNumber")).isTrue();
         assertThat(noReg.get("registrationNumber")).isNull();
 

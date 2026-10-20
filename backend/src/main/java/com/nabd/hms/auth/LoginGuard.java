@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -32,7 +33,10 @@ public class LoginGuard {
     private final TotpService totp;
     private final AuthProperties props;
 
-    LoginGuard(AuthRepository repo, JdbcTemplate jdbc, TotpService totp, AuthProperties props) {
+    private final Clock clock;
+
+    LoginGuard(AuthRepository repo, JdbcTemplate jdbc, TotpService totp, AuthProperties props, Clock clock) {
+        this.clock = clock;
         this.repo = repo;
         this.jdbc = jdbc;
         this.totp = totp;
@@ -47,7 +51,7 @@ public class LoginGuard {
         }
         Instant lastFailedAt = repo.lastFailedAttemptAt(staffId).orElse(Instant.EPOCH);
         Instant lockedUntil = lastFailedAt.plus(backoff(failures));
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         if (now.isBefore(lockedUntil)) {
             log.warn("account locked: staff {} has {} failed attempts, locked until {}", staffId, failures, lockedUntil);
             long retry = Math.max(1, Duration.between(now, lockedUntil).toSeconds());
@@ -68,7 +72,8 @@ public class LoginGuard {
 
     /** Valid code AND its time-step is newer than the last one accepted for this account (atomic claim). */
     boolean verifyTotp(UUID staffId, byte[] secret, String code) {
-        long step = totp.matchStep(secret, code, Instant.now());
+        if (secret == null) return false; // PLT-044: secret did not decrypt for this row (FieldCipher logged it)
+        long step = totp.matchStep(secret, code, Instant.now(clock));
         return step >= 0 && jdbc.update("UPDATE staff SET mfa_last_used_step = ? WHERE id = ? "
                 + "AND (mfa_last_used_step IS NULL OR mfa_last_used_step < ?)", step, staffId, step) == 1;
     }

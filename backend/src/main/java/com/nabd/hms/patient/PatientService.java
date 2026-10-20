@@ -3,7 +3,7 @@ package com.nabd.hms.patient;
 import com.nabd.hms.common.PhoneNumbers;
 import com.nabd.hms.patient.dto.PatientRegistryResponse;
 import com.nabd.hms.common.ClinicClock;
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.Cursor;
@@ -47,14 +47,14 @@ public class PatientService {
 
     private final PatientRepository repo;
     private final TenantContext tenantContext;
-    private final AesGcmCipher cipher;
+    private final FieldCipher cipher;
     private final StepUpVerifier stepUpVerifier;
     private final StaffService staffService;
     private final AuditService auditService;
 
     private final ClinicClock clock;
 
-    PatientService(PatientRepository repo, TenantContext tenantContext, AesGcmCipher cipher,
+    PatientService(PatientRepository repo, TenantContext tenantContext, FieldCipher cipher,
                     StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock) {
         this.clock = clock;
         this.repo = repo;
@@ -66,18 +66,13 @@ public class PatientService {
     }
 
     public static final List<String> REGISTRY_FILTERS = List.of("all", "recent", "followup", "package", "balance", "duplicate", "archived");
-    private static final int RECENT_VISIT_DAYS = 90;
-    // ponytail: flags are computed for up to REGISTRY_CAP patients per request, then filtered and
-    // searched in memory; move filtering into SQL with keyset paging once a clinic outgrows this.
-    private static final int REGISTRY_CAP = 3000;
     private static final int REGISTRY_ROWS = 200;
 
     /**
      * Patient Registry: per-patient visit/appointment/package/balance/clinical flags, one count per filter.
-     * REC-040: rows are paged with limit (clamped to 1..REGISTRY_ROWS, default REGISTRY_ROWS, so a call without
-     * paging params behaves exactly as before) and an opaque offset cursor over the name-then-id ordered result.
-     * Offset, not keyset: the rows are filtered and searched in memory (see REGISTRY_CAP), and the order is
-     * stable (name, id), so a page boundary only shifts if patients are added or removed between requests.
+     * OPS-008: reads the patient_registry_summary read model (OPS-007) with the filter, search and keyset paging in
+     * SQL, so every filter covers every patient (no cap). limit 1..REGISTRY_ROWS, default REGISTRY_ROWS. The read
+     * model trails writes by the projector's poll (about a second); cross-patient duplicate flags by the nightly job.
      */
     @Transactional(readOnly = true)
     public PatientRegistryResponse registry(UUID tenantId, UUID callerStaffId, String q, String filter,
@@ -89,14 +84,21 @@ public class PatientService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-filter", "Invalid filter",
                     "filter must be one of " + String.join(", ", REGISTRY_FILTERS) + ".");
         }
+        int size = limit == null ? REGISTRY_ROWS : limit;
+        String[] after = cursor == null ? null : decodeRegistryCursor(tenantId, cursor);
         java.time.ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
-        List<PatientRegistryResponse.Row> all = repo.registry(tenantId, scopedToDoctorId, today,
-                today.atStartOfDay(zone).toInstant(), REGISTRY_CAP).stream().map(r -> {
+        LocalDate today = clock.today(zone);
+        PatientRepository.RegistrySearch search = PatientRepository.RegistrySearch.of(q);
+        PatientRepository.RegistryCounts counts = repo.registryCounts(tenantId, scopedToDoctorId, REGISTRY_FILTERS, f, search, today);
+        List<PatientRepository.RegistryRow> found = repo.registryPage(tenantId, scopedToDoctorId, f, search, today,
+                today.atStartOfDay(zone).toInstant(), after == null ? null : after[0], after == null ? null : UUID.fromString(after[1]), size + 1);
+        boolean hasMore = found.size() > size;
+        List<PatientRepository.RegistryRow> page = hasMore ? found.subList(0, size) : found;
+        List<PatientRegistryResponse.Row> rows = page.stream().map(r -> {
             boolean archived = !"active".equals(r.status());
             List<String> tags = new java.util.ArrayList<>();
             if (archived) tags.add("archived");
-            if (!archived && r.lastVisit() != null && !r.lastVisit().isBefore(today.minusDays(RECENT_VISIT_DAYS))) tags.add("recent");
+            if (!archived && r.lastVisit() != null && !r.lastVisit().isBefore(today.minusDays(90))) tags.add("recent");
             if (!archived && r.followUpDue()) tags.add("followup");
             if (!archived && r.packageTotal() > 0) tags.add("package");
             if (r.balanceDue()) tags.add("balance");
@@ -109,62 +111,39 @@ public class PatientService {
                     r.condition(), r.followUpDue(), r.allergy(), r.balanceDue(), r.duplicate(), archived,
                     r.queueToken(), r.queueStatus(), List.copyOf(tags));
         }).toList();
-
-        java.util.Map<String, Integer> counts = new java.util.LinkedHashMap<>();
-        for (String key : REGISTRY_FILTERS) {
-            counts.put(key, (int) all.stream().filter(r -> inFilter(r, key)).count());
-        }
-        String needle = q == null ? "" : q.strip().toLowerCase();
-        List<PatientRegistryResponse.Row> matched = all.stream()
-                .filter(r -> inFilter(r, f))
-                .filter(r -> needle.isEmpty() || matches(r, needle))
-                .toList();
-        int size = limit == null ? REGISTRY_ROWS : Math.max(1, Math.min(limit, REGISTRY_ROWS));
-        int offset = cursor == null ? 0 : decodeRegistryCursor(cursor);
-        int from = Math.min(offset, matched.size());
-        int to = Math.min(from + size, matched.size());
-        boolean hasMore = to < matched.size();
-        String nextCursor = hasMore ? encodeRegistryCursor(to) : null;
-        return new PatientRegistryResponse(counts.get("all"), counts, matched.subList(from, to),
-                matched.size(), hasMore, new PageMeta(nextCursor, size));
+        PatientRepository.RegistryRow last = hasMore ? page.get(page.size() - 1) : null;
+        String nextCursor = last == null ? null : encodeRegistryCursor(tenantId, last.nameSearch(), last.id());
+        return new PatientRegistryResponse(counts.counts().get("all"), counts.counts(), rows,
+                counts.matched(), hasMore, new PageMeta(nextCursor, size));
     }
 
-    private static final String REGISTRY_CURSOR_PREFIX = "reg:";
+    private static final String REGISTRY_CURSOR_PREFIX = "rk1|";
 
-    private static String encodeRegistryCursor(int offset) {
-        return java.util.Base64.getUrlEncoder().withoutPadding()
-                .encodeToString((REGISTRY_CURSOR_PREFIX + offset).getBytes(StandardCharsets.UTF_8));
+    /** PLT-044 AAD: a cursor opens only for the clinic that was issued it (not stored, so no row id). */
+    private static FieldCipher.Aad registryCursorAad(UUID tenantId) {
+        return FieldCipher.Aad.of(tenantId, "patient_registry", "cursor", "-");
     }
 
-    /** Same 400 invalid-cursor problem as common.Cursor for anything that isn't a cursor this endpoint issued. */
-    private static int decodeRegistryCursor(String value) {
+    /** Keyset (name_search, patient_id), encrypted: the sort key is a patient's name, which must never sit in a URL. */
+    private String encodeRegistryCursor(UUID tenantId, String nameSearch, UUID id) {
+        byte[] raw = (REGISTRY_CURSOR_PREFIX + id + "|" + nameSearch).getBytes(StandardCharsets.UTF_8);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(cipher.encrypt(raw, registryCursorAad(tenantId)));
+    }
+
+    /** {nameSearch, patientId}; the same 400 invalid-cursor problem as common.Cursor for anything this endpoint did not issue. */
+    private String[] decodeRegistryCursor(UUID tenantId, String value) {
         try {
-            String raw = new String(java.util.Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+            String raw = new String(cipher.decrypt(java.util.Base64.getUrlDecoder().decode(value), registryCursorAad(tenantId)), StandardCharsets.UTF_8);
             if (raw.startsWith(REGISTRY_CURSOR_PREFIX)) {
-                int offset = Integer.parseInt(raw.substring(REGISTRY_CURSOR_PREFIX.length()));
-                if (offset >= 0) {
-                    return offset;
-                }
+                String[] parts = raw.substring(REGISTRY_CURSOR_PREFIX.length()).split("\\|", 2);
+                UUID.fromString(parts[0]);
+                return new String[]{parts[1], parts[0]};
             }
         } catch (RuntimeException ignored) {
             // fall through to the 400 below
         }
         throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-cursor", "Invalid cursor",
                 "The pagination cursor is malformed.");
-    }
-
-    private static boolean inFilter(PatientRegistryResponse.Row r, String filter) {
-        return "all".equals(filter) ? !r.archived() : r.tags().contains(filter);
-    }
-
-    /** Name, MRN, mobile digits, or today's token ("T-12" / "12"). */
-    private static boolean matches(PatientRegistryResponse.Row r, String needle) {
-        String digits = needle.replaceAll("\\D", "");
-        String token = needle.startsWith("t-") ? needle.substring(2) : needle;
-        return r.name().toLowerCase().contains(needle)
-                || r.mrn().toLowerCase().contains(needle)
-                || (digits.length() >= 3 && r.phone().replaceAll("\\D", "").contains(digits))
-                || (r.queueToken() != null && token.equals(String.valueOf(r.queueToken())));
     }
 
     @Transactional
@@ -215,8 +194,9 @@ public class PatientService {
                     .toList());
         }
 
-        byte[] nationalIdEnc = encryptOrNull(req.nationalId());
-        UUID id = repo.insert(tenantId, req.name(), phone, req.dob(), req.gender(),
+        UUID id = UUID.randomUUID();
+        byte[] nationalIdEnc = encryptOrNull(tenantId, id, req.nationalId());
+        repo.insert(id, tenantId, req.name(), phone, req.dob(), req.gender(),
                 req.guardianId(), req.address(), nationalIdEnc);
         if (req.guardianId() != null) {
             grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId(), req.guardianConsent().channel());
@@ -305,7 +285,7 @@ public class PatientService {
             changes.put("guardian_review_kept_by", null);
         }
         if (req.has("address")) changes.put("address", req.address());
-        if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(req.nationalId()));
+        if (req.has("nationalId")) changes.put("national_id_enc", encryptOrNull(tenantId, id, req.nationalId()));
         repo.update(tenantId, id, changes);
         auditUpdate(tenantId, callerStaffId, id, before, req, changes.get("phone"), hadNationalId);
         // NB-081/NB-085: this is the one place guardian_id ever changes post-registration, so it's
@@ -386,7 +366,7 @@ public class PatientService {
                     "Only an adult patient who still has a guardian on file has a guardian review.");
         }
         java.util.Map<String, Object> changes = new java.util.LinkedHashMap<>();
-        changes.put("guardian_review_kept_at", java.sql.Timestamp.from(java.time.Instant.now()));
+        changes.put("guardian_review_kept_at", java.sql.Timestamp.from(clock.now()));
         changes.put("guardian_review_kept_by", callerStaffId);
         repo.update(tenantId, id, changes);
         audit(tenantId, callerStaffId, "patient.guardian_review_kept", id, null, Map.of("guardianId", before.guardianId().toString()));
@@ -521,10 +501,11 @@ public class PatientService {
         }
     }
 
-    private byte[] encryptOrNull(String nationalId) {
+    private byte[] encryptOrNull(UUID tenantId, UUID patientId, String nationalId) {
         return nationalId == null || nationalId.isBlank()
                 ? null
-                : cipher.encrypt(nationalId.getBytes(StandardCharsets.UTF_8));
+                : cipher.encrypt(nationalId.getBytes(StandardCharsets.UTF_8),
+                        FieldCipher.Aad.of(tenantId, "patients", "national_id_enc", patientId));
     }
 
     private PatientResponse toResponse(PatientRow row) {

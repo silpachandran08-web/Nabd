@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import AppShell from "./AppShell";
@@ -16,12 +17,14 @@ export const metadata: Metadata = {
   description: "Nabd clinic staff sign-in",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  await connection(); // FEF-010: render per request so Next stamps the CSP nonce on its scripts (static pages would carry none).
   return (
     <html lang="en" className={poppins.variable}>
       <body>
-        <AppShell>{children}</AppShell>
-        <IdleLockGuard />
+        <IdleLockGuard>
+          <AppShell>{children}</AppShell>
+        </IdleLockGuard>
       </body>
     </html>
   );

@@ -34,9 +34,11 @@ public class SupportAccessController {
     }
 
     @PostMapping("/grants")
+    @PreAuthorize("hasAuthority('support_access:request')")
     public ResponseEntity<GrantResponse> requestGrant(@Valid @RequestBody RequestGrantRequest req,
                                                         @AuthenticationPrincipal Jwt jwt, HttpServletRequest http) {
-        GrantResponse grant = service.requestGrant(req.tenantId(), operatorId(jwt), req.reason(), RequestMeta.clientIp(http));
+        GrantResponse grant = service.requestGrant(req.tenantId(), req.ticketId(), req.scope(), req.minutes(),
+                operatorId(jwt), req.reason(), RequestMeta.clientIp(http));
         return ResponseEntity.status(HttpStatus.CREATED).body(grant);
     }
 

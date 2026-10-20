@@ -55,6 +55,10 @@ class ProvisioningOwnerEmailFailureApiTest extends ApiTestBase {
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.get("steps");
         Map<String, Object> inviteStep = steps.stream().filter(s -> "verify_invite_owner".equals(s.get("stepName"))).findFirst().orElseThrow();
         assertThat(inviteStep.get("status")).isEqualTo("done"); // not "failed" — the email exception must not have escaped the step
+        // OPS-012: SMTP ran after the step's transaction committed (the guard would have refused it inside one) and the
+        // failure was recorded on the step in its own statement
+        assertThat((String) inviteStep.get("errorDetail")).contains("owner invite email not sent (Mail")
+                .doesNotContain("NoTransactionAllowed");
 
         UUID tenantId = UUID.fromString((String) body.get("createdTenantId"));
         Integer staffCount = inTenantTx(tenantId, () -> jdbc.queryForObject(

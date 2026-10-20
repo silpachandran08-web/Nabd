@@ -1,8 +1,23 @@
 package com.nabd.hms.owner;
 
 import com.nabd.hms.auth.AuthService;
+import com.nabd.hms.auth.MfaPolicy;
+import com.nabd.hms.auth.TotpService;
+import com.nabd.hms.auth.dto.MfaChallengeResponse;
+import com.nabd.hms.auth.dto.MfaEnrollResponse;
+import com.nabd.hms.auth.dto.MfaSetupRequiredResponse;
+import com.nabd.hms.auth.dto.RecoveryVerifyRequest;
 import com.nabd.hms.auth.dto.TokenPairResponse;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.AuditService;
+import com.nabd.hms.owner.dto.OwnerMfaConfirmRequest;
+import com.nabd.hms.owner.dto.OwnerMfaConfirmResponse;
+import com.nabd.hms.owner.dto.OwnerMfaEnrollRequest;
+import com.nabd.hms.owner.dto.OwnerMfaVerifyRequest;
+import com.nabd.hms.owner.dto.OwnerWorkspaceTokenResponse;
+import com.nabd.hms.shared.security.ChallengeTokenDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.config.AuthProperties;
@@ -25,9 +40,13 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,6 +68,8 @@ public class OwnerService {
     private static final Logger log = LoggerFactory.getLogger(OwnerService.class);
     private static final String ISSUER = "https://api.nabd.health"; // must match AuthService.ISSUER — same signing key/issuer
     private static final String PENDING_WORKSPACE_PURPOSE = "owner_pending_workspace";
+    private static final String OWNER_MFA_PENDING = "owner_mfa_pending";
+    private static final String OWNER_MFA_SETUP = "owner_mfa_setup";
 
     private final OwnerRepository repo;
     private final TenantContext tenantContext;
@@ -56,9 +77,24 @@ public class OwnerService {
     private final JwtEncoder jwtEncoder;
     private final AuthProperties props;
     private final AuthService authService;
+    private final MfaPolicy mfaPolicy;
+    private final TotpService totp;
+    private final FieldCipher cipher;
+    private final ChallengeTokenDecoder challengeDecoder;
+    private final AuditService auditService;
+
+    private final Clock clock;
 
     OwnerService(OwnerRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
-                 JwtEncoder jwtEncoder, AuthProperties props, AuthService authService) {
+                 JwtEncoder jwtEncoder, AuthProperties props, AuthService authService, MfaPolicy mfaPolicy,
+                 TotpService totp, FieldCipher cipher, ChallengeTokenDecoder challengeDecoder, AuditService auditService,
+                 Clock clock) {
+        this.clock = clock;
+        this.mfaPolicy = mfaPolicy;
+        this.totp = totp;
+        this.cipher = cipher;
+        this.challengeDecoder = challengeDecoder;
+        this.auditService = auditService;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.pinEncoder = pinEncoder;
@@ -70,7 +106,7 @@ public class OwnerService {
     // noRollbackFor: recordLoginAttempt() must survive the ApiException thrown right after it, same
     // reasoning as AuthService.login() — see that class for the rollback gotcha this avoids.
     @Transactional(noRollbackFor = ApiException.class)
-    public PendingWorkspaceTokenResponse login(OwnerLoginRequest req, String ip) {
+    public Object login(OwnerLoginRequest req, String ip) {
         enforceIpRateLimit(ip);
         String email = req.email().toLowerCase();
 
@@ -86,10 +122,128 @@ public class OwnerService {
             repo.recordLoginAttempt(owner.id(), email, ip, false);
             throw invalidCredentials();
         }
-        repo.recordLoginAttempt(owner.id(), email, ip, true);
+        if (!repo.mfaState(owner.id()).enabled()) { // with MFA the success is recorded after the second factor, so a PIN cannot reset TOTP failures
+            repo.recordLoginAttempt(owner.id(), email, ip, true);
+        }
         log.info("owner {} authenticated via PIN", owner.id());
+        return afterFirstFactor(owner);
+    }
 
+    /** PLT-005: enrolled owners get a TOTP challenge, unenrolled ones a setup token; the workspace token comes only after. */
+    private Object afterFirstFactor(Owner owner) {
+        if (repo.mfaState(owner.id()).enabled()) {
+            return new MfaChallengeResponse(ownerChallengeToken(owner, TokenType.MFA_PENDING, OWNER_MFA_PENDING), "totp",
+                    props.mfaChallengeTtlMinutes() * 60L);
+        }
+        if (mfaPolicy.requiredForOwner()) {
+            return new MfaSetupRequiredResponse(ownerChallengeToken(owner, TokenType.MFA_SETUP, OWNER_MFA_SETUP),
+                    props.mfaChallengeTtlMinutes() * 60L);
+        }
         return new PendingWorkspaceTokenResponse(issuePendingWorkspaceToken(owner), 300);
+    }
+
+    @Transactional(noRollbackFor = ApiException.class) // the failed attempt must survive the 401
+    public OwnerWorkspaceTokenResponse verifyMfa(OwnerMfaVerifyRequest req, String ip) {
+        Owner owner = ownerFrom(req.challengeToken(), TokenType.MFA_PENDING, OWNER_MFA_PENDING);
+        enforceAccountLockout(owner);
+        OwnerRepository.MfaState mfa = repo.mfaState(owner.id());
+        // a blob bound to another row fails closed as an MFA failure (401), like staff/operator MFA
+        long step = mfa.secretEnc() == null ? -1 : cipher.tryDecrypt(mfa.secretEnc(), mfaAad(owner)).map(k -> totp.matchStep(k, req.code(), Instant.now(clock))).orElse(-1L);
+        if (step < 0 || !repo.claimTotpStep(owner.id(), step)) {
+            repo.recordLoginAttempt(owner.id(), owner.email(), ip, false);
+            log.warn("MFA verification failed for owner {}", owner.id());
+            throw mfaFailed();
+        }
+        repo.recordLoginAttempt(owner.id(), owner.email(), ip, true);
+        return new OwnerWorkspaceTokenResponse(issuePendingWorkspaceToken(owner), 300, null);
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public OwnerWorkspaceTokenResponse recoveryVerify(RecoveryVerifyRequest req, String ip) {
+        Owner owner = ownerFrom(req.challengeToken(), TokenType.MFA_PENDING, OWNER_MFA_PENDING);
+        enforceAccountLockout(owner);
+        Integer left = repo.consumeRecoveryCode(owner.id(), OpaqueTokens.sha256Hex(req.recoveryCode().trim().toUpperCase(Locale.ROOT)));
+        if (left == null) {
+            repo.recordLoginAttempt(owner.id(), owner.email(), ip, false);
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "recovery-code-invalid", "Recovery code invalid",
+                    "That recovery code is not valid.");
+        }
+        repo.recordLoginAttempt(owner.id(), owner.email(), ip, true);
+        audit(owner, ip, "owner_auth.recovery_code_used");
+        return new OwnerWorkspaceTokenResponse(issuePendingWorkspaceToken(owner), 300, left);
+    }
+
+    @Transactional
+    public MfaEnrollResponse enrollMfa(OwnerMfaEnrollRequest req) {
+        Owner owner = ownerFrom(req.setupToken(), TokenType.MFA_SETUP, OWNER_MFA_SETUP);
+        byte[] secret = totp.generateSecret();
+        repo.setPendingMfaSecret(owner.id(), cipher.encrypt(secret, mfaAad(owner)));
+        log.info("owner {} started MFA enrollment", owner.id());
+        return new MfaEnrollResponse(totp.toBase32(secret), totp.otpauthUri(secret, "Nabd", owner.email()));
+    }
+
+    @Transactional(noRollbackFor = ApiException.class)
+    public OwnerMfaConfirmResponse confirmMfa(OwnerMfaConfirmRequest req, String ip) {
+        Owner owner = ownerFrom(req.setupToken(), TokenType.MFA_SETUP, OWNER_MFA_SETUP);
+        enforceAccountLockout(owner);
+        byte[] pending = repo.mfaState(owner.id()).pendingSecretEnc();
+        long step = pending == null ? -1 : cipher.tryDecrypt(pending, mfaAad(owner)).map(k -> totp.matchStep(k, req.code(), Instant.now(clock))).orElse(-1L);
+        if (step < 0 || !repo.claimTotpStep(owner.id(), step)) {
+            repo.recordLoginAttempt(owner.id(), owner.email(), ip, false);
+            throw mfaFailed();
+        }
+        List<String> codes = new ArrayList<>();
+        List<String> hashes = new ArrayList<>();
+        for (int i = 0; i < 8; i++) { // same shape as staff recovery codes (AuthService.confirmMfa)
+            String code = OpaqueTokens.generate().substring(0, 10).toUpperCase(Locale.ROOT);
+            codes.add(code);
+            hashes.add(OpaqueTokens.sha256Hex(code));
+        }
+        if (!repo.confirmPendingMfa(owner.id(), hashes)) {
+            throw mfaFailed();
+        }
+        repo.recordLoginAttempt(owner.id(), owner.email(), ip, true);
+        audit(owner, ip, "owner_auth.mfa_enrolled");
+        return new OwnerMfaConfirmResponse(codes, issuePendingWorkspaceToken(owner), 300);
+    }
+
+    private Owner ownerFrom(String token, TokenType type, String purpose) {
+        try {
+            Jwt jwt = challengeDecoder.decode(token, type);
+            if (purpose.equals(jwt.getClaimAsString("purpose"))) {
+                Owner owner = repo.findById(UUID.fromString(jwt.getSubject())).orElse(null);
+                if (owner != null && "active".equals(owner.status())) {
+                    return owner;
+                }
+            }
+        } catch (JwtException | IllegalArgumentException e) {
+            // fall through: expired, tampered, wrong type or audience all get the same 401
+        }
+        throw type == TokenType.MFA_SETUP
+                ? new ApiException(HttpStatus.UNAUTHORIZED, "token-type-not-allowed", "Token type not allowed",
+                        "This action needs the MFA setup token from owner sign-in.")
+                : mfaFailed();
+    }
+
+    private String ownerChallengeToken(Owner owner, TokenType type, String purpose) {
+        Instant now = Instant.now(clock);
+        JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
+                .issuer(ISSUER)
+                .issuedAt(now)
+                .expiresAt(now.plus(props.mfaChallengeTtlMinutes(), ChronoUnit.MINUTES))
+                .subject(owner.id().toString())
+                .claim("purpose", purpose); // no tenantId: staff /auth/mfa/* refuse it (purpose and the missing claim)
+        return jwtEncoder.encode(JwtEncoderParameters.from(type.stamp(claimsB, Audience.MFA).build())).getTokenValue();
+    }
+
+    // owners are not an audit actor type (V14/V126 CHECK); the platform ledger records it as a system event on the owner entity
+    private void audit(Owner owner, String ip, String action) {
+        auditService.recordPlatform("system", null, "owner account", "owner", ip, action, "owner", owner.id(), null, null);
+    }
+
+    private ApiException mfaFailed() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "mfa-failed", "MFA verification failed",
+                "The code is incorrect or the challenge has expired.");
     }
 
     /** Called from provisioning (verify_invite_owner) on every job for this owner, not just their
@@ -105,7 +259,7 @@ public class OwnerService {
             return Optional.empty();
         }
         String rawToken = OpaqueTokens.generate();
-        repo.setInviteToken(ownerId, OpaqueTokens.sha256Hex(rawToken), Instant.now().plus(72, ChronoUnit.HOURS));
+        repo.setInviteToken(ownerId, OpaqueTokens.sha256Hex(rawToken), Instant.now(clock).plus(72, ChronoUnit.HOURS));
         log.info("owner {} invited to set their account PIN", ownerId);
         return Optional.of(rawToken);
     }
@@ -114,11 +268,11 @@ public class OwnerService {
      * straight in" convenience — translated to the owner's two-step login: hands back a pending
      * workspace token instead of real tokens, since which clinic to enter still isn't chosen yet. */
     @Transactional
-    public PendingWorkspaceTokenResponse acceptInvite(String rawToken, String pin) {
+    public Object acceptInvite(String rawToken, String pin) {
         Owner owner = repo.findByInviteTokenHash(OpaqueTokens.sha256Hex(rawToken)).orElseThrow(this::inviteInvalid);
         repo.acceptInvite(owner.id(), pinEncoder.encode(pin));
         log.info("owner {} accepted invite and activated", owner.id());
-        return new PendingWorkspaceTokenResponse(issuePendingWorkspaceToken(owner), 300);
+        return afterFirstFactor(owner); // PLT-005: straight into enrolment when MFA is enforced
     }
 
     @Transactional
@@ -156,7 +310,7 @@ public class OwnerService {
     }
 
     private String issuePendingWorkspaceToken(Owner owner) {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         Instant exp = now.plusSeconds(300);
         JwtClaimsSet.Builder claimsB = JwtClaimsSet.builder()
                 .issuer(ISSUER)
@@ -169,7 +323,7 @@ public class OwnerService {
     }
 
     private void enforceIpRateLimit(String ip) {
-        int recent = repo.countAttemptsFromIpSince(ip, Instant.now().minus(1, ChronoUnit.MINUTES));
+        int recent = repo.countAttemptsFromIpSince(ip, Instant.now(clock).minus(1, ChronoUnit.MINUTES));
         if (recent >= props.rateLimitPerIpPerMinute()) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "rate-limited", "Too many attempts", "Try again shortly.");
         }
@@ -185,7 +339,7 @@ public class OwnerService {
         }
         Instant lastFailedAt = repo.lastFailedAttemptAt(owner.id()).orElse(Instant.EPOCH);
         Instant lockedUntil = lastFailedAt.plus(backoffDuration(failures));
-        if (Instant.now().isBefore(lockedUntil)) {
+        if (Instant.now(clock).isBefore(lockedUntil)) {
             log.warn("account locked: owner {} has {} failed attempts, locked until {}", owner.id(), failures, lockedUntil);
             throw accountLocked();
         }
@@ -222,5 +376,10 @@ public class OwnerService {
     private ApiException inviteInvalid() {
         return new ApiException(HttpStatus.BAD_REQUEST, "invite-invalid", "Invite invalid",
                 "This invite link is invalid or has expired.");
+    }
+
+    /** PLT-044: AAD binds the owner's TOTP secret to its row; pending and active share it (SQL moves pending -> active). */
+    private static FieldCipher.Aad mfaAad(Owner owner) {
+        return FieldCipher.Aad.of("platform", "owners", "mfa_secret", owner.id());
     }
 }

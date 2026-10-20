@@ -17,6 +17,12 @@ class Pipeline(unittest.TestCase):
     def test_required_checks_match_jobs(self):
         req = json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"]
         self.assertEqual(sorted(req), sorted(k for k in self.wf["jobs"] if k.startswith("stage")))
+    def test_stage5_api_contract_is_report_only(self):  # OPS-034
+        j = self.wf["jobs"]["api-contract-report"]
+        self.assertLessEqual(j["timeout-minutes"], 2)
+        self.assertTrue(j["continue-on-error"])
+        self.assertFalse(any("api-contract" in c for c in json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"]))
+        self.assertIn("oasdiff", str(j["steps"]))
     def test_protection_rules(self):
         p = json.load(open(".github/branch-protection.json"))
         self.assertTrue(p["required_signatures"] and p["enforce_admins"] and not p["allow_force_pushes"])

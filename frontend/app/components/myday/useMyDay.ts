@@ -6,6 +6,7 @@ import { can } from "../../lib/permissions";
 import { useLatestLoad } from "../../lib/useLatestLoad";
 import type { PatientDetail, QueueEntry } from "../consult/shared";
 import { apiFetch, goLogin } from "../../lib/apiClient";
+import { clinicTimeZoneReady, clinicToday } from "../../lib/clinicTime";
 
 
 // DTOs mirror the backend records exactly (queue/dto/*, clinical/dto/DueConditionResponse).
@@ -33,10 +34,6 @@ function selfIdFromToken(token: string): string {
   return String(decodeJwtPayload<{ sub?: string }>(token)?.sub ?? "");
 }
 
-function localDate(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 export function useMyDay() {
   const [data, setData] = useState<MyDayData | null>(null);
@@ -78,9 +75,11 @@ export function useMyDay() {
     };
     try {
       const wantDue = can("clinical:view");
+      const today = clinicToday(await clinicTimeZoneReady()); // the clinic's date, not the device's (FEF-011)
+      if (signal.aborted) return;
       const [queueRes, appointments, delay, wait, due] = await Promise.all([
         get(`/queue?doctorId=${selfId}`),
-        part(`/appointments?doctorId=${selfId}&date=${localDate()}&limit=100`, (j) => j as AppointmentPage),
+        part(`/appointments?doctorId=${selfId}&date=${today}&limit=100`, (j) => j as AppointmentPage),
         part(`/doctors/${selfId}/delay`, (j) => ((j as DoctorDelay[]).find((d) => d.active) ?? null)),
         part(`/queue/wait-estimate?doctorId=${selfId}`, (j) => j as WaitEstimate),
         wantDue ? part(`/clinical/conditions/due`, (j) => j as DueCondition[]) : Promise.resolve(null),

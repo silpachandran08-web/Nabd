@@ -50,6 +50,22 @@ class PlatformAuthRepository {
                 operatorId, email, ip, succeeded);
     }
 
+    /** PLT-005: forced enrolment reuses PLT-004's pending-secret columns (V160); the active secret is untouched until confirm. */
+    void setPendingMfaSecret(UUID operatorId, byte[] secretEnc) {
+        jdbc.update("UPDATE master.operators SET mfa_pending_secret_enc = ?, mfa_pending_created_at = now() WHERE id = ?",
+                secretEnc, operatorId);
+    }
+
+    Optional<byte[]> findPendingMfaSecret(UUID operatorId) {
+        return jdbc.query("SELECT mfa_pending_secret_enc FROM master.operators WHERE id = ? AND mfa_pending_secret_enc IS NOT NULL",
+                (rs, i) -> rs.getBytes(1), operatorId).stream().findFirst();
+    }
+
+    void confirmPendingMfa(UUID operatorId) {
+        jdbc.update("UPDATE master.operators SET mfa_secret_enc = mfa_pending_secret_enc, mfa_enabled = true, "
+                + "mfa_pending_secret_enc = NULL, mfa_pending_created_at = NULL WHERE id = ? AND mfa_pending_secret_enc IS NOT NULL", operatorId);
+    }
+
     /** TOTP replay guard: a time-step is accepted once per operator (atomic). */
     boolean claimTotpStep(UUID operatorId, long step) {
         return jdbc.update("UPDATE master.operators SET mfa_last_used_step = ? WHERE id = ? "

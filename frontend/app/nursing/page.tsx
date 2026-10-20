@@ -15,6 +15,7 @@ import { usePolling } from "../lib/usePolling";
 import { useLatestLoad } from "../lib/useLatestLoad";
 import { VITAL_FIELDS, EMPTY_VITALS, EMPTY_EXTRAS, BLOOD_SUGAR_UNIT, PAIN_SCORE_MAX, nurseVitalsErrors, nurseVitalsPayload, formatBp, VITALS_BLANK_HINT, type VitalKey, type VitalsForm, type VitalsExtras, type PreviousVitals } from "../lib/vitals";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { moveBody, moveErrorMessage } from "../lib/queueMove";
 
 // E13 Nursing, Orders & Triage. NB-142's vitals worklist plus NB-143/145/146/148 as tabs on the
 // same page — NB-144/149 (clinical triage inbox, task handoff) aren't built, both need NB-197's
@@ -548,10 +549,9 @@ function NursingWorklist() {
       setActionError("Couldn't determine the next stage.");
       return;
     }
-    const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: next }) });
+    const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: moveBody(next, entry.status) });
     if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't continue the visit." }));
-      setActionError(p.detail || "Couldn't continue the visit.");
+      setActionError(await moveErrorMessage(res, "Couldn't continue the visit."));
     }
     load();
   }

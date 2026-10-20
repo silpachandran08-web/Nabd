@@ -40,14 +40,15 @@ class ConditionRepository {
     }
 
     /** NB-077: derived, not manually maintained — anything active whose review_due_date has arrived. */
-    List<DueConditionRow> findDue(UUID tenantId, LocalDate asOf) {
+    List<DueConditionRow> findDue(ReadScope scope, LocalDate asOf) {
         return jdbc.query("SELECT c.id, c.patient_id, p.name AS patient_name, c.condition, c.review_due_date " +
                         "FROM chronic_conditions c JOIN patients p ON p.id = c.patient_id " +
                         "WHERE c.tenant_id = ? AND c.status = 'active' AND c.review_due_date IS NOT NULL AND c.review_due_date <= ? " +
+                        scope.gate("c.patient_id", "c.tenant_id") +
                         "ORDER BY c.review_due_date",
                 (rs, i) -> new DueConditionRow(UUID.fromString(rs.getString("id")), UUID.fromString(rs.getString("patient_id")),
                         rs.getString("patient_name"), rs.getString("condition"), rs.getDate("review_due_date").toLocalDate()),
-                tenantId, Date.valueOf(asOf));
+                scope.tenantId(), Date.valueOf(asOf));
     }
 
     private RowMapper<ConditionRow> mapper() {

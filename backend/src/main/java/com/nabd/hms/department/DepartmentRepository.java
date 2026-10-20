@@ -151,8 +151,8 @@ class DepartmentRepository {
     }
 
     private List<StaffRosterEntry> listDoctorsInDepartment(UUID tenantId, UUID departmentId, String departmentName) {
-        return jdbc.query("SELECT s.id, s.name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.department_id = ? AND s.status = 'active' AND r.name ILIKE 'doctor' ORDER BY s.name",
+        return jdbc.query("SELECT s.id, s.name FROM staff s " + // PLT-016: clinician flag, not a role name
+                        "WHERE s.tenant_id = ? AND s.department_id = ? AND s.status = 'active' AND s.is_clinician ORDER BY s.name",
                 (rs, i) -> new StaffRosterEntry(UUID.fromString(rs.getString("id")), rs.getString("name"), departmentName),
                 tenantId, departmentId);
     }

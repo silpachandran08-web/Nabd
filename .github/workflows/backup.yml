@@ -1,0 +1,67 @@
+# OPS-054: PITR lag publisher (every 5 min) and the quarterly restore drill. OIDC only, no stored cloud keys.
+# Inactive until repo variables are set from infra/terraform/bootstrap/aws outputs (Needs external action):
+#   AWS_MONITOR_ROLE_ARN, AWS_DRILL_ROLE_ARN, CELL_IN_DB_STAGING / CELL_IN_DB_PROD (DB identifiers), DRILL_SG_ID, DRILL_SUBNET_GROUP.
+name: backup
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # lag sample; GitHub may delay runs, the heartbeat alarm catches long gaps
+    - cron: "17 4 15 1,4,7,10 *" # quarterly drill: 15 Jan / Apr / Jul / Oct, 09:47 IST
+  workflow_dispatch:
+    inputs:
+      drill_target_time: { description: "Restore target time (UTC ISO-8601); empty = 15 minutes ago", required: false }
+      drill_db: { description: "Source DB identifier; empty = staging", required: false }
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 infra/backup/pitr-lag.py --selftest && python3 infra/backup/verify-restore.py --selftest
+
+  pitr-lag:
+    if: github.event.schedule == '*/5 * * * *' && vars.AWS_MONITOR_ROLE_ARN != ''
+    needs: selftest
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions: { contents: read, id-token: write }
+    strategy:
+      matrix: { db: ["${{ vars.CELL_IN_DB_STAGING }}", "${{ vars.CELL_IN_DB_PROD }}"] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: "${{ vars.AWS_MONITOR_ROLE_ARN }}", aws-region: ap-south-1 }
+      - if: matrix.db != ''
+        run: python3 infra/backup/pitr-lag.py "${{ matrix.db }}" --region ap-south-1
+
+  drill:
+    if: (github.event.schedule == '17 4 15 1,4,7,10 *' || github.event_name == 'workflow_dispatch') && vars.AWS_DRILL_ROLE_ARN != ''
+    needs: selftest
+    runs-on: [self-hosted, drill-in] # a runner inside the cell's drill security group (Needs external action)
+    environment: restore-drill
+    timeout-minutes: 90
+    permissions: { contents: read, id-token: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with: { role-to-assume: "${{ vars.AWS_DRILL_ROLE_ARN }}", aws-region: ap-south-1 }
+      - name: Restore, verify, boot, time
+        env:
+          AWS_REGION: ap-south-1
+          DRILL_SG_ID: ${{ vars.DRILL_SG_ID }}
+          DRILL_SUBNET_GROUP: ${{ vars.DRILL_SUBNET_GROUP }}
+          SOURCE_URL: ${{ vars.DRILL_SOURCE_URL }}
+          APP_IMAGE: ${{ vars.DRILL_APP_IMAGE }}
+          APP_ENV_FILE: /etc/nabd/drill-app.env # provisioned on the runner from the secret manager
+          DRILL_RECORD: restore-drill.json
+          IN_TARGET: ${{ inputs.drill_target_time }} # via env, never interpolated into the script
+          IN_DB: ${{ inputs.drill_db }}
+          DEFAULT_DB: ${{ vars.CELL_IN_DB_STAGING }}
+        run: |
+          T=${IN_TARGET:-$(date -u -d '15 minutes ago' +%FT%TZ)}
+          infra/backup/restore-drill.sh "${IN_DB:-$DEFAULT_DB}" "$T"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: restore-drill, path: "restore-drill.json*", retention-days: 90 }

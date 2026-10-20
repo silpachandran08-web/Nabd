@@ -177,12 +177,12 @@ class PlatformAuthApiTest extends ApiTestBase {
     }
 
     @Test
-    void superAdminMeSeesAllFourteenSurfacesPlusTheThreeWriteAuthorities() {
+    void superAdminMeSeesAllFourteenSurfacesPlusTheFiveWriteAuthorities() { // PLT-056 added support_access:request, CLN-004 safety_content:edit
         SeededOperator operator = seedOperator("super1@nabd.health", "super_admin", false);
         String token = platformLoginAndGetAccessToken(operator);
 
         ResponseEntity<Map> resp = exchange("/v1/platform/auth/me", HttpMethod.GET, authed(token), Map.class);
-        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(17);
+        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(19).contains("safety_content:edit", "support_access:request");
     }
 
     @Test
@@ -194,7 +194,8 @@ class PlatformAuthApiTest extends ApiTestBase {
         Map<?, ?> claims = objectMapper.readValue(java.util.Base64.getUrlDecoder().decode(parts[1]), Map.class);
         assertThat((List<String>) claims.get("permissions"))
                 .containsExactlyInAnyOrder("command_centre:view", "clinics_fleet:view", "tenant_detail:view",
-                        "support_tickets:view", "platform_health:view", "support_access:view");
+                        "support_tickets:view", "platform_health:view", "support_access:view",
+                        "support_access:request"); // PLT-056
     }
 
     // ---- MFA challenge ----

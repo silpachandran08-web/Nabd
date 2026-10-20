@@ -4,46 +4,92 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { lockedMessage } from "./lib/pinPolicy";
 import { refreshSession, unlockMessage } from "./lib/apiClient";
+import { SHELL_SKIP_PREFIXES, signOut as endSession } from "./lib/session";
+import { clampIdleMinutes, idlePhase, IDLE_POLICY_KEY, onLockMessage, persistLock, persistUnlock, readLockedAt } from "./lib/idleLock";
 
-// NB-044: shared clinic workstations auto-lock after inactivity. This is an overlay on top of
-// whatever page is mounted, not a navigation — nothing in the page underneath unmounts, so a
-// doctor's in-progress consultation note (or any other draft state) is exactly as it was when
-// the lock clears. Unlocking re-checks the PIN only; the existing session/access token is
-// untouched, so there's no new login and nothing else to restore.
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+// NB-044 / FEF-005: shared clinic workstations auto-lock after inactivity (clinic setting
+// session.idle_lock_minutes, default 5). The lock is persisted (reload and new tabs start locked) and
+// broadcast to other tabs. The page tree is never unmounted by a lock, so an in-progress note survives,
+// but it is `inert` while locked; a tab that OPENS locked does not render the page at all.
+// Unlocking re-checks the PIN only; the existing session/access token is untouched.
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-const SKIP_PREFIXES = ["/login", "/platform", "/owner"];
 
-export default function IdleLockGuard() {
+export default function IdleLockGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [booted, setBooted] = useState(false);
+  const [released, setReleased] = useState(false); // false = opened locked: render no page until unlocked
   const [locked, setLocked] = useState(false);
+  const [warn, setWarn] = useState<number | null>(null);
+  const [timeoutMs, setTimeoutMs] = useState(clampIdleMinutes(null) * 60_000);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRef = useRef(0);
+  const lockedRef = useRef(false);
+  const dialogRef = useRef<HTMLFormElement>(null);
 
-  const skip = SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
+  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
+  const hasToken = () => !!localStorage.getItem("nabd_access_token");
+
+  function applyLock(on: boolean) {
+    lockedRef.current = on;
+    setLocked(on);
+    if (!on) { setReleased(true); setWarn(null); lastRef.current = Date.now(); }
+  }
 
   useEffect(() => {
     if (skip) return;
-
-    function resetTimer() {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        if (localStorage.getItem("nabd_access_token")) setLocked(true);
-      }, IDLE_TIMEOUT_MS);
-    }
-
-    const events = ["mousedown", "keydown", "touchstart", "scroll"];
-    events.forEach((e) => window.addEventListener(e, resetTimer));
-    resetTimer();
-    return () => {
-      events.forEach((e) => window.removeEventListener(e, resetTimer));
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
+    // A lock left behind by a session that no longer has a token must not trap the next login.
+    const on = hasToken() && readLockedAt() !== null;
+    if (!on && readLockedAt() !== null) persistUnlock();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    applyLock(on); setBooted(true);
+    return onLockMessage((l) => { if (!l || hasToken()) applyLock(l); });
   }, [skip]);
+
+  // Clinic idle timeout (setup:view only; anyone who cannot read it keeps the 5 min default).
+  useEffect(() => {
+    if (skip || !hasToken()) return;
+    fetch(`${API_BASE}/setup/policies`, { headers: { Authorization: `Bearer ${localStorage.getItem("nabd_access_token")}` } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: { policyKey: string; value: string }[]) => {
+        const row = Array.isArray(rows) ? rows.find((x) => x.policyKey === IDLE_POLICY_KEY) : undefined;
+        setTimeoutMs(clampIdleMinutes(row?.value) * 60_000);
+      })
+      .catch(() => {});
+  }, [skip]);
+
+  useEffect(() => {
+    if (skip) return;
+    lastRef.current = Date.now();
+    const bump = () => { if (!lockedRef.current) { lastRef.current = Date.now(); setWarn(null); } };
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "l" && hasToken()) {
+        e.preventDefault();
+        if (!lockedRef.current) { persistLock(); applyLock(true); }
+        return;
+      }
+      bump();
+    };
+    const events = ["mousedown", "touchstart", "scroll"];
+    events.forEach((e) => window.addEventListener(e, bump));
+    window.addEventListener("keydown", onKey);
+    const tick = setInterval(() => {
+      if (lockedRef.current) return;
+      const { phase, secondsLeft } = idlePhase(Date.now() - lastRef.current, timeoutMs);
+      if (phase === "lock") {
+        if (hasToken()) { persistLock(); applyLock(true); }
+        else lastRef.current = Date.now();
+      } else setWarn(phase === "warn" ? secondsLeft : null);
+    }, 1000);
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, bump));
+      window.removeEventListener("keydown", onKey);
+      clearInterval(tick);
+    };
+  }, [skip, timeoutMs]);
 
   async function unlock(e: React.FormEvent) {
     e.preventDefault();
@@ -71,7 +117,8 @@ export default function IdleLockGuard() {
         setError(unlockMessage(res.status, res.headers.get("Retry-After"), false));
         return;
       }
-      setLocked(false);
+      persistUnlock();
+      applyLock(false);
       setPin("");
     } catch {
       setError("Couldn't reach the server.");
@@ -84,55 +131,72 @@ export default function IdleLockGuard() {
   // so without this, a locked session with a forgotten PIN has no way out at all.
   async function signOut() {
     setSigningOut(true);
-    const token = localStorage.getItem("nabd_access_token");
-    if (token) {
-      await fetch(`${API_BASE}/auth/logout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {});
-    }
-    localStorage.removeItem("nabd_access_token");
-    localStorage.removeItem("nabd_refresh_token");
-    setLocked(false);
+    await endSession(); // logout call, tokens, lock flag and the drafts database
+    persistUnlock();
+    applyLock(false);
     setPin("");
     router.replace("/login");
   }
 
-  if (skip || !locked) return null;
+  // Tab traps inside the dialog; the page behind is inert as well.
+  function trapTab(e: React.KeyboardEvent) {
+    if (e.key !== "Tab") return;
+    const els = dialogRef.current?.querySelectorAll<HTMLElement>("input, button:not([disabled])");
+    if (!els?.length) return;
+    const first = els[0], last = els[els.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
 
+  if (skip) return <>{children}</>;
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(10,12,14,0.97)", zIndex: 9999,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
-      <form onSubmit={unlock} style={{
-        width: 320, background: "var(--nb-surface-1)", border: "1px solid var(--nb-border-default)",
-        borderRadius: "var(--nb-radius-lg)", padding: 24,
-      }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: "var(--nb-text-primary)" }}>Session locked</h2>
-        <p style={{ fontSize: 13, color: "var(--nb-text-secondary)", margin: "0 0 16px" }}>Enter your PIN to continue where you left off.</p>
-        {error && <div role="alert" aria-live="assertive" style={{ background: "var(--nb-danger-tint)", color: "var(--nb-danger-500)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBottom: 12 }}>{error}</div>}
-        <input
-          type="password" inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} autoFocus required
-          value={pin} onChange={(ev) => setPin(ev.target.value.replace(/\D/g, ""))}
-          style={{
-            width: "100%", height: 40, background: "var(--nb-surface-3)", border: "1px solid var(--nb-border-default)",
-            borderRadius: 8, padding: "0 12px", color: "var(--nb-text-primary)", fontSize: 14, marginBottom: 12, boxSizing: "border-box",
-          }}
-        />
-        <button type="submit" disabled={checking || pin.length < 4} style={{
-          width: "100%", height: 40, border: "none", borderRadius: 8, background: "var(--nb-accent-gradient)",
-          color: "var(--nb-on-accent)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+    <>
+      <div id="app-root" style={{ display: "contents" }} inert={locked}>{booted && (released || !locked) ? children : null}</div>
+      {warn !== null && !locked && (
+        <div role="alert" style={{
+          position: "fixed", insetBlockEnd: 16, insetInlineStart: 16, zIndex: 9998, maxInlineSize: 360,
+          background: "var(--nb-surface-1)", color: "var(--nb-text-primary)", border: "1px solid var(--nb-border-default)",
+          borderRadius: "var(--nb-radius-lg)", padding: "12px 16px", fontSize: 13,
         }}>
-          {checking ? "Checking…" : "Unlock"}
-        </button>
-        <button type="button" onClick={signOut} disabled={signingOut} style={{
-          width: "100%", height: 36, marginTop: 8, border: "none", background: "transparent",
-          color: "var(--nb-text-secondary)", fontSize: 13, cursor: "pointer", textDecoration: "underline",
+          Screen locks in {warn} s. Press any key to stay signed in.
+        </div>
+      )}
+      {locked && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(10,12,14,0.97)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          {signingOut ? "Signing out…" : "Not you? Sign out"}
-        </button>
-      </form>
-    </div>
+          <form ref={dialogRef} onSubmit={unlock} onKeyDown={trapTab} role="dialog" aria-modal="true" aria-labelledby="lock-title" style={{
+            inlineSize: 320, maxInlineSize: "calc(100vw - 32px)", background: "var(--nb-surface-1)", border: "1px solid var(--nb-border-default)",
+            borderRadius: "var(--nb-radius-lg)", padding: 24,
+          }}>
+            <h2 id="lock-title" style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px", color: "var(--nb-text-primary)" }}>Screen locked</h2>
+            <p style={{ fontSize: 13, color: "var(--nb-text-secondary)", margin: "0 0 16px" }}>Enter your PIN to continue where you left off.</p>
+            {error && <div role="alert" aria-live="assertive" style={{ background: "var(--nb-danger-tint)", color: "var(--nb-danger-500)", borderRadius: 8, padding: "8px 12px", fontSize: 13, marginBlockEnd: 12 }}>{error}</div>}
+            <label htmlFor="lock-pin" style={{ display: "block", fontSize: 13, color: "var(--nb-text-secondary)", marginBlockEnd: 4 }}>PIN</label>
+            <input
+              id="lock-pin" type="password" inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} autoFocus required autoComplete="off"
+              value={pin} onChange={(ev) => setPin(ev.target.value.replace(/\D/g, ""))}
+              style={{
+                inlineSize: "100%", blockSize: 44, background: "var(--nb-surface-3)", border: "1px solid var(--nb-border-default)",
+                borderRadius: 8, paddingInline: 12, color: "var(--nb-text-primary)", fontSize: 14, marginBlockEnd: 12, boxSizing: "border-box",
+              }}
+            />
+            <button type="submit" disabled={checking || pin.length < 4} style={{
+              inlineSize: "100%", blockSize: 44, border: "none", borderRadius: 8, background: "var(--nb-accent-gradient)",
+              color: "var(--nb-on-accent)", fontWeight: 600, fontSize: 13, cursor: "pointer",
+            }}>
+              {checking ? "Checking…" : "Unlock"}
+            </button>
+            <button type="button" onClick={signOut} disabled={signingOut} style={{
+              inlineSize: "100%", blockSize: 44, marginBlockStart: 8, border: "none", background: "transparent",
+              color: "var(--nb-text-secondary)", fontSize: 13, cursor: "pointer", textDecoration: "underline",
+            }}>
+              {signingOut ? "Signing out…" : "Not you? Sign out"}
+            </button>
+          </form>
+        </div>
+      )}
+    </>
   );
 }

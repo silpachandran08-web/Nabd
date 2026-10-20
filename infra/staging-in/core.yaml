@@ -1,0 +1,70 @@
+# OPS-053: staging-in Core runtime. Two stateless replicas behind one Service (the load balancer targets ready pods only).
+# Kubernetes-shaped because the acceptance speaks of "ready pods"; the platform choice needs an ADR (nabd-dev SKILL section 3).
+# Secrets (DB_*, JWT_KEYS_FILE content) come from the Secret "core-secrets"/"core-jwt-keys", created outside this repo (Needs external action).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core
+  namespace: staging-in
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }   # never drop below 2 ready pods during a deploy
+  selector:
+    matchLabels: { app: core }
+  template:
+    metadata:
+      labels: { app: core }
+    spec:
+      terminationGracePeriodSeconds: 45                  # > preStop sleep + spring.lifecycle.timeout-per-shutdown-phase (25s)
+      containers:
+        - name: core
+          image: ghcr.io/REPLACE_ORG/nabd-core@sha256:REPLACE_DIGEST   # deploy by signed digest only (docs/ops/ci.md)
+          ports: [{ name: http, containerPort: 8080 }, { name: management, containerPort: 8081 }]   # actuator is on the management port only (OPS-025)
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: prod }
+            - { name: JWT_KEYS_FILE, value: /secrets/jwt/jwks.json }   # same secret on every replica = tokens survive a restart
+            - { name: DB_USER, value: nabd_app }
+            - { name: DB_URL, valueFrom: { secretKeyRef: { name: core-secrets, key: db-url } } }          # PgBouncer endpoint
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: core-secrets, key: db-password } } }
+            - { name: APP_CRYPTO_KEY, valueFrom: { secretKeyRef: { name: core-secrets, key: app-crypto-key } } }   # PLT-044: legacy reads only, drop after the re-encrypt verify pass
+            - { name: APP_CRYPTO_KEYRING, valueFrom: { secretKeyRef: { name: core-secrets, key: app-crypto-keyring } } }   # PLT-044: "kid:base64,..."; prod refuses to boot without it
+            - { name: APP_CRYPTO_ACTIVE_KID, value: "1" }
+          volumeMounts:
+            - { name: jwt-keys, mountPath: /secrets/jwt, readOnly: true }
+          # Probe paths are Spring's standard group endpoints; they wait on OPS-025 shipping them (not in this tree yet).
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: management }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: management }
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: management }
+            periodSeconds: 5
+            failureThreshold: 36
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "10"] }          # LB deregisters the pod before Tomcat starts draining
+      volumes:
+        - name: jwt-keys
+          secret: { secretName: core-jwt-keys }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: core, namespace: staging-in }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: core } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: core, namespace: staging-in }
+spec:
+  type: LoadBalancer
+  selector: { app: core }
+  ports: [{ name: http, port: 80, targetPort: http }]
+  # no sessionAffinity: pods are stateless (refresh tokens in Postgres, signing keys shared)

@@ -36,7 +36,7 @@ const VISIT_LABELS: Record<Booking["visitType"], string> = {
   appointment: "Appointment", follow_up: "Follow-up", walk_in: "Walk-in", transfer: "Transfer",
 };
 const STATUS_LABELS: Record<string, string> = {
-  scheduled: "Not arrived", checked_in: "Checked in", waiting: "Waiting", billing_pending: "Billing pending",
+  scheduled: "Not arrived", arrived: "Arrived", checked_in: "Arrived", waiting: "Waiting", billing_pending: "Billing pending",
   vitals_pending: "Vitals pending", vitals_done: "Vitals done", in_consult: "In consultation",
   procedures_pending: "Procedures pending", checkout_pending: "Checkout pending", completed: "Completed", no_show: "No-show",
 };

@@ -3,8 +3,9 @@ package com.nabd.hms.messaging;
 import com.nabd.hms.common.WhatsAppOtpSender;
 import org.springframework.stereotype.Component;
 
-/** Sent synchronously, not via the outbox — a login code that arrives after a 30s retry backoff
- * is useless, so a failure should surface to the caller now. */
+/** Called by auth.OtpRequestedHandler from the outbox with no transaction open (OPS-012): a Meta slowdown must
+ * not hold request threads and DB connections. A failed send is retried with the outbox backoff while the code
+ * is still valid. */
 @Component
 class TemplateWhatsAppOtpSender implements WhatsAppOtpSender {
 

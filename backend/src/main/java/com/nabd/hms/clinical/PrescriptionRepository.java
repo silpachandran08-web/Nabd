@@ -110,9 +110,13 @@ class PrescriptionRepository {
     /** Returns affected rows (0 = it was not a draft); the caller audits only when a row actually changed.
      * DOC-R3: the allergy snapshot is written in the same UPDATE as the status flip. V51's trigger refuses any later
      * UPDATE of a signed row, so this is the only moment it can be written. */
-    int sign(UUID tenantId, UUID prescriptionId, String allergySnapshotJson) {
-        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now(), allergy_snapshot = ?::jsonb " +
-                "WHERE tenant_id = ? AND id = ? AND status = 'draft'", allergySnapshotJson, tenantId, prescriptionId);
+    int sign(UUID tenantId, UUID prescriptionId, String allergySnapshotJson, String safetyDictionaryVersion,
+             UUID signedBy, String signedByRegistrationNo) {
+        // CLN-005: signer and the licence number it signed under are stored with the status flip (V1221 CHECK).
+        return jdbc.update("UPDATE prescriptions SET status = 'signed', signed_at = now(), allergy_snapshot = ?::jsonb, " +
+                "safety_dictionary_version = ?, signed_by = ?, signed_by_registration_no = ? " +
+                "WHERE tenant_id = ? AND id = ? AND status = 'draft'",
+                allergySnapshotJson, safetyDictionaryVersion, signedBy, signedByRegistrationNo, tenantId, prescriptionId);
     }
 
     /** DOC-033: type-ahead source. Pharmacy item master (active stocked items) first, then distinct names this tenant
@@ -229,7 +233,10 @@ class PrescriptionRepository {
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("signed_at") == null ? null : rs.getTimestamp("signed_at").toInstant(),
-                rs.getString("allergy_snapshot_json"));
+                rs.getString("allergy_snapshot_json"),
+                rs.getString("safety_dictionary_version"),
+                rs.getString("signed_by") == null ? null : UUID.fromString(rs.getString("signed_by")),
+                rs.getString("signed_by_registration_no"));
     }
 
     private RowMapper<PrescriptionItemRow> itemMapper() {

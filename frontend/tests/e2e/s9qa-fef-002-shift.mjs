@@ -24,7 +24,7 @@ async function world({ ttl = 60, pages = 3 }) {
     navigator.locks.request = (n, fn) => lr(n, async (l) => { window.qaLog('LOCK granted'); try { return await fn(l); } finally { window.qaLog('LOCK released'); } });
   });
   await ctx.addInitScript(([a]) => { if (!localStorage.getItem('nabd_access_token')) { localStorage.setItem('nabd_access_token', a); localStorage.setItem('nabd_refresh_token', 'r0'); } }, [mk(t0 + ttl, 'seed')]);
-  const fakeNow = async () => (await w.pages[0].evaluate(() => Date.now())) / 1000;
+  const fakeNow = async (pg) => (await (pg || w.pages[0]).evaluate(() => Date.now())) / 1000;
   await ctx.route(/^(http:\/\/localhost:8080|https:\/\/nabd-f0zb\.onrender\.com)\/v1\//, async (route) => {
     const req = route.request();
     const u = new URL(req.url()); const path = u.pathname.replace(/^\/v1/, '');
@@ -38,7 +38,8 @@ async function world({ ttl = 60, pages = 3 }) {
       if (w.used.has(rt)) { w.reuse++; w.revoked = true; }
       if (w.revoked || !w.valid.has(rt)) return send(401, { title: 'REFRESH_INVALID' });
       w.used.add(rt); w.valid.delete(rt); const n = ++w.n; w.valid.add('r' + n);
-      const now = Math.floor(await fakeNow());
+      // iat from the REQUESTING tab's clock: the tabs' fake clocks drift apart during runFor, and page 0's clock made the token look older to the other tabs (gaps of 36-47 s)
+      const now = Math.floor(await fakeNow(req.frame().page()));
       return send(200, { accessToken: mk(now + ttl, 'fresh' + n), refreshToken: 'r' + n, expiresIn: ttl });
     }
     if (path.startsWith('/queue')) {

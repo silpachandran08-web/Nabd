@@ -203,7 +203,7 @@
 .pillRole { background: var(--nb-surface-3); color: var(--nb-text-secondary); }
 
 .actionBtn {
-  height: 28px;
+  min-height: 44px; /* 44px touch target (PLT-004 QA U2.2) */
   padding: 0 var(--nb-space-12);
   border: 1px solid var(--nb-border-default);
   border-radius: var(--nb-radius-md);

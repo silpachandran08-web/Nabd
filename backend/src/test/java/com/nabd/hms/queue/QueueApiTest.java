@@ -170,8 +170,7 @@ class QueueApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         addWorkingHours(token, staff.id(), 2);
         String booked = registerPatientWithDob(token, "CapB", "+919999910110");
-        java.time.Instant slot = java.time.Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES)
-                .truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        java.time.Instant slot = nextQuarterHour(); // ACC-004: bookings must sit on the 15-minute grid
         ResponseEntity<Map> appt = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "doctorId", staff.id().toString(), "patientId", booked, "startTime", slot.toString())), Map.class);
         assertThat(appt.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -193,8 +192,7 @@ class QueueApiTest extends ApiTestBase {
         String token = loginAndGetAccessToken(staff);
         addWorkingHours(token, staff.id(), 1);
         String patient = registerPatientWithDob(token, "CapA", "+919999910120");
-        java.time.Instant slot = java.time.Instant.now().plus(5, java.time.temporal.ChronoUnit.MINUTES)
-                .truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        java.time.Instant slot = nextQuarterHour(); // ACC-004: bookings must sit on the 15-minute grid
         ResponseEntity<Map> appt = exchange("/v1/appointments", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "doctorId", staff.id().toString(), "patientId", patient, "startTime", slot.toString())), Map.class);
         Map<String, Object> body = Map.of("appointmentId", appt.getBody().get("id"), "patientId", patient,
@@ -203,7 +201,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, body), Map.class)
                 .getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, body), Map.class)
-                .getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT); // ACC-003: was 404
     }
 
     /** QA-04: two front desks racing for the last slot — the per-doctor-day advisory lock lets exactly one in. */
@@ -314,7 +312,7 @@ class QueueApiTest extends ApiTestBase {
         String entryId = (String) checkin.getBody().get("id");
 
         ResponseEntity<Map> illegal = exchange("/v1/queue/" + entryId + "/status", HttpMethod.PATCH,
-                authedJsonBody(token, Map.of("status", "completed")), Map.class);
+                authedJsonBody(token, Map.of("status", "in_consult")), Map.class); // ACC-002: "completed" is now 403 (own test)
         assertThat(illegal.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(illegal.getBody().get("type")).asString().contains("illegal-transition");
 
@@ -405,7 +403,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(toBilling.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> interim = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "CONSULT", "chargeName", "Consultation fee",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "CONSULT", "chargeName", "Consultation fee",
                         "category", "Consultation", "quantity", 1, "unitPrice", 500.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(interim.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -464,7 +462,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(toBilling.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> firstBill = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "FILLING", "chargeName", "Tooth filling",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "FILLING", "chargeName", "Tooth filling",
                         "category", "Procedure", "quantity", 1, "unitPrice", 2000.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(firstBill.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -476,7 +474,7 @@ class QueueApiTest extends ApiTestBase {
         assertThat(queueStatus(tenant.id(), entryId)).isEqualTo("checkout_pending");
 
         ResponseEntity<Map> secondBill = exchange("/v1/billing/checkout/" + entryId, HttpMethod.POST, authedJsonBody(token, Map.of(
-                "lineItems", List.of(Map.of("chargeCode", "XRAY", "chargeName", "Dental X-ray",
+                "lineItems", List.of(Map.of("override", Map.of("reasonCode", "other"), "chargeCode", "XRAY", "chargeName", "Dental X-ray",
                         "category", "Procedure", "quantity", 1, "unitPrice", 300.00, "taxRatePercent", 0.00)),
                 "discount", 0)), Map.class);
         assertThat(secondBill.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -769,5 +767,12 @@ class QueueApiTest extends ApiTestBase {
         assertThat(((Number) row.get("waitMinutes")).intValue()).isEqualTo(12);
         assertThat(row.get("tokenNumber")).isEqualTo(1);
         assertThat(row.get("visitType")).isEqualTo("walk_in");
+    }
+
+    /** First 15-minute boundary at least 5 minutes ahead (hours in addWorkingHours run 00:00-23:45 UTC). */
+    private static java.time.Instant nextQuarterHour() {
+        long q = 15 * 60;
+        long t = java.time.Instant.now().plusSeconds(5 * 60).getEpochSecond();
+        return java.time.Instant.ofEpochSecond((t + q - 1) / q * q);
     }
 }

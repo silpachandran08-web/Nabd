@@ -1,7 +1,9 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.patient.registry.RegistryReconciler;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
@@ -15,6 +17,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Patient Registry: every flag from real data, the per-filter counts, search and the archived rule. */
 class PatientRegistryApiTest extends ApiTestBase {
+
+    // OPS-008: the registry reads the summary read model; tests catch it up explicitly (background poll and the
+    // nightly duplicate pass are off in tests), which also flags the earlier duplicate partner.
+    @Autowired RegistryReconciler reconciler;
 
     private String register(String token, String name, String phone, String dob, String guardianId) {
         return register(token, name, phone, dob, guardianId, false);
@@ -37,6 +43,10 @@ class PatientRegistryApiTest extends ApiTestBase {
         SeededStaff owner = seedStaff(tenant, seedFullAccessRole(tenant.id()), "reg1@a.com", "+919800067001", false);
         String token = loginAndGetAccessToken(owner);
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        // ACC-004: bookings must fall inside working hours; tomorrow 10:00 UTC
+        exchange("/v1/doctors/" + owner.id() + "/working-hours", HttpMethod.POST, authedJsonBody(token, Map.of(
+                "dayOfWeek", today.plusDays(1).getDayOfWeek().getValue() % 7,
+                "startTime", "00:00:00", "endTime", "23:45:00", "slotMinutes", 15)), Map.class);
 
         String inQueue = register(token, "Ananya Rao", "+919811177001", "1990-01-01", null);
         Map<String, Object> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(token, Map.of(
@@ -63,6 +73,7 @@ class PatientRegistryApiTest extends ApiTestBase {
                     tenant.id(), owes, owner.id());
             jdbc.update("UPDATE patients SET status = 'merged', merged_into_id = ?::uuid WHERE id = ?::uuid", owes, merged);
         });
+        reconciler.reconcileTenant(tenant.id());
 
         Map<String, Object> all = exchange("/v1/patients/registry", HttpMethod.GET, authed(token), Map.class).getBody();
         Map<String, Object> counts = (Map<String, Object>) all.get("counts");
@@ -109,6 +120,7 @@ class PatientRegistryApiTest extends ApiTestBase {
         for (int i = 0; i < names.length; i++) {
             ids.add(register(token, names[i], "+91981117710" + i, (1950 + i * 7) + "-0" + (i + 1) + "-1" + i, null));
         }
+        reconciler.reconcileTenant(tenant.id());
 
         // no paging params: today's call shape still returns every row, plus the new fields
         Map<String, Object> unpaged = exchange("/v1/patients/registry", HttpMethod.GET, authed(token), Map.class).getBody();
@@ -143,9 +155,9 @@ class PatientRegistryApiTest extends ApiTestBase {
         Map<String, Object> one = exchange("/v1/patients/registry?q=Divya&limit=4", HttpMethod.GET, authed(token), Map.class).getBody();
         assertThat(one).containsEntry("matchedTotal", 1).containsEntry("hasMore", false);
 
-        // limit is clamped like the encounters list (1..200), a foreign/garbled cursor is a 400
-        Map<String, Object> clamped = exchange("/v1/patients/registry?limit=0", HttpMethod.GET, authed(token), Map.class).getBody();
-        assertThat((List<?>) clamped.get("rows")).hasSize(1);
+        // PLT-027: an out-of-range limit is a 400 (was clamped), a foreign/garbled cursor is a 400
+        assertThat(exchange("/v1/patients/registry?limit=0", HttpMethod.GET, authed(token), Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(exchange("/v1/patients/registry?cursor=not-a-cursor", HttpMethod.GET, authed(token), Map.class).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
         String encounterStyleCursor = new com.nabd.hms.common.Cursor(java.time.Instant.now(), UUID.randomUUID()).encode();
@@ -157,6 +169,7 @@ class PatientRegistryApiTest extends ApiTestBase {
         SeededStaff otherOwner = seedStaff(other, seedFullAccessRole(other.id()), "reg3@a.com", "+919800067003", false);
         String otherToken = loginAndGetAccessToken(otherOwner);
         String otherPatient = register(otherToken, "Pager Other", "+919811177199", "1999-09-09", null);
+        reconciler.reconcileTenant(other.id());
         Map<String, Object> otherPage = exchange("/v1/patients/registry?limit=1", HttpMethod.GET, authed(otherToken), Map.class).getBody();
         assertThat(otherPage).containsEntry("total", 1).containsEntry("matchedTotal", 1).containsEntry("hasMore", false);
         assertThat(((List<Map<String, Object>>) otherPage.get("rows")).stream().map(r -> r.get("id")).toList())

@@ -37,17 +37,17 @@ public class ScheduleBoardService {
     public ScheduleDayResponse day(UUID tenantId, LocalDate date) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
-        LocalDate day = date != null ? date : LocalDate.now(zone);
-        return build(tenantId, day, zone, LocalDate.now(zone), Instant.now());
+        LocalDate day = date != null ? date : clock.today(zone);
+        return build(tenantId, day, zone, clock.today(zone), clock.now());
     }
 
     @Transactional(readOnly = true)
     public ScheduleWeekResponse week(UUID tenantId, LocalDate start) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
-        LocalDate today = LocalDate.now(zone);
+        LocalDate today = clock.today(zone);
         LocalDate first = start != null ? start : today;
-        Instant now = Instant.now();
+        Instant now = clock.now();
         List<ScheduleWeekResponse.Day> days = new ArrayList<>();
         for (int i = 0; i < 7; i++) {
             ScheduleDayResponse d = build(tenantId, first.plusDays(i), zone, today, now);

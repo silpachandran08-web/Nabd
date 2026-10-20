@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getIdentity } from "../../lib/session";
+import { clinicToday, formatClinicDate, formatClinicTime } from "../../lib/clinicTime";
+import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
 import StatusPill from "../ui/StatusPill";
 import { Skeleton } from "../ui/StateViews";
 import { upcomingFollowUp, type AppointmentLite } from "./consultFlow";
 import type { AuthedFetch, Problem } from "./shared";
 import s from "./consultParts.module.css";
-
-// Clinic wall-clock time, not the browser's (DOC-038). The region is chosen at provisioning.
-const REGION_TZ: Record<string, string> = { IN: "Asia/Kolkata", KSA: "Asia/Riyadh" };
 
 const INTERVALS: { id: string; label: string; days?: number; months?: number }[] = [
   { id: "3d", label: "3 days", days: 3 },
@@ -19,9 +17,6 @@ const INTERVALS: { id: string; label: string; days?: number; months?: number }[]
   { id: "custom", label: "Custom" },
 ];
 
-function clinicToday(tz: string | undefined): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: tz });
-}
 function addToDate(ymd: string, days: number, months: number): string {
   const [y, m, d] = ymd.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1 + months, d + days));
@@ -35,7 +30,7 @@ export default function FollowUpPanel({
   /** queue:create — booking controls are absent without it; the existing follow-up still shows. */
   canBook: boolean;
 }) {
-  const [tz] = useState<string | undefined>(() => REGION_TZ[getIdentity()?.tenantRegion ?? ""]);
+  const tz = useClinicTimeZone(); // clinic wall-clock time from the session, not the browser's (DOC-038, FEF-011)
   const [interval, setIntervalId] = useState<string | null>(null);
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<string[] | null>(null);
@@ -46,8 +41,8 @@ export default function FollowUpPanel({
   const [booked, setBooked] = useState<string | null>(null);
   const [existing, setExisting] = useState<"loading" | "error" | "done">("loading");
 
-  const fmtSlot = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: tz });
-  const fmtFull = (iso: string) => `${new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", timeZone: tz })} ${fmtSlot(iso)}`;
+  const fmtSlot = (iso: string) => formatClinicTime(iso, tz);
+  const fmtFull = (iso: string) => `${formatClinicDate(iso, { weekday: "short", day: "2-digit", month: "short" }, tz)} ${fmtSlot(iso)}`;
 
   // A follow-up booked earlier (another session, or before a reload) is the current state: the
   // soonest scheduled follow-up appointment with this doctor (GET /appointments, is_follow_up).
@@ -153,7 +148,7 @@ export default function FollowUpPanel({
       )}
       {date && (
         <div style={{ marginBlockStart: "var(--nb-space-12)" }}>
-          <p className={s.muted}>Free slots on {date}{tz ? ` (${tz.split("/")[1].replace("_", " ")} time)` : ""}</p>
+          <p className={s.muted}>Free slots on {date}{tz?.includes("/") ? ` (${tz.split("/")[1].replace("_", " ")} time)` : ""}</p>
           {slots === null ? <Skeleton rows={1} label="Loading slots" /> : slots.length === 0 ? (
             <p className={s.muted}>{slotsError ? "Couldn't load free slots. Pick the date again to retry." : "No free slots that day. Try another interval."}</p>
           ) : (

@@ -6,6 +6,6 @@ import java.time.Instant;
 public record RefundResponse(
         String id, String instanceId, String patientName, String packageName, String reason,
         BigDecimal usedListValue, BigDecimal refundAmount, BigDecimal amountOwed, String status,
-        String creditNoteNumber, Instant createdAt
+        String creditNoteNumber, Instant createdAt, BigDecimal recomputedAmount
 ) {
 }

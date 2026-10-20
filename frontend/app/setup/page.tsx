@@ -274,7 +274,7 @@ function SetupPageInner() {
   };
 
   const updatePolicy = async (p: Policy) => {
-    const value = prompt(`New value for ${p.policyKey}`, p.value);
+    const value = prompt(`New value for ${p.policyKey}${p.policyKey === "session.idle_lock_minutes" ? " (minutes, 2-30)" : ""}`, p.value);
     if (value === null) return;
     if (await patch(`/setup/policies/${p.policyKey}`, { value })) loadAll();
   };

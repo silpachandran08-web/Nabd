@@ -20,6 +20,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PrescriptionApiTest extends ApiTestBase {
 
+    // CLN-005: signing needs a registered clinician. Every staff member these tests seed is one, so they keep testing what
+    // they were written for; the licence refusals themselves are covered in ClinicalLicenceApiTest.
+    @Override
+    protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
+                                    boolean emailVerified, boolean mobileVerified) {
+        return com.nabd.hms.support.ClinicianFixture.licensed(
+                super.seedStaff(tenant, roleId, email, mobilePhone, mfaEnabled, emailVerified, mobileVerified));
+    }
+
     private String registerPatient(String token, String name, String phone) {
         ResponseEntity<Map> resp = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", name, "phone", phone, "dob", "1990-01-01", "gender", "male")), Map.class);
@@ -519,7 +528,8 @@ class PrescriptionApiTest extends ApiTestBase {
         org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataAccessException.class, () ->
                 inTenantTx(tenant.id(), () -> jdbc.update("DELETE FROM prescriptions WHERE tenant_id = ? AND status = 'signed'", tenant.id())));
         // (c) TRUNCATE on either table
-        assertTruncateRefusedByTrigger("TRUNCATE prescription_items", "signed prescriptions are final");
+        // CASCADE: V1350 invoice_line_items references prescription_items, so a plain TRUNCATE stops at the FK first
+        assertTruncateRefusedByTrigger("TRUNCATE prescription_items CASCADE", "signed prescriptions are final");
         assertTruncateRefusedByTrigger("TRUNCATE prescriptions CASCADE", "signed prescriptions are final");
 
         Integer signedItems = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
@@ -987,11 +997,11 @@ class PrescriptionApiTest extends ApiTestBase {
                 authedJsonBody(token, Map.of("substance", "Dust", "severity", "mild")), Map.class);
         String legacyEntry = checkIn(token, patientId, doc.id());
         UUID legacyId = UUID.randomUUID();
-        // What a pre-V79 sign left behind: status signed, signed_at set, no allergy_snapshot.
+        // What a pre-V79 sign left behind: status signed, signed_at set, no allergy_snapshot (signed_by as V1222 backfilled it).
         inTenantTx(tenant.id(), () -> jdbc.update(
-                "INSERT INTO prescriptions (id, tenant_id, queue_entry_id, patient_id, doctor_id, status, signed_at) " +
-                        "VALUES (?,?,?::uuid,?::uuid,?,'signed', now() - interval '30 days')",
-                legacyId, tenant.id(), legacyEntry, patientId, doc.id()));
+                "INSERT INTO prescriptions (id, tenant_id, queue_entry_id, patient_id, doctor_id, status, signed_at, signed_by) " +
+                        "VALUES (?,?,?::uuid,?::uuid,?,'signed', now() - interval '30 days', ?)",
+                legacyId, tenant.id(), legacyEntry, patientId, doc.id(), doc.id()));
 
         ResponseEntity<Map> legacy = exchange("/v1/clinical/prescriptions/" + legacyEntry, HttpMethod.GET, authed(token), Map.class);
         assertThat(legacy.getStatusCode()).isEqualTo(HttpStatus.OK);

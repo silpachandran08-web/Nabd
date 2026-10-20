@@ -111,6 +111,7 @@ public class PackageController {
         return instanceService.detail(tenantId(jwt), id);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/instances/items/{itemId}/book")
     @PreAuthorize("hasAuthority('packages:edit')")
     public InstanceResponse book(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID itemId) {
@@ -147,6 +148,7 @@ public class PackageController {
         return instanceService.refundPreview(tenantId(jwt), id);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/instances/{id}/refund")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('packages:edit')")
@@ -160,10 +162,20 @@ public class PackageController {
         return instanceService.listRefunds(tenantId(jwt));
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/refunds/{id}/approve")
     @PreAuthorize("hasAuthority('packages:approve')")
-    public RefundResponse approveRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return instanceService.approveRefund(tenantId(jwt), staffId(jwt), id);
+    public RefundResponse approveRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                        @RequestBody(required = false) com.nabd.hms.packages.dto.ApproveRefundRequest req) {
+        return instanceService.approveRefund(tenantId(jwt), staffId(jwt), id, req == null ? null : req.expectedAmount());
+    }
+
+    @com.nabd.hms.shared.idempotency.Idempotent
+    @PostMapping("/refunds/{id}/reject")
+    @PreAuthorize("hasAuthority('packages:approve')")
+    public RefundResponse rejectRefund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                       @Valid @RequestBody com.nabd.hms.packages.dto.RejectRefundRequest req) {
+        return instanceService.rejectRefund(tenantId(jwt), staffId(jwt), id, req.reason());
     }
 
     @GetMapping("/liability")

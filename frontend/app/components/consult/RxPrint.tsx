@@ -246,6 +246,12 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
             <div className={r.metaLabel}>Signed at</div>
             <div>{when(rx.signedAt)}</div>
           </div>
+          {rx.safetyDictionaryVersion && (
+            <div>
+              <div className={r.metaLabel}>Safety checks</div>
+              <div>Nabd safety dictionary {rx.safetyDictionaryVersion}</div>
+            </div>
+          )}
         </footer>
       </article>
     </main>

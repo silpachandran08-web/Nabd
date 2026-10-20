@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import styles from "./patients.module.css";
 import StatusPill from "../components/ui/StatusPill";
+import { fingerprint, submitKeyed } from "../lib/idempotency";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 type Problem = { title: string; detail: string };
@@ -85,7 +86,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
         ...(minor && guardian ? { guardianConsent: { confirmed: true, channel } } : {}),
         ...(confirmed ? { confirmedNotDuplicate: true } : {}),
       };
-      const res = await authedFetch("/patients", { method: "POST", body: JSON.stringify(body) });
+      const res = await submitKeyed(authedFetch, "/patients", body, `reg.${fingerprint(JSON.stringify(body))}`);
       if (!res) return;
       if (res.status === 409) {
         const dup: { candidates: Candidate[] } = await res.json();

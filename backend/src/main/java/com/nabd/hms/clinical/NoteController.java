@@ -26,15 +26,21 @@ import java.util.UUID;
 public class NoteController {
 
     private final NoteService service;
+    private final ClinicalReadScope scopes;
 
-    NoteController(NoteService service) {
+    NoteController(NoteService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("note")
     @GetMapping("/{queueEntryId}")
     @PreAuthorize("hasAuthority('clinical:view')")
     public NoteResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.get(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return FieldGrantMasker.note(scope, service.get(scope.tenantId(), queueEntryId));
     }
 
     @PatchMapping("/{queueEntryId}")
@@ -44,28 +50,39 @@ public class NoteController {
         return service.upsert(tenantId(jwt), queueEntryId, req);
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/{queueEntryId}/sign")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public NoteResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.sign(tenantId(jwt), queueEntryId);
+        return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
     }
 
+    @com.nabd.hms.shared.idempotency.Idempotent
     @PostMapping("/{queueEntryId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
     public NoteAmendmentResponse amend(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId,
                                         @Valid @RequestBody NoteAmendmentRequest req) {
-        return service.amend(tenantId(jwt), staffId(jwt), queueEntryId, req);
+        return service.amend(tenantId(jwt), staffId(jwt), canApprove(jwt), queueEntryId, req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("note_amendments")
     @GetMapping("/{queueEntryId}/amendments")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<NoteAmendmentResponse> listAmendments(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
-        return service.listAmendments(tenantId(jwt), queueEntryId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requireVisit(scope, queueEntryId);
+        return FieldGrantMasker.amendments(scope, service.listAmendments(scope.tenantId(), queueEntryId));
     }
 
     private UUID tenantId(Jwt jwt) {
         return UUID.fromString(jwt.getClaimAsString("tenantId"));
+    }
+
+    private static boolean canApprove(Jwt jwt) {
+        List<String> permissions = jwt.getClaimAsStringList("permissions");
+        return permissions != null && permissions.contains(PrescriptionService.PERMISSION_CLINICAL_APPROVE);
     }
 
     private UUID staffId(Jwt jwt) {

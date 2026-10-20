@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./account.module.css";
-import { apiFetch, goLogin } from "../lib/apiClient";
+import { apiFetch, goLogin, storeTokens } from "../lib/apiClient";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
 // self-activated emergency access (NB-048). All work against a normal logged-in access token.
@@ -135,8 +135,7 @@ export default function AccountPage() {
         return;
       }
       const body = await res.json();
-      localStorage.setItem("nabd_access_token", body.accessToken);
-      localStorage.setItem("nabd_refresh_token", body.refreshToken);
+      storeTokens(body);
       setBgActive(true);
       setBgReason("");
     } finally {

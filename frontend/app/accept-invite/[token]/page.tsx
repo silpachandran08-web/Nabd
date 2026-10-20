@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { decodeAccessToken, landingPathFor } from "../../lib/session";
+import { storeTokens } from "../../lib/apiClient";
 import styles from "../../login/login.module.css";
+import MfaEnrolCard from "../../components/MfaEnrolCard";
 
 // Matches POST /v1/staff/invitations/{token}/accept (StaffController.acceptInvite) — used by both
 // regular staff invites (staff/page.tsx) and the owner invite provisioning now sends (NB-353).
@@ -21,6 +23,9 @@ export default function AcceptInvitePage() {
   const [confirmPin, setConfirmPin] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // PLT-005: a role that requires MFA gets a setup token instead of a session; enrol here, then sign in.
+  const [setupToken, setSetupToken] = useState<string | null>(null);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -41,9 +46,12 @@ export default function AcceptInvitePage() {
         setFormError((body as Problem).detail || "That invite link is invalid or has expired.");
         return;
       }
+      if ("setupToken" in body) {
+        setSetupToken(body.setupToken);
+        return;
+      }
       const pair = body as TokenPair;
-      localStorage.setItem("nabd_access_token", pair.accessToken);
-      localStorage.setItem("nabd_refresh_token", pair.refreshToken);
+      storeTokens(pair);
       // Land where the role works (as login does); /account when the role has no home worklist.
       const claims = decodeAccessToken(pair.accessToken);
       router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
@@ -52,6 +60,27 @@ export default function AcceptInvitePage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (setupToken) {
+    return (
+      <main className={styles.page}>
+        <div className={styles.card}>
+          {recoveryCodes ? (
+            <>
+              <h1 className={styles.title}>Save your recovery codes</h1>
+              <p className={styles.subtitle}>Each code works once if you lose your authenticator. They won&apos;t be shown again.</p>
+              <div className={styles.recoveryCodes}>{recoveryCodes.map((c) => <span key={c}>{c}</span>)}</div>
+              <button className={styles.submit} type="button" onClick={() => router.replace("/login")}>Sign in now</button>
+            </>
+          ) : (
+            <MfaEnrolCard enrollUrl={`${API_BASE}/auth/mfa/enroll`} confirmUrl={`${API_BASE}/auth/mfa/confirm`} setupToken={setupToken}
+              subtitle="Your role requires an authenticator app before you can sign in."
+              onDone={(b) => setRecoveryCodes((b as { recoveryCodes?: string[] } | null)?.recoveryCodes ?? [])} />
+          )}
+        </div>
+      </main>
+    );
   }
 
   return (

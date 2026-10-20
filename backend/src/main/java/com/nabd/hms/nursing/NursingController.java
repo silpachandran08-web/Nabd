@@ -1,5 +1,6 @@
 package com.nabd.hms.nursing;
 
+import com.nabd.hms.clinical.ClinicalReadScope;
 import com.nabd.hms.nursing.dto.ActivityEntryResponse;
 import com.nabd.hms.nursing.dto.AdministerRequest;
 import com.nabd.hms.nursing.dto.AdministrationOrderRequest;
@@ -40,8 +41,11 @@ public class NursingController {
     private final VaccineRecordService vaccineRecordService;
     private final WorklistService worklistService;
 
+    private final ClinicalReadScope scopes;
+
     NursingController(AdministrationService administrationService, ProcedureService procedureService, ActivityService activityService,
-                      VaccineRecordService vaccineRecordService, WorklistService worklistService) {
+                      VaccineRecordService vaccineRecordService, WorklistService worklistService, ClinicalReadScope scopes) {
+        this.scopes = scopes;
         this.worklistService = worklistService;
         this.vaccineRecordService = vaccineRecordService;
         this.administrationService = administrationService;
@@ -118,10 +122,11 @@ public class NursingController {
         return vaccineRecordService.record(tenantId(jwt), staffId(jwt), req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
     @GetMapping("/vaccine-records/today")
     @PreAuthorize("hasAuthority('nursing:view')")
     public List<VaccineRecordResponse> vaccineRecordsToday(@AuthenticationPrincipal Jwt jwt) {
-        return vaccineRecordService.listToday(tenantId(jwt));
+        return vaccineRecordService.listToday(scopes.resolve(jwt)); // IDC-001: consent + own-patients gate in the list SQL
     }
 
     /** NUR-019: same permission as GET /queue; patient/vitals sub-objects follow patients:view / clinical:view. */

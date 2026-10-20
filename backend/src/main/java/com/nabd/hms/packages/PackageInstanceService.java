@@ -61,12 +61,14 @@ public class PackageInstanceService {
     private final TenantContext tenantContext;
     private final CheckoutService checkoutService;
     private final AuditService auditService;
+    private final com.nabd.hms.common.EventPublisher eventPublisher;
 
     private final ClinicClock clock;
 
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
-                            AuditService auditService, ClinicClock clock) {
+                            AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher) {
         this.clock = clock;
+        this.eventPublisher = eventPublisher;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.checkoutService = checkoutService;
@@ -156,8 +158,9 @@ public class PackageInstanceService {
         tenantContext.set(tenantId);
         InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(this::notFound);
         UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(this::notFound);
+        repo.lockInstance(tenantId, instanceId); // FIN-004: serialise with refund request/approve
         InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(this::notFound);
-        requireActionable(instance, item, clock.today(tenantId));
+        requireActionable(tenantId, instance, item, clock.today(tenantId));
 
         repo.insertRedemption(tenantId, instanceItemId, staffId);
         repo.insertEvent(tenantId, instanceId, "session_booked", item.name() + " · no entitlement consumed on booking", 0, staffId);
@@ -169,8 +172,9 @@ public class PackageInstanceService {
         tenantContext.set(tenantId);
         InstanceItemRow item = repo.findInstanceItem(tenantId, instanceItemId).orElseThrow(this::notFound);
         UUID instanceId = repo.findInstanceIdForItem(tenantId, instanceItemId).orElseThrow(this::notFound);
+        repo.lockInstance(tenantId, instanceId); // FIN-004: serialise with refund request/approve
         InstanceRow instance = repo.findInstance(tenantId, instanceId).orElseThrow(this::notFound);
-        requireActionable(instance, item, clock.today(tenantId));
+        requireActionable(tenantId, instance, item, clock.today(tenantId));
 
         if ("first_session".equals(instance.validityStarts()) && instance.validityStart() == null) {
             LocalDate start = clock.today(tenantId);
@@ -197,11 +201,15 @@ public class PackageInstanceService {
 
     /** The wireframe's own rule: no booking or redeeming on an expired, fully consumed, refunded or
      * cancelled package. Grace period still permits both — only past grace is a hard stop. */
-    private void requireActionable(InstanceRow instance, InstanceItemRow item, LocalDate today) {
+    private void requireActionable(UUID tenantId, InstanceRow instance, InstanceItemRow item, LocalDate today) {
         String status = effectiveStatus(instance, today);
         if (!"active".equals(status) && !"grace".equals(status)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "package-not-actionable", "Package not available",
                     "This package is " + status + " and can no longer be booked or redeemed.");
+        }
+        if (repo.hasPendingRefund(tenantId, instance.id())) {
+            throw new ApiException(HttpStatus.CONFLICT, "refund-pending", "Refund pending",
+                    "A refund is awaiting approval for this package. Approve or reject it before booking or redeeming.");
         }
         if (item.quantityConsumed() >= item.quantityTotal()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "no-sessions-remaining", "No sessions remaining",
@@ -214,6 +222,16 @@ public class PackageInstanceService {
         tenantContext.set(tenantId);
         InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
         LocalDate currentEnd = instance.validityEnd();
+        if ("refunded".equals(instance.status()) || "cancelled".equals(instance.status())) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "instance-not-extendable", "Package cannot be extended",
+                    "This package is " + instance.status() + " and can no longer be extended.");
+        }
+        LocalDate today = clock.today(tenantId);
+        LocalDate floor = currentEnd == null || currentEnd.isBefore(today) ? today : currentEnd;
+        if (!req.newValidityEnd().isAfter(floor)) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "extension-not-later", "Extension must be later",
+                    "The new validity end must be after " + floor + ".");
+        }
         repo.extendValidity(tenantId, id, req.newValidityEnd());
         repo.insertEvent(tenantId, id, "extended",
                 "from " + currentEnd + " to " + req.newValidityEnd() + " · " + req.reason(), null, staffId);
@@ -290,7 +308,18 @@ public class PackageInstanceService {
     @Transactional
     public RefundResponse requestRefund(UUID tenantId, UUID staffId, UUID id, RefundRequestRequest req) {
         tenantContext.set(tenantId);
-        repo.findInstance(tenantId, id).orElseThrow(this::notFound);
+        if (!repo.lockInstance(tenantId, id)) {
+            throw notFound();
+        }
+        InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
+        if ("refunded".equals(instance.status()) || "cancelled".equals(instance.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "instance-not-refundable", "Package not refundable",
+                    "This package is " + instance.status() + " and cannot be refunded.");
+        }
+        if (repo.hasPendingRefund(tenantId, id)) {
+            throw new ApiException(HttpStatus.CONFLICT, "refund-already-open", "Refund already open",
+                    "This package already has a refund awaiting approval.");
+        }
         RefundPreviewResponse preview = refundPreview(tenantId, id);
         UUID refundId = repo.insertRefund(tenantId, id, req.reason(), preview.usedListValue(),
                 preview.refundAmount(), preview.amountOwed(), staffId);
@@ -306,28 +335,71 @@ public class PackageInstanceService {
 
     /** NB-160: approval closes the package, issues the credit note automatically, and (per the
      * wireframe's own footer note) reminders stop — a refunded/cancelled instance is never
-     * "actionable" again, per requireActionable, and never appears in expiringSoon (status filter). */
+     * "actionable" again, per requireActionable, and never appears in expiringSoon (status filter).
+     * FIN-004: the instance row lock serialises concurrent approvers (losers see the decided status and
+     * get 409 before a credit note number is drawn), and the amount is recomputed under that lock. */
     @Transactional
-    public RefundResponse approveRefund(UUID tenantId, UUID staffId, UUID refundId) {
+    public RefundResponse approveRefund(UUID tenantId, UUID staffId, UUID refundId, BigDecimal expectedAmount) {
         tenantContext.set(tenantId);
         RefundRow refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound);
-        if ("approved".equals(refund.status())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "refund-already-approved", "Already approved",
-                    "This refund has already been approved.");
-        }
         // NB-056 maker-checker: whoever requested the refund cannot also be the one who approves it.
         if (refund.requestedBy().equals(staffId)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "self-approval-blocked", "Self-approval blocked",
+            throw new ApiException(HttpStatus.FORBIDDEN, "same-user", "Self-approval blocked",
                     "A refund must be approved by someone other than whoever requested it.");
         }
+        repo.lockInstance(tenantId, refund.instanceId());
+        refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound); // re-read under the lock
+        requirePending(refund);
+        RefundPreviewResponse current = refundPreview(tenantId, refund.instanceId());
+        BigDecimal confirmed = expectedAmount != null ? expectedAmount : refund.refundAmount();
+        if (confirmed.compareTo(current.refundAmount()) != 0) {
+            throw new ApiException(HttpStatus.CONFLICT, "amount-changed", "Refund amount changed",
+                    "Sessions were used since the request. Review the new amount and approve again.",
+                    java.util.Map.of("requestedAmount", refund.refundAmount(), "currentAmount", current.refundAmount(),
+                            "currentAmountOwed", current.amountOwed()));
+        }
         String creditNoteNumber = repo.nextCreditNoteNumber(tenantId);
-        repo.approveRefund(tenantId, refundId, staffId, creditNoteNumber);
+        if (repo.approveRefund(tenantId, refundId, staffId, creditNoteNumber, current.refundAmount()) != 1) {
+            throw alreadyDecided();
+        }
         repo.updateInstanceStatus(tenantId, refund.instanceId(), "refunded");
         repo.insertEvent(tenantId, refund.instanceId(), "refunded",
-                "credit note " + creditNoteNumber + " · " + refund.refundAmount(), null, staffId);
+                "credit note " + creditNoteNumber + " · " + current.refundAmount(), null, staffId);
         RefundResponse approved = toRefundResponse(repo.findRefund(tenantId, refundId).orElseThrow());
         audit(tenantId, staffId, "packages.refund_approved", refundId, refund, approved);
+        eventPublisher.publish(tenantId, PackageRefundApprovedHandler.EVENT_TYPE, java.util.Map.of(
+                "tenantId", tenantId, "refundId", refundId, "instanceId", refund.instanceId(),
+                "refundMinor", minor(current.refundAmount()), "owedMinor", minor(current.amountOwed()),
+                "creditNoteNumber", creditNoteNumber));
         return approved;
+    }
+
+    @Transactional
+    public RefundResponse rejectRefund(UUID tenantId, UUID staffId, UUID refundId, String reason) {
+        tenantContext.set(tenantId);
+        RefundRow refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound);
+        repo.lockInstance(tenantId, refund.instanceId());
+        if (repo.rejectRefund(tenantId, refundId, staffId, reason) != 1) {
+            throw alreadyDecided();
+        }
+        RefundResponse rejected = toRefundResponse(repo.findRefund(tenantId, refundId).orElseThrow());
+        audit(tenantId, staffId, "packages.refund_rejected", refundId, refund, rejected);
+        return rejected;
+    }
+
+    private void requirePending(RefundRow refund) {
+        if (!"pending".equals(refund.status())) {
+            throw alreadyDecided();
+        }
+    }
+
+    private ApiException alreadyDecided() {
+        return new ApiException(HttpStatus.CONFLICT, "already-decided", "Already decided",
+                "This refund has already been approved or rejected.");
+    }
+
+    private static long minor(BigDecimal amount) {
+        return amount.movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
@@ -380,7 +452,7 @@ public class PackageInstanceService {
     private RefundResponse toRefundResponse(RefundRow r) {
         return new RefundResponse(r.id().toString(), r.instanceId().toString(), r.patientName(), r.packageName(),
                 r.reason(), r.usedListValue(), r.refundAmount(), r.amountOwed(), r.status(), r.creditNoteNumber(),
-                r.createdAt());
+                r.createdAt(), r.recomputedAmount());
     }
 
     private ApiException notFound() {

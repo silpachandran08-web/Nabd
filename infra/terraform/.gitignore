@@ -1,0 +1,6 @@
+.terraform/
+# shortcut: lock files not committed (generated offline from a single-platform mirror); commit them from the first CI init.
+.terraform.lock.hcl
+*.tfstate*
+plan.out
+plan.json

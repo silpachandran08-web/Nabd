@@ -24,7 +24,7 @@ class SupportAccessApiTest extends ApiTestBase {
         String token = platformLoginAndGetAccessToken(op);
 
         ResponseEntity<Map> resp = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
-                authedJsonBody(token, Map.of("tenantId", tenant.id().toString(), "reason", "Investigating stuck queue")),
+                authedJsonBody(token, grantBody(tenant, "Investigating stuck queue")),
                 Map.class);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -58,7 +58,7 @@ class SupportAccessApiTest extends ApiTestBase {
         SeededOperator op = seedOperator("access-view@nabd.health", "support_engineer", false);
         String opToken = platformLoginAndGetAccessToken(op);
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
-                authedJsonBody(opToken, Map.of("tenantId", tenant.id().toString(), "reason", "Support ticket follow-up")), Map.class);
+                authedJsonBody(opToken, grantBody(tenant, "Support ticket follow-up")), Map.class);
         String grantId = (String) grant.getBody().get("id");
 
         ResponseEntity<Map> view = exchange("/v1/platform/support-access/grants/" + grantId + "/patients/" + patientId,
@@ -87,7 +87,7 @@ class SupportAccessApiTest extends ApiTestBase {
         SeededOperator opA = seedOperator("access-a@nabd.health", "support_engineer", false);
         String tokenA = platformLoginAndGetAccessToken(opA);
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
-                authedJsonBody(tokenA, Map.of("tenantId", tenant.id().toString(), "reason", "A's investigation")), Map.class);
+                authedJsonBody(tokenA, grantBody(tenant, "A's investigation")), Map.class);
         String grantId = (String) grant.getBody().get("id");
 
         SeededOperator opB = seedOperator("access-b@nabd.health", "support_engineer", false);
@@ -111,7 +111,7 @@ class SupportAccessApiTest extends ApiTestBase {
         SeededOperator op = seedOperator("access-revoke@nabd.health", "support_engineer", false);
         String token = platformLoginAndGetAccessToken(op);
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
-                authedJsonBody(token, Map.of("tenantId", tenant.id().toString(), "reason", "Will be revoked")), Map.class);
+                authedJsonBody(token, grantBody(tenant, "Will be revoked")), Map.class);
         String grantId = (String) grant.getBody().get("id");
 
         ResponseEntity<Void> revokeResp = http.exchange(url("/v1/platform/support-access/grants/" + grantId + "/revoke"),
@@ -141,7 +141,7 @@ class SupportAccessApiTest extends ApiTestBase {
         SeededOperator op = seedOperator("access-expiry@nabd.health", "support_engineer", false);
         String token = platformLoginAndGetAccessToken(op);
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
-                authedJsonBody(token, Map.of("tenantId", tenant.id().toString(), "reason", "Will expire")), Map.class);
+                authedJsonBody(token, grantBody(tenant, "Will expire")), Map.class);
         String grantId = (String) grant.getBody().get("id");
 
         // master.support_access_grants carries no RLS — a plain jdbc.update backdates it directly.
@@ -152,5 +152,20 @@ class SupportAccessApiTest extends ApiTestBase {
                 HttpMethod.GET, authed(token), Map.class);
         assertThat(view.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(view.getBody().get("type")).asString().contains("grant-not-active");
+    }
+
+    /** PLT-056: a grant names a ticket of that tenant and a scope. */
+    Map<String, Object> grantBody(SeededTenant tenant, String reason) {
+        return Map.of("tenantId", tenant.id().toString(), "ticketId", seedTicket(tenant.id()).toString(),
+                "scope", "redacted_patient_view", "reason", reason);
+    }
+
+    // master.support_tickets carries no RLS (operator plane), so the app connection can seed it directly.
+    UUID seedTicket(UUID tenantId) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("INSERT INTO master.support_tickets (id, tenant_id, source, raised_by_name, raised_by_role, subject, "
+                + "description, sla_due_at) VALUES (?, ?, 'system', 'Nabd System', 'System', 'Grant test', 'd', now() + interval '1 day')",
+                id, tenantId);
+        return id;
     }
 }

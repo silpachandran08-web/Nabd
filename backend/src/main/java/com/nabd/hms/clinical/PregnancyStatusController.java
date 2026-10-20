@@ -25,15 +25,21 @@ import java.util.UUID;
 public class PregnancyStatusController {
 
     private final PregnancyStatusService service;
+    private final ClinicalReadScope scopes;
 
-    PregnancyStatusController(PregnancyStatusService service) {
+    PregnancyStatusController(PregnancyStatusService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("pregnancy_status")
     @GetMapping("/patients/{patientId}/pregnancy-status")
     @PreAuthorize("hasAuthority('clinical:view')")
     public PregnancyStatusResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.get(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.get(scope.tenantId(), patientId);
     }
 
     @PutMapping("/patients/{patientId}/pregnancy-status")
@@ -43,10 +49,14 @@ public class PregnancyStatusController {
         return service.record(tenantId(jwt), patientId, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("pregnancy_status_history")
     @GetMapping("/patients/{patientId}/pregnancy-status/history")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<PregnancyEventResponse> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.history(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.history(scope.tenantId(), patientId);
     }
 
     private UUID tenantId(Jwt jwt) {

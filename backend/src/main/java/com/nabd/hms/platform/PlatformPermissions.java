@@ -40,13 +40,15 @@ final class PlatformPermissions {
             Map.entry("platform_health", Set.of("super_admin", "support_engineer", "sre")),
             Map.entry("aggregator_demand", Set.of("super_admin", "commercial")),
             Map.entry("support_access", Set.of("super_admin", "implementation", "support_engineer")),
-            Map.entry("audit_compliance", Set.of("super_admin", "sre", "compliance_dpo"))
+            Map.entry("audit_compliance", Set.of("super_admin", "compliance_dpo")) // PLT-056 (SEC-20): sre removed
     );
 
     /** Finer-grained authorities beyond ":view"; each lists exactly the roles that hold it. */
     private static final Map<String, Set<String>> ACTION_ROLES = Map.of(
             "billing_revenue:edit", Set.of("super_admin", "billing"),
             "billing_revenue:approve", Set.of("super_admin"),
+            "support_access:request", Set.of("super_admin", "implementation", "support_engineer"), // PLT-056
+            "safety_content:edit", Set.of("super_admin"), // CLN-004: upload / record CSO approval / activate the safety dictionary
             "tenant_detail:edit", Set.of("super_admin") // V3-001: suspend / offboard / reactivate a clinic; shortcut: implementation excluded until the role spec says otherwise
     );
 

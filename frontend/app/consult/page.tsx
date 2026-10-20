@@ -10,7 +10,7 @@ import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
-import { useClinicalContext } from "../components/consult/clinical";
+import { isPatientNotFound, useClinicalContext } from "../components/consult/clinical";
 import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
 import ConsultTimer from "../components/consult/ConsultTimer";
@@ -19,15 +19,17 @@ import NoteTemplates from "../components/consult/NoteTemplates";
 import DoseCalculator from "../components/consult/DoseCalculator";
 import DentalDrawer from "../components/consult/DentalDrawer";
 import DoctorOrders from "../components/consult/DoctorOrders";
-import { deleteDraft, readDraft, writeDraft, type NoteFields } from "../components/consult/draftStore";
+import { deleteDraft, readDraft, takeLostDrafts, writeDraft, type NoteFields } from "../components/consult/draftStore";
 import FollowUpPanel from "../components/consult/FollowUpPanel";
 import MedicinesList from "../components/consult/MedicinesList";
 import PackageSessionCard from "../components/consult/PackageSessionCard";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
+import { useSafetyDictionarySource } from "../components/consult/safetyDictionary";
 import RxPad from "../components/consult/RxPad";
 import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
+import { signBlockMessage, type SignAuthority } from "../components/consult/signAuthority";
 import VisitOutputs from "../components/consult/VisitOutputs";
 import VisitTimeline from "../components/consult/VisitTimeline";
 import {
@@ -41,6 +43,7 @@ import {
 import p from "../components/consult/consultParts.module.css";
 import styles from "./consult.module.css";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { moveBody, moveErrorMessage } from "../lib/queueMove";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
@@ -149,6 +152,8 @@ export default function ConsultPage() {
   const [completing, setCompleting] = useState(false);
   const [closeAck, setCloseAck] = useState(false);
   const [shellError, setShellError] = useState<string | null>(null);
+  // IDC-001: the server answered patient-not-found for this visit (consent withdrawn / out of scope).
+  const [unavailable, setUnavailable] = useState(false);
   // undefined = not known (still checking, or the lookup failed): never shown as "Not set" (T1-BUG-2).
   const [followUpLabel, setFollowUpLabel] = useState<string | null | undefined>(undefined);
   const [preview, setPreview] = useState<Row | null>(null);
@@ -165,6 +170,7 @@ export default function ConsultPage() {
   const [transferError, setTransferError] = useState<string | null>(null);
   const [rxItems, setRxItems] = useState<PrescriptionItem[]>([]);
   const [rxStatus, setRxStatus] = useState<"draft" | "signed">("draft");
+  const [signAuthority, setSignAuthority] = useState<SignAuthority | null | "error">(null); // CLN-005
   const [rxSaving, setRxSaving] = useState(false);
   const [rxError, setRxError] = useState<string | null>(null);
   const [showSignConfirm, setShowSignConfirm] = useState(false);
@@ -180,6 +186,7 @@ export default function ConsultPage() {
   const [amendReason, setAmendReason] = useState("");
   const [amendDiagnosis, setAmendDiagnosis] = useState("");
   const [amending, setAmending] = useState(false);
+  const [amendError, setAmendError] = useState<string | null>(null);
 
   const dirtyRef = useRef(dirty);
   const noteRef = useRef(note);
@@ -216,7 +223,8 @@ export default function ConsultPage() {
     [router]
   );
 
-  const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, activeEntry?.patientId ?? null, activeEntry?.id ?? null);
+  const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, unavailable ? null : activeEntry?.patientId ?? null, activeEntry?.id ?? null);
+  const rxSource = useSafetyDictionarySource(authedFetch);
 
   const load = useCallback(async (which: "mine" | "all" = "mine") => {
     setLoading(true);
@@ -434,11 +442,10 @@ export default function ConsultPage() {
     setStarting(true);
     setPreviewError(null);
     try {
-      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
+      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: moveBody("in_consult", row.status) });
       if (!res) return;
       if (!res.ok) {
-        const pr: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't start the consultation." }));
-        setPreviewError(pr.detail || "Couldn't start the consultation.");
+        setPreviewError(await moveErrorMessage(res, "Couldn't start the consultation."));
         return;
       }
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: "in_consult" } : r)));
@@ -481,11 +488,13 @@ export default function ConsultPage() {
     setConflict(null);
     setNotice(null);
     setShellError(null);
+    setUnavailable(false);
     setCloseAck(false);
     setFollowUpLabel(undefined);
     setShowDental(false);
     setRxItems([]);
     setRxStatus("draft");
+    setSignAuthority(null);
     setRxError(null);
     setRxDirty(false);
     setOverride(null);
@@ -516,6 +525,12 @@ export default function ConsultPage() {
           if (stale()) return;
           if (aRes?.ok) setAmendments(await aRes.json());
         }
+      } else if (nRes && await isPatientNotFound(nRes)) {
+        if (stale()) return;
+        // No patient details, no further reads, no retry: the answer will not change on its own.
+        setActivePatient(null);
+        setUnavailable(true);
+        return;
       } else if (nRes && nRes.status !== 404) {
         noteLoadRef.current = "error";
         setNoteLoad("error");
@@ -527,6 +542,7 @@ export default function ConsultPage() {
       // Not when the note failed to load: the draft is kept untouched for the next successful open.
       const draft = noteLoadRef.current === "ok" ? await readDraft(row.id) : null;
       if (stale()) return;
+      if (takeLostDrafts() > 0) setNotice("An unsent local draft could not be recovered after the page reloaded. Re-check this note.");
       if (draft) {
         const serverFields = server ? toFields(server) : BLANK_DRAFT;
         if (server?.status === "signed") {
@@ -556,6 +572,9 @@ export default function ConsultPage() {
       } else {
         setRxItems([{ ...BLANK_RX_ITEM }]);
       }
+      const aRes = await authedFetch(`/clinical/prescriptions/${row.id}/signing-authority`);
+      if (stale()) return;
+      setSignAuthority(aRes?.status === 200 ? ((await aRes.json()) as SignAuthority) : "error");
     } catch {
       if (!stale()) {
         if (noteLoadRef.current === "loading") { noteLoadRef.current = "error"; setNoteLoad("error"); }
@@ -691,8 +710,9 @@ export default function ConsultPage() {
 
 
   async function submitAmendment() {
-    if (!activeEntry || !amendReason.trim()) return;
+    if (!activeEntry || amendReason.trim().length < 5) return;
     setAmending(true);
+    setAmendError(null);
     try {
       const res = await authedFetch(`/clinical/notes/${activeEntry.id}/amendments`, {
         method: "POST",
@@ -704,7 +724,12 @@ export default function ConsultPage() {
         setShowAmendForm(false);
         const aRes = await authedFetch(`/clinical/notes/${activeEntry.id}/amendments`);
         if (aRes?.ok) setAmendments(await aRes.json());
+      } else {
+        const pr: Problem | null = await res?.json().catch(() => null);
+        setAmendError(pr?.detail || "Couldn't save the amendment. Try again.");
       }
+    } catch {
+      setAmendError("Couldn't reach the server. The amendment was not saved; try again.");
     } finally {
       setAmending(false);
     }
@@ -774,7 +799,8 @@ export default function ConsultPage() {
           return;
         }
         const signRes = await authedFetch(`/clinical/notes/${activeEntry.id}/sign`, { method: "POST" });
-        if (!signRes?.ok) {
+        // CLN-006: 409 means an earlier attempt already signed it; carry on to the checkout handoff.
+        if (!signRes?.ok && signRes?.status !== 409) {
           const pr: Problem = await signRes?.json().catch(() => ({ title: "Error", detail: "Couldn't sign the note." }));
           setShellError(pr?.detail || "Couldn't sign the note.");
           return;
@@ -783,7 +809,7 @@ export default function ConsultPage() {
         const signed: Partial<Note> | null = await signRes.json().catch(() => null);
         setSignedAt(typeof signed?.signedAt === "string" ? signed.signedAt : new Date().toISOString());
       }
-      const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "checkout_pending" }) });
+      const statusRes = await authedFetch(`/queue/${activeEntry.id}/status`, { method: "PATCH", body: moveBody("checkout_pending", activeEntry.status) });
       if (!statusRes?.ok) {
         const pr: Problem | null = await statusRes?.json().catch(() => null);
         setShellError(`Note signed, but couldn't move the patient to checkout${pr?.detail ? ` (${pr.detail})` : ""}. Use “Retry checkout handoff”.`);
@@ -865,6 +891,22 @@ export default function ConsultPage() {
     </>
   );
 
+  if (activeEntry && unavailable) {
+    return (
+      <main className={`${styles.page} ${styles.pageWide}`}>
+        <div className={styles.strip}>
+          <div className={styles.stripIdentity}>
+            <button className={styles.backBtn} onClick={closeShell}>Queue</button>
+          </div>
+        </div>
+        <div className={`${p.notice} ${p.noticeInfo}`} role="alert">
+          <Icon name="info" size={16} />
+          <span>Record not available.</span>
+        </div>
+      </main>
+    );
+  }
+
   if (activeEntry) {
     const pat = activePatient;
     const saveBadge = conflict ? <StatusPill tone="warn" icon="alert" label="Sync conflict — review" />
@@ -878,12 +920,17 @@ export default function ConsultPage() {
     const locked = noteStatus === "signed";
     const openWarnings = rxItems.reduce((n, i) => n + (i.warnings ?? []).filter((w) => w.requiresDecision && !w.resolved).length, 0);
     // Recording a warning decision and signing are the visit doctor's (or a clinical:approve holder's); the server enforces it (403 not-prescriber), the UI simply doesn't offer it to anyone else.
-    const mayDecideRx = activeEntry.doctorId === selfId || can("clinical:approve");
+    // CLN-005: and only as a registered clinician with an in-date licence (signing-authority, same rule as the server).
+    const mayDecideRx = (activeEntry.doctorId === selfId || can("clinical:approve"))
+      && signAuthority !== null && signAuthority !== "error" && signAuthority.canSign;
+    const signBlocked = signBlockMessage(signAuthority);
     // Advisory warnings (moderate/mild allergy) don't block but are acknowledged at signing; decisions already recorded are shown, not re-asked.
     const advisoryItems = rxItems.filter((i) => (i.warnings ?? []).some((w) => !w.requiresDecision));
     const doctorName = getIdentity()?.staffName ?? "";
     const signedBlocked = closeIssues.length > 0 && !closeAck;
     const canEditNote = can("clinical:edit");
+    // CLN-006: signing and amending are the visit doctor's (or a clinical:approve holder's); others see the note read-only.
+    const mayAmendNote = canEditNote && mayDecideRx;
     const stepIndex = Math.max(0, STEPS.findIndex((x) => x.id === step));
     const next = closedOut ? nextPatient(rows, activeEntry.id, selfId, canStartRow) : null;
     const vd = ctx.vitals.data;
@@ -1011,7 +1058,7 @@ export default function ConsultPage() {
             {locked && (
               <div className={styles.signedBanner}>
                 <span>This note is finalised. Changes need a documented amendment with a reason, which is audited.</span>
-                {canEditNote && (
+                {mayAmendNote && (
                   <span className={styles.followUpControls}>
                     <button className={styles.backBtn} onClick={() => setShowAmendForm((v) => !v)}>
                       {showAmendForm ? "Cancel amendment" : "Amend note"}
@@ -1021,19 +1068,21 @@ export default function ConsultPage() {
               </div>
             )}
 
-            {showAmendForm && canEditNote && (
+            {showAmendForm && mayAmendNote && (
               <div className={styles.card} style={{ padding: "16px" }}>
                 <div className={styles.noteField}>
                   <label className={styles.noteLabel} htmlFor="amendReason">Reason for amendment</label>
-                  <input id="amendReason" className={styles.input} value={amendReason} onChange={(e) => setAmendReason(e.target.value)} />
+                  <input id="amendReason" className={styles.input} value={amendReason} maxLength={500} aria-describedby="amendReasonHint" onChange={(e) => setAmendReason(e.target.value)} />
+                  <span id="amendReasonHint" className={styles.saveStatus}>Required, 5 to 500 characters.</span>
                 </div>
                 <div className={styles.noteField} style={{ marginBlockStart: "8px" }}>
                   <label className={styles.noteLabel} htmlFor="amendDiagnosis">Corrected diagnosis (optional)</label>
                   <input id="amendDiagnosis" className={styles.input} value={amendDiagnosis} onChange={(e) => setAmendDiagnosis(e.target.value)} />
                 </div>
-                <button className={styles.completeBtn} style={{ marginBlockStart: "8px" }} onClick={submitAmendment} disabled={amending || !amendReason.trim()}>
+                <button className={styles.completeBtn} style={{ marginBlockStart: "8px" }} onClick={submitAmendment} disabled={amending || amendReason.trim().length < 5}>
                   {amending ? "Saving…" : "Save amendment"}
                 </button>
+                {amendError && <div className={styles.errorState} role="alert">{amendError}</div>}
               </div>
             )}
 
@@ -1133,6 +1182,7 @@ export default function ConsultPage() {
                       </div>
                     )}
                   </div>
+                  {rxStatus !== "signed" && signBlocked && <p className={p.muted} role="status" data-testid="rx-sign-blocked">{signBlocked}</p>}
                   {rxStatus !== "signed" && <p className={p.muted}>The allergy check matches drug names and common drug classes only. It is not a drug database, so confirm against the patient&apos;s record.</p>}
                   {rxError && <div className={styles.errorState} role="alert">{rxError}</div>}
                   {openWarnings > 0 && rxStatus !== "signed" && (
@@ -1154,6 +1204,7 @@ export default function ConsultPage() {
                         onOverride={mayDecideRx ? (warning) => { setOverrideError(null); setOverride({ index: i, warning }); } : undefined}
                         onChangeMedicine={() => focusDrug(i)}
                         onRemove={rxItems.length > 1 ? () => removeRxItem(i) : undefined}
+                        source={rxSource}
                       />
                     </div>
                   ))}
@@ -1266,7 +1317,7 @@ export default function ConsultPage() {
           <div className={styles.stripActions}>
             {closedOut ? (
               <>
-                {canEditNote && <button className={styles.completeBtn} onClick={() => { setShowAmendForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Add amendment</button>}
+                {mayAmendNote && <button className={styles.completeBtn} onClick={() => { setShowAmendForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}>Add amendment</button>}
                 {step !== "close" && <button className={styles.backBtn} onClick={() => setStep("close")}>Visit outputs</button>}
                 {next
                   ? <button className={styles.backBtn} onClick={() => void switchTo(next)}>Next patient · #{next.tokenNumber}</button>
@@ -1284,7 +1335,7 @@ export default function ConsultPage() {
                 )}
                 {canEditNote && (step !== "close" ? (
                   <button className={styles.completeBtn} onClick={() => setStep("close")}>Close consultation</button>
-                ) : (
+                ) : mayDecideRx && (
                   <button className={styles.completeBtn} onClick={completeConsultation} disabled={completing || closedOut || signedBlocked || !!conflict}>
                     {primaryLabel}
                   </button>

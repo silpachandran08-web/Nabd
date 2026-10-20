@@ -1,7 +1,7 @@
 package com.nabd.hms.support;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nabd.hms.common.AesGcmCipher;
+import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.ModuleGrant;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,6 +125,8 @@ public abstract class ApiTestBase {
         registry.add("app.crypto.key", () -> CRYPTO_KEY_B64);
         // tests call OutboxDispatcher.poll() themselves; the background poll would race them for the same rows
         registry.add("app.outbox.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE));
+        registry.add("app.registry.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // OPS-007: tests call drain() themselves
+        registry.add("app.registry.reconcile-cron", () -> "-"); // never fires; tests call runAll()
         // default 20/min is realistic for one browser, not for a suite of HTTP calls from one loopback IP
         registry.add("app.auth.rate-limit-per-ip-per-minute", () -> "100000");
     }
@@ -149,6 +151,15 @@ public abstract class ApiTestBase {
         http.getRestTemplate().setRequestFactory(new org.springframework.http.client.JdkClientHttpRequestFactory());
     }
 
+    /** Tests call OutboxDispatcher.poll() (one batch, oldest first) and no background poll runs, so rows
+     * left by earlier tests (any tenant, any event type) would fill the batch and starve the test's own row. */
+    @BeforeEach
+    void settleLeftoverOutboxRows() throws SQLException {
+        try (Connection su = superuserConnection(); var st = su.createStatement()) {
+            st.executeUpdate("UPDATE outbox_events SET status = 'done' WHERE status IN ('pending', 'processing')");
+        }
+    }
+
     @Autowired
     protected JdbcTemplate jdbc;
 
@@ -156,7 +167,7 @@ public abstract class ApiTestBase {
     protected PasswordEncoder pinEncoder;
 
     @Autowired
-    protected AesGcmCipher cipher;
+    protected FieldCipher cipher;
 
     @Autowired
     protected ObjectMapper objectMapper;
@@ -259,7 +270,7 @@ public abstract class ApiTestBase {
 
     protected SeededOperator seedOperator(String email, String role, boolean mfaEnabled) {
         UUID id = UUID.randomUUID();
-        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET) : null;
+        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET, FieldCipher.Aad.of("platform", "master.operators", "mfa_secret", id)) : null;
         jdbc.update("INSERT INTO master.operators (id, name, email, pin_hash, role, status, mfa_enabled, mfa_secret_enc) " +
                         "VALUES (?,?,?,?,?,'active',?,?)",
                 id, "Test Operator", email, pinEncoder.encode(STAFF_PIN), role, mfaEnabled, mfaSecretEnc);
@@ -348,7 +359,7 @@ public abstract class ApiTestBase {
     protected SeededStaff seedStaff(SeededTenant tenant, UUID roleId, String email, String mobilePhone, boolean mfaEnabled,
                                      boolean emailVerified, boolean mobileVerified) {
         UUID id = UUID.randomUUID();
-        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET) : null;
+        byte[] mfaSecretEnc = mfaEnabled ? cipher.encrypt(TOTP_SECRET, FieldCipher.Aad.of(tenant.id(), "staff", "mfa_secret", id)) : null;
         inTenantTx(tenant.id(), () -> jdbc.update("""
                 INSERT INTO staff (id, tenant_id, role_id, email, name, mobile_phone, pin_hash, status,
                                     email_verified, mobile_verified, mfa_enabled, mfa_secret_enc)
@@ -379,12 +390,14 @@ public abstract class ApiTestBase {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(accessToken);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString()); // PLT-026: required by @Idempotent endpoints, ignored elsewhere
         return new HttpEntity<>(writeJson(body), headers);
     }
 
     protected HttpEntity<Void> authed(String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(accessToken);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString()); // PLT-026: body-less POSTs (sign, approve, book)
         return new HttpEntity<>(headers);
     }
 
@@ -392,6 +405,7 @@ public abstract class ApiTestBase {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(accessToken);
+        headers.set("Idempotency-Key", UUID.randomUUID().toString());
         if (headerValue != null) {
             headers.set(headerName, headerValue);
         }

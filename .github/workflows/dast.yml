@@ -1,0 +1,163 @@
+# OPS-037: dynamic security scans and API fuzzing against previews (QA §4.2 / §4.5).
+# PR: ZAP baseline (0 High gate), header/CORS-per-verb checks, sampled Schemathesis per role (blocking from S4, ci/dast-gate.json).
+# Nightly: authenticated ZAP full scan, one context (bearer token) per RBAC role; new Highs open defect issues; full Schemathesis.
+# Inputs from the preview pipeline (OPS-035/036): a successful deployment_status whose environment_url is the preview web URL,
+# repo variable PREVIEW_API_URL_TEMPLATE (e.g. https://api-pr-{sha}.example) or STAGING_API_URL for nightly, and secret
+# DAST_ROLE_TOKENS = JSON {"owner": "...", "receptionist": "...", "doctor": "...", "nurse": "..."} minted for the seeded preview tenant.
+name: dast
+on:
+  deployment_status:     # external preview providers; GITHUB_TOKEN-created deployments never trigger workflows
+  workflow_run:          # OPS-036 previews: ci.yml stage 7 (preview.yml) deploys to https://pr-<n>.<PREVIEW_DOMAIN>
+    workflows: [ci]
+    types: [completed]
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+    inputs:
+      web_url: { description: "web URL to scan (canary: a branch with a seeded vulnerable endpoint)", required: true }
+      api_url: { description: "API base URL (without /v1)", required: true }
+permissions:
+  contents: read
+env:
+  STAFF_ORIGIN: ${{ vars.STAFF_ORIGIN }}
+
+jobs:
+  target:
+    if: >-
+      (github.event_name != 'deployment_status' && github.event_name != 'workflow_run') ||
+      (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success' && contains(github.event.deployment.environment, 'review')) ||
+      (github.event_name == 'workflow_run' && vars.PREVIEW_ENABLED == 'true' && github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.pull_requests[0].number)
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs:
+      web: ${{ steps.t.outputs.web }}
+      api: ${{ steps.t.outputs.api }}
+    steps:
+      - id: t
+        env:
+          EVENT: ${{ github.event_name }}
+          DEPLOY_URL: ${{ github.event.deployment_status.environment_url }}
+          SHA: ${{ github.event.deployment.sha }}
+          RUN_PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          PREVIEW_DOMAIN: ${{ vars.PREVIEW_DOMAIN }}
+          IN_WEB: ${{ inputs.web_url }}
+          IN_API: ${{ inputs.api_url }}
+          API_TEMPLATE: ${{ vars.PREVIEW_API_URL_TEMPLATE }}
+          STAGING_WEB: ${{ vars.STAGING_WEB_URL }}
+          STAGING_API: ${{ vars.STAGING_API_URL }}
+        run: |
+          case "$EVENT" in
+            deployment_status) web="$DEPLOY_URL"; api="${API_TEMPLATE//\{sha\}/${SHA:0:7}}" ;;
+            workflow_run) web="https://pr-$RUN_PR.$PREVIEW_DOMAIN"; api="$web" ;;   # same host as infra/preview/deploy.sh
+            workflow_dispatch) web="$IN_WEB"; api="$IN_API" ;;
+            *) web="$STAGING_WEB"; api="$STAGING_API" ;;
+          esac
+          [ -n "$web" ] && [ -n "$api" ] || { echo "no preview/staging URL configured (Needs external action: OPS-035/036)"; exit 1; }
+          echo "web=$web" >> "$GITHUB_OUTPUT"; echo "api=$api" >> "$GITHUB_OUTPUT"
+
+  zap-baseline:
+    needs: target
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: ZAP baseline (passive, 1 min spider)
+        run: |
+          mkdir -p zap && chmod 777 zap
+          docker run --rm -v "$PWD/zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:2.16.0 \
+            zap-baseline.py -t "${{ needs.target.outputs.web }}" -m 1 -J zap.json -r zap.html -I || true
+      - name: gate (any High or token-in-URL fails; Mediums listed with owners from ci/zap-owners.json)
+        run: |
+          set -o pipefail
+          python3 scripts/ci/dast.py zap-gate zap/zap.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: zap-baseline, path: zap/ }
+
+  headers-cors:
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: CSP, HSTS, CORS per verb (QA-05), limit=0 -> 400 (QA-19)
+        env:
+          TOKENS: ${{ secrets.DAST_ROLE_TOKENS }}
+        run: |
+          export DAST_TOKEN=$(python3 -c 'import json,os; print(json.loads(os.environ.get("TOKENS") or "{}").get("receptionist",""))')
+          python3 scripts/ci/dast.py headers "${{ needs.target.outputs.web }}" "${{ needs.target.outputs.api }}"
+
+  schemathesis:
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ github.event_name == 'schedule' && 60 || 6 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [owner, receptionist, doctor, nurse]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: fuzz api/openapi/core.yaml with the ${{ matrix.role }} token (stateful links)
+        env:
+          TOKENS: ${{ secrets.DAST_ROLE_TOKENS }}
+          ROLE: ${{ matrix.role }}
+          EXAMPLES: ${{ github.event_name == 'schedule' && 100 || 10 }}
+        run: |
+          pip install -q schemathesis==3.39.16
+          token=$(python3 -c 'import json,os; print(json.loads(os.environ.get("TOKENS") or "{}").get(os.environ["ROLE"],""))')
+          [ -n "$token" ] || { echo "no $ROLE token in DAST_ROLE_TOKENS (Needs external action)"; exit 1; }
+          echo "::add-mask::$token"
+          rc=0
+          schemathesis run api/openapi/core.yaml --base-url "${{ needs.target.outputs.api }}" \
+            --checks not_a_server_error,status_code_conformance,response_schema_conformance \
+            --stateful=links --hypothesis-max-examples "$EXAMPLES" --hypothesis-derandomize \
+            -H "Authorization: Bearer $token" --junit-xml "st-$ROLE.xml" --request-timeout 10000 || rc=$?
+          python3 scripts/ci/dast.py st-gate "$rc"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: "schemathesis-${{ matrix.role }}", path: "st-*.xml" }
+
+  zap-full-nightly:
+    needs: target
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [owner, receptionist, doctor, nurse]
+    steps:
+      - uses: actions/checkout@v4
+      - name: authenticated ZAP full scan, ${{ matrix.role }} context
+        env:
+          TOKENS: ${{ secrets.DAST_ROLE_TOKENS }}
+          ROLE: ${{ matrix.role }}
+        run: |
+          token=$(python3 -c 'import json,os; print(json.loads(os.environ.get("TOKENS") or "{}").get(os.environ["ROLE"],""))')
+          [ -n "$token" ] || { echo "no $ROLE token (Needs external action)"; exit 1; }
+          echo "::add-mask::$token"
+          mkdir -p zap && chmod 777 zap && cp api/openapi/core.yaml zap/   # ZAP walks every documented endpoint as this role
+          docker run --rm -v "$PWD/zap:/zap/wrk" -e ZAP_AUTH_HEADER=Authorization -e ZAP_AUTH_HEADER_VALUE="Bearer $token" \
+            ghcr.io/zaproxy/zaproxy:2.16.0 zap-api-scan.py -t /zap/wrk/core.yaml -f openapi \
+            -O "${{ needs.target.outputs.api }}" -J "zap-$ROLE.json" -r "zap-$ROLE.html" -I \
+            -z "-config api.disablekey=true" || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: "zap-full-${{ matrix.role }}", path: zap/ }
+      - name: publish and open S2 defects for new Highs
+        env: { GH_TOKEN: "${{ github.token }}", ROLE: "${{ matrix.role }}" }
+        run: |
+          python3 scripts/ci/dast.py zap-gate "zap/zap-$ROLE.json" >> "$GITHUB_STEP_SUMMARY" || true
+          python3 scripts/ci/dast.py zap-issues "zap/zap-$ROLE.json" | while read -r line; do
+            title=$(jq -r .title <<<"$line"); body=$(jq -r .body <<<"$line")
+            if [ -z "$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')" ]; then
+              gh issue create --title "$title" --body "$body (role: $ROLE)" --label defect --label S2 --label security || true
+            fi
+          done

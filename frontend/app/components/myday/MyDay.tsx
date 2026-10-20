@@ -6,6 +6,8 @@ import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { DONE_STATUSES, WAITING_STATUSES } from "../consult/shared";
 import { useMyDay } from "./useMyDay";
+import { clinicToday, formatClinicDate } from "../../lib/clinicTime";
+import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
 import { AppointmentsCard, ChronicDueCard, NeedsMeCard, NowNext, QueueList, SessionStrip } from "./MyDayParts";
 
 // DOC-002 "My Day" (wireframe NabdShell.html DOC-01 / "Doctor home"): session strip, In the room /
@@ -21,7 +23,8 @@ export default function MyDay() {
     return () => { clearTimeout(first); clearInterval(t); };
   }, []);
 
-  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const tz = useClinicTimeZone();
+  const today = tz ? formatClinicDate(clinicToday(tz), { weekday: "long", day: "numeric", month: "long" }) : "";
   const active = data?.rows.filter((r) => r.status !== "no_show") ?? [];
   const inRoom = active.find((r) => r.status === "in_consult" && r.doctorId === data?.selfId) ?? null;
   const waiting = active.filter((r) => WAITING_STATUSES.includes(r.status));

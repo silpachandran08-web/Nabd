@@ -1,0 +1,95 @@
+{
+ "resource_changes": [
+  {
+   "address": "module.cell.module.aws[0].aws_db_instance.this",
+   "mode": "managed",
+   "type": "aws_db_instance",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "publicly_accessible": false,
+     "storage_encrypted": true,
+     "backup_retention_period": 35,
+     "deletion_protection": true,
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "phi"
+     }
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_s3_bucket.this[\"audit\"]",
+   "mode": "managed",
+   "type": "aws_s3_bucket",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "audit"
+     }
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_s3_bucket_public_access_block.this[\"audit\"]",
+   "mode": "managed",
+   "type": "aws_s3_bucket_public_access_block",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "block_public_acls": true,
+     "block_public_policy": true,
+     "ignore_public_acls": true,
+     "restrict_public_buckets": true
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_security_group.db",
+   "mode": "managed",
+   "type": "aws_security_group",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "ingress": [
+      {
+       "cidr_blocks": [
+        "10.40.0.0/16"
+       ]
+      }
+     ],
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "network"
+     }
+    }
+   }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_kms_alias.root[\"phi\"]",
+   "mode": "managed",
+   "type": "aws_kms_alias",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "name": "alias/x"
+    }
+   }
+  }
+ ]
+}

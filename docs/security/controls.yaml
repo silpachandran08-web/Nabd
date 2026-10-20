@@ -1,0 +1,680 @@
+# OPS-048: the 67 Security Controls from 'Nabd HMS - Implementation Task Plan v2.xlsx' (sheet Security Controls, row order = SC id).
+# tests: JUnit test classes (or Class#method) whose latest results verify the control; all must pass.
+# evidence: in-repo path or URL; counts as verified only once accepted_by and accepted_on are filled by the owner.
+# owner: placeholder GitHub team (Needs external action: name a person per control).
+# Checked by: python3 scripts/ci/phase0_gate.py controls  (see docs/gates/README.md)
+controls:
+  - id: SC-01
+    domain: "Identity"
+    control: "Staff sign-in limited to WhatsApp OTP, short PIN or authenticator app — no SSO, no hardware keys (NFR-06)"
+    task: NB-040
+    delivered_by: "Staff authentication — WhatsApp OTP"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [AuthApiTest, PinPolicyTest]
+    evidence: []
+  - id: SC-02
+    domain: "Identity"
+    control: "Verified email and mobile both required before any patient data is reachable (CAD-12)"
+    task: NB-041
+    delivered_by: "Dual-channel staff identity"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-03
+    domain: "Identity"
+    control: "Authenticator MFA enforced for Owner, Platform operators and refund/discount holders"
+    task: NB-042
+    delivered_by: "Authenticator-app MFA enforcement"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [Plt004MfaTest, TotpServiceTest, TotpReplayTest]
+    evidence: []
+  - id: SC-04
+    domain: "Identity"
+    control: "Short-lived tokens, rotating refresh, reuse detection, remote session revoke"
+    task: NB-043
+    delivered_by: "Session management & device trust"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [JwtTokenPolicyTest, TokenMisuseMatrixTest]
+    evidence: []
+  - id: SC-05
+    domain: "Identity"
+    control: "Shared-workstation auto-lock without losing draft clinical notes"
+    task: NB-044
+    delivered_by: "Idle timeout & clinical screen lock"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [S10QaIdleLockPolicyTest]
+    evidence: []
+  - id: SC-06
+    domain: "Identity"
+    control: "Break-glass access is time-boxed, reason-captured and loudly alerted"
+    task: NB-048
+    delivered_by: "Break-glass emergency access"
+    priority: Should
+    gate: "Post-launch acceptable"
+    owner: "@nabd/security-owners"
+    tests: [BreakGlassAuthzTest, Plt012BreakGlassS9QaTest]
+    evidence: []
+  - id: SC-07
+    domain: "Access control"
+    control: "Deny-by-default server-side authorisation on every endpoint"
+    task: NB-050
+    delivered_by: "Server-side policy enforcement point"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-08
+    domain: "Access control"
+    control: "Row-level patient scoping enforced in the query, not by post-filtering"
+    task: NB-051
+    delivered_by: "Row-level scoping"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-09
+    domain: "Access control"
+    control: "Field-level restrictions applied in the API response, not merely hidden in the UI"
+    task: NB-052
+    delivered_by: "Field-level restrictions"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-10
+    domain: "Access control"
+    control: "Consent evaluated at query level — the UI is not the enforcement point (NFR-08)"
+    task: NB-053
+    delivered_by: "Consent checked at query level"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []  # IDC-001 adds ClinicalReadScopeTest
+    evidence: []
+  - id: SC-11
+    domain: "Access control"
+    control: "Maker-checker on refunds, large discounts and clinical amendments"
+    task: NB-056
+    delivered_by: "Approval workflows & maker-checker"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-12
+    domain: "Access control"
+    control: "Restricted elements are absent from the UI, never disabled"
+    task: NB-054
+    delivered_by: "UI permission rendering contract"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence:
+      - { link: "frontend/package.json#check:permissions", accepted_by: null, accepted_on: null }
+  - id: SC-13
+    domain: "Access control"
+    control: "Seven segregated SaaS operator roles; no single super-admin does everything (SSA-02)"
+    task: NB-257
+    delivered_by: "Seven SaaS operator roles"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [PlatformPermissionsTest]
+    evidence: []
+  - id: SC-14
+    domain: "Access control"
+    control: "Support engineers are blind to clinical fields (SSA-04)"
+    task: NB-266
+    delivered_by: "Support access with consent gate"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [SupportAccessApiTest]
+    evidence: []
+  - id: SC-15
+    domain: "Tenancy"
+    control: "Tenant isolation verified by test; no cross-tenant read path"
+    task: NB-002
+    delivered_by: "Multi-tenancy isolation model"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [CrossTenantIsolationApiTest, RlsSchemaInvariantTest, RlsRoleTopologyTest]
+    evidence: []
+  - id: SC-16
+    domain: "Tenancy"
+    control: "Region locked irreversibly at provisioning; no cross-region replication (SYS-14 / NFR-04)"
+    task: NB-271
+    delivered_by: "Multi-region deployment & residency"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [ProvisioningJobApiTest]
+    evidence: []
+  - id: SC-17
+    domain: "Tenancy"
+    control: "Installation secrets separated from tenant integration secrets (SYS-14)"
+    task: NB-009
+    delivered_by: "Config & secrets management with role"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-18
+    domain: "Cryptography"
+    control: "Region-scoped KMS with per-tenant keys and a documented rotation runbook (NFR-04)"
+    task: NB-283
+    delivered_by: "Region-scoped encryption at rest"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-19
+    domain: "Cryptography"
+    control: "TLS 1.3 only, HSTS preload, automated certificate renewal"
+    task: NB-284
+    delivered_by: "Encryption in transit"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-20
+    domain: "Cryptography"
+    control: "Column-level encryption for national identifiers"
+    task: NB-285
+    delivered_by: "PHI field-level encryption"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-21
+    domain: "Application"
+    control: "Parameterised queries and schema validation on every endpoint"
+    task: NB-286
+    delivered_by: "Input validation & injection defence"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-22
+    domain: "Application"
+    control: "OWASP Top 10 and API Top 10 pass, including IDOR/BOLA on patient and family-scoped routes"
+    task: NB-287
+    delivered_by: "OWASP Top 10 & API Top 10"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-23
+    domain: "Application"
+    control: "Content Security Policy in enforce mode; no inline script"
+    task: NB-291
+    delivered_by: "Security headers & frontend hardening"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [Plt027ProblemAndPagingApiTest]
+    evidence: []
+  - id: SC-24
+    domain: "Application"
+    control: "Uploads type-verified, AV-scanned and served only via signed short-lived URLs"
+    task: NB-292
+    delivered_by: "File upload security pipeline"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-25
+    domain: "Application"
+    control: "Rate limiting per IP, tenant, user and phone number, including the public aggregator number"
+    task: NB-288
+    delivered_by: "Rate limiting, bot & abuse"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: [IpRateLimitS9FixBTest, BruteForceS9QaTest]
+    evidence: []
+  - id: SC-26
+    domain: "Messaging"
+    control: "A file is never sent into open chat — always an expiring, access-logged link (SYS-18)"
+    task: NB-076
+    delivered_by: "Secure file delivery via expiring link"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-27
+    domain: "Messaging"
+    control: "Number change or re-registration requires re-verification before any patient data is released"
+    task: NB-289
+    delivered_by: "Messaging channel abuse"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-28
+    domain: "Messaging"
+    control: "Fixed template text is uneditable in every send path, including the API"
+    task: NB-191
+    delivered_by: "Variable-fill-only template enforcement"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-29
+    domain: "Messaging"
+    control: "Consent gate on every outbound send, effective across all surfaces within one minute (SYS-02)"
+    task: NB-196
+    delivered_by: "Consent gate on every outbound send"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-30
+    domain: "Messaging"
+    control: "Child profiles can never receive marketing, enforced server-side (DPO-09 / CMP-04)"
+    task: NB-089
+    delivered_by: "Child marketing block"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-31
+    domain: "Messaging"
+    control: "India DLT registration complete; the surface is entirely absent for KSA tenants (CMP-07)"
+    task: NB-194
+    delivered_by: "India DLT registration"
+    priority: Must
+    gate: "Go-live blocker in India"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-32
+    domain: "Supply chain"
+    control: "SCA in CI, SBOM per release, patch SLA by severity, build fails on critical CVE"
+    task: NB-290
+    delivered_by: "Secrets scanning & dependency"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: []
+    evidence:
+      - { link: ".github/workflows/ci.yml#stage6-build-and-scan", accepted_by: null, accepted_on: null }
+  - id: SC-33
+    domain: "Detection"
+    control: "SIEM alerting on auth failures, privilege change, support access and mass export"
+    task: NB-293
+    delivered_by: "Security logging, SIEM"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: []
+    evidence: []
+  - id: SC-34
+    domain: "Detection"
+    control: "Immutable append-only audit trail with before/after values (SYS-13)"
+    task: NB-238
+    delivered_by: "Immutable audit trail service"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: [AuditServiceTest]
+    evidence: []
+  - id: SC-35
+    domain: "Detection"
+    control: "No PHI written to application logs — verified by an automated scanner"
+    task: NB-304
+    delivered_by: "Observability — metrics"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: [LogPhiLeakTest, LogPhiLeakS9QaTest]
+    evidence:
+      - { link: ".github/workflows/log-phi-scan.yml", accepted_by: null, accepted_on: null }
+  - id: SC-36
+    domain: "Resilience"
+    control: "Encrypted backups with point-in-time recovery, never crossing a region boundary"
+    task: NB-306
+    delivered_by: "Backup, retention & restore"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: []
+    evidence: []
+  - id: SC-37
+    domain: "Resilience"
+    control: "Immutable backup copies and an isolated recovery environment for ransomware"
+    task: NB-296
+    delivered_by: "Business continuity & ransomware"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: []
+    evidence: []
+  - id: SC-38
+    domain: "Resilience"
+    control: "DR drill meeting RTO 4h / RPO 15 min in both regions"
+    task: NB-307
+    delivered_by: "Disaster recovery — RTO/RPO"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: []
+    evidence: []
+  - id: SC-39
+    domain: "Resilience"
+    control: "A third-party outage never blocks clinical or billing work"
+    task: NB-330
+    delivered_by: "Graceful degradation for third-party"
+    priority: Should
+    gate: "Post-launch acceptable"
+    owner: "@nabd/platform-owners"
+    tests: []
+    evidence: []
+  - id: SC-40
+    domain: "Resilience"
+    control: "A sync backlog is treated as a clinic working offline, not as lost data (SYS-22 / NFR-12)"
+    task: NB-328
+    delivered_by: "Offline queue, replay & sync banner"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/platform-owners"
+    tests: []
+    evidence: []
+  - id: SC-41
+    domain: "Assurance"
+    control: "Annual CERT-In-empanelled VAPT for India, plus the annual tenant drill (NFR-09)"
+    task: NB-294
+    delivered_by: "Annual CERT-In-empanelled VAPT"
+    priority: Must
+    gate: "Go-live blocker in India"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-42
+    domain: "Assurance"
+    control: "Independent penetration test covering the KSA stack"
+    task: NB-295
+    delivered_by: "KSA penetration test"
+    priority: Must
+    gate: "Go-live blocker in KSA"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-43
+    domain: "Assurance"
+    control: "Threat model reviewed with mitigations tracked"
+    task: NB-282
+    delivered_by: "Threat model & security architecture"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-44
+    domain: "Assurance"
+    control: "Breach runbook with a completed tabletop exercise"
+    task: NB-248
+    delivered_by: "Breach-notification runbook"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-45
+    domain: "Assurance"
+    control: "Platform-side breach and incident operations console (DPO-03 / SSA-05)"
+    task: NB-249
+    delivered_by: "Platform breach management operations"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/security-owners"
+    tests: []
+    evidence: []
+  - id: SC-46
+    domain: "Privacy — India"
+    control: "DPDP Act 2023 pack: consent, notice, rights, grievance officer, breach reporting"
+    task: NB-253
+    delivered_by: "India DPDP Act 2023"
+    priority: Must
+    gate: "Go-live blocker in India"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-47
+    domain: "Privacy — Saudi"
+    control: "PDPL / SDAIA pack: residency, controller obligations, cross-border rules, retention"
+    task: NB-254
+    delivered_by: "Saudi PDPL & SDAIA"
+    priority: Must
+    gate: "Go-live blocker in KSA"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-48
+    domain: "Privacy"
+    control: "Consent versioned, withdrawable, and a hard gate with owner evidence (CMP-01 / CMP-02)"
+    task: NB-241
+    delivered_by: "Consent as a hard gate"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-49
+    domain: "Privacy"
+    control: "Consent and DPA registry with full version audit (DPO-01)"
+    task: NB-242
+    delivered_by: "Consent registry & versioned audit"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-50
+    domain: "Privacy"
+    control: "DSR engine with statutory timers and automatic closure letters (DPO-02)"
+    task: NB-244
+    delivered_by: "DSR workflow engine"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-51
+    domain: "Privacy"
+    control: "Regulator or owner export within 72 hours, 3-year retention (NFR-07)"
+    task: NB-078
+    delivered_by: "Patient data export & erasure execution"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-52
+    domain: "Privacy"
+    control: "Retention defaults active from day one with a pre-delete notice (CMP-05)"
+    task: NB-245
+    delivered_by: "Retention auto-rules"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-53
+    domain: "Privacy"
+    control: "Retention clocks per region with legal hold overriding erasure"
+    task: NB-247
+    delivered_by: "Medical record retention & legal hold"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-54
+    domain: "Privacy"
+    control: "Data classification standard applied to every table and log field"
+    task: NB-255
+    delivered_by: "Data classification & handling standard"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-55
+    domain: "Privacy"
+    control: "Plan plus signed digital DPA required before the tenant may hold patient data (CEO-17)"
+    task: NB-276
+    delivered_by: "Digital DPA gate"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/dpo"
+    tests: []
+    evidence: []
+  - id: SC-56
+    domain: "Payments"
+    control: "PCI-DSS SAQ-A scope: no card data touches Nabd servers"
+    task: NB-168
+    delivered_by: "Payment gateway integration"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/engineering"
+    tests: []
+    evidence: []
+  - id: SC-57
+    domain: "Payments"
+    control: "ZATCA e-invoicing passes the sandbox compliance validator"
+    task: NB-164
+    delivered_by: "Saudi VAT & ZATCA"
+    priority: Must
+    gate: "Go-live blocker in KSA"
+    owner: "@nabd/engineering"
+    tests: []
+    evidence: []
+  - id: SC-58
+    domain: "Payments"
+    control: "GST and ZATCA output independently verified against worked examples"
+    task: NB-322
+    delivered_by: "Tax & invoice correctness test pack"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/engineering"
+    tests: []
+    evidence: []
+  - id: SC-59
+    domain: "Clinical safety"
+    control: "Allergy conflicts cannot be overridden without a documented reason (DERM-05)"
+    task: NB-108
+    delivered_by: "Allergy hard-warning"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/clinical-safety"
+    tests: [PrescriptionApiTest]
+    evidence: []
+  - id: SC-60
+    domain: "Clinical safety"
+    control: "Paediatric dosing derives from recorded weight via a named, versioned rule source (PED-05)"
+    task: NB-112
+    delivered_by: "Weight-based paediatric dosing"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/clinical-safety"
+    tests: [DoseWeightPolicyTest, DoseCalculatorS9QaTest]
+    evidence: []
+  - id: SC-61
+    domain: "Clinical safety"
+    control: "Pregnancy and lactation warnings fire without the Gynaecology profile (GYN-03)"
+    task: NB-113
+    delivered_by: "Pregnancy & lactation warnings"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/clinical-safety"
+    tests: [RxSafetyChecksPregnancyStatusTest, PregnancyStatusApiTest]
+    evidence: []
+  - id: SC-62
+    domain: "Clinical safety"
+    control: "Signed clinical notes immutable; amendments append with reason and author"
+    task: NB-104
+    delivered_by: "Clinical note amendment"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/clinical-safety"
+    tests: []
+    evidence: []
+  - id: SC-63
+    domain: "Clinical safety"
+    control: "A procedure cannot proceed without recorded consent (DOC-09)"
+    task: NB-119
+    delivered_by: "Procedure consent capture & signature"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/clinical-safety"
+    tests: []
+    evidence: []
+  - id: SC-64
+    domain: "Clinical safety"
+    control: "Emergency phrases halt aggregator routing and show emergency guidance only (AGG-02)"
+    task: NB-222
+    delivered_by: "Emergency phrase interception"
+    priority: Must
+    gate: "Go-live blocker for aggregator"
+    owner: "@nabd/clinical-safety"
+    tests: []
+    evidence: []
+  - id: SC-65
+    domain: "Clinical safety"
+    control: "Hazard log reviewed and signed by a clinical safety officer"
+    task: NB-321
+    delivered_by: "Clinical safety test cases"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/clinical-safety"
+    tests: []
+    evidence:
+      - { link: "docs/clinical-safety/signoff/hazard-log-v1.json", accepted_by: null, accepted_on: null }
+  - id: SC-66
+    domain: "Traceability"
+    control: "Every wireframe requirement identifier mapped to a delivered, tested task"
+    task: NB-343
+    delivered_by: "Requirement traceability & coverage sign-off"
+    priority: Must
+    gate: "Go-live blocker"
+    owner: "@nabd/engineering"
+    tests: []
+    evidence: []
+  - id: SC-67
+    domain: "People"
+    control: "Security awareness and clinical data handling training completed by all staff"
+    task: NB-348
+    delivered_by: "Staff security awareness & data handling"
+    priority: Should
+    gate: "Before pilot"
+    owner: "@nabd/engineering"
+    tests: []
+    evidence: []

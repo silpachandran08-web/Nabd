@@ -1,5 +1,5 @@
 // REC-047: shared billing-state chip on checkout, counter sale and patients. Run: node s8-rec4-billing-states.mjs (server on APP, default :3104).
-import { launch, seedClinic, mockApi, check, results, dumpLog } from '/home/claude/ws/qa/t3/qa-lib.mjs';
+import { launch, seedClinic, mockApi, check, results, dumpLog } from './qa-lib.mjs';
 
 const APP = process.env.APP ?? 'http://localhost:3000';
 const SHOTS = '/home/claude/ws/reports/shots-rec4';

@@ -1,0 +1,71 @@
+# OPS-036 stage 7: per-PR preview (Core + staff web + Postgres + comms stub) in its own namespace, seeded with
+# synthetic tenants, URL + role logins posted on the PR, then the FEF-049 smoke + axe run against it.
+# Called from ci.yml (job "preview"); the required check is ci.yml's "stage7-preview-e2e".
+# Needs external action: preview cluster + OIDC trust (vars.PREVIEW_CLUSTER_LOGIN), wildcard DNS/TLS (vars.PREVIEW_DOMAIN),
+# then set vars.PREVIEW_ENABLED=true. Until then ci.yml skips this workflow and stage 7 reports "preview disabled".
+name: preview
+on:
+  workflow_call:
+    outputs:
+      app_url: { value: "${{ jobs.deploy.outputs.app_url }}" }
+permissions:
+  contents: read
+  packages: write        # push the PR's preview images to GHCR
+  id-token: write        # short-lived OIDC login to the non-prod cluster; no kubeconfig secret
+  pull-requests: write   # URL + logins comment
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+env:
+  PR: ${{ github.event.pull_request.number }}
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8   # "reachable within 8 min"
+    outputs:
+      app_url: ${{ steps.up.outputs.app_url }}
+      api_url: ${{ steps.up.outputs.api_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17", cache: maven }
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - name: build and push preview images (core, migrate, web)
+        run: |
+          tag="pr-$PR-${GITHUB_SHA::12}"
+          mvn -B -q -f backend/pom.xml package -Dmaven.test.skip=true
+          docker build -t "$IMAGE:$tag" . && docker build --target migrate -t "$IMAGE-migrate:$tag" .
+          docker build -f infra/preview/web.Dockerfile --build-arg NEXT_PUBLIC_API_BASE_URL="https://pr-$PR.${{ vars.PREVIEW_DOMAIN }}/v1" -t "$IMAGE-web:$tag" frontend
+          for i in "$IMAGE" "$IMAGE-migrate" "$IMAGE-web"; do docker push -q "$i:$tag"; done
+          echo "IMAGE_CORE=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE:$tag")" >> "$GITHUB_ENV"
+          echo "IMAGE_MIGRATE=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE-migrate:$tag")" >> "$GITHUB_ENV"
+          echo "IMAGE_WEB=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE-web:$tag")" >> "$GITHUB_ENV"
+      - name: log in to the preview cluster (OIDC, token valid for this job only)
+        run: ${{ vars.PREVIEW_CLUSTER_LOGIN }}
+      - name: deploy, migrate, scan + seed synthetic tenants
+        id: up
+        env: { SHA: "${{ github.sha }}", PREVIEW_DOMAIN: "${{ vars.PREVIEW_DOMAIN }}", PREVIEW_MAX: "${{ vars.PREVIEW_MAX || '10' }}", SEED_OUT: seed }
+        run: |
+          sudo apt-get install -y -q postgresql-client gettext-base >/dev/null && pip install -q argon2-cffi==23.1.0
+          infra/preview/deploy.sh | tee "$RUNNER_TEMP/deploy.log"
+          grep -E '^(app_url|api_url)=' "$RUNNER_TEMP/deploy.log" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with: { name: preview-seed, path: seed, retention-days: 3 }   # synthetic logins; die with the preview
+      - name: post URL and per-role logins on the PR
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          python3 infra/preview/preview.py comment --url "${{ steps.up.outputs.app_url }}" --logins seed/logins.json > "$RUNNER_TEMP/c.md"
+          id=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" --paginate --jq '[.[] | select(.body | startswith("<!-- preview-env -->"))] | last | .id // empty')
+          if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@"$RUNNER_TEMP/c.md"
+          else gh pr comment "$PR" --body-file "$RUNNER_TEMP/c.md"; fi
+
+  smoke:
+    needs: deploy
+    uses: ./.github/workflows/e2e-smoke.yml
+    with:
+      app_url: ${{ needs.deploy.outputs.app_url }}
+      api_url: ${{ needs.deploy.outputs.api_url }}
+      seed_artifact: preview-seed

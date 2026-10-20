@@ -9,7 +9,7 @@ final class SupportAccessModels {
     private SupportAccessModels() {
     }
 
-    record Grant(UUID id, UUID tenantId, UUID operatorId, String reason, Instant grantedAt,
+    record Grant(UUID id, UUID tenantId, UUID ticketId, String scope, UUID operatorId, String reason, Instant grantedAt,
                  Instant expiresAt, Instant revokedAt) {
         boolean isActive(Instant now) {
             return revokedAt == null && now.isBefore(expiresAt);

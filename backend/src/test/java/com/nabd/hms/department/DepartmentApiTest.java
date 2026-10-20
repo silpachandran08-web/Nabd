@@ -108,7 +108,7 @@ class DepartmentApiTest extends ApiTestBase {
         UUID doctorRoleId = seedRole(tenant.id(), "Doctor", false, fullGrant("clinical"), fullGrant("queue"));
         SeededStaff dentist = seedStaff(tenant, doctorRoleId, "dentist@a.com", "+919200001006", false);
         UUID dentalUuid = UUID.fromString(dentalId);
-        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ? WHERE id = ?", dentalUuid, dentist.id()));
+        inTenantTx(tenant.id(), () -> jdbc.update("UPDATE staff SET department_id = ?, is_clinician = true WHERE id = ?", dentalUuid, dentist.id())); // PLT-016
 
         ResponseEntity<List> resp = exchange("/v1/departments/" + generalId + "/transfer-targets", HttpMethod.GET, authed(ownerToken), List.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);

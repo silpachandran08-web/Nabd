@@ -19,6 +19,7 @@ import type { Part } from "../components/consult/clinical";
 import type { Vitals } from "../components/consult/shared";
 import { DEFAULT_START_STATUS, statusBeforeConsult, statusSequence } from "../components/consult/consultFlow";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { moveBody, moveErrorMessage } from "../lib/queueMove";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
@@ -56,7 +57,8 @@ type RegistryRow = {
   allergy: string | null; balanceDue: boolean; duplicate: boolean; archived: boolean;
   queueToken: number | null; queueStatus: string | null; tags: string[];
 };
-type Registry = { total: number; counts: Record<string, number>; rows: RegistryRow[] };
+// OPS-008: keyset paging; page.nextCursor fetches the next page of the same filter + q.
+type Registry = { total: number; counts: Record<string, number>; rows: RegistryRow[]; matchedTotal?: number; page?: { nextCursor: string | null } };
 // Today's queue entry for the drawer patient (GET /v1/queue, QueueEntryResponse subset).
 type TodayVisit = { id: string; patientId: string; doctorId: string; departmentId: string; status: string; tokenNumber: number };
 const VISIT_DONE = ["completed", "cancelled", "no_show", "transferred_out"];
@@ -143,6 +145,8 @@ function PatientsList() {
   const [perms, setPerms] = useState<Perms>(NO_PERMS);
   const { checkIn: canCheckIn, register: canRegister, clinicalView, clinicalEdit, dentalView: canDental, dentalEdit, billingView, patientsEdit } = perms;
   const loadSeq = useRef(0);
+  const [moreState, setMoreState] = useState<"idle" | "loading" | "error">("idle");
+  const moreRef = useRef<HTMLDivElement | null>(null);
   const [phoneShown, setPhoneShown] = useState(false);
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
   const [loading, setLoading] = useState(true);
@@ -256,7 +260,7 @@ function PatientsList() {
           return;
         }
         const body: Registry = await res.json();
-        if (seq === loadSeq.current) setRegistry(body);
+        if (seq === loadSeq.current) { setRegistry(body); setMoreState("idle"); }
       } catch {
         if (seq === loadSeq.current) setError("Couldn't reach the server. Check your connection and try again.");
       } finally {
@@ -265,6 +269,35 @@ function PatientsList() {
     },
     [authedFetch]
   );
+
+  // OPS-008: the next keyset page of the same filter + search, appended (infinite scroll; the button is the keyboard path).
+  const nextCursor = registry?.page?.nextCursor ?? null;
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || moreState === "loading") return;
+    const seq = loadSeq.current;
+    setMoreState("loading");
+    try {
+      const params = new URLSearchParams({ filter, cursor: nextCursor });
+      if (q.trim()) params.set("q", q.trim());
+      const res = await authedFetch(`/patients/registry?${params}`);
+      if (seq !== loadSeq.current) return; // filter or search changed meanwhile
+      if (!res?.ok) { setMoreState("error"); return; }
+      const body: Registry = await res.json();
+      if (seq !== loadSeq.current) return;
+      setRegistry((prev) => prev && { ...body, rows: [...prev.rows, ...body.rows] });
+      setMoreState("idle");
+    } catch {
+      if (seq === loadSeq.current) setMoreState("error");
+    }
+  }, [authedFetch, filter, q, nextCursor, moreState]);
+
+  useEffect(() => {
+    const el = moreRef.current;
+    if (!el || !nextCursor || moreState !== "idle" || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) void loadMore(); });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [loadMore, nextCursor, moreState]);
 
   // Live search: first load is immediate, typing is debounced; filter changes reload straight away.
   const firstLoad = useRef(true);
@@ -401,11 +434,10 @@ function PatientsList() {
     setStarting(true);
     setStartError(null);
     try {
-      const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "in_consult" }) });
+      const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: moveBody("in_consult", entry.status) });
       if (!res) return;
       if (!res.ok) {
-        const p: { detail?: string; title?: string } | null = await res.json().catch(() => null);
-        setStartError(p?.detail || p?.title || "Couldn't start the consultation.");
+        setStartError(await moveErrorMessage(res, "Couldn't start the consultation."));
         return;
       }
       router.push(`/consult?entry=${encodeURIComponent(entry.id)}`);
@@ -748,19 +780,22 @@ function PatientsList() {
                 ))}
               </tbody>
             </table>
-            {/* GET /patients/registry has no paging parameters (server returns at most 200 rows per filter);
-                say so instead of implying the list is complete. Counts are pre-search, so only compare without q. */}
-            {!q.trim() && registry.rows.length < (registry.counts[filter] ?? 0) && (
-              <p className={styles.muted} role="status">
-                Showing the first {registry.rows.length} of {registry.counts[filter]}. Search by name, mobile or patient ID to find others.
-              </p>
+            {nextCursor && (
+              <div ref={moreRef} className={styles.moreRow}>
+                <p className={styles.muted} role="status">
+                  {moreState === "error" ? "Couldn't load more patients." : `Showing ${registry.rows.length} of ${registry.matchedTotal ?? registry.counts[filter] ?? 0}.`}
+                </p>
+                <button type="button" className={styles.secondaryBtn} onClick={() => void loadMore()} disabled={moreState === "loading"}>
+                  {moreState === "loading" ? "Loading…" : moreState === "error" ? "Try again" : "Load more"}
+                </button>
+              </div>
             )}
           </div>
         )}
       </div>
 
       {checkInFor && (
-        <CheckInDialog patient={checkInFor} authedFetch={authedFetch} onClose={() => setCheckInFor(null)}
+        <CheckInDialog patient={checkInFor} onClose={() => setCheckInFor(null)}
           onDone={(token) => { setFlash(`${checkInFor.name} checked in · T-${token}`); setCheckInFor(null); void load(q, filter); }} />
       )}
       {registering && (

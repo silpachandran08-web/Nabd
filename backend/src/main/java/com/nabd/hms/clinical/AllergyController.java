@@ -32,16 +32,22 @@ import java.util.UUID;
 public class AllergyController {
 
     private final AllergyService service;
+    private final ClinicalReadScope scopes;
 
-    AllergyController(AllergyService service) {
+    AllergyController(AllergyService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("allergies")
     @GetMapping("/patients/{patientId}/allergies")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<AllergyResponse> list(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId,
                                       @RequestParam(defaultValue = "false") boolean includeInactive) {
-        return service.list(tenantId(jwt), patientId, includeInactive);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.list(scope.tenantId(), patientId, includeInactive);
     }
 
     @PostMapping("/patients/{patientId}/allergies")
@@ -68,16 +74,24 @@ public class AllergyController {
         service.deactivate(tenantId(jwt), id, staffId(jwt), RequestMeta.clientIp(http), req);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("allergy_history")
     @GetMapping("/patients/{patientId}/allergies/history")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<AllergyEventResponse> history(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.history(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.history(scope.tenantId(), patientId);
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("allergy_status")
     @GetMapping("/patients/{patientId}/allergies/status")
     @PreAuthorize("hasAuthority('clinical:view')")
     public AllergyStatusResponse status(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.status(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.status(scope.tenantId(), patientId);
     }
 
     @PutMapping("/patients/{patientId}/allergies/status")

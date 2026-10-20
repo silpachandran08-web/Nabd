@@ -287,8 +287,9 @@ class PackageApiTest extends ApiTestBase {
 
         // NB-056 maker-checker: the requester cannot also be the approver.
         ResponseEntity<Map> selfApprove = exchange("/v1/packages/refunds/" + refundId + "/approve", HttpMethod.POST, authed(token), Map.class);
-        assertThat(selfApprove.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(selfApprove.getBody().get("type")).asString().contains("self-approval-blocked");
+        // FIN-004: maker == checker is 403 same-user (was 400 self-approval-blocked).
+        assertThat(selfApprove.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(selfApprove.getBody().get("type")).asString().contains("same-user");
 
         ResponseEntity<Map> approveResp = exchange("/v1/packages/refunds/" + refundId + "/approve", HttpMethod.POST, authed(approverToken), Map.class);
         assertThat(approveResp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -328,8 +329,10 @@ class PackageApiTest extends ApiTestBase {
         assertThat(far.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(far.getBody().get("type")).asString().contains("not-expiring-soon");
 
-        exchange(base + "/extend", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "newValidityEnd", LocalDate.now(ZoneOffset.UTC).plusDays(10).toString(), "reason", "Test near expiry")), Map.class);
+        // FIN-004: extend refuses an earlier date, so move the end closer directly.
+        new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).update(
+                "UPDATE package_instances SET validity_end = ? WHERE id = ?::uuid",
+                java.sql.Date.valueOf(LocalDate.now(ZoneOffset.UTC).plusDays(10)), instanceId);
         ResponseEntity<Map> ok = exchange(base + "/send-reminder", HttpMethod.POST, authed(token), Map.class);
         assertThat(ok.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(ok.getBody().toString()).contains("expiry_warning_sent", "recorded only, no message sent");

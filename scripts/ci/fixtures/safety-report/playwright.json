@@ -1,0 +1,4 @@
+{"suites":[{"title":"otc.spec.ts","file":"otc.spec.ts","specs":[],"suites":[{"title":"otc","file":"otc.spec.ts","specs":[
+ {"title":"pharmacy OTC blocks an Rx item","file":"otc.spec.ts","tags":[],"tests":[{"annotations":[{"type":"hazard","description":"H-05"}],"results":[{"status":"passed"}]}]},
+ {"title":"untagged spec","file":"otc.spec.ts","tags":[],"tests":[{"annotations":[],"results":[{"status":"passed"}]}]}
+]}]}]}

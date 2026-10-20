@@ -37,8 +37,8 @@ public class QueueService {
     /**
      * NB-355: the linear order is no longer fixed in code — DepartmentService.resolveStatusSequence()
      * is the single source of truth for a department's configured (or default) pipeline shape;
-     * this is a pure lookup over whatever sequence it returns. no_show is reachable from anywhere
-     * before the terminal checkout_pending step, matching the original NB-094 rule. transferred_out
+     * this is a pure lookup over whatever sequence it returns. no_show is reachable only before
+     * in_consult (ACC-002). "completed" is never a PATCH target: billing's VisitCommands owns it. transferred_out
      * is a second terminal alongside checkout_pending, reachable only from in_consult — a doctor's
      * end-of-consult choice between billing this leg or moving the patient into another
      * department's queue.
@@ -52,7 +52,8 @@ public class QueueService {
         if ("in_consult".equals(current)) {
             next = union(next, "transferred_out");
         }
-        if (!"checkout_pending".equals(current)) {
+        int consult = sequence.indexOf("in_consult");
+        if (i >= 0 && (consult < 0 ? !"checkout_pending".equals(current) : i < consult)) { // ACC-002: no_show only before in_consult
             next = union(next, "no_show");
         }
         return next;
@@ -73,10 +74,13 @@ public class QueueService {
 
     private final ClinicClock clock;
     private final com.nabd.hms.common.AuditService auditService;
+    private final com.nabd.hms.common.EventPublisher events;
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
                  ScheduleRepository scheduleRepo, DepartmentService departmentService, TenantContext tenantContext, ClinicClock clock,
-                 com.nabd.hms.common.AuditService auditService) {
+                 com.nabd.hms.common.AuditService auditService,
+                 com.nabd.hms.common.EventPublisher events) {
+        this.events = events;
         this.auditService = auditService;
         this.clock = clock;
         this.repo = repo;
@@ -103,10 +107,13 @@ public class QueueService {
 
         if (req.appointmentId() != null) {
             var appt = appointmentRepo.findById(tenantId, req.appointmentId())
-                    .filter(a -> "scheduled".equals(a.status()))
+                    .filter(a -> "scheduled".equals(a.status()) || "arrived".equals(a.status()))
                     .filter(a -> a.patientId().equals(req.patientId()) && a.doctorId().equals(req.doctorId()))
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
                             "Appointment not found, already resolved, or doesn't match patient/doctor."));
+            if ("arrived".equals(appt.status())) {
+                throw alreadyCheckedIn(tenantId, appt.id());
+            }
             LocalDate apptDay = appt.startTime().atZone(clock.zone(tenantId)).toLocalDate();
             if (!apptDay.equals(today)) {
                 throw new ApiException(HttpStatus.CONFLICT, "appointment-not-today", "Appointment is not for today",
@@ -116,22 +123,35 @@ public class QueueService {
 
         // serializes both "what's the next token number" and, for walk-ins, the session-capacity
         // check below against AppointmentService.book() — same pool, same lock (QueueRepository.lockDoctorDay)
-        repo.lockDoctorDay(req.doctorId(), today);
+        repo.lockDoctorDay(tenantId, req.doctorId(), today);
 
         if (req.appointmentId() == null) {
             enforceSessionCapacity(tenantId, req.doctorId(), today); // scheduled check-ins were already capacity-checked at booking
-        } else if (repo.appointmentCheckedIn(tenantId, req.appointmentId())) {
-            // QA-04: under the lock above, so a double-submit can't mint a second, uncounted token for one booking
-            throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found",
-                    "Appointment not found, already resolved, or doesn't match patient/doctor.");
+        } else if (appointmentRepo.markArrived(tenantId, req.appointmentId()) == 0) {
+            // ACC-003: the flip is atomic under the lock above, so a double-submit (or a second desk) can't mint a second token
+            throw alreadyCheckedIn(tenantId, req.appointmentId());
         }
 
         UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
         int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
-        UUID id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
-                null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode(), null, null);
+        UUID id;
+        try {
+            id = repo.insert(tenantId, req.appointmentId(), req.patientId(), req.doctorId(), departmentId,
+                    null, null, today, token, source, "checked_in", req.presentingComplaint(), req.paymentMode(), null, null, clock.now());
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            if (req.appointmentId() != null && String.valueOf(e.getMessage()).contains("uq_queue_entries_appointment")) {
+                throw new ApiException(HttpStatus.CONFLICT, "already-checked-in", "Already checked in",
+                        "This appointment has already been checked in.", java.util.Map.of("code", "ALREADY_CHECKED_IN")); // DB backstop of the lock; tx is aborted, no lookup
+            }
+            throw e;
+        }
+        var actor = repo.actor(tenantId, callerStaffId);
+        auditService.record(tenantId, "staff", callerStaffId, (String) actor.get("name"), (String) actor.get("role"), null,
+                "queue.check_in", "queue_entry", id, null,
+                java.util.Map.of("doctorId", req.doctorId(), "tokenNumber", token, "source", source,
+                        "appointmentId", req.appointmentId() == null ? "" : req.appointmentId().toString()));
         log.info("queue check-in by {}: token {} for doctor {} ({}), entry {}",  // log-phi-ok: queue token number, not a credential
                 callerStaffId, token, req.doctorId(), req.appointmentId() == null ? "walk-in" : "scheduled", id);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
@@ -146,23 +166,63 @@ public class QueueService {
 
     @Transactional
     public QueueEntryResponse updateStatus(UUID tenantId, UUID callerStaffId, UUID id, QueueStatusUpdateRequest req) {
+        if ("completed".equals(req.status())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "completion-reserved-for-billing", "Completion is reserved for billing",
+                    "A visit is completed only by a successful checkout.");
+        }
+        return move(tenantId, callerStaffId, id, req.expectedStatus(), req.status());
+    }
+
+    /** Billing's only way to reach 'completed' (see VisitCommands); same CAS and legality as any move. */
+    QueueEntryResponse move(UUID tenantId, UUID callerStaffId, UUID id, String expectedStatus, String nextStatus) {
         tenantContext.set(tenantId);
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
-        requireLegalTransition(tenantId, current, req.status(), callerStaffId, id);
-
-        repo.updateStatus(tenantId, id, req.status());
-        log.info("queue entry {} moved {} -> {} by {}", id, current.status(), req.status(), callerStaffId);
-        if (current.appointmentId() != null && ("completed".equals(req.status()) || "no_show".equals(req.status()))) {
-            appointmentService.markTerminal(tenantId, current.appointmentId(), req.status());
+        if (expectedStatus != null && !expectedStatus.equals(current.status())) {
+            throw stale(current.status());
+        }
+        requireLegalTransition(tenantId, current, nextStatus, callerStaffId, id);
+        casStatus(tenantId, callerStaffId, current, nextStatus);
+        if ("completed".equals(nextStatus) || "no_show".equals(nextStatus)) {
+            // a transferred leg has no appointment of its own: the encounter's first leg does (ACC-003, QA-08)
+            UUID apptId = current.appointmentId() != null ? current.appointmentId()
+                    : repo.appointmentOfEncounter(tenantId, current.encounterId()).orElse(null);
+            if (apptId != null) {
+                appointmentService.markTerminal(tenantId, apptId, nextStatus);
+            }
         }
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** The one status write: WHERE status = the row we validated against, so a concurrent move makes this 0 rows -> 409. */
+    private void casStatus(UUID tenantId, UUID callerStaffId, QueueEntryRow current, String nextStatus) {
+        if (repo.updateStatus(tenantId, current.id(), current.status(), nextStatus) == 0) {
+            throw stale(repo.findById(tenantId, current.id()).map(QueueEntryRow::status).orElseThrow(this::notFound));
+        }
+        log.info("queue entry {} moved {} -> {} by {}", current.id(), current.status(), nextStatus, callerStaffId);
+        String role = (String) repo.actor(tenantId, callerStaffId).get("role");
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("tenantId", tenantId);
+        payload.put("queueEntryId", current.id());
+        payload.put("encounterId", current.encounterId());
+        payload.put("doctorId", current.doctorId());
+        payload.put("clinicDate", current.queueDate());
+        payload.put("fromStatus", current.status());
+        payload.put("toStatus", nextStatus);
+        payload.put("occurredAt", clock.now());
+        payload.put("actorRole", role);
+        events.publish(tenantId, "visit.queue_entry.status_changed.v1", payload);
+    }
+
+    private ApiException stale(String currentStatus) {
+        return new ApiException(HttpStatus.CONFLICT, "stale-status", "Visit already moved",
+                "This visit is no longer at the stage your screen shows.", java.util.Map.of("currentStatus", currentStatus));
     }
 
     private void requireLegalTransition(UUID tenantId, QueueEntryRow current, String nextStatus, UUID callerStaffId, UUID id) {
         List<String> sequence = departmentService.resolveStatusSequence(tenantId, current.departmentId());
         Set<String> allowed = allowedNextStatuses(current.status(), sequence);
         if (!allowed.contains(nextStatus)) {
-            log.warn("illegal queue transition blocked by {}: entry {} {} -> {}", callerStaffId, id, current.status(), nextStatus);
+            log.warn("illegal queue transition blocked by {}: entry {} {} -> {}", callerStaffId, id, current.status(), nextStatus); // ids only, no PHI
             throw new ApiException(HttpStatus.BAD_REQUEST, "illegal-transition", "Illegal queue transition",
                     "Cannot move from " + current.status() + " to " + nextStatus + ".");
         }
@@ -189,17 +249,17 @@ public class QueueService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "transfer-reason-required", "Transfer reason required",
                     "A reason is required when moving a patient to another department.");
         }
-        repo.updateStatus(tenantId, id, "transferred_out");
+        casStatus(tenantId, callerStaffId, current, "transferred_out");
         log.info("queue entry {} transferred_out by {} (patient {} -> department {})",
                 id, callerStaffId, current.patientId(), req.toDepartmentId());
 
         LocalDate today = clock.today(tenantId);
-        repo.lockDoctorDay(req.doctorId(), today);
+        repo.lockDoctorDay(tenantId, req.doctorId(), today);
         int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         // Same encounter, new leg — the whole visit's identity carries across the transfer even
         // though this is a brand-new queue_entries row with its own status/practitioner/department.
         UUID newId = repo.insert(tenantId, null, current.patientId(), req.doctorId(), req.toDepartmentId(),
-                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null, req.reason(), blankToNull(req.reasonNote()));
+                current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null, req.reason(), blankToNull(req.reasonNote()), clock.now());
         log.info("queue entry {} opened by transfer from {} (doctor {}, department {})",
                 newId, id, req.doctorId(), req.toDepartmentId());
 
@@ -257,7 +317,7 @@ public class QueueService {
     /** NB-098 — same session cap AppointmentService.book() enforces, applied to the walk-in path. */
     private void enforceSessionCapacity(UUID tenantId, UUID doctorId, LocalDate today) {
         ZoneId zone = clock.zone(tenantId);
-        LocalTime now = Instant.now().atZone(zone).toLocalTime(); // the clinic's clock, same as the block times
+        LocalTime now = clock.now().atZone(zone).toLocalTime(); // the clinic's clock, same as the block times
         int dayOfWeek = today.getDayOfWeek().getValue() % 7;
 
         Optional<WorkingHoursRow> block = scheduleRepo.findBlockCovering(doctorId, dayOfWeek, now);
@@ -281,11 +341,19 @@ public class QueueService {
                 row.priorityAcknowledgedBy(), row.priorityAcknowledgedAt(), row.source(),
                 row.presentingComplaint(), row.paymentMode(), row.createdAt(),
                 row.transferReason(), row.transferReasonNote(), row.ageYears(), row.gender(), row.doctorName(),
-                row.waitMinutes(), row.visitType());
+                row.waitMinutes(), row.visitType(), row.appointmentStatus());
     }
 
     private static String blankToNull(String v) {
         return v == null || v.isBlank() ? null : v.trim();
+    }
+
+    /** 409 with the existing token so the desk can say "Already checked in as T-12 at 10:04". */
+    private ApiException alreadyCheckedIn(UUID tenantId, UUID appointmentId) {
+        var extras = new java.util.HashMap<String, Object>(repo.findCheckInOf(tenantId, appointmentId).orElse(java.util.Map.of()));
+        extras.put("code", "ALREADY_CHECKED_IN");
+        return new ApiException(HttpStatus.CONFLICT, "already-checked-in", "Already checked in",
+                "This appointment has already been checked in.", extras);
     }
 
     private ApiException notFound() {

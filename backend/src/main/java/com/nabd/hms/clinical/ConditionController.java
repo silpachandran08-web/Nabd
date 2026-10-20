@@ -25,15 +25,21 @@ import java.util.UUID;
 public class ConditionController {
 
     private final ConditionService service;
+    private final ClinicalReadScope scopes;
 
-    ConditionController(ConditionService service) {
+    ConditionController(ConditionService service, ClinicalReadScope scopes) {
         this.service = service;
+        this.scopes = scopes;
     }
 
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("conditions")
     @GetMapping("/patients/{patientId}/conditions")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<ConditionResponse> list(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID patientId) {
-        return service.list(tenantId(jwt), patientId);
+        ReadScope scope = scopes.resolve(jwt);
+        scopes.requirePatient(scope, patientId);
+        return service.list(scope.tenantId(), patientId);
     }
 
     @PostMapping("/patients/{patientId}/conditions")
@@ -51,10 +57,12 @@ public class ConditionController {
     }
 
     /** NB-077's clinic-wide "chronic review due" list — derived from review_due_date, not a manual flag. */
+    @org.springframework.transaction.annotation.Transactional // IDC-001: caller lookup, gate and read share one pool connection
+    @com.nabd.hms.shared.phiread.PhiRead("conditions_due_list")
     @GetMapping("/conditions/due")
     @PreAuthorize("hasAuthority('clinical:view')")
     public List<DueConditionResponse> due(@AuthenticationPrincipal Jwt jwt) {
-        return service.due(tenantId(jwt));
+        return service.due(scopes.resolve(jwt));
     }
 
     private UUID tenantId(Jwt jwt) {

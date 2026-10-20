@@ -4,6 +4,8 @@
 // across tabs (Web Locks, localStorage mutex fallback) and the new pair is announced on BroadcastChannel.
 // React-free so it is unit-tested (tests/unit/apiClient.test.mjs). Never logs a token.
 import { decodeJwtPayload } from "./jwt.ts";
+import { clearLocalSessionData } from "./idleLock.ts";
+import { COOKIE_AUTH } from "./bffShim.ts";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const ACCESS_KEY = "nabd_access_token";
@@ -20,6 +22,7 @@ function claims(token: string | null): Claims {
 
 /** True once 80% of the token's lifetime has passed. An unreadable token is left to the reactive 401 path. */
 export function needsRefresh(token: string | null, nowMs = Date.now()): boolean {
+  if (COOKIE_AUTH) return false; // FEF-009: the BFF refreshes server-side
   const { exp, iat } = claims(token);
   if (!exp) return false;
   const start = iat ?? exp - DEFAULT_TTL_S;
@@ -46,6 +49,7 @@ export function goLogin(): void {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);
   void idbPair(null);
+  void clearLocalSessionData();
   if (leaving) return;
   const here = window.location.pathname + window.location.search;
   if (window.location.pathname.startsWith("/login")) return;
@@ -160,6 +164,7 @@ let inflight: Promise<boolean> | null = null;
 /** Refreshes the session once however many callers/tabs ask. `stale` is the access token the caller
  * just saw rejected (or ageing): if storage already holds a different, fresh one, another tab did it. */
 export function refreshSession(stale: string | null): Promise<boolean> {
+  if (COOKIE_AUTH) return cookieSession(); // FEF-009: GET /api/session refreshes via the cookie if it can
   if (inflight) return inflight;
   const locked = async (): Promise<boolean> => {
     if (localStorage.getItem(REFRESH_KEY)) await freshestRefreshToken(); // adopt a pair another tab rotated moments ago
@@ -175,9 +180,18 @@ export function refreshSession(stale: string | null): Promise<boolean> {
   return inflight;
 }
 
+async function cookieSession(): Promise<boolean> {
+  const res = await fetch("/api/session", { cache: "no-store" });
+  if (res.status === 401) return false;
+  if (!res.ok) throw new Error(`session check failed: ${res.status}`);
+  const s: { accessToken?: string } = await res.json();
+  if (s.accessToken) localStorage.setItem(ACCESS_KEY, s.accessToken); // claims snapshot, not a token
+  return true;
+}
+
 let timer: ReturnType<typeof setTimeout> | undefined;
 function schedule(): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || COOKIE_AUTH) return;
   clearTimeout(timer);
   const token = localStorage.getItem(ACCESS_KEY);
   const { exp, iat } = claims(token);
@@ -185,14 +199,24 @@ function schedule(): void {
   const start = iat ?? exp - DEFAULT_TTL_S;
   const wait = Math.max(0, (start + 0.8 * (exp - start)) * 1000 - Date.now());
   timer = setTimeout(() => {
-    const t = localStorage.getItem(ACCESS_KEY);
-    if (t) void refreshSession(t).then((ok) => { if (!ok) goLogin(); }).catch(() => { /* offline: next request retries */ });
+    // The token this timer was set for, not whatever storage holds now: if another tab already rotated it, that is "adopt", not "stale".
+    if (localStorage.getItem(ACCESS_KEY)) void refreshSession(token).then((ok) => { if (!ok) goLogin(); }).catch(() => { /* offline: next request retries */ });
   }, Math.min(wait, 2 ** 31 - 1));
   (timer as { unref?: () => void }).unref?.();
 }
 if (typeof window !== "undefined") {
   schedule();
   window.addEventListener("storage", (e) => { if (e.key === ACCESS_KEY) schedule(); });
+}
+
+/** RFC 9562 UUIDv7: 48-bit ms timestamp, then random. */
+export function uuidv7(nowMs = Date.now()): string {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  for (let i = 0; i < 6; i++) b[i] = Math.floor(nowMs / 2 ** (8 * (5 - i))) & 0xff;
+  b[6] = (b[6] & 0x0f) | 0x70;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
 // ---- fetch ---------------------------------------------------------------------------------------
@@ -206,6 +230,13 @@ function send(path: string, init: RequestInit | undefined, token: string | null)
  * a 401, then replays the request. A 401 that survives refresh is returned (tokens already cleared) so
  * the caller's existing 401 branch runs goLogin(). Network errors reject, as plain fetch does. */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  // PLT-026: one key per user action, kept across the 401 replay below. A caller that retries after a network
+  // error passes its own Idempotency-Key header so the server sees the same action.
+  if (init?.method?.toUpperCase() === "POST" && !new Headers(init.headers).has("Idempotency-Key")) {
+    const headers = new Headers(init.headers);
+    headers.set("Idempotency-Key", uuidv7());
+    init = { ...init, headers };
+  }
   let token = localStorage.getItem(ACCESS_KEY);
   if (token && needsRefresh(token)) {
     try { if (await refreshSession(token)) token = localStorage.getItem(ACCESS_KEY); } catch { /* try the old token */ }
