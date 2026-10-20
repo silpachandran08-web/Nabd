@@ -503,6 +503,11 @@ export default function StaffAccessPage() {
     }
   }
 
+  function clinicianSaved(staffId: string, clinician: boolean) {
+    setStaff((prev) => prev.map((x) => (x.id === staffId ? { ...x, clinician } : x)));
+    setReview((prev) => prev.filter((r) => r.staffId !== staffId));
+  }
+
   // PLT-016: the Clinician flag (needs a registration number; the server refuses it otherwise).
   async function setClinician(staffId: string, value: boolean) {
     setBusyId(staffId);
@@ -516,8 +521,7 @@ export default function StaffAccessPage() {
         return;
       }
       const saved: Staff = await res.json();
-      setStaff((prev) => prev.map((x) => (x.id === saved.id ? { ...x, clinician: saved.clinician } : x)));
-      setReview((prev) => prev.filter((r) => r.staffId !== staffId));
+      clinicianSaved(saved.id, !!saved.clinician);
     } catch {
       setRoleNotice("Couldn't reach the server. The clinician flag was not changed.");
     } finally {
@@ -634,15 +638,10 @@ export default function StaffAccessPage() {
                     )}
                     {showLogin && (() => { const m = mfaBadge(s); return <td data-testid="mfa-status"><StatusPill tone={m.tone} label={m.label} /></td>; })()}
                     <td>
+                      {/* CARRY-12: the one clinician control per row (CLN-005 dialog: number, clinician flag, expiry). */}
                       {canEditRoles && (
                         <button className={styles.actionBtn} onClick={() => setRegEdit(s)}>
-                          {s.professionalRegistrationNo ? "Reg. no." : "Add reg. no."}
-                        </button>
-                      )}
-                      {canEditRoles && (s.professionalRegistrationNo || s.clinician) && (
-                        <button className={styles.actionBtn} aria-pressed={!!s.clinician} disabled={busyId === s.id}
-                          onClick={() => setClinician(s.id, !s.clinician)}>
-                          {s.clinician ? "Clinician: on" : "Clinician: off"}
+                          {s.professionalRegistrationNo ? "Reg. no. & clinician" : "Add reg. no. & clinician"}
                         </button>
                       )}
                       {canResetMfa && s.status === "active" && (
@@ -772,7 +771,8 @@ export default function StaffAccessPage() {
 
       {regEdit && canEditRoles && (
         <RegistrationNoDialog staffId={regEdit.id} staffName={regEdit.name} current={regEdit.professionalRegistrationNo ?? null}
-          onSave={(v) => saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)} authedFetch={authedFetch} />
+          onSave={(v) => saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)} authedFetch={authedFetch}
+          onClinicianSaved={(on) => clinicianSaved(regEdit.id, on)} />
       )}
 
       {inviteOpen && canInvite && (

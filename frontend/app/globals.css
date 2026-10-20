@@ -20,7 +20,7 @@
   --nb-accent-glow: 0 8px 24px rgba(46, 211, 224, 0.26);
   --nb-on-accent: #04231f;
 
-  --nb-danger-500: #f0455c;
+  --nb-danger-500: #ff6b7d; /* CARRY-12: >= 4.5:1 as text on --nb-danger-tint over every surface (was #f0455c, 3.5:1) */
   --nb-danger-tint: rgba(240, 69, 92, 0.13);
 
   /* Healthcare status states (DESIGN.md §1.3/§1.4) — pages use these, never literals. */
@@ -34,7 +34,7 @@
   --nb-info-500: #58b2f5;
   --nb-info-600: #3d94db;
   --nb-info-tint: rgba(88, 178, 245, 0.14);
-  --nb-sync-500: #a78bfa;
+  --nb-sync-500: #b49cfb; /* CARRY-12: >= 4.5:1 on --nb-sync-tint (was #a78bfa, 4.3:1) */
   --nb-sync-tint: rgba(167, 139, 250, 0.14);
   --nb-urgent-500: #ff7a45;
   --nb-urgent-tint: rgba(255, 122, 69, 0.14);

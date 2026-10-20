@@ -1,4 +1,4 @@
-// PLT-016 E2E: preset badge + Reset to preset (Owner only), Clinician toggle, clinician backfill review list.
+// PLT-016 E2E: preset badge + Reset to preset (Owner only), Clinician pill, clinician backfill review list.
 // Run: NODE_PATH=/home/claude/ws/qa/node_modules APP=http://localhost:3517 node s11-plt-016-role-presets.mjs
 import { launch, seedClinic, mockApi, check, results, dumpLog, APP } from './qa-lib.mjs';
 
@@ -51,8 +51,9 @@ try {
   await resetBtns.click();
   await s.page.getByText('Doctor is back to its preset.').waitFor({ timeout: 5000 }).then(() => check('3 reset confirms and the list shows the preset name again', true), () => check('3 reset confirmation', false));
   check('4 reset sent an Idempotency-Key', /^[0-9a-f-]{36}$/.test(opts.resetHeaders?.['idempotency-key'] ?? ''));
-  check('5 staff row shows Clinician pill and toggle for registered doctor', /Dr Asha[\s\S]*Clinician/.test(await body(s.page)) && await s.page.getByRole('button', { name: 'Clinician: on' }).count() === 1);
-  check('6 no Clinician toggle for staff without a registration number', await s.page.getByRole('button', { name: /Clinician: (on|off)/ }).count() === 1);
+  // CARRY-12: the separate Clinician: on/off toggle was merged into the CLN-005 dialog (one clinician control per row).
+  check('5 staff row shows Clinician pill and the single clinician control for registered doctor', /Dr Asha[\s\S]*Clinician/.test(await body(s.page)) && await s.page.getByRole('button', { name: 'Reg. no. & clinician', exact: true }).count() === 1);
+  check('6 no separate Clinician toggle on any row', await s.page.getByRole('button', { name: /Clinician: (on|off)/ }).count() === 0);
   const review = s.page.getByRole('table', { name: 'Clinicians to confirm' });
   check('7 review list shows the ambiguous row with a readable reason', /Bala Front[\s\S]*registration number but no doctor role/.test(await review.innerText()));
   await review.getByRole('button', { name: 'Not a clinician' }).click();
