@@ -387,7 +387,8 @@ paths:
     post:
       tags: [Auth]
       summary: End emergency access early (holder, or staff:edit)
-      x-required-permission: "holder of the grant OR staff:edit"
+      x-required-permission: authenticated
+      x-permission-check: "holder of the grant OR staff:edit"
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       responses:
         "204": { description: "Ended (idempotent); the elevated session is revoked" }
@@ -444,7 +445,8 @@ paths:
     get:
       tags: [Auth]
       summary: PLT-039 Owner's in-app read-volume alerts (one actor read more distinct patients in an hour than the limit; no patient data)
-      x-required-permission: owner
+      x-required-permission: authenticated
+      x-permission-check: owner
       responses:
         "200":
           description: Alerts for the caller's clinic, newest first (max 50)
@@ -712,7 +714,8 @@ paths:
       tags: [Owners]
       summary: List the caller's brands and the clinics under each
       description: Requires a pendingToken from /owners/auth/login — the purpose claim, checked server-side, gates this, not a module:action permission.
-      x-required-permission: authenticated
+      x-required-permission: public
+      x-permission-check: "pendingToken from /owners/auth/login (purpose claim)"
       responses:
         "200":
           description: OK
@@ -732,7 +735,8 @@ paths:
         "don't confirm existence" rule as row-level scoping elsewhere in this spec. The resulting
         token is indistinguishable in shape from a staff member's — every other endpoint in this
         spec works unchanged from here on.
-      x-required-permission: authenticated
+      x-required-permission: public
+      x-permission-check: "pendingToken from /owners/auth/login (purpose claim)"
       requestBody:
         required: true
         content:
@@ -1557,7 +1561,7 @@ paths:
         "200": { description: "Working hours", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WorkingHours" } } } } }
     post:
       tags: [Queue]
-      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"
       description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       requestBody:
@@ -1575,7 +1579,7 @@ paths:
     put:
       tags: [Queue]
       summary: Replace one working-hours block of this doctor
-      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"
       description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       requestBody:
         required: true
@@ -1588,7 +1592,7 @@ paths:
     delete:
       tags: [Queue]
       summary: Delete one working-hours block of this doctor (existing appointments are not touched)
-      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"
       description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       responses:
         "204": { description: Deleted }
@@ -2224,7 +2228,7 @@ paths:
     get:
       tags: [Clinical]
       summary: "DOC-033. Drug name type-ahead for the prescription pad, built only from this tenant's pharmacy item master (active stocked items) and names it has prescribed before. Returns [] for q shorter than 2 characters. Names only, no PII. Not a clinical formulary; free-text entry always remains possible."
-      x-required-permission: clinical:view (or clinical:edit)
+      x-required-permission: "clinical:view | clinical:edit"
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
         - { name: limit, in: query, required: false, schema: { type: integer, default: 8, minimum: 1, maximum: 20 } }
@@ -2347,7 +2351,8 @@ paths:
     post:
       tags: [Clinical]
       summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). CLN-005 - the caller must also be a registered clinician (staff isClinician + a registration number on file, else 403 not-licensed-clinician) with an in-date licence or an owner's unexpired override (else 403 licence-expired) and hold clinical:edit (else not-prescriber; an approve-only caller is let past the permission check so it gets the specific code). A break-glass session is refused with 403 break-glass-cannot-sign and an audit row (prescription.sign_refused). The signer and the registration number signed under are stored (signedBy, signedByRegistrationNo) and clinical.prescription.signed.v1 is published. Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
-      x-required-permission: clinical:edit
+      x-required-permission: "clinical:edit | clinical:approve | clinical:view"
+      x-permission-check: "visit doctor or clinical:approve, plus clinical:edit and CLN-005 licence (see summary)"
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Signed, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
@@ -2522,7 +2527,8 @@ paths:
     post:
       tags: [Clinical]
       summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; CLN-005 - the same licence rule applies (403 not-licensed-clinician, licence-expired; a break-glass session gets break-glass-cannot-sign with an audit row). Creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
-      x-required-permission: clinical:edit
+      x-required-permission: "clinical:edit | clinical:approve"
+      x-permission-check: "visit doctor or clinical:approve, plus CLN-005 licence (see summary)"
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Issued, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
@@ -2592,7 +2598,8 @@ paths:
         REC-060: recording needs clinical:create or clinical:edit. Changing a value that is already recorded for the visit
         (a non-null field sent with a different value) needs clinical:edit, else 403 vitals-correction-forbidden; filling a
         still-empty field or re-sending the same value is not a correction.
-      x-required-permission: "clinical:create or clinical:edit (correcting a recorded value: clinical:edit)"
+      x-required-permission: "clinical:create | clinical:edit"
+      x-permission-check: "correcting a recorded value: clinical:edit"
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true

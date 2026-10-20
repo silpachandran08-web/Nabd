@@ -201,7 +201,8 @@ class Ops034Contract(unittest.TestCase):
         for needle in ("oasdiff changelog", "oasdiff breaking", "gh pr comment", "api/openapi/core.yaml"):
             self.assertIn(needle, text)
         required = json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"]
-        self.assertFalse([c for c in required if "contract" in c or "stage5" in c], "stage 5 must not be a required check")
+        # OPS-035 made stage 5 blocking in its own job (stage5-api-contract); this report job must still never be required
+        self.assertNotIn("api-contract-report", required, "the stage 5 report job must not be a required check")
 
     def test_generated_vs_committed_diff_runs_in_a_required_stage(self):
         self.assertIn("OpenApiSpecApiTest", open("backend/src/test/java/com/nabd/hms/config/OpenApiSpecApiTest.java").read())
