@@ -56,9 +56,10 @@ public class ProvisioningService {
 
     public ProvisioningJobResponse createJob(CreateProvisioningJobRequest req, UUID requestedBy, String ip) {
         realDataGuard.check();
+        String ownerMobile = com.nabd.hms.common.PhoneNumbers.require(req.ownerMobile(), req.region(), "ownerMobile"); // ACC-028: fail at request, not at the invite step
         UUID jobId = UUID.randomUUID();
         repo.insertJob(jobId, requestedBy, req.tenantSlug().toLowerCase(), req.tenantName(), req.region(),
-                req.ownerEmail().toLowerCase(), req.ownerName(), req.ownerMobile(), req.brandName(), req.path());
+                req.ownerEmail().toLowerCase(), req.ownerName(), ownerMobile, req.brandName(), req.path());
         for (int i = 0; i < STEP_ORDER.size(); i++) {
             repo.insertStep(UUID.randomUUID(), jobId, STEP_ORDER.get(i), i + 1);
         }
