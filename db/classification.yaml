@@ -871,6 +871,13 @@ schemas:
       consent_signed_name: pii
       consent_recorded_by: operational
       consent_signed_at: operational
+    projector_applied_events:
+      tenant_id: operational
+      consumer_group: operational
+      event_id: operational
+      subject: pii  # uncertain: an aggregate id, a patient id for patient-subject events (same as patient_id elsewhere)
+      version: operational
+      applied_at: operational
     queue_entries:
       id: operational
       tenant_id: operational

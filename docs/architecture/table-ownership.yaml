@@ -55,5 +55,5 @@ modules:
     owns: [appointments, doctor_delays, doctor_leave, doctor_working_hours, queue_entries, waitlist_entries]
     reads: []
   shared:
-    owns: [idempotency_keys, shedlock]
+    owns: [idempotency_keys, projector_applied_events, shedlock]
     reads: []
