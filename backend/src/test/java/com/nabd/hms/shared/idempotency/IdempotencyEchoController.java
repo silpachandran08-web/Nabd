@@ -1,5 +1,6 @@
 package com.nabd.hms.shared.idempotency;
 
+import com.nabd.hms.shared.Idempotent;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;

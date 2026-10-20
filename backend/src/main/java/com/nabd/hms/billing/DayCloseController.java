@@ -39,6 +39,7 @@ public class DayCloseController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('billing:approve')")
+    @com.nabd.hms.shared.Idempotent // FIN-005 spec: a retried close with the same Idempotency-Key replays the first 200
     public DayCloseSummaryResponse close(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DayCloseRequest req) {
         return service.close(tenantId(jwt), UUID.fromString(jwt.getSubject()), req);
     }

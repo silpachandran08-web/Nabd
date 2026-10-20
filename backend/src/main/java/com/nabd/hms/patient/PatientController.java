@@ -84,7 +84,7 @@ public class PatientController {
         return service.guardianReviewsDue(tenantId(jwt), staffId(jwt));
     }
 
-    @com.nabd.hms.shared.idempotency.Idempotent
+    @com.nabd.hms.shared.Idempotent
     @PostMapping
     @PreAuthorize("hasAuthority('patients:create')")
     public ResponseEntity<Object> register(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PatientWriteRequest req) {

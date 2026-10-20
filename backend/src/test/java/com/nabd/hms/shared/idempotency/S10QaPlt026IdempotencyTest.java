@@ -1,5 +1,7 @@
 package com.nabd.hms.shared.idempotency;
 
+import com.nabd.hms.shared.Idempotent;
+
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

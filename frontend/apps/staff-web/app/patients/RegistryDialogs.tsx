@@ -28,7 +28,7 @@ function useEscape(onClose: () => void) {
 }
 
 /** ACC-028: the server's field error for the phone (it names the clinic country), shown under the input. */
-function phoneFieldError(p: Problem | null): string | null {
+export function phoneFieldError(p: Problem | null): string | null {
   const e = p?.errors?.find((x) => x.field === "phone");
   return e ? `Mobile ${e.message}.` : null;
 }

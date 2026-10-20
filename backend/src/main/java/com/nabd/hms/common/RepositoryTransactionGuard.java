@@ -19,7 +19,8 @@ import java.lang.reflect.Modifier;
  * PLT-019, tests only (nabd.tenancy.strict-repositories=true in src/test/resources): a *Repository call made outside
  * a transaction runs in one whose app.tenant_id is a non-UUID sentinel, so any RLS policy it hits (app_tenant_id())
  * fails in Postgres itself, and that failure is rethrown as IllegalStateException. Non-RLS queries are unaffected.
- * Production fails closed instead (RLS returns no rows).
+ * Production fails closed instead (RLS returns no rows). Inside a bound transaction it also runs
+ * {@link TenantContext#verifyBinding()}: a raw set_config that switched the tenant is refused.
  */
 @Component
 @ConditionalOnProperty("nabd.tenancy.strict-repositories")
@@ -29,10 +30,13 @@ class RepositoryTransactionGuard implements BeanPostProcessor {
 
     private final ObjectProvider<PlatformTransactionManager> txManager;
     private final ObjectProvider<JdbcTemplate> jdbc;
+    private final ObjectProvider<TenantContext> tenantContext;
 
-    RepositoryTransactionGuard(ObjectProvider<PlatformTransactionManager> txManager, ObjectProvider<JdbcTemplate> jdbc) {
+    RepositoryTransactionGuard(ObjectProvider<PlatformTransactionManager> txManager, ObjectProvider<JdbcTemplate> jdbc,
+                               ObjectProvider<TenantContext> tenantContext) {
         this.txManager = txManager;
         this.jdbc = jdbc;
+        this.tenantContext = tenantContext;
     }
 
     @Override
@@ -43,6 +47,7 @@ class RepositoryTransactionGuard implements BeanPostProcessor {
         }
         MethodInterceptor guard = inv -> {
             if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                tenantContext.getObject().verifyBinding(); // a raw set_config switched the bound tenant: refuse
                 return inv.proceed();
             }
             Object[] out = new Object[1];

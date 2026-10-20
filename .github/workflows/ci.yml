@@ -133,8 +133,14 @@ jobs:
             else gh pr comment "$pr" --body-file arch.md || true; fi
           fi
       - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        name: tenant-parameter metric (PLT-019 AC5, report only; target 0 in migrated modules by S6)
+        continue-on-error: true
+        run: |
+          python3 scripts/ci/tenant_params.py | tee tenant-params.json
+          { echo "### Explicit tenantId service parameters (PLT-019)"; echo '```json'; cat tenant-params.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
         uses: actions/upload-artifact@v4
-        with: { name: architecture-report, path: "architecture-report.json\narch.md" }
+        with: { name: architecture-report, path: "architecture-report.json\narch.md\ntenant-params.json" }
       - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
         name: architecture gate (mode from ci/architecture-gate.json; report only until its dates are set)
         run: python3 scripts/ci/arch.py gate backend/target/architecture-violations.json

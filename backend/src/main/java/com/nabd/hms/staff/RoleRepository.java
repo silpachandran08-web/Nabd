@@ -47,6 +47,13 @@ class RoleRepository {
                 name, grantsJson, mfaRequired, tenantId, id);
     }
 
+    /** PLT-007 AC3: grants live in the JWT, so a grant edit ends every live session of the role's holders; returns their staff ids. */
+    List<UUID> revokeHolderSessions(UUID tenantId, UUID roleId) {
+        return jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = 'role_changed' " +
+                "WHERE tenant_id = ? AND revoked_at IS NULL AND staff_id IN (SELECT id FROM staff WHERE tenant_id = ? AND role_id = ?) " +
+                "RETURNING staff_id", UUID.class, tenantId, tenantId, roleId).stream().distinct().toList();
+    }
+
     /** PLT-016: back to the current preset definition; built_in is not filtered, so the Owner preset can move versions too. */
     void resetToPreset(UUID tenantId, UUID id, String grantsJson, int presetVersion) {
         jdbc.update("UPDATE roles SET grants = ?::jsonb, preset_version = ? WHERE tenant_id = ? AND id = ? AND preset_code IS NOT NULL",

@@ -50,14 +50,14 @@ public class NoteController {
         return service.upsert(tenantId(jwt), queueEntryId, req);
     }
 
-    @com.nabd.hms.shared.idempotency.Idempotent
+    @com.nabd.hms.shared.Idempotent
     @PostMapping("/{queueEntryId}/sign")
     @PreAuthorize("hasAuthority('clinical:edit')")
     public NoteResponse sign(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID queueEntryId) {
         return service.sign(tenantId(jwt), queueEntryId, staffId(jwt), canApprove(jwt));
     }
 
-    @com.nabd.hms.shared.idempotency.Idempotent
+    @com.nabd.hms.shared.Idempotent
     @PostMapping("/{queueEntryId}/amendments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('clinical:edit')")
