@@ -319,7 +319,7 @@ class Ops053Staging(unittest.TestCase):
             os.unlink(f.name)
         self.assertEqual(subprocess.run(["python3", "infra/staging-in/check-staging-in.py"], capture_output=True).returncode, 0)
 
-    @unittest.expectedFailure  # known defect: ShedLock waits on OPS-013
+    # was a known defect until OPS-013 (S12) added ShedLock
     def test_known_defect_OPS053_each_scheduled_job_runs_once_across_replicas_shedlock(self):
         pom = open("backend/pom.xml").read()
         src = "".join(open(os.path.join(d, f)).read() for d, _, fs in os.walk("backend/src/main/java") for f in fs if f.endswith(".java"))

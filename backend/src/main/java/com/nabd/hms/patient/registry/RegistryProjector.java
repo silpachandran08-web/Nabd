@@ -45,6 +45,10 @@ public class RegistryProjector {
 
     @Scheduled(fixedDelayString = "${app.registry.poll-interval-ms:1000}")
     @SchedulerLock(name = "registry-projector", lockAtMostFor = "PT2M")
+    public void poll() { // lock only the poller: an explicit drain() must really drain, not be skipped while the poller holds the lock
+        drain();
+    }
+
     public synchronized void drain() { // serialises the poller with explicit callers: SKIP LOCKED made a concurrent caller return before the poller's claim committed
         try {
             for (UUID tenantId : tx.execute(s -> repo.dirtyTenants(100))) {
