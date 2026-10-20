@@ -71,6 +71,8 @@ jobs:
           npm run -s check:permissions
       - name: OpenAPI valid
         run: pip install -q openapi-spec-validator && python3 -m openapi_spec_validator api/openapi.yaml
+      - name: Event schemas (OPS-015 catalogue, PHI denylist, envelope < 2 KB) and the gate's own tests
+        run: python3 scripts/ci/events.py check && python3 scripts/ci/test_events.py
 
   stage2-unit:
     needs: changes
@@ -138,6 +140,9 @@ jobs:
       - if: needs.changes.outputs.backend == 'true'
         uses: actions/upload-artifact@v4
         with: { name: jacoco, path: backend/target/site/jacoco }
+      - if: needs.changes.outputs.backend == 'true'
+        name: every event the producer tests published validates (OPS-015, samples from DomainEventContractApiTest)
+        run: pip install -q jsonschema && python3 scripts/ci/events.py check --samples backend/target/event-samples
       # OPS-032: coverage comment + gates (ci/quality-gates.json; gates stay report-only until enabled_from is set)
       - if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request'
         name: JaCoCo summary comment and coverage gates

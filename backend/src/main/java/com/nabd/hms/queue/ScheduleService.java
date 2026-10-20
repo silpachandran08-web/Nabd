@@ -45,7 +45,11 @@ public class ScheduleService {
 
     private final ClinicClock clock;
 
-    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock) {
+    private final com.nabd.hms.common.EventPublisher events;
+
+    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock,
+                    com.nabd.hms.common.EventPublisher events) {
+        this.events = events;
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -210,6 +214,7 @@ public class ScheduleService {
         log.info("doctor {} delay announced by {}: {} min", doctorId, callerStaffId, req.delayMinutes());
         DoctorDelayRow row = repo.findActiveDelay(doctorId, today).orElseThrow();
         auditDelay(tenantId, callerStaffId, "doctor_delay.announced", id, null, toDelayResponse(row, today));
+        delayChanged(tenantId, doctorId, id, req.delayMinutes(), "active");
         return toDelayResponse(row, today);
     }
 
@@ -225,6 +230,13 @@ public class ScheduleService {
         repo.clearActiveDelay(tenantId, doctorId, callerStaffId);
         log.info("doctor {} delay cleared by {}", doctorId, callerStaffId);
         auditDelay(tenantId, callerStaffId, "doctor_delay.cleared", active.id(), toDelayResponse(active, today), null);
+        delayChanged(tenantId, doctorId, active.id(), 0, "cleared");
+    }
+
+    /** OPS-015: the free-text reason stays out of the event. */
+    private void delayChanged(UUID tenantId, UUID doctorId, UUID delayId, int delayMinutes, String status) {
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.DOCTOR_DELAY_CHANGED, doctorId, java.util.Map.of(
+                "doctorId", doctorId, "delayId", delayId, "delayMinutes", delayMinutes, "status", status));
     }
 
     @Transactional

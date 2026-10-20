@@ -155,6 +155,7 @@ public class StaffService {
 
         staffRepo.update(tenantId, id, roleId, scope, fieldGrants, departmentId);
         log.info("staff {} updated by {} (role {}, scope {})", id, callerStaffId, roleId, scope);
+        staffChanged(tenantId, id, "updated");
 
         if (roleChanged || scopeChanged || fieldsChanged) {
             auditRoleChange(tenantId, caller, id, current, roleId, scope, fieldGrants, scopeChanged, ipAddress);
@@ -204,10 +205,22 @@ public class StaffService {
                 Map.of("roleId", before.roleId(), "scope", before.scope(), "fieldGrants", before.fieldGrants()),
                 Map.of("roleId", roleId, "scope", scope, "fieldGrants", fieldGrants));
         // ponytail: 'role_changed' is not in sessions.revoked_reason's CHECK yet (PLT-007 adds it); admin_revoke until then
-        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        revokeSessions(tenantId, id, "admin_revoke");
         eventPublisher.publish(tenantId, StaffRoleChangedHandler.TYPE, Map.of("tenantId", tenantId.toString(),
                 "staffId", id.toString(), "fromRoleId", before.roleId().toString(), "toRoleId", roleId.toString(),
                 "scopeChanged", scopeChanged));
+    }
+
+    /** OPS-015: every session of the staff member, revoked in this transaction; the event lets caches drop them. */
+    private void revokeSessions(UUID tenantId, UUID staffId, String reason) {
+        staffRepo.revokeAllSessions(tenantId, staffId, reason);
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.SESSION_REVOKED, staffId,
+                Map.of("staffId", staffId, "scope", "all_sessions", "reasonCode", reason, "status", "revoked"));
+    }
+
+    private void staffChanged(UUID tenantId, UUID staffId, String status) {
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.STAFF_CHANGED, staffId,
+                Map.of("staffId", staffId, "status", status));
     }
 
     @Transactional
@@ -216,7 +229,8 @@ public class StaffService {
         tenantContext.set(tenantId);
         staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
         staffRepo.suspend(tenantId, id);
-        staffRepo.revokeAllSessions(tenantId, id, "suspended");
+        revokeSessions(tenantId, id, "suspended");
+        staffChanged(tenantId, id, "suspended");
         log.warn("staff {} suspended by {} (tenant {}) — all sessions killed", id, callerStaffId, tenantId);
     }
 
@@ -227,7 +241,7 @@ public class StaffService {
         tenantContext.set(tenantId);
         staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
         staffRepo.resetMfa(tenantId, id);
-        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        revokeSessions(tenantId, id, "admin_revoke");
         StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
         String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
         auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,

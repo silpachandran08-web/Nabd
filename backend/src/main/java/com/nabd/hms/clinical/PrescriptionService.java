@@ -477,6 +477,8 @@ public class PrescriptionService {
         event.put("signedBy", callerStaffId.toString());
         event.put("dictionaryVersion", dict.label()); // CLN-004's safety dictionary the sign was checked against
         eventPublisher.publish(tenantId, SIGNED_EVENT, event);
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.RX_SIGNED, row.id(), Map.of("prescriptionId", row.id(),
+                "queueEntryId", queueEntryId, "signedBy", callerStaffId, "status", "signed")); // OPS-015; SIGNED_EVENT above is deprecated
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 

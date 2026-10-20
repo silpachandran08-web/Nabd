@@ -56,8 +56,10 @@ public class SetupService {
     private final TenantContext tenantContext;
 
     private final Clock clock;
+    private final com.nabd.hms.common.EventPublisher events;
 
-    SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock) {
+    SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events) {
+        this.events = events;
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -100,6 +102,7 @@ public class SetupService {
         }
         repo.updateProfile(tenantId, req);
         log.info("clinic profile updated for tenant {} by {}", tenantId, callerStaffId);
+        configChanged(tenantId, "clinic.profile");
         return getProfile(tenantId);
     }
 
@@ -114,6 +117,7 @@ public class SetupService {
         tenantContext.set(tenantId);
         UUID id = repo.insertCharge(tenantId, req);
         log.info("charge head {} added for tenant {} by {}", id, tenantId, callerStaffId);
+        catalogueChanged(tenantId, id, "added");
         return repo.findCharge(tenantId, id).map(this::toChargeResponse)
                 .orElseThrow(() -> new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "charge-not-found", "Charge not found after insert", "Charge not found after insert"));
     }
@@ -125,8 +129,20 @@ public class SetupService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "charge-not-found", "Charge not found", "Charge not found"));
         repo.updateCharge(tenantId, id, req);
         log.info("charge head {} updated for tenant {} by {}", id, tenantId, callerStaffId);
+        catalogueChanged(tenantId, id, "updated");
         return repo.findCharge(tenantId, id).map(this::toChargeResponse)
                 .orElseThrow(() -> new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "charge-not-found", "Charge not found after update", "Charge not found after update"));
+    }
+
+    /** OPS-015: which setting changed, never its value (a value can be free text). */
+    private void configChanged(UUID tenantId, String configKey) {
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.ORGANIZATION_CONFIG_CHANGED, tenantId,
+                java.util.Map.of("configKey", configKey, "status", "updated"));
+    }
+
+    private void catalogueChanged(UUID tenantId, UUID chargeHeadId, String status) {
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.CATALOGUE_CHANGED, chargeHeadId,
+                java.util.Map.of("chargeHeadId", chargeHeadId, "status", status));
     }
 
     @Transactional
@@ -143,6 +159,7 @@ public class SetupService {
         }
         repo.updatePolicy(tenantId, policyKey, req.value());
         log.info("policy {} updated for tenant {} by {}", policyKey, tenantId, callerStaffId);
+        configChanged(tenantId, policyKey);
         return repo.listPolicies(tenantId).stream()
                 .filter(p -> p.policyKey().equals(policyKey))
                 .findFirst()

@@ -53,9 +53,12 @@ public class PatientService {
     private final AuditService auditService;
 
     private final ClinicClock clock;
+    private final com.nabd.hms.common.EventPublisher events;
 
     PatientService(PatientRepository repo, TenantContext tenantContext, FieldCipher cipher,
-                    StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock) {
+                    StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock,
+                    com.nabd.hms.common.EventPublisher events) {
+        this.events = events;
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -396,8 +399,15 @@ public class PatientService {
         }
     }
 
+    /** OPS-015: consent type code and status only. */
+    private void consentChanged(UUID tenantId, UUID patientId, String consentType, String status) {
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.CONSENT_CHANGED, patientId,
+                Map.of("patientId", patientId, "consentType", consentType, "status", status));
+    }
+
     private void grantGuardianConsent(UUID tenantId, UUID callerStaffId, UUID patientId, UUID guardianId, String channel) {
         repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS, callerStaffId, channel);
+        consentChanged(tenantId, patientId, GUARDIAN_ACCESS, "granted");
         audit(tenantId, callerStaffId, "patient.guardian_grant", patientId, null,
                 Map.of("guardianId", guardianId, "consentChannel", channel));
     }
@@ -405,9 +415,11 @@ public class PatientService {
     private void changeGuardian(UUID tenantId, UUID callerStaffId, UUID patientId, UUID oldGuardianId, UUID newGuardianId) {
         if (oldGuardianId != null) {
             repo.withdrawConsent(tenantId, patientId, GUARDIAN_ACCESS);
+            consentChanged(tenantId, patientId, GUARDIAN_ACCESS, "withdrawn");
         }
         if (newGuardianId != null) {
             repo.grantConsent(tenantId, patientId, GUARDIAN_ACCESS);
+            consentChanged(tenantId, patientId, GUARDIAN_ACCESS, "granted");
         }
         String action = newGuardianId == null ? "patient.guardian_revoke"
                 : oldGuardianId == null ? "patient.guardian_grant" : "patient.guardian_reassign";
@@ -465,6 +477,7 @@ public class PatientService {
             throw notFound();
         }
         repo.withdrawConsent(tenantId, patientId, consentType);
+        consentChanged(tenantId, patientId, consentType, "withdrawn");
         log.info("consent '{}' withdrawn for patient {} by {} (tenant {})", consentType, patientId, callerStaffId, tenantId);
     }
 

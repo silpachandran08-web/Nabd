@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:cloudevent.v1",
+  "title": "Nabd CloudEvents 1.0 envelope (OPS-015)",
+  "description": "Structured-mode JSON envelope of every domain event, rendered by view outbox_cloudevents. data is described by the schema named in dataschema. See docs/architecture/events.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specversion", "id", "source", "type", "time", "subject", "tenantid", "region", "dataschema", "datacontenttype", "data"],
+  "properties": {
+    "specversion": { "const": "1.0" },
+    "id": { "type": "string", "pattern": "^[1-9][0-9]*$", "description": "outbox_events.id; unique per region database, dedupe key for consumers" },
+    "source": { "type": "string", "pattern": "^core/[a-z]+$" },
+    "type": { "type": "string", "pattern": "^[a-z]+(\\.[a-z_]+)+\\.v[1-9][0-9]*$" },
+    "time": { "type": "string", "format": "date-time" },
+    "subject": { "type": "string", "format": "uuid", "description": "aggregate id (outbox_events.aggregate_id)" },
+    "tenantid": { "type": "string", "format": "uuid" },
+    "region": { "enum": ["in", "ksa"] },
+    "traceparent": { "type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$", "description": "W3C trace context of the publishing HTTP request; absent for jobs" },
+    "dataschema": { "type": "string", "pattern": "^urn:nabd:event-schema:" },
+    "datacontenttype": { "const": "application/json" },
+    "data": { "type": "object" }
+  }
+}
