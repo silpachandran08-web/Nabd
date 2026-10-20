@@ -2854,6 +2854,90 @@ paths:
                   voidedTotal: { type: number, description: "Sum of those invoices' total" }
                 additionalProperties: true
         "403": { description: Forbidden }
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-005: close a clinic day (date defaults to today; a past day can be closed, and a reopened day closed again,
+        which recomputes expected cash and increments close.closeCount). Takes the per-tenant-day advisory lock shared with
+        checkout, payment, void, package sale and refund approval, so a racing payment is either counted or refused with
+        409 day-closed. The variance tolerance is the clinic policy cash_variance_tolerance (minor units; default 200 INR,
+        20 SAR/AED/QAR). Writes day_close_events + audit day_close.close and publishes billing.day.closed.v1.
+      x-required-permission: billing:approve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [countedCash]
+              properties:
+                countedCash: { type: number, minimum: 0 }
+                note: { type: string, maxLength: 1000, description: "Required when |variance| > cashTolerance" }
+                date: { type: string, format: date, description: "Clinic day to close; default today; never a future day" }
+      responses:
+        "200": { description: DayCloseSummaryResponse (as GET; close.closeCount counts the closes) }
+        "400": { description: "variance-note-required, date-in-future, validation-failed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: Forbidden }
+        "409": { description: "day-already-closed, day-close-blocked", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /billing/day-close/reopen:
+    post:
+      tags: [Billing]
+      summary: >
+        Reopen a closed day with a reason (FIN-005: body date, else ?date=, else today). Writes day_close_events + audit
+        day_close.reopen and publishes billing.day.reopened.v1 ({ tenantId, date }; the free-text reason stays in audit_log).
+      x-required-permission: billing:approve
+      parameters:
+        - { name: date, in: query, required: false, schema: { type: string, format: date } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+                date: { type: string, format: date }
+      responses:
+        "200": { description: DayCloseSummaryResponse }
+        "403": { description: Forbidden }
+        "409": { description: day-not-closed, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /billing/day-close/history:
+    get:
+      tags: [Billing]
+      summary: FIN-005 close/reopen history for clinic days in [from, to] (default last 31 days), newest first, keyset-paged.
+      x-required-permission: billing:view
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        date: { type: string, format: date }
+                        action: { type: string, enum: [close, reopen] }
+                        expectedCash: { type: number, nullable: true }
+                        countedCash: { type: number, nullable: true }
+                        variance: { type: number, nullable: true }
+                        note: { type: string, nullable: true, description: "Close note or reopen reason" }
+                        actorName: { type: string, nullable: true }
+                        at: { type: string, format: date-time }
+                  nextCursor: { type: string, nullable: true }
+        "400": { description: "invalid-cursor, invalid-range", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: Forbidden }
   /billing/invoices/{id}:
     get:
       tags: [Billing]

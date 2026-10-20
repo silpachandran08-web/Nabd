@@ -1,13 +1,16 @@
 package com.nabd.hms.billing;
 
 import com.nabd.hms.iam.api.ActorDirectory;
+import com.nabd.hms.billing.dto.DayCloseHistoryResponse;
 import com.nabd.hms.billing.dto.DayCloseRequest;
 import com.nabd.hms.billing.dto.DayCloseSummaryResponse;
 import com.nabd.hms.billing.dto.DayReopenRequest;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.ClinicClock;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.organization.api.ClinicPolicies;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,29 +21,64 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
-/** E15 Billing & Day Close: the day's billing summary, closing it against a cash count, reopening it. */
+/** E15 Billing & Day Close: the day's billing summary, closing it against a cash count, reopening it.
+ * FIN-005: close/reopen take any past date, a reopened day closes again (history in day_close_events + audit_log),
+ * and close, reopen and every billing write share one per-tenant-day advisory lock. */
 @Service
 public class DayCloseService {
 
-    // Variance allowed before a note is required (wireframe: ₹200 India, SAR 20 Saudi Arabia).
-    private static final BigDecimal TOLERANCE_IN = new BigDecimal("200.00");
-    private static final BigDecimal TOLERANCE_KSA = new BigDecimal("20.00");
+    static final String CLOSED_EVENT = "billing.day.closed.v1";
+    static final String REOPENED_EVENT = "billing.day.reopened.v1";
+    static final String TOLERANCE_POLICY = "cash_variance_tolerance";
+    // Used only while the clinic has no cash_variance_tolerance policy row (minor units): wireframe ₹200 India, 20 in the Gulf currencies.
+    private static final Map<String, Long> DEFAULT_TOLERANCE_MINOR = Map.of("INR", 20_000L, "SAR", 2_000L, "AED", 2_000L, "QAR", 2_000L);
+    private static final int HISTORY_DEFAULT_DAYS = 31;
 
     private final DayCloseRepository repo;
     private final TenantContext tenantContext;
     private final ClinicClock clock;
     private final AuditService auditService;
+    private final ClinicPolicies setupService;
+    private final EventPublisher eventPublisher;
 
     private final ActorDirectory actors;
 
-    DayCloseService(DayCloseRepository repo, TenantContext tenantContext, ClinicClock clock, AuditService auditService, ActorDirectory actors) {
+    DayCloseService(DayCloseRepository repo, TenantContext tenantContext, ClinicClock clock, AuditService auditService,
+                    ClinicPolicies setupService, EventPublisher eventPublisher, ActorDirectory actors) {
         this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.clock = clock;
         this.auditService = auditService;
+        this.setupService = setupService;
+        this.eventPublisher = eventPublisher;
+    }
+
+    /** Tenant currency from the provisioning region (IN / KSA today; AE / QA as ACC-028 names them). */
+    static String currency(String region) {
+        return switch (region == null ? "IN" : region) {
+            case "KSA", "SA" -> "SAR";
+            case "AE" -> "AED";
+            case "QA" -> "QAR";
+            default -> "INR";
+        };
+    }
+
+    /** The clinic's cash_variance_tolerance policy (minor units) or, without one, the currency's default. */
+    static BigDecimal tolerance(String currency, Optional<String> policyMinor) {
+        long minor = policyMinor.map(Long::parseLong).orElseGet(() -> DEFAULT_TOLERANCE_MINOR.getOrDefault(currency, 2_000L));
+        return BigDecimal.valueOf(minor, 2);
+    }
+
+    private String currencyOf(UUID tenantId) {
+        return currency(repo.region(tenantId).orElse("IN"));
+    }
+
+    private BigDecimal toleranceOf(UUID tenantId, String currency) {
+        return tolerance(currency, setupService.policyValue(tenantId, TOLERANCE_POLICY));
     }
 
     @Transactional(readOnly = true)
@@ -51,70 +89,121 @@ public class DayCloseService {
         LocalDate day = date != null ? date : today;
         Instant start = day.atStartOfDay(zone).toInstant();
         Instant end = day.plusDays(1).atStartOfDay(zone).toInstant();
-        boolean ksa = "KSA".equals(repo.region(tenantId).orElse("IN"));
+        String currency = currencyOf(tenantId);
         DayCloseSummaryResponse.Close close = repo.findClose(tenantId, day).map(c -> new DayCloseSummaryResponse.Close(
                 c.status(), c.expectedCash(), c.countedCash(), c.variance(), c.note(), c.closedByName(), c.closedAt(),
-                c.reopenedByName(), c.reopenedAt(), c.reopenReason())).orElse(null);
+                c.reopenedByName(), c.reopenedAt(), c.reopenReason(), c.closeCount())).orElse(null);
         DayCloseRepository.Voided voided = repo.voided(tenantId, start, end);
-        return new DayCloseSummaryResponse(day, day.equals(today), ksa ? "SAR" : "INR", ksa ? "VAT" : "GST",
-                ksa ? TOLERANCE_KSA : TOLERANCE_IN, repo.totals(tenantId, start, end), repo.methods(tenantId, start, end),
+        return new DayCloseSummaryResponse(day, day.equals(today), currency, "INR".equals(currency) ? "GST" : "VAT",
+                toleranceOf(tenantId, currency), repo.totals(tenantId, start, end), repo.methods(tenantId, start, end),
                 repo.outstanding(tenantId, start, end), repo.pendingCheckouts(tenantId, day), repo.unbilled(tenantId, day),
                 repo.taxBands(tenantId, start, end), repo.splitPaymentBills(tenantId, start, end), close,
                 voided.count(), voided.total());
     }
 
-    /** Closes the clinic's today. Blocked while any ended consultation has no bill. */
+    /** Closes a clinic day (default today; never a future day). Blocked while any ended consultation has no bill. */
     @Transactional
     public DayCloseSummaryResponse close(UUID tenantId, UUID staffId, DayCloseRequest req) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
         LocalDate today = clock.today(zone);
-        if (repo.isClosed(tenantId, today)) {
-            throw new ApiException(HttpStatus.CONFLICT, "day-already-closed", "Day already closed",
-                    "Today is already closed. Unlock it first to change anything.");
+        LocalDate day = req.date() != null ? req.date() : today;
+        if (day.isAfter(today)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "date-in-future", "Day hasn't happened yet",
+                    "A day can only be closed once it has started. Pick today or an earlier day.");
         }
-        List<DayCloseSummaryResponse.Unbilled> unbilled = repo.unbilled(tenantId, today);
+        repo.lockDay(tenantId, day);
+        if (repo.isClosed(tenantId, day)) {
+            throw new ApiException(HttpStatus.CONFLICT, "day-already-closed", "Day already closed",
+                    day + " is already closed. Unlock it first to change anything.");
+        }
+        List<DayCloseSummaryResponse.Unbilled> unbilled = repo.unbilled(tenantId, day);
         if (!unbilled.isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "day-close-blocked", "Close blocked",
                     unbilled.size() + (unbilled.size() == 1 ? " completed consultation still has" : " completed consultations still have")
                             + " no bill. Bill each one before the day can close.");
         }
-        Instant start = today.atStartOfDay(zone).toInstant();
-        Instant end = today.plusDays(1).atStartOfDay(zone).toInstant();
+        Instant start = day.atStartOfDay(zone).toInstant();
+        Instant end = day.plusDays(1).atStartOfDay(zone).toInstant();
         BigDecimal expected = repo.methods(tenantId, start, end).stream().filter(m -> "cash".equals(m.method()))
                 .findFirst().map(DayCloseSummaryResponse.Method::amount).orElse(BigDecimal.ZERO);
         BigDecimal variance = req.countedCash().subtract(expected);
-        BigDecimal tolerance = "KSA".equals(repo.region(tenantId).orElse("IN")) ? TOLERANCE_KSA : TOLERANCE_IN;
+        String currency = currencyOf(tenantId);
+        BigDecimal tolerance = toleranceOf(tenantId, currency);
         String note = req.note() == null || req.note().isBlank() ? null : req.note().strip();
         if (variance.abs().compareTo(tolerance) > 0 && note == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "variance-note-required", "Note required",
                     "The cash count is off by more than " + tolerance.toPlainString() + ". Add a note explaining the difference.");
         }
-        UUID id = repo.upsertClose(tenantId, today, expected, req.countedCash(), variance, note, staffId);
-        audit(tenantId, staffId, "day_close.close", id,
-                Map.of("date", today.toString(), "expectedCash", expected, "countedCash", req.countedCash(), "variance", variance));
-        return summary(tenantId, today);
+        DayCloseRepository.Closed closed = repo.upsertClose(tenantId, day, expected, req.countedCash(), variance, note, staffId);
+        repo.insertEvent(tenantId, closed.id(), "close", expected, req.countedCash(), variance, note, staffId);
+        audit(tenantId, staffId, "day_close.close", closed.id(), Map.of("date", day.toString(), "expectedCash", expected,
+                "countedCash", req.countedCash(), "variance", variance, "closeCount", closed.closeCount()));
+        eventPublisher.publish(tenantId, CLOSED_EVENT, Map.of("tenantId", tenantId, "date", day.toString(),
+                "expectedCashMinor", minor(expected), "countedCashMinor", minor(req.countedCash()), "varianceMinor", minor(variance),
+                "currency", currency, "closeCount", closed.closeCount()));
+        return summary(tenantId, day);
     }
 
     /** Unlocks a closed day (default: today) so billing can be corrected; the reason is audited. */
     @Transactional
     public DayCloseSummaryResponse reopen(UUID tenantId, UUID staffId, LocalDate date, DayReopenRequest req) {
         tenantContext.set(tenantId);
-        LocalDate day = date != null ? date : clock.today(tenantId);
+        LocalDate day = req.date() != null ? req.date() : date != null ? date : clock.today(tenantId);
+        repo.lockDay(tenantId, day);
         DayCloseRepository.CloseRow row = repo.findClose(tenantId, day).filter(c -> "closed".equals(c.status()))
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "day-not-closed", "Day isn't closed",
                         "There's no closed day to unlock on " + day + "."));
-        repo.reopen(tenantId, row.id(), staffId, req.reason().strip());
-        audit(tenantId, staffId, "day_close.reopen", row.id(), Map.of("date", day.toString(), "reason", req.reason().strip()));
+        String reason = req.reason().strip();
+        repo.reopen(tenantId, row.id(), staffId, reason);
+        repo.insertEvent(tenantId, row.id(), "reopen", null, null, null, reason, staffId);
+        audit(tenantId, staffId, "day_close.reopen", row.id(), Map.of("date", day.toString(), "reason", reason));
+        // Free-text reason stays out of the event (PHI-free payload); consumers read audit_log if they need it.
+        eventPublisher.publish(tenantId, REOPENED_EVENT, Map.of("tenantId", tenantId, "date", day.toString()));
         return summary(tenantId, day);
     }
 
-    /** Billing writes land on the clinic's today; once today is closed they'd change a reconciled day. */
-    void requireTodayOpen(UUID tenantId) {
-        if (repo.isClosed(tenantId, clock.today(tenantId))) {
+    /** Close/reopen history for [from, to] (defaults: the last 31 days to today), newest first, keyset-paged. */
+    @Transactional(readOnly = true)
+    public DayCloseHistoryResponse history(UUID tenantId, LocalDate from, LocalDate to, String cursor, int limit) {
+        tenantContext.set(tenantId);
+        LocalDate end = to != null ? to : clock.today(tenantId);
+        LocalDate begin = from != null ? from : end.minusDays(HISTORY_DEFAULT_DAYS);
+        if (begin.isAfter(end)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-range", "Invalid range", "from must be on or before to.");
+        }
+        Instant beforeAt = null;
+        UUID beforeId = null;
+        if (cursor != null && !cursor.isBlank()) {
+            try {
+                String[] parts = cursor.split("_", 2);
+                beforeAt = Instant.parse(parts[0]);
+                beforeId = UUID.fromString(parts[1]);
+            } catch (RuntimeException e) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-cursor", "Invalid cursor", "The cursor isn't one this endpoint returned.");
+            }
+        }
+        limit = Math.max(1, Math.min(limit, 100));
+        List<DayCloseHistoryResponse.Item> rows = repo.history(tenantId, begin, end, beforeAt, beforeId, limit + 1);
+        List<DayCloseHistoryResponse.Item> page = rows.size() > limit ? rows.subList(0, limit) : rows;
+        String next = rows.size() > limit ? page.get(limit - 1).at() + "_" + page.get(limit - 1).id() : null;
+        return new DayCloseHistoryResponse(List.copyOf(page), next);
+    }
+
+    /** Billing writes land on the clinic's today; once today is closed they'd change a reconciled day. Takes the
+     * tenant-day lock first, so a write racing a close either commits before the close counts it or sees it closed.
+     * Callers: checkout, OTC and package sale, payment, void, package refund approval. */
+    public void requireTodayOpen(UUID tenantId) {
+        LocalDate today = clock.today(tenantId);
+        repo.lockDay(tenantId, today);
+        if (repo.isClosed(tenantId, today)) {
             throw new ApiException(HttpStatus.CONFLICT, "day-closed", "Day is closed",
                     "Today's billing is closed. Ask the owner to unlock the day before billing or taking payments.");
         }
+    }
+
+    private static long minor(BigDecimal amount) {
+        return amount.movePointRight(2).longValueExact();
     }
 
     private void audit(UUID tenantId, UUID staffId, String action, UUID entityId, Object after) {

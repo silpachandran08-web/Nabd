@@ -48,7 +48,7 @@ import static com.nabd.hms.organization.setup.SetupModels.StaffShiftRow;
 import static com.nabd.hms.organization.setup.SetupModels.TenantProfileRow;
 
 @Service
-public class SetupService {
+public class SetupService implements com.nabd.hms.organization.api.ClinicPolicies {
 
     private static final Logger log = LoggerFactory.getLogger(SetupService.class);
 
@@ -157,6 +157,9 @@ public class SetupService {
         if ("session.idle_lock_minutes".equals(policyKey) && !req.value().matches("^(?:[2-9]|[12][0-9]|30)$")) { // FEF-005
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "out-of-range", "Out of range", "Idle lock must be a whole number of minutes from 2 to 30");
         }
+        if ("cash_variance_tolerance".equals(policyKey) && !req.value().matches("^\\d{1,9}$")) { // FIN-005: minor units
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "out-of-range", "Out of range", "Cash tolerance must be a whole number of minor currency units (0 or more)");
+        }
         repo.updatePolicy(tenantId, policyKey, req.value());
         log.info("policy {} updated for tenant {} by {}", policyKey, tenantId, callerStaffId);
         configChanged(tenantId, policyKey);
@@ -165,6 +168,14 @@ public class SetupService {
                 .findFirst()
                 .map(this::toPolicyResponse)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "policy-not-found", "Policy not found", "Policy not found"));
+    }
+
+    /** FIN-005: one policy's stored value, without seeding defaults (safe inside a read-only transaction). */
+    @Transactional(readOnly = true)
+    @Override
+    public java.util.Optional<String> policyValue(UUID tenantId, String policyKey) {
+        tenantContext.set(tenantId);
+        return repo.findPolicyValue(tenantId, policyKey);
     }
 
     @Transactional

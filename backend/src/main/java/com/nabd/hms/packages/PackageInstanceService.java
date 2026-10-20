@@ -65,12 +65,15 @@ public class PackageInstanceService {
     private final com.nabd.hms.common.EventPublisher eventPublisher;
 
     private final ClinicClock clock;
+    private final com.nabd.hms.billing.DayCloseService dayClose;
 
     private final ActorDirectory actors;
 
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
-                            AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher, ActorDirectory actors) {
+                            AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher, ActorDirectory actors,
+                            com.nabd.hms.billing.DayCloseService dayClose) {
         this.actors = actors;
+        this.dayClose = dayClose;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
         this.repo = repo;
@@ -351,6 +354,7 @@ public class PackageInstanceService {
             throw new ApiException(HttpStatus.FORBIDDEN, "same-user", "Self-approval blocked",
                     "A refund must be approved by someone other than whoever requested it.");
         }
+        dayClose.requireTodayOpen(tenantId); // FIN-005: the credit note lands on today; day lock before the instance lock
         repo.lockInstance(tenantId, refund.instanceId());
         refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound); // re-read under the lock
         requirePending(refund);
