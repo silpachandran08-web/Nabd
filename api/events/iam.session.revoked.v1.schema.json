@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:iam.session.revoked.v1",
+  "title": "iam.session.revoked.v1",
+  "description": "Sessions of a staff member were revoked.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "staffId",
+    "scope",
+    "reasonCode",
+    "status",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "staffId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "all_sessions"
+      ]
+    },
+    "reasonCode": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+    },
+    "status": {
+      "type": "string",
+      "const": "revoked"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "staffId": "22222222-2222-4222-8222-222222222222",
+      "scope": "all_sessions",
+      "reasonCode": "suspended",
+      "status": "revoked",
+      "version": 1
+    }
+  ]
+}

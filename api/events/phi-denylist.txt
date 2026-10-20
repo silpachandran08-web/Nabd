@@ -1,0 +1,20 @@
+# OPS-015: a data field whose name contains any of these (case-insensitive) fails CI (scripts/ci/events.py) and the
+# backend contract test (DomainEventContractApiTest). Events carry ids, status and codes only; consumers read details
+# through the API, where access, consent and PHI read audit apply.
+name
+phone
+mobile
+email
+dob
+birth
+address
+text
+note
+complaint
+substance
+reaction
+diagnosis
+national
+aadhaar
+iqama
+mrn
