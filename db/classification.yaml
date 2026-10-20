@@ -533,6 +533,11 @@ schemas:
       last_error: operational  # uncertain: must not echo payload; verify
       created_at: operational
       updated_at: operational
+      ce_type: operational
+      ce_source: operational
+      aggregate_id: operational
+      trace_parent: operational
+      schema_version: operational
     owner_mfa_recovery_codes:
       id: operational
       owner_id: operational
@@ -748,6 +753,7 @@ schemas:
       updated_at: operational
       guardian_review_kept_at: operational
       guardian_review_kept_by: operational
+      phone_invalid: pii
     pharmacy_settings:
       tenant_id: operational
       mode: operational
@@ -952,6 +958,11 @@ schemas:
       expires_at: operational
       revoked_at: operational
       revoked_reason: operational
+    shedlock:
+      name: operational
+      lock_until: operational
+      locked_at: operational
+      locked_by: operational
     staff:
       id: operational
       tenant_id: operational
