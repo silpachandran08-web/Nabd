@@ -44,11 +44,20 @@ public class ClinicClock {
 
     /** tenants carries no RLS (V6), so this works before or after TenantContext.set. */
     public ZoneId zone(UUID tenantId) {
+        String[] row = tenantRow(tenantId);
+        return resolve(row[0], row[1], tenantId);
+    }
+
+    /** The tenant's region code (IN, KSA, AE, QA), or null for an unknown tenant; e.g. the default phone country (ACC-028). */
+    public String region(UUID tenantId) {
+        return tenantRow(tenantId)[1];
+    }
+
+    private String[] tenantRow(UUID tenantId) {
         // ponytail: one PK lookup per call; cache per request if it ever shows in a profile.
         // a list of String[] because a null timezone in a List<String> made findFirst() throw (500 on /schedule/day)
-        String[] row = jdbc.query("SELECT timezone, region FROM tenants WHERE id = ?",
+        return jdbc.query("SELECT timezone, region FROM tenants WHERE id = ?",
                 (rs, i) -> new String[] {rs.getString(1), rs.getString(2)}, tenantId).stream().findFirst().orElse(new String[2]);
-        return resolve(row[0], row[1], tenantId);
     }
 
     public LocalDate today(UUID tenantId) {

@@ -165,8 +165,7 @@ public class DayCloseService {
 
     /** Close/reopen history for [from, to] (defaults: the last 31 days to today), newest first, keyset-paged. */
     @Transactional(readOnly = true)
-    public DayCloseHistoryResponse history(UUID tenantId, LocalDate from, LocalDate to, String cursor, int limit) {
-        tenantContext.set(tenantId);
+    public DayCloseHistoryResponse history(UUID tenantId, LocalDate from, LocalDate to, String cursor, int limit) { // tenant bound at transaction start (PLT-019)
         LocalDate end = to != null ? to : clock.today(tenantId);
         LocalDate begin = from != null ? from : end.minusDays(HISTORY_DEFAULT_DAYS);
         if (begin.isAfter(end)) {
@@ -184,7 +183,10 @@ public class DayCloseService {
             }
         }
         limit = Math.max(1, Math.min(limit, 100));
-        List<DayCloseHistoryResponse.Item> rows = repo.history(tenantId, begin, end, beforeAt, beforeId, limit + 1);
+        List<DayCloseRepository.HistoryRow> found = repo.history(tenantId, begin, end, beforeAt, beforeId, limit + 1);
+        Map<UUID, ActorDirectory.Actor> names = actors.findActors(tenantId, found.stream().map(DayCloseRepository.HistoryRow::actorId).toList());
+        List<DayCloseHistoryResponse.Item> rows = found.stream().map(r -> r.withActorName(
+                names.containsKey(r.actorId()) ? names.get(r.actorId()).name() : null)).toList();
         List<DayCloseHistoryResponse.Item> page = rows.size() > limit ? rows.subList(0, limit) : rows;
         String next = rows.size() > limit ? page.get(limit - 1).at() + "_" + page.get(limit - 1).id() : null;
         return new DayCloseHistoryResponse(List.copyOf(page), next);
