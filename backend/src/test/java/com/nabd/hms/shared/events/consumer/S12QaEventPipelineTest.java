@@ -14,6 +14,7 @@ import com.nabd.hms.common.valkey.ValkeyProperties;
 import com.nabd.hms.shared.cache.CacheKeyPolicy;
 import com.nabd.hms.shared.ops.OutboxMetrics;
 import com.nabd.hms.shared.relay.OutboxRelay;
+import com.nabd.hms.shared.relay.RelayRedriveCommand;
 import com.nabd.hms.shared.relay.RelayProperties;
 import com.nabd.hms.support.ApiTestBase;
 import com.nabd.hms.support.ValkeyTestSupport;
@@ -21,6 +22,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -160,6 +162,7 @@ class S12QaEventPipelineTest extends ApiTestBase {
     @Autowired MeterRegistry meters;
     @Autowired Clock clock;
     @Autowired DlqReplayCommand cli;
+    @Autowired RelayRedriveCommand redrive;
     @Autowired List<Probe> probes;
     @Autowired Environment env;
     @Autowired EventPublisher publisher;
@@ -196,6 +199,12 @@ class S12QaEventPipelineTest extends ApiTestBase {
         drain(groups);
         probe.calls.set(0);
         probeCache.calls.set(0);
+    }
+
+    /** FIX-C: the context (and its relay bean) outlives this class; a relay left leading would claim every later class's domain rows. */
+    @AfterEach
+    void stopRelay() {
+        relayBean.stop();
     }
 
     // =====================================================================================================
@@ -805,10 +814,14 @@ class S12QaEventPipelineTest extends ApiTestBase {
         assertThat(valkey.opsForStream().pending("ev:in:clinical", "projector").getTotalPendingMessages()).isZero();
     }
 
-    /** Valkey restarts (empty, as a failover without persistence) after the relay XADDed but before the group read it. */
+    /**
+     * Valkey restarts (empty, as a failover without persistence) after the relay XADDed but before the group read it.
+     * FIX-C (D2): production keeps the streams durable (ElastiCache durability sync, valkey.tf), but the stand-in restarts empty by
+     * design, so the entry IS gone here; what must hold is that on-call's redrive of the window recovers it, exactly once.
+     */
     @Test
-    @Tag("known-defect-OPS-016")
     void e2e_valkeyRestartedAfterTheXaddButBeforeTheConsumerReadLosesNoEvent() throws Exception {
+        Instant windowFrom = Instant.now().minusSeconds(5);
         U u = user();
         String p = patient(u.token);
         checkIn(u, p);
@@ -825,7 +838,15 @@ class S12QaEventPipelineTest extends ApiTestBase {
                 return false;
             }
         });
-        long deadline = System.currentTimeMillis() + 10_000;
+        assertThat(streamEntriesWithId("ev:in:clinical", id)).as("the stand-in lost the entry").isZero();
+        String to = Instant.now().plusSeconds(5).toString();
+        assertThat(redrive.redrive(windowFrom.toString(), to, "x")).as("operator required").isEqualTo(2);
+        assertThat(redrive.redrive(to, windowFrom.toString(), "qa7-oncall")).as("inverted window").isEqualTo(2);
+        assertThat(redrive.redrive(windowFrom.minusSeconds(8 * 86400).toString(), to, "qa7-oncall")).as("over 7 days").isEqualTo(2);
+        assertThat(redrive.redrive(windowFrom.toString(), to, "qa7-oncall")).isZero();
+        assertThat(new JdbcTemplate(superuserDataSource()).queryForObject("SELECT count(*) FROM audit_log WHERE tenant_id IS NULL "
+                + "AND action = 'events.relay.redriven' AND actor_name = 'relay-redrive-cli:qa7-oncall'", Integer.class)).isPositive();
+        long deadline = System.currentTimeMillis() + 15_000;
         while (System.currentTimeMillis() < deadline && ledgerRows(u.tenant.id(), "projector", String.valueOf(id)) == 0) {
             groups.pollOnce();
             Thread.sleep(200);
@@ -834,6 +855,11 @@ class S12QaEventPipelineTest extends ApiTestBase {
                 + " stream entries=" + streamEntriesWithId("ev:in:clinical", id)
                 + " ledger=" + ledgerRows(u.tenant.id(), "projector", String.valueOf(id)));
         assertThat(ledgerRows(u.tenant.id(), "projector", String.valueOf(id))).as("event consumed despite the Valkey restart").isEqualTo(1);
+        for (int i = 0; i < 3; i++) {
+            groups.pollOnce();
+        }
+        assertThat(ledgerRows(u.tenant.id(), "projector", String.valueOf(id))).as("exactly once in effect").isEqualTo(1);
+        assertThat(status(id)).isEqualTo("done");
     }
 
     // =====================================================================================================
@@ -842,7 +868,6 @@ class S12QaEventPipelineTest extends ApiTestBase {
     // =====================================================================================================
 
     @Test
-    @Tag("known-defect-OPS-020")
     void e2e_ops020_ac4_timezoneChangeReachesEveryInstanceWithin5sInARegionWithStreams() throws Exception {
         U a = user();
         U other = user();

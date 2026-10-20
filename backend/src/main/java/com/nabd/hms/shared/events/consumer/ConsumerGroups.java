@@ -283,7 +283,7 @@ public class ConsumerGroups {
     public record Replayed(String group, String stream, String entryId, String eventId, UUID tenantId, Outcome outcome) {
     }
 
-    /** consumer_lag_events and consumer_lag_seconds per group and stream. Per replica (no lock): every pod exports the same value. */
+    /** consumer_lag_events and consumer_lag_seconds per group and stream. Per replica, no @SchedulerLock on purpose: every pod exports the same value. */
     @Scheduled(fixedDelayString = "${app.events.consumer.lag-refresh-ms:15000}")
     public void refreshLag() {
         StringRedisTemplate v = valkey.getIfAvailable();

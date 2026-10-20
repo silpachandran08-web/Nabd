@@ -182,7 +182,8 @@ Redis 6.2) and `consumer_lag_seconds{group,stream}` (age of the oldest undeliver
 | group | strategy | gated | handles | status |
 |---|---|---|---|---|
 | projector | DB_LEDGER | yes | `clinical.allergy.changed.v1` -> `RegistryProjector.project(patient)` | built (OPS-017); the V221 trigger poller stays until OPS-016 runs everywhere |
-| cache-invalidator, eta-engine, sse-fanout, comms, edge-projector | | | | their own stories |
+| cache-invalidator | VALKEY_SET | no | `organization.config.changed.v1` -> `TenantConfigEvictions`: evicts the tenant's zone/region locally and PUBLISHes the tenant id on `nabd:cfg:changed`, which every instance subscribes to | built (OPS-020, FIX-C). A group delivers each entry to ONE replica, so the pub/sub broadcast is the fan-out to all instances. Without Valkey the outbox dispatcher calls the same bean |
+| eta-engine, sse-fanout, comms, edge-projector | | | | their own stories |
 
 ## 8. Relay to Valkey Streams (OPS-016)
 
@@ -222,6 +223,25 @@ nodes, so a stream can hold somewhat more). 1,000,000 is 7 days at about 1.65 ev
 on the busiest domain stream, at an envelope of under 2 KB (about 1 KB typical) roughly 1 GB per full stream. This is
 an estimate for pilot traffic: recompute it as 7 x the busiest day's events of one domain and size the managed Valkey
 (OPS-020) to match.
+
+**Durability.** The streams are not a cache: a row is done once its XADD is acknowledged, so Valkey must keep acknowledged
+entries across a restart or failover. The cell's ElastiCache Valkey runs with `durability = "sync"` (Valkey 9, Multi-AZ
+transaction log before the ACK; `infra/terraform/modules/cell/aws/valkey.tf`, enforced by `check-terraform.py` and
+`policy/cell.rego`). A self-managed Valkey needs `appendonly yes` + `appendfsync always` (`everysec` may lose the last
+second of acknowledged entries, which the redrive below then has to cover).
+
+**Redrive.** If entries are lost anyway (a Valkey without persistence, an operator `FLUSHALL`), done rows stay 7 days
+(`OutboxPurgeJob`), so on-call puts the domain rows finished in a window back to pending and the relay XADDs them again;
+consumers dedupe on the CloudEvents `id`. A one-off run of the worker image, audited (`events.relay.redriven`, platform
+chain); exit code 0 = redriven, 2 = bad arguments (operator name, window empty or over 7 days):
+
+```
+java -jar app.jar --spring.main.web-application-type=none --app.events.consumer.enabled=false \
+  --app.relay.redrive-from=2026-10-20T08:00:00Z --app.relay.redrive-to=2026-10-20T09:00:00Z --app.relay.redrive-by=<operator>
+```
+
+Pick the window from the restart time back to the oldest entry a consumer might not have read (its lag,
+`consumer_lag_seconds`); a wider window only costs duplicate deliveries.
 
 **Metrics and alerts** (`infra/observability/outbox-relay.rules.yml`):
 - `relay_leader` (1 on the leader, 0 on standbys), `relay_errors_total`, `relay_events_published_total`.

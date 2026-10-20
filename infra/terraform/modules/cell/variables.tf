@@ -97,7 +97,11 @@ variable "pitr_lag_alarm_seconds" {
 }
 
 variable "valkey_node_type" {
-  description = "OPS-020: ElastiCache Valkey node type (primary and its replica)."
+  description = "OPS-020: ElastiCache Valkey node type (primary and its replica). Durable (streams) clusters need r7g/r6g/m7g/m6g/c7gn."
   type        = string
-  default     = "cache.t4g.small"
+  default     = "cache.m7g.large"
+  validation {
+    condition     = can(regex("^cache\\.(r7g|r6g|m7g|m6g|c7gn)\\.", var.valkey_node_type))
+    error_message = "Valkey durability (OPS-016 streams) needs a Graviton r7g, r6g, m7g, m6g or c7gn node type."
+  }
 }

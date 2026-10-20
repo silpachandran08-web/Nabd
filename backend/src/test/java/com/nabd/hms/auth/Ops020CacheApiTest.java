@@ -14,6 +14,8 @@ import com.nabd.hms.common.valkey.ValkeyProperties;
 import com.nabd.hms.config.AuthProperties;
 import com.nabd.hms.shared.cache.CacheKeyPolicy;
 import com.nabd.hms.shared.cache.DataTier;
+import com.nabd.hms.shared.relay.OutboxRelay;
+import com.nabd.hms.shared.relay.RelayProperties;
 import com.nabd.hms.support.ApiTestBase;
 import com.nabd.hms.support.ValkeyTestSupport;
 import io.micrometer.core.instrument.Counter;
@@ -31,6 +33,7 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -134,6 +137,8 @@ class Ops020CacheApiTest extends ApiTestBase {
     TenantConfigEvictions evictions;
     @Autowired
     OutboxDispatcher dispatcher;
+    @Autowired
+    Environment env;
 
     @BeforeEach
     void captureLogs() {
@@ -183,7 +188,7 @@ class Ops020CacheApiTest extends ApiTestBase {
     }
 
     SessionLivenessCache replicaCache(StringRedisTemplate t) {
-        return new SessionLivenessCache(provider(StringRedisTemplate.class, t), keys, new SimpleMeterRegistry(), authProperties, Clock.systemUTC());
+        return new SessionLivenessCache(provider(StringRedisTemplate.class, t), keys, new SimpleMeterRegistry(), authProperties, Clock.systemUTC(), jdbc);
     }
 
     // ---------- statement counting ----------
@@ -435,11 +440,21 @@ class Ops020CacheApiTest extends ApiTestBase {
         assertThat(clinicClock.zone(t.id())).isEqualTo(before);
         assertThat(clockB.zone(t.id())).isEqualTo(before);
 
+        // FIX-C (D1): with VALKEY_URL set the relay owns domain rows (V1680), so the dispatcher no longer delivers this
+        // event; the worker's relay XADDs it and this context's 'cache-invalidator' group (consumers on, 200 ms) consumes it
+        dispatcher.poll(); // still polled as in production: it must not be what moves the zone
         long t0 = System.nanoTime();
-        dispatcher.poll(); // consumes organization.config.changed.v1 (TenantConfigEvictions on this instance)
-        while ((!clinicClock.zone(t.id()).getId().equals(NEW_ZONE) || !clockB.zone(t.id()).getId().equals(NEW_ZONE))
-                && System.nanoTime() - t0 < 10_000_000_000L) {
-            Thread.sleep(20);
+        OutboxRelay relay = new OutboxRelay(jdbc, valkey, new RelayProperties(true, 500, 10, 2000, 2000, 1000, 1_000_000, null, null, null),
+                OutboxRelay.direct(env.getProperty("spring.datasource.url"), env.getProperty("spring.datasource.username"),
+                        env.getProperty("spring.datasource.password")), new SimpleMeterRegistry());
+        relay.start();
+        try {
+            while ((!clinicClock.zone(t.id()).getId().equals(NEW_ZONE) || !clockB.zone(t.id()).getId().equals(NEW_ZONE))
+                    && System.nanoTime() - t0 < 10_000_000_000L) {
+                Thread.sleep(20);
+            }
+        } finally {
+            relay.stop();
         }
         long ms = (System.nanoTime() - t0) / 1_000_000;
         assertThat(clinicClock.zone(t.id()).getId()).isEqualTo(NEW_ZONE);

@@ -261,7 +261,6 @@ class S12QaValkeyCacheTest extends ApiTestBase {
 
     /** Partial outage: the revoking pod cannot reach Valkey, the other pod can and still holds the live marker. */
     @Test
-    @Tag("known-defect-OPS-020")
     void ops020_ac3_boundary_revocationOnAPodCutOffFromValkeyIsStillRefusedOnAnotherPodWithinOneSecond() throws Exception {
         StringRedisTemplate tB = replicaTemplate(VALKEY.url());
         SessionRevocationJwtDecoder decoderB = decoderB(tB, new AtomicInteger());
@@ -384,7 +383,7 @@ class S12QaValkeyCacheTest extends ApiTestBase {
 
     private SessionLivenessCache cache(StringRedisTemplate t) {
         return new SessionLivenessCache(new StaticListableBeanFactory(Map.of("b", t)).getBeanProvider(StringRedisTemplate.class),
-                keys, new SimpleMeterRegistry(), authProperties, Clock.systemUTC());
+                keys, new SimpleMeterRegistry(), authProperties, Clock.systemUTC(), jdbc);
     }
 
     static StringRedisTemplate replicaTemplate(String url) {
