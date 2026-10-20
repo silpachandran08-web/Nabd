@@ -111,3 +111,74 @@ Their handlers stay registered so that rows already in flight drain.
 - Stage 3 runs `DomainEventContractApiTest`, which drives every producer over HTTP and checks every envelope it
   published. The test writes those envelopes to `backend/target/event-samples/`, and
   `events.py check --samples backend/target/event-samples` then validates them with full jsonschema.
+
+## 7. Consumers (OPS-017)
+
+Framework: `com.nabd.hms.shared.events.consumer` (`ConsumerGroups`, `EventConsumer`). A consumer is a bean implementing
+`EventConsumer`: a group name, the CloudEvents types it handles, an idempotency strategy and (optionally) the version gate.
+The app refuses to boot a consumer with no idempotency strategy, a duplicate group, or a version gate without the DB ledger.
+
+### 7.1 Stream entries
+
+- The consumer reads streams `ev:<region>:<domain>` for every region in `app.events.consumer.regions` (default `in,ksa`)
+  and every domain of its types. Entries of other types are acknowledged without calling the handler.
+- **Contract with OPS-016:** each stream entry has one field, `ce`, holding the structured envelope of section 2 as JSON.
+  An entry without a valid envelope (specversion 1.0, id, type, tenantid, integral `data.version`) is dead-lettered at
+  once with reason `malformed_envelope`.
+
+### 7.2 Delivery
+
+- Each group is created from `0` with `MKSTREAM`. Every replica is one consumer (name = `app.events.consumer.name`,
+  default the host name) of every group. The polls therefore carry **no `@SchedulerLock`**: Valkey splits new entries
+  across replicas, and a lock would serialise them onto one pod. Nothing in the framework must run only once.
+- Each poll (`poll-interval-ms`, 200): `XREADGROUP >` for new entries, then the replica's own pending entries whose backoff
+  has passed (`XCLAIM` to itself), then `XAUTOCLAIM` of entries idle for `claim-idle-ms` (60 s) on any consumer. That is
+  how a crash mid-batch is recovered: the restarted replica (same name) retries its own pending entries at once, and a
+  peer takes the entries of a replica that never comes back after 60 s.
+- Idempotency: `DB_LEDGER` inserts a `projector_applied_events` row (V1690) in the same `TenantScope.run` transaction as
+  the handler, so a redelivery is a no-op and a failed handler leaves no row. `VALKEY_SET` (stateless consumers) skips an
+  event whose key `consumer:applied:{<group>}:<id>` exists and sets it, with a 24 h TTL, after the handler succeeded.
+- Version gate (state-carrying consumers, DB ledger only): the event is applied only if `data.version` is higher than
+  the highest version this group applied for the same `subject`; otherwise the outcome is `STALE` and the handler is
+  not called. A per-subject advisory lock makes this safe across replicas.
+- Handlers get the tenant from `tenantid` through `TenantScope.run` (PLT-019). They never read another module's tables;
+  for detail they call the owning module's API.
+
+### 7.3 Retries and dead letters
+
+- A failed entry stays pending. It is retried after `retry-base-ms * 2^(failures-1)` (1 s, 2 s, 4 s ... capped at 30 s),
+  counted in `consumer:failures:{<group>}:<stream>:<entry>` (TTL 1 day).
+- The 8th failure (`max-attempts`) XADDs `{originalStream, entryId, eventId, consumer, attempts, lastError}` to
+  `ev:<region>:dlq`, acknowledges the entry, increments `consumer_dlq_total{group}` and logs one ERROR line.
+  `lastError` is the exception class name: never the message, never event data.
+- Alert `NabdConsumerDeadLetter` (`infra/observability/event-consumers.rules.yml`) fires on the first dead letter.
+
+### 7.4 Replay CLI
+
+A one-off run of the same image. There is no HTTP endpoint: only someone who can start the worker with its database and
+Valkey credentials can replay, and every replay is audited (`events.dlq.replayed` in the tenant's chain,
+`events.dlq.replay_failed` in the platform chain).
+
+```
+valkey-cli XRANGE ev:in:dlq - +          # find the entry id
+java -jar app.jar --spring.main.web-application-type=none --app.events.consumer.enabled=false \
+  --app.events.dlq.region=in --app.events.dlq.replay=<dlq entry id>[,<id>...] --app.events.dlq.replayed-by=<operator>
+```
+
+The replay reads the original entry from `originalStream` (it must still be within the stream's MAXLEN), runs it
+through the group's ledger and version gate, and deletes the DLQ entry on success. Exit code 0 = all replayed,
+1 = some not, 2 = bad arguments.
+
+### 7.5 Lag
+
+`consumer_lag_events{group,stream}` (entries not yet delivered to the group: Valkey's `lag`, or a capped count on
+Redis 6.2) and `consumer_lag_seconds{group,stream}` (age of the oldest undelivered entry). They are refreshed every
+`lag-refresh-ms` (15 s) on every replica, so alert on `max()`. `NabdConsumerLagging` fires when a group is more than
+60 s behind for 5 minutes.
+
+### 7.6 Groups
+
+| group | strategy | gated | handles | status |
+|---|---|---|---|---|
+| projector | DB_LEDGER | yes | `clinical.allergy.changed.v1` -> `RegistryProjector.project(patient)` | built (OPS-017); the V221 trigger poller stays until OPS-016 runs everywhere |
+| cache-invalidator, eta-engine, sse-fanout, comms, edge-projector | | | | their own stories |

@@ -609,7 +609,7 @@ function NursingWorklist() {
     URL.revokeObjectURL(url);
   }
 
-  const allow = (permission: string) => !loading && can(permission);
+  const allow = (permission: Parameters<typeof can>[0]) => !loading && can(permission);
 
   const visibleVitalsRows = vitalsFilter === "due" ? rows : vitalsFilter === "recorded" ? recordedRows : [...rows, ...recordedRows];
   const urgentCandidates = [...rows, ...recordedRows].filter((r) => !r.priority);

@@ -18,10 +18,11 @@ function sources(dir, out = []) {
 const files = [...sources(join(fe, "apps")), ...sources(join(fe, "packages"))].map((p) => [p.slice(fe.length), readFileSync(p, "utf8")]);
 const definedIn = (re) => files.filter(([, s]) => re.test(s)).map(([p]) => p).sort();
 
+// A plain `export type X = G.Y;` alias of the generated type (FEF-014 "wired" line) is not a second definition.
 test("AC3: QueueEntry, PatientSummary and Problem are each defined once", () => {
-  assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+QueueEntry\b/m), ["packages/domain/src/types.ts"]);
-  assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+PatientSummary\b/m), ["packages/domain/src/types.ts"]);
-  assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+Problem\b\s*=/m), ["packages/api-client/src/generated/types.ts"]);
+  assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+QueueEntry\b(?!\s*=\s*G\.\w+;)/m), ["packages/domain/src/types.ts"]);
+  assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+PatientSummary\b(?!\s*=\s*G\.\w+;)/m), ["packages/domain/src/types.ts"]);
+  assert.deepEqual(definedIn(/^\s*(export\s+)?(type|interface)\s+Problem\b(?!\s*=\s*G\.\w+;)\s*=/m), ["packages/api-client/src/generated/types.ts"]);
 });
 
 test("AC4: VISIT_LABEL, initials() and age() exist once, in packages/domain", () => {

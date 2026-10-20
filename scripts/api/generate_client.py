@@ -3,9 +3,11 @@
 
   python3 scripts/api/generate_client.py           # (re)write frontend/packages/api-client/src/generated/
   python3 scripts/api/generate_client.py --check   # exit 1 when the committed files differ (CI stage 5)
+  pnpm codegen (frontend/) / pnpm turbo run codegen # the same, from the workspace (FEF-014)
 
 Writes ONLY into frontend/packages/api-client/src/generated/ (package.json files belong to FEF-012):
   types.ts     one TS type per component schema + an Operations map (method, path, permission, params, body, response)
+               + the Permission union of every authority named in x-required-permission (FEF-014)
   schemas.ts   one Zod schema per component schema + operationSchemas (imports "zod")
   handlers.ts  MSW handlers with deterministic example bodies; msw is passed in (createHandlers({ http, HttpResponse }))
                so this package needs no msw dependency until FEF-014 wires it
@@ -184,6 +186,11 @@ def topo(schemas):
     return out
 
 
+def permissions(ops):
+    # 'public' / 'authenticated' are not authorities; SpEL such as hasAuthority('setup:edit') or ... keeps only the quoted grants
+    return sorted({m for o in ops for m in re.findall(r"[a-z][a-z_]*:[A-Za-z_]+", o["permission"] or "")})
+
+
 def params_type(params, where):
     ps = [p for p in params if p["in"] == where]
     if not ps:
@@ -206,6 +213,8 @@ def render(spec):
                      f" body: {ts(o['body']) if o['body'] else 'never'}; response: {ts(o['response']) if o['response'] else 'void'} }};")
     types.append("};")
     types.append("export type OperationId = keyof Operations;")
+    types.append("\n/** Every authority an operation requires (x-required-permission; `a | b` and SpEL are split). FEF-014: can() takes this. */")
+    types.append("export type Permission =\n" + "\n".join(f"  | {json.dumps(p)}" for p in permissions(ops)) + ";")
 
     zs = [HEADER, 'import { z } from "zod";\n']
     for n in order:
@@ -244,18 +253,21 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
 
 
 def main(argv):
-    files = render(yaml.safe_load(SPEC.read_text()))
+    # --spec=/--out= let a test generate from a modified copy of the spec into a temp dir (FEF-014 rename proof)
+    opt = dict(a[2:].split("=", 1) for a in argv if a.startswith("--") and "=" in a)
+    spec, out = Path(opt.get("spec", SPEC)), Path(opt.get("out", OUT))
+    files = render(yaml.safe_load(spec.read_text()))
     if "--check" in argv:
-        stale = [n for n, text in files.items() if not (OUT / n).exists() or (OUT / n).read_text() != text]
+        stale = [n for n, text in files.items() if not (out / n).exists() or (out / n).read_text() != text]
         if stale:
             print(f"generated client is stale ({', '.join(stale)}): run python3 scripts/api/generate_client.py and commit {OUT.relative_to(ROOT)}")
             return 1
         print(f"generated client up to date ({len(files)} files)")
         return 0
-    OUT.mkdir(parents=True, exist_ok=True)
+    out.mkdir(parents=True, exist_ok=True)
     for n, text in files.items():
-        (OUT / n).write_text(text)
-    print(f"wrote {len(files)} files to {OUT.relative_to(ROOT)}")
+        (out / n).write_text(text)
+    print(f"wrote {len(files)} files to {out}")
     return 0
 
 
