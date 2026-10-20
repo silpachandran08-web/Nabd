@@ -1,5 +1,6 @@
 package com.nabd.hms.common;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -25,13 +26,18 @@ class OutboxRepository {
     private static final String FENCE = " WHERE id = ? AND status = 'processing' AND attempts = ?";
 
     private final JdbcTemplate jdbc;
+    private final boolean relayOwnsDomainEvents;
 
-    OutboxRepository(JdbcTemplate jdbc) {
+    /** OPS-016: a region with Valkey has the Streams relay, which owns every domain event (ce_type set); the dispatcher
+     * then claims legacy rows only, so the two never finish the same row (V1680). Without Valkey there is no stream and
+     * the log-only DomainEventHandlers finish domain rows as before. */
+    OutboxRepository(JdbcTemplate jdbc, @Value("${app.valkey.url:}") String valkeyUrl) {
         this.jdbc = jdbc;
+        this.relayOwnsDomainEvents = !valkeyUrl.isBlank();
     }
 
     List<OutboxEvent> claim(int limit, int leaseSeconds) {
-        return jdbc.query("SELECT * FROM claim_outbox_events(?, ?)", mapper(), limit, leaseSeconds);
+        return jdbc.query("SELECT * FROM claim_outbox_events(?, ?, ?)", mapper(), limit, leaseSeconds, relayOwnsDomainEvents);
     }
 
     /** Renews the lease of every event in {@code events} this worker still owns (fenced, cross-tenant via

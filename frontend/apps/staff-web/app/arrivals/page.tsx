@@ -3,6 +3,10 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { STALE } from "@nabd/api-client/queries";
+import type { AppointmentPage, CallbackEntryResponse, DoctorDelayResponse, PatientDetailResponse, PatientPage, PatientResponse, QueueEntryResponse, StaffRosterEntry, TransferTargetResponse, WaitEstimateResponse } from "@nabd/api-client/generated";
+import type { CreatedPatient, DuplicateCandidate } from "@nabd/api-client/types";
 import styles from "./arrivals.module.css";
 import Dialog from "../components/ui/Dialog";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
@@ -11,33 +15,45 @@ import type { IconName } from "../components/ui/Icon";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
 import { usePolling } from "../lib/usePolling";
-import { useLatestLoad } from "../lib/useLatestLoad";
-import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, VISIT_LABEL, type PatientSummary, type QueueEntry, type VitalsForm } from "@nabd/domain";
-import { moveBody, moveErrorMessage } from "../lib/queueMove";
+import { useHasMounted } from "../lib/useHasMounted";
+import { getter, key, live, prefix, queueQuery, useDebounced, useReload } from "../lib/query";
+import { VITAL_FIELDS, EMPTY_VITALS, vitalsErrors, vitalsPayload, VITALS_BLANK_HINT, VISIT_LABEL, type VitalsForm } from "@nabd/domain";
+import { staleMessage } from "../lib/queueMove";
 import { CheckInDialog, CheckInIntakeFields, CheckInResultDialog, type CheckInResult } from "../components/arrivals/CheckInDialog";
-import { apiFetch, goLogin } from "../lib/apiClient";
-import { api, ApiError, errorText, intentKeys, problemMessage } from "../lib/api";
-import type { CreatedPatient, DuplicateCandidate } from "@nabd/api-client/types";
+import { api, ApiError, errorText, intentKeys } from "../lib/api";
 
-// Matches GET /v1/queue (QueueController), GET /v1/patients (PatientController),
-// GET /v1/staff/roster (StaffController — id+name only, queue:view not staff:view, so Reception
-// can populate the doctor picker), POST /v1/queue/check-in, POST /v1/queue/{id}/reorder.
-type Row = QueueEntry & { patientName: string; patientMrn: string };
-type PatientOption = { id: string; name: string; phone: string; mrn: string };
-type GuardianOption = { id: string; name: string; phone: string };
+// FEF-015: server state through TanStack Query (lib/query.tsx), response types generated from the API spec.
+// GET /v1/queue, /v1/staff/roster (queue:view, so Reception can populate the doctor picker), /v1/patients/{id}
+// (one cached query per patient, shared by the board, the detail rail and the check-in picker).
+// springdoc marks no response field required; a queue entry always carries these, so the board types them so.
+type Entry = QueueEntryResponse & { id: string; status: string; patientId: string; doctorId: string; departmentId: string; createdAt: string; source: string };
+type Row = Entry & { patientName: string; patientMrn: string };
+type Staff = StaffRosterEntry & { id: string; name: string };
 const DELAY_PRESETS = [10, 15, 30, 45, 60];
-// LIVE-04: each flag is exactly what its control's endpoint needs (see the setGrants effect).
+// LIVE-04: each flag is exactly what its control's endpoint needs (see grantsNow).
 type Grants = { queueCreate: boolean; queueEdit: boolean; checkout: boolean; vitalsRecord: boolean; patientsView: boolean; patientsCreate: boolean };
-type StaffOption = { id: string; name: string; departmentName?: string | null };
-// NB-116: a follow-up appointment either marked no_show or still "scheduled" 15+ days past its start.
-type CallbackEntry = { appointmentId: string; patientId: string; patientName: string; doctorId: string; startTime: string; status: string };
-// A today's-schedule appointment not yet checked in — the "Check in" quick action's picker.
+// A today's-schedule appointment not yet checked in — the "Check in" quick action's picker (a view model, not an API type).
 type AppointmentOption = { id: string; patientId: string; patientName: string; doctorId: string; doctorName: string; startTime: string };
-// Matches GET /departments/{id}/transfer-targets (DepartmentController) — same shape consult's
-// own transfer picker already uses.
 // REC-021 transfer reasons (S4 contract values); `other` takes a free-text note (<=200 chars).
 const MOVE_REASONS: [string, string][] = [["wrong_department", "Wrong department"], ["doctor_unavailable", "Doctor unavailable"], ["patient_request", "Patient request"], ["other", "Other"]];
-type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
+
+const NO_GRANTS: Grants = { queueCreate: false, queueEdit: false, checkout: false, vitalsRecord: false, patientsView: false, patientsCreate: false };
+function grantsNow(): Grants {
+  return {
+    queueCreate: can("queue:create"), queueEdit: can("queue:edit"),
+    // Checkout opens GET /billing/checkout (billing:view) to bill (POST, billing:create) or take payment (billing:edit).
+    checkout: can("billing:view") && (can("billing:create") || can("billing:edit")),
+    // REC-060: first vitals for a vitals_pending visit need clinical:create or clinical:edit.
+    vitalsRecord: can("clinical:create") || can("clinical:edit"),
+    patientsView: can("patients:view"), patientsCreate: can("patients:create"),
+  };
+}
+
+// S7-B02: a 403 carries the server's reason (e.g. vitals-correction-forbidden); generic only when it has none.
+const failText = (e: unknown, fallback: string) =>
+  e instanceof ApiError && e.status === 403 ? e.detail || "Your role isn't allowed to do this." : errorText(e, fallback);
+const patientDetailQuery = (id: string) => ({ queryKey: key("patient", { id }), queryFn: getter<PatientDetailResponse>(`/patients/${id}`), staleTime: STALE.patient });
+const QUEUE_MOVE = ["queue-move"];
 
 
 // REC-011: the table's Visit column (QueueRepository's visit_type), same labels as /schedule.
@@ -122,35 +138,70 @@ function ArrivalsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const [rows, setRows] = useState<Row[]>([]);
-  const [staff, setStaff] = useState<StaffOption[]>([]);
-  const [rosterFailed, setRosterFailed] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [forbidden, setForbidden] = useState(false);
+  const qc = useQueryClient();
+  // Permissions and the clock live in the browser (localStorage token): read only after hydration so the
+  // server render and the first client render match. Controls stay absent until known, never disabled.
+  const mounted = useHasMounted();
+  const grants = mounted ? grantsNow() : NO_GRANTS;
+  const queueView = mounted && can("queue:view"); // LIVE-09: no requests that can only 403
+  const region = mounted ? getIdentity()?.tenantRegion : undefined;
+  const dateLabel = mounted ? new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) : "";
   const [, setNow] = useState(() => Date.now());
-  // Per-action visibility (REC-014/052/062). Read after mount: the token lives in localStorage, so
-  // evaluating can() during SSR/first render would mismatch. Absent until known, never disabled.
-  const [grants, setGrants] = useState<Grants>({ queueCreate: false, queueEdit: false, checkout: false, vitalsRecord: false, patientsView: false, patientsCreate: false });
-  // Patient name/MRN lookups are per-row GET /patients/{id}; cache them so the 15s poll only
-  // fetches patients it hasn't seen (the N+1 shrinks to the first load).
-  const patientCache = useRef(new Map<string, { name: string; mrn: string }>());
-  // Only the newest load may write the board: a slower, older poll must never put a stale status back.
-  const newSignal = useLatestLoad();
-  const [sendingIds, setSendingIds] = useState<string[]>([]);
+
+  // ---- server state -------------------------------------------------------------------------------
+  // One GET /queue, shared with the sidebar badge (same key). Polled every 15 s while visible and reloaded
+  // once on return to the tab; a reload cancels a slower one still in flight (FEF-004).
+  const queueQ = useQuery({ ...queueQuery(), enabled: queueView });
+  const rosterQ = useQuery({ queryKey: key("roster"), queryFn: getter<Staff[]>("/staff/roster"), staleTime: STALE.roster, enabled: queueView });
+  const callbackQ = useQuery({ queryKey: key("callback-list"), queryFn: getter<CallbackEntryResponse[]>("/appointments/callback-list"), staleTime: STALE.callbacks, enabled: queueView });
+  // Array guards: a malformed body shows as an empty board, never a crashed page.
+  const entries = (Array.isArray(queueQ.data) ? queueQ.data : []) as Entry[];
+  const staff = Array.isArray(rosterQ.data) ? rosterQ.data : [];
+  const patientIds = [...new Set(entries.map((e) => e.patientId))];
+  // Names come from the patient cache: a 15 s poll asks for none it already has; a focus revalidates them (AC4).
+  const patientQs = useQueries({ queries: patientIds.map((id) => ({ ...patientDetailQuery(id), enabled: grants.patientsView })) });
+  const patientById = new Map(patientIds.map((id, i) => [id, patientQs[i]]));
+  const rows: Row[] = entries.map((e) => {
+    const p = patientById.get(e.patientId);
+    return { ...e, patientName: p?.data?.name ?? (p?.isPending && grants.patientsView ? "…" : "Unknown patient"), patientMrn: p?.data?.mrn ?? "" };
+  });
+  // NB-101/NB-100: per-doctor wait estimate and any active delay, for the sidebar.
+  const doctorIds = staff.map((s) => s.id);
+  const estimateQs = useQueries({ queries: doctorIds.map((id) => ({
+    queryKey: key("wait-estimate", { doctorId: id }), queryFn: getter<WaitEstimateResponse>(`/queue/wait-estimate?doctorId=${id}`),
+    ...live,
+  })) });
+  const delayQs = useQueries({ queries: doctorIds.map((id) => ({
+    queryKey: key("doctor-delay", { doctorId: id }), queryFn: getter<DoctorDelayResponse[]>(`/doctors/${id}/delay`),
+    ...live,
+  })) });
+  const waitEstimates: Record<string, number | undefined> = Object.fromEntries(doctorIds.map((id, i) => [id, estimateQs[i]?.data?.estimatedMinutes]));
+  const delays: Record<string, { delayMinutes?: number; reason?: string } | null> = Object.fromEntries(doctorIds.map((id, i) => {
+    const active = Array.isArray(delayQs[i]?.data) ? delayQs[i].data.find((h) => h.active) : undefined;
+    return [id, active ? { delayMinutes: active.delayMinutes, reason: active.reason } : null];
+  }));
+  const callbackList = Array.isArray(callbackQ.data) ? callbackQ.data : [];
+
+  const qErr = queueQ.error;
+  const forbidden = mounted && (!can("queue:view") || (qErr instanceof ApiError && qErr.status === 403));
+  const loading = !forbidden && queueQ.isPending;
+  const error = !qErr || forbidden ? null : qErr instanceof ApiError ? "Couldn't load today's arrivals. Try again." : "Couldn't reach the server. Check your connection and try again.";
+  const rosterFailed = rosterQ.isError;
+  // Board, wait estimates and delays reload together (poll + return to the tab), newest wins (FEF-004).
+  // shortcut: still 2 requests per doctor per poll; GET /queue/board (T-094) folds them into one.
+  const reload = useReload("queue", "wait-estimate", "doctor-delay");
+  // Every write changes the queue: re-read it (and the badge with it).
+  const invalidateQueue = () => qc.invalidateQueries({ queryKey: prefix("queue") });
+  const retryAll = () => { void reload(); if (rosterQ.isError) void rosterQ.refetch(); };
+
   const [railId, setRailId] = useState<string | null>(null);
-  const [railPatient, setRailPatient] = useState<{ state: "loading" | "error" | "ready"; data: Partial<PatientSummary> | null }>({ state: "loading", data: null });
   const [checkInResult, setCheckInResult] = useState<CheckInResult | null>(null);
   const [checkinTarget, setCheckinTarget] = useState<AppointmentOption | null>(null);
   const [guardianQuery, setGuardianQuery] = useState("");
-  const [guardianResults, setGuardianResults] = useState<GuardianOption[]>([]);
-  const [guardian, setGuardian] = useState<GuardianOption | null>(null);
+  const [guardian, setGuardian] = useState<PatientResponse | null>(null);
   // CGV-005: staff-confirmed guardian consent (wording constant needs legal review, same as the registry dialog).
   const [guardianConsent, setGuardianConsent] = useState(false);
   const [guardianChannel, setGuardianChannel] = useState("");
-  // Computed client-side only — server and browser locale defaults for toLocaleDateString can
-  // differ, and doing this during the initial render causes a hydration mismatch.
-  const [dateLabel, setDateLabel] = useState("");
 
   const [vitalsEntryId, setVitalsEntryId] = useState<string | null>(null);
   const [vitalsForm, setVitalsForm] = useState<VitalsForm>(EMPTY_VITALS);
@@ -166,8 +217,8 @@ function ArrivalsPageInner() {
 
   const [showModal, setShowModal] = useState(false);
   const [patientQuery, setPatientQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<PatientOption[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<PatientOption | null>(null);
+  const [searchResults, setSearchResults] = useState<PatientResponse[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientResponse | null>(null);
   const [newPatientMode, setNewPatientMode] = useState(false);
   const [duplicateCandidates, setDuplicateCandidates] = useState<DuplicateCandidate[]>([]);
   const [newName, setNewName] = useState("");
@@ -182,15 +233,12 @@ function ArrivalsPageInner() {
   const keys = useRef(intentKeys()); // Idempotency-Key per register / check-in intent, reused on a user retry of the same request
   const [submitting, setSubmitting] = useState(false);
 
-  const [waitEstimates, setWaitEstimates] = useState<Record<string, number>>({});
-  const [delays, setDelays] = useState<Record<string, { delayMinutes: number; reason: string | null } | null>>({});
   const [delayFormFor, setDelayFormFor] = useState<string | null>(null);
   const [delayMinutesInput, setDelayMinutesInput] = useState("15");
   const [delayReasonInput, setDelayReasonInput] = useState("");
   const [delayBusy, setDelayBusy] = useState(false);
   const [delayError, setDelayError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [callbackList, setCallbackList] = useState<CallbackEntry[]>([]);
   const [showDelayPicker, setShowDelayPicker] = useState(false);
 
   // "Check in" quick action: a today's-appointment picker, distinct from Register walk-in.
@@ -202,7 +250,7 @@ function ArrivalsPageInner() {
   // picker consult's page already uses against POST /queue/{id}/transfer.
   const [showMove, setShowMove] = useState(false);
   const [moveEntryId, setMoveEntryId] = useState("");
-  const [moveTargets, setMoveTargets] = useState<TransferTarget[] | null>(null);
+  const [moveTargets, setMoveTargets] = useState<TransferTargetResponse[] | null>(null);
   const [moveDepartmentId, setMoveDepartmentId] = useState("");
   const [moveDoctorId, setMoveDoctorId] = useState("");
   const [moveReason, setMoveReason] = useState("");
@@ -213,152 +261,21 @@ function ArrivalsPageInner() {
   // "Checkout" quick action: pick which checkout-pending patient, then reuse the existing route.
   const [showCheckoutPicker, setShowCheckoutPicker] = useState(false);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
-
-  const load = useCallback(async () => {
-    const signal = newSignal();
-    setError(null);
-    try {
-      if (!can("queue:view")) { setForbidden(true); return; } // LIVE-09: no requests that can only 403
-      const [queueRes, staffRes] = await Promise.all([authedFetch("/queue", { signal }), authedFetch("/staff/roster", { signal })]);
-      if (!queueRes) return;
-      if (queueRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!queueRes.ok) {
-        setError("Couldn't load today's arrivals. Try again.");
-        return;
-      }
-      const entries: QueueEntry[] = await queueRes.json();
-      if (signal.aborted) return;
-      const staffMap = new Map<string, string>();
-      let doctorIds: string[] = [];
-      setRosterFailed(!staffRes?.ok);
-      if (staffRes?.ok) {
-        const roster: StaffOption[] = await staffRes.json();
-        if (signal.aborted) return;
-        setStaff(roster.map((s) => ({ id: s.id, name: s.name, departmentName: s.departmentName ?? null })));
-        roster.forEach((s) => staffMap.set(s.id, s.name));
-        doctorIds = roster.map((s) => s.id);
-      }
-      const withNames = await Promise.all(entries.map(async (e) => {
-        const cached = patientCache.current.get(e.patientId);
-        if (cached) return { ...e, patientName: cached.name, patientMrn: cached.mrn };
-        const pRes = can("patients:view") ? await authedFetch(`/patients/${e.patientId}`, { signal }) : null;
-        const p = pRes?.ok ? await pRes.json() : null;
-        if (p?.name) patientCache.current.set(e.patientId, { name: p.name, mrn: p.mrn ?? "" });
-        return { ...e, patientName: p?.name ?? "Unknown patient", patientMrn: p?.mrn ?? "" };
-      }));
-      if (signal.aborted) return;
-      setRows(withNames);
-
-      // NB-101/NB-100: per-doctor wait estimate and any active delay, for the sidebar.
-      const estimateEntries = await Promise.all(doctorIds.map(async (id: string) => {
-        const res = await authedFetch(`/queue/wait-estimate?doctorId=${id}`, { signal });
-        return [id, res?.ok ? (await res.json()).estimatedMinutes : null] as const;
-      }));
-      if (signal.aborted) return;
-      setWaitEstimates(Object.fromEntries(estimateEntries.filter(([, v]) => v !== null)));
-
-      const delayEntries = await Promise.all(doctorIds.map(async (id: string) => {
-        const res = await authedFetch(`/doctors/${id}/delay`, { signal });
-        if (!res?.ok) return [id, null] as const;
-        const history: { active: boolean; delayMinutes: number; reason: string | null }[] = await res.json();
-        const active = history.find((h) => h.active);
-        return [id, active ? { delayMinutes: active.delayMinutes, reason: active.reason } : null] as const;
-      }));
-      if (signal.aborted) return;
-      setDelays(Object.fromEntries(delayEntries));
-    } catch {
-      if (signal.aborted) return;
-      setError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [authedFetch, newSignal]);
-
-  useEffect(() => {
-    void Promise.resolve().then(load);
-  }, [load]);
-
-  const [region, setRegion] = useState<string | undefined>(undefined);
   // A patient created by a check-in whose second call failed: a retry must reuse it, not re-register.
   // shortcut: editing any new-patient field after "registered, check-in failed" re-registers on retry (like the name edit already did), so a corrected DOB is never dropped; the duplicate check then surfaces the earlier record. A PATCH of the changed fields would avoid the second record.
   const registeredRef = useRef<{ id: string; name: string } | null>(null);
-  useEffect(() => {
-    void Promise.resolve().then(() => setRegion(getIdentity()?.tenantRegion));
-  }, []);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => setGrants({
-      queueCreate: can("queue:create"), queueEdit: can("queue:edit"),
-      // Checkout opens GET /billing/checkout (billing:view) to bill (POST, billing:create) or take payment (billing:edit).
-      checkout: can("billing:view") && (can("billing:create") || can("billing:edit")),
-      // REC-060: first vitals for a vitals_pending visit need clinical:create or clinical:edit.
-      vitalsRecord: can("clinical:create") || can("clinical:edit"),
-      patientsView: can("patients:view"), patientsCreate: can("patients:create"),
-    }));
-  }, []);
 
   // Guardian search for a minor's new record (same /patients?q= call the registry's dialog uses).
-  useEffect(() => {
-    const q = guardianQuery.trim();
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      if (q.length < 2) {
-        if (!cancelled) setGuardianResults([]);
-        return;
-      }
-      const res = await authedFetch(`/patients?q=${encodeURIComponent(q)}&limit=6`);
-      if (cancelled || !res?.ok) return;
-      const page: { data: GuardianOption[] } = await res.json();
-      if (!cancelled) setGuardianResults(page.data);
-    }, 250);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [guardianQuery, authedFetch]);
-
-  // Detail rail: one GET /patients/{id} when a row is opened.
-  const loadRailPatient = useCallback(async (patientId: string) => {
-    setRailPatient({ state: "loading", data: null });
-    try {
-      const res = await authedFetch(`/patients/${patientId}`);
-      if (!res) return;
-      if (!res.ok) { setRailPatient({ state: "error", data: null }); return; }
-      setRailPatient({ state: "ready", data: await res.json() });
-    } catch {
-      setRailPatient({ state: "error", data: null });
-    }
-  }, [authedFetch]);
-  useEffect(() => {
-    void Promise.resolve().then(async () => {
-      if (!can("queue:view")) return;
-      const res = await authedFetch("/appointments/callback-list");
-      if (res?.ok) setCallbackList(await res.json());
-    });
-  }, [authedFetch]);
+  const guardianTerm = useDebounced(guardianQuery.trim(), 250);
+  const guardianQ = useQuery({
+    queryKey: key("patients", { q: guardianTerm, limit: 6 }),
+    queryFn: getter<PatientPage>(`/patients?q=${encodeURIComponent(guardianTerm)}&limit=6`),
+    enabled: guardianTerm.length >= 2,
+  });
+  const guardianResults = guardianTerm.length >= 2 ? guardianQ.data?.data ?? [] : [];
 
   // NB-095: "live-updates without refresh" via polling — full push-based sync is NB-096, separate.
-  usePolling(load, POLL_MS);
+  usePolling(reload, POLL_MS);
 
   // Re-render the "Wait" column once a minute without waiting on the full poll.
   useEffect(() => {
@@ -369,20 +286,13 @@ function ArrivalsPageInner() {
   // TopBar's "Register walk-in" (on the schedule board) lands here with ?action=walkin; strip it
   // once consumed so back/refresh doesn't reopen the dialog. Fresh mount, so fields are already blank.
   useEffect(() => {
-    if (searchParams.get("action") !== "walkin") return;
-    if (!can("queue:create") || !can("patients:view")) { router.replace("/arrivals"); return; }
-    void Promise.resolve().then(() => {
+    if (!mounted || searchParams.get("action") !== "walkin") return;
+    if (can("queue:create") && can("patients:view")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot URL signal, consumed and stripped
       setShowModal(true);
-      router.replace("/arrivals");
-    });
-  }, [searchParams, router]);
-
-  useEffect(() => {
-    // Deferred to a microtask so the effect body itself never calls setState synchronously.
-    void Promise.resolve().then(() => {
-      setDateLabel(new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }));
-    });
-  }, []);
+    }
+    router.replace("/arrivals");
+  }, [mounted, searchParams, router]);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function onPatientQueryChange(value: string) {
@@ -397,8 +307,8 @@ function ArrivalsPageInner() {
       return;
     }
     searchTimer.current = setTimeout(async () => {
-      const res = await authedFetch(`/patients?q=${encodeURIComponent(value.trim())}`);
-      if (res?.ok) setSearchResults((await res.json()).data);
+      const page = await api.get<PatientPage>(`/patients?q=${encodeURIComponent(value.trim())}`).catch(() => null);
+      if (page) setSearchResults(page.data ?? []);
     }, 300);
   }
 
@@ -419,7 +329,6 @@ function ArrivalsPageInner() {
     setModalError(null);
     setDuplicateCandidates([]);
     setGuardianQuery("");
-    setGuardianResults([]);
     setGuardian(null);
     setGuardianConsent(false);
     setGuardianChannel("");
@@ -492,9 +401,9 @@ function ArrivalsPageInner() {
       }
 
       const ciBody = { patientId, doctorId, presentingComplaint: presentingComplaint.trim() || null, paymentMode };
-      let entry: QueueEntry;
+      let entry: QueueEntryResponse;
       try {
-        entry = await api.post<QueueEntry>("/queue/check-in", ciBody, { idempotencyKey: keys.current.get("checkin", ciBody) });
+        entry = await api.post<QueueEntryResponse>("/queue/check-in", ciBody, { idempotencyKey: keys.current.get("checkin", ciBody) });
       } catch (e) {
         setModalError(errorText(e, "Couldn't check in."));
         return;
@@ -502,10 +411,10 @@ function ArrivalsPageInner() {
       keys.current.done("checkin");
       setShowModal(false);
       setCheckInResult({
-        tokenNumber: entry.tokenNumber, patientName, doctorId,
-        doctorName: staff.find((s) => s.id === doctorId)?.name ?? "", entryId: entry.id,
+        tokenNumber: entry.tokenNumber ?? 0, patientName, doctorId,
+        doctorName: staff.find((s) => s.id === doctorId)?.name ?? "", entryId: entry.id ?? "",
       });
-      void load();
+      void invalidateQueue();
     } finally {
       setSubmitting(false);
     }
@@ -526,17 +435,11 @@ function ArrivalsPageInner() {
     if (Object.keys(vitalsErrors(vitalsForm)).length > 0) return;
     setVitalsSubmitting(true);
     try {
-      const res = await authedFetch(`/clinical/vitals/${vitalsEntryId}`, {
-        method: "PATCH",
-        body: JSON.stringify(vitalsPayload(vitalsForm)),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setVitalsError(await problemMessage(res, "Couldn't save vitals."));
-        return;
-      }
+      await api.patch(`/clinical/vitals/${vitalsEntryId}`, vitalsPayload(vitalsForm));
       setVitalsEntryId(null);
-      load();
+      void invalidateQueue();
+    } catch (err) {
+      setVitalsError(failText(err, "Couldn't save vitals."));
     } finally {
       setVitalsSubmitting(false);
     }
@@ -556,13 +459,11 @@ function ArrivalsPageInner() {
     if (reason.length < 3) return; // QueueReorderRequest.reason: @Size(min = 3)
     setPrioritySubmitting(true);
     try {
-      const res = await authedFetch(`/queue/${priorityEntryId}/reorder`, { method: "POST", body: JSON.stringify({ priority: true, reason }) });
-      if (res?.ok) {
-        setPriorityEntryId(null);
-        load();
-      } else if (res) {
-        setPriorityError(await problemMessage(res, "Couldn't mark this patient as priority."));
-      }
+      await api.post(`/queue/${priorityEntryId}/reorder`, { priority: true, reason });
+      setPriorityEntryId(null);
+      void invalidateQueue();
+    } catch (err) {
+      setPriorityError(failText(err, "Couldn't mark this patient as priority."));
     } finally {
       setPrioritySubmitting(false);
     }
@@ -573,26 +474,26 @@ function ArrivalsPageInner() {
     if (!delayFormFor) return;
     setDelayBusy(true);
     try {
-      const res = await authedFetch(`/doctors/${delayFormFor}/delay`, {
-        method: "POST",
-        body: JSON.stringify({ delayMinutes: Number(delayMinutesInput), reason: delayReasonInput || null }),
-      });
-      if (res?.ok) {
-        setDelayFormFor(null);
-        setDelayReasonInput("");
-        load();
-      } else if (res) {
-        setDelayError(await problemMessage(res, "Couldn't announce the delay."));
-      }
+      await api.post(`/doctors/${delayFormFor}/delay`, { delayMinutes: Number(delayMinutesInput), reason: delayReasonInput || null });
+      setDelayFormFor(null);
+      setDelayReasonInput("");
+      void qc.invalidateQueries({ queryKey: prefix("doctor-delay") });
+      void qc.invalidateQueries({ queryKey: prefix("wait-estimate") });
+    } catch (err) {
+      setDelayError(failText(err, "Couldn't announce the delay."));
     } finally {
       setDelayBusy(false);
     }
   }
 
   async function clearDelay(doctorId: string) {
-    const res = await authedFetch(`/doctors/${doctorId}/delay/clear`, { method: "POST" });
-    if (res?.ok) load();
-    else if (res) setActionError(await problemMessage(res, "Couldn't clear the delay."));
+    try {
+      await api.post(`/doctors/${doctorId}/delay/clear`);
+      void qc.invalidateQueries({ queryKey: prefix("doctor-delay") });
+      void qc.invalidateQueries({ queryKey: prefix("wait-estimate") });
+    } catch (err) {
+      setActionError(failText(err, "Couldn't clear the delay."));
+    }
   }
 
   function pickDelayDoctor(doctorId: string) {
@@ -611,23 +512,24 @@ function ArrivalsPageInner() {
     setCheckinAppointments(null);
     // Local date, not toISOString() (UTC) — before 05:30 in India that would ask for yesterday.
     const today = new Date().toLocaleDateString("en-CA");
-    const res = await authedFetch(`/appointments?date=${today}&limit=100`);
-    if (!res?.ok) {
-      setCheckinError(res ? await problemMessage(res, "Couldn't load today's appointments.") : "Couldn't load today's appointments.");
+    let list: AppointmentPage["data"];
+    try {
+      const body = await api.get<AppointmentPage>(`/appointments?date=${today}&limit=100`);
+      list = body.data ?? [];
+    } catch (err) {
+      setCheckinError(failText(err, "Couldn't load today's appointments."));
       setCheckinAppointments([]);
       return;
     }
-    const body = await res.json();
-    const list: { id: string; patientId: string; doctorId: string; startTime: string; status: string }[] = body.data ?? body;
     const alreadyArrived = new Set(rows.map((r) => r.appointmentId).filter(Boolean));
     const pending = list.filter((a) => a.status === "scheduled" && !alreadyArrived.has(a.id));
+    // Names from the same patient cache the board fills: a patient already on screen costs no request.
     const withNames = await Promise.all(pending.map(async (a) => {
-      const pRes = can("patients:view") ? await authedFetch(`/patients/${a.patientId}`) : null;
-      const p = pRes?.ok ? await pRes.json() : null;
+      const p = grants.patientsView && a.patientId ? await qc.ensureQueryData(patientDetailQuery(a.patientId)).catch(() => null) : null;
       return {
-        id: a.id, patientId: a.patientId, doctorId: a.doctorId,
+        id: a.id ?? "", patientId: a.patientId ?? "", doctorId: a.doctorId ?? "",
         doctorName: staff.find((s) => s.id === a.doctorId)?.name ?? "—",
-        patientName: p?.name ?? "Unknown patient", startTime: a.startTime,
+        patientName: p?.name ?? "Unknown patient", startTime: a.startTime ?? "",
       };
     }));
     setCheckinAppointments(withNames);
@@ -652,13 +554,15 @@ function ArrivalsPageInner() {
     setMoveReason(""); setMoveReasonNote(""); setMoveError(null);
     const entry = rows.find((r) => r.id === entryId);
     if (!entry) return;
-    const res = await authedFetch(`/departments/${entry.departmentId}/transfer-targets`);
-    if (!res?.ok) {
+    try {
+      setMoveTargets(await qc.fetchQuery({
+        queryKey: key("transfer-targets", { departmentId: entry.departmentId }), staleTime: STALE.departments,
+        queryFn: getter<TransferTargetResponse[]>(`/departments/${entry.departmentId}/transfer-targets`),
+      }));
+    } catch {
       setMoveError("Couldn't load transfer options.");
       setMoveTargets([]);
-      return;
     }
-    setMoveTargets(await res.json());
   }
 
   // The reason is required only when the department changes (same-department = doctor change).
@@ -670,20 +574,14 @@ function ArrivalsPageInner() {
     setMoveSubmitting(true);
     setMoveError(null);
     try {
-      const res = await authedFetch(`/queue/${moveEntryId}/transfer`, {
-        method: "POST",
-        body: JSON.stringify({
-          toDepartmentId: moveDepartmentId, doctorId: moveDoctorId,
-          ...(moveReason ? { reason: moveReason, ...(moveReason === "other" && moveReasonNote.trim() ? { reasonNote: moveReasonNote.trim() } : {}) } : {}),
-        }),
+      await api.post(`/queue/${moveEntryId}/transfer`, {
+        toDepartmentId: moveDepartmentId, doctorId: moveDoctorId,
+        ...(moveReason ? { reason: moveReason, ...(moveReason === "other" && moveReasonNote.trim() ? { reasonNote: moveReasonNote.trim() } : {}) } : {}),
       });
-      if (!res) return;
-      if (!res.ok) {
-        setMoveError(await problemMessage(res, "Couldn't move the patient."));
-        return;
-      }
       setShowMove(false);
-      load();
+      void invalidateQueue();
+    } catch (err) {
+      setMoveError(failText(err, "Couldn't move the patient."));
     } finally {
       setMoveSubmitting(false);
     }
@@ -693,37 +591,28 @@ function ArrivalsPageInner() {
   // vitals_pending), and front desk has no reason to care about that middle "waiting" state —
   // it's rendered with the same pill and grouped into the same tab as checked_in. This one button
   // walks both hops (or just the second, if already "waiting") so vitals becomes reachable at all.
-  async function sendForVitals(row: Row) {
-    if (sendingIds.includes(row.id)) return;
-    setSendingIds((ids) => [...ids, row.id]);
-    setActionError(null);
-    // Show each hop as soon as the server accepts it, so the board never waits on the full reload.
-    const showStatus = (status: string) => setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status } : r)));
-    try {
-      if (row.status === "checked_in") {
-        const toWaiting = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: moveBody("waiting", "checked_in") });
-        if (!toWaiting) return;
-        if (!toWaiting.ok) {
-          setActionError(await moveErrorMessage(toWaiting, "Couldn't send the patient for vitals."));
-          return;
-        }
-        showStatus("waiting");
-      }
-      const res = await authedFetch(`/queue/${row.id}/status`, { method: "PATCH", body: moveBody("vitals_pending", "waiting") });
-      if (!res) return;
-      if (!res.ok) {
-        setActionError(await moveErrorMessage(res, "Couldn't send the patient for vitals."));
-        return;
-      }
-      showStatus("vitals_pending");
-    } catch {
-      setActionError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setSendingIds((ids) => ids.filter((id) => id !== row.id));
-      // Always re-read the queue, success or not: the first hop may have applied even if the second did not.
-      void load();
-    }
-  }
+  // FEF-015: the row shows "Vitals pending" at once; a failed hop (409 stale-status, ACC-002) rolls it
+  // back and says why; the queue is always re-read after, since the first hop may have applied.
+  const sendForVitals = useMutation({
+    mutationKey: QUEUE_MOVE,
+    mutationFn: async (row: Row) => {
+      if (row.status === "checked_in") await api.patch(`/queue/${row.id}/status`, { status: "waiting", expectedStatus: "checked_in" });
+      await api.patch(`/queue/${row.id}/status`, { status: "vitals_pending", expectedStatus: "waiting" });
+    },
+    onMutate: async (row) => {
+      setActionError(null);
+      const queueKey = queueQuery().queryKey;
+      await qc.cancelQueries({ queryKey: queueKey });
+      const before = qc.getQueryData(queueKey);
+      qc.setQueryData(queueKey, (old) => old?.map((e) => (e.id === row.id ? { ...e, status: "vitals_pending" } : e)));
+      return { before };
+    },
+    onError: (err, _row, ctx) => {
+      qc.setQueryData(queueQuery().queryKey, ctx?.before);
+      setActionError((err instanceof ApiError && staleMessage(err.problem)) || failText(err, "Couldn't send the patient for vitals."));
+    },
+    onSettled: () => invalidateQueue(),
+  });
 
   // The URL is the tab's only state: sidebar links and tab clicks both just change ?tab=, so the
   // sidebar's active item always matches what's on screen.
@@ -766,7 +655,6 @@ function ArrivalsPageInner() {
 
   function openRail(row: Row) {
     setRailId(row.id);
-    void loadRailPatient(row.patientId);
   }
   // Rail actions close the rail first so only one dialog traps focus at a time.
   function fromRail(fn: () => void) {
@@ -775,8 +663,12 @@ function ArrivalsPageInner() {
   }
 
   const railRow = railId ? rows.find((r) => r.id === railId) ?? null : null;
+  // Detail rail: the same cached patient query the board row uses (revalidated when the rail opens).
+  const railPatientQ = useQuery({ ...patientDetailQuery(railRow?.patientId ?? ""), enabled: !!railRow });
+  const railPatient = { state: railPatientQ.data ? "ready" : railPatientQ.isError ? "error" : "loading", data: railPatientQ.data ?? null };
   const checkoutRows = rows.filter((r) => bucketOf(r.status) === "checkout_pending");
   const hasQuickActions = grants.queueCreate || grants.queueEdit || grants.checkout;
+  const sendingId = sendForVitals.isPending ? sendForVitals.variables?.id : undefined;
 
   // One contextual set of row actions, shared by the table and the detail rail. Each is absent
   // (not disabled) when the role lacks the permission the endpoint needs.
@@ -788,7 +680,7 @@ function ArrivalsPageInner() {
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openPriorityModal(r.id))}>Mark priority</button>
         )}
         {grants.queueEdit && (r.status === "checked_in" || r.status === "waiting") && (
-          <button type="button" className={styles.actionBtn} disabled={sendingIds.includes(r.id)} onClick={() => afterClick(() => void sendForVitals(r))}>{sendingIds.includes(r.id) ? "Sending…" : "Send for vitals"}</button>
+          <button type="button" className={styles.actionBtn} disabled={sendingId === r.id} onClick={() => afterClick(() => sendForVitals.mutate(r))}>{sendingId === r.id ? "Sending…" : "Send for vitals"}</button>
         )}
         {grants.vitalsRecord && r.status === "vitals_pending" && (
           <button type="button" className={styles.actionBtn} onClick={() => afterClick(() => openVitalsModal(r.id))}>Record vitals</button>
@@ -853,13 +745,13 @@ function ArrivalsPageInner() {
       ) : forbidden ? (
         <div className={styles.card}><EmptyState icon="shield" title="No access to the arrivals board" hint="Your role doesn't include the live queue. Ask your clinic owner if you need it." /></div>
       ) : error && rows.length === 0 ? (
-        <div className={styles.card}><ErrorState message={error} onRetry={() => { setLoading(true); void load(); }} /></div>
+        <div className={styles.card}><ErrorState message={error} onRetry={retryAll} /></div>
       ) : (
         <>
         {error && (
           <div className={styles.formError} role="alert">
             {error} Showing the last loaded list.{" "}
-            <button type="button" className={styles.linkBtn} onClick={() => void load()}>Retry</button>
+            <button type="button" className={styles.linkBtn} onClick={retryAll}>Retry</button>
           </div>
         )}
         <div className={styles.layout}>
@@ -908,7 +800,7 @@ function ArrivalsPageInner() {
           <div className={styles.card}>
             <div className={styles.sideTitle}>Doctor queues</div>
             {rosterFailed ? (
-              <ErrorState message="Couldn't load the doctor roster." onRetry={() => void load()} />
+              <ErrorState message="Couldn't load the doctor roster." onRetry={() => void rosterQ.refetch()} />
             ) : doctorQueues.length === 0 ? (
               <EmptyState icon="stethoscope" title="No doctors on the roster" />
             ) : (
@@ -949,7 +841,7 @@ function ArrivalsPageInner() {
                     {c.status === "no_show" ? <StatusPill tone="danger" label="Missed" /> : <StatusPill tone="warn" label="Overdue" />}
                   </div>
                   <span className={styles.callbackNote}>
-                    Follow-up was {new Date(c.startTime).toLocaleDateString()}
+                    Follow-up was {new Date(c.startTime ?? "").toLocaleDateString()}
                   </span>
                 </div>
               ))}
@@ -978,7 +870,7 @@ function ArrivalsPageInner() {
           {railPatient.state === "loading" ? (
             <Skeleton rows={3} label="Loading patient" />
           ) : railPatient.state === "error" ? (
-            <ErrorState message="Couldn't load the patient record." onRetry={() => void loadRailPatient(railRow.patientId)} />
+            <ErrorState message="Couldn't load the patient record." onRetry={() => void railPatientQ.refetch()} />
           ) : (
             <dl className={styles.railList}>
               <div><dt>Phone</dt><dd>{railPatient.data?.phone || "—"}</dd></div>
@@ -1071,7 +963,7 @@ function ArrivalsPageInner() {
                           <div className={styles.searchResults}>
                             {guardianResults.map((g) => (
                               <button type="button" key={g.id} className={styles.searchResultRow}
-                                onClick={() => { registeredRef.current = null; setGuardian(g); setGuardianResults([]); }}>
+                                onClick={() => { registeredRef.current = null; setGuardian(g); }}>
                                 {g.name} · {g.phone}
                               </button>
                             ))}
@@ -1150,7 +1042,7 @@ function ArrivalsPageInner() {
             nextDoctorName: checkinTarget.doctorName, nextAppointment: checkinTarget.startTime,
           }}
           onClose={closeCheckinTarget}
-          onCheckedIn={() => void load()}
+          onCheckedIn={() => void invalidateQueue()}
           onDone={closeCheckinTarget}
         />
       )}
@@ -1361,7 +1253,7 @@ function ArrivalsPageInner() {
                     <label className={styles.label} htmlFor="moveDoctor">Doctor</label>
                     <select id="moveDoctor" className={styles.select} value={moveDoctorId} onChange={(e) => setMoveDoctorId(e.target.value)}>
                       <option value="">Select a doctor…</option>
-                      {moveTargets.find((t) => t.departmentId === moveDepartmentId)?.doctors.map((d) => (
+                      {moveTargets.find((t) => t.departmentId === moveDepartmentId)?.doctors?.map((d) => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
                     </select>

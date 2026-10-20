@@ -1,0 +1,27 @@
+# OPS-016: Prometheus alert rules for the outbox -> Valkey Streams relay (docs/architecture/events.md section 7).
+# Metrics: relay_leader, relay_errors_total (OutboxRelay), outbox_oldest_pending_age_seconds{region} (OPS-014).
+# Wiring this file into the cell's Prometheus/Alertmanager is Needs external action (no Prometheus in the repo yet).
+groups:
+  - name: nabd-outbox-relay
+    rules:
+      - alert: NabdOutboxOldestPendingOver30s
+        expr: max by (region) (outbox_oldest_pending_age_seconds) > 30
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "Outbox events wait more than 30 s (SLO p99 < 30 s): relay down, no leader, or Valkey unreachable"
+          runbook: docs/architecture/events.md
+      - alert: NabdRelayErrors
+        expr: sum(increase(relay_errors_total[5m])) > 0
+        for: 0m
+        labels: { severity: ticket }
+        annotations:
+          summary: "The outbox relay failed to claim, XADD or finish events; they stay pending in Postgres"
+          runbook: docs/architecture/events.md
+      - alert: NabdRelayNoLeader
+        expr: sum(relay_leader) < 1
+        for: 1m
+        labels: { severity: page }
+        annotations:
+          summary: "No worker holds the outbox relay lock: domain events are not reaching Valkey Streams"
+          runbook: docs/architecture/events.md
