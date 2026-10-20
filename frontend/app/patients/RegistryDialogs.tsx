@@ -6,7 +6,7 @@ import StatusPill from "../components/ui/StatusPill";
 import { fingerprint, submitKeyed } from "../lib/idempotency";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-type Problem = { title: string; detail: string };
+type Problem = { title: string; detail: string; errors?: { field: string; message: string }[] };
 type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
 
 // PatientMatchCandidateResponse.matchScore is a 0-1 fraction (1.0 = exact phone match, else name similarity).
@@ -27,9 +27,10 @@ function useEscape(onClose: () => void) {
   }, [onClose]);
 }
 
-async function detail(res: Response, fallback: string): Promise<string> {
-  const p: Problem | null = await res.json().catch(() => null);
-  return p?.detail || p?.title || fallback;
+/** ACC-028: the server's field error for the phone (it names the clinic country), shown under the input. */
+function phoneFieldError(p: Problem | null): string | null {
+  const e = p?.errors?.find((x) => x.field === "phone");
+  return e ? `Mobile ${e.message}.` : null;
 }
 
 /**
@@ -48,6 +49,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
   const [consent, setConsent] = useState(false);
   const [channel, setChannel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   useEscape(onClose);
 
@@ -94,7 +96,12 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
         return;
       }
       if (!res.ok) {
-        setError(await detail(res, "Couldn't register the patient."));
+        const p: Problem | null = await res.json().catch(() => null);
+        const fieldErr = res.status === 400 ? phoneFieldError(p) : null;
+        if (fieldErr) {
+          setCandidates(null);
+          setPhoneError(fieldErr);
+        } else setError(p?.detail || p?.title || "Couldn't register the patient.");
         return;
       }
       const created: { id: string } = await res.json();
@@ -137,7 +144,9 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
             <input id="reg-name" className={styles.input} value={form.name} autoFocus onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <label className={styles.fieldLabel} htmlFor="reg-phone">Mobile</label>
             <input id="reg-phone" className={styles.input} value={form.phone} inputMode="tel" placeholder="+91 98765 43210"
-              onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              aria-invalid={phoneError ? true : undefined} aria-describedby={phoneError ? "reg-phone-error" : undefined}
+              onChange={(e) => { setForm({ ...form, phone: e.target.value }); setPhoneError(null); }} />
+            {phoneError && <div id="reg-phone-error" className={styles.errorInline} role="alert">{phoneError}</div>}
             <div className={styles.fieldRow}>
               <div>
                 <label className={styles.fieldLabel} htmlFor="reg-dob">Date of birth</label>
