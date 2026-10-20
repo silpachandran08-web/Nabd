@@ -204,9 +204,23 @@ function schedule(): void {
   }, Math.min(wait, 2 ** 31 - 1));
   (timer as { unref?: () => void }).unref?.();
 }
+/** PLT-007: another tab dropped the session (logout, revoked refresh) -> this tab signs out too. */
+export function onStorage(e: { key: string | null; newValue: string | null }): void {
+  if (e.key !== ACCESS_KEY) return;
+  if (e.newValue === null) goLogin(); else schedule();
+}
+
+/** PLT-007: revocation (suspension, role change, clinic suspended, 12 h cap) reaches an idle tab within 60 s. */
+export const PROBE_MS = 60_000;
+export async function probeSession(): Promise<void> {
+  if (!localStorage.getItem(ACCESS_KEY)) return;
+  try { if ((await apiFetch("/auth/sessions")).status === 401) goLogin(); } catch { /* offline: try again next tick */ }
+}
+
 if (typeof window !== "undefined") {
   schedule();
-  window.addEventListener("storage", (e) => { if (e.key === ACCESS_KEY) schedule(); });
+  window.addEventListener("storage", onStorage);
+  (setInterval(() => void probeSession(), PROBE_MS) as { unref?: () => void }).unref?.();
 }
 
 /** RFC 9562 UUIDv7: 48-bit ms timestamp, then random. */

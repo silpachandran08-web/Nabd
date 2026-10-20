@@ -311,7 +311,10 @@ paths:
           description: New pair issued; old refresh token invalidated
           content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
         "401":
-          description: Reused/revoked refresh token — entire session family revoked as a compromise signal
+          description: >
+            Reused/revoked refresh token (entire session family revoked as a compromise signal), or PLT-007:
+            Problem type TENANT_INACTIVE (clinic suspended/offboarded) or SESSION_MAX_AGE (refresh family older than
+            app.auth.absolute-session-hours, 12 h; idle-lock unlock does not extend it)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /auth/logout:
@@ -751,6 +754,9 @@ paths:
         "401":
           description: Missing, invalid, or wrong-purpose token
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "403":
+          description: PLT-007 Problem type TENANT_INACTIVE - the clinic is suspended or offboarded
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
   # --------------------------------------------------------------- Staff
@@ -906,7 +912,8 @@ paths:
               required: [reason]
               properties: { reason: { type: string, minLength: 3 } }
       responses:
-        "204": { description: "Suspended; sessions killed < 30s, audit event written" }
+        "204": { description: "Suspended; every session on every device revoked at once (iam.session.revoked.v1), audit event written" }
+        "403": { description: "step-up-required, or STEP_UP_INVALID when the step-up token was minted in another session (PLT-007)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /staff/{id}/mfa/reset:
     post:
@@ -4104,6 +4111,7 @@ components:
 
     StepUpToken:
       type: object
+      description: PLT-007 - bound to the minting session (sid) and tenant; any other access token gets 403 STEP_UP_INVALID
       properties:
         stepUpToken: { type: string }
         expiresIn: { type: integer, example: 300 }

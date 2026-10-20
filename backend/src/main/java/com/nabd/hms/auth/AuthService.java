@@ -85,6 +85,9 @@ public class AuthService {
 
     private final Clock clock;
 
+    @org.springframework.beans.factory.annotation.Value("${app.auth.absolute-session-hours:12}")
+    private int absoluteSessionHours; // PLT-007: refresh-family cap (one shift); per-tenant SSO policy later
+
     AuthService(AuthRepository repo, TenantContext tenantContext, PasswordEncoder pinEncoder,
                 TotpService totpService, FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder,
                 AuthProperties props, ObjectMapper objectMapper, OtpOutbox otpOutbox, AuditService auditService,
@@ -315,7 +318,10 @@ public class AuthService {
                 .issuedAt(now)
                 .expiresAt(exp)
                 .subject(staffId.toString())
-                .claim("purpose", "step_up");
+                .claim("purpose", "step_up")
+                // PLT-007: bound to the minting session and tenant; StepUpVerifier compares them with the caller's token
+                .claim("sid", callerJwt.getClaimAsString("sid"))
+                .claim("tenantId", callerJwt.getClaimAsString("tenantId"));
         TokenType.STEP_UP.stamp(claimsB, Audience.STEP_UP);
         JwtClaimsSet claims = claimsB.build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(claims)).getTokenValue();
@@ -490,6 +496,9 @@ public class AuthService {
     @Transactional
     public TokenPairResponse issueTokensForStaff(UUID tenantId, UUID staffId, String ip, String device, String userAgent) {
         tenantContext.set(tenantId);
+        if (tenantInactive(tenantId)) { // PLT-007: workspace select into a suspended/offboarded clinic
+            throw tenantInactiveError(HttpStatus.FORBIDDEN);
+        }
         Staff staff = repo.findStaffById(staffId)
                 .orElseThrow(() -> new IllegalStateException("staff " + staffId + " vanished right after invite accept"));
         return mintTokenPair(staff, UUID.randomUUID(), ip, device, userAgent);
@@ -505,6 +514,13 @@ public class AuthService {
 
         tenantContext.set(session.tenantId());
 
+        // PLT-007: checked before reuse detection, since suspension revokes the sessions this would read as reuse
+        if (tenantInactive(session.tenantId())) {
+            throw tenantInactiveError(HttpStatus.UNAUTHORIZED);
+        }
+        if ("max_age".equals(session.revokedReason())) {
+            throw sessionMaxAge();
+        }
         if (session.revokedAt() != null) {
             // token already used once (or already revoked) and is being presented again — compromise signal
             log.warn("refresh-token reuse detected — revoking session family {} (staff {}, tenant {})",
@@ -514,6 +530,11 @@ public class AuthService {
         }
         if (session.expiresAt().isBefore(Instant.now(clock))) {
             throw invalidRefresh();
+        }
+        // PLT-007: absolute lifetime of the family; unlock never mints, so an idle-lock unlock cannot extend it
+        if (!Instant.now(clock).isBefore(repo.familyStartedAt(session.tenantId(), session.id()).plus(absoluteSessionHours, ChronoUnit.HOURS))) {
+            repo.revokeFamily(session.familyId(), "max_age");
+            throw sessionMaxAge();
         }
 
         Staff staff = repo.findStaffById(session.staffId()).orElseThrow(this::invalidRefresh);
@@ -665,7 +686,7 @@ public class AuthService {
         String rawRefresh = OpaqueTokens.generate();
         Instant refreshExp = bg != null ? bg.expiresAt() : now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
         repo.insertSession(sessionId, staff.tenantId(), staff.id(), familyId,
-                OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent);
+                OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent, now);
 
         return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds(),
                 Duration.between(now, refreshExp).toSeconds());
@@ -695,6 +716,21 @@ public class AuthService {
     private ApiException mfaFailed() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "mfa-failed", "MFA verification failed",
                 "The code is incorrect or the challenge has expired.");
+    }
+
+    private boolean tenantInactive(UUID tenantId) {
+        return repo.findTenantById(tenantId).map(t -> com.nabd.hms.common.SessionRevocation.INACTIVE_TENANT_STATUSES.contains(t.status()))
+                .orElse(true);
+    }
+
+    private ApiException tenantInactiveError(HttpStatus status) {
+        return new ApiException(status, "TENANT_INACTIVE", "Clinic not active",
+                "This clinic is suspended or closed; contact the clinic owner.");
+    }
+
+    private ApiException sessionMaxAge() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "SESSION_MAX_AGE", "Session too old",
+                "Sessions last one shift; sign in again.");
     }
 
     private ApiException invalidRefresh() {

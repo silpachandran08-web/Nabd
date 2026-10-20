@@ -7,6 +7,7 @@ import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.common.SessionRevocation;
 import com.nabd.hms.staff.dto.AcceptInviteRequest;
 import com.nabd.hms.staff.dto.AcceptedStaffIdentity;
 import com.nabd.hms.staff.dto.CallerInfo;
@@ -203,11 +204,19 @@ public class StaffService {
         auditService.record(tenantId, "staff", caller.id(), caller.name(), callerRole, ipAddress, "staff.role_changed", "staff", id,
                 Map.of("roleId", before.roleId(), "scope", before.scope(), "fieldGrants", before.fieldGrants()),
                 Map.of("roleId", roleId, "scope", scope, "fieldGrants", fieldGrants));
-        // ponytail: 'role_changed' is not in sessions.revoked_reason's CHECK yet (PLT-007 adds it); admin_revoke until then
-        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        revokeSessions(tenantId, id, "role_changed"); // PLT-007: the next sign-in carries the new grants
         eventPublisher.publish(tenantId, StaffRoleChangedHandler.TYPE, Map.of("tenantId", tenantId.toString(),
                 "staffId", id.toString(), "fromRoleId", before.roleId().toString(), "toRoleId", roleId.toString(),
                 "scopeChanged", scopeChanged));
+    }
+
+    /** PLT-007: revoke every live session of one staff member and tell open tabs (iam.session.revoked.v1). */
+    private int revokeSessions(UUID tenantId, UUID staffId, String reason) {
+        List<UUID> ids = staffRepo.revokeAllSessions(tenantId, staffId, reason);
+        if (!ids.isEmpty()) {
+            eventPublisher.publish(tenantId, SessionRevocation.EVENT, SessionRevocation.payload(tenantId, staffId, ids, reason));
+        }
+        return ids.size();
     }
 
     @Transactional
@@ -216,7 +225,11 @@ public class StaffService {
         tenantContext.set(tenantId);
         staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
         staffRepo.suspend(tenantId, id);
-        staffRepo.revokeAllSessions(tenantId, id, "suspended");
+        int revoked = revokeSessions(tenantId, id, "suspended"); // NB-047: every device
+        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
+        auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(),
+                caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff"),
+                null, "staff.suspended", "staff", id, null, Map.of("sessionsRevoked", revoked));
         log.warn("staff {} suspended by {} (tenant {}) — all sessions killed", id, callerStaffId, tenantId);
     }
 
@@ -227,7 +240,7 @@ public class StaffService {
         tenantContext.set(tenantId);
         staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
         staffRepo.resetMfa(tenantId, id);
-        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        revokeSessions(tenantId, id, "admin_revoke");
         StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
         String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
         auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,

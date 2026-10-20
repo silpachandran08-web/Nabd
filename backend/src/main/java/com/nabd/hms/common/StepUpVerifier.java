@@ -34,6 +34,17 @@ public class StepUpVerifier {
         if (!valid) {
             throw stepUpError();
         }
+        // PLT-007: a step-up token only works with the access token of the session (and tenant) that minted it
+        if (org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication() instanceof
+                org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken caller) {
+            String sid = token.getClaimAsString("sid");
+            String tenantId = token.getClaimAsString("tenantId");
+            if (sid == null || !sid.equals(caller.getToken().getClaimAsString("sid"))
+                    || (tenantId != null && !tenantId.equals(caller.getToken().getClaimAsString("tenantId")))) {
+                throw new ApiException(HttpStatus.FORBIDDEN, "STEP_UP_INVALID", "Step-up token not valid here",
+                        "This step-up confirmation belongs to another session; confirm again.");
+            }
+        }
     }
 
     private ApiException stepUpError() {

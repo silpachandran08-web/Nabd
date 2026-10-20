@@ -69,6 +69,9 @@ public class PlatformAuthService {
 
     private final Clock clock;
 
+    @org.springframework.beans.factory.annotation.Value("${app.auth.absolute-session-hours:12}")
+    private int absoluteSessionHours; // PLT-007: same refresh-family cap as staff sessions
+
     PlatformAuthService(PlatformAuthRepository repo, PasswordEncoder pinEncoder, TotpService totpService,
                          FieldCipher cipher, JwtEncoder jwtEncoder, ChallengeTokenDecoder jwtDecoder, AuthProperties props,
                          PlatformAudit audit, AuditService auditService, MfaPolicy mfaPolicy, Clock clock) {
@@ -231,6 +234,9 @@ public class PlatformAuthService {
         String tokenHash = OpaqueTokens.sha256Hex(req.refreshToken());
         SessionRow session = repo.findSessionByTokenHash(tokenHash).orElseThrow(this::invalidRefresh);
 
+        if ("max_age".equals(session.revokedReason())) {
+            throw sessionMaxAge();
+        }
         if (session.revokedAt() != null) {
             log.warn("refresh-token reuse detected — revoking session family {} (operator {})",
                     session.familyId(), session.operatorId());
@@ -241,6 +247,10 @@ public class PlatformAuthService {
         }
         if (session.expiresAt().isBefore(Instant.now(clock))) {
             throw invalidRefresh();
+        }
+        if (!Instant.now(clock).isBefore(repo.familyStartedAt(session.id()).plus(absoluteSessionHours, ChronoUnit.HOURS))) {
+            repo.revokeFamily(session.familyId(), "max_age"); // PLT-007
+            throw sessionMaxAge();
         }
 
         Operator operator = repo.findById(session.operatorId()).orElseThrow(this::invalidRefresh);
@@ -352,7 +362,7 @@ public class PlatformAuthService {
         String rawRefresh = OpaqueTokens.generate();
         Instant refreshExp = now.plus(props.refreshTokenTtlDays(), ChronoUnit.DAYS);
         repo.insertSession(sessionId, operator.id(), familyId,
-                OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent);
+                OpaqueTokens.sha256Hex(rawRefresh), refreshExp, device, ip, userAgent, now);
 
         return new TokenPairResponse(accessToken, rawRefresh, Duration.between(now, accessExp).toSeconds(),
                 Duration.between(now, refreshExp).toSeconds());
@@ -371,6 +381,11 @@ public class PlatformAuthService {
     private ApiException mfaFailed() {
         return new ApiException(HttpStatus.UNAUTHORIZED, "mfa-failed", "MFA verification failed",
                 "The code is incorrect or the challenge has expired.");
+    }
+
+    private ApiException sessionMaxAge() {
+        return new ApiException(HttpStatus.UNAUTHORIZED, "SESSION_MAX_AGE", "Session too old",
+                "Sessions last one shift; sign in again.");
     }
 
     private ApiException invalidRefresh() {
