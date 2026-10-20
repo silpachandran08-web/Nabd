@@ -87,7 +87,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <scope>runtime</scope>
+      <!-- OPS-016: compile scope for PGConnection.getNotifications (relay LISTEN) -->
     </dependency>
     <!-- Argon2PasswordEncoder delegates to Bouncy Castle; not pulled in transitively -->
     <dependency>

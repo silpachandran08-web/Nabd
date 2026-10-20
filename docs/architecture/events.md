@@ -19,8 +19,9 @@ They use the envelope as it is defined here. Changing it needs a new `.v2` type,
   Postgres merges identical notifications within one transaction, so a transaction that publishes N events wakes
   `LISTEN outbox` exactly once, at commit. A rollback sends no notification (tested).
 - Every catalogue type has one `OutboxEventHandler` bean. `DomainEventHandlers` registers a log-only handler per type, so
-  the dispatcher marks these rows done instead of retrying "no handler" forever. **OPS-016:** replace
-  `DomainEventHandlers` with the relay handlers. Keep one handler per type: the dispatcher refuses duplicate types.
+  the dispatcher marks these rows done instead of retrying "no handler" forever. **OPS-016:** in a region with Valkey
+  the dispatcher no longer claims domain rows at all and the Streams relay owns them (section 8). The log-only
+  handlers stay for deployments without Valkey, where no stream exists.
 
 ## 2. Envelope: CloudEvents 1.0, structured JSON
 
@@ -182,3 +183,50 @@ Redis 6.2) and `consumer_lag_seconds{group,stream}` (age of the oldest undeliver
 |---|---|---|---|---|
 | projector | DB_LEDGER | yes | `clinical.allergy.changed.v1` -> `RegistryProjector.project(patient)` | built (OPS-017); the V221 trigger poller stays until OPS-016 runs everywhere |
 | cache-invalidator, eta-engine, sse-fanout, comms, edge-projector | | | | their own stories |
+
+## 8. Relay to Valkey Streams (OPS-016)
+
+`com.nabd.hms.shared.relay.OutboxRelay` moves committed domain events to Valkey Streams. It runs in the Core worker
+profile (same image, `SPRING_PROFILES_ACTIVE=worker`, `application-worker.yml` sets `app.relay.enabled=true`).
+
+**Who finishes which row.** The relay and `OutboxDispatcher` never mark the same row done, because the rows are split
+between them in SQL (V1680):
+
+| Region | Domain rows (`ce_type` set) | Legacy rows (`whatsapp.send`, OTP, ...) |
+|---|---|---|
+| Valkey configured (`VALKEY_URL` set) | the relay only: `claim_relay_events` / `finish_relay_events` | the dispatcher only: `claim_outbox_events(limit, lease, true)` |
+| no Valkey (dev, most tests) | the dispatcher, with the log-only `DomainEventHandlers` (no stream to publish to) | the dispatcher |
+
+The switch is the presence of `VALKEY_URL`, which every pod of a region shares, so no pod can mark a domain row done
+without an XADD in a region that has streams. A region with Valkey but no running worker keeps its domain events
+pending and the 30 s alert fires; nothing is lost.
+
+**Leader.** One leader per region database: `pg_try_advisory_lock` on a dedicated direct connection (not the business
+pool, not PgBouncer: `RELAY_DB_URL`, falling back to `DB_URL`). Standbys retry every `lock-retry-ms` (2 s). A killed
+leader's session ends and releases the lock, so a standby takes over within 10 s and claims from where the outbox
+stands: unfinished rows are pending, or processing with a lease (10 s, a batch takes well under a second) that the next claim takes back.
+
+**Loop.** The leader `LISTEN outbox` on the same connection and drains on every notification, and at least every
+`poll-ms` (2 s) when a notification is lost. A drain claims batches of `batch-size` (500) with a lease, sends them in
+one pipelined round trip (`XADD <stream> MAXLEN ~ <stream-maxlen> * ce <envelope>`), then finishes them fenced
+(`status = 'processing' AND attempts = <claimed>`). A row is marked done only after every XADD of its batch
+succeeded. On any Valkey error the whole batch goes back to pending at once, `relay_errors_total` counts it, and the
+relay backs off `error-backoff-ms` (1 s). Delivery is at-least-once: a batch whose XADDs partly succeeded is sent
+again, so consumers dedupe on the CloudEvents `id` (and the `version` gate, section 1).
+
+**Stream entries.** Stream `ev:<region>:<domain>` (`ev:in:visit`, `ev:ksa:billing`, ...). Each entry has one field,
+`ce`, holding the structured CloudEvents envelope exactly as `outbox_cloudevents` renders it (section 2).
+
+**Retention.** `MAXLEN ~ 1,000,000` per stream (`app.relay.stream-maxlen`), approximate trimming (Valkey trims whole
+nodes, so a stream can hold somewhat more). 1,000,000 is 7 days at about 1.65 events/s (about 143,000 events a day)
+on the busiest domain stream, at an envelope of under 2 KB (about 1 KB typical) roughly 1 GB per full stream. This is
+an estimate for pilot traffic: recompute it as 7 x the busiest day's events of one domain and size the managed Valkey
+(OPS-020) to match.
+
+**Metrics and alerts** (`infra/observability/outbox-relay.rules.yml`):
+- `relay_leader` (1 on the leader, 0 on standbys), `relay_errors_total`, `relay_events_published_total`.
+- `NabdOutboxOldestPendingOver30s` on `outbox_oldest_pending_age_seconds` (OPS-014, every 15 s) > 30, `NabdRelayErrors`,
+  `NabdRelayNoLeader`.
+
+**Rules.** The relay never calls an HTTP API (`RelayArchitectureTest`). It sees only ids, attempts, the stream name and
+the envelope (PHI-free by section 3).
