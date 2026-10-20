@@ -30,6 +30,8 @@ async function open(perms, { doctorId = SELF, status = 'signed', amend = null, a
       return r.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(a) });
     }],
     ['GET', /^\/clinical\/notes\/e1/, ok(note(status))],
+    // CLN-005: sign/amend also need a licensed clinician; this fixture's caller is one.
+    ['GET', /^\/clinical\/prescriptions\/e1\/signing-authority$/, ok({ canSign: true, reason: null })],
     ['GET', /^\/clinical\/(vitals|prescriptions)\//, { status: 404, body: {} }],
     ['GET', /./, ok([])],
   ]);

@@ -52,6 +52,7 @@ export async function mockApi(page, log, handlers) {
       return route.fulfill({ headers: CORS, status: h.status ?? 200, contentType: h.status >= 400 ? 'application/problem+json' : 'application/json', body: h.body === undefined ? '' : JSON.stringify(h.body) });
     }
     if (req.method() === 'GET' && /^\/setup\/policies/.test(path)) return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: '[]' }); // FEF-005 idle-lock default
+    if (req.method() === 'GET' && /^\/setup\/profile$|^\/schedule\/day$/.test(path)) return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: JSON.stringify({ timezone: 'Asia/Kolkata', region: 'IN' }) }); // FEF-011 clinic-zone default
     log.unmatched.push(`${req.method()} ${path}`);
     return route.fulfill({ headers: CORS, status: 404, contentType: 'application/problem+json', body: JSON.stringify({ type: 'not-found', title: 'Not found', detail: 'The requested resource was not found.' }) });
   });

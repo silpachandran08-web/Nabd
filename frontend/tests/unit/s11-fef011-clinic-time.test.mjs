@@ -79,6 +79,16 @@ test("AC4: null timezone falls back to the region default", () => {
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
+// Runs before the AC4 test below: the warning is once per page load (module state).
+test("shell boot: a failed zone request (401/404/500/offline) falls back WITHOUT the null-zone warning", async (t) => {
+  const warn = t.mock.method(console, "warn", () => {});
+  assert.equal(await loadClinicTimeZone(async () => json(404, {}), "IN", "f1"), "Asia/Kolkata");
+  assert.equal(await loadClinicTimeZone(async () => json(401, {}), "AE", "f2"), "Asia/Dubai");
+  assert.equal(await loadClinicTimeZone(async (p) => (p === "/setup/profile" ? json(403, {}) : json(500, {})), "QA", "f3"), "Asia/Qatar");
+  assert.equal(await loadClinicTimeZone(async () => { throw new TypeError("offline"); }, "SA", "f4"), "Asia/Riyadh");
+  assert.equal(warn.mock.callCount(), 0);
+});
+
 test("AC4: shell boot with tenants.timezone null warns exactly once", async (t) => {
   const warn = t.mock.method(console, "warn", () => {});
   const fetcher = async () => json(200, { timezone: null, region: "AE" });
