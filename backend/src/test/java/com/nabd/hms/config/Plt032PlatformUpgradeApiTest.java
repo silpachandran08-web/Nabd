@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** PLT-032: the app runs on a supported Boot line, Java 21, with Tomcat on virtual threads; build/runtime files agree. */
+@org.springframework.test.context.TestPropertySource(properties = "spring.threads.virtual.enabled=true")
 class Plt032PlatformUpgradeApiTest extends ApiTestBase {
 
     @Autowired
@@ -28,7 +29,7 @@ class Plt032PlatformUpgradeApiTest extends ApiTestBase {
     }
 
     @Test
-    void tomcatRequestsRunOnVirtualThreads() {
+    void whenSwitchedOnTomcatRequestsRunOnVirtualThreads() {
         var tomcat = ((TomcatWebServer) web.getWebServer()).getTomcat();
         assertThat(tomcat.getConnector().getProtocolHandler().getExecutor()).isInstanceOf(VirtualThreadExecutor.class);
         // a real request still answers on that executor

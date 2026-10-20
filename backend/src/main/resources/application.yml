@@ -3,10 +3,12 @@ spring:
     timeout-per-shutdown-phase: 25s
   application:
     name: hms-backend
-  # PLT-032: Tomcat requests, @Async and @Scheduled run on virtual threads (Java 21); pinning review in the PLT-032 report
+  # PLT-032: Tomcat requests, @Async and @Scheduled run on virtual threads (Java 21) when APP_VIRTUAL_THREADS=true.
+  # Default OFF until the staging k6 check-in profile proves p95 within +10 %: on 2 CPUs the in-repo proxy (S10QaArrivedTest.ac6)
+  # measured +30-40 % with virtual threads on and no change with them off (docs/adr/0017-spring-boot-upgrade.md, section 4.6).
   threads:
     virtual:
-      enabled: true
+      enabled: ${APP_VIRTUAL_THREADS:false}
   # PLT-032: Jackson 3 with Boot's Jackson 2 defaults, so request/response JSON stays as it was (e.g. absent primitives -> 0/false)
   jackson:
     use-jackson2-defaults: true

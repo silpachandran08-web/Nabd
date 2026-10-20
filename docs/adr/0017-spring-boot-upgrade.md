@@ -20,7 +20,7 @@ No 3.x line is supported, so the choice is 4.x. 4.0 ends in two months, so we ta
 
 ## 3. Decision
 
-- `spring-boot-starter-parent` 4.1.1, `java.version` 21, `spring.threads.virtual.enabled=true`.
+- `spring-boot-starter-parent` 4.1.1, `java.version` 21, `spring.threads.virtual.enabled=${APP_VIRTUAL_THREADS:false}` (see 4.6: off until staging k6 clears it).
 - Aligned libraries: Spring Framework 7.0, Spring Security 7.1, Spring Modulith 2.1.1, springdoc 3.1.1, ShedLock 7.10.1,
   Testcontainers 2.0.5 (Boot-managed, replaces the OPS-031 1.21.3 pin), Flyway 12, Lettuce 7, JUnit 6, PostgreSQL JDBC 42.7.13.
 - Images: `eclipse-temurin:21-jre-alpine` (layer extraction) and `gcr.io/distroless/java21-debian12:nonroot` (runtime). CI: every `setup-java` is `21`.
@@ -49,7 +49,11 @@ No 3.x line is supported, so the choice is 4.x. 4.0 ends in two months, so we ta
    `HttpStatus.UNPROCESSABLE_ENTITY` is deprecated for `UNPROCESSABLE_CONTENT` (same 422).
 5. **OpenAPI.** springdoc 3 defaults to OpenAPI 3.1; we pin `springdoc.api-docs.version=openapi_3_0` so the OPS-035 drift gate and client generator are unchanged. springdoc 3 now
    documents Bean Validation (`minLength: 1` for `@NotBlank`, `minimum`, `minItems`) and `LocalTime` as `string/time-local`; `api/openapi/core.yaml` and the generated client were regenerated.
-6. **Virtual threads.** Tomcat requests, `@Async` and `@Scheduled` run on virtual threads. Java 21 pins a carrier inside `synchronized` around blocking I/O, so such code uses
+6. **Virtual threads, supported but default OFF.** `spring.threads.virtual.enabled=${APP_VIRTUAL_THREADS:false}`. Measured on this 2-CPU sandbox with the in-repo check-in proxy
+   (`S10QaArrivedTest`, 3 runs each, p95 ms): base Boot 3.3 496/539/605, Boot 4.1 with virtual threads off 487/511/557, with virtual threads on 630/718/850 (+30-40 %).
+   Virtual threads are not time-sliced, so CPU-bound request work queues on the 2 carrier threads. That breaks the story's +10 % budget here, so the switch ships off and is
+   flipped per environment after the staging k6 profile shows p95 within +10 % and the 24 h canary is clean. With the switch on, the whole suite logged 0 pinned-thread traces.
+   When on, Tomcat requests, `@Async` and `@Scheduled` run on virtual threads. Java 21 pins a carrier inside `synchronized` around blocking I/O, so such code uses
    `ReentrantLock` (`RegistryProjector.drain`). pgJDBC 42.7.x already uses locks internally. The Hikari pool (20) stays the real concurrency limit: do not raise it because threads are cheap.
 7. **Testcontainers 2** still talks to the sandbox daemon (`DOCKER_MIN_API_VERSION=1.24`).
 
