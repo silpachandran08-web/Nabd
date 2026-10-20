@@ -1,0 +1,20 @@
+# OPS-017: Prometheus alert rules for the Valkey consumer groups (ConsumerGroups, /actuator/prometheus).
+# Wiring this file into the cell's Prometheus/Alertmanager is Needs external action (no Prometheus in the repo yet).
+# max(), not sum(): every replica exports the same lag gauges, and each dead letter is counted by the replica that moved it.
+groups:
+  - name: nabd-event-consumers
+    rules:
+      - alert: NabdConsumerDeadLetter
+        expr: sum by (group) (increase(consumer_dlq_total[5m])) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "Consumer group {{ $labels.group }} moved an event to ev:<region>:dlq after 8 failed attempts"
+          runbook: docs/architecture/events.md
+      - alert: NabdConsumerLagging
+        expr: max by (group, stream) (consumer_lag_seconds) > 60
+        for: 5m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Consumer group {{ $labels.group }} is more than 60 s behind on {{ $labels.stream }}"
+          runbook: docs/architecture/events.md
