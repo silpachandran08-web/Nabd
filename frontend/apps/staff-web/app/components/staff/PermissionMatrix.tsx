@@ -95,7 +95,8 @@ export default function PermissionMatrix({
         {extra.length > 0 ? `, plus ${extra.length} specialty and department ${extra.length === 1 ? "module" : "modules"}` : ""}.
         Financial, clinical and personal fields stay protected at field level even inside granted modules.
       </p>
-      <div className={styles.scroll}>
+      {/* axe scrollable-region-focusable: the table scrolls sideways on narrow screens, so keyboard users can focus it */}
+      <div className={styles.scroll} tabIndex={0} role="region" aria-label={`Permission table: ${roleName}`}>
         <table className={styles.table}>
           <thead>
             <tr>
