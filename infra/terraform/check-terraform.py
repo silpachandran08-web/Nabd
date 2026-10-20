@@ -9,7 +9,8 @@ Rules:
   creds     no static cloud credentials in infra/terraform or the infra workflow (CI must use OIDC)
   regions   the reusable module hard-codes no region names (only modules/cell/residency.tf lists them)
   safety    Postgres private, encrypted, 35-day PITR, deletion protection; every bucket has a full public-access block;
-            Valkey (OPS-020) TLS required, AUTH, encrypted at rest, a replica in a second AZ, private subnets only
+            Valkey (OPS-020) TLS required, AUTH, encrypted at rest, a replica in a second AZ, private subnets only,
+            durability = "sync" (OPS-016 streams live there: an acknowledged XADD must survive a restart or failover)
 Needs: pip install python-hcl2
 """
 import pathlib
@@ -62,7 +63,7 @@ def check(tf_dir, workflow):
                     errors.append(f"safety: {where} needs {k} = {str(v).lower()}")
         if rtype == "aws_elasticache_replication_group":
             want = {"transit_encryption_enabled": True, "transit_encryption_mode": "required", "at_rest_encryption_enabled": True,
-                    "automatic_failover_enabled": True, "multi_az_enabled": True}
+                    "automatic_failover_enabled": True, "multi_az_enabled": True, "durability": "sync"}
             for k, v in want.items():
                 got = body.get(k)
                 if (got.strip('"') if isinstance(got, str) else got) != v:
@@ -114,9 +115,14 @@ BAD = {
     "plaintext_valkey": 'resource "aws_elasticache_replication_group" "x" {\n  transit_encryption_enabled = false\n'
                         '  at_rest_encryption_enabled = true\n  automatic_failover_enabled = true\n  multi_az_enabled = true\n'
                         '  num_cache_clusters = 1\n  tags = merge(var.tags, { data_class = "ops" })\n}\n',
+    "volatile_streams": 'resource "aws_elasticache_replication_group" "x" {\n  transit_encryption_enabled = true\n'
+                        '  transit_encryption_mode = "required"\n  at_rest_encryption_enabled = true\n'
+                        '  automatic_failover_enabled = true\n  multi_az_enabled = true\n  durability = "disabled"\n'
+                        '  num_cache_clusters = 2\n  tags = merge(var.tags, { data_class = "ops" })\n}\n',
 }
 EXPECT = {"untagged": "tags:", "public_db": "publicly_accessible", "open_bucket": "public_access_block",
-          "static_key": "creds:", "region": "regions:", "plaintext_valkey": "transit_encryption_enabled"}
+          "static_key": "creds:", "region": "regions:", "plaintext_valkey": "transit_encryption_enabled",
+          "volatile_streams": "durability"}
 
 
 def selftest():

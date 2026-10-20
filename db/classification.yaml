@@ -963,6 +963,9 @@ schemas:
       label: operational
       created_at: operational
       updated_at: operational
+    session_cache_revocations:
+      session_id: operational
+      revoked_at: operational
     sessions:
       id: operational
       tenant_id: operational

@@ -115,7 +115,7 @@ deny contains msg if {
 	r.type == "aws_elasticache_replication_group"
 	a := r.change.after
 	not valkey_safe(a)
-	msg := sprintf("%v: Valkey needs TLS required, encryption at rest, >= 2 nodes, multi-AZ and automatic failover", [r.address])
+	msg := sprintf("%v: Valkey needs TLS required, encryption at rest, >= 2 nodes, multi-AZ, automatic failover and durability sync", [r.address])
 }
 
 valkey_safe(a) if {
@@ -125,4 +125,5 @@ valkey_safe(a) if {
 	a.num_cache_clusters >= 2
 	a.multi_az_enabled == true
 	a.automatic_failover_enabled == true
+	a.durability == "sync" # OPS-016 streams (QA-7 D2)
 }

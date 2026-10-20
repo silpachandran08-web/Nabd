@@ -1,5 +1,11 @@
-# OPS-020: managed Valkey (ElastiCache) for the cell, used for session revocation, rate limits and config
-# invalidation (keys and ids only, never PHI values: docs/architecture/valkey.md). DEC-19 prefers managed.
+# OPS-020: managed Valkey (ElastiCache) for the cell, used for session revocation, rate limits, config invalidation
+# and (OPS-016/017) the event streams ev:<region>:<domain> (keys, ids and PHI-free envelopes only:
+# docs/architecture/valkey.md). DEC-19 prefers managed.
+# The streams are NOT a cache: the relay marks an outbox row done once its XADD is acknowledged, so an acknowledged
+# entry must survive a restart or failover (QA-7 D2). ElastiCache for Valkey 9 durability "sync" writes every command
+# to a Multi-AZ transaction log before the ACK (the managed equivalent of AOF appendfsync always; AOF itself is not
+# offered on ElastiCache). Durability is fixed at creation: moving an existing cell means a new replication group and
+# a cut-over (docs/ops/cells.md). Durable clusters need a Graviton r/m/c7gn node type (var.valkey_node_type).
 # TLS is required (no plaintext listener), AUTH token from Secrets Manager, encrypted at rest with the cell's ops key,
 # one replica in a second AZ with automatic failover, private subnets only: ElastiCache has no public endpoint and the
 # security group admits the cell VPC alone.
@@ -46,8 +52,8 @@ resource "aws_elasticache_replication_group" "valkey" {
   replication_group_id        = "${var.name}-valkey"
   description                 = "Nabd ${var.name} cache (ids and keys only, no PHI values)"
   engine                      = "valkey"
-  engine_version              = "7.2"
-  parameter_group_name        = "default.valkey7"
+  engine_version              = "9.0"   # durability needs Valkey 9.0+; the engine's default parameter group applies
+  durability                  = "sync" # streams: an acknowledged XADD is in the Multi-AZ log (async may drop ~10 s)
   node_type                   = var.valkey_node_type
   port                        = 6379
   num_cache_clusters          = 2 # primary + one replica
@@ -61,7 +67,8 @@ resource "aws_elasticache_replication_group" "valkey" {
   auth_token                  = random_password.valkey_auth.result
   at_rest_encryption_enabled  = true
   kms_key_id                  = aws_kms_key.root["ops"].arn
-  snapshot_retention_limit    = 0 # cache only: every value is rebuilt from Postgres (revocation falls back to the DB)
+  snapshot_retention_limit    = 7 # daily snapshots on top of the log; the outbox redrive (events.md section 8) covers the rest
+  snapshot_window             = "20:00-21:00" # UTC, before the maintenance window
   auto_minor_version_upgrade  = true
   maintenance_window          = "sun:22:00-sun:23:00" # UTC, after the Postgres window
   apply_immediately           = false

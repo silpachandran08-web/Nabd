@@ -1,5 +1,6 @@
 package com.nabd.hms.common;
 
+import com.nabd.hms.shared.events.consumer.EventConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -10,17 +11,19 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * OPS-020: organization.config.changed.v1 drops the tenant's cached zone on EVERY instance. The outbox hands the event
- * to one instance only, so that instance evicts locally and publishes the tenant id on a Valkey pub/sub channel that
- * every instance subscribes to. Pub/sub, not an outbox consumer group: OPS-017's groups are in another branch, and this
- * is one PUBLISH on the connection PLT-008 already gives us. A lost message (Valkey down) costs at most the cache TTL
- * (app.cache.tenant-config-ttl-seconds, 30 s). The message is the tenant id only, never a config value.
+ * OPS-020: organization.config.changed.v1 drops the tenant's cached zone on EVERY instance. The event reaches one
+ * instance only: the outbox dispatcher in a region without Valkey, or (VALKEY_URL set: the relay owns domain rows, V1680)
+ * the OPS-017 'cache-invalidator' group on ev:&lt;region&gt;:organization, which delivers each entry to ONE replica. That
+ * instance evicts locally and publishes the tenant id on a Valkey pub/sub channel every instance subscribes to: the
+ * fan-out to all. A lost message (Valkey down) costs at most the cache TTL (app.cache.tenant-config-ttl-seconds, 30 s).
+ * The message is the tenant id only, never a config value.
  */
 @Component
-public class TenantConfigEvictions implements OutboxEventHandler {
+public class TenantConfigEvictions implements OutboxEventHandler, EventConsumer {
 
     static final String CHANNEL = "nabd:cfg:changed";
     private static final Logger log = LoggerFactory.getLogger(TenantConfigEvictions.class);
@@ -44,22 +47,46 @@ public class TenantConfigEvictions implements OutboxEventHandler {
 
     @Override
     public void handle(OutboxEvent event) {
-        if (event.tenantId() == null) {
+        evictEverywhere(event.tenantId());
+    }
+
+    @Override
+    public String group() {
+        return "cache-invalidator";
+    }
+
+    @Override
+    public Set<String> types() {
+        return Set.of(eventType());
+    }
+
+    @Override
+    public Idempotency idempotency() {
+        return Idempotency.VALKEY_SET; // stateless: an eviction is idempotent anyway
+    }
+
+    @Override
+    public void handle(Event event) {
+        evictEverywhere(event.tenantId());
+    }
+
+    private void evictEverywhere(UUID tenantId) {
+        if (tenantId == null) {
             return; // tenant config only
         }
-        clinicClock.evict(event.tenantId());
+        clinicClock.evict(tenantId);
         StringRedisTemplate t = valkey.getIfAvailable();
         if (t == null) {
             return; // no Valkey (single instance / dev): the local eviction is all there is
         }
         try {
-            t.convertAndSend(CHANNEL, event.tenantId().toString());
+            t.convertAndSend(CHANNEL, tenantId.toString());
         } catch (RuntimeException e) {
-            log.warn("config change of tenant {} not broadcast (Valkey unavailable); other instances refresh within the cache TTL", event.tenantId());
+            log.warn("config change of tenant {} not broadcast (Valkey unavailable); other instances refresh within the cache TTL", tenantId);
         }
     }
 
-    /** Per instance on purpose (no SchedulerLock): every pod keeps its own subscription; re-subscribes after a failure. */
+    /** Per instance, no @SchedulerLock on purpose: every pod keeps its own subscription; re-subscribes after a failure. */
     @Scheduled(fixedDelayString = "${app.cache.subscribe-retry-ms:5000}")
     public void ensureSubscribed() {
         RedisConnectionFactory factory = valkeyFactory.getIfAvailable();
