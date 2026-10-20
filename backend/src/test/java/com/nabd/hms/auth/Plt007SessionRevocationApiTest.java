@@ -87,7 +87,7 @@ class Plt007SessionRevocationApiTest extends ApiTestBase {
         assertThat(String.valueOf(select.getBody().get("type"))).endsWith("TENANT_INACTIVE");
 
         assertThat(su.queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.session.revoked.v1' "
-                + "AND payload->>'reason' = 'tenant_suspended' AND (payload->>'sessionCount')::int = 2", Integer.class, clinic.id())).isEqualTo(1);
+                + "AND payload->>'reasonCode' = 'tenant_suspended' AND payload->>'scope' = 'all_sessions'", Integer.class, clinic.id())).isEqualTo(2); // OPS-015 schema: one per staff member
 
         // reactivated: a fresh sign-in works again (old sessions stay dead)
         assertThat(transition(clinic.id(), "active").getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -150,7 +150,7 @@ class Plt007SessionRevocationApiTest extends ApiTestBase {
         assertThat(su.queryForObject("SELECT count(*) FROM sessions WHERE staff_id = ? AND revoked_reason = 'role_changed'",
                 Integer.class, rec.id())).isEqualTo(2);
         assertThat(su.queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.session.revoked.v1' "
-                + "AND payload->>'staffId' = ? AND payload->>'reason' = 'role_changed' AND jsonb_array_length(payload->'sessionIds') = 2",
+                + "AND payload->>'staffId' = ? AND payload->>'reasonCode' = 'role_changed' AND payload->>'scope' = 'all_sessions'", // OPS-015 schema: no session ids
                 Integer.class, clinic.id(), rec.id().toString())).isEqualTo(1);
         // the owner's own session is untouched
         assertThat(get("/v1/staff", ownerAccess).getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -268,7 +268,7 @@ class Plt007SessionRevocationApiTest extends ApiTestBase {
         assertThat(su.queryForObject("SELECT count(*) FROM audit_log WHERE tenant_id = ? AND action = 'staff.suspended' AND entity_id = ?",
                 Integer.class, clinic.id(), rec.id())).isEqualTo(1);
         assertThat(su.queryForObject("SELECT count(*) FROM outbox_events WHERE tenant_id = ? AND event_type = 'iam.session.revoked.v1' "
-                + "AND payload->>'staffId' = ? AND payload->>'reason' = 'suspended'", Integer.class, clinic.id(), rec.id().toString())).isEqualTo(1);
+                + "AND payload->>'staffId' = ? AND payload->>'reasonCode' = 'suspended'", Integer.class, clinic.id(), rec.id().toString())).isEqualTo(1);
         // and they cannot sign back in
         assertThat(http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of("tenantSlug", clinic.slug(), "email", rec.email(), "pin", STAFF_PIN)),
                 Map.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

@@ -58,7 +58,11 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final Clock clock;
     private final com.nabd.hms.common.EventPublisher events;
 
-    SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events) {
+    private final com.nabd.hms.common.TenantScope tenantScope;
+
+    SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
+                 com.nabd.hms.common.TenantScope tenantScope) {
+        this.tenantScope = tenantScope;
         this.events = events;
         this.clock = clock;
         this.repo = repo;
@@ -174,8 +178,7 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     @Transactional(readOnly = true)
     @Override
     public java.util.Optional<String> policyValue(UUID tenantId, String policyKey) {
-        tenantContext.set(tenantId);
-        return repo.findPolicyValue(tenantId, policyKey);
+        return tenantScope.run(tenantId, () -> repo.findPolicyValue(tenantId, policyKey)); // kernel API: joins and binds or checks (PLT-019)
     }
 
     @Transactional

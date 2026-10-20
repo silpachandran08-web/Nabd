@@ -24,6 +24,7 @@ class PhoneValidationApiTest extends ApiTestBase {
     private static final AtomicInteger SEQ = new AtomicInteger((int) (System.nanoTime() % 1_000_000));
 
     @Autowired AuditService audit;
+    @Autowired com.nabd.hms.common.TenantScope tenantScope;
 
     private static String staffMobile() {
         return "+91945" + String.format("%07d", SEQ.incrementAndGet() % 10_000_000);
@@ -123,7 +124,7 @@ class PhoneValidationApiTest extends ApiTestBase {
         SeededTenant other = tenant("KSA");
         UUID otherBad = insertRaw(other, "Other Bad", "zzz");
 
-        PhoneRenormaliseJob job = new PhoneRenormaliseJob(jdbc, new TransactionTemplate(txManager), tenantContext, audit);
+        PhoneRenormaliseJob job = new PhoneRenormaliseJob(jdbc, new TransactionTemplate(txManager), tenantScope, audit);
         assertThat(job.run(t.id(), "KSA")).containsExactly(1, 2);
         assertThat(job.run(t.id(), "KSA")).as("re-runnable, nothing left to do").containsExactly(0, 0);
         job.run(other.id(), "KSA");

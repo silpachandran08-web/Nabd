@@ -190,8 +190,7 @@ public class PatientService {
         } catch (IllegalArgumentException e) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "invalid-cursor", "Invalid cursor", "The pagination cursor is malformed.");
         }
-        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId);
-        tenantContext.set(tenantId);
+        UUID scopedToDoctorId = requireVerifiedAndResolveScope(tenantId, callerStaffId); // tenant bound at transaction start (PLT-019)
         List<com.nabd.hms.patient.dto.DataQualityPage.Item> rows = repo.findInvalidPhones(tenantId, scopedToDoctorId, after, limit + 1);
         boolean more = rows.size() > limit;
         List<com.nabd.hms.patient.dto.DataQualityPage.Item> page = more ? rows.subList(0, limit) : rows;

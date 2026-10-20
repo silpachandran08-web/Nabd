@@ -2,6 +2,7 @@ com.nabd.hms.auth.AuthService.enforceIpRateLimit
 com.nabd.hms.auth.AuthService.mfaRequiredByPolicy
 com.nabd.hms.auth.AuthService.mintTokenPair
 com.nabd.hms.auth.AuthService.privilegedByPolicy
+com.nabd.hms.auth.AuthService.tenantInactive
 com.nabd.hms.auth.BreakGlassOwnerNotifier$InApp.handle
 com.nabd.hms.auth.BreakGlassOwnerNotifier$WhatsApp.handle
 com.nabd.hms.auth.LoginGuard.enforceLockout
@@ -14,6 +15,7 @@ com.nabd.hms.billing.CheckoutService.requireOtcAvailable
 com.nabd.hms.billing.CheckoutService.standaloneInvoice
 com.nabd.hms.billing.CheckoutService.toInvoiceResponse
 com.nabd.hms.billing.DayCloseService.audit
+com.nabd.hms.billing.DayCloseService.currencyOf
 com.nabd.hms.billing.DayCloseService.requireTodayOpen
 com.nabd.hms.clinical.AllergyService.audit
 com.nabd.hms.clinical.NoteService.requireVisitDoctor
@@ -34,7 +36,6 @@ com.nabd.hms.common.OutboxDispatcher.poll
 com.nabd.hms.common.OutboxEventProcessor.markDone
 com.nabd.hms.common.OutboxEventProcessor.recordFailureBound
 com.nabd.hms.common.OutboxPurgeJob.purge
-com.nabd.hms.department.DepartmentService.listTemplates
 com.nabd.hms.messaging.WhatsAppSendHandler.claimForSend
 com.nabd.hms.messaging.WhatsAppSendHandler.handle
 com.nabd.hms.messaging.WhatsAppSendHandler.requeue
@@ -45,6 +46,7 @@ com.nabd.hms.messaging.WhatsAppWebhookController.receive
 com.nabd.hms.nursing.AdministrationService.toResponse
 com.nabd.hms.nursing.ProcedureService.toResponse
 com.nabd.hms.nursing.VaccineRecordService.toResponse
+com.nabd.hms.organization.department.DepartmentService.listTemplates
 com.nabd.hms.owner.OwnerService.afterFirstFactor
 com.nabd.hms.owner.OwnerService.enforceAccountLockout
 com.nabd.hms.owner.OwnerService.enforceIpRateLimit
@@ -126,3 +128,4 @@ com.nabd.hms.staff.RoleService.changed
 com.nabd.hms.staff.RoleService.requireNoPrivilegeEscalation
 com.nabd.hms.staff.StaffLicenceService.audit
 com.nabd.hms.staff.StaffService.auditRoleChange
+com.nabd.hms.staff.StaffService.revokeSessions
