@@ -65,6 +65,24 @@ Re-run step 1 (`bootstrap-roles.sql`) once as the owner login: it now also creat
 needs Postgres 16+). Then step 4 (migrate) and step 5 (the new variables above). Owners are forced to enrol MFA on the next
 login (PLT-038): tell them before the deploy.
 
+## After upgrading to Sprint 12 (S3) code
+
+Do these in order; each is one line of work.
+
+1. **Java 21 / Spring Boot 4.1.1 (PLT-032).** The image and CI use Java 21. Virtual threads are OFF by default (`APP_VIRTUAL_THREADS=false`);
+   turn them on only after the staging k6 run shows check-in p95 within +10 %. Rollback is the previous image (no schema change comes with the upgrade).
+2. **Valkey (OPS-020).** Set `VALKEY_URL` (TLS, `rediss://`). Without it the API falls back to the database for session liveness and tenant config
+   (slower, still correct). The Terraform change asks for `durability = "sync"`, which forces a **new** replication group: plan it as a replacement.
+3. **Relay worker (OPS-016).** Run the relay as its own process with `RELAY_DB_URL` (its own role); one active instance is enough, a second is safe.
+   Failed relay rows are re-driven with the audited `RelayRedriveCommand` (not by hand-editing rows).
+4. **Migrations.** Run the migrate job (step 4) before the API rolls out. Six unreleased migrations (V1510 to V1630) were edited before release:
+   if any database already applied an earlier version of them, Flyway will report a checksum mismatch; repair that database or rebuild it.
+5. **Patient phone numbers (ACC-028).** Existing numbers are normalised only after one run with `app.maintenance.phone-renormalise.enabled=true`;
+   unreadable ones appear on the "Numbers to fix" screen. Turn the flag off again afterwards.
+6. **Scheduled jobs (OPS-013).** Needs the `shedlock` table (created by the migrations). The "purge job failing 3 nights" alarm exists in Terraform but has no pager feed yet.
+7. **Front end (FEF-012).** The repository is a pnpm + Turborepo monorepo. The Vercel project's Root Directory must be `frontend/apps/staff-web`,
+   and the GitHub team `@nabd/frontend` must exist (CODEOWNERS for `packages/ui` and `packages/tokens`).
+
 ## Errors seen and what they mean
 
 | Error | Cause | Fix |
