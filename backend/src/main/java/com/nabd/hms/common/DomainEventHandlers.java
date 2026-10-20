@@ -11,7 +11,9 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * OPS-015: one log-only OutboxEventHandler bean per {@link DomainEventType}, so the dispatcher marks those rows done
- * instead of retrying 'no handler' forever. OPS-016's relay replaces this class (one handler per type, same map key).
+ * instead of retrying 'no handler' forever. OPS-016: kept on purpose for regions without Valkey (no stream exists, dev,
+ * most test contexts). With Valkey the dispatcher never claims domain rows (OutboxRepository, V1680) and only the
+ * Streams relay (shared.relay.OutboxRelay) finishes them, after a successful XADD, so these handlers never run there.
  */
 @Configuration
 class DomainEventHandlers {
