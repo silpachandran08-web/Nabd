@@ -1,13 +1,13 @@
-package com.nabd.hms.department;
+package com.nabd.hms.organization.department;
 
-import com.nabd.hms.department.dto.DepartmentResponse;
-import com.nabd.hms.department.dto.DepartmentWorkflowRequest;
-import com.nabd.hms.department.dto.DepartmentWorkflowResponse;
-import com.nabd.hms.department.dto.DepartmentWriteRequest;
-import com.nabd.hms.department.dto.FlowStepResponse;
-import com.nabd.hms.department.dto.TransferEdge;
-import com.nabd.hms.department.dto.TransferGraphRequest;
-import com.nabd.hms.department.dto.TransferTargetResponse;
+import com.nabd.hms.organization.department.dto.DepartmentResponse;
+import com.nabd.hms.organization.department.dto.DepartmentWorkflowRequest;
+import com.nabd.hms.organization.department.dto.DepartmentWorkflowResponse;
+import com.nabd.hms.organization.department.dto.DepartmentWriteRequest;
+import com.nabd.hms.organization.department.dto.FlowStepResponse;
+import com.nabd.hms.organization.department.dto.TransferEdge;
+import com.nabd.hms.organization.department.dto.TransferGraphRequest;
+import com.nabd.hms.organization.department.dto.TransferTargetResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -45,7 +46,10 @@ public class ScheduleService {
 
     private final ClinicClock clock;
 
-    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock) {
+    private final ActorDirectory actors;
+
+    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock, ActorDirectory actors) {
+        this.actors = actors;
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -122,7 +126,7 @@ public class ScheduleService {
     }
 
     private void auditHours(UUID tenantId, UUID callerStaffId, String action, UUID hoursId, Object before, Object after) {
-        QueueModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "doctor_working_hours", hoursId, before, after);
     }
@@ -235,7 +239,7 @@ public class ScheduleService {
     }
 
     private void auditDelay(UUID tenantId, UUID callerStaffId, String action, UUID delayId, Object before, Object after) {
-        QueueModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "doctor_delay", delayId, before, after);
     }

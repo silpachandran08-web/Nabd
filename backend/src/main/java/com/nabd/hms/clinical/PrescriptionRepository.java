@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
-import static com.nabd.hms.clinical.PrescriptionModels.ActorInfo;
 import static com.nabd.hms.clinical.PrescriptionModels.DrugSuggestionRow;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetItemRow;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetRow;
@@ -49,14 +48,6 @@ class PrescriptionRepository {
     Optional<String> findTenantRegion(UUID tenantId) {
         return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region"), tenantId)
                 .stream().findFirst();
-    }
-
-    /** NB-108: actor_name/actor_role snapshot for the audit row an allergy override writes. */
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     Optional<PrescriptionRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {

@@ -197,11 +197,6 @@ class QueueRepository {
         return count == null ? 0 : count;
     }
 
-    /** Name + role snapshot for the audit trail. */
-    java.util.Map<String, Object> actor(UUID tenantId, UUID staffId) {
-        return jdbc.queryForMap("SELECT s.name, COALESCE(r.name, 'Staff') AS role FROM staff s LEFT JOIN roles r ON r.id = s.role_id WHERE s.tenant_id = ? AND s.id = ?", tenantId, staffId);
-    }
-
     private RowMapper<QueueEntryRow> mapper() {
         return (rs, i) -> {
             String appointmentId = rs.getString("appointment_id");

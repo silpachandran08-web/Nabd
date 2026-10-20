@@ -1,19 +1,20 @@
-package com.nabd.hms.department;
+package com.nabd.hms.organization.department;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.TenantContext;
-import com.nabd.hms.department.dto.DepartmentResponse;
-import com.nabd.hms.department.dto.DepartmentWorkflowRequest;
-import com.nabd.hms.department.dto.DepartmentWorkflowResponse;
-import com.nabd.hms.department.dto.DepartmentWriteRequest;
-import com.nabd.hms.department.dto.FlowStepResponse;
-import com.nabd.hms.department.dto.TransferEdge;
-import com.nabd.hms.department.dto.TransferGraphRequest;
-import com.nabd.hms.department.dto.TransferTargetResponse;
-import com.nabd.hms.department.dto.WorkflowTemplateResponse;
+import com.nabd.hms.organization.api.OrganizationConfig;
+import com.nabd.hms.organization.department.dto.DepartmentResponse;
+import com.nabd.hms.organization.department.dto.DepartmentWorkflowRequest;
+import com.nabd.hms.organization.department.dto.DepartmentWorkflowResponse;
+import com.nabd.hms.organization.department.dto.DepartmentWriteRequest;
+import com.nabd.hms.organization.department.dto.FlowStepResponse;
+import com.nabd.hms.organization.department.dto.TransferEdge;
+import com.nabd.hms.organization.department.dto.TransferGraphRequest;
+import com.nabd.hms.organization.department.dto.TransferTargetResponse;
+import com.nabd.hms.organization.department.dto.WorkflowTemplateResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -27,13 +28,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.department.DepartmentModels.DepartmentRow;
-import static com.nabd.hms.department.DepartmentModels.TransferEdgeRow;
-import static com.nabd.hms.department.DepartmentModels.WorkflowSelectionRow;
-import static com.nabd.hms.department.DepartmentModels.WorkflowTemplateRow;
+import static com.nabd.hms.organization.department.DepartmentModels.DepartmentRow;
+import static com.nabd.hms.organization.department.DepartmentModels.TransferEdgeRow;
+import static com.nabd.hms.organization.department.DepartmentModels.WorkflowSelectionRow;
+import static com.nabd.hms.organization.department.DepartmentModels.WorkflowTemplateRow;
 
 @Service
-public class DepartmentService {
+public class DepartmentService implements OrganizationConfig {
 
     private static final Logger log = LoggerFactory.getLogger(DepartmentService.class);
 
@@ -205,6 +206,7 @@ public class DepartmentService {
      * unconfigured, the default vitals+consultation) expanded to their queue statuses in between.
      * Called by both QueueService (to compute legal transitions) and CheckoutService (to know what
      * status an interim billing stop should advance to). */
+    @Override
     @Transactional
     public List<String> resolveStatusSequence(UUID tenantId, UUID departmentId) {
         tenantContext.set(tenantId);

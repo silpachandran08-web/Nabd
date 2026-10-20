@@ -1,4 +1,4 @@
-package com.nabd.hms.department;
+package com.nabd.hms.organization.department;
 
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;

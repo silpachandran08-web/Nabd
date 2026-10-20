@@ -1,4 +1,4 @@
-package com.nabd.hms.department;
+package com.nabd.hms.organization.department;
 
 import java.util.UUID;
 

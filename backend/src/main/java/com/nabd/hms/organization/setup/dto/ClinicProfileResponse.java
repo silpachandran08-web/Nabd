@@ -1,4 +1,4 @@
-package com.nabd.hms.setup.dto;
+package com.nabd.hms.organization.setup.dto;
 
 import java.time.Instant;
 import java.util.List;

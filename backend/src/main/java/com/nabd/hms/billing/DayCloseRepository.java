@@ -161,14 +161,6 @@ class DayCloseRepository {
                 "WHERE tenant_id = ? AND id = ?", staffId, reason, tenantId, closeId);
     }
 
-    /** Actor snapshot for audit_log — same shape as PatientRepository.findActorInfo. */
-    Optional<String[]> actor(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new String[]{rs.getString("name"), rs.getString("role_name")}, tenantId, staffId)
-                .stream().findFirst();
-    }
-
     Optional<String> region(UUID tenantId) {
         return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
     }

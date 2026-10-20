@@ -1,4 +1,4 @@
-package com.nabd.hms.department;
+package com.nabd.hms.organization.department;
 
 import com.nabd.hms.staff.dto.StaffRosterEntry;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -9,10 +9,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.department.DepartmentModels.DepartmentRow;
-import static com.nabd.hms.department.DepartmentModels.TransferEdgeRow;
-import static com.nabd.hms.department.DepartmentModels.WorkflowSelectionRow;
-import static com.nabd.hms.department.DepartmentModels.WorkflowTemplateRow;
+import static com.nabd.hms.organization.department.DepartmentModels.DepartmentRow;
+import static com.nabd.hms.organization.department.DepartmentModels.TransferEdgeRow;
+import static com.nabd.hms.organization.department.DepartmentModels.WorkflowSelectionRow;
+import static com.nabd.hms.organization.department.DepartmentModels.WorkflowTemplateRow;
 
 @Repository
 class DepartmentRepository {

@@ -1,4 +1,4 @@
-package com.nabd.hms.setup.dto;
+package com.nabd.hms.organization.setup.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

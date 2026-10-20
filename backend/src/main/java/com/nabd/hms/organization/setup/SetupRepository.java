@@ -1,12 +1,12 @@
-package com.nabd.hms.setup;
+package com.nabd.hms.organization.setup;
 
 import com.nabd.hms.common.ClinicClock;
-import com.nabd.hms.setup.dto.ChargeHeadWriteRequest;
-import com.nabd.hms.setup.dto.ClinicHolidayWriteRequest;
-import com.nabd.hms.setup.dto.ClinicProfileWriteRequest;
-import com.nabd.hms.setup.dto.ConsentContactWriteRequest;
-import com.nabd.hms.setup.dto.LicenceWriteRequest;
-import com.nabd.hms.setup.dto.StaffShiftWriteRequest;
+import com.nabd.hms.organization.setup.dto.ChargeHeadWriteRequest;
+import com.nabd.hms.organization.setup.dto.ClinicHolidayWriteRequest;
+import com.nabd.hms.organization.setup.dto.ClinicProfileWriteRequest;
+import com.nabd.hms.organization.setup.dto.ConsentContactWriteRequest;
+import com.nabd.hms.organization.setup.dto.LicenceWriteRequest;
+import com.nabd.hms.organization.setup.dto.StaffShiftWriteRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -21,18 +21,18 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.setup.SetupModels.AttendanceRow;
-import static com.nabd.hms.setup.SetupModels.ChargeHeadRow;
-import static com.nabd.hms.setup.SetupModels.ConsentContactRow;
-import static com.nabd.hms.setup.SetupModels.ExportJobRow;
-import static com.nabd.hms.setup.SetupModels.HolidayRow;
-import static com.nabd.hms.setup.SetupModels.ImportJobRow;
-import static com.nabd.hms.setup.SetupModels.LicenceRow;
-import static com.nabd.hms.setup.SetupModels.PolicyRow;
-import static com.nabd.hms.setup.SetupModels.SetupProgressRow;
-import static com.nabd.hms.setup.SetupModels.StaffShiftRow;
-import static com.nabd.hms.setup.SetupModels.StaffSummaryRow;
-import static com.nabd.hms.setup.SetupModels.TenantProfileRow;
+import static com.nabd.hms.organization.setup.SetupModels.AttendanceRow;
+import static com.nabd.hms.organization.setup.SetupModels.ChargeHeadRow;
+import static com.nabd.hms.organization.setup.SetupModels.ConsentContactRow;
+import static com.nabd.hms.organization.setup.SetupModels.ExportJobRow;
+import static com.nabd.hms.organization.setup.SetupModels.HolidayRow;
+import static com.nabd.hms.organization.setup.SetupModels.ImportJobRow;
+import static com.nabd.hms.organization.setup.SetupModels.LicenceRow;
+import static com.nabd.hms.organization.setup.SetupModels.PolicyRow;
+import static com.nabd.hms.organization.setup.SetupModels.SetupProgressRow;
+import static com.nabd.hms.organization.setup.SetupModels.StaffShiftRow;
+import static com.nabd.hms.organization.setup.SetupModels.StaffSummaryRow;
+import static com.nabd.hms.organization.setup.SetupModels.TenantProfileRow;
 
 @Repository
 class SetupRepository {

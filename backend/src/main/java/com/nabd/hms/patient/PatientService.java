@@ -1,5 +1,6 @@
 package com.nabd.hms.patient;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.PhoneNumbers;
 import com.nabd.hms.patient.dto.PatientRegistryResponse;
 import com.nabd.hms.common.ClinicClock;
@@ -35,7 +36,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-import static com.nabd.hms.patient.PatientModels.ActorInfo;
 import static com.nabd.hms.patient.PatientModels.MatchCandidateRow;
 import static com.nabd.hms.patient.PatientModels.PatientRow;
 
@@ -54,8 +54,11 @@ public class PatientService {
 
     private final ClinicClock clock;
 
+    private final ActorDirectory actors;
+
     PatientService(PatientRepository repo, TenantContext tenantContext, FieldCipher cipher,
-                    StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock) {
+                    StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock, ActorDirectory actors) {
+        this.actors = actors;
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -417,7 +420,7 @@ public class PatientService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "patient", entityId, before, after);
     }

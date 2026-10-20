@@ -6,7 +6,8 @@
   arch.py freeze  JAVA_JSON        rewrite ci/architecture-baseline.json from the current violations
 JAVA_JSON is backend/target/architecture-violations.json written by ArchitectureRulesTest (Modulith + ArchUnit).
 SQL scans: tenant-predicate (SQL on a tenant_id/RLS table without a tenant_id predicate) and sql-ownership
-(writes only own tables, reads only own + allow-listed tables, docs/architecture/table-ownership.yaml).
+(writes only own tables, reads only own + allow-listed tables, docs/architecture/table-ownership.yaml; PLT-033: every
+table in public/identity/consent has exactly one owner, a module may span several packages via `packages:`).
 shortcut: regex over Java string literals, not a SQL parser; SQL built across methods or via StringBuilder is not
 followed. Upgrade to a JSqlParser-based scan in the ArchUnit test if false positives/negatives start to matter.
 """
@@ -107,23 +108,41 @@ def has_tenant_predicate(sql):
 
 # ---------- ownership yaml ----------
 def ownership(root="."):
+    """(owner, reads, owners, package_module): owners lists every module claiming a table (more than one is a violation);
+    package_module maps a Java package under com.nabd.hms to its module (`packages:`, default the module name)."""
     import yaml
     mods = (yaml.safe_load(open(f"{root}/{OWNERSHIP}")) or {}).get("modules") or {}
-    owner = {}
+    owner, owners, pkg = {}, collections.defaultdict(list), {}
     for mod, spec in mods.items():
-        for t in (spec or {}).get("owns") or []: owner[norm(t)] = mod
+        for t in (spec or {}).get("owns") or []: owner[norm(t)] = mod; owners[norm(t)].append(mod)
+        for p in (spec or {}).get("packages") or [mod]: pkg[p] = mod
     reads = {mod: {norm(t) for t in ((spec or {}).get("reads") or [])} for mod, spec in mods.items()}
-    return owner, reads
+    return owner, reads, owners, pkg
+
+
+MAPPED_SCHEMAS = ("public", "identity", "consent")  # PLT-033: every table here needs exactly one owner
+
+
+def map_gaps(tables, owners):
+    """PLT-033: tables in public/identity/consent with no owner or several owners in table-ownership.yaml."""
+    out = []
+    for t in sorted(tables):
+        if (t.split(".")[0] if "." in t else "public") not in MAPPED_SCHEMAS: continue
+        o = owners.get(t, [])
+        if len(o) != 1:
+            out.append(v("sql-ownership", o[0] if o else "app", OWNERSHIP, 0,
+                         f"table {t} " + (f"has {len(o)} owners in table-ownership.yaml: {', '.join(o)}" if o else "has no owner in table-ownership.yaml")))
+    return out
 
 
 def scan(root="."):
     tables, tenant = schema(root)
-    owner, reads = ownership(root)
-    out = []
+    owner, reads, owners, pkg = ownership(root)
+    out = map_gaps(tables, owners)
     for f in sorted(glob.glob(f"{root}/{SRC}/**/*.java", recursive=True)):
         rel = os.path.relpath(f, root)
         parts = os.path.relpath(f, f"{root}/{SRC}").split(os.sep)
-        mod = parts[0] if len(parts) > 1 else "app"
+        mod = pkg.get(parts[0], parts[0]) if len(parts) > 1 else "app"
         for line, sql in statements(Path(f).read_text(encoding="utf-8")):
             w, r = touched(sql, tables)
             tt = sorted((w | r) & tenant)

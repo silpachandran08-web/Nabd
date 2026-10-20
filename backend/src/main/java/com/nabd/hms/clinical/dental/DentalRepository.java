@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.clinical.dental.DentalModels.ActorInfo;
 import static com.nabd.hms.clinical.dental.DentalModels.HistoryEntryRow;
 import static com.nabd.hms.clinical.dental.DentalModels.ToothRow;
 
@@ -74,14 +73,6 @@ class DentalRepository {
     int deleteSupernumerary(UUID tenantId, UUID patientId, UUID id) {
         return jdbc.update("DELETE FROM dental_chart_entries WHERE tenant_id = ? AND patient_id = ? AND id = ? " +
                 "AND is_supernumerary", tenantId, patientId, id);
-    }
-
-    /** NB-127: actor_name/actor_role snapshot for the audit row a chart write makes. */
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     /** CLN-006 (MF-52): one append-only row per chart change, written in the same transaction as the change. */

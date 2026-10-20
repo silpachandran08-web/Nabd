@@ -147,13 +147,6 @@ class NursingRepository {
                 (rs, i) -> mapVaccine(rs), scope.tenantId(), java.sql.Timestamp.from(from), java.sql.Timestamp.from(to));
     }
 
-    Optional<NursingModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new NursingModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
-
     // ── NB-146: procedure orders ─────────────────────────────────────────────
 
     record ChargeSnapshot(String code, String name, BigDecimal baseAmount, BigDecimal taxRatePercent) {

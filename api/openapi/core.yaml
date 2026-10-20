@@ -3471,7 +3471,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/departments:
     get:
@@ -3504,7 +3504,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:view
     post:
       operationId: DepartmentController_create
@@ -3540,7 +3540,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:create
   /v1/departments/transfers:
     get:
@@ -3573,7 +3573,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:view
     post:
       operationId: DepartmentController_replaceTransfers
@@ -3611,7 +3611,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:edit
   /v1/departments/{id}:
     delete:
@@ -3645,7 +3645,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:delete
     patch:
       operationId: DepartmentController_update
@@ -3688,7 +3688,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:edit
   /v1/departments/{id}/flow:
     get:
@@ -3728,7 +3728,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: queue:view
   /v1/departments/{id}/transfer-targets:
     get:
@@ -3768,7 +3768,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: queue:view
   /v1/departments/{id}/workflow:
     get:
@@ -3806,7 +3806,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:view
     post:
       operationId: DepartmentController_replaceWorkflow
@@ -3849,7 +3849,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:edit
   /v1/doctors/{id}/availability:
     get:
@@ -9243,7 +9243,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addCharge
@@ -9279,7 +9279,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/charges/{id}:
     patch:
@@ -9323,7 +9323,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/checklist:
     get:
@@ -9356,7 +9356,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/checklist/{step}/complete:
     post:
@@ -9389,7 +9389,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/checklist/{step}/skip:
     post:
@@ -9422,7 +9422,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/consent-contact:
     get:
@@ -9453,7 +9453,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     patch:
       operationId: SetupController_updateConsentContact
@@ -9489,7 +9489,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/export-jobs:
     get:
@@ -9522,7 +9522,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_createExportJob
@@ -9558,7 +9558,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/holidays:
     get:
@@ -9591,7 +9591,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addHoliday
@@ -9627,7 +9627,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/holidays/{id}:
     delete:
@@ -9661,7 +9661,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/import-jobs:
     get:
@@ -9694,7 +9694,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_createImportJob
@@ -9730,7 +9730,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/licences:
     get:
@@ -9763,7 +9763,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addLicence
@@ -9799,7 +9799,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/licences/{id}:
     patch:
@@ -9843,7 +9843,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/payroll-export:
     get:
@@ -9882,7 +9882,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/policies:
     get:
@@ -9915,7 +9915,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/policies/{key}:
     patch:
@@ -9958,7 +9958,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/profile:
     get:
@@ -9989,7 +9989,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     patch:
       operationId: SetupController_updateProfile
@@ -10025,7 +10025,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/shifts:
     get:
@@ -10058,7 +10058,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addShift
@@ -10094,7 +10094,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/staff:
     get:
@@ -10127,7 +10127,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/subscription:
     get:
@@ -10158,7 +10158,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/whatsapp-templates:
     get:

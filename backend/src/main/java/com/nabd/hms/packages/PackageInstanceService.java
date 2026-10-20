@@ -1,5 +1,6 @@
 package com.nabd.hms.packages;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.billing.CheckoutService;
 import com.nabd.hms.billing.dto.CheckoutRequest;
@@ -65,8 +66,11 @@ public class PackageInstanceService {
 
     private final ClinicClock clock;
 
+    private final ActorDirectory actors;
+
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
-                            AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher) {
+                            AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher, ActorDirectory actors) {
+        this.actors = actors;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
         this.repo = repo;
@@ -403,7 +407,7 @@ public class PackageInstanceService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        PackageModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "package_refund", entityId, before, after);
     }

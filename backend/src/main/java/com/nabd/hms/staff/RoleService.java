@@ -1,5 +1,6 @@
 package com.nabd.hms.staff;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,8 +53,11 @@ public class RoleService {
 
     private final Clock clock;
 
+    private final ActorDirectory actors;
+
     RoleService(RoleRepository repo, TenantContext tenantContext, ObjectMapper objectMapper, AuditService auditService,
-                DelegationGuard delegationGuard, EventPublisher eventPublisher, Clock clock) {
+                DelegationGuard delegationGuard, EventPublisher eventPublisher, Clock clock, ActorDirectory actors) {
+        this.actors = actors;
         this.clock = clock;
         this.delegationGuard = delegationGuard;
         this.eventPublisher = eventPublisher;
@@ -116,7 +120,7 @@ public class RoleService {
                         "This is a custom role; only preset roles can be reset."));
         repo.resetToPreset(tenantId, id, writeGrantsJson(preset.grants()), RolePresets.VERSION);
         RoleRow after = repo.findById(tenantId, id).orElseThrow();
-        RoleRepository.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null, "role.reset_to_preset", "role", id,
                 Map.of("presetVersion", String.valueOf(current.presetVersion()), "grants", readGrants(current.grantsJson())),
                 Map.of("presetVersion", String.valueOf(after.presetVersion()), "grants", readGrants(after.grantsJson())));
@@ -159,7 +163,7 @@ public class RoleService {
                     "A delegation can't run longer than 30 days — create a new one if the cover extends past that.");
         }
         // unknown id (FK would 500) or another tenant's staff (FK would pass) -> 404
-        repo.findActorInfo(tenantId, req.staffId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such staff member."));
+        actors.findActor(tenantId, req.staffId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such staff member."));
         delegationGuard.check(tenantId, callerStaffId, req.staffId(), delegatedRole, stepUpToken);
 
         UUID id = repo.insertDelegation(tenantId, req.staffId(), req.delegatedRoleId(), callerStaffId, req.reason(), req.expiresAt());
@@ -202,7 +206,7 @@ public class RoleService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        RoleRepository.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "role_delegation", entityId, before, after);
     }

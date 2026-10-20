@@ -1,4 +1,4 @@
-package com.nabd.hms.setup;
+package com.nabd.hms.organization.setup;
 
 import java.math.BigDecimal;
 import java.time.Instant;

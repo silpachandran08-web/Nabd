@@ -1,5 +1,6 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.billing.dto.DayCloseRequest;
 import com.nabd.hms.billing.dto.DayCloseSummaryResponse;
 import com.nabd.hms.billing.dto.DayReopenRequest;
@@ -32,7 +33,10 @@ public class DayCloseService {
     private final ClinicClock clock;
     private final AuditService auditService;
 
-    DayCloseService(DayCloseRepository repo, TenantContext tenantContext, ClinicClock clock, AuditService auditService) {
+    private final ActorDirectory actors;
+
+    DayCloseService(DayCloseRepository repo, TenantContext tenantContext, ClinicClock clock, AuditService auditService, ActorDirectory actors) {
+        this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.clock = clock;
@@ -114,7 +118,7 @@ public class DayCloseService {
     }
 
     private void audit(UUID tenantId, UUID staffId, String action, UUID entityId, Object after) {
-        String[] actor = repo.actor(tenantId, staffId).orElse(new String[]{"Unknown", "Unknown"});
+        String[] actor = actors.findActor(tenantId, staffId).map(a -> new String[]{a.name(), a.role()}).orElse(new String[]{"Unknown", "Unknown"});
         auditService.record(tenantId, "staff", staffId, actor[0], actor[1], null, action, "day_close", entityId, null, after);
     }
 }

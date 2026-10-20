@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,7 +25,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.nabd.hms.clinical.AllergyModels.ActorInfo;
 import static com.nabd.hms.clinical.AllergyModels.AllergyEventRow;
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
 import static com.nabd.hms.clinical.AllergyModels.AssessmentRow;
@@ -47,7 +47,10 @@ public class AllergyService {
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
 
-    AllergyService(AllergyRepository repo, TenantContext tenantContext, AuditService auditService, ObjectMapper objectMapper) {
+    private final ActorDirectory actors;
+
+    AllergyService(AllergyRepository repo, TenantContext tenantContext, AuditService auditService, ObjectMapper objectMapper, ActorDirectory actors) {
+        this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.auditService = auditService;
@@ -214,7 +217,7 @@ public class AllergyService {
     }
 
     private void audit(UUID tenantId, UUID staffId, String ip, String action, UUID entityId, Object before, Object after) {
-        ActorInfo actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, action, "patient_allergy", entityId, before, after);
     }
 

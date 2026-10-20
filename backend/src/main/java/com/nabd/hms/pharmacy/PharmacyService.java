@@ -1,5 +1,6 @@
 package com.nabd.hms.pharmacy;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.TenantContext;
@@ -20,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.nabd.hms.pharmacy.PharmacyModels.ActorInfo;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingQueueRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
 
@@ -37,7 +37,10 @@ public class PharmacyService {
     private final TenantContext tenantContext;
     private final AuditService auditService;
 
-    PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService) {
+    private final ActorDirectory actors;
+
+    PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService, ActorDirectory actors) {
+        this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.auditService = auditService;
@@ -69,7 +72,7 @@ public class PharmacyService {
                     "Give a reason (3-200 characters) for changing the pharmacy mode.");
         }
         repo.upsertMode(tenantId, req.mode());
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("mode", req.mode());
         after.put("reason", reason);
@@ -184,7 +187,7 @@ public class PharmacyService {
     }
 
     private void audit(UUID tenantId, UUID staffId, String ip, String action, UUID itemId, Object before, Object after) {
-        ActorInfo actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, action, "pharmacy_item", itemId, before, after);
     }
 

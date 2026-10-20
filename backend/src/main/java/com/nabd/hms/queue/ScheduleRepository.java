@@ -105,13 +105,6 @@ class ScheduleRepository {
         jdbc.update("DELETE FROM doctor_working_hours WHERE doctor_id = ? AND id = ?", doctorId, hoursId);
     }
 
-    Optional<QueueModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, COALESCE(r.name, 'Staff') AS role_name FROM staff s " +
-                        "LEFT JOIN roles r ON r.id = s.role_id WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new QueueModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
-
     List<DoctorLeaveRow> listLeave(UUID doctorId) {
         return jdbc.query(
                 "SELECT id, doctor_id, date_from, date_to, reason FROM doctor_leave WHERE doctor_id = ? ORDER BY date_from",

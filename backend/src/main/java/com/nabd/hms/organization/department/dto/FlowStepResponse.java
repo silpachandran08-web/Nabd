@@ -1,4 +1,4 @@
-package com.nabd.hms.department.dto;
+package com.nabd.hms.organization.department.dto;
 
 /** One entry of a department's *resolved* pipeline, in order — the expansion of its workflow
  * template plus toggles (see DepartmentService.resolveStatusSequence). Read-only: there is no

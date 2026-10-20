@@ -1,4 +1,4 @@
-package com.nabd.hms.setup;
+package com.nabd.hms.organization.setup;
 
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;

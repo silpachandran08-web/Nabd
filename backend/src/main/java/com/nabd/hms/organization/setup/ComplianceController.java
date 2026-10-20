@@ -1,6 +1,6 @@
-package com.nabd.hms.setup;
+package com.nabd.hms.organization.setup;
 
-import com.nabd.hms.setup.dto.ComplianceHealthResponse;
+import com.nabd.hms.organization.setup.dto.ComplianceHealthResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;

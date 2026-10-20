@@ -21,7 +21,4 @@ final class AllergyModels {
 
     record AssessmentRow(UUID documentedBy, Instant documentedAt) {
     }
-
-    record ActorInfo(String name, String role) {
-    }
 }

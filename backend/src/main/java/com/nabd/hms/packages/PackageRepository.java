@@ -402,13 +402,6 @@ class PackageRepository {
         return "CN-" + String.format("%06d", seq);
     }
 
-    Optional<com.nabd.hms.packages.PackageModels.ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new com.nabd.hms.packages.PackageModels.ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
-
     /** FIN-004: compare-and-set on 'pending'; the caller already holds the instance row lock. */
     int approveRefund(UUID tenantId, UUID id, UUID approvedBy, String creditNoteNumber, BigDecimal recomputedAmount) {
         return jdbc.update("UPDATE package_refunds SET status = 'approved', approved_by = ?, credit_note_number = ?, " +

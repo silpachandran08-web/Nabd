@@ -1,4 +1,4 @@
-package com.nabd.hms.department.dto;
+package com.nabd.hms.organization.department.dto;
 
 import jakarta.validation.constraints.NotNull;
 

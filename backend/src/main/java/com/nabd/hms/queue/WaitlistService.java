@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -24,7 +25,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.nabd.hms.queue.QueueModels.ActorInfo;
 import static com.nabd.hms.queue.QueueModels.WaitlistEntryRow;
 import static com.nabd.hms.queue.QueueModels.WorkingHoursRow;
 
@@ -56,9 +56,12 @@ public class WaitlistService {
     private final ClinicClock clock;
     private final SlotValidator slotValidator;
 
+    private final ActorDirectory actors;
+
     WaitlistService(WaitlistRepository repo, AppointmentRepository appointmentRepo, ScheduleRepository scheduleRepo,
                      QueueRepository queueRepo, TenantContext tenantContext, AuditService auditService, ClinicClock clock,
-                     SlotValidator slotValidator) {
+                     SlotValidator slotValidator, ActorDirectory actors) {
+        this.actors = actors;
         this.slotValidator = slotValidator;
         this.clock = clock;
         this.repo = repo;
@@ -238,7 +241,7 @@ public class WaitlistService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "waitlist_entry", entityId, before, after);
     }
