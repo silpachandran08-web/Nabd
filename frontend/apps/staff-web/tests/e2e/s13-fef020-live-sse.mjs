@@ -74,7 +74,7 @@ try {
   // 1 two desks: a check-in on the core side reaches both within 2 s; the pill says Live
   await open(A); await open(B);
   check('1a desk A shows the first patient', (await rows(A.page)) === 1);
-  check('1b pill reads Live on both desks', await until(async () => /Live/.test(await pill(A.page)) && /Live/.test(await pill(B.page)), 4000) >= 0, await pill(A.page));
+  check('1b pill reads Live on both desks', await until(async () => /^\s*Live/.test(await pill(A.page)) && /^\s*Live/.test(await pill(B.page)), 4000) >= 0, await pill(A.page));
   check('1c one EventSource per browser (2 browsers -> 2 streams)', core.streams.size === 2, `streams=${core.streams.size}`);
   check('1d the BFF carried the cookie token, the browser cookie never reached Core', core.opened.every((o) => !o.cookie));
   const lat = [];
@@ -104,7 +104,7 @@ try {
 
   // 3 chaos: Core refuses the stream, A stays on screen; Reconnecting after 5 s; 60 s fallback poll; resume with Last-Event-ID
   const pageA = await A.context.newPage(); await pageA.goto(APP + '/arrivals'); await pageA.waitForLoadState('networkidle').catch(() => {});
-  await until(async () => /Live/.test(await pill(pageA)), 4000);
+  await until(async () => /^\s*Live/.test(await pill(pageA)), 4000);
   core.refuse = true; killStreams();
   const t0 = Date.now();
   check('3a pill is NOT Reconnecting yet at ~3 s', (await sleep(3000), !/Reconnecting/.test(await pill(pageA))));
@@ -118,7 +118,7 @@ try {
   const opened1 = core.opened.length;
   core.refuse = false;
   checkIn(13);
-  const back = await until(async () => /Live/.test(await pill(pageA)), 45_000);
+  const back = await until(async () => /^\s*Live/.test(await pill(pageA)), 45_000);
   check('3d the stream resumed and the pill is Live again', back >= 0, `${back} ms`);
   check('3e the resume sent Last-Event-ID (no gap)', core.opened.slice(opened1).some((o) => o.last !== null), JSON.stringify(core.opened.slice(opened1).map((o) => o.last)));
   check('3f the event missed during the outage arrived on resume', (await until(async () => (await rows(pageA)) === 13, 3000)) >= 0, `lastSeen=${lastSeen}`);
@@ -131,9 +131,9 @@ try {
 
   // 5 phone width
   const P = await desk('r@qa.test', { width: 390, height: 800 });
-  await open(P); await until(async () => /Live/.test(await pill(P.page)), 4000);
+  await open(P); await until(async () => /^\s*Live/.test(await pill(P.page)), 4000);
   check('5a 390px: no horizontal scroll with the Live pill', await P.page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
-  check('5b 390px: pill visible', /Live/.test(await pill(P.page)));
+  check('5b 390px: pill visible', /^\s*Live/.test(await pill(P.page)));
   check('5c zero console errors (phone)', clean(P.log).length === 0, clean(P.log).slice(0, 2).join(' | '));
   await P.browser.close();
   check('6 zero console/page errors on the desks', clean(A.log).length === 0 && clean(B.log).length === 0, [...clean(A.log), ...clean(B.log)].slice(0, 3).join(' | '));
