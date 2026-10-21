@@ -11114,6 +11114,96 @@ paths:
       tags:
       - staff
       x-required-permission: staff:delete
+  /v1/support-access/requests:
+    get:
+      operationId: SupportAccessOwnerController_list
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/OwnerRequestResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: compliance:view
+  /v1/support-access/requests/{id}/decision:
+    post:
+      operationId: SupportAccessOwnerController_decide
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DecisionResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: compliance:approve
   /v1/support/tickets:
     post:
       operationId: TicketController_raise
@@ -11129,6 +11219,37 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/TicketResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: authenticated
+  /v1/support/tickets/redaction-preview:
+    post:
+      operationId: TicketController_preview
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RaiseTicketRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RedactionPreview"
           description: OK
         "401":
           content:
@@ -12529,6 +12650,26 @@ components:
           minLength: 0
       required:
       - reason
+    DecisionRequest:
+      type: object
+      properties:
+        decision:
+          type: string
+          pattern: approve|decline
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - decision
+    DecisionResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        windowEndsAt:
+          type: string
+          format: date-time
     DelayAnnounceRequest:
       type: object
       properties:
@@ -13247,6 +13388,8 @@ components:
       properties:
         active:
           type: boolean
+        declineNote:
+          type: string
         expiresAt:
           type: string
           format: date-time
@@ -13256,6 +13399,9 @@ components:
         id:
           type: string
           format: uuid
+        minutes:
+          type: integer
+          format: int32
         operatorId:
           type: string
           format: uuid
@@ -13270,12 +13416,20 @@ components:
           format: date-time
         scope:
           type: string
+        status:
+          type: string
         tenantId:
           type: string
           format: uuid
         ticketId:
           type: string
           format: uuid
+        windowEndsAt:
+          type: string
+          format: date-time
+        windowStartedAt:
+          type: string
+          format: date-time
     GuardianConsent:
       type: object
       properties:
@@ -14076,6 +14230,13 @@ components:
       required:
       - challengeToken
       - code
+    OwnerRequestResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupportAccessRequestItem"
     OwnerWorkspaceTokenResponse:
       type: object
       properties:
@@ -14413,21 +14574,14 @@ components:
     PatientViewResponse:
       type: object
       properties:
-        dob:
+        birthYear:
+          type: integer
+          format: int32
+        initials:
           type: string
-          format: date
-        gender:
+        maskedPhone:
           type: string
-        id:
-          type: string
-          format: uuid
         mrn:
-          type: string
-        name:
-          type: string
-        phone:
-          type: string
-        status:
           type: string
     PatientWriteRequest:
       type: object
@@ -15322,6 +15476,16 @@ components:
         remainingCodes:
           type: integer
           format: int32
+    RedactionPreview:
+      type: object
+      properties:
+        description:
+          type: string
+        redactionCount:
+          type: integer
+          format: int32
+        subject:
+          type: string
     Redemption:
       type: object
       properties:
@@ -16148,6 +16312,37 @@ components:
         status:
           type: string
           pattern: healthy|decayed|filled|missing|crown|root_canal
+    SupportAccessRequestItem:
+      type: object
+      properties:
+        declineNote:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        minutes:
+          type: integer
+          format: int32
+        operatorName:
+          type: string
+        reason:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        scope:
+          type: string
+        status:
+          type: string
+        windowEndsAt:
+          type: string
+          format: date-time
+        windowStartedAt:
+          type: string
+          format: date-time
     TaxBand:
       type: object
       properties:
@@ -16257,6 +16452,8 @@ components:
     TicketResponse:
       type: object
       properties:
+        bodyRedacted:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -16273,6 +16470,9 @@ components:
           type: string
         raisedByRole:
           type: string
+        redactionCount:
+          type: integer
+          format: int32
         resolvedAt:
           type: string
           format: date-time

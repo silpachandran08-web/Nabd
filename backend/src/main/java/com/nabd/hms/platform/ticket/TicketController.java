@@ -31,6 +31,12 @@ public class TicketController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ticket);
     }
 
+    /** PLT-057: the form calls this while the staff member types, to warn before submitting. Stores nothing. */
+    @PostMapping("/redaction-preview")
+    public TicketService.RedactionPreview preview(@Valid @RequestBody RaiseTicketRequest req) {
+        return service.preview(req);
+    }
+
     private UUID tenantId(Jwt jwt) {
         return UUID.fromString(jwt.getClaimAsString("tenantId"));
     }

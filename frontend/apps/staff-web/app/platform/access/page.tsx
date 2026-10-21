@@ -20,15 +20,19 @@ type Grant = {
   expiresAt: string;
   revokedAt: string | null;
   active: boolean;
+  // PLT-057: a grant is a request until the clinic owner approves it; the window starts at approval.
+  status: "requested" | "active" | "declined" | "expired" | "revoked";
+  windowEndsAt: string | null;
+  declineNote: string | null;
 };
 
 type TenantOption = { id: string; name: string; slug: string };
 // PLT-056: a grant names one of the clinic's support tickets (GET /v1/platform/support/tickets).
 type TicketOption = { id: string; tenantId: string; subject: string; status: string };
 
-function grantState(g: Grant): "active" | "expired" | "revoked" {
-  if (g.revokedAt) return "revoked";
-  return g.active ? "active" : "expired";
+function grantState(g: Grant): Grant["status"] {
+  if (g.status === "active" && !g.active) return "expired"; // window ran out before the sweep wrote it
+  return g.status;
 }
 
 export default function SupportAccessPage() {
@@ -141,7 +145,7 @@ export default function SupportAccessPage() {
         return;
       }
       setGrants((prev) =>
-        prev.map((g) => (g.id === id ? { ...g, active: false, revokedAt: new Date().toISOString() } : g))
+        prev.map((g) => (g.id === id ? { ...g, active: false, status: "revoked", revokedAt: new Date().toISOString() } : g))
       );
     } catch {
       setRevokeError("Couldn't reach the server. Check your connection and try again.");
@@ -154,7 +158,7 @@ export default function SupportAccessPage() {
     <main className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Support Access</h1>
-        <p className={styles.subtitle}>Consented, time-boxed and audited — one clinic, one ticket, one scope, at most 60 minutes, no clinical fields.</p>
+        <p className={styles.subtitle}>Starts only after the clinic owner approves — one clinic, one ticket, one scope, at most 60 minutes from approval, no clinical fields.</p>
       </div>
 
       {!forbidden && (
@@ -206,7 +210,7 @@ export default function SupportAccessPage() {
               />
             </div>
             <button className={styles.submit} type="submit" disabled={submitting}>
-              {submitting ? "Requesting…" : "Request grant"}
+              {submitting ? "Requesting…" : "Request access"}
             </button>
             {formError && <div className={styles.formError} role="alert">{formError}</div>}
           </form>
@@ -238,8 +242,8 @@ export default function SupportAccessPage() {
                 <tr>
                   <th>Operator</th>
                   <th>Reason</th>
-                  <th>Granted</th>
-                  <th>Expires</th>
+                  <th>Requested</th>
+                  <th>Open until</th>
                   <th>Status</th>
                   <th></th>
                 </tr>
@@ -252,16 +256,19 @@ export default function SupportAccessPage() {
                       <td>{g.operatorName} <span className={styles.muted}>({g.operatorRole})</span></td>
                       <td>{g.reason}</td>
                       <td>{new Date(g.grantedAt).toLocaleString()}</td>
-                      <td>{new Date(g.expiresAt).toLocaleString()}</td>
-                      <td><GrantStatusPill state={state} /></td>
+                      <td>{new Date(g.windowEndsAt ?? g.expiresAt).toLocaleString()}</td>
                       <td>
-                        {state === "active" && (
+                        <GrantStatusPill state={state} />
+                        {state === "declined" && g.declineNote && <div className={styles.muted}>{g.declineNote}</div>}
+                      </td>
+                      <td>
+                        {(state === "active" || state === "requested") && (
                           <button
                             className={styles.revokeBtn}
                             disabled={actingOn === g.id}
                             onClick={() => revoke(g.id)}
                           >
-                            {actingOn === g.id ? "…" : "Revoke"}
+                            {actingOn === g.id ? "…" : state === "requested" ? "Withdraw" : "Revoke"}
                           </button>
                         )}
                       </td>

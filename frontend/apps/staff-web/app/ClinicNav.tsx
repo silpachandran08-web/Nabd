@@ -70,6 +70,7 @@ const OWNER_ITEMS: OwnerItem[] = [
     active: (p, tab) => p.startsWith("/setup") && tab !== "licences" && tab !== "subscription" },
   { label: "Compliance & Audit", short: "Audit", icon: "shield", href: "/setup?tab=licences", permission: "setup:view",
     active: (p, tab) => p === "/setup" && tab === "licences" },
+  { label: "Support access", short: "Support", icon: "shield", href: "/compliance", permission: "compliance:view", active: (p) => p.startsWith("/compliance") },
   { label: "Plan & Modules", short: "Plan", icon: "list", href: "/setup?tab=subscription", permission: "setup:view",
     active: (p, tab) => p === "/setup" && tab === "subscription" },
 ];

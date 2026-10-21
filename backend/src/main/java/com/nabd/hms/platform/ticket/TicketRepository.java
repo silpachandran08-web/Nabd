@@ -34,21 +34,29 @@ class TicketRepository {
                 tenantId, staffId).stream().findFirst();
     }
 
+    /** PLT-057: this clinic's patient names (RLS, caller has bound the tenant) that occur in the given text. */
+    List<String> patientNamesIn(String text) {
+        return jdbc.queryForList("SELECT name FROM patients WHERE tenant_id = app_tenant_id() AND length(name) >= 4 AND strpos(lower(?), lower(name)) > 0",
+                String.class, text);
+    }
+
     void insert(Ticket t) {
         jdbc.update("""
                 INSERT INTO master.support_tickets
                     (id, tenant_id, source, raised_by_staff_id, raised_by_name, raised_by_email, raised_by_role,
-                     subject, description, priority, status, sla_due_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                     subject, description, priority, status, sla_due_at, body_redacted, redaction_count)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 t.id(), t.tenantId(), t.source(), t.raisedByStaffId(), t.raisedByName(), t.raisedByEmail(),
-                t.raisedByRole(), t.subject(), t.description(), t.priority(), t.status(), Timestamp.from(t.slaDueAt()));
+                t.raisedByRole(), t.subject(), t.description(), t.priority(), t.status(), Timestamp.from(t.slaDueAt()),
+                t.bodyRedacted(), t.redactionCount());
     }
 
     private static final String BASE_SELECT =
             "SELECT st.id, st.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug, st.source, " +
                     "       st.raised_by_staff_id, st.raised_by_name, st.raised_by_email, st.raised_by_role, " +
-                    "       st.subject, st.description, st.priority, st.status, st.sla_due_at, st.resolved_at, st.created_at " +
+                    "       st.subject, st.description, st.priority, st.status, st.sla_due_at, st.resolved_at, st.created_at, " +
+                    "       st.body_redacted, st.redaction_count " +
                     "FROM master.support_tickets st JOIN tenants t ON st.tenant_id = t.id ";
 
     /** Breached-open tickets first, then open/in_progress by soonest due, resolved/closed last. */
@@ -88,6 +96,8 @@ class TicketRepository {
                 rs.getString("status"),
                 rs.getTimestamp("sla_due_at").toInstant(),
                 rs.getTimestamp("resolved_at") == null ? null : rs.getTimestamp("resolved_at").toInstant(),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(),
+                rs.getBoolean("body_redacted"),
+                rs.getInt("redaction_count"));
     }
 }

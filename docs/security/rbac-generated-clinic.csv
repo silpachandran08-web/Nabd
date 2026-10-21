@@ -133,6 +133,7 @@ owner,GET /v1/staff/clinician-review,staff:view,allow
 owner,GET /v1/staff/roster,queue:view,allow
 owner,GET /v1/staff/{id},staff:view,allow
 owner,GET /v1/staff/{id}/clinical-licence,staff:view,allow
+owner,GET /v1/support-access/requests,compliance:view,allow
 owner,GET /v1/waitlist,queue:view,allow
 owner,PATCH /v1/clinical/allergies/{id},clinical:edit,deny-403
 owner,PATCH /v1/clinical/allergies/{id}/deactivate,clinical:edit,deny-403
@@ -254,6 +255,7 @@ owner,POST /v1/staff,staff:create,allow
 owner,POST /v1/staff/{id}/clinical-licence/override,staff:edit,allow
 owner,POST /v1/staff/{id}/mfa/reset,staff:edit,allow
 owner,POST /v1/staff/{id}/suspend,staff:delete,allow
+owner,POST /v1/support-access/requests/{id}/decision,compliance:approve,allow
 owner,POST /v1/waitlist,queue:create,allow
 owner,POST /v1/waitlist/{id}/accept,queue:edit,allow
 owner,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
@@ -392,6 +394,7 @@ owner_doctor,GET /v1/staff/clinician-review,staff:view,allow
 owner_doctor,GET /v1/staff/roster,queue:view,allow
 owner_doctor,GET /v1/staff/{id},staff:view,allow
 owner_doctor,GET /v1/staff/{id}/clinical-licence,staff:view,allow
+owner_doctor,GET /v1/support-access/requests,compliance:view,allow
 owner_doctor,GET /v1/waitlist,queue:view,allow
 owner_doctor,PATCH /v1/clinical/allergies/{id},clinical:edit,allow
 owner_doctor,PATCH /v1/clinical/allergies/{id}/deactivate,clinical:edit,allow
@@ -513,6 +516,7 @@ owner_doctor,POST /v1/staff,staff:create,allow
 owner_doctor,POST /v1/staff/{id}/clinical-licence/override,staff:edit,allow
 owner_doctor,POST /v1/staff/{id}/mfa/reset,staff:edit,allow
 owner_doctor,POST /v1/staff/{id}/suspend,staff:delete,allow
+owner_doctor,POST /v1/support-access/requests/{id}/decision,compliance:approve,allow
 owner_doctor,POST /v1/waitlist,queue:create,allow
 owner_doctor,POST /v1/waitlist/{id}/accept,queue:edit,allow
 owner_doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
@@ -651,6 +655,7 @@ doctor,GET /v1/staff/clinician-review,staff:view,deny-403
 doctor,GET /v1/staff/roster,queue:view,allow
 doctor,GET /v1/staff/{id},staff:view,deny-403
 doctor,GET /v1/staff/{id}/clinical-licence,staff:view,deny-403
+doctor,GET /v1/support-access/requests,compliance:view,deny-403
 doctor,GET /v1/waitlist,queue:view,allow
 doctor,PATCH /v1/clinical/allergies/{id},clinical:edit,allow
 doctor,PATCH /v1/clinical/allergies/{id}/deactivate,clinical:edit,allow
@@ -772,6 +777,7 @@ doctor,POST /v1/staff,staff:create,deny-403
 doctor,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 doctor,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-403
 doctor,POST /v1/staff/{id}/suspend,staff:delete,deny-403
+doctor,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-403
 doctor,POST /v1/waitlist,queue:create,deny-403
 doctor,POST /v1/waitlist/{id}/accept,queue:edit,allow
 doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
@@ -910,6 +916,7 @@ nurse,GET /v1/staff/clinician-review,staff:view,deny-403
 nurse,GET /v1/staff/roster,queue:view,allow
 nurse,GET /v1/staff/{id},staff:view,deny-403
 nurse,GET /v1/staff/{id}/clinical-licence,staff:view,deny-403
+nurse,GET /v1/support-access/requests,compliance:view,deny-403
 nurse,GET /v1/waitlist,queue:view,allow
 nurse,PATCH /v1/clinical/allergies/{id},clinical:edit,allow
 nurse,PATCH /v1/clinical/allergies/{id}/deactivate,clinical:edit,allow
@@ -1031,6 +1038,7 @@ nurse,POST /v1/staff,staff:create,deny-403
 nurse,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 nurse,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-403
 nurse,POST /v1/staff/{id}/suspend,staff:delete,deny-403
+nurse,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-403
 nurse,POST /v1/waitlist,queue:create,deny-403
 nurse,POST /v1/waitlist/{id}/accept,queue:edit,allow
 nurse,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
@@ -1169,6 +1177,7 @@ receptionist,GET /v1/staff/clinician-review,staff:view,deny-403
 receptionist,GET /v1/staff/roster,queue:view,allow
 receptionist,GET /v1/staff/{id},staff:view,deny-403
 receptionist,GET /v1/staff/{id}/clinical-licence,staff:view,deny-403
+receptionist,GET /v1/support-access/requests,compliance:view,deny-403
 receptionist,GET /v1/waitlist,queue:view,allow
 receptionist,PATCH /v1/clinical/allergies/{id},clinical:edit,deny-403
 receptionist,PATCH /v1/clinical/allergies/{id}/deactivate,clinical:edit,deny-403
@@ -1290,6 +1299,7 @@ receptionist,POST /v1/staff,staff:create,deny-403
 receptionist,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 receptionist,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-403
 receptionist,POST /v1/staff/{id}/suspend,staff:delete,deny-403
+receptionist,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-403
 receptionist,POST /v1/waitlist,queue:create,allow
 receptionist,POST /v1/waitlist/{id}/accept,queue:edit,allow
 receptionist,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
@@ -1428,6 +1438,7 @@ frontdesk_vitals,GET /v1/staff/clinician-review,staff:view,deny-403
 frontdesk_vitals,GET /v1/staff/roster,queue:view,allow
 frontdesk_vitals,GET /v1/staff/{id},staff:view,deny-403
 frontdesk_vitals,GET /v1/staff/{id}/clinical-licence,staff:view,deny-403
+frontdesk_vitals,GET /v1/support-access/requests,compliance:view,deny-403
 frontdesk_vitals,GET /v1/waitlist,queue:view,allow
 frontdesk_vitals,PATCH /v1/clinical/allergies/{id},clinical:edit,deny-403
 frontdesk_vitals,PATCH /v1/clinical/allergies/{id}/deactivate,clinical:edit,deny-403
@@ -1549,6 +1560,7 @@ frontdesk_vitals,POST /v1/staff,staff:create,deny-403
 frontdesk_vitals,POST /v1/staff/{id}/clinical-licence/override,staff:edit,deny-403
 frontdesk_vitals,POST /v1/staff/{id}/mfa/reset,staff:edit,deny-403
 frontdesk_vitals,POST /v1/staff/{id}/suspend,staff:delete,deny-403
+frontdesk_vitals,POST /v1/support-access/requests/{id}/decision,compliance:approve,deny-403
 frontdesk_vitals,POST /v1/waitlist,queue:create,allow
 frontdesk_vitals,POST /v1/waitlist/{id}/accept,queue:edit,allow
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403

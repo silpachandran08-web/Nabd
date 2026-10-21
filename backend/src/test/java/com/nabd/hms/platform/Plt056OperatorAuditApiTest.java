@@ -194,14 +194,16 @@ class Plt056OperatorAuditApiTest extends ApiTestBase {
         assertThat(full.get("scope")).isEqualTo("redacted_patient_view");
         assertThat(full.get("ticketId")).isEqualTo(ticket.toString());
         assertThat(windowMinutes(full)).isEqualTo(60);
-        Map<String, Object> defaulted = grant(token, body(tenant.id(), ticket, "config_only", null));
+        // PLT-057: one open request per operator and ticket, so each further request names another ticket
+        Map<String, Object> defaulted = grant(token, body(tenant.id(), seedTicket(tenant.id()), "config_only", null));
         assertThat(windowMinutes(defaulted)).isEqualTo(60);
-        Map<String, Object> shortOne = grant(token, body(tenant.id(), ticket, "config_only", 15));
+        Map<String, Object> shortOne = grant(token, body(tenant.id(), seedTicket(tenant.id()), "config_only", 15));
         assertThat(windowMinutes(shortOne)).isEqualTo(15);
 
         // the DB enforces the ceiling and the scope set too
-        assertThatThrownBy(() -> jdbc.update("UPDATE master.support_access_grants SET expires_at = granted_at + interval '61 minutes' WHERE id = ?::uuid",
-                full.get("id"))).hasStackTraceContaining("support_access_grants_max_60_min");
+        // PLT-057: the ceiling now guards the approved window (the 24 h request deadline sits on expires_at)
+        assertThatThrownBy(() -> jdbc.update("UPDATE master.support_access_grants SET window_started_at = now(), window_ends_at = now() + interval '61 minutes' WHERE id = ?::uuid",
+                full.get("id"))).hasStackTraceContaining("support_access_grants_window_max_60_min");
         assertThatThrownBy(() -> jdbc.update("UPDATE master.support_access_grants SET scope = 'all' WHERE id = ?::uuid",
                 full.get("id"))).hasStackTraceContaining("support_access_grants_scope_chk");
     }
@@ -305,8 +307,7 @@ class Plt056OperatorAuditApiTest extends ApiTestBase {
     }
 
     private long windowMinutes(Map<String, Object> grant) {
-        return Duration.between(java.time.Instant.parse((String) grant.get("grantedAt")),
-                java.time.Instant.parse((String) grant.get("expiresAt"))).toMinutes();
+        return ((Number) grant.get("minutes")).longValue(); // PLT-057: the requested window; it starts at the owner's approval
     }
 
     // master.support_tickets carries no RLS (operator plane), so the app connection can seed it directly.

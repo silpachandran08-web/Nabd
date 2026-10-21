@@ -67,6 +67,8 @@ export type DayCloseHistoryResponse = { items?: Array<Item>; nextCursor?: string
 export type DayCloseRequest = { countedCash: number; date?: string; note?: string; };
 export type DayCloseSummaryResponse = { cashTolerance?: number; close?: Close; currency?: string; date?: string; methods?: Array<Method>; outstanding?: Outstanding; pendingCheckouts?: number; splitPaymentBills?: number; taxBands?: Array<TaxBand>; taxLabel?: string; today?: boolean; totals?: Totals; unbilled?: Array<Unbilled>; voidedCount?: number; voidedTotal?: number; };
 export type DayReopenRequest = { date?: string; reason: string; };
+export type DecisionRequest = { decision: string; note?: string; };
+export type DecisionResponse = { status?: string; windowEndsAt?: string; };
 export type DelayAnnounceRequest = { delayMinutes: number; reason?: string; };
 export type DelegationRequest = { delegatedRoleId: string; expiresAt: string; reason: string; staffId: string; };
 export type DelegationResponse = { active?: boolean; delegatedRoleId?: string; delegatedRoleName?: string; expiresAt?: string; grantedBy?: string; id?: string; reason?: string; revokedAt?: string; revokedReason?: string; staffId?: string; startsAt?: string; };
@@ -107,7 +109,7 @@ export type FleetSummaryResponse = { byStatus?: Record<string, number>; live?: n
 export type FlowStepResponse = { stepType?: string; };
 export type FollowUpItem = { appointmentId?: string; cancelReason?: string; patientId?: string; patientMrn?: string; patientName?: string; startTime?: string; status?: string; };
 export type FollowUpPage = { data?: Array<FollowUpItem>; page?: PageMeta; };
-export type GrantResponse = { active?: boolean; expiresAt?: string; grantedAt?: string; id?: string; operatorId?: string; operatorName?: string; operatorRole?: string; reason?: string; revokedAt?: string; scope?: string; tenantId?: string; ticketId?: string; };
+export type GrantResponse = { active?: boolean; declineNote?: string; expiresAt?: string; grantedAt?: string; id?: string; minutes?: number; operatorId?: string; operatorName?: string; operatorRole?: string; reason?: string; revokedAt?: string; scope?: string; status?: string; tenantId?: string; ticketId?: string; windowEndsAt?: string; windowStartedAt?: string; };
 export type GuardianConsent = { channel?: string; confirmed?: boolean; };
 export type GuardianReviewDecisionRequest = { decision: string; };
 export type GuardianReviewResponse = { dob?: string; guardianId?: string; guardianName?: string; mrn?: string; patientId?: string; patientName?: string; };
@@ -157,6 +159,7 @@ export type OwnerMfaConfirmRequest = { code: string; setupToken: string; };
 export type OwnerMfaConfirmResponse = { expiresIn?: number; recoveryCodes?: Array<string>; workspaceToken?: string; };
 export type OwnerMfaEnrollRequest = { setupToken: string; };
 export type OwnerMfaVerifyRequest = { challengeToken: string; code: string; };
+export type OwnerRequestResponse = { items?: Array<SupportAccessRequestItem>; };
 export type OwnerWorkspaceTokenResponse = { expiresIn?: number; remainingRecoveryCodes?: number; workspaceToken?: string; };
 export type PackageItemInput = { itemType?: string; name: string; quantity?: number; taxRatePercent?: number; unitListPrice: number; };
 export type PackageItemResponse = { id?: string; itemType?: string; listValue?: number; name?: string; quantity?: number; taxRatePercent?: number; unitListPrice?: number; };
@@ -172,7 +175,7 @@ export type PatientPage = { data?: Array<PatientResponse>; page?: PageMeta; };
 export type PatientPatchRequest = { address?: string; dob?: string; gender?: string; guardianId?: string; name?: string; nationalId?: string; phone?: string; };
 export type PatientRegistryResponse = { counts?: Record<string, number>; hasMore?: boolean; matchedTotal?: number; page?: PageMeta; rows?: Array<Row>; total?: number; };
 export type PatientResponse = { dob?: string; gender?: string; id?: string; isMinor?: boolean; mrn?: string; name?: string; phone?: string; status?: string; };
-export type PatientViewResponse = { dob?: string; gender?: string; id?: string; mrn?: string; name?: string; phone?: string; status?: string; };
+export type PatientViewResponse = { birthYear?: number; initials?: string; maskedPhone?: string; mrn?: string; };
 export type PatientWriteRequest = { address?: string; confirmedNotDuplicate?: boolean; dob: string; gender: string; guardianConsent?: GuardianConsent; guardianId?: string; name: string; nationalId?: string; phone: string; };
 export type PaymentRequest = { amount: number; method: string; reference?: string; };
 export type PaymentResponse = { amount?: number; id?: string; idempotencyKey?: string; method?: string; recordedAt?: string; };
@@ -218,6 +221,7 @@ export type QueueStatusUpdateRequest = { expectedStatus?: string; status: string
 export type RaiseTicketRequest = { description: string; priority?: string; subject: string; };
 export type RecoveryVerifyRequest = { challengeToken: string; recoveryCode: string; };
 export type RecoveryVerifyResponse = { accessToken?: string; expiresIn?: number; refreshToken?: string; remainingCodes?: number; };
+export type RedactionPreview = { description?: string; redactionCount?: number; subject?: string; };
 export type Redemption = { sessionsRedeemed?: number; sessionsSold?: number; };
 export type RefreshRequest = { refreshToken: string; };
 export type RefundPreviewItem = { listValue?: number; name?: string; quantityConsumed?: number; };
@@ -270,13 +274,14 @@ export type SubscriptionUpsertRequest = { mrrCents: number; planId: string; rene
 export type SuggestedLine = { chargeCode?: string; name?: string; tier?: string; unitPrice?: number; };
 export type SummaryPrefillResponse = { body?: Record<string, string>; noteSigned?: boolean; prescriptionSigned?: boolean; };
 export type SupernumeraryToothRequest = { nearToothNumber?: number; note?: string; status?: string; };
+export type SupportAccessRequestItem = { declineNote?: string; expiresAt?: string; id?: string; minutes?: number; operatorName?: string; reason?: string; requestedAt?: string; scope?: string; status?: string; windowEndsAt?: string; windowStartedAt?: string; };
 export type TaxBand = { ratePercent?: number; tax?: number; taxable?: number; };
 export type TemplateRequest = { body?: string; category?: string; examples?: Array<string>; language?: string; name?: string; };
 export type TemplateResponse = { body?: string; category?: string; headerText?: string; id?: string; language?: string; name?: string; paramCount?: number; qualityRating?: string; rejectionReason?: string; status?: string; updatedAt?: string; };
 export type TenantLifecycleResponse = { events?: Array<LifecycleEventResponse>; status?: string; tenantId?: string; };
 export type TenantSummaryResponse = { brandName?: string; createdAt?: string; id?: string; name?: string; ownerEmail?: string; ownerName?: string; privilegedMfaEnrolled?: number; privilegedMfaPercent?: number; privilegedUsers?: number; region?: string; slug?: string; status?: string; };
 export type Tender = { amount?: number; count?: number; method?: string; };
-export type TicketResponse = { createdAt?: string; description?: string; id?: string; priority?: string; raisedByEmail?: string; raisedByName?: string; raisedByRole?: string; resolvedAt?: string; slaBreached?: boolean; slaDueAt?: string; source?: string; status?: string; subject?: string; tenantId?: string; tenantName?: string; tenantSlug?: string; };
+export type TicketResponse = { bodyRedacted?: boolean; createdAt?: string; description?: string; id?: string; priority?: string; raisedByEmail?: string; raisedByName?: string; raisedByRole?: string; redactionCount?: number; resolvedAt?: string; slaBreached?: boolean; slaDueAt?: string; source?: string; status?: string; subject?: string; tenantId?: string; tenantName?: string; tenantSlug?: string; };
 export type TokenPairResponse = { accessToken?: string; expiresIn?: number; refreshExpiresIn?: number; refreshToken?: string; };
 export type ToothHistoryEntryResponse = { action?: string; actorName?: string; actorRole?: string; after?: string; before?: string; occurredAt?: string; };
 export type ToothResponse = { id?: string; isSupernumerary?: boolean; note?: string; patientId?: string; status?: string; toothNumber?: number; updatedAt?: string; updatedBy?: string; };
@@ -604,7 +609,10 @@ export type Operations = {
   StaffLicenceController_override: { method: "post"; path: "/v1/staff/{id}/clinical-licence/override"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: OverrideRequest; response: LicenceResponse };
   StaffController_resetMfa: { method: "post"; path: "/v1/staff/{id}/mfa/reset"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: MfaResetRequest; response: void };
   StaffController_suspend: { method: "post"; path: "/v1/staff/{id}/suspend"; permission: "staff:delete"; pathParams: { id: string; }; query: never; body: never; response: void };
+  SupportAccessOwnerController_list: { method: "get"; path: "/v1/support-access/requests"; permission: "compliance:view"; pathParams: never; query: { status?: string; limit?: number; }; body: never; response: OwnerRequestResponse };
+  SupportAccessOwnerController_decide: { method: "post"; path: "/v1/support-access/requests/{id}/decision"; permission: "compliance:approve"; pathParams: { id: string; }; query: never; body: DecisionRequest; response: DecisionResponse };
   TicketController_raise: { method: "post"; path: "/v1/support/tickets"; permission: "authenticated"; pathParams: never; query: never; body: RaiseTicketRequest; response: TicketResponse };
+  TicketController_preview: { method: "post"; path: "/v1/support/tickets/redaction-preview"; permission: "authenticated"; pathParams: never; query: never; body: RaiseTicketRequest; response: RedactionPreview };
   WaitlistController_list: { method: "get"; path: "/v1/waitlist"; permission: "queue:view"; pathParams: never; query: { doctorId: string; }; body: never; response: Array<WaitlistEntryResponse> };
   WaitlistController_join: { method: "post"; path: "/v1/waitlist"; permission: "queue:create"; pathParams: never; query: never; body: WaitlistJoinRequest; response: WaitlistEntryResponse };
   WaitlistController_cancel: { method: "delete"; path: "/v1/waitlist/{id}"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
@@ -630,6 +638,8 @@ export type Permission =
   | "clinical:edit"
   | "clinical:view"
   | "clinics_fleet:view"
+  | "compliance:approve"
+  | "compliance:view"
   | "departments:create"
   | "departments:delete"
   | "departments:edit"
