@@ -1600,6 +1600,17 @@ paths:
           description: Invalid filter (`invalid-filter`), limit outside 1..200 (`validation`, code `INVALID_LIMIT`) or malformed cursor (`invalid-cursor`)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
+  /patients/batch:
+    get:
+      tags: [Patients]
+      summary: Patient 360 for up to 100 ids in one call (FEF-016); unknown or out-of-scope ids are absent
+      x-required-permission: patients:view
+      parameters:
+        - { name: ids, in: query, required: true, schema: { type: array, maxItems: 100, items: { type: string, format: uuid } }, style: form, explode: false }
+      responses:
+        "200": { description: "PatientDetail list", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PatientDetail" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
   /patients/{id}:
     get:
       tags: [Patients]

@@ -1,21 +1,23 @@
 "use client";
 
-import { decodeJwtPayload } from "../../lib/jwt";
-import { useCallback, useEffect, useState } from "react";
-import { can } from "../../lib/permissions";
-import { useLatestLoad } from "../../lib/useLatestLoad";
+import { useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AppointmentPage as GAppointmentPage, AppointmentResponse, PageMeta, DoctorDelayResponse, DueConditionResponse, WaitEstimateResponse } from "@nabd/api-client/generated";
 import type { PatientSummary as PatientDetail, QueueEntry } from "@nabd/domain";
-import { apiFetch, goLogin } from "../../lib/apiClient";
+import { can } from "../../lib/permissions";
+import { api, ApiError } from "../../lib/api";
+import { doctorQueueQuery, key } from "../../lib/query";
+import { loadPatients, selfStaffId, type Need } from "../../lib/doctorQueries";
 import { clinicTimeZoneReady, clinicToday } from "../../lib/clinicTime";
 import { useLiveRefresh } from "../../lib/live";
 
-
-// DTOs mirror the backend records exactly (queue/dto/*, clinical/dto/DueConditionResponse).
-export type Appointment = { id: string; patientId: string; doctorId: string; startTime: string; endTime: string; status: string; isFollowUp: boolean };
-export type AppointmentPage = { data: Appointment[]; page: { nextCursor: string | null; limit: number } };
-export type DoctorDelay = { id: string; doctorId: string; delayMinutes: number; reason: string | null; announcedAt: string; clearedAt: string | null; active: boolean };
-export type WaitEstimate = { estimatedMinutes: number; patientsAhead: number; avgVisitMinutes: number; basedOnHistory: boolean };
-export type DueCondition = { id: string; patientId: string; patientName: string; condition: string; reviewDueDate: string };
+// FEF-016: My Day on the shared query client. One query holds the composite day; the five reads run in parallel and
+// the patient names/flags come from one batched call (<= 6 requests whatever the queue length).
+export type Appointment = Need<AppointmentResponse, "id" | "patientId" | "doctorId" | "startTime" | "endTime" | "status" | "isFollowUp">;
+export type AppointmentPage = Omit<GAppointmentPage, "data" | "page"> & { data: Appointment[]; page: Need<Omit<PageMeta, "nextCursor">, "limit"> & { nextCursor: string | null } };
+export type DoctorDelay = Need<Omit<DoctorDelayResponse, "reason" | "clearedAt">, "id" | "doctorId" | "delayMinutes" | "announcedAt" | "active"> & { reason: string | null; clearedAt: string | null };
+export type WaitEstimate = Need<WaitEstimateResponse, "estimatedMinutes" | "patientsAhead" | "avgVisitMinutes" | "basedOnHistory">;
+export type DueCondition = Need<DueConditionResponse, "id" | "patientId" | "patientName" | "condition" | "reviewDueDate">;
 
 /** A secondary read: loaded, or honestly unavailable (error / 403) so the widget says so instead of a number. */
 export type Part<T> = { state: "ok"; data: T } | { state: "unavailable" };
@@ -31,94 +33,53 @@ export type MyDayData = {
   patientNames: Record<string, string>;
 };
 
-function selfIdFromToken(token: string): string {
-  return String(decodeJwtPayload<{ sub?: string }>(token)?.sub ?? "");
-}
-
+const NO_SERVER = "Couldn't reach the server. Check your connection and try again.";
 
 export function useMyDay() {
-  const [data, setData] = useState<MyDayData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const newSignal = useLatestLoad();
-  const load = useCallback(async () => {
-    const signal = newSignal();
-    setLoading(true);
-    setError(null);
-    const token = localStorage.getItem("nabd_access_token");
-    const selfId = token ? selfIdFromToken(token) : "";
-    if (!token || !selfId) {
-      goLogin();
-      return;
-    }
-    const get = async (path: string): Promise<Response | null> => {
-      try {
-        const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` }, signal });
-        if (res.status === 401) {
-          localStorage.removeItem("nabd_access_token");
-          goLogin();
-          return null;
-        }
-        return res;
-      } catch {
-        return null;
-      }
-    };
-    const part = async <T,>(path: string, pick: (j: unknown) => T): Promise<Part<T>> => {
-      const res = await get(path);
-      if (!res?.ok) return { state: "unavailable" };
-      try {
-        return { state: "ok", data: pick(await res.json()) };
-      } catch {
-        return { state: "unavailable" };
-      }
-    };
-    try {
-      const wantDue = can("clinical:view");
+  const qc = useQueryClient();
+  const selfId = selfStaffId();
+  const forceFresh = useRef(false); // set by Refresh: the queue is read again even if the sidebar badge just read it
+  const q = useQuery({
+    queryKey: key("my-day", { doctorId: selfId }),
+    enabled: !!selfId,
+    staleTime: 0,
+    queryFn: async ({ signal }): Promise<MyDayData> => {
+      const part = async <T,>(path: string, pick: (j: unknown) => T): Promise<Part<T>> => {
+        try { return { state: "ok", data: pick(await api.get<unknown>(path, { signal })) }; }
+        catch (e) { if (signal.aborted) throw e; return { state: "unavailable" }; }
+      };
+      const queueStale = forceFresh.current ? 0 : 2000;
+      forceFresh.current = false;
       const today = clinicToday(await clinicTimeZoneReady()); // the clinic's date, not the device's (FEF-011)
-      if (signal.aborted) return;
-      const [queueRes, appointments, delay, wait, due] = await Promise.all([
-        get(`/queue?doctorId=${selfId}`),
+      const [entries, appointments, delay, wait, due] = await Promise.all([
+        qc.fetchQuery({ ...doctorQueueQuery(selfId), staleTime: queueStale }) as Promise<QueueEntry[]>, // joins the sidebar badge's request
         part(`/appointments?doctorId=${selfId}&date=${today}&limit=100`, (j) => j as AppointmentPage),
         part(`/doctors/${selfId}/delay`, (j) => ((j as DoctorDelay[]).find((d) => d.active) ?? null)),
         part(`/queue/wait-estimate?doctorId=${selfId}`, (j) => j as WaitEstimate),
-        wantDue ? part(`/clinical/conditions/due`, (j) => j as DueCondition[]) : Promise.resolve(null),
+        can("clinical:view") ? part(`/clinical/conditions/due`, (j) => j as DueCondition[]) : Promise.resolve(null),
       ]);
-      if (signal.aborted) return;
-      if (!queueRes) { setError("Couldn't reach the server. Check your connection and try again."); return; }
-      if (!queueRes.ok) { setError("Couldn't load today's queue. Try again."); return; }
-      const entries: QueueEntry[] = await queueRes.json();
-      if (signal.aborted) return;
-
-      // Names/flags: one patient read per distinct patient across the queue and today's appointments.
+      // Names/flags: one batched read for every distinct patient across the queue and today's appointments.
       // Without patients:view (or on a failed read) the row shows its token instead of a name.
-      const patientIds = new Set<string>(entries.map((e) => e.patientId));
-      if (appointments.state === "ok") appointments.data.data.forEach((a) => patientIds.add(a.patientId));
-      const details = new Map<string, PatientDetail | null>();
-      if (can("patients:view")) {
-        await Promise.all([...patientIds].map(async (id) => {
-          const r = await get(`/patients/${id}`);
-          details.set(id, r?.ok ? ((await r.json()) as PatientDetail) : null);
-        }));
-      }
-      if (signal.aborted) return;
+      const ids = new Set<string>(entries.map((e) => e.patientId));
+      if (appointments.state === "ok") appointments.data.data.forEach((a) => ids.add(a.patientId));
+      const details = can("patients:view") ? await loadPatients(qc, ids, signal) : new Map<string, PatientDetail>();
       const patientNames: Record<string, string> = {};
-      details.forEach((p, id) => { if (p) patientNames[id] = p.name; });
-      setData({
+      details.forEach((p, id) => { patientNames[id] = p.name; });
+      return {
         selfId,
         rows: entries.map((e) => ({ ...e, patient: details.get(e.patientId) ?? null, patientName: details.get(e.patientId)?.name ?? null })),
         appointments, delay, wait, due, patientNames,
-      });
-    } catch {
-      if (signal.aborted) return;
-      setError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      if (!signal.aborted) setLoading(false);
-    }
-  }, [newSignal]);
+      };
+    },
+  });
 
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
-  useLiveRefresh(["queue", "roster", "doctor-delay", "wait-estimate"], load); // FEF-020; the Refresh button stays as a manual fallback
-  return { data, loading, error, reload: load };
+  // The newest Refresh wins (FEF-004): whatever is still in flight, including the queue read, is cancelled first.
+  const reload = useCallback(async () => {
+    forceFresh.current = true;
+    await Promise.all([qc.cancelQueries({ queryKey: key("my-day", { doctorId: selfId }) }), qc.cancelQueries({ queryKey: doctorQueueQuery(selfId).queryKey })]);
+    await q.refetch();
+  }, [qc, q, selfId]);
+  useLiveRefresh(["queue", "roster", "doctor-delay", "wait-estimate"], reload); // FEF-020; the Refresh button stays as a manual fallback
+  const error = q.error ? (q.error instanceof ApiError ? "Couldn't load today's queue. Try again." : NO_SERVER) : null;
+  return { data: q.data ?? null, loading: q.isPending, error, reload };
 }

@@ -493,6 +493,7 @@ export type Operations = {
   PackageController_deactivate: { method: "post"; path: "/v1/packages/{id}/deactivate"; permission: "packages:edit"; pathParams: { id: string; }; query: never; body: never; response: PackageResponse };
   PatientController_list: { method: "get"; path: "/v1/patients"; permission: "patients:view"; pathParams: never; query: { q?: string; limit?: number; cursor?: string; }; body: never; response: PatientPage };
   PatientController_register: { method: "post"; path: "/v1/patients"; permission: "patients:create"; pathParams: never; query: never; body: PatientWriteRequest; response: Record<string, unknown> };
+  PatientBatchController_batch: { method: "get"; path: "/v1/patients/batch"; permission: "patients:view"; pathParams: never; query: { ids: Array<string>; }; body: never; response: Array<PatientDetailResponse> };
   PatientController_dataQuality: { method: "get"; path: "/v1/patients/data-quality"; permission: "patients:edit"; pathParams: never; query: { issue: string; limit?: number; cursor?: string; }; body: never; response: DataQualityPage };
   PatientController_guardianReviewsDue: { method: "get"; path: "/v1/patients/guardian-reviews-due"; permission: "patients:view"; pathParams: never; query: never; body: never; response: Array<GuardianReviewResponse> };
   PatientController_undoMerge: { method: "post"; path: "/v1/patients/merges/{mergeId}/undo"; permission: "patients:delete"; pathParams: { mergeId: string; }; query: never; body: never; response: void };
