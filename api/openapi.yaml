@@ -1386,12 +1386,16 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Free-text match on name (any script), phone, MRN or token
+          description: >
+            OPS-009 index-assisted search: phone prefix (national number, e.g. 98123 for +91 98123 45678), MRN (exact, or
+            prefix from 3 characters) or name (any script; Arabic diacritics and alef/yaa/taa-marbuta variants fold).
+            Ranked phone, MRN, name; top-N, no cursor. limit is 1..50 when q is given.
           schema: { type: string }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
         "200": { $ref: "#/components/responses/PatientPage" }
+        "400": { description: "With q: code QUERY_TOO_SHORT (under 3 characters and not an exact MRN) or INVALID_LIMIT (limit outside 1..50)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
     post:
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Patients]
@@ -4443,6 +4447,7 @@ components:
         dob: { type: string, format: date }
         gender: { type: string, enum: [male, female, other] }
         status: { type: string, enum: [active, merged] }
+        matchedOn: { type: string, enum: [phone, mrn, name], description: "Search results only (OPS-009): which index branch found the patient" }
 
     PatientDetail:
       allOf:

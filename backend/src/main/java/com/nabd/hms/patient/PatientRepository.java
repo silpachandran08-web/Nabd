@@ -308,15 +308,47 @@ class PatientRepository {
                 all.toArray());
     }
 
-    /** Free-text search: phone/MRN prefix, name by substring OR trigram fuzzy match (typo-tolerant). */
-    List<PatientRow> search(UUID tenantId, String q, UUID scopedToDoctorId, int limit) {
-        return jdbc.query("SELECT " + COLUMNS + "FROM patients " +
-                        "WHERE tenant_id = ? AND status = 'active' " +
-                        "AND (phone ILIKE ? || '%' OR mrn ILIKE ? || '%' " +
-                        "     OR name ILIKE '%' || ? || '%' OR similarity(name, ?) > 0.25) " +
-                        CONSENT_GATE + SCOPE_GATE +
-                        "ORDER BY similarity(name, ?) DESC, created_at DESC LIMIT ?",
-                patientMapper(), tenantId, q, q, q, q, scopedToDoctorId, scopedToDoctorId, q, limit);
+    /** One OPS-009 search hit: the row, which branch found it (1 phone, 2 mrn, 3 name) and the name similarity. */
+    record SearchHit(PatientRow row, int branch, double sim) {
+    }
+
+    /**
+     * OPS-009: UNION ALL of up to three index-driven branches, each LIMIT k (phone_last10 / mrn prefix ranges on
+     * text_pattern_ops, name_search trigram), ranked after the filter. Prefix ranges use ~>=~ / ~<~ so they stay
+     * indexable under a generic prepared plan. Null key = branch absent. The same consent and row-scope gates apply.
+     */
+    List<SearchHit> search(UUID tenantId, String phoneKey, String mrnKey, boolean mrnPrefix, String name, UUID scopedToDoctorId, int k) {
+        SearchSql built = searchSql(tenantId, phoneKey, mrnKey, mrnPrefix, name, scopedToDoctorId, k);
+        if (built == null) return List.of();
+        return jdbc.query(built.sql(), (rs, i) -> new SearchHit(patientMapper().mapRow(rs, i), rs.getInt("branch"), rs.getDouble("sim")), built.args().toArray());
+    }
+
+    record SearchSql(String sql, List<Object> args) {
+    }
+
+    /** The statement search() runs (null when no branch applies); the plan test EXPLAINs exactly this text. */
+    SearchSql searchSql(UUID tenantId, String phoneKey, String mrnKey, boolean mrnPrefix, String name, UUID scopedToDoctorId, int k) {
+        List<String> parts = new java.util.ArrayList<>();
+        List<Object> args = new java.util.ArrayList<>();
+        String head = "(SELECT " + COLUMNS.trim() + ", ";
+        String tail = " FROM patients WHERE tenant_id = ? AND status = 'active' AND ";
+        String gates = " " + CONSENT_GATE + SCOPE_GATE + "LIMIT ?)";
+        if (phoneKey != null) {
+            parts.add(head + "1 AS branch, 0::float8 AS sim" + tail + "phone_last10 ~>=~ ? AND phone_last10 ~<~ ?" + gates);
+            args.addAll(java.util.Arrays.asList(tenantId, phoneKey, phoneKey + "~", scopedToDoctorId, scopedToDoctorId, k));
+        }
+        if (mrnKey != null) {
+            parts.add(head + "2 AS branch, 0::float8 AS sim" + tail + (mrnPrefix ? "mrn ~>=~ ? AND mrn ~<~ ?" : "mrn = ?") + gates);
+            args.add(tenantId);
+            args.add(mrnKey);
+            if (mrnPrefix) args.add(mrnKey + "~");
+            args.addAll(java.util.Arrays.asList(scopedToDoctorId, scopedToDoctorId, k));
+        }
+        if (name != null) {
+            parts.add(head + "3 AS branch, similarity(name_search, ?) AS sim" + tail + "name_search LIKE ?" + gates);
+            args.addAll(java.util.Arrays.asList(name, tenantId, "%" + name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%", scopedToDoctorId, scopedToDoctorId, k));
+        }
+        return parts.isEmpty() ? null : new SearchSql(String.join(" UNION ALL ", parts), args);
     }
 
     List<PatientRow> listPage(UUID tenantId, UUID scopedToDoctorId, int limit, Instant afterCreatedAt, UUID afterId) {

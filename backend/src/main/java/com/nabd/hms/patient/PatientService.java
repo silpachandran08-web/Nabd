@@ -158,10 +158,7 @@ public class PatientService {
         tenantContext.set(tenantId);
 
         if (q != null && !q.isBlank()) {
-            // search is relevance-ranked, not stably ordered, so it isn't cursor-paginated —
-            // capped top-N is the right shape for a clinic-sized patient search anyway
-            List<PatientRow> rows = repo.search(tenantId, q.trim(), scopedToDoctorId, limit);
-            return new PatientPage(rows.stream().map(this::toResponse).toList(), new PageMeta(null, limit));
+            return search(tenantId, q.trim(), scopedToDoctorId, limit);
         }
 
         Cursor after = cursor == null ? null : Cursor.decode(cursor);
@@ -175,6 +172,39 @@ public class PatientService {
                 : null;
 
         return new PatientPage(page.stream().map(this::toResponse).toList(), new PageMeta(nextCursor, limit));
+    }
+
+    private static final int NAME_MIN = 3; // a 1-2 char trigram pattern has no trigram: the GIN would scan the whole tenant
+    private static final int PHONE_MIN = 3;
+    private static final int BRANCH_K = 50;
+
+    /**
+     * OPS-009: phone / MRN / name search, each only when the query can use its index. A query too short for any branch
+     * still answers an exact MRN, else 400 QUERY_TOO_SHORT. Ranked phone, MRN, then name by similarity; no cursor
+     * (top-N, nextCursor null).
+     */
+    private PatientPage search(UUID tenantId, String q, UUID scopedToDoctorId, int limit) {
+        com.nabd.hms.common.PageRequest.limit(limit, 50);
+        boolean phoneLike = q.matches("[0-9+()\\-\\s]+");
+        String phoneKey = phoneLike ? SearchKeys.last10(q) : null;
+        if (phoneKey != null && phoneKey.length() < PHONE_MIN) phoneKey = null;
+        String mrn = q.matches("[A-Za-z0-9-]+") ? q.toUpperCase(java.util.Locale.ROOT) : null;
+        boolean mrnPrefix = mrn != null && mrn.length() >= PHONE_MIN;
+        String name = q.chars().anyMatch(Character::isLetter) ? SearchKeys.normaliseName(q) : null;
+        if (name != null && name.length() < NAME_MIN) name = null;
+        List<PatientRepository.SearchHit> hits = repo.search(tenantId, phoneKey, mrn, mrnPrefix, name, scopedToDoctorId, BRANCH_K);
+        if (hits.isEmpty() && phoneKey == null && name == null && !mrnPrefix) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation", "Validation failed", "q: too short",
+                    Map.of("errors", List.of(Map.of("field", "q", "message", "too short")), "code", "QUERY_TOO_SHORT"));
+        }
+        Map<UUID, PatientRepository.SearchHit> best = new java.util.LinkedHashMap<>();
+        hits.forEach(h -> best.merge(h.row().id(), h, (a, b) -> a.branch() <= b.branch() ? a : b));
+        List<PatientResponse> items = best.values().stream()
+                .sorted(java.util.Comparator.comparingInt(PatientRepository.SearchHit::branch).thenComparing(PatientRepository.SearchHit::sim, java.util.Comparator.reverseOrder()))
+                .limit(limit)
+                .map(h -> toResponse(h.row()).withMatchedOn(new String[]{null, "phone", "mrn", "name"}[h.branch()]))
+                .toList();
+        return new PatientPage(items, new PageMeta(null, limit));
     }
 
     /** ACC-028: active patients whose stored phone failed validation (phone_invalid), keyset-paged by id. Only issue=phone exists. */
