@@ -36,3 +36,8 @@ AS $$
 $$;
 
 SELECT nabd_adopt_definer_functions();
+
+-- The money triggers (V1921) read the currency of the tenant's region; the old CASE on tenants.region knew no 'SA', so a Saudi
+-- tenant had no currency and checkout failed. The currency now comes from the regions table.
+CREATE OR REPLACE FUNCTION tenant_currency(t uuid) RETURNS char(3) LANGUAGE sql STABLE AS
+$$ SELECT r.currency::char(3) FROM tenants x JOIN regions r ON r.code = x.region_code WHERE x.id = t $$;

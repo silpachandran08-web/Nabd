@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
  * an email, a national ID, an MRN or a patient's name. Over-redacting is the safe direction: every match, including a
  * long order number, becomes [redacted].
  *
- * <p>Per market: IN (mobile with or without +91, Aadhaar 12 digits, ABHA 14 digits, PAN) and KSA (mobile 05xxxxxxxx or
+ * <p>Per market: IN (mobile with or without +91, Aadhaar 12 digits, ABHA 14 digits, PAN) and Saudi Arabia (mobile 05xxxxxxxx or
  * +966, national ID / iqama 10 digits starting 1 or 2). They are all covered by one digit-run rule: 8 or more digits
  * in a row, allowing a single space, dash, dot or bracket between groups. Patient names come from the tenant's own
  * patient list (the caller passes the names found in the text).

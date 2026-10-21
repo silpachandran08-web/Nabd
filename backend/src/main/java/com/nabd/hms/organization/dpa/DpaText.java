@@ -5,17 +5,10 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
 /** The versioned DPA text of one market: the word for the clinic's role depends on the law (fiduciary in India, controller in the Gulf). */
 final class DpaText {
-
-    private static final Map<String, String> LAW = Map.of(
-            "IN", "Digital Personal Data Protection Act, 2023 (wording to be confirmed by counsel).",
-            "KSA", "Personal Data Protection Law, PDPL (wording to be confirmed by counsel).",
-            "AE", "Federal Law 2/2019 (wording to be confirmed by counsel).",
-            "QA", "Law 13/2016 (wording to be confirmed by counsel).");
 
     private DpaText() {
     }
@@ -32,18 +25,23 @@ final class DpaText {
         return Integer.parseInt(props().getProperty("reacceptDays"));
     }
 
-    /** India: data fiduciary / data processor. UAE, KSA, Qatar: controller / processor. */
+    /** Per-market wording lives in dpa.properties ({market}.law / .controller / .processor, else default.*). */
     static String controllerTerm(String market) {
-        return "IN".equals(market) ? "data fiduciary" : "controller";
+        return market("controller", market);
     }
 
     static String processorTerm(String market) {
-        return "IN".equals(market) ? "data processor" : "processor";
+        return market("processor", market);
+    }
+
+    private static String market(String key, String market) {
+        Properties p = props();
+        return p.getProperty(market + "." + key, p.getProperty("default." + key));
     }
 
     /** Plain-text lines: "# " heading, "## " subheading, "- " bullet, else a paragraph. */
     static List<String> lines(String market, String clinicName) {
-        String law = LAW.getOrDefault(market, LAW.get("IN"));
+        String law = market("law", market);
         List<String> out = new ArrayList<>();
         for (String raw : read("dpa-v1.txt").split("\n")) {
             if (raw.contains("{{SUBPROCESSORS}}")) {

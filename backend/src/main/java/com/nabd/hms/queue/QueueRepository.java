@@ -99,11 +99,12 @@ class QueueRepository {
     /** Server-derived, never client-supplied — a doctor's own assigned department, falling back to
      * the tenant's single default department if nobody has assigned one yet (so check-in never
      * breaks for a doctor no one has gotten around to configuring). */
-    UUID findCheckInDepartment(UUID tenantId, UUID doctorId) {
-        return jdbc.queryForObject(
+    /** Empty list = no such staff row (one round trip also answers "does the doctor exist"); the element may be null. */
+    List<UUID> findCheckInDepartment(UUID tenantId, UUID doctorId) {
+        return jdbc.query(
                 "SELECT COALESCE(s.department_id, (SELECT id FROM departments WHERE tenant_id = ? AND is_default)) " +
                         "FROM staff s WHERE s.tenant_id = ? AND s.id = ?",
-                UUID.class, tenantId, tenantId, doctorId);
+                (rs, i) -> rs.getObject(1, UUID.class), tenantId, tenantId, doctorId);
     }
 
     /** The owner-designed transfer graph, read narrowly here rather than injecting DepartmentRepository. */

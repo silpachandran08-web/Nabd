@@ -23,13 +23,13 @@ class DpaTextTest {
 
     @Test
     void gulfMarketsUseControllerAndProcessor() {
-        for (String m : List.of("KSA", "AE", "QA")) {
+        for (String m : List.of("SA", "AE", "QA")) {
             String t = text(m);
             assertThat(t).as(m).contains("(the controller)").contains("(the processor)").doesNotContain("fiduciary");
         }
         assertThat(text("AE")).contains("Federal Law 2/2019");
         assertThat(text("QA")).contains("Law 13/2016");
-        assertThat(text("KSA")).contains("PDPL");
+        assertThat(text("SA")).contains("PDPL");
     }
 
     @Test
