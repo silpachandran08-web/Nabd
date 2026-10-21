@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { arrivalsSource, walkInDialogSource } from "./arrivalsSource.mjs";
 import { createClient, intentKeys, ApiError, TimeoutError, uuidv7 } from "@nabd/api-client";
 
 const json = (status, body) => new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -159,8 +160,9 @@ test("migrated screens contain 0 fetch(, 0 API_BASE and 0 hand-written response 
     assert.doesNotMatch(src, /^\s*(export )?type (Invoice|Charge|Payment|LineItem|Problem|QueueEntry|CheckoutContext|OtcContext|FlowStep|PrescribedItem)\b/m, f);
     assert.doesNotMatch(src, /\.json\(\)/, f);
   }
-  const arr = readFileSync(new URL("../../app/arrivals/page.tsx", import.meta.url), "utf8");
+  const arr = arrivalsSource(); // FEF-028: page + components/arrivals
   assert.doesNotMatch(arr, /API_BASE/);
-  const walk = arr.slice(arr.indexOf("async function registerAndCheckIn"), arr.indexOf("function openVitalsModal"));
+  const wd = walkInDialogSource();
+  const walk = wd.slice(wd.indexOf("async function registerAndCheckIn"), wd.indexOf("function onField"));
   assert.doesNotMatch(walk, /fetch\(|\.json\(\)/i);
 });

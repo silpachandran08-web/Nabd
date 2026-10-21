@@ -2,6 +2,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { walkInDialogSource } from "./arrivalsSource.mjs";
 import { createClient, ApiError, TimeoutError, intentKeys, uuidv7 } from "@nabd/api-client";
 
 const UUID7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -243,9 +244,9 @@ for (const f of ["app/checkout/[queueEntryId]/page.tsx", "app/checkout/otc/page.
   });
 }
 test("AC3: the walk-in registration function in arrivals/page.tsx uses the client, not fetch", () => {
-  const s = strip(src("app/arrivals/page.tsx"));
+  const s = strip(walkInDialogSource()); // FEF-028: the function moved from page.tsx into the walk-in dialog
   const a = s.indexOf("async function registerAndCheckIn");
-  const b = s.indexOf("function openVitalsModal");
+  const b = s.indexOf("function onField");
   assert.ok(a > 0 && b > a);
   const body = s.slice(a, b);
   assert.doesNotMatch(body, /\bfetch\s*\(|authedFetch|API_BASE/);
