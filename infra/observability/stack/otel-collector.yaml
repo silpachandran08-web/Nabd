@@ -1,0 +1,70 @@
+# OPS-026: per-cell OTel Collector. Every endpoint is a private in-cell name (*.obs.cell.internal) or an env var the deploy sets to one;
+# scripts/ci/test_ops026_ops027.py fails if an exporter points anywhere else (egress test, OPS-057).
+# Defence in depth: apps redact first; here a denylist drops PHI-shaped attributes and counts every drop.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: "0.0.0.0:4317" }
+      http: { endpoint: "0.0.0.0:4318" }
+
+processors:
+  memory_limiter: { check_interval: 1s, limit_percentage: 75, spike_limit_percentage: 20 }
+  batch: {}
+  # Drop (not hash): nothing downstream needs these values. Applies to span, log record and resource attributes alike.
+  attributes/phi_denylist:
+    actions:
+      - { key: phone, action: delete }
+      - { key: name, action: delete }
+      - { key: dob, action: delete }
+      - { key: email, action: delete }
+      - { key: free_text, action: delete }
+  resource/phi_denylist:
+    attributes:
+      - { key: phone, action: delete }
+      - { key: name, action: delete }
+      - { key: dob, action: delete }
+      - { key: email, action: delete }
+      - { key: free_text, action: delete }
+  # Audit-relevant log streams only (the app tags them nabd.stream=audit); they also go to the object-locked bucket.
+  filter/audit_only:
+    error_mode: ignore
+    logs:
+      log_record:
+        - 'attributes["nabd.stream"] != "audit"'
+
+connectors:
+  forward/traces: {}
+  forward/logs: {}
+  # Counts telemetry that still carries a denylisted key BEFORE it is dropped -> nabd_telemetry_denylisted_*_total on /metrics.
+  count/denylisted:
+    spans:
+      nabd.telemetry.denylisted.spans:
+        description: Spans that arrived with a PHI-denylisted attribute (dropped by the Collector)
+        conditions:
+          - 'attributes["phone"] != nil or attributes["name"] != nil or attributes["dob"] != nil or attributes["email"] != nil or attributes["free_text"] != nil'
+    logs:
+      nabd.telemetry.denylisted.logs:
+        description: Log records that arrived with a PHI-denylisted attribute (dropped by the Collector)
+        conditions:
+          - 'attributes["phone"] != nil or attributes["name"] != nil or attributes["dob"] != nil or attributes["email"] != nil or attributes["free_text"] != nil'
+
+exporters:
+  otlp/tempo: { endpoint: "tempo.obs.cell.internal:4317", tls: { ca_file: /etc/obs/tls/ca.pem } }
+  otlphttp/loki: { endpoint: "https://loki.obs.cell.internal:3100/otlp", tls: { ca_file: /etc/obs/tls/ca.pem } }
+  prometheusremotewrite: { endpoint: "https://prometheus.obs.cell.internal:9090/api/v1/write", tls: { ca_file: /etc/obs/tls/ca.pem } }
+  # Object-locked audit-log archive; bucket and region come from the cell Terraform outputs (OPS-026 buckets), never a literal.
+  awss3/audit_logs:
+    s3uploader: { region: "${env:OBS_REGION}", s3_bucket: "${env:OBS_AUDIT_LOG_BUCKET}", s3_prefix: audit-logs, s3_partition_format: "year=%Y/month=%m/day=%d/hour=%H" }
+    marshaler: otlp_json
+
+service:
+  telemetry:
+    metrics: { level: detailed, readers: [{ pull: { exporter: { prometheus: { host: "0.0.0.0", port: 8888 } } } }] }
+  pipelines:
+    # W3C traceparent is propagated by the apps; the Collector never samples or rewrites trace ids, so BFF -> Core -> Comms stays one trace.
+    traces/in:      { receivers: [otlp], processors: [memory_limiter], exporters: [count/denylisted, forward/traces] }
+    traces/out:     { receivers: [forward/traces], processors: [attributes/phi_denylist, resource/phi_denylist, batch], exporters: [otlp/tempo] }
+    logs/in:        { receivers: [otlp], processors: [memory_limiter], exporters: [count/denylisted, forward/logs] }
+    logs/out:       { receivers: [forward/logs], processors: [attributes/phi_denylist, resource/phi_denylist, batch], exporters: [otlphttp/loki] }
+    logs/audit:     { receivers: [forward/logs], processors: [attributes/phi_denylist, resource/phi_denylist, filter/audit_only, batch], exporters: [awss3/audit_logs] }
+    metrics/in:     { receivers: [otlp, count/denylisted], processors: [memory_limiter, resource/phi_denylist, batch], exporters: [prometheusremotewrite] }

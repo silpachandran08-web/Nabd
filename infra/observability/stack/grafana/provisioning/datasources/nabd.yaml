@@ -1,0 +1,5 @@
+apiVersion: 1
+datasources:
+  - { name: Prometheus, uid: prometheus, type: prometheus, url: "https://prometheus.obs.cell.internal:9090", isDefault: true }
+  - { name: Loki, uid: loki, type: loki, url: "https://loki.obs.cell.internal:3100" }
+  - { name: Tempo, uid: tempo, type: tempo, url: "https://tempo.obs.cell.internal:3200", jsonData: { tracesToLogsV2: { datasourceUid: loki } } }

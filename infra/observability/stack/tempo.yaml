@@ -1,0 +1,8 @@
+# OPS-026: Tempo, traces kept 14 d in the cell's trace bucket.
+server: { http_listen_port: 3200 }
+distributor: { receivers: { otlp: { protocols: { grpc: { endpoint: "0.0.0.0:4317" } } } } }
+compactor: { compaction: { block_retention: 336h } }   # 14 d
+storage:
+  trace:
+    backend: s3
+    s3: { bucket: "${OBS_TRACE_BUCKET}", endpoint: "s3.${OBS_REGION}.amazonaws.com", region: "${OBS_REGION}", sse: { type: SSE-KMS, kms_key_id: "${OBS_KMS_KEY_ARN}" } }

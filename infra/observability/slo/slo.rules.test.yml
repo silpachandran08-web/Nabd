@@ -1,0 +1,96 @@
+# OPS-027: promtool test rules. Run: promtool test rules slo.rules.test.yml (from this directory).
+rule_files: [slo.rules.yml, alerts.rules.yml, ../event-consumers.rules.yml]
+evaluation_interval: 1m
+tests:
+  - name: availability fast burn pages (20% errors = 200x budget burn)
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200",uri="/v1/queue"}'
+        values: '0+80x120'
+      - series: 'http_server_requests_seconds_count{status="500",uri="/v1/queue"}'
+        values: '0+20x120'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: NabdSloFastBurn
+        exp_alerts:
+          - exp_labels: { slo: staff-api-availability, service: core, severity: page }
+            exp_annotations:
+              summary: "staff-api-availability: burning the 28 d error budget at more than 14.4x (1h and 5m windows)"
+              runbook: docs/runbooks/NabdSloFastBurn.md
+  - name: healthy traffic does not page
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200",uri="/v1/queue"}'
+        values: '0+100x120'
+    alert_rule_test:
+      - { eval_time: 90m, alertname: NabdSloFastBurn, exp_alerts: [] }
+      - { eval_time: 90m, alertname: NabdSloSlowBurn, exp_alerts: [] }
+  - name: 0.5% errors is below the 14.4x line (0.0144) but above 1x
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200",uri="/v1/queue"}'
+        values: '0+995x120'
+      - series: 'http_server_requests_seconds_count{status="500",uri="/v1/queue"}'
+        values: '0+5x120'
+    alert_rule_test:
+      - { eval_time: 90m, alertname: NabdSloFastBurn, exp_alerts: [] }
+  - name: check-in latency degrades (only 80% under 500 ms) pages the latency SLO
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200",uri="/v1/queue",method="POST"}'
+        values: '0+100x120'
+      - series: 'http_server_requests_seconds_bucket{status="200",uri="/v1/queue",method="POST",le="0.5"}'
+        values: '0+80x120'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: NabdSloFastBurn
+        exp_alerts:
+          - exp_labels: { slo: checkin-queue-latency, service: core, severity: page }
+            exp_annotations:
+              summary: "checkin-queue-latency: burning the 28 d error budget at more than 14.4x (1h and 5m windows)"
+              runbook: docs/runbooks/NabdSloFastBurn.md
+  - name: budget remaining and release freeze (budget 0.1%, 28 d window)
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="200",uri="/v1/queue"}'
+        values: '0+999x60'
+      - series: 'http_server_requests_seconds_count{status="500",uri="/v1/queue"}'
+        values: '0+1x60'   # exactly 0.1% errors = whole budget burnt
+    promql_expr_test:
+      - expr: 'slo:release_frozen{slo="staff-api-availability"}'
+        eval_time: 50m
+        exp_samples: [{ labels: 'slo:release_frozen{slo="staff-api-availability", service="core"}', value: 1 }]
+  - name: read-model lag over 60 s for 5 min raises a ticket
+    interval: 1m
+    input_series:
+      - series: 'consumer_lag_seconds{group="projector",stream="ev:in:queue"}'
+        values: '90x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: NabdConsumerLagging
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: NabdConsumerLagging
+        exp_alerts:
+          - exp_labels: { group: projector, stream: "ev:in:queue", severity: ticket }
+            exp_annotations:
+              summary: "Consumer group projector is more than 60 s behind on ev:in:queue"
+              runbook: docs/runbooks/NabdConsumerLagging.md
+  - name: WhatsApp quality drop warns
+    interval: 1m
+    input_series:
+      - series: 'waba_quality_rating{phone_number_id="sender-1"}'
+        values: '3 3 2 2'
+      - series: 'waba_quality_rating{phone_number_id="sender-2"}'
+        values: '3 3 3 3'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: NabdWabaQualityDropped
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: NabdWabaQualityDropped
+        exp_alerts:
+          - exp_labels: { phone_number_id: sender-1, severity: warning }
+            exp_annotations:
+              summary: "WhatsApp sender sender-1 quality dropped (rating 2; 2 = yellow, 1 = red)"
+              runbook: docs/runbooks/NabdWabaQualityDropped.md
