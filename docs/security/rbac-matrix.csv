@@ -93,7 +93,7 @@ operator,super_admin,billing_revenue,view|edit|approve
 operator,super_admin,support_tickets,view
 operator,super_admin,pricing_packaging,view
 operator,super_admin,territories,view
-operator,super_admin,messaging_operations,view
+operator,super_admin,messaging_operations,view|override
 operator,super_admin,platform_health,view
 operator,super_admin,aggregator_demand,view
 operator,super_admin,support_access,view|request
