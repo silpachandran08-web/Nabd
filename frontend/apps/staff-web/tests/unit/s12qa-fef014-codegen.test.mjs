@@ -150,14 +150,14 @@ test("FEF-014 AC2: renaming spec fields breaks compilation of EVERY consumer (Qu
     console.log(`tsc errors after rename: ${errors.length}\n${errors.map((l) => "  " + l.replace(/\(\d+,\d+\).*Property '(\w+)'.*/, " -> $1")).join("\n")}`);
     assert.notEqual(r.status, 0, "typecheck must fail at all");
     // Positive control: a field read only through the generated type breaks its consumer.
-    assert.ok(errors.some((l) => l.includes("app/arrivals/page.tsx") && /estimatedMinutes/.test(l)), "arrivals wait estimate");
+    assert.ok(errors.some((l) => /app\/(components\/)?arrivals\//.test(l) && /estimatedMinutes/.test(l)), "arrivals wait estimate");
     // The AC: every consumer of the renamed queue field fails, not just some.
     const consumers = tokenConsumers();
     const silent = consumers.filter((c) => !errors.some((l) => l.startsWith(c) || l.includes(c + "(")));
     assert.deepEqual(silent, [], `consumers of .tokenNumber that still compile after QueueEntryResponse.tokenNumber was renamed (they would read undefined at runtime): ${silent.join(", ")}`);
     // status: the arrivals and nursing row types re-declare it, so they must still fail on the rename.
-    for (const page of ["app/arrivals/page.tsx", "app/nursing/page.tsx"]) {
-      assert.ok(errors.some((l) => l.includes(page) && /'status'|queueStatus/.test(l)), `${page} must fail when QueueEntryResponse.status is renamed`);
+    for (const page of ["app/(components/)?arrivals/", "app/nursing/page.tsx"]) { // FEF-028: Arrivals is a folder now
+      assert.ok(errors.some((l) => new RegExp(page).test(l) && /'status'|queueStatus/.test(l)), `${page} must fail when QueueEntryResponse.status is renamed`);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

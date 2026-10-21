@@ -25,7 +25,7 @@ const rd = ratio(tok('text-disabled'), tok('surface-1'));
 check(`T2 disabled ${tok('text-disabled')} on surface-1 >= 3`, rd >= 3, rd.toFixed(2));
 
 // ---- 2. no font-size < 12px in the reception-screen styles (print blocks excluded)
-const SCOPE = ['app/clinicNav.module.css', 'app/topBar.module.css', 'app/schedule/schedule.module.css', 'app/patients/patients.module.css', 'app/arrivals/arrivals.module.css',
+const SCOPE = ['app/clinicNav.module.css', 'app/topBar.module.css', 'app/schedule/schedule.module.css', 'app/patients/patients.module.css', 'app/components/arrivals/arrivals.module.css',
   'app/billing/billing.module.css', 'app/checkout/checkout.module.css', 'app/components/ui/ui.module.css', 'app/components/arrivals/checkin.module.css'];
 const stripPrint = (s) => { let out = '', i = 0; for (;;) { const j = s.indexOf('@media print', i); if (j < 0) return out + s.slice(i); out += s.slice(i, j); let d = 0, k = s.indexOf('{', j); for (; k < s.length; k++) { if (s[k] === '{') d++; else if (s[k] === '}' && --d === 0) break; } i = k + 1; } };
 const small = [];
