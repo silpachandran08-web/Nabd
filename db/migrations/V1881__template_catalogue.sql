@@ -94,7 +94,7 @@ ALTER TABLE whatsapp_templates ADD CONSTRAINT whatsapp_templates_category_check
 ALTER TABLE whatsapp_templates VALIDATE CONSTRAINT whatsapp_templates_category_check;
 ALTER TABLE whatsapp_templates DROP CONSTRAINT whatsapp_templates_status_check;
 ALTER TABLE whatsapp_templates ADD CONSTRAINT whatsapp_templates_status_check
-  CHECK (status IN ('queued', 'pending', 'approved', 'flagged', 'paused', 'disabled', 'rejected')) NOT VALID;
+  CHECK (status IN ('submitting', 'queued', 'pending', 'approved', 'flagged', 'paused', 'disabled', 'rejected')) NOT VALID;
 ALTER TABLE whatsapp_templates VALIDATE CONSTRAINT whatsapp_templates_status_check;
 -- migration-lint: allow MIG-001 whatsapp_templates holds tens of rows per clinic and CONCURRENTLY cannot run in the Flyway transaction
 CREATE UNIQUE INDEX whatsapp_templates_catalogue_once ON whatsapp_templates (tenant_id, catalogue_key, language) WHERE catalogue_key IS NOT NULL;
