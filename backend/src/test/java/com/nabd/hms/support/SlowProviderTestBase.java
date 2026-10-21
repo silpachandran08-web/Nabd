@@ -26,6 +26,7 @@ public abstract class SlowProviderTestBase extends ApiTestBase {
         registry.add("app.whatsapp.api-base-url", STUB::baseUrl);
         registry.add("app.whatsapp.access-token", () -> STUB_TOKEN);
         registry.add("app.whatsapp.phone-number-id", () -> "stub-number");
+        registry.add("app.whatsapp.business-account-id", () -> "stub-waba");
         registry.add("app.integration.circuit-open-seconds", () -> "3");
     }
 

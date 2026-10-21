@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.nabd.hms.shared.integration.CircuitOpenException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
@@ -62,25 +64,33 @@ public class WhatsAppTemplateService {
         }
         String body = req.body() == null ? null : req.body().strip();
         int paramCount = TemplateRules.checkBody(body, req.examples());
-        WhatsAppTemplateRepository.Clinic clinic = inTenantTx(tenantId -> {
-            if (repo.findByName(tenantId, req.name(), req.language()).isPresent()) {
-                throw duplicate(req);
-            }
-            return repo.clinic(tenantId);
-        });
-        String header = header(clinic);
-        String metaName = clinic.slug().toLowerCase().replaceAll("[^a-z0-9_]", "_") + "_" + req.name();
-        WhatsAppClient.Submission submission = submitToMeta(() ->
-                client.createTemplate(metaName, req.language(), req.category(), header, body, req.examples()));
+        // COM-003 two-phase: (1) the 'submitting' row is committed first, (2) Meta is called with no transaction open,
+        // (3) the row is completed. A timeout or a failed write after Meta accepted leaves the row for TemplateReconciler.
+        String[] names = new String[2]; // header, metaName
+        UUID rowId;
         try {
-            return inTenantTx(tenantId -> {
-                UUID id = repo.insert(tenantId, req.name(), metaName, req.language(), req.category(), header, body, paramCount,
-                        statusOf(submission.status()), submission.metaTemplateId());
-                return toResponse(repo.find(tenantId, id).orElseThrow());
+            rowId = inTenantTx(tenantId -> {
+                WhatsAppTemplateRepository.Clinic clinic = repo.clinic(tenantId);
+                names[0] = header(clinic);
+                names[1] = clinic.slug().toLowerCase().replaceAll("[^a-z0-9_]", "_") + "_" + req.name();
+                return repo.insertSubmitting(tenantId, req.name(), names[1], req.language(), req.category(), names[0], body, paramCount);
             });
-        } catch (DuplicateKeyException raced) { // a concurrent create of the same name won between the check and here
+        } catch (DuplicateKeyException exists) { // same name+language (or Meta name) already taken, or a concurrent create won
             throw duplicate(req);
         }
+        WhatsAppClient.Submission submission;
+        try {
+            submission = client.createTemplate(names[1], req.language(), req.category(), names[0], body, req.examples());
+        } catch (RuntimeException e) {
+            if (!outcomeUnknown(e)) { // Meta never created it: free the name at once
+                inTenantTx(tenantId -> repo.deleteSubmitting(tenantId, rowId));
+            }
+            throw metaFailure(e);
+        }
+        return inTenantTx(tenantId -> {
+            repo.completeSubmission(tenantId, rowId, statusOf(submission.status()), submission.metaTemplateId());
+            return toResponse(repo.find(tenantId, rowId).orElseThrow());
+        });
     }
 
     /** The fix path for a rejected template: new text goes back to Meta for review. */
@@ -109,18 +119,33 @@ public class WhatsAppTemplateService {
         return name.length() <= TemplateRules.MAX_HEADER ? name : name.substring(0, TemplateRules.MAX_HEADER).strip();
     }
 
-    /** Meta's own 4xx verdicts (policy, duplicates, formatting) go back to the clinic verbatim. */
     private static <T> T submitToMeta(java.util.function.Supplier<T> call) {
         try {
             return call.get();
-        } catch (RestClientResponseException e) {
-            if (e.getStatusCode().is4xxClientError()) {
-                throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "whatsapp-template-refused",
-                        "Meta refused the template", metaMessage(e));
-            }
-            throw new ApiException(HttpStatus.BAD_GATEWAY, "whatsapp-unavailable", "WhatsApp is unavailable",
+        } catch (RuntimeException e) {
+            throw metaFailure(e);
+        }
+    }
+
+    /** True when Meta may have created the template although we saw a failure (timeout, 5xx): keep the row. */
+    private static boolean outcomeUnknown(RuntimeException e) {
+        return e instanceof ResourceAccessException
+                || (e instanceof RestClientResponseException r && r.getStatusCode().is5xxServerError());
+    }
+
+    /** Meta's own 4xx verdicts (policy, duplicates, formatting) go back to the clinic verbatim; anything that means
+     * "WhatsApp did not answer" (timeout, 5xx, 429, open circuit, bulkhead) is a 502, never a 500. */
+    private static RuntimeException metaFailure(RuntimeException e) {
+        if (e instanceof RestClientResponseException r && r.getStatusCode().is4xxClientError() && r.getStatusCode().value() != 429) {
+            return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "whatsapp-template-refused",
+                    "Meta refused the template", metaMessage(r));
+        }
+        if (e instanceof RestClientResponseException || e instanceof ResourceAccessException
+                || e instanceof CircuitOpenException || e instanceof ProviderBusyException) {
+            return new ApiException(HttpStatus.BAD_GATEWAY, "whatsapp-unavailable", "WhatsApp is unavailable",
                     "Couldn't reach WhatsApp to submit the template. Try again in a few minutes.");
         }
+        return e;
     }
 
     private static String metaMessage(RestClientResponseException e) {

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:nabd:event-schema:comms.message.status_changed.v1",
   "title": "comms.message.status_changed.v1",
-  "description": "An outbound WhatsApp message moved forward to delivered, read or failed.",
+  "description": "A WhatsApp message moved: an outbound message was delivered, read or failed (COM-001), or cancelled / expired before it was sent (COM-003). 'at' is the moment of the change.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -33,7 +33,9 @@
       "enum": [
         "delivered",
         "read",
-        "failed"
+        "failed",
+        "cancelled",
+        "expired"
       ]
     },
     "errorCode": {

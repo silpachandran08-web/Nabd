@@ -76,7 +76,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
             Map.entry("iam.role.changed.v1", List.of("roleId", "status")),
             Map.entry("iam.staff.changed.v1", List.of("staffId", "status")),
             Map.entry("iam.session.revoked.v1", List.of("staffId", "scope", "reasonCode", "status")),
-            Map.entry("billing.catalogue.changed.v1", List.of("chargeHeadId", "status")));
+            Map.entry("billing.catalogue.changed.v1", List.of("chargeHeadId", "status")),
+            Map.entry("comms.message.status_changed.v1", List.of("messageId", "status")));
 
     // ---------------- helpers ----------------
 

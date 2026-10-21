@@ -55,9 +55,13 @@ class WhatsAppMessageRepository {
         return granted;
     }
 
-    /** OPS-012: committed before the provider call, so a second worker can see a send is (or was) in flight. */
-    void markSending(UUID id) {
-        jdbc.update("UPDATE whatsapp_messages SET status = 'sending' WHERE id = ? AND status IN ('queued', 'sending')", id);
+    /** OPS-012: committed before the provider call, so a second worker can see a send is (or was) in flight.
+     * COM-003: bumps attempts and returns it: the fencing token this claim must present to finish the send. */
+    int markSending(UUID id) {
+        return jdbc.queryForObject("""
+                UPDATE whatsapp_messages SET status = 'sending', attempts = attempts + 1, last_attempt_at = now()
+                WHERE id = ? AND status IN ('queued', 'sending') RETURNING attempts
+                """, Integer.class, id);
     }
 
     /** True while a 'sending' row is younger than {@code seconds}: its sender may still be mid-call. */
@@ -67,17 +71,27 @@ class WhatsAppMessageRepository {
                 Boolean.class, seconds, id));
     }
 
-    /** The provider call failed in a way that is safe to retry: back to queued for the next attempt. */
-    void requeue(UUID id) {
-        jdbc.update("UPDATE whatsapp_messages SET status = 'queued' WHERE id = ? AND status = 'sending'", id);
+    /** The provider call failed in a way that is safe to retry: back to queued for the next attempt. Fenced: a stale
+     * worker (older attempt) changes nothing. */
+    void requeue(UUID id, int attempt) {
+        jdbc.update("UPDATE whatsapp_messages SET status = 'queued' WHERE id = ? AND status = 'sending' AND attempts = ?", id, attempt);
     }
 
-    int markSent(UUID id, String wamid) {
-        return jdbc.update("UPDATE whatsapp_messages SET status = 'sent', wamid = ? WHERE id = ? AND status IN ('queued', 'sending')", wamid, id);
+    int markSent(UUID id, String wamid, int attempt) {
+        return jdbc.update("UPDATE whatsapp_messages SET status = 'sent', wamid = ? WHERE id = ? AND status IN ('queued', 'sending') AND attempts = ?", wamid, id, attempt);
     }
 
     void markFailed(UUID id, String error) {
         jdbc.update("UPDATE whatsapp_messages SET status = 'failed', error = ? WHERE id = ? AND status IN ('queued', 'sending')", error, id);
+    }
+
+    void markFailed(UUID id, String error, int attempt) {
+        jdbc.update("UPDATE whatsapp_messages SET status = 'failed', error = ? WHERE id = ? AND status IN ('queued', 'sending') AND attempts = ?", error, id, attempt);
+    }
+
+    /** COM-003: only a message that has not started sending can be cancelled/expired; never touches 'sending'/'sent'. */
+    boolean markTerminal(UUID id, String status) {
+        return jdbc.update("UPDATE whatsapp_messages SET status = ? WHERE id = ? AND status IN ('scheduled', 'queued')", status, id) == 1;
     }
 
     void markBlocked(UUID id, String reason) {

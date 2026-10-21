@@ -1190,6 +1190,8 @@ schemas:
       created_at: operational
       updated_at: operational
       template_id: operational
+      attempts: operational
+      last_attempt_at: operational
     whatsapp_inbound_events:
       id: operational
       tenant_id: operational
@@ -1228,6 +1230,7 @@ schemas:
       meta_template_id: operational
       created_at: operational
       updated_at: operational
+      submitted_at: operational
     workflow_definitions:
       id: operational
       code: operational
