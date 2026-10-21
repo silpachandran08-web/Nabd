@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.provisioning;
 
 import tools.jackson.databind.ObjectMapper;
+import com.nabd.hms.common.CatalogueTemplates;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WabaProvisioningGateway;
@@ -41,6 +42,7 @@ class ProvisioningStepRunner {
     private final ProvisioningRepository repo;
     private final TenantContext tenantContext;
     private final WabaProvisioningGateway wabaGateway;
+    private final CatalogueTemplates catalogueTemplates;
     private final ObjectMapper objectMapper;
     private final TenantLifecycleService lifecycleService;
     private final StaffService staffService;
@@ -51,7 +53,8 @@ class ProvisioningStepRunner {
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
-                            OwnerService ownerService) {
+                            OwnerService ownerService, CatalogueTemplates catalogueTemplates) {
+        this.catalogueTemplates = catalogueTemplates;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.wabaGateway = wabaGateway;
@@ -93,6 +96,7 @@ class ProvisioningStepRunner {
             }
             case "provision_whatsapp" -> {
                 wabaGateway.provisionNumber(job.tenantSlug());
+                catalogueTemplates.instantiateDefaults(job.createdTenantId(), job.region()); // COM-012: queued; submitted in the background
                 yield StepResult.NONE;
             }
             case "verify_invite_owner" -> inviteOwner(job);
@@ -111,8 +115,13 @@ class ProvisioningStepRunner {
             case "seed_masters" -> undoSeedMasters(job);
             case "create_tenant" -> undoCreateTenant(job);
             case "verify_invite_owner" -> undoInviteOwner(job);
-            case "migrate_schema", "provision_whatsapp" -> {
-                // nothing persisted by run() for these steps — see the comments there
+            case "migrate_schema" -> {
+                // nothing persisted by run() for this step — see the comment there
+            }
+            case "provision_whatsapp" -> {
+                if (job.createdTenantId() != null) {
+                    catalogueTemplates.removeInstantiated(job.createdTenantId()); // COM-012: queued catalogue rows reference the tenant
+                }
             }
             case "go_live" -> {
                 // go_live is structurally the last step — nothing can fail after it to trigger an
