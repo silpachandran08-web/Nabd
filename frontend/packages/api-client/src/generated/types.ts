@@ -250,6 +250,7 @@ export type SessionCount = { booked?: number; free?: number; label?: string; };
 export type SessionResponse = { current?: boolean; device?: string; id?: string; ip?: string; lastSeenAt?: string; };
 export type SetupChecklistItemResponse = { doneAt?: string; skippedAt?: string; status?: string; step?: string; };
 export type SourceBreakdownResponse = { revenue?: number; source?: string; untaggedCount?: number; visitCount?: number; };
+export type SseEmitter = { timeout?: number; };
 export type StaffInviteRequest = { departmentId?: string; email: string; mobilePhone: string; name: string; roleId: string; scope?: string; };
 export type StaffInviteResponse = { inviteToken?: string; staff?: StaffResponse; };
 export type StaffPage = { data?: Array<StaffResponse>; page?: PageMeta; };
@@ -425,6 +426,7 @@ export type Operations = {
   ScheduleController_addWorkingHours: { method: "post"; path: "/v1/doctors/{id}/working-hours"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; }; query: never; body: WorkingHoursWriteRequest; response: WorkingHoursResponse };
   ScheduleController_updateWorkingHours: { method: "put"; path: "/v1/doctors/{id}/working-hours/{hoursId}"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; hoursId: string; }; query: never; body: WorkingHoursWriteRequest; response: WorkingHoursResponse };
   ScheduleController_deleteWorkingHours: { method: "delete"; path: "/v1/doctors/{id}/working-hours/{hoursId}"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; hoursId: string; }; query: never; body: never; response: void };
+  EventsController_stream: { method: "get"; path: "/v1/events"; permission: "authenticated"; pathParams: never; query: { topics?: string; }; body: never; response: SseEmitter };
   NursingController_activityToday: { method: "get"; path: "/v1/nursing/activity/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<ActivityEntryResponse> };
   NursingController_orderAdministration: { method: "post"; path: "/v1/nursing/administration-orders"; permission: "nursing:create"; pathParams: never; query: never; body: AdministrationOrderRequest; response: AdministrationOrderResponse };
   NursingController_administrationOrdersToday: { method: "get"; path: "/v1/nursing/administration-orders/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<AdministrationOrderResponse> };
