@@ -8,7 +8,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 // Currency is deliberately not a field here — it's derived server-side from the tenant's region
-// (IN -> INR, KSA -> SAR), one less thing an operator can set wrong.
+// (the tenant region's currency), one less thing an operator can set wrong.
 public record SubscriptionUpsertRequest(
         @NotNull UUID planId,
         @NotNull @Min(0) Integer mrrCents,

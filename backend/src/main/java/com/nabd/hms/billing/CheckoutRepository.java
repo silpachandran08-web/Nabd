@@ -33,7 +33,7 @@ class CheckoutRepository {
     }
 
     Optional<String> findTenantRegion(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region"), tenantId)
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region_code"), tenantId)
                 .stream().findFirst();
     }
 

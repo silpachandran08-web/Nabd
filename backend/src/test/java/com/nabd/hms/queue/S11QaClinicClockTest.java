@@ -37,7 +37,7 @@ class S11QaClinicClockTest extends ApiTestBase {
     private static void forceRegion(java.util.UUID tenantId, String region) {
         try (java.sql.Connection c = superuserConnection(); java.sql.Statement st = c.createStatement()) {
             st.execute("SET session_replication_role = replica");
-            st.execute("UPDATE tenants SET region = '" + region + "' WHERE id = '" + tenantId + "'");
+            st.execute("UPDATE tenants SET region_code = '" + region + "' WHERE id = '" + tenantId + "'");
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException(e);
         }
@@ -80,7 +80,7 @@ class S11QaClinicClockTest extends ApiTestBase {
     // PLT-028 AC2: frozen at 23:59:30 clinic time an evening walk-in belongs to the session's day; 40 s later the
     // clinic's "today" has moved on while UTC has not (Gulf and India are ahead of UTC)
     @ParameterizedTest
-    @CsvSource({"Asia/Dubai,IN", "Asia/Riyadh,KSA", "Asia/Kolkata,IN"})
+    @CsvSource({"Asia/Dubai,IN", "Asia/Riyadh,SA", "Asia/Kolkata,IN"})
     void eveningCheckInAt235930IsTheSessionsDayAndTodayRollsAtClinicMidnight(String zone, String region) {
         Clinic c = clinic(zone, region);
         String p = patient(c, "Late Evening");
@@ -97,26 +97,14 @@ class S11QaClinicClockTest extends ApiTestBase {
         assertThat(scheduleToday(c)).containsEntry("date", "2026-03-11").containsEntry("today", true);
     }
 
-    // FEF-011 (c): tenants.timezone NULL (the column is nullable, V17). ClinicClock's contract is "a bad or missing value
-    // degrades to UTC", which already disagrees with the UI's region default. Found instead: zone() throws an NPE
-    // (List.of(null).stream().findFirst()), so every clinic-day endpoint answers 500 for such a tenant.
+    // OPS-061: tenants.timezone is NOT NULL (V1991, tested in Ops061RegionsApiTest); the profile reports the stored zone and region
     @Test
-    void nullTimezoneTenantGetsAClinicDayInsteadOfA500() {
-        Clinic c = clinic(null, "KSA");
-        clock.set(java.time.Instant.parse("2026-03-10T22:30:00Z"));
-        Map<String, Object> day = scheduleToday(c);
-        assertThat(day.get("timezone")).isIn("UTC", "Asia/Riyadh");
-    }
-
-    // FEF-011 (c): the raw null is what the UI sees from /setup/profile, so it applies the region default
-    @Test
-    void setupProfileReportsTheNullTimezoneAndTheRegion() {
-        Clinic c = clinic(null, "KSA");
+    void setupProfileReportsTheTimezoneAndTheRegion() {
+        Clinic c = clinic("Asia/Riyadh", "SA");
         ResponseEntity<Map> profile = exchange("/v1/setup/profile", HttpMethod.GET, authed(c.token), Map.class);
         assertThat(profile.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(profile.getBody()).containsKey("timezone");
-        assertThat(profile.getBody().get("timezone")).isNull();
-        assertThat(profile.getBody().get("region")).isEqualTo("KSA");
+        assertThat(profile.getBody().get("timezone")).isEqualTo("Asia/Riyadh");
+        assertThat(profile.getBody().get("region")).isEqualTo("SA");
     }
 
     // PLT-028 AC4 companion: an unusable legacy value also degrades to UTC (never a 500)

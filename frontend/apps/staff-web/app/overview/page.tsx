@@ -140,9 +140,9 @@ export default function OverviewPage() {
         setCanSwitchClinic(isOwner() && !!sessionStorage.getItem("nabd_owner_pending_token"));
       } catch { /* storage blocked: card simply stays visible */ }
       const region = getIdentity()?.tenantRegion;
-      setMoney(new Intl.NumberFormat(region === "KSA" ? "en-SA" : "en-IN", {
-        style: "currency", currency: region === "KSA" ? "SAR" : "INR", maximumFractionDigits: 0,
-      }));
+      // shortcut: static region -> currency/locale pairs mirror the regions table; read GET /v1/regions once the client caches it
+      const fmt = ({ AE: ["en-AE", "AED"], SA: ["en-SA", "SAR"], QA: ["en-QA", "QAR"] } as Record<string, string[]>)[region ?? ""] ?? ["en-IN", "INR"];
+      setMoney(new Intl.NumberFormat(fmt[0], { style: "currency", currency: fmt[1], maximumFractionDigits: 0 }));
       setNow(Date.now());
     } catch {
       setError("Couldn't reach the server. Check your connection and try again.");

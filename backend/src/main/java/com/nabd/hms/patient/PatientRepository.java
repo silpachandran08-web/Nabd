@@ -157,7 +157,7 @@ class PatientRepository {
     }
 
     String region(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst().orElse("IN");
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst().orElse("IN");
     }
 
     boolean existsActive(UUID tenantId, UUID id) {

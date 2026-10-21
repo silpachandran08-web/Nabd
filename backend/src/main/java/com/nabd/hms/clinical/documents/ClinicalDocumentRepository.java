@@ -74,7 +74,7 @@ class ClinicalDocumentRepository {
     }
 
     Optional<String> findRegion(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
     }
 
     Optional<PatientHeader> findPatientHeader(UUID tenantId, UUID patientId) {

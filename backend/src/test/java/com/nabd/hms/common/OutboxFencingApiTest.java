@@ -156,11 +156,11 @@ class OutboxFencingApiTest extends ApiTestBase {
         assertThat(meters.get("outbox.pending.events").tag("region", "IN").gauge().value()).isEqualTo(3); // leftovers were settled to done
         assertThat(meters.get("outbox.dead.events").tag("region", "IN").gauge().value()).isGreaterThanOrEqualTo(1);
         assertThat(meters.get("outbox.oldest.pending.age.seconds").tag("region", "IN").gauge().value()).isBetween(119.0, 600.0);
-        assertThat(meters.get("outbox.pending.events").tag("region", "KSA").gauge().value()).isZero();
+        assertThat(meters.get("outbox.pending.events").tag("region", "SA").gauge().value()).isZero();
 
         HttpResponse<String> scrape = HttpClient.newHttpClient().send(HttpRequest.newBuilder(
                 URI.create("http://localhost:" + mgmtPort + "/actuator/prometheus")).GET().build(), HttpResponse.BodyHandlers.ofString());
-        assertThat(scrape.body()).contains("outbox_pending_events{region=\"IN\"} 3.0", "outbox_pending_events{region=\"KSA\"} 0.0",
+        assertThat(scrape.body()).contains("outbox_pending_events{region=\"IN\"} 3.0", "outbox_pending_events{region=\"SA\"} 0.0",
                 "outbox_dead_events{region=\"IN\"}", "outbox_oldest_pending_age_seconds{region=\"IN\"}", "outbox_fencing_rejected_total");
         assertThat(scrape.body().lines().filter(l -> l.startsWith("outbox_") && l.contains("tenant"))).isEmpty();
     }

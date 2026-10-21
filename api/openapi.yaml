@@ -1128,6 +1128,72 @@ paths:
         "204": { description: "Step completed" }
         "400": { $ref: "#/components/responses/BadRequest" }
 
+  /regions:
+    get:
+      tags: [Setup]
+      summary: OPS-061. Supported regions and their rules (non-PHI reference data from the regions table); any authenticated staff (operators use /platform/regions).
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Active regions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string, enum: [IN, AE, SA, QA] }
+                        name: { type: string }
+                        currency: { type: string, description: "ISO 4217" }
+                        minorUnits: { type: integer }
+                        taxRegime: { type: string, description: "GST, VAT or NONE" }
+                        standardTaxRate: { type: [number, "null"], description: "Headline rate in percent; null where there is no single rate (India GST)" }
+                        regulator: { type: string }
+                        defaultTimezone: { type: string }
+                        phoneRules:
+                          type: object
+                          properties:
+                            countryCode: { type: string }
+                            nsnLength: { type: array, items: { type: integer } }
+                        cell: { type: string }
+
+  /platform/regions:
+    get:
+      tags: [Platform]
+      summary: OPS-061. Supported regions and their rules (non-PHI reference data from the regions table); any authenticated staff or operator.
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Active regions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string, enum: [IN, AE, SA, QA] }
+                        name: { type: string }
+                        currency: { type: string, description: "ISO 4217" }
+                        minorUnits: { type: integer }
+                        taxRegime: { type: string, description: "GST, VAT or NONE" }
+                        standardTaxRate: { type: [number, "null"], description: "Headline rate in percent; null where there is no single rate (India GST)" }
+                        regulator: { type: string }
+                        defaultTimezone: { type: string }
+                        phoneRules:
+                          type: object
+                          properties:
+                            countryCode: { type: string }
+                            nsnLength: { type: array, items: { type: integer } }
+                        cell: { type: string }
+
   /setup/profile:
     get:
       tags: [Setup]
@@ -3282,6 +3348,36 @@ paths:
                   byStatus: { type: object, additionalProperties: { type: integer } }
                   regions: { type: array, items: { type: string } }
         "403": { description: "Forbidden: no clinics_fleet:view (sre)" }
+  /platform/tenants/{tenantId}/region:
+    patch:
+      tags: [Platform]
+      summary: >
+        OPS-061. A clinic's region is chosen at provisioning and is immutable (database trigger V1991). Asking for the same
+        region is a no-op 200; any other region answers 409 REGION_IMMUTABLE. Unknown tenant 404.
+      x-required-permission: tenant_detail:edit
+      parameters:
+        - { name: tenantId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [regionCode]
+              properties:
+                regionCode: { type: string, enum: [IN, AE, SA, QA] }
+      responses:
+        "200":
+          description: Region unchanged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenantId: { type: string, format: uuid }
+                  regionCode: { type: string, enum: [IN, AE, SA, QA] }
+        "404": { description: "Tenant not found", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "REGION_IMMUTABLE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   # ------------------------------------------------- Platform console: support access (PLT-056)
   /platform/support-access/grants:
     post:

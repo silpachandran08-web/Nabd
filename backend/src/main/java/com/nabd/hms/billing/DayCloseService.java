@@ -45,9 +45,12 @@ public class DayCloseService {
     private final EventPublisher eventPublisher;
 
     private final ActorDirectory actors;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
     DayCloseService(DayCloseRepository repo, TenantContext tenantContext, ClinicClock clock, AuditService auditService,
-                    ClinicPolicies setupService, EventPublisher eventPublisher, ActorDirectory actors) {
+                    ClinicPolicies setupService, EventPublisher eventPublisher, ActorDirectory actors,
+                    com.nabd.hms.organization.api.RegionRules regions) {
+        this.regions = regions;
         this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -57,16 +60,6 @@ public class DayCloseService {
         this.eventPublisher = eventPublisher;
     }
 
-    /** Tenant currency from the provisioning region (IN / KSA today; AE / QA as ACC-028 names them). */
-    static String currency(String region) {
-        return switch (region == null ? "IN" : region) {
-            case "KSA", "SA" -> "SAR";
-            case "AE" -> "AED";
-            case "QA" -> "QAR";
-            default -> "INR";
-        };
-    }
-
     /** The clinic's cash_variance_tolerance policy (minor units) or, without one, the currency's default. */
     static BigDecimal tolerance(String currency, Optional<String> policyMinor) {
         long minor = policyMinor.map(Long::parseLong).orElseGet(() -> DEFAULT_TOLERANCE_MINOR.getOrDefault(currency, 2_000L));
@@ -74,7 +67,7 @@ public class DayCloseService {
     }
 
     private String currencyOf(UUID tenantId) {
-        return currency(repo.region(tenantId).orElse("IN"));
+        return regions.region(repo.region(tenantId).orElse("IN")).currency();
     }
 
     private BigDecimal toleranceOf(UUID tenantId, String currency) {

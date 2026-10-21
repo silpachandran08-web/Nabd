@@ -1,6 +1,5 @@
 package com.nabd.hms.platform.provisioning;
 
-import com.nabd.hms.common.ClinicClock;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
@@ -188,7 +187,7 @@ class ProvisioningRepository {
 
     /** Any one existing region tells us the owner's region lock (NB-002) — an owner never spans regions. */
     Optional<String> findAnyRegionForOwner(UUID ownerId) {
-        return jdbc.query("SELECT t.region FROM tenants t JOIN brands b ON t.brand_id = b.id WHERE b.owner_id = ? LIMIT 1",
+        return jdbc.query("SELECT t.region_code AS region FROM tenants t JOIN brands b ON t.brand_id = b.id WHERE b.owner_id = ? LIMIT 1",
                 (rs, i) -> rs.getString("region"), ownerId
         ).stream().findFirst();
     }
@@ -208,9 +207,9 @@ class ProvisioningRepository {
     /** Unique on slug — callers must translate the resulting DuplicateKeyException into a readable step failure. */
     UUID insertTenant(String slug, String name, String region, UUID brandId) {
         UUID id = UUID.randomUUID();
-        // New clinics get their region's zone; existing ones keep what they have (UTC by default).
-        jdbc.update("INSERT INTO tenants (id, slug, name, region, status, brand_id, timezone) VALUES (?,?,?,?,'provisioning',?,?)",
-                id, slug, name, region, brandId, ClinicClock.defaultZoneFor(region));
+        // timezone is left out: the V1991 trigger gives a new clinic its region's zone
+        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, brand_id) VALUES (?,?,?,?,'provisioning',?)",
+                id, slug, name, region, brandId);
         return id;
     }
 

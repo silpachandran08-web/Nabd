@@ -41,11 +41,11 @@ export function isOwner(): boolean {
   return decodeAccessToken(token)?.owner === true;
 }
 
-/** Display name for the tenant region (fixed at provisioning: IN or KSA). Unknown codes pass through. */
+/** Display name for the tenant region (fixed at provisioning: IN, AE, SA or QA; GET /v1/regions has the names). Unknown codes pass through. */
+// KSA: display alias for access tokens issued before OPS-061 (they expire; nothing else reads it)
+const REGION_LABELS: Record<string, string> = { IN: "India", AE: "United Arab Emirates", SA: "Saudi Arabia", KSA: "Saudi Arabia", QA: "Qatar" };
 export function regionLabel(region: string | null | undefined): string {
-  if (region === "IN") return "India";
-  if (region === "KSA") return "Saudi Arabia";
-  return region ?? "";
+  return REGION_LABELS[region ?? ""] ?? region ?? "";
 }
 
 /** The owner portal's pending-workspace token (sessionStorage, ~5 min, OwnerService) while it is

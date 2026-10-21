@@ -9,19 +9,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * OPS-014: outbox backlog gauges per region from one aggregate query (outbox_stats, V1320) every 15 s:
- * outbox_pending_events, outbox_dead_events, outbox_oldest_pending_age_seconds. The only label is region (IN, KSA):
+ * outbox_pending_events, outbox_dead_events, outbox_oldest_pending_age_seconds. The only label is region (a regions.code):
  * no tenant label at all, so no cardinality growth and nothing identifying (OPS-025 rule for /actuator/prometheus).
  */
 @Component
 public class OutboxMetrics {
 
-    static final List<String> REGIONS = List.of("IN", "KSA");
     private static final Logger log = LoggerFactory.getLogger(OutboxMetrics.class);
 
     private record Stats(long pending, long dead, double ageSeconds) {
@@ -30,9 +28,9 @@ public class OutboxMetrics {
     private final JdbcTemplate jdbc;
     private final Map<String, AtomicReference<Stats>> byRegion = new HashMap<>();
 
-    OutboxMetrics(JdbcTemplate jdbc, MeterRegistry registry) {
+    OutboxMetrics(JdbcTemplate jdbc, MeterRegistry registry, com.nabd.hms.organization.api.RegionRules regions) {
         this.jdbc = jdbc;
-        for (String region : REGIONS) {
+        for (String region : regions.all().stream().map(com.nabd.hms.organization.api.RegionRules.Region::code).toList()) {
             AtomicReference<Stats> ref = new AtomicReference<>(new Stats(0, 0, 0));
             byRegion.put(region, ref);
             Gauge.builder("outbox.pending.events", ref, r -> r.get().pending()).tag("region", region)

@@ -907,6 +907,19 @@ schemas:
       transfer_reason: operational
       transfer_reason_note: phi  # uncertain: free text, may carry clinical reason
       legacy_duplicate: operational
+    regions:
+      code: operational
+      name: operational
+      currency: operational
+      minor_units: operational
+      tax_regime: operational
+      standard_tax_rate: operational
+      regulator: operational
+      default_timezone: operational
+      phone_country_code: operational
+      phone_nsn_length: operational
+      cell: operational
+      active: operational
     registry_dirty:
       tenant_id: operational
       patient_id: pii
@@ -1057,6 +1070,7 @@ schemas:
       slug: operational
       name: operational
       region: operational
+      region_code: operational
       status: operational
       created_at: operational
       updated_at: operational

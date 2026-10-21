@@ -70,11 +70,14 @@ public class CheckoutService {
     private final com.nabd.hms.pharmacy.RxGate rxGate;
 
     private final ActorDirectory actors;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
-                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors) {
+                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
+                     com.nabd.hms.organization.api.RegionRules regions) {
+        this.regions = regions;
         this.actors = actors;
         this.rxGate = rxGate;
         this.visitCommands = visitCommands;
@@ -446,8 +449,7 @@ public class CheckoutService {
     }
 
     private String currencyFor(UUID tenantId) {
-        String region = repo.findTenantRegion(tenantId).orElse("IN");
-        return "KSA".equals(region) ? "SAR" : "INR";
+        return regions.region(repo.findTenantRegion(tenantId).orElse("IN")).currency();
     }
 
     private ApiException notFound() {

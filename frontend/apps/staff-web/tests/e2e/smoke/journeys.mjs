@@ -7,7 +7,7 @@ import { ArrivalsPage, ConsultPage, CheckoutPage } from './pages.mjs';
 // Synthetic only. Phones use the reserved test range of tools/synthetic-data (national number starting 0000: never assignable).
 export const TENANTS = [
   { key: 'IN', region: 'IN', name: 'Synthetic Clinic IN', timezone: 'Asia/Kolkata', currency: 'INR', patient: 'Asha Verma', phone: '+910000000101', walkIn: 'Kavya Iyer' },
-  { key: 'KSA', region: 'KSA', name: 'Synthetic Clinic KSA', timezone: 'Asia/Riyadh', currency: 'SAR', patient: 'Noura Al-Harbi', phone: '+9660000000101', walkIn: 'Reem Al-Qahtani' },
+  { key: 'KSA', region: 'SA', name: 'Synthetic Clinic KSA', timezone: 'Asia/Riyadh', currency: 'SAR', patient: 'Noura Al-Harbi', phone: '+9660000000101', walkIn: 'Reem Al-Qahtani' },
 ];
 export const PROJECTS = [
   { key: 'desktop', viewport: { width: 1280, height: 900 } },

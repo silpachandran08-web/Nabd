@@ -31,15 +31,20 @@ class BillingPricing {
     }
 
     private final CheckoutRepository repo;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
-    BillingPricing(CheckoutRepository repo) {
+    BillingPricing(CheckoutRepository repo, com.nabd.hms.organization.api.RegionRules regions) {
         this.repo = repo;
+        this.regions = regions;
     }
 
     /** trusted = a server-built bill (package sale): lines are not client input, so no catalogue/authority check. */
     List<LineItemInput> resolveLines(UUID tenantId, List<LineItemRequest> lines, boolean followUpEligible,
                                      boolean canDiscount, boolean trusted, UUID staffId) {
         List<LineItemInput> out = new ArrayList<>(lines.size());
+        // OPS-061: a free-text line without its own rate takes the region's headline rate (AE 5, SA 15); none (India GST slabs, Qatar) is 0
+        BigDecimal regionTax = java.util.Objects.requireNonNullElse(
+                regions.region(repo.findTenantRegion(tenantId).orElse("IN")).standardTaxRate(), BigDecimal.ZERO);
         java.util.Map<String, PharmacyChargeRow> catalogue = trusted ? java.util.Map.of()
                 : repo.findCatalogueCharges(tenantId, lines.stream().map(LineItemRequest::chargeCode).distinct().toList());
         for (LineItemRequest li : lines) {
@@ -49,7 +54,7 @@ class BillingPricing {
                         c.name() + " has been deactivated and can't be billed. Remove it from the bill.");
             }
             if (c == null || !c.active()) {
-                out.add(freeText(li, canDiscount, trusted, staffId));
+                out.add(freeText(li, canDiscount, trusted, staffId, regionTax));
                 continue;
             }
             boolean followUp = followUpEligible && "Consultation".equals(c.category()) && c.followUpAmount() != null;
@@ -75,7 +80,7 @@ class BillingPricing {
         return out;
     }
 
-    private LineItemInput freeText(LineItemRequest li, boolean canDiscount, boolean trusted, UUID staffId) {
+    private LineItemInput freeText(LineItemRequest li, boolean canDiscount, boolean trusted, UUID staffId, BigDecimal regionTax) {
         if (!trusted && !canDiscount) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "unknown-charge", "Unknown charge",
                     "'" + li.chargeCode() + "' is not an active charge in the price list.");
@@ -87,7 +92,7 @@ class BillingPricing {
         var o = li.override();
         String reason = trusted ? null : requireReason(o == null ? null : o.reasonCode());
         return new LineItemInput(li.chargeCode(), li.chargeName(), li.category() == null || li.category().isBlank() ? "Service" : li.category(),
-                li.quantity(), li.unitPrice(), li.taxRatePercent() == null ? BigDecimal.ZERO : li.taxRatePercent(), null,
+                li.quantity(), li.unitPrice(), li.taxRatePercent() != null ? li.taxRatePercent() : regionTax, null,
                 li.unitPrice(), "custom", reason, o == null ? null : o.note(), trusted ? null : staffId, false, li.prescriptionItemId());
     }
 

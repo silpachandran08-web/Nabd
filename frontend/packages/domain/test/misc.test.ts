@@ -13,10 +13,10 @@ test("pregnancy prompt: female, 12 to 55 inclusive (configurable default awaitin
 
 test("payment labels are region-aware for UPI only", () => {
   expect(PAYMENT_METHODS).toEqual(["cash", "card", "upi", "other"]);
-  expect(isKsa("KSA")).toBe(true);
+  expect(isKsa("SA")).toBe(true);
   expect(isKsa(null)).toBe(false);
   expect(paymentMethodLabel("upi")).toBe("UPI");
-  expect(paymentMethodLabel("upi", "KSA")).toBe("Mada & digital");
+  expect(paymentMethodLabel("upi", "SA")).toBe("Mada & digital");
   expect(paymentMethodLabel("cash")).toBe("Cash");
   expect(paymentMethodLabel("card")).toBe("Card");
   expect(paymentMethodLabel("other")).toBe("Other");

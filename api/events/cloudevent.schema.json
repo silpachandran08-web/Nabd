@@ -14,7 +14,7 @@
     "time": { "type": "string", "format": "date-time" },
     "subject": { "type": "string", "format": "uuid", "description": "aggregate id (outbox_events.aggregate_id)" },
     "tenantid": { "type": "string", "format": "uuid" },
-    "region": { "enum": ["in", "ksa"] },
+    "region": { "enum": ["in", "ae", "sa", "qa"] },
     "traceparent": { "type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$", "description": "W3C trace context of the publishing HTTP request; absent for jobs" },
     "dataschema": { "type": "string", "pattern": "^urn:nabd:event-schema:" },
     "datacontenttype": { "const": "application/json" },

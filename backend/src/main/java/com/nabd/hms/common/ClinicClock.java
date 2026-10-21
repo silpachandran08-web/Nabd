@@ -74,10 +74,10 @@ public class ClinicClock {
     /** tenants carries no RLS (V6), so this works before or after TenantContext.set. */
     public ZoneId zone(UUID tenantId) {
         String[] row = tenantRow(tenantId);
-        return resolve(row[0], row[1], tenantId);
+        return resolve(row[0], tenantId);
     }
 
-    /** The tenant's region code (IN, KSA, AE, QA), or null for an unknown tenant; e.g. the default phone country (ACC-028). */
+    /** The tenant's region_code (IN, AE, SA, QA), or null for an unknown tenant; e.g. the default phone country (ACC-028). */
     public String region(UUID tenantId) {
         return tenantRow(tenantId)[1];
     }
@@ -102,13 +102,14 @@ public class ClinicClock {
 
     private String[] load(UUID tenantId) {
         // a list of String[] because a null timezone in a List<String> made findFirst() throw (500 on /schedule/day)
-        return jdbc.query("SELECT timezone, region FROM tenants WHERE id = ?",
+        // timezone is NOT NULL (V1991); the region default is the safety net for a row written with triggers off
+        return jdbc.query("SELECT COALESCE(t.timezone, r.default_timezone), t.region_code FROM tenants t LEFT JOIN regions r ON r.code = t.region_code WHERE t.id = ?",
                 (rs, i) -> new String[] {rs.getString(1), rs.getString(2)}, tenantId).stream().findFirst().orElse(null);
     }
 
     /** Built by CacheKeyPolicy: tenants.timezone/region are operational, so this never refuses (ADR-04 gate). */
     private String key(UUID tenantId) {
-        return keys.key("tenant-zone", tenantId, List.of("tenants.timezone", "tenants.region"), false, "row");
+        return keys.key("tenant-zone", tenantId, List.of("tenants.timezone", "tenants.region_code"), false, "row");
     }
 
     public LocalDate today(UUID tenantId) {
@@ -137,27 +138,16 @@ public class ClinicClock {
         }
     }
 
-    /** IANA zone for a region; same map as the UI's REGION_DEFAULT_TZ (frontend/apps/staff-web/app/lib/clinicTime.ts). */
-    public static String defaultZoneFor(String region) {
-        return switch (region == null ? "" : region) {
-            case "IN" -> "Asia/Kolkata";
-            case "KSA", "SA" -> "Asia/Riyadh";
-            case "AE" -> "Asia/Dubai";
-            case "QA" -> "Asia/Qatar";
-            default -> "UTC";
-        };
-    }
-
     /**
-     * No timezone stored: the region default, as the UI does (FEF-011), so both agree on the clinic day.
-     * Legacy rows predate validation, so a bad value degrades to UTC (today's behaviour) rather than failing requests.
+     * The stored zone (the region default was applied by SQL when it was missing). Legacy rows predate validation, so a
+     * bad or blank value degrades to UTC rather than failing requests.
      */
-    static ZoneId resolve(String tz, String region, UUID tenantId) {
+    static ZoneId resolve(String tz, UUID tenantId) {
         if (isValidZone(tz)) {
             return ZoneId.of(tz);
         }
         if (tz == null || tz.isBlank()) {
-            return ZoneId.of(defaultZoneFor(region));
+            return UTC; // unknown tenant
         }
         log.warn("tenant {} has unusable timezone '{}', using UTC", tenantId, tz);
         return UTC;

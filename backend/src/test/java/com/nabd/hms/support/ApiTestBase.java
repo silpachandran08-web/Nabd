@@ -225,7 +225,7 @@ public abstract class ApiTestBase {
     protected SeededTenant seedTenant() {
         UUID id = UUID.randomUUID();
         String slug = "t" + id.toString().replace("-", "").substring(0, 12);
-        jdbc.update("INSERT INTO tenants (id, slug, name, region, status) VALUES (?,?,?,?,?)",
+        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, timezone) VALUES (?,?,?,?,?,'UTC')", // UTC as before OPS-061: the region default would move every suite's clinic day
                 id, slug, "Test Clinic " + slug, "IN", "active");
         // Every tenant gets a default department the moment it exists — same backfill guarantee
         // V37's migration gives every already-provisioned tenant, and ProvisioningStepRunner gives
