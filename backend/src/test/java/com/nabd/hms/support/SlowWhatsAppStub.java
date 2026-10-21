@@ -1,7 +1,7 @@
 package com.nabd.hms.support;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
@@ -44,7 +44,7 @@ public final class SlowWhatsAppStub {
                 byte[] in = ex.getRequestBody().readAllBytes();
                 if (stub.status.get() == 200) { // counted on arrival: the provider has the send even if the caller times out
                     JsonNode body = stub.json.readTree(in.length == 0 ? "{}".getBytes() : in);
-                    String marker = body.path("template").path("components").path(0).path("parameters").path(0).path("text").asText("");
+                    String marker = body.path("template").path("components").path(0).path("parameters").path(0).path("text").asString("");
                     stub.sendsByMarker.computeIfAbsent(marker, k -> new AtomicInteger()).incrementAndGet();
                 }
                 try {

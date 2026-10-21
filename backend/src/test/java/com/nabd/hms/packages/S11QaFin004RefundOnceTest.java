@@ -216,13 +216,13 @@ class S11QaFin004RefundOnceTest extends ApiTestBase {
                 .getBody().get("validityEnd"));
         java.util.function.Function<LocalDate, ResponseEntity<Map>> extend = d -> exchange("/v1/packages/instances/" + c.instanceId() + "/extend",
                 HttpMethod.POST, authedJsonBody(c.maker(), Map.of("newValidityEnd", d.toString(), "reason", "Hospitalised")), Map.class);
-        assertThat(extend.apply(end.minusDays(10)).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
-        assertThat(extend.apply(end).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(extend.apply(end.minusDays(10)).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(extend.apply(end).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(extend.apply(end.plusDays(5)).getStatusCode()).isEqualTo(HttpStatus.OK);
         String refundId = (String) request(c.maker(), c.instanceId()).getBody().get("id");
         assertThat(approve(c.checkers().get(0), refundId, null).getStatusCode()).isEqualTo(HttpStatus.OK);
         ResponseEntity<Map> refunded = extend.apply(end.plusDays(60));
-        assertThat(refunded.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(refunded.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(String.valueOf(refunded.getBody())).doesNotContain("Exception");
     }
 

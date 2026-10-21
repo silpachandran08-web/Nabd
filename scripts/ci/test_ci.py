@@ -21,7 +21,8 @@ class Pipeline(unittest.TestCase):
         j = self.wf["jobs"]["api-contract-report"]
         self.assertLessEqual(j["timeout-minutes"], 2)
         self.assertTrue(j["continue-on-error"])
-        self.assertFalse(any("api-contract" in c for c in json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"]))
+        # OPS-035: the report job stays non-blocking; the blocking contract gate is the separate stage5-api-contract job
+        self.assertNotIn("api-contract-report", json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"])
         self.assertIn("oasdiff", str(j["steps"]))
     def test_protection_rules(self):
         p = json.load(open(".github/branch-protection.json"))
@@ -39,12 +40,16 @@ class Pipeline(unittest.TestCase):
 
 class Artefacts(unittest.TestCase):
     def test_testcontainers_pinned(self):
-        v = re.search(r"<testcontainers.version>([\d.]+)<", R("backend/pom.xml")).group(1)
-        self.assertGreaterEqual(tuple(map(int, v.split("."))), (1, 21, 0))
+        # PLT-032: Testcontainers comes from the Boot 4 BOM (2.0.x), so there is no property to read; the pom must say so
+        pom = R("backend/pom.xml")
+        self.assertNotIn("<testcontainers.version>", pom)
+        self.assertIn("Testcontainers comes from the Boot BOM", pom)
     def test_frontend_scripts(self):
-        s = json.load(open("frontend/package.json"))["scripts"]
+        s = json.load(open("frontend/apps/staff-web/package.json"))["scripts"]
         self.assertIn("next typegen && tsc --noEmit", s["typecheck"])
-        self.assertIn("scripts/test-consult-flow.mjs", s["test:unit"])
+        # FEF-013: the consult-flow cases moved to Vitest in packages/domain (turbo runs its test script in CI)
+        self.assertIn("vitest run --coverage", json.load(open("frontend/packages/domain/package.json"))["scripts"]["test"])
+        self.assertIn("test(", R("frontend/packages/domain/test/consultFlow.test.ts"))
         self.assertEqual(s["test"], "npm run -s test:unit")
     @unittest.skip("KNOWN GAP (Sprint 9 integration): Dockerfile kept as-is so Render keeps building; OPS-031 distroless jar-copy build needs a decision")
     def test_dockerfile(self):
@@ -80,6 +85,13 @@ class Baseline(unittest.TestCase):
         self.assertEqual(baseline.new_npm_findings(a, [self.ok], D), ["y"])
         self.assertEqual(baseline.new_npm_findings(a, [], D), ["x", "y"])
         self.assertEqual(baseline.new_npm_findings(a, [{**self.ok, "expires": "2026-10-02"}], dt.date(2026, 11, 1)), ["x", "y"])
+    def test_pnpm_audit_new_vs_baselined(self):  # FEF-012: pnpm audit --json shape
+        a = {"advisories": {"1": {"id": 1, "module_name": "x", "severity": "high", "github_advisory_id": "GHSA-x"},
+                            "2": {"id": 2, "module_name": "y", "severity": "critical", "github_advisory_id": "GHSA-y"},
+                            "3": {"id": 3, "module_name": "z", "severity": "moderate", "github_advisory_id": "GHSA-z"}}}
+        self.assertEqual(baseline.new_npm_findings(a, [self.ok], D), ["y"])
+        self.assertEqual(baseline.new_npm_findings(a, [{**self.ok, "id": "GHSA-y"}], D), ["x"])
+        self.assertEqual(baseline.new_npm_findings(a, [], D), ["x", "y"])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

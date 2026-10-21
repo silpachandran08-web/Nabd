@@ -1,15 +1,13 @@
 package com.nabd.hms.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.FieldCipher;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
-import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.common.TenantScope;
 import com.nabd.hms.common.WhatsAppOtpSender;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -30,17 +28,15 @@ class OtpRequestedHandler implements OutboxEventHandler {
     private final JdbcTemplate jdbc;
     private final FieldCipher cipher;
     private final WhatsAppOtpSender sender;
-    private final TenantContext tenantContext;
-    private final TransactionTemplate tx;
+    private final TenantScope tenantScope;
     private final ObjectMapper objectMapper;
 
-    OtpRequestedHandler(JdbcTemplate jdbc, FieldCipher cipher, WhatsAppOtpSender sender, TenantContext tenantContext,
-                        PlatformTransactionManager txManager, ObjectMapper objectMapper) {
+    OtpRequestedHandler(JdbcTemplate jdbc, FieldCipher cipher, WhatsAppOtpSender sender, TenantScope tenantScope,
+                        ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.cipher = cipher;
         this.sender = sender;
-        this.tenantContext = tenantContext;
-        this.tx = new TransactionTemplate(txManager);
+        this.tenantScope = tenantScope;
         this.objectMapper = objectMapper;
     }
 
@@ -56,9 +52,8 @@ class OtpRequestedHandler implements OutboxEventHandler {
 
     @Override
     public void handle(OutboxEvent event) throws Exception {
-        UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("otpRequestId").asText());
-        Pending p = tx.execute(s -> {
-            tenantContext.set(event.tenantId());
+        UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("otpRequestId").asString());
+        Pending p = tenantScope.run(event.tenantId(), () -> {
             jdbc.update("UPDATE otp_requests SET code_enc = NULL WHERE id = ? AND sent_at IS NULL AND expires_at <= now()", id);
             return jdbc.query("""
                     SELECT s.mobile_phone, r.code_enc FROM otp_requests r JOIN staff s ON s.id = r.staff_id
@@ -69,8 +64,7 @@ class OtpRequestedHandler implements OutboxEventHandler {
             return; // already sent, expired, or the staff member has no mobile any more
         }
         sender.send(p.mobilePhone(), new String(cipher.decrypt(p.codeEnc(), OtpOutbox.aad(event.tenantId(), id)), StandardCharsets.UTF_8));
-        tx.executeWithoutResult(s -> {
-            tenantContext.set(event.tenantId());
+        tenantScope.run(event.tenantId(), () -> {
             jdbc.update("UPDATE otp_requests SET sent_at = now(), code_enc = NULL WHERE id = ?", id);
         });
     }

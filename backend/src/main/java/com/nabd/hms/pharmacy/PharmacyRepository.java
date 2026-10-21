@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.pharmacy.PharmacyModels.ActorInfo;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingItemRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.DispensingQueueRow;
 import static com.nabd.hms.pharmacy.PharmacyModels.PharmacyItemRow;
@@ -95,13 +94,6 @@ class PharmacyRepository {
                         rs.getString("actor_id") == null ? null : UUID.fromString(rs.getString("actor_id")),
                         rs.getString("actor_name"), rs.getTimestamp("occurred_at").toInstant()),
                 tenantId, itemId);
-    }
-
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     UUID insertItem(UUID tenantId, String code, PharmacyItemWriteRequest req) {

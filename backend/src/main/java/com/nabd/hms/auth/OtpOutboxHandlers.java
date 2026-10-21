@@ -1,7 +1,7 @@
 package com.nabd.hms.auth;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
@@ -35,7 +35,7 @@ final class OtpOutboxHandlers {
         public void handle(OutboxEvent e) throws Exception {
             JsonNode p = mapper.readTree(e.payloadJson());
             log.warn("ALERT iam.otp_abuse.detected tenant={} capHit={} sendsInWindow={} windowStart={}", e.tenantId(),
-                    p.path("capHit").asText(), p.path("sendsInWindow").asInt(), p.path("windowStart").asText());
+                    p.path("capHit").asString(), p.path("sendsInWindow").asInt(), p.path("windowStart").asString());
             audit.recordPlatform("system", null, "System", "System", null, "iam.otp_abuse_detected", "tenant", e.tenantId(), null,
                     mapper.convertValue(p, java.util.Map.class));
         }

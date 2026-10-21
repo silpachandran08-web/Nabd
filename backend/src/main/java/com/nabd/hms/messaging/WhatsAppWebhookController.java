@@ -1,7 +1,7 @@
 package com.nabd.hms.messaging;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -64,24 +64,24 @@ class WhatsAppWebhookController {
         for (JsonNode entry : objectMapper.readTree(body).path("entry")) {
             for (JsonNode change : entry.path("changes")) {
                 JsonNode value = change.path("value");
-                switch (change.path("field").asText()) {
+                switch (change.path("field").asString()) {
                     case "message_template_status_update" -> templates.applyUpdate(
-                            value.path("message_template_id").asText(),
-                            WhatsAppTemplateService.statusOf(value.path("event").asText()),
-                            value.path("reason").isNull() || "NONE".equals(value.path("reason").asText())
-                                    ? null : value.path("reason").asText(null),
+                            value.path("message_template_id").asString(),
+                            WhatsAppTemplateService.statusOf(value.path("event").asString()),
+                            value.path("reason").isNull() || "NONE".equals(value.path("reason").asString())
+                                    ? null : value.path("reason").asString(null),
                             null);
                     case "message_template_quality_update" -> templates.applyUpdate(
-                            value.path("message_template_id").asText(), null, null,
-                            value.path("new_quality_score").asText("UNKNOWN"));
+                            value.path("message_template_id").asString(), null, null,
+                            value.path("new_quality_score").asString("UNKNOWN"));
                     default -> { }
                 }
                 for (JsonNode s : change.path("value").path("statuses")) {
-                    String status = s.path("status").asText();
+                    String status = s.path("status").asString();
                     if (TRACKED.contains(status)) {
                         JsonNode err = s.path("errors").path(0);
-                        repo.applyStatus(s.path("id").asText(), status,
-                                err.isMissingNode() ? null : err.path("code").asText() + ": " + err.path("title").asText());
+                        repo.applyStatus(s.path("id").asString(), status,
+                                err.isMissingNode() ? null : err.path("code").asString() + ": " + err.path("title").asString());
                     }
                 }
                 // ponytail: inbound patient messages are acknowledged but not stored — see V46 header.

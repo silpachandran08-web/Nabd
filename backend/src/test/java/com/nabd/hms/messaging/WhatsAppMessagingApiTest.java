@@ -51,7 +51,7 @@ class WhatsAppMessagingApiTest extends ApiTestBase {
 
         seedReminderTemplate(tenant.id());
         UUID id = inTenantTx(tenant.id(), () -> service.queueTemplate(
-                tenant.id(), patient, "+91 90000 00000", "appointment_reminder", "en", List.of("Dr. A", "10:00")));
+                patient, "+91 90000 00000", "appointment_reminder", "en", List.of("Dr. A", "10:00")));
         dispatcher.poll();
 
         String wamid = inTenantTx(tenant.id(), () -> jdbc.queryForObject(
@@ -72,7 +72,7 @@ class WhatsAppMessagingApiTest extends ApiTestBase {
 
         seedReminderTemplate(tenant.id());
         UUID id = inTenantTx(tenant.id(), () -> service.queueTemplate(
-                tenant.id(), patient, "+919000000000", "appointment_reminder", "en", List.of("Dr. A", "10:00")));
+                patient, "+919000000000", "appointment_reminder", "en", List.of("Dr. A", "10:00")));
         // withdrawal lands after queueing, before the dispatcher picks it up (NB-196)
         inTenantTx(tenant.id(), () -> jdbc.update(
                 "INSERT INTO consents (tenant_id, patient_id, consent_type, created_at, withdrawn_at) " +
@@ -101,8 +101,17 @@ class WhatsAppMessagingApiTest extends ApiTestBase {
     }
 
     private void seedReminderTemplate(UUID tenantId) {
-        templates.create(tenantId, new WhatsAppTemplateService.TemplateRequest("appointment_reminder", "en", "UTILITY",
-                "Your visit with {{1}} is at {{2}} today.", List.of("Dr. A", "10:00")));
+        // PLT-019: the service takes the tenant bound at transaction start, i.e. the signed-in staff member's
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(
+                        org.springframework.security.oauth2.jwt.Jwt.withTokenValue("t").header("alg", "none")
+                                .subject(UUID.randomUUID().toString()).claim("tenantId", tenantId.toString()).build()));
+        try {
+            templates.create(new WhatsAppTemplateService.TemplateRequest("appointment_reminder", "en", "UTILITY",
+                    "Your visit with {{1}} is at {{2}} today.", List.of("Dr. A", "10:00")));
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
     }
 
     private UUID seedPatient(UUID tenantId) {

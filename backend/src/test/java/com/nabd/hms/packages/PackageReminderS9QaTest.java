@@ -20,7 +20,7 @@ class PackageReminderS9QaTest extends ApiTestBase {
 
     private String instance(String token, String suffix) {
         String patientId = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(token, Map.of(
-                "name", "Qa Reminder " + suffix, "phone", "+9198" + (7100000 + Math.abs(suffix.hashCode() % 90000)), "dob", "1980-01-01", "gender", "female")), Map.class).getBody().get("id");
+                "name", "Qa Reminder " + suffix, "phone", "+91998" + (7100000 + Math.abs(suffix.hashCode() % 90000)), "dob", "1980-01-01", "gender", "female")), Map.class).getBody().get("id");
         ResponseEntity<Map> pkg = exchange("/v1/packages", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "name", "Qa Pkg", "packageType", "combination", "speciality", "Dermatology", "description", "d", "price", 2400.00,
                 "taxInclusive", false, "validityDays", 90, "validityStarts", "purchase_date", "graceDays", 7,

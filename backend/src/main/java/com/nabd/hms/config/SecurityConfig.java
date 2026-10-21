@@ -91,7 +91,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); // PUT: DOC-R7 working hours and the allergy/pregnancy safety writes (CLN-001)
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id", "X-Step-Up-Token", "Idempotency-Key"));
-        config.setExposedHeaders(List.of("X-Request-Id", "Idempotent-Replayed"));
+        config.setExposedHeaders(List.of("X-Request-Id", "Idempotent-Replayed", "Retry-After"));
         config.setMaxAge(600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/v1/**", config);
@@ -102,8 +102,10 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http,
             Converter<org.springframework.security.oauth2.jwt.Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter,
             CorsConfigurationSource corsConfigurationSource,
-            com.nabd.hms.shared.idempotency.IdempotencyFilter idempotencyFilter) throws Exception {
+            com.nabd.hms.shared.idempotency.IdempotencyFilter idempotencyFilter,
+            com.nabd.hms.shared.ratelimit.RateLimitFilter rateLimitFilter) throws Exception {
         http
+                .addFilterAfter(rateLimitFilter, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class) // PLT-008, before idempotency
                 .addFilterAfter(idempotencyFilter, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter.class) // PLT-026
                 .csrf(csrf -> csrf.disable()) // stateless bearer-token API, no cookies to forge
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))

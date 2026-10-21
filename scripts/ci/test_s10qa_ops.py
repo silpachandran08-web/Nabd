@@ -201,7 +201,8 @@ class Ops034Contract(unittest.TestCase):
         for needle in ("oasdiff changelog", "oasdiff breaking", "gh pr comment", "api/openapi/core.yaml"):
             self.assertIn(needle, text)
         required = json.load(open(".github/branch-protection.json"))["required_status_checks"]["contexts"]
-        self.assertFalse([c for c in required if "contract" in c or "stage5" in c], "stage 5 must not be a required check")
+        # OPS-035 made stage 5 blocking in its own job (stage5-api-contract); this report job must still never be required
+        self.assertNotIn("api-contract-report", required, "the stage 5 report job must not be a required check")
 
     def test_generated_vs_committed_diff_runs_in_a_required_stage(self):
         self.assertIn("OpenApiSpecApiTest", open("backend/src/test/java/com/nabd/hms/config/OpenApiSpecApiTest.java").read())
@@ -318,7 +319,7 @@ class Ops053Staging(unittest.TestCase):
             os.unlink(f.name)
         self.assertEqual(subprocess.run(["python3", "infra/staging-in/check-staging-in.py"], capture_output=True).returncode, 0)
 
-    @unittest.expectedFailure  # known defect: ShedLock waits on OPS-013
+    # was a known defect until OPS-013 (S12) added ShedLock
     def test_known_defect_OPS053_each_scheduled_job_runs_once_across_replicas_shedlock(self):
         pom = open("backend/pom.xml").read()
         src = "".join(open(os.path.join(d, f)).read() for d, _, fs in os.walk("backend/src/main/java") for f in fs if f.endswith(".java"))

@@ -1230,6 +1230,62 @@ paths:
       tags:
       - billing
       x-required-permission: billing:approve
+  /v1/billing/day-close/history:
+    get:
+      operationId: DayCloseController_history
+      parameters:
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DayCloseHistoryResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
   /v1/billing/day-close/reopen:
     post:
       operationId: DayCloseController_reopen
@@ -1741,7 +1797,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - clinical
-      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve')"
+      x-required-permission: clinical:edit | clinical:approve
   /v1/clinical/drugs/search:
     get:
       operationId: PrescriptionController_searchDrugs
@@ -2974,8 +3030,7 @@ paths:
           description: Error (RFC 7807)
       tags:
       - clinical
-      x-required-permission: "hasAnyAuthority('clinical:edit', 'clinical:approve',\
-        \ 'clinical:view')"
+      x-required-permission: clinical:edit | clinical:approve | clinical:view
   /v1/clinical/prescriptions/{queueEntryId}/signing-authority:
     get:
       operationId: PrescriptionController_signingAuthority
@@ -3471,7 +3526,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/departments:
     get:
@@ -3504,7 +3559,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:view
     post:
       operationId: DepartmentController_create
@@ -3540,7 +3595,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:create
   /v1/departments/transfers:
     get:
@@ -3573,7 +3628,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:view
     post:
       operationId: DepartmentController_replaceTransfers
@@ -3611,7 +3666,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:edit
   /v1/departments/{id}:
     delete:
@@ -3645,7 +3700,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:delete
     patch:
       operationId: DepartmentController_update
@@ -3688,7 +3743,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:edit
   /v1/departments/{id}/flow:
     get:
@@ -3728,7 +3783,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: queue:view
   /v1/departments/{id}/transfer-targets:
     get:
@@ -3768,7 +3823,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: queue:view
   /v1/departments/{id}/workflow:
     get:
@@ -3806,7 +3861,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:view
     post:
       operationId: DepartmentController_replaceWorkflow
@@ -3849,7 +3904,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - department
+      - organization
       x-required-permission: departments:edit
   /v1/doctors/{id}/availability:
     get:
@@ -4180,7 +4235,8 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: setup:edit
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
+        \ #id.toString()"
   /v1/doctors/{id}/working-hours/{hoursId}:
     delete:
       operationId: ScheduleController_deleteWorkingHours
@@ -4220,7 +4276,8 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: setup:edit
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
+        \ #id.toString()"
     put:
       operationId: ScheduleController_updateWorkingHours
       parameters:
@@ -4269,7 +4326,8 @@ paths:
           description: Error (RFC 7807)
       tags:
       - queue
-      x-required-permission: setup:edit
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
+        \ #id.toString()"
   /v1/nursing/activity/today:
     get:
       operationId: NursingController_activityToday
@@ -5892,6 +5950,54 @@ paths:
       tags:
       - patient
       x-required-permission: patients:create
+  /v1/patients/data-quality:
+    get:
+      operationId: PatientController_dataQuality
+      parameters:
+      - in: query
+        name: issue
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DataQualityPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/patients/guardian-reviews-due:
     get:
       operationId: PatientController_guardianReviewsDue
@@ -9243,7 +9349,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addCharge
@@ -9279,7 +9385,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/charges/{id}:
     patch:
@@ -9323,7 +9429,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/checklist:
     get:
@@ -9356,7 +9462,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/checklist/{step}/complete:
     post:
@@ -9389,7 +9495,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/checklist/{step}/skip:
     post:
@@ -9422,7 +9528,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/consent-contact:
     get:
@@ -9453,7 +9559,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     patch:
       operationId: SetupController_updateConsentContact
@@ -9489,7 +9595,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/export-jobs:
     get:
@@ -9522,7 +9628,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_createExportJob
@@ -9558,7 +9664,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/holidays:
     get:
@@ -9591,7 +9697,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addHoliday
@@ -9627,7 +9733,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/holidays/{id}:
     delete:
@@ -9661,7 +9767,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/import-jobs:
     get:
@@ -9694,7 +9800,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_createImportJob
@@ -9730,7 +9836,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/licences:
     get:
@@ -9763,7 +9869,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addLicence
@@ -9799,7 +9905,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/licences/{id}:
     patch:
@@ -9843,7 +9949,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/payroll-export:
     get:
@@ -9882,7 +9988,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/policies:
     get:
@@ -9915,7 +10021,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/policies/{key}:
     patch:
@@ -9958,7 +10064,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/profile:
     get:
@@ -9989,7 +10095,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     patch:
       operationId: SetupController_updateProfile
@@ -10025,7 +10131,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/shifts:
     get:
@@ -10058,7 +10164,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
     post:
       operationId: SetupController_addShift
@@ -10094,7 +10200,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:edit
   /v1/setup/staff:
     get:
@@ -10127,7 +10233,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/subscription:
     get:
@@ -10158,7 +10264,7 @@ paths:
                 $ref: "#/components/schemas/Problem"
           description: Error (RFC 7807)
       tags:
-      - setup
+      - organization
       x-required-permission: setup:view
   /v1/setup/whatsapp-templates:
     get:
@@ -11261,6 +11367,7 @@ components:
       properties:
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6,8}$"
       required:
       - pin
@@ -11269,6 +11376,7 @@ components:
       properties:
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,6}$"
       required:
       - pin
@@ -11328,8 +11436,10 @@ components:
       properties:
         dose:
           type: string
+          minLength: 1
         drugName:
           type: string
+          minLength: 1
         queueEntryId:
           type: string
           format: uuid
@@ -11545,6 +11655,7 @@ components:
           minLength: 0
         severity:
           type: string
+          minLength: 1
           pattern: mild|moderate|severe
         source:
           type: string
@@ -11731,6 +11842,7 @@ components:
           format: uuid
         reasonCode:
           type: string
+          minLength: 1
           pattern: unconscious_patient|life_threatening|no_treating_clinician_available|other
         reasonText:
           type: string
@@ -11866,10 +11978,13 @@ components:
           type: boolean
         baseAmount:
           type: number
+          minimum: 0
         category:
           type: string
+          minLength: 1
         code:
           type: string
+          minLength: 1
         displayOrder:
           type: integer
           format: int32
@@ -11883,14 +11998,18 @@ components:
           format: date
         emergencyAmount:
           type: number
+          minimum: 0
         followUpAmount:
           type: number
+          minimum: 0
         name:
           type: string
+          minLength: 1
         taxCode:
           type: string
         taxRatePercent:
           type: number
+          minimum: 0
       required:
       - baseAmount
       - category
@@ -12034,6 +12153,7 @@ components:
           format: date
         name:
           type: string
+          minLength: 1
         recurring:
           type: boolean
       required:
@@ -12070,6 +12190,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         specialties:
           type: array
           items:
@@ -12081,6 +12202,7 @@ components:
           pattern: ^GSTIN|VAT$
         timezone:
           type: string
+          minLength: 1
         whatsappNumber:
           type: string
       required:
@@ -12117,6 +12239,9 @@ components:
     Close:
       type: object
       properties:
+        closeCount:
+          type: integer
+          format: int32
         closedAt:
           type: string
           format: date-time
@@ -12186,6 +12311,7 @@ components:
       properties:
         condition:
           type: string
+          minLength: 1
         reviewDueDate:
           type: string
           format: date
@@ -12205,8 +12331,11 @@ components:
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         name:
           type: string
+          minLength: 1
         phone:
           type: string
       required:
@@ -12229,22 +12358,31 @@ components:
       properties:
         brandName:
           type: string
+          minLength: 1
         ownerEmail:
           type: string
+          format: email
+          minLength: 1
         ownerMobile:
           type: string
+          minLength: 1
         ownerName:
           type: string
+          minLength: 1
         path:
           type: string
+          minLength: 1
           pattern: ^(self_serve|enterprise)$
         region:
           type: string
+          minLength: 1
           pattern: ^(IN|KSA)$
         tenantName:
           type: string
+          minLength: 1
         tenantSlug:
           type: string
+          minLength: 1
           pattern: "^[A-Za-z0-9](?:[A-Za-z0-9-]{1,61}[A-Za-z0-9])?$"
       required:
       - brandName
@@ -12279,6 +12417,15 @@ components:
         paymentCountToday:
           type: integer
           format: int32
+    DataQualityPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        nextCursor:
+          type: string
     Day:
       type: object
       properties:
@@ -12302,6 +12449,15 @@ components:
         unbilledConsultations:
           type: integer
           format: int32
+    DayCloseHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        nextCursor:
+          type: string
     DayCloseRequest:
       type: object
       properties:
@@ -12309,6 +12465,9 @@ components:
           type: number
           exclusiveMinimum: false
           minimum: 0.00
+        date:
+          type: string
+          format: date
         note:
           type: string
           maxLength: 1000
@@ -12361,6 +12520,9 @@ components:
     DayReopenRequest:
       type: object
       properties:
+        date:
+          type: string
+          format: date
         reason:
           type: string
           maxLength: 500
@@ -12392,6 +12554,7 @@ components:
           format: date-time
         reason:
           type: string
+          minLength: 1
         staffId:
           type: string
           format: uuid
@@ -12449,6 +12612,7 @@ components:
       properties:
         templateCode:
           type: string
+          minLength: 1
         toggles:
           type: object
           additionalProperties:
@@ -12479,6 +12643,7 @@ components:
           type: boolean
         name:
           type: string
+          minLength: 1
       required:
       - name
     DiscountPage:
@@ -12517,6 +12682,7 @@ components:
           minimum: 0.01
         reason:
           type: string
+          minLength: 1
         tenantId:
           type: string
           format: uuid
@@ -12887,6 +13053,7 @@ components:
       properties:
         exportType:
           type: string
+          minLength: 1
           pattern: full_tenant|patients|invoices|charges
       required:
       - exportType
@@ -12914,6 +13081,7 @@ components:
           format: date
         reason:
           type: string
+          minLength: 1
       required:
       - newValidityEnd
       - reason
@@ -13146,8 +13314,10 @@ components:
       properties:
         fileName:
           type: string
+          minLength: 1
         importType:
           type: string
+          minLength: 1
           pattern: patients|appointments|invoices|charges
       required:
       - fileName
@@ -13374,11 +13544,14 @@ components:
           type: string
         licenceType:
           type: string
+          minLength: 1
           pattern: clinician|facility
         number:
           type: string
+          minLength: 1
         region:
           type: string
+          minLength: 1
           pattern: IN|KSA
       required:
       - expiryDate
@@ -13419,6 +13592,7 @@ components:
           type: string
         chargeCode:
           type: string
+          minLength: 1
         chargeName:
           type: string
         override:
@@ -13464,31 +13638,20 @@ components:
           type: string
         unitPrice:
           type: number
-    LocalTime:
-      type: object
-      properties:
-        hour:
-          type: integer
-          format: int32
-        minute:
-          type: integer
-          format: int32
-        nano:
-          type: integer
-          format: int32
-        second:
-          type: integer
-          format: int32
     LoginRequest:
       type: object
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - email
       - pin
@@ -13516,6 +13679,7 @@ components:
       properties:
         code:
           type: string
+          minLength: 1
           pattern: "\\d{6}"
         setupToken:
           type: string
@@ -13561,6 +13725,7 @@ components:
           type: string
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
       required:
       - challengeId
@@ -13731,8 +13896,11 @@ components:
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
       required:
       - email
@@ -13767,9 +13935,11 @@ components:
       properties:
         mobilePhone:
           type: string
+          minLength: 1
           pattern: "^\\+?[0-9](?:[ ()-]?[0-9]){7,14}$"
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - mobilePhone
       - tenantSlug
@@ -13778,11 +13948,14 @@ components:
       properties:
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
         mobilePhone:
           type: string
+          minLength: 1
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - code
       - mobilePhone
@@ -13848,8 +14021,11 @@ components:
       properties:
         email:
           type: string
+          format: email
+          minLength: 1
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
       required:
       - email
@@ -13859,9 +14035,11 @@ components:
       properties:
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
         setupToken:
           type: string
+          minLength: 1
       required:
       - code
       - setupToken
@@ -13882,6 +14060,7 @@ components:
       properties:
         setupToken:
           type: string
+          minLength: 1
       required:
       - setupToken
     OwnerMfaVerifyRequest:
@@ -13889,8 +14068,10 @@ components:
       properties:
         challengeToken:
           type: string
+          minLength: 1
         code:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6}$"
       required:
       - challengeToken
@@ -13914,9 +14095,12 @@ components:
           pattern: service_session|procedure|consultation|take_home_product
         name:
           type: string
+          minLength: 1
         quantity:
           type: integer
           format: int32
+          exclusiveMinimum: true
+          minimum: 0
         taxRatePercent:
           type: number
           exclusiveMinimum: false
@@ -14025,12 +14209,16 @@ components:
         graceDays:
           type: integer
           format: int32
+          exclusiveMinimum: false
+          minimum: 0
         items:
           type: array
           items:
             $ref: "#/components/schemas/PackageItemInput"
+          minItems: 1
         name:
           type: string
+          minLength: 1
         packageType:
           type: string
           pattern: combination|session
@@ -14047,6 +14235,8 @@ components:
         validityDays:
           type: integer
           format: int32
+          exclusiveMinimum: true
+          minimum: 0
         validityStarts:
           type: string
           pattern: purchase_date|first_session
@@ -14251,6 +14441,7 @@ components:
           format: date
         gender:
           type: string
+          minLength: 1
           pattern: male|female|other
         guardianConsent:
           $ref: "#/components/schemas/GuardianConsent"
@@ -14259,10 +14450,12 @@ components:
           format: uuid
         name:
           type: string
+          minLength: 1
         nationalId:
           type: string
         phone:
           type: string
+          minLength: 1
       required:
       - dob
       - gender
@@ -14367,13 +14560,17 @@ components:
           type: boolean
         name:
           type: string
+          minLength: 1
         price:
           type: number
+          minimum: 0
         stockQty:
           type: integer
           format: int32
+          minimum: 0
         taxRatePercent:
           type: number
+          minimum: 0
       required:
       - name
       - price
@@ -14441,9 +14638,11 @@ components:
       properties:
         currentPin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
         newPin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{6,8}$"
       required:
       - currentPin
@@ -14453,13 +14652,17 @@ components:
       properties:
         mobilePhone:
           type: string
+          minLength: 1
         newPin:
           type: string
+          minLength: 1
           pattern: "\\d{6,8}"
         tenantSlug:
           type: string
+          minLength: 1
         token:
           type: string
+          minLength: 1
       required:
       - mobilePhone
       - newPin
@@ -14470,8 +14673,10 @@ components:
       properties:
         mobilePhone:
           type: string
+          minLength: 1
         tenantSlug:
           type: string
+          minLength: 1
       required:
       - mobilePhone
       - tenantSlug
@@ -14513,8 +14718,10 @@ components:
           type: boolean
         code:
           type: string
+          minLength: 1
         currency:
           type: string
+          minLength: 1
           pattern: INR|SAR
         monthlyPriceCents:
           type: integer
@@ -14522,6 +14729,7 @@ components:
           minimum: 0
         name:
           type: string
+          minLength: 1
         seatLimit:
           type: integer
           format: int32
@@ -14549,6 +14757,7 @@ components:
       properties:
         value:
           type: string
+          minLength: 1
       required:
       - value
     PregnancyEventResponse:
@@ -14597,6 +14806,7 @@ components:
           format: date
         status:
           type: string
+          minLength: 1
           pattern: not_pregnant|pregnant|lactating|unknown
       required:
       - status
@@ -14838,6 +15048,7 @@ components:
       properties:
         signedName:
           type: string
+          minLength: 1
       required:
       - signedName
     ProcedureNotesRequest:
@@ -14852,6 +15063,7 @@ components:
       properties:
         chargeCode:
           type: string
+          minLength: 1
         consentNote:
           type: string
         prepNotes:
@@ -15064,6 +15276,7 @@ components:
           type: string
         status:
           type: string
+          minLength: 1
       required:
       - status
     RaiseTicketRequest:
@@ -15088,6 +15301,7 @@ components:
       properties:
         challengeToken:
           type: string
+          minLength: 1
         recoveryCode:
           type: string
           maxLength: 32
@@ -15122,6 +15336,7 @@ components:
       properties:
         refreshToken:
           type: string
+          minLength: 1
       required:
       - refreshToken
     RefundPreviewItem:
@@ -15154,6 +15369,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     RefundResponse:
@@ -15189,6 +15405,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     RegionSummaryResponse:
@@ -15226,6 +15443,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     RequestGrantRequest:
@@ -15300,10 +15518,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ModuleGrant"
+          minItems: 1
         mfaRequired:
           type: boolean
         name:
           type: string
+          minLength: 1
       required:
       - grants
       - name
@@ -15362,6 +15582,7 @@ components:
       properties:
         phone:
           type: string
+          minLength: 1
       required:
       - phone
     RxReasonOption:
@@ -15376,6 +15597,7 @@ components:
       properties:
         kind:
           type: string
+          minLength: 1
           pattern: allergy|pregnancy|controlled
         note:
           type: string
@@ -15383,6 +15605,7 @@ components:
           minLength: 0
         reasonCode:
           type: string
+          minLength: 1
       required:
       - kind
       - reasonCode
@@ -15497,6 +15720,7 @@ components:
           format: uuid
         paymentMethod:
           type: string
+          minLength: 1
       required:
       - packageId
       - patientId
@@ -15584,10 +15808,14 @@ components:
           format: uuid
         email:
           type: string
+          format: email
+          minLength: 1
         mobilePhone:
           type: string
+          minLength: 1
         name:
           type: string
+          minLength: 1
         roleId:
           type: string
           format: uuid
@@ -15748,6 +15976,7 @@ components:
           format: date
         patternJson:
           type: string
+          minLength: 1
         staffId:
           type: string
           format: uuid
@@ -15860,8 +16089,10 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
         toStatus:
           type: string
+          minLength: 1
       required:
       - reason
       - toStatus
@@ -16203,8 +16434,10 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
         toStatus:
           type: string
+          minLength: 1
       required:
       - reason
       - toStatus
@@ -16229,6 +16462,7 @@ components:
       properties:
         pin:
           type: string
+          minLength: 1
           pattern: "^[0-9]{4,8}$"
       required:
       - pin
@@ -16446,6 +16680,7 @@ components:
       properties:
         reason:
           type: string
+          minLength: 1
       required:
       - reason
     WaitEstimateResponse:
@@ -16536,7 +16771,8 @@ components:
           type: integer
           format: int32
         endTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
         id:
           type: string
           format: uuid
@@ -16547,7 +16783,8 @@ components:
           type: integer
           format: int32
         startTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
     WorkingHoursWriteRequest:
       type: object
       properties:
@@ -16557,7 +16794,8 @@ components:
           maximum: 6
           minimum: 0
         endTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
         maxPatients:
           type: integer
           format: int32
@@ -16566,18 +16804,28 @@ components:
           type: integer
           format: int32
         startTime:
-          $ref: "#/components/schemas/LocalTime"
+          type: string
+          format: time-local
       required:
       - dayOfWeek
       - endTime
       - startTime
+    WorklistItem:
+      type: object
+      properties:
+        entry:
+          $ref: "#/components/schemas/QueueEntryResponse"
+        patient:
+          $ref: "#/components/schemas/PatientDetailResponse"
+        vitals:
+          $ref: "#/components/schemas/VitalsResponse"
     WorklistResponse:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Item"
+            $ref: "#/components/schemas/WorklistItem"
     WorkspaceSelectRequest:
       type: object
       properties:

@@ -121,7 +121,7 @@ class OtcRxGateApiTest extends ApiTestBase {
     }
 
     private static void assertProblem(ResponseEntity<Map> r, String type) {
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat((String) r.getBody().get("type")).endsWith("/" + type);
     }
 
@@ -317,7 +317,7 @@ class OtcRxGateApiTest extends ApiTestBase {
         List<HttpStatus> codes = new ArrayList<>();
         for (var f : results) codes.add(HttpStatus.valueOf(f.get().getStatusCode().value()));
         pool.shutdown();
-        assertThat(codes).containsExactlyInAnyOrder(HttpStatus.OK, HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(codes).containsExactlyInAnyOrder(HttpStatus.OK, HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(stock(c, rx)).isEqualTo(45);
     }
 

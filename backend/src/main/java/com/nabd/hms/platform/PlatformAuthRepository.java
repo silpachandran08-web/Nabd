@@ -101,12 +101,25 @@ class PlatformAuthRepository {
     }
 
     void insertSession(UUID id, UUID operatorId, UUID familyId, String tokenHash,
-                        Instant expiresAt, String deviceLabel, String ip, String userAgent) {
+                        Instant expiresAt, String deviceLabel, String ip, String userAgent, Instant now) {
         jdbc.update(
-                "INSERT INTO master.sessions (id, operator_id, family_id, token_hash, expires_at, device_label, ip_address, user_agent) " +
-                        "VALUES (?,?,?,?,?,?,?::inet,?)",
-                id, operatorId, familyId, tokenHash, Timestamp.from(expiresAt), deviceLabel, ip, userAgent
+                "INSERT INTO master.sessions (id, operator_id, family_id, token_hash, expires_at, device_label, ip_address, user_agent, family_started_at) " +
+                        "VALUES (?,?,?,?,?,?,?::inet,?, COALESCE((SELECT min(family_started_at) FROM master.sessions WHERE family_id = ?), ?))",
+                id, operatorId, familyId, tokenHash, Timestamp.from(expiresAt), deviceLabel, ip, userAgent,
+                familyId, Timestamp.from(now) // PLT-007: rotation keeps the family's start (12 h cap)
         );
+    }
+
+    /** PLT-007: when this session's refresh family was first signed in. */
+    Instant familyStartedAt(UUID sessionId) {
+        return jdbc.queryForObject("SELECT family_started_at FROM master.sessions WHERE id = ?", Timestamp.class, sessionId).toInstant();
+    }
+
+    /** PLT-007: operator access-token liveness (logout / revoke take effect on the next request). */
+    boolean isSessionActive(UUID sessionId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM master.sessions WHERE id = ? AND revoked_at IS NULL AND expires_at > now())",
+                Boolean.class, sessionId));
     }
 
     Optional<SessionRow> findSessionByTokenHash(String tokenHash) {

@@ -1,7 +1,6 @@
 package com.nabd.hms.architecture;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.NabdHmsApplication;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
@@ -41,7 +40,7 @@ class ArchitectureRulesTest {
             v.add(Map.of("tool", "modulith", "rule", "modulith-bootstrap", "module", "app", "detail", String.valueOf(e.getMessage())));
         }
         Files.createDirectories(OUT.getParent());
-        new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT).writeValue(OUT.toFile(), v);
+        new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(OUT.toFile(), v);
         assertTrue(Files.size(OUT) > 0);
     }
 

@@ -10,7 +10,7 @@ Goal: a deploy during OPD hours never locks `queue_entries` and never breaks pod
 Every migration starts with `SET lock_timeout = '5s';` (MIG-004). A blocked DDL then fails fast and the deploy retries, instead of queueing behind a long transaction and blocking every reader and writer behind it.
 
 ## Concurrent indexes
-`CREATE INDEX` on an existing table takes a write-blocking lock (MIG-001). Use `CREATE INDEX CONCURRENTLY IF NOT EXISTS`. It cannot run inside a transaction, so give the file its own Flyway script config with `executeInTransaction=false` and keep it to index statements only. Indexes on a table created in the same file are exempt.
+`CREATE INDEX` on an existing table takes a write-blocking lock (MIG-001). Use `CREATE INDEX CONCURRENTLY IF NOT EXISTS`. It cannot run inside a transaction, so give the file its own Flyway script config with `executeInTransaction=false` and keep it to index statements only. Indexes on a table created in the same file are exempt. Our Flyway runs every file in a transaction (CONCURRENTLY there hangs the migrate), so a plain index on a small table may be waived per file with `-- migration-lint: allow MIG-001 <reason>`; only MIG-001 can be waived.
 
 ## Check constraints
 A plain `ADD CONSTRAINT ... CHECK` scans the table under an ACCESS EXCLUSIVE lock (MIG-002). Do it in two steps:

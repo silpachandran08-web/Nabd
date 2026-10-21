@@ -1,0 +1,122 @@
+"use client";
+
+import { decodeJwtPayload } from "../../lib/jwt";
+import { useCallback, useEffect, useState } from "react";
+import { can } from "../../lib/permissions";
+import { useLatestLoad } from "../../lib/useLatestLoad";
+import type { PatientSummary as PatientDetail, QueueEntry } from "@nabd/domain";
+import { apiFetch, goLogin } from "../../lib/apiClient";
+import { clinicTimeZoneReady, clinicToday } from "../../lib/clinicTime";
+
+
+// DTOs mirror the backend records exactly (queue/dto/*, clinical/dto/DueConditionResponse).
+export type Appointment = { id: string; patientId: string; doctorId: string; startTime: string; endTime: string; status: string; isFollowUp: boolean };
+export type AppointmentPage = { data: Appointment[]; page: { nextCursor: string | null; limit: number } };
+export type DoctorDelay = { id: string; doctorId: string; delayMinutes: number; reason: string | null; announcedAt: string; clearedAt: string | null; active: boolean };
+export type WaitEstimate = { estimatedMinutes: number; patientsAhead: number; avgVisitMinutes: number; basedOnHistory: boolean };
+export type DueCondition = { id: string; patientId: string; patientName: string; condition: string; reviewDueDate: string };
+
+/** A secondary read: loaded, or honestly unavailable (error / 403) so the widget says so instead of a number. */
+export type Part<T> = { state: "ok"; data: T } | { state: "unavailable" };
+
+export type DayRow = QueueEntry & { patientName: string | null; patient: PatientDetail | null };
+export type MyDayData = {
+  selfId: string;
+  rows: DayRow[];
+  appointments: Part<AppointmentPage>;
+  delay: Part<DoctorDelay | null>;
+  wait: Part<WaitEstimate>;
+  due: Part<DueCondition[]> | null; // null = no clinical:view: the widget is absent
+  patientNames: Record<string, string>;
+};
+
+function selfIdFromToken(token: string): string {
+  return String(decodeJwtPayload<{ sub?: string }>(token)?.sub ?? "");
+}
+
+
+export function useMyDay() {
+  const [data, setData] = useState<MyDayData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const newSignal = useLatestLoad();
+  const load = useCallback(async () => {
+    const signal = newSignal();
+    setLoading(true);
+    setError(null);
+    const token = localStorage.getItem("nabd_access_token");
+    const selfId = token ? selfIdFromToken(token) : "";
+    if (!token || !selfId) {
+      goLogin();
+      return;
+    }
+    const get = async (path: string): Promise<Response | null> => {
+      try {
+        const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` }, signal });
+        if (res.status === 401) {
+          localStorage.removeItem("nabd_access_token");
+          goLogin();
+          return null;
+        }
+        return res;
+      } catch {
+        return null;
+      }
+    };
+    const part = async <T,>(path: string, pick: (j: unknown) => T): Promise<Part<T>> => {
+      const res = await get(path);
+      if (!res?.ok) return { state: "unavailable" };
+      try {
+        return { state: "ok", data: pick(await res.json()) };
+      } catch {
+        return { state: "unavailable" };
+      }
+    };
+    try {
+      const wantDue = can("clinical:view");
+      const today = clinicToday(await clinicTimeZoneReady()); // the clinic's date, not the device's (FEF-011)
+      if (signal.aborted) return;
+      const [queueRes, appointments, delay, wait, due] = await Promise.all([
+        get(`/queue?doctorId=${selfId}`),
+        part(`/appointments?doctorId=${selfId}&date=${today}&limit=100`, (j) => j as AppointmentPage),
+        part(`/doctors/${selfId}/delay`, (j) => ((j as DoctorDelay[]).find((d) => d.active) ?? null)),
+        part(`/queue/wait-estimate?doctorId=${selfId}`, (j) => j as WaitEstimate),
+        wantDue ? part(`/clinical/conditions/due`, (j) => j as DueCondition[]) : Promise.resolve(null),
+      ]);
+      if (signal.aborted) return;
+      if (!queueRes) { setError("Couldn't reach the server. Check your connection and try again."); return; }
+      if (!queueRes.ok) { setError("Couldn't load today's queue. Try again."); return; }
+      const entries: QueueEntry[] = await queueRes.json();
+      if (signal.aborted) return;
+
+      // Names/flags: one patient read per distinct patient across the queue and today's appointments.
+      // Without patients:view (or on a failed read) the row shows its token instead of a name.
+      const patientIds = new Set<string>(entries.map((e) => e.patientId));
+      if (appointments.state === "ok") appointments.data.data.forEach((a) => patientIds.add(a.patientId));
+      const details = new Map<string, PatientDetail | null>();
+      if (can("patients:view")) {
+        await Promise.all([...patientIds].map(async (id) => {
+          const r = await get(`/patients/${id}`);
+          details.set(id, r?.ok ? ((await r.json()) as PatientDetail) : null);
+        }));
+      }
+      if (signal.aborted) return;
+      const patientNames: Record<string, string> = {};
+      details.forEach((p, id) => { if (p) patientNames[id] = p.name; });
+      setData({
+        selfId,
+        rows: entries.map((e) => ({ ...e, patient: details.get(e.patientId) ?? null, patientName: details.get(e.patientId)?.name ?? null })),
+        appointments, delay, wait, due, patientNames,
+      });
+    } catch {
+      if (signal.aborted) return;
+      setError("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      if (!signal.aborted) setLoading(false);
+    }
+  }, [newSignal]);
+
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  return { data, loading, error, reload: load };
+}

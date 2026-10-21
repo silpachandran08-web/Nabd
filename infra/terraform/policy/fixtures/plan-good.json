@@ -90,6 +90,30 @@
      "name": "alias/x"
     }
    }
+  },
+  {
+   "address": "module.cell.module.aws[0].aws_elasticache_replication_group.valkey",
+   "mode": "managed",
+   "type": "aws_elasticache_replication_group",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "transit_encryption_enabled": true,
+     "transit_encryption_mode": "required",
+     "at_rest_encryption_enabled": true,
+     "num_cache_clusters": 2,
+     "multi_az_enabled": true,
+     "automatic_failover_enabled": true,
+     "durability": "sync",
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "ops"
+     }
+    }
+   }
   }
  ]
 }

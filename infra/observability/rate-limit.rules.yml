@@ -1,0 +1,20 @@
+# PLT-008: Prometheus alert rules for the Valkey rate limiter (metrics from RateLimitFilter, /actuator/prometheus).
+# Wiring this file into the cell's Prometheus/Alertmanager is Needs external action (no Prometheus in the repo yet).
+# Fail-open fires on the first evaluation after a failed limiter call: scrape 15-30 s + evaluation 30 s < 2 min.
+groups:
+  - name: nabd-rate-limit
+    rules:
+      - alert: NabdRateLimitFailOpen
+        expr: sum(increase(nabd_rate_limit_fail_open_total[1m])) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "Rate limits are failing open: Valkey unreachable (tenant/user/ip limits off, OTP limits still on Postgres)"
+          runbook: docs/architecture/valkey.md
+      - alert: NabdTenantRateLimitedRepeatedly
+        expr: sum(increase(nabd_rate_limit_exceeded_total{dimension="tenant"}[10m])) > 100
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "A tenant keeps hitting its API quota; see nabd.security rate_limit_exceeded log lines for the tenant id"
+          runbook: docs/architecture/valkey.md

@@ -1,15 +1,16 @@
 # OPS-033 SQL ownership (ARCH §11.2, ADR-02). A module writes only the tables it owns and reads only its own tables
 # plus its reads allow-list. Checked by scripts/ci/arch.py (stage 2). Every table created in db/migrations must be listed
 # under exactly one owner; a new table not listed here is reported as a violation.
+# PLT-033: a module may span several Java packages (`packages:`, default its own name); every table in public, identity
+# and consent must have exactly one owner (arch.py reports a gap or a second owner as a sql-ownership violation).
+# doc06 §4.4 also assigns tenants (projection), brands, legal_entities, tax_registrations and invoice_series to organization;
+# they stay with platform/owner/billing until their writers move, so the frozen baseline does not grow.
 # Initial owners were drafted from the current writers (module with most write statements, domain owner on ties) and
 # need confirmation at the architecture review. Read allow-lists start empty on purpose: today's cross-module reads are
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
 modules:
-  auth:
-    owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, sessions]
-    reads: []
   billing:
-    owns: [charge_catalogue, day_closes, invoice_discounts, invoice_line_items, invoice_payments, invoice_series, invoices]
+    owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_payments, invoice_series, invoices]
     reads: []
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, favourite_rx_set_items, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]
@@ -17,14 +18,23 @@ modules:
   common:
     owns: [audit_chain_heads, audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
     reads: []
-  department:
-    owns: [department_transfers, department_workflow_selection, departments, service_points, workflow_definitions]
+  iam:
+    # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff
+    # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
+    # (remaining direct staff reads elsewhere are baseline debt).
+    packages: [iam, auth, staff]
+    owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review]
     reads: []
   messaging:
     owns: [whatsapp_messages, whatsapp_templates]
     reads: []
   nursing:
     owns: [administration_orders, administration_records, procedure_orders, vaccine_records]
+    reads: []
+  organization:
+    # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
+    # organization.department / organization.setup); other modules use organization.api.
+    owns: [attendance_records, clinic_holidays, clinic_policies, clinic_setup_progress, data_export_jobs, data_import_jobs, department_transfers, department_workflow_selection, departments, licence_registry, service_points, staff_shifts, workflow_definitions]
     reads: []
   owner:
     owns: [legal_entities, owners, tax_registrations]
@@ -44,12 +54,6 @@ modules:
   queue:
     owns: [appointments, doctor_delays, doctor_leave, doctor_working_hours, queue_entries, waitlist_entries]
     reads: []
-  setup:
-    owns: [attendance_records, clinic_holidays, clinic_policies, clinic_setup_progress, data_export_jobs, data_import_jobs, licence_registry, staff_shifts]
-    reads: []
   shared:
-    owns: [idempotency_keys]
-    reads: []
-  staff:
-    owns: [role_delegations, roles, staff, staff_clinician_review]
+    owns: [idempotency_keys, projector_applied_events, shedlock]
     reads: []

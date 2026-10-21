@@ -1,5 +1,6 @@
 package com.nabd.hms.shared.idempotency;
 
+import com.nabd.hms.shared.Idempotent;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
@@ -77,7 +78,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         switch (o.kind()) {
             case IN_PROGRESS -> problem(response, HttpStatus.CONFLICT, "IDEMPOTENCY_IN_PROGRESS", "Request in progress",
                     "The first attempt with this Idempotency-Key is still running; retry shortly.");
-            case REUSED -> problem(response, HttpStatus.UNPROCESSABLE_ENTITY, "IDEMPOTENCY_KEY_REUSED", "Idempotency-Key reused",
+            case REUSED -> problem(response, HttpStatus.UNPROCESSABLE_CONTENT, "IDEMPOTENCY_KEY_REUSED", "Idempotency-Key reused",
                     "This Idempotency-Key was already used with a different request.");
             case REPLAY -> {
                 response.setStatus(o.status());

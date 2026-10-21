@@ -13,10 +13,8 @@ import java.util.UUID;
  * NB-043: "revoked session denied within 60s" — a bare stateless JwtDecoder can't do this, since a
  * revoked session's already-issued access token stays cryptographically valid until its own
  * (15-minute) expiry. Wraps the real decoder with one extra check, applied only to tokens that
- * carry BOTH "sid" and "tenantId" — i.e. staff access tokens minted by AuthService.mintTokenPair.
- * Every other token this app issues (MFA challenge, step-up, mfa_setup_required, platform-operator
- * tokens) is missing one or the other claim and passes through unchanged; see mintTokenPair's
- * neighbors for why none of them share this exact claim pair.
+ * carry "sid": staff access tokens (sid + tenantId, public.sessions) and, since PLT-007, platform-operator
+ * access tokens (sid, no tenantId, master.sessions). Other token types never reach this decoder's callers.
  */
 @Component
 @Primary
@@ -24,10 +22,13 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
 
     private final JwtDecoder delegate;
     private final SessionLivenessChecker livenessChecker;
+    private final SessionLivenessCache cache;
 
-    SessionRevocationJwtDecoder(@Qualifier("accessTokenDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker) {
+    SessionRevocationJwtDecoder(@Qualifier("accessTokenDecoder") JwtDecoder delegate, SessionLivenessChecker livenessChecker,
+                                SessionLivenessCache cache) {
         this.delegate = delegate;
         this.livenessChecker = livenessChecker;
+        this.cache = cache;
     }
 
     @Override
@@ -38,17 +39,18 @@ class SessionRevocationJwtDecoder implements JwtDecoder {
         if (sid == null) {
             throw new BadJwtException("access token without sid"); // PLT-001: no pass-through for sid-less tokens
         }
-        boolean active = true;
-        if (tenantId != null) {
-            try {
-                active = livenessChecker.isActive(UUID.fromString(tenantId), UUID.fromString(sid));
-            } catch (RuntimeException e) {
-                if (com.nabd.hms.common.DbFailureAdvice.classify(e) != null) {
-                    // not an invalid token: SecurityConfig's entry point turns this into 503
-                    throw new BadJwtException("session check unavailable", e); // the resource-server filter rethrows AuthenticationServiceException, so it must be this type
-                }
-                throw e;
+        boolean active;
+        try { // PLT-007: operator tokens (no tenantId) are checked against master.sessions too
+            UUID s = UUID.fromString(sid);
+            active = tenantId == null
+                    ? livenessChecker.isActive(null, s)
+                    : cache.isActive(s, jwt.getExpiresAt(), () -> livenessChecker.isActive(UUID.fromString(tenantId), s)); // OPS-020
+        } catch (RuntimeException e) {
+            if (com.nabd.hms.common.DbFailureAdvice.classify(e) != null) {
+                // not an invalid token: SecurityConfig's entry point turns this into 503
+                throw new BadJwtException("session check unavailable", e); // the resource-server filter rethrows AuthenticationServiceException, so it must be this type
             }
+            throw e;
         }
         if (!active) {
             throw new BadJwtException("session revoked");

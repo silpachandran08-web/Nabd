@@ -12,7 +12,7 @@ permissions:
   contents: read
 env:
   NODE_VERSION: "22"
-  JAVA_VERSION: "17"
+  JAVA_VERSION: "21"
 
 jobs:
   changes:
@@ -36,6 +36,7 @@ jobs:
             frontend:
               - 'frontend/**'
               - '.github/**'
+              - 'scripts/api/**'
 
   stage1-static:
     needs: changes
@@ -59,18 +60,27 @@ jobs:
           semgrep scan --config p/ci --config p/java --config p/typescript --severity ERROR --error --metrics=off \
             --baseline-commit "$base" --exclude node_modules --exclude target
       - if: needs.changes.outputs.frontend == 'true'
-        uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+        uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
       - if: needs.changes.outputs.frontend == 'true'
-        name: next typegen, tsc, ESLint, permission rendering
+        uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      # FEF-012: Turborepo cache stays on the CI runner (actions/cache), no SaaS remote cache holds build output.
+      - if: needs.changes.outputs.frontend == 'true'
+        uses: actions/cache@v4
+        with: { path: frontend/.turbo/cache, key: "turbo-static-${{ github.sha }}", restore-keys: "turbo-static-" }
+      - if: needs.changes.outputs.frontend == 'true'
+        name: next typegen, tsc, ESLint (incl. boundaries), permission rendering (turbo; unchanged packages hit the cache)
         working-directory: frontend
         run: |
-          npm ci --no-audit --no-fund
-          npm run -s typecheck
-          npx eslint .
-          npm run -s check:permissions
+          pnpm install --frozen-lockfile
+          pnpm turbo run typecheck lint check:permissions
       - name: OpenAPI valid
         run: pip install -q openapi-spec-validator && python3 -m openapi_spec_validator api/openapi.yaml
+      - name: Event schemas (OPS-015 catalogue, PHI denylist, envelope < 2 KB) and the gate's own tests
+        run: python3 scripts/ci/events.py check && python3 scripts/ci/test_events.py
+      - name: No cache value in logs or metrics (OPS-020 static scan) and the scan's own tests
+        run: python3 scripts/ci/cache_values.py check && python3 scripts/ci/test_cache_values.py
 
   stage2-unit:
     needs: changes
@@ -82,12 +92,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - if: needs.changes.outputs.frontend == 'true'
+        uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
+      - if: needs.changes.outputs.frontend == 'true'
         uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      # FEF-012: Turborepo cache stays on the CI runner (actions/cache), no SaaS remote cache holds build output.
+      - if: needs.changes.outputs.frontend == 'true'
+        uses: actions/cache@v4
+        with: { path: frontend/.turbo/cache, key: "turbo-unit-${{ github.sha }}", restore-keys: "turbo-unit-" }
       - if: needs.changes.outputs.frontend == 'true'
         name: unit tests incl. consult flow
         working-directory: frontend
-        run: npm ci --no-audit --no-fund && npm test
+        run: |
+          # staff-web unit tests also read api/, .github/, perf/ and renovate.json: their git hashes key the turbo cache
+          export NABD_REPO_INPUTS="$(git rev-parse HEAD:api HEAD:.github HEAD:perf HEAD:renovate.json | tr '\n' ' ')"
+          pnpm install --frozen-lockfile && pnpm turbo run test
       - if: needs.changes.outputs.backend == 'true'
         uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "${{ env.JAVA_VERSION }}", cache: maven }
@@ -113,8 +133,14 @@ jobs:
             else gh pr comment "$pr" --body-file arch.md || true; fi
           fi
       - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
+        name: tenant-parameter metric (PLT-019 AC5, report only; target 0 in migrated modules by S6)
+        continue-on-error: true
+        run: |
+          python3 scripts/ci/tenant_params.py | tee tenant-params.json
+          { echo "### Explicit tenantId service parameters (PLT-019)"; echo '```json'; cat tenant-params.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
         uses: actions/upload-artifact@v4
-        with: { name: architecture-report, path: "architecture-report.json\narch.md" }
+        with: { name: architecture-report, path: "architecture-report.json\narch.md\ntenant-params.json" }
       - if: "!cancelled() && needs.changes.outputs.backend == 'true'"
         name: architecture gate (mode from ci/architecture-gate.json; report only until its dates are set)
         run: python3 scripts/ci/arch.py gate backend/target/architecture-violations.json
@@ -138,6 +164,12 @@ jobs:
       - if: needs.changes.outputs.backend == 'true'
         uses: actions/upload-artifact@v4
         with: { name: jacoco, path: backend/target/site/jacoco }
+      - if: needs.changes.outputs.backend == 'true'
+        name: every event the producer tests published validates (OPS-015, samples from DomainEventContractApiTest)
+        run: pip install -q jsonschema && python3 scripts/ci/events.py check --samples backend/target/event-samples
+      - if: needs.changes.outputs.backend == 'true'
+        name: no cached value in the captured logs or Prometheus scrape (OPS-020, samples from Ops020CacheApiTest)
+        run: python3 scripts/ci/cache_values.py check --samples backend/target/cache-scan
       # OPS-032: coverage comment + gates (ci/quality-gates.json; gates stay report-only until enabled_from is set)
       - if: needs.changes.outputs.backend == 'true' && github.event_name == 'pull_request'
         name: JaCoCo summary comment and coverage gates
@@ -194,6 +226,35 @@ jobs:
           id=$(gh api "repos/${{ github.repository }}/issues/$pr/comments" --paginate --jq '[.[] | select(.body | startswith("<!-- oasdiff-report -->"))] | last | .id // empty')
           if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@"$RUNNER_TEMP/report.md"
           else gh pr comment "$pr" --body-file "$RUNNER_TEMP/report.md"; fi
+
+  # OPS-035 stage 5 (blocking, required): spec drift, permission reflection, oasdiff breaking rule, generated client up to date.
+  # The api-contract-report job above stays the non-blocking PR comment.
+  stage5-api-contract:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "${{ env.JAVA_VERSION }}", cache: maven }
+      - name: undocumented / phantom operations and x-required-permission == @PreAuthorize (0 allowed)
+        working-directory: backend
+        run: mvn -B -q test -Dtest=ApiContractGateTest -Dsurefire.failIfNoSpecifiedTests=false
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: generated types, Zod schemas, MSW handlers and Permission union (frontend/packages/api-client/src/generated) match api/openapi/core.yaml
+        run: pip install -q pyyaml && python3 scripts/api/generate_client.py --check
+      - name: oasdiff breaking changes block unless deprecated with a Sunset (x-sunset)
+        if: github.event_name == 'pull_request'
+        env: { OASDIFF_VERSION: "1.10.23" }
+        shell: bash   # -eo pipefail: the tee below must not hide the gate's exit code
+        run: |
+          git show "origin/${{ github.base_ref }}:api/openapi/core.yaml" > "$RUNNER_TEMP/base.yaml" || { echo "no base spec yet"; exit 0; }
+          curl -sSfL "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_amd64.tar.gz" | tar xz oasdiff
+          ./oasdiff breaking "$RUNNER_TEMP/base.yaml" api/openapi/core.yaml -f json > "$RUNNER_TEMP/breaking.json"
+          python3 scripts/ci/api_contract.py breaking "$RUNNER_TEMP/breaking.json" api/openapi/core.yaml | tee -a "$GITHUB_STEP_SUMMARY"
 
   # OPS-036 / FEF-049 stage 7: preview per PR + browser smoke and axe. Off until the preview cluster exists (vars.PREVIEW_ENABLED).
   preview:
@@ -256,17 +317,19 @@ jobs:
           path: backend
           format: HTML
           args: --failOnCVSS 7 --suppression ci/dependency-check-suppressions.xml --nvdApiKey ${{ secrets.NVD_API_KEY }}
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
       - uses: actions/setup-node@v4
-        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
-      - name: npm audit (new High/Critical only, baseline with owners)
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: pnpm audit (new High/Critical only, baseline with owners)
         working-directory: frontend
         run: |
-          npm audit --audit-level=high --json > "$RUNNER_TEMP/audit.json" || true
+          pnpm audit --audit-level=high --json > "$RUNNER_TEMP/audit.json" || true
           python3 ../scripts/ci/baseline.py npm-audit "$RUNNER_TEMP/audit.json" ../.github/security-baseline.json
       - name: CycloneDX SBOMs
         run: |
           mvn -B -q -f backend/pom.xml org.cyclonedx:cyclonedx-maven-plugin:2.8.1:makeAggregateBom -DoutputFormat=json -DoutputName=sbom-backend
-          (cd frontend && npm ci --no-audit --no-fund -q && npx --yes @cyclonedx/cyclonedx-npm@1.19.3 --output-file ../sbom-frontend.json)
+          (cd frontend && pnpm install --frozen-lockfile && npx --yes @cyclonedx/cdxgen@12.8.5 -t pnpm -o ../sbom-frontend.json .)
       # Publish only on merge to main: push, sign, attach SBOM, expose digest. Deploys must reference the digest.
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3

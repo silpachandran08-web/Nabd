@@ -4,6 +4,7 @@ import com.nabd.hms.config.OutboxProperties;
 import com.nabd.hms.shared.ops.OutboxLag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +29,7 @@ public class OutboxDispatcher {
     }
 
     @Scheduled(fixedDelayString = "${app.outbox.poll-interval-ms:2000}")
+    @SchedulerLock(name = "outbox-dispatcher", lockAtMostFor = "PT2M") // leases (OPS-014) still fence a run that outlives it
     public void poll() {
         var events = repo.claim(props.batchSize(), props.leaseSeconds());
         int failures = 0;

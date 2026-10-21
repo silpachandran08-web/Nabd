@@ -4,6 +4,7 @@ import com.nabd.hms.common.ApiException;
 import com.nabd.hms.platform.PlatformAudit;
 import com.nabd.hms.platform.tenant.dto.LifecycleEventResponse;
 import com.nabd.hms.platform.tenant.dto.TenantLifecycleResponse;
+import com.nabd.hms.common.SessionRevocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -39,10 +40,12 @@ public class TenantLifecycleService {
 
     private final TenantLifecycleRepository repo;
     private final PlatformAudit audit;
+    private final SessionRevocation.TenantRevoker sessions;
 
-    TenantLifecycleService(TenantLifecycleRepository repo, PlatformAudit audit) {
+    TenantLifecycleService(TenantLifecycleRepository repo, PlatformAudit audit, SessionRevocation.TenantRevoker sessions) {
         this.repo = repo;
         this.audit = audit;
+        this.sessions = sessions;
     }
 
     @Transactional
@@ -60,6 +63,9 @@ public class TenantLifecycleService {
         after.put("fromStatus", fromStatus);
         after.put("toStatus", toStatus);
         after.put("reason", reason);
+        if (SessionRevocation.INACTIVE_TENANT_STATUSES.contains(toStatus)) {
+            after.put("sessionsRevoked", sessions.revokeAll(tenantId, "tenant_suspended")); // PLT-007: same transaction
+        }
         audit.record(tenantId, changedBy, ipAddress, "platform_tenant.lifecycle_changed", "tenant", tenantId, after);
         log.info("tenant {} transitioned {} -> {} by operator {}", tenantId, fromStatus, toStatus, changedBy);
         return getLifecycle(tenantId);

@@ -6,7 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import ch.qos.logback.core.read.ListAppender;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.PhiJsonEncoder;
 import com.nabd.hms.common.PhiMaskingConverter;
 import com.nabd.hms.common.WhatsAppOtpSender;
@@ -100,7 +100,7 @@ class LogPhiLeakS9QaTest extends ApiTestBase {
                 new Object[]{"+919876543210", "ab@x.org"});
         assertThat(new PhiMaskingConverter().convert(ev)).isEqualTo("p=+91******3210 m=a***@*** c=******");
         var json = new ObjectMapper().readTree(new PhiJsonEncoder().encode(ev));
-        assertThat(json.get("message").asText()).doesNotContain("9876543210").doesNotContain("ab@x.org");
+        assertThat(json.get("message").asString()).doesNotContain("9876543210").doesNotContain("ab@x.org");
         assertThat(json.has("timestamp") && json.has("level") && json.has("traceId")).isTrue();
         // throwable text is masked too
         LoggingEvent err = new LoggingEvent("x", lg, Level.ERROR, "boom", new RuntimeException("phone +971501234567"), null);

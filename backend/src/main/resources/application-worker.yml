@@ -1,0 +1,7 @@
+# OPS-016 (ADR-03): the Core worker profile, same image as the API (SPRING_PROFILES_ACTIVE=worker). Every worker pod is
+# a relay candidate; exactly one per region holds the advisory lock. RELAY_DB_URL is the direct (non-PgBouncer)
+# connection for the lock and LISTEN; unset = DB_URL. Valkey (VALKEY_URL) is required.
+app:
+  relay:
+    enabled: true
+    direct-url: ${RELAY_DB_URL:}

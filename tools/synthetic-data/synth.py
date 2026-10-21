@@ -4,7 +4,7 @@
   python3 tools/synthetic-data/synth.py generate --out data.json [--seed 36] [--patients 2000]
   python3 tools/synthetic-data/synth.py scan data.json        # exit 1 and list findings when anything looks real
 
-Data: 4 tenants (IN, AE, SA, QA), one staff per RBAC role (frontend/tests/e2e/smoke/roles.json), patients with
+Data: 4 tenants (IN, AE, SA, QA), one staff per RBAC role (frontend/apps/staff-web/tests/e2e/smoke/roles.json), patients with
 Indian / Arabic names split across the tenants, a day of appointments per tenant on the 15-minute grid.
 Phones: reserved test range = the national number starts with 0000. E.164 national numbers never start with 0
 (that is the trunk prefix), so these can never reach a real subscriber.
@@ -16,7 +16,7 @@ import argparse, datetime as dt, json, random, re, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-ROLES = json.loads((ROOT / "frontend/tests/e2e/smoke/roles.json").read_text())
+ROLES = json.loads((ROOT / "frontend/apps/staff-web/tests/e2e/smoke/roles.json").read_text())
 ROLE_KEYS = [k for k in ROLES if not k.startswith("_")]
 
 TENANTS = [  # key, country calling code, region, IANA zone, currency

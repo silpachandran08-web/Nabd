@@ -42,8 +42,14 @@ public class OpenApiConfig {
             "/v1/platform/auth/login", "/v1/platform/auth/mfa/verify", "/v1/platform/auth/refresh",
             "/.well-known/jwks.json", "/v1/webhooks/whatsapp");
 
-    private static final Pattern AUTHORITY = Pattern.compile("hasAuthority\\('([^']+)'\\)");
+    private static final Pattern AUTHORITY = Pattern.compile("'([^']+)'");
+    /** OPS-035: only a plain OR-chain of hasAuthority/hasAnyAuthority becomes "a | b"; any other SpEL is written verbatim. */
+    private static final Pattern OR_CHAIN = Pattern.compile("has(Any)?Authority\\('[^']+'(\\s*,\\s*'[^']+')*\\)(\\s+or\\s+has(Any)?Authority\\('[^']+'(\\s*,\\s*'[^']+')*\\))*");
     private static final AntPathMatcher MATCHER = new AntPathMatcher();
+
+    static { // PLT-032: swagger-core only knows Jackson 2's JsonNode; without this a Jackson 3 JsonNode is documented as a bean
+        org.springdoc.core.utils.SpringDocUtils.getConfig().replaceWithClass(tools.jackson.databind.JsonNode.class, com.fasterxml.jackson.databind.JsonNode.class);
+    }
 
     @Bean
     OpenAPI nabdOpenApi() {
@@ -77,7 +83,7 @@ public class OpenApiConfig {
             if (pre != null) {
                 Set<String> authorities = new LinkedHashSet<>();
                 Matcher m = AUTHORITY.matcher(pre.value());
-                while (m.find()) authorities.add(m.group(1));
+                if (OR_CHAIN.matcher(pre.value().trim()).matches()) while (m.find()) authorities.add(m.group(1));
                 permission = authorities.isEmpty() ? pre.value() : String.join(" | ", authorities);
             } else if (isPublic(type, handler.getMethod())) {
                 permission = "public";
@@ -99,7 +105,7 @@ public class OpenApiConfig {
         };
     }
 
-    private static boolean isPublic(Class<?> type, java.lang.reflect.Method method) {
+    static boolean isPublic(Class<?> type, java.lang.reflect.Method method) {
         RequestMapping base = AnnotatedElementUtils.findMergedAnnotation(type, RequestMapping.class);
         RequestMapping own = AnnotatedElementUtils.findMergedAnnotation(method, RequestMapping.class);
         List<String> bases = base == null || base.path().length == 0 ? List.of("") : List.of(base.path());

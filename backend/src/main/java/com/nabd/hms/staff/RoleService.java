@@ -1,8 +1,9 @@
 package com.nabd.hms.staff;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nabd.hms.iam.api.ActorDirectory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.auth.MfaPolicy;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -52,8 +53,11 @@ public class RoleService {
 
     private final Clock clock;
 
+    private final ActorDirectory actors;
+
     RoleService(RoleRepository repo, TenantContext tenantContext, ObjectMapper objectMapper, AuditService auditService,
-                DelegationGuard delegationGuard, EventPublisher eventPublisher, Clock clock) {
+                DelegationGuard delegationGuard, EventPublisher eventPublisher, Clock clock, ActorDirectory actors) {
+        this.actors = actors;
         this.clock = clock;
         this.delegationGuard = delegationGuard;
         this.eventPublisher = eventPublisher;
@@ -84,7 +88,22 @@ public class RoleService {
         UUID id = UUID.randomUUID();
         repo.insert(id, tenantId, req.name(), writeGrantsJson(req.grants()), Boolean.TRUE.equals(req.mfaRequired()));
         log.info("role {} created by {} (tenant {})", id, callerStaffId, tenantId);
+        roleChanged(tenantId, id, "created");
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
+    }
+
+    /** OPS-015: the role id and what happened; consumers re-read grants (the role name is not carried). */
+    private void roleChanged(UUID tenantId, UUID roleId, String status) {
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.ROLE_CHANGED, roleId,
+                java.util.Map.of("roleId", roleId, "status", status));
+    }
+
+    /** PLT-007 AC3: same mechanism as StaffService's role reassignment (revoke + iam.session.revoked.v1 per holder). */
+    private void sessionsRevoked(UUID tenantId, List<UUID> staffIds) {
+        for (UUID staffId : staffIds) {
+            eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.SESSION_REVOKED, staffId,
+                    Map.of("staffId", staffId, "scope", "all_sessions", "reasonCode", "role_changed", "status", "revoked"));
+        }
     }
 
     @Transactional
@@ -100,6 +119,8 @@ public class RoleService {
         repo.update(tenantId, id, req.name(), writeGrantsJson(req.grants()),
                 req.mfaRequired() == null ? current.mfaRequired() : req.mfaRequired());
         log.info("role {} updated by {} (tenant {})", id, callerStaffId, tenantId);
+        roleChanged(tenantId, id, "updated");
+        sessionsRevoked(tenantId, repo.revokeHolderSessions(tenantId, id));
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow();
     }
 
@@ -115,8 +136,10 @@ public class RoleService {
                 .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "not-a-preset", "NOT_A_PRESET",
                         "This is a custom role; only preset roles can be reset."));
         repo.resetToPreset(tenantId, id, writeGrantsJson(preset.grants()), RolePresets.VERSION);
+        roleChanged(tenantId, id, "reset_to_preset");
+        sessionsRevoked(tenantId, repo.revokeHolderSessions(tenantId, id));
         RoleRow after = repo.findById(tenantId, id).orElseThrow();
-        RoleRepository.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null, "role.reset_to_preset", "role", id,
                 Map.of("presetVersion", String.valueOf(current.presetVersion()), "grants", readGrants(current.grantsJson())),
                 Map.of("presetVersion", String.valueOf(after.presetVersion()), "grants", readGrants(after.grantsJson())));
@@ -127,7 +150,7 @@ public class RoleService {
     /** PLT-005: a role holding :approve or :refundDiscount always requires MFA; asking for false is refused, not ignored. */
     private void requireMfaInvariant(RoleWriteRequest req) {
         if (Boolean.FALSE.equals(req.mfaRequired()) && MfaPolicy.privilegedGrants(GrantsFlattener.flatten(req.grants()))) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "mfa-required-by-policy", "MFA required by policy",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "mfa-required-by-policy", "MFA required by policy",
                     "Roles that can approve, refund or discount always require MFA; mfaRequired cannot be false.");
         }
     }
@@ -159,7 +182,7 @@ public class RoleService {
                     "A delegation can't run longer than 30 days — create a new one if the cover extends past that.");
         }
         // unknown id (FK would 500) or another tenant's staff (FK would pass) -> 404
-        repo.findActorInfo(tenantId, req.staffId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such staff member."));
+        actors.findActor(tenantId, req.staffId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "No such staff member."));
         delegationGuard.check(tenantId, callerStaffId, req.staffId(), delegatedRole, stepUpToken);
 
         UUID id = repo.insertDelegation(tenantId, req.staffId(), req.delegatedRoleId(), callerStaffId, req.reason(), req.expiresAt());
@@ -202,7 +225,7 @@ public class RoleService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        RoleRepository.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "role_delegation", entityId, before, after);
     }
@@ -217,7 +240,7 @@ public class RoleService {
         try {
             return objectMapper.readValue(json, new TypeReference<List<ModuleGrant>>() {
             });
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("malformed grants JSON", e);
         }
     }
@@ -225,7 +248,7 @@ public class RoleService {
     private String writeGrantsJson(List<ModuleGrant> grants) {
         try {
             return objectMapper.writeValueAsString(grants);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("failed to serialize grants", e);
         }
     }

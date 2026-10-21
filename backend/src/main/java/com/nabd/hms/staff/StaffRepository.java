@@ -20,10 +20,12 @@ class StaffRepository {
 
     private final JdbcTemplate jdbc;
     private final com.nabd.hms.auth.MfaPolicy mfaPolicy;
+    private final com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions;
 
-    StaffRepository(JdbcTemplate jdbc, com.nabd.hms.auth.MfaPolicy mfaPolicy) {
+    StaffRepository(JdbcTemplate jdbc, com.nabd.hms.auth.MfaPolicy mfaPolicy, com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions) {
         this.jdbc = jdbc;
         this.mfaPolicy = mfaPolicy;
+        this.revokedSessions = revokedSessions;
     }
 
     // ::citext cast is load-bearing — see AuthRepository's class comment for why a bare "= ?"
@@ -126,9 +128,11 @@ class StaffRepository {
                 + "AND used_at IS NULL AND revoked_at IS NULL", tenantId, staffId);
     }
 
-    void revokeAllSessions(UUID tenantId, UUID staffId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
-                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL", reason, tenantId, staffId);
+    List<UUID> revokeAllSessions(UUID tenantId, UUID staffId, String reason) {
+        List<UUID> ids = jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
+                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL RETURNING id", UUID.class, reason, tenantId, staffId);
+        revokedSessions.revoked(ids); // OPS-020: Valkey revocation cache
+        return ids;
     }
 
     /** Accepting the emailed invite link is itself the email-verification step (NB-041). */

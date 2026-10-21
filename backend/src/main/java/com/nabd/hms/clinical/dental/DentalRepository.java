@@ -1,7 +1,7 @@
 package com.nabd.hms.clinical.dental;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.clinical.dental.DentalModels.ActorInfo;
 import static com.nabd.hms.clinical.dental.DentalModels.HistoryEntryRow;
 import static com.nabd.hms.clinical.dental.DentalModels.ToothRow;
 
@@ -76,14 +75,6 @@ class DentalRepository {
                 "AND is_supernumerary", tenantId, patientId, id);
     }
 
-    /** NB-127: actor_name/actor_role snapshot for the audit row a chart write makes. */
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
-
     /** CLN-006 (MF-52): one append-only row per chart change, written in the same transaction as the change. */
     void insertEvent(UUID tenantId, UUID patientId, UUID entryId, int toothNumber, String event,
                      Map<String, Object> before, Map<String, Object> after, UUID actorId) {
@@ -112,7 +103,7 @@ class DentalRepository {
     private String json(Map<String, Object> m) {
         try {
             return m == null ? null : objectMapper.writeValueAsString(m);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalArgumentException("dental chart snapshot is not serializable", e);
         }
     }

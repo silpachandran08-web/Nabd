@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.patient.PatientModels.ActorInfo;
 import static com.nabd.hms.patient.PatientModels.MatchCandidateRow;
 import static com.nabd.hms.patient.PatientModels.PatientRow;
 
@@ -334,6 +333,15 @@ class PatientRepository {
                 patientMapper(), tenantId, Timestamp.from(afterCreatedAt), afterId, scopedToDoctorId, scopedToDoctorId, limit);
     }
 
+    /** ACC-028: the data-quality list; same consent and own-patients gates as every other patient read. */
+    List<com.nabd.hms.patient.dto.DataQualityPage.Item> findInvalidPhones(UUID tenantId, UUID scopedToDoctorId, UUID afterId, int limit) {
+        return jdbc.query("SELECT id, name, phone FROM patients " +
+                        "WHERE tenant_id = ? AND status = 'active' AND phone_invalid AND (?::uuid IS NULL OR id > ?::uuid) " +
+                        CONSENT_GATE + SCOPE_GATE + "ORDER BY id LIMIT ?",
+                (rs, i) -> new com.nabd.hms.patient.dto.DataQualityPage.Item(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("phone")),
+                tenantId, afterId, afterId, scopedToDoctorId, scopedToDoctorId, limit);
+    }
+
     /** Phone-exact is the strong signal; DOB match + trigram name similarity is the fuzzy one (NB-060). */
     // Phones compare as digits (PhoneNumbers), so records saved in any format before normalisation still match.
     // REC-038: phone_match / dob_match / name_match report which compared fields agreed (same 0.3 name threshold).
@@ -442,14 +450,6 @@ class PatientRepository {
     Optional<java.time.Instant> findGuardianReviewKeptAt(UUID tenantId, UUID id) {
         return jdbc.query("SELECT guardian_review_kept_at FROM patients WHERE tenant_id = ? AND id = ? AND guardian_review_kept_at IS NOT NULL",
                 (rs, i) -> rs.getTimestamp(1).toInstant(), tenantId, id).stream().findFirst();
-    }
-
-    /** NB-085: audit_log's actor_name/actor_role snapshot — same per-module pattern as Dental. */
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     private RowMapper<PatientRow> patientMapper() {

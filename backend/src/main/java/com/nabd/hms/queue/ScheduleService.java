@@ -1,5 +1,6 @@
 package com.nabd.hms.queue;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
@@ -45,7 +46,13 @@ public class ScheduleService {
 
     private final ClinicClock clock;
 
-    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock) {
+    private final com.nabd.hms.common.EventPublisher events;
+    private final ActorDirectory actors;
+
+    ScheduleService(ScheduleRepository repo, TenantContext tenantContext, AuditService auditService, ClinicClock clock,
+                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors) {
+        this.events = events;
+        this.actors = actors;
         this.clock = clock;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -122,7 +129,7 @@ public class ScheduleService {
     }
 
     private void auditHours(UUID tenantId, UUID callerStaffId, String action, UUID hoursId, Object before, Object after) {
-        QueueModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "doctor_working_hours", hoursId, before, after);
     }
@@ -210,6 +217,7 @@ public class ScheduleService {
         log.info("doctor {} delay announced by {}: {} min", doctorId, callerStaffId, req.delayMinutes());
         DoctorDelayRow row = repo.findActiveDelay(doctorId, today).orElseThrow();
         auditDelay(tenantId, callerStaffId, "doctor_delay.announced", id, null, toDelayResponse(row, today));
+        delayChanged(tenantId, doctorId, id, req.delayMinutes(), "active");
         return toDelayResponse(row, today);
     }
 
@@ -225,6 +233,13 @@ public class ScheduleService {
         repo.clearActiveDelay(tenantId, doctorId, callerStaffId);
         log.info("doctor {} delay cleared by {}", doctorId, callerStaffId);
         auditDelay(tenantId, callerStaffId, "doctor_delay.cleared", active.id(), toDelayResponse(active, today), null);
+        delayChanged(tenantId, doctorId, active.id(), 0, "cleared");
+    }
+
+    /** OPS-015: the free-text reason stays out of the event. */
+    private void delayChanged(UUID tenantId, UUID doctorId, UUID delayId, int delayMinutes, String status) {
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.DOCTOR_DELAY_CHANGED, doctorId, java.util.Map.of(
+                "doctorId", doctorId, "delayId", delayId, "delayMinutes", delayMinutes, "status", status));
     }
 
     @Transactional
@@ -235,7 +250,7 @@ public class ScheduleService {
     }
 
     private void auditDelay(UUID tenantId, UUID callerStaffId, String action, UUID delayId, Object before, Object after) {
-        QueueModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::hoursNotFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "doctor_delay", delayId, before, after);
     }

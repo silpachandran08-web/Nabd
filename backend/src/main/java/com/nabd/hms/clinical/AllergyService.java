@@ -1,8 +1,9 @@
 package com.nabd.hms.clinical;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nabd.hms.iam.api.ActorDirectory;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.clinical.dto.AllergyCorrectionRequest;
 import com.nabd.hms.clinical.dto.AllergyEventResponse;
 import com.nabd.hms.clinical.dto.AllergyRemovalRequest;
@@ -24,7 +25,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-import static com.nabd.hms.clinical.AllergyModels.ActorInfo;
 import static com.nabd.hms.clinical.AllergyModels.AllergyEventRow;
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
 import static com.nabd.hms.clinical.AllergyModels.AssessmentRow;
@@ -46,8 +46,14 @@ public class AllergyService {
     private final TenantContext tenantContext;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final com.nabd.hms.common.EventPublisher events;
 
-    AllergyService(AllergyRepository repo, TenantContext tenantContext, AuditService auditService, ObjectMapper objectMapper) {
+    private final ActorDirectory actors;
+
+    AllergyService(AllergyRepository repo, TenantContext tenantContext, AuditService auditService, ObjectMapper objectMapper,
+                   com.nabd.hms.common.EventPublisher events, ActorDirectory actors) {
+        this.events = events;
+        this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.auditService = auditService;
@@ -95,6 +101,7 @@ public class AllergyService {
         }
         Map<String, Object> after = snapshot(row);
         repo.insertEvent(tenantId, patientId, id, "recorded", null, json(after), null, callerStaffId);
+        allergyChanged(tenantId, patientId, Map.of("allergyId", id, "change", "recorded", "status", "active"));
         audit(tenantId, callerStaffId, ipAddress, "allergy.recorded", id, null, after);
         return toResponse(row, repo.findStaffNames(tenantId, Set.of(callerStaffId)).get(callerStaffId), null);
     }
@@ -134,6 +141,7 @@ public class AllergyService {
         AllergyRow updated = repo.findById(tenantId, id).orElseThrow();
         Map<String, Object> after = snapshot(updated);
         repo.insertEvent(tenantId, current.patientId(), id, "corrected", json(before), json(after), reason, callerStaffId);
+        allergyChanged(tenantId, current.patientId(), Map.of("allergyId", id, "change", "corrected", "status", "active"));
         Map<String, Object> auditAfter = new LinkedHashMap<>(after);
         auditAfter.put("reason", reason);
         audit(tenantId, callerStaffId, ipAddress, "allergy.corrected", id, before, auditAfter);
@@ -160,6 +168,7 @@ public class AllergyService {
         Map<String, Object> after = new LinkedHashMap<>(before);
         after.put("active", false);
         repo.insertEvent(tenantId, current.patientId(), id, "removed", json(before), json(after), reason, callerStaffId);
+        allergyChanged(tenantId, current.patientId(), Map.of("allergyId", id, "change", "removed", "status", "removed"));
         Map<String, Object> auditAfter = new LinkedHashMap<>(after);
         auditAfter.put("reason", reason);
         audit(tenantId, callerStaffId, ipAddress, "allergy.removed", id, before, auditAfter);
@@ -210,11 +219,19 @@ public class AllergyService {
         }
         repo.upsertAssessment(tenantId, patientId, callerStaffId);
         audit(tenantId, callerStaffId, ipAddress, "allergy.no_known_allergies_documented", patientId, null, Map.of("status", "no_known_allergies"));
+        allergyChanged(tenantId, patientId, Map.of("change", "no_known_allergies", "status", "none_documented"));
         return status(tenantId, patientId);
     }
 
+    /** OPS-015: ids and codes only; substance, severity and reaction never leave the register in an event. */
+    private void allergyChanged(UUID tenantId, UUID patientId, Map<String, Object> data) {
+        var body = new LinkedHashMap<String, Object>(data);
+        body.put("patientId", patientId);
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.ALLERGY_CHANGED, patientId, body);
+    }
+
     private void audit(UUID tenantId, UUID staffId, String ip, String action, UUID entityId, Object before, Object after) {
-        ActorInfo actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, action, "patient_allergy", entityId, before, after);
     }
 
@@ -232,7 +249,7 @@ public class AllergyService {
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("allergy snapshot is not serializable", e);
         }
     }
@@ -243,7 +260,7 @@ public class AllergyService {
         }
         try {
             return objectMapper.readValue(json, JSON_MAP);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return null;
         }
     }

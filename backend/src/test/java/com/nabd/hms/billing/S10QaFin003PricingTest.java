@@ -98,7 +98,7 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
             Map<String, Object> l = line(code, 1);
             l.putAll(Map.of("chargeName", "x", "category", "Service", "unitPrice", 0, "taxRatePercent", 0));
             ResponseEntity<Map> r = checkout(reception, atCheckout(e), List.of(l));
-            assertThat(r.getStatusCode()).as(code).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            assertThat(r.getStatusCode()).as(code).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
             assertThat(type(r)).as(code).contains("unknown-charge");
         }
         assertThat(count(e, "SELECT count(*) FROM invoices")).isZero();
@@ -124,7 +124,7 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
         Map<String, Object> ghost = line("GHOST", 1);
         ghost.putAll(Map.of("chargeName", "Ghost", "category", "Service", "unitPrice", 75, "taxRatePercent", 0));
         ResponseEntity<Map> r = checkout(e.token(), atCheckout(e), List.of(ghost));
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(r)).contains("reason-required");
     }
 
@@ -134,10 +134,10 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
         Env e = env();
         String entry = atCheckout(e);
         ResponseEntity<Map> noReason = checkout(e.token(), entry, List.of(withOverride("CONS", 1, 300, null)));
-        assertThat(noReason.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(noReason.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(noReason)).contains("reason-required");
         ResponseEntity<Map> badReason = checkout(e.token(), entry, List.of(withOverride("CONS", 1, 300, "because")));
-        assertThat(badReason.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(badReason.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(count(e, "SELECT count(*) FROM invoices")).isZero();
         assertThat(checkout(e.token(), entry, List.of(withOverride("CONS", 1, -1, "goodwill"))).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
@@ -244,7 +244,7 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
         Env e = env();
         String entry = atInterimBilling(e);
         ResponseEntity<Map> big = checkout(e.token(), entry, List.of(line("SVC", 1)), "discounts", List.of(disc("500.01", "goodwill")));
-        assertThat(big.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(big.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(big)).contains("discount-exceeds-subtotal");
         assertThat(count(e, "SELECT count(*) FROM invoices")).isZero();
         assertThat(count(e, "SELECT count(*) FROM invoice_discounts")).isZero();
@@ -253,7 +253,7 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
         move(e, entry, "vitals_done", "in_consult", "checkout_pending");
         // remaining subtotal on the one invoice is 200
         ResponseEntity<Map> second = checkout(e.token(), entry, List.of(), "discounts", List.of(disc("200.01", "goodwill")));
-        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(second.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(second)).contains("discount-exceeds-subtotal");
         assertThat(num(getInvoice(e.token(), inv).getBody().get("discount"))).isEqualTo(300.0);
     }
@@ -274,10 +274,10 @@ class S10QaFin003PricingTest extends S10QaBillingSupport {
     void discountNeedsAKnownReasonCode() {
         Env e = env();
         ResponseEntity<Map> none = checkout(e.token(), atCheckout(e), List.of(line("SVC", 1)), "discounts", List.of(disc(10, null)));
-        assertThat(none.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(none.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(type(none)).contains("reason-required");
         assertThat(checkout(e.token(), atCheckout(e), List.of(line("SVC", 1)), "discounts", List.of(disc(10, "nope"))).getStatusCode())
-                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+                .isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(count(e, "SELECT count(*) FROM invoice_discounts")).isZero();
     }
 

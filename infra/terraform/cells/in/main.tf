@@ -3,7 +3,8 @@
 terraform {
   required_version = ">= 1.8"
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.81" }
+    aws    = { source = "hashicorp/aws", version = "~> 5.81" }
+    random = { source = "hashicorp/random", version = "~> 3.6" }
   }
   backend "s3" {} # bucket/key/lock table come from backend-<env>.hcl (created by bootstrap/aws)
 }
@@ -42,6 +43,7 @@ module "cell" {
 output "cell" { value = module.cell.cell }
 output "postgres" { value = module.cell.postgres }
 output "storage" { value = module.cell.storage }
+output "valkey" { value = module.cell.valkey }
 output "kms" { value = module.cell.kms }
 output "dns" { value = module.cell.dns }
 output "backup" { value = module.cell.backup }

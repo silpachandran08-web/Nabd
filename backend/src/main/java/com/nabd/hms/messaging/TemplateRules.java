@@ -69,6 +69,6 @@ final class TemplateRules {
     }
 
     private static ApiException invalid(String detail) {
-        return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid-whatsapp-template", "Invalid WhatsApp template", detail);
+        return new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "invalid-whatsapp-template", "Invalid WhatsApp template", detail);
     }
 }

@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.nabd.hms.reports.ReportsModels.ActorInfo;
 import static com.nabd.hms.reports.ReportsModels.DoctorPunctualityRow;
 import static com.nabd.hms.reports.ReportsModels.LeakageRow;
 import static com.nabd.hms.reports.ReportsModels.NoShowRiskRow;
@@ -387,13 +386,6 @@ class ReportsRepository {
                         rs.getString("patient_name"), rs.getString("package_name"), rs.getDate("validity_end").toLocalDate(),
                         rs.getBigDecimal("remaining")),
                 tenantId, Date.valueOf(from), Date.valueOf(to), Date.valueOf(today));
-    }
-
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
     }
 
     private BigDecimal nz(BigDecimal v) {

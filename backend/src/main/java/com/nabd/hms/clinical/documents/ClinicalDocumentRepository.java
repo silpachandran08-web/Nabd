@@ -83,13 +83,6 @@ class ClinicalDocumentRepository {
                 tenantId, patientId).stream().findFirst();
     }
 
-    Optional<PartyInfo> findStaff(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new PartyInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
-
     /** The doctor's printed professional registration number (V55); empty when none is recorded. */
     Optional<String> findRegistrationNo(UUID tenantId, UUID staffId) {
         return jdbc.query("SELECT professional_registration_no FROM staff WHERE tenant_id = ? AND id = ?",

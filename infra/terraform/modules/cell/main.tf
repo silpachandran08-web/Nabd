@@ -30,4 +30,5 @@ module "aws" {
   audit_lock_days         = var.audit_lock_days
   dns_zone                = var.dns_zone
   pitr_lag_alarm_seconds  = var.pitr_lag_alarm_seconds
+  valkey_node_type        = var.valkey_node_type
 }

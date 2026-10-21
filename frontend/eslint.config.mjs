@@ -1,26 +1,45 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+// FEF-012: lint for packages/* (each package's `eslint .` finds this file; apps/* carry their own config).
+// Boundaries: ui/tokens/domain never import api-client (domain: type-only from /generated); only api-client calls fetch.
+import tseslint from "typescript-eslint";
+import boundaries from "eslint-plugin-boundaries";
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-  { rules: { "no-restricted-globals": ["error", { name: "atob", message: "Use decodeJwtPayload from app/lib/jwt.ts (UTF-8 safe)." }] } },
-  { files: ["app/lib/jwt.ts"], rules: { "no-restricted-globals": "off" } },
-  // FEF-011: dates and times in migrated files go through app/lib/clinicTime.ts (clinic timezone, one locale).
-  { files: ["app/components/myday/**", "app/components/myschedule/**", "app/components/consult/FollowUpPanel.tsx", "app/components/consult/DocumentSheet.tsx"],
-    rules: { "no-restricted-syntax": ["error",
-      { selector: "CallExpression[callee.property.name=/^toLocale(Date|Time)String$/]", message: "Use formatClinicDate/formatClinicTime from app/lib/clinicTime.ts (clinic timezone)." },
-      { selector: ":matches(NewExpression, CallExpression)[callee.object.name='Intl'][callee.property.name='DateTimeFormat']", message: "Use app/lib/clinicTime.ts; it is the only place that builds Intl.DateTimeFormat." },
-    ] } },
-]);
+const noFetch = {
+  "no-restricted-globals": ["error", { name: "fetch", message: "Only packages/api-client calls fetch." }],
+  "no-restricted-properties": ["error",
+    { object: "globalThis", property: "fetch", message: "Only packages/api-client calls fetch." },
+    { object: "window", property: "fetch", message: "Only packages/api-client calls fetch." },
+    { object: "self", property: "fetch", message: "Only packages/api-client calls fetch." }],
+};
 
-export default eslintConfig;
+export default tseslint.config(
+  { ignores: ["**/node_modules/**", "**/src/generated/**", "**/lint-fixtures/**"] },
+  { files: ["**/*.{ts,tsx,mts,js,mjs}"], languageOptions: { parser: tseslint.parser } },
+  {
+    files: ["**/*.{ts,tsx,mts,js,mjs}"],
+    plugins: { boundaries },
+    settings: {
+      "boundaries/root-path": import.meta.dirname,
+      "boundaries/elements": [
+        { type: "ui", pattern: "packages/ui" },
+        { type: "tokens", pattern: "packages/tokens" },
+        { type: "domain", pattern: "packages/domain" },
+        { type: "api-client", pattern: "packages/api-client" },
+      ],
+    },
+    rules: {
+      "boundaries/dependencies": ["error", {
+        default: "allow",
+        checkAllOrigins: true, // also check bare "@nabd/api-client" imports, not only relative ones
+        policies: [
+          { from: { element: { type: "!api-client" } }, disallow: { to: { element: { type: "api-client" } } } },
+          { from: { element: { type: "!api-client" } }, disallow: { to: { module: { source: ["@nabd/api-client", "@nabd/api-client/**"] } } } },
+          { from: { element: { types: { anyOf: ["tokens", "domain"] } } }, disallow: { to: { element: { type: "ui" } } } },
+          // FEF-014: domain types are derived from the generated wire types (a spec rename breaks every consumer). Exception,
+          // narrow: domain only, `import type` only, only from @nabd/api-client/generated (no runtime code, no fetch).
+          { from: { element: { type: "domain" } }, allow: { dependency: { kind: "type", source: "@nabd/api-client/generated" } } },
+        ],
+      }],
+    },
+  },
+  { files: ["packages/{ui,tokens,domain}/**", "ui/**", "tokens/**", "domain/**"], rules: noFetch },
+);

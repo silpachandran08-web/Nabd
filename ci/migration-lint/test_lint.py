@@ -28,6 +28,12 @@ class Rules(unittest.TestCase):
         for ddl in ("ALTER TABLE q DROP COLUMN a;", "DROP TABLE q;", "ALTER TABLE q ALTER COLUMN a TYPE bigint;"):
             self.assertEqual(rules(HDR + ddl), ["MIG-007"], ddl)
             self.assertEqual(rules(HDR + ddl, contract=True), [], ddl)
+    def test_waiver_needs_reason_and_covers_only_mig001(self):
+        idx = "CREATE INDEX ix ON queue_entries(a);"
+        self.assertEqual(rules(HDR + "-- migration-lint: allow MIG-001 small table\n" + idx), [])
+        self.assertEqual(rules(HDR + "-- migration-lint: allow MIG-001\n" + idx), ["MIG-001"])  # no reason
+        self.assertEqual(rules("-- migration-lint: allow MIG-004 nope\nCREATE TABLE t(a int);"), ["MIG-004"])
+        self.assertEqual(rules(HDR + "-- migration-lint: allow MIG-001 x\nALTER TABLE q ADD CONSTRAINT c CHECK (a > 0);"), ["MIG-002"])
     def test_comments_and_bodies_ignored(self):
         self.assertEqual(rules(HDR + "-- CREATE INDEX x ON q(a);\nDO $$ BEGIN CREATE INDEX y ON q(a); END $$;"), [])
 

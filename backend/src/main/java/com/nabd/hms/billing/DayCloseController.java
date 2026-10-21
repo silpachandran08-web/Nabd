@@ -1,5 +1,6 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.billing.dto.DayCloseHistoryResponse;
 import com.nabd.hms.billing.dto.DayCloseRequest;
 import com.nabd.hms.billing.dto.DayCloseSummaryResponse;
 import com.nabd.hms.billing.dto.DayReopenRequest;
@@ -38,6 +39,7 @@ public class DayCloseController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('billing:approve')")
+    @com.nabd.hms.shared.Idempotent // FIN-005 spec: a retried close with the same Idempotency-Key replays the first 200
     public DayCloseSummaryResponse close(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DayCloseRequest req) {
         return service.close(tenantId(jwt), UUID.fromString(jwt.getSubject()), req);
     }
@@ -48,6 +50,17 @@ public class DayCloseController {
                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                           @Valid @RequestBody DayReopenRequest req) {
         return service.reopen(tenantId(jwt), UUID.fromString(jwt.getSubject()), date, req);
+    }
+
+    /** FIN-005: every close and reopen in [from, to], newest first. */
+    @GetMapping("/history")
+    @PreAuthorize("hasAuthority('billing:view')")
+    public DayCloseHistoryResponse history(@AuthenticationPrincipal Jwt jwt,
+                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                           @RequestParam(required = false) String cursor,
+                                           @RequestParam(defaultValue = "50") int limit) {
+        return service.history(tenantId(jwt), from, to, cursor, limit);
     }
 
     private static UUID tenantId(Jwt jwt) {

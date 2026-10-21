@@ -21,8 +21,4 @@ final class NoteModels {
     record AmendmentRow(UUID id, UUID noteId, UUID amendedBy, String reason, String subjective, String objective,
                          String assessment, String plan, String diagnosis, Instant createdAt) {
     }
-
-    /** For AuditService's actor_name/actor_role snapshot. */
-    record ActorInfo(String name, String role) {
-    }
 }

@@ -1,7 +1,7 @@
 package com.nabd.hms.platform.audit;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.platform.audit.dto.AuditEntryResponse;
@@ -108,7 +108,7 @@ public class AuditSearchService {
         try {
             repo.insertOperatorAudit(operatorId, action, f.tenantId(), objectMapper.writeValueAsString(params),
                     rowCount, reason, ipAddress);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
         if (f.tenantId() != null && repo.tenantExists(f.tenantId())) {

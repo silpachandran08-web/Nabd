@@ -33,7 +33,7 @@ class IdempotencyApiTest extends ApiTestBase {
         if (key != null) h.set("Idempotency-Key", key);
         try {
             return new HttpEntity<>(objectMapper.writeValueAsString(body), h);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -150,7 +150,7 @@ class IdempotencyApiTest extends ApiTestBase {
 
         ResponseEntity<Map> reused = post("/v1/test-idem/echo", token, key, Map.of("a", 2));
 
-        assertThat(reused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(reused.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(reused.getBody().get("code")).isEqualTo("IDEMPOTENCY_KEY_REUSED");
     }
 

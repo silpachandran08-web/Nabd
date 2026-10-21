@@ -137,7 +137,7 @@ class PaymentIntegrityApiTest extends ApiTestBase {
         java.util.Arrays.fill(amounts, 50);
         List<HttpStatus> statuses = concurrentPayments(c, inv, amounts);
         assertThat(statuses.stream().filter(s -> s == HttpStatus.CREATED).count()).isEqualTo(10);
-        assertThat(statuses.stream().filter(s -> s == HttpStatus.UNPROCESSABLE_ENTITY).count()).isEqualTo(2);
+        assertThat(statuses.stream().filter(s -> s == HttpStatus.UNPROCESSABLE_CONTENT).count()).isEqualTo(2);
         Map<String, Object> row = dbInvoice(c.tenant().id(), inv);
         assertThat(((Number) row.get("paid")).doubleValue()).isEqualTo(500.0);
         assertThat(row.get("status")).isEqualTo("paid");
@@ -179,14 +179,14 @@ class PaymentIntegrityApiTest extends ApiTestBase {
         assertThat(pay(c, inv, 300, null).getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<Map> over = pay(c, inv, 250, null);
-        assertThat(over.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(over.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(over.getBody().get("type")).asString().contains("overpayment");
         assertThat(((Number) over.getBody().get("balance")).doubleValue()).isEqualTo(200.0);
         assertThat(paymentRows(c.tenant().id(), inv)).isEqualTo(1);
 
         assertThat(pay(c, inv, 200, null).getStatusCode()).isEqualTo(HttpStatus.CREATED); // boundary: exactly the balance
         ResponseEntity<Map> afterPaid = pay(c, inv, 1, null);
-        assertThat(afterPaid.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(afterPaid.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(((Number) afterPaid.getBody().get("balance")).doubleValue()).isEqualTo(0.0);
     }
 
@@ -215,7 +215,7 @@ class PaymentIntegrityApiTest extends ApiTestBase {
         assertThat(((Number) replay.getBody().get("paid")).doubleValue()).isEqualTo(100.0);
         assertThat(paymentRows(c.tenant().id(), inv)).isEqualTo(1);
         // PLT-026 filter: same key on a different request is 422 IDEMPOTENCY_KEY_REUSED (was FIN-001 service 409)
-        assertThat(pay(c, other, 100, key).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(pay(c, other, 100, key).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(paymentRows(c.tenant().id(), other)).isZero();
     }
 

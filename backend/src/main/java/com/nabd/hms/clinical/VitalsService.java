@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.VitalsHistoryResponse;
 import com.nabd.hms.clinical.dto.VitalsResponse;
@@ -41,8 +42,11 @@ public class VitalsService {
     private final ClinicClock clock;
     private final AuditService auditService;
 
+    private final ActorDirectory actors;
+
     VitalsService(VitalsRepository repo, QueueService queueService, TenantContext tenantContext, ClinicClock clock,
-                  AuditService auditService) {
+                  AuditService auditService, ActorDirectory actors) {
+        this.actors = actors;
         this.clock = clock;
         this.auditService = auditService;
         this.repo = repo;
@@ -152,7 +156,7 @@ public class VitalsService {
         if (now.isEmpty()) {
             return;
         }
-        VitalsModels.ActorInfo actor = repo.findActorInfo(tenantId, staffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, staffId).orElseThrow(this::notFound);
         now.put("queueEntryId", queueEntryId.toString());
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), null, "vitals.corrected", "vitals",
                 after.id(), was, now);

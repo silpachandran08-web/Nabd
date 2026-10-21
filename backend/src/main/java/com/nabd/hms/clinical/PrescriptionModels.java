@@ -24,10 +24,6 @@ final class PrescriptionModels {
     record DrugSuggestionRow(String name, String source, String code, Boolean inStock, Boolean prescriptionOnly) {
     }
 
-    /** For AuditService's actor_name/actor_role snapshot fields (NB-108). */
-    record ActorInfo(String name, String role) {
-    }
-
     /** NB-114: a saved prescription set — doctorId null means a clinic default, visible to every doctor. */
     record FavouriteSetRow(UUID id, UUID doctorId, String name, Instant createdAt, boolean shared, Instant updatedAt,
                             Instant lastUsedAt, String ownerName) {

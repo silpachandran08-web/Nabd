@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical.dental;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.clinical.dental.dto.ToothHistoryEntryResponse;
 import com.nabd.hms.clinical.dental.dto.ToothResponse;
 import com.nabd.hms.common.ApiException;
@@ -14,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static com.nabd.hms.clinical.dental.DentalModels.ActorInfo;
 import static com.nabd.hms.clinical.dental.DentalModels.ToothRow;
 
 /** NB-121/122: the specialty-workspace framework's one proof-of-concept — gated entirely by the
@@ -33,7 +33,10 @@ public class DentalService {
     private final AuditService auditService;
     private final TenantContext tenantContext;
 
-    DentalService(DentalRepository repo, AuditService auditService, TenantContext tenantContext) {
+    private final ActorDirectory actors;
+
+    DentalService(DentalRepository repo, AuditService auditService, TenantContext tenantContext, ActorDirectory actors) {
+        this.actors = actors;
         this.repo = repo;
         this.auditService = auditService;
         this.tenantContext = tenantContext;
@@ -118,7 +121,7 @@ public class DentalService {
 
     private void audit(UUID tenantId, UUID callerStaffId, String ipAddress, String action, UUID entityId,
                         ToothRow before, ToothRow after) {
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress,
                 action, "dental_chart_entries", entityId, snapshot(before), snapshot(after));
     }

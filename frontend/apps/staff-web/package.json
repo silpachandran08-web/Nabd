@@ -1,0 +1,35 @@
+{
+  "name": "staff-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "check:permissions": "node scripts/check-permission-rendering.mjs",
+    "typegen": "next typegen",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test:unit": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/unit/*.test.mjs",
+    "test": "npm run -s test:unit"
+  },
+  "dependencies": {
+    "@nabd/api-client": "workspace:*",
+    "@nabd/domain": "workspace:*",
+    "@tanstack/react-query": "5.104.1",
+    "next": "16.4.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "axe-core": "4.13.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.2",
+    "eslint-plugin-boundaries": "7.2.0",
+    "msw": "2.7.0",
+    "typescript": "^5"
+  }
+}

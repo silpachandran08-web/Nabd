@@ -1,7 +1,7 @@
 package com.nabd.hms.shared.phiread;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
 import io.micrometer.core.instrument.Counter;
@@ -37,6 +37,6 @@ class PhiReadVolumeAlertHandler implements OutboxEventHandler {
         JsonNode p = mapper.readTree(e.payloadJson());
         counter.increment();
         security.warn("security_event type=phi_read_volume_alert tenantId={} actorId={} distinctPatients={} windowMinutes={}",
-                e.tenantId(), p.path("actorId").asText(), p.path("distinctPatients").asInt(), p.path("windowMinutes").asInt());
+                e.tenantId(), p.path("actorId").asString(), p.path("distinctPatients").asInt(), p.path("windowMinutes").asInt());
     }
 }

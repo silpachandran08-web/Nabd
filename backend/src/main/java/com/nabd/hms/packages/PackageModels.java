@@ -22,10 +22,6 @@ final class PackageModels {
     record PackageSettingsRow(BigDecimal priceFloorPercent) {
     }
 
-    /** NB-056: audit_log's actor_name/actor_role snapshot — same per-module pattern as Patient/Nursing. */
-    record ActorInfo(String name, String role) {
-    }
-
     record InstanceRow(UUID id, UUID packageId, UUID patientId, String patientName, UUID invoiceId,
                         String invoiceNumber, String packageName, BigDecimal soldPrice, BigDecimal soldTax,
                         String validityStarts, int validityDays, LocalDate validityStart, LocalDate validityEnd,

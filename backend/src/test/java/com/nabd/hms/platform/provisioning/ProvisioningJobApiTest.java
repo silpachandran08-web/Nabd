@@ -472,7 +472,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
                 "region", region,
                 "ownerEmail", ownerEmail,
                 "ownerName", "Test Owner",
-                "ownerMobile", "+9198765" + Math.abs(slug.hashCode() % 100000),
+                "ownerMobile", "+9198765" + String.format("%05d", Math.abs(slug.hashCode() % 100000)), // ACC-028: always a valid 10-digit mobile
                 "brandName", brandName,
                 "path", path
         );

@@ -120,7 +120,7 @@ class RolePresetSeedApiTest extends ApiTestBase {
         String token = platformLoginAndGetAccessToken(seedOperator("super-" + UUID.randomUUID() + "@nabd.health", "super_admin", false));
         ResponseEntity<Map> created = exchange("/v1/platform/provisioning-jobs", HttpMethod.POST, authedJsonBody(token, Map.of(
                 "tenantSlug", slug, "tenantName", "Clinic " + slug, "region", "IN", "ownerEmail", "owner-" + slug + "@nabd.health",
-                "ownerName", "Test Owner", "ownerMobile", "+9198765" + Math.abs(slug.hashCode() % 100000),
+                "ownerName", "Test Owner", "ownerMobile", "+9198765" + String.format("%05d", Math.abs(slug.hashCode() % 100000)), // ACC-028: always a valid 10-digit mobile
                 "brandName", "Brand " + slug, "path", "self_serve")), Map.class);
         String jobId = (String) created.getBody().get("id");
         lastJobId = UUID.fromString(jobId);

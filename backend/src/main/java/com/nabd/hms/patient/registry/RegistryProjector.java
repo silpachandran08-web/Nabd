@@ -4,6 +4,7 @@ import com.nabd.hms.common.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -11,6 +12,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * OPS-007: keeps patient_registry_summary current. DB triggers (V221) queue the patient in registry_dirty inside the
@@ -33,6 +35,8 @@ public class RegistryProjector {
     private final TenantContext tenantContext;
     private final TransactionTemplate tx;
     private final ApplicationEventPublisher events;
+    // PLT-032: a lock, not synchronized, so a virtual thread blocked on JDBC inside drain() does not pin its carrier
+    private final ReentrantLock drainLock = new ReentrantLock();
 
     RegistryProjector(RegistrySummaryRepository repo, TenantContext tenantContext, PlatformTransactionManager txManager,
                       ApplicationEventPublisher events) {
@@ -43,7 +47,13 @@ public class RegistryProjector {
     }
 
     @Scheduled(fixedDelayString = "${app.registry.poll-interval-ms:1000}")
-    public synchronized void drain() { // serialises the poller with explicit callers: SKIP LOCKED made a concurrent caller return before the poller's claim committed
+    @SchedulerLock(name = "registry-projector", lockAtMostFor = "PT2M")
+    public void poll() { // lock only the poller: an explicit drain() must really drain, not be skipped while the poller holds the lock
+        drain();
+    }
+
+    public void drain() { // serialises the poller with explicit callers: SKIP LOCKED made a concurrent caller return before the poller's claim committed
+        drainLock.lock();
         try {
             for (UUID tenantId : tx.execute(s -> repo.dirtyTenants(100))) {
                 int claimed;
@@ -59,6 +69,8 @@ public class RegistryProjector {
         } catch (RuntimeException e) {
             // rows stay queued (same transaction), the next poll retries; reconciliation is the backstop
             log.warn("registry projector pass failed: {}", e.toString());
+        } finally {
+            drainLock.unlock();
         }
     }
 

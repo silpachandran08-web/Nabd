@@ -1,7 +1,7 @@
 name: migrations
 on:
   pull_request:
-    paths: ['db/**', 'ci/migration-lint/**', '.github/workflows/migrations.yml']
+    paths: ['db/**', 'ci/migration-lint/**', 'scripts/ci/classification_check.py', '.github/workflows/migrations.yml']
   push:
     branches: [main]
 jobs:
@@ -16,6 +16,9 @@ jobs:
           # contract label + reference to the earlier expand release lets MIG-007 pass
           CONTRACT_REF: ${{ contains(github.event.pull_request.labels.*.name, 'contract') && github.event.pull_request.body || '' }}
         run: python3 ci/migration-lint/lint.py --base origin/${{ github.base_ref || 'main' }}
+      # PLT-052: a migration that adds an untagged column fails (db/classification.yaml)
+      - run: python3 scripts/ci/test_classification_check.py
+      - run: python3 scripts/ci/classification_check.py --base origin/${{ github.base_ref || 'main' }}
   migrate:
     needs: migration-lint
     if: github.event_name == 'pull_request'
@@ -30,6 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: PGPASSWORD=ci ci/migration-lint/migrate-check.sh   # set SEED_SQL once the OPS-031 snapshot exists
+      - run: python3 scripts/ci/classification_check.py --db postgresql://postgres:ci@localhost:5432/nabd_empty   # PLT-052 full drift check
   schema-docs:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

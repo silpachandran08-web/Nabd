@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: "17", cache: maven }
+        with: { distribution: temurin, java-version: "21", cache: maven }
       - name: Backend suite (results feed the report; failures surface as unverified hazards)
         working-directory: backend
         run: mvn -B test -Dmaven.test.failure.ignore=true
@@ -34,7 +34,7 @@ jobs:
           pip install -q pyyaml
           python3 scripts/ci/test_safety_report.py
           args=(); for d in $DICT; do args+=(--dictionary "$d"); done
-          pw=(); [ -f frontend/playwright-report.json ] && pw=(--playwright frontend/playwright-report.json)
+          pw=(); [ -f frontend/apps/staff-web/playwright-report.json ] && pw=(--playwright frontend/apps/staff-web/playwright-report.json)
           set +e
           python3 scripts/ci/safety_report.py report --sha "${{ github.sha }}" --release "${{ github.ref_name }}" \
             --junit backend/target/surefire-reports "${pw[@]}" "${args[@]}" --require-signed --out safety-report | tee gate.txt

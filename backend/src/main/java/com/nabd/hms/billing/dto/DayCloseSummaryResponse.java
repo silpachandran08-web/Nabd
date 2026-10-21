@@ -14,7 +14,7 @@ import java.util.UUID;
 public record DayCloseSummaryResponse(
         LocalDate date,
         boolean today,
-        String currency,             // INR / SAR
+        String currency,             // INR / SAR (AED / QAR once those regions exist)
         String taxLabel,             // GST (India) / VAT (Saudi Arabia)
         BigDecimal cashTolerance,    // variance beyond this needs a note
         Totals totals,
@@ -46,6 +46,7 @@ public record DayCloseSummaryResponse(
     }
 
     public record Close(String status, BigDecimal expectedCash, BigDecimal countedCash, BigDecimal variance, String note,
-                        String closedByName, Instant closedAt, String reopenedByName, Instant reopenedAt, String reopenReason) {
+                        String closedByName, Instant closedAt, String reopenedByName, Instant reopenedAt, String reopenReason,
+                        int closeCount) {
     }
 }

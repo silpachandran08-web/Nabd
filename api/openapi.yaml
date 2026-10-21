@@ -311,7 +311,10 @@ paths:
           description: New pair issued; old refresh token invalidated
           content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } }
         "401":
-          description: Reused/revoked refresh token — entire session family revoked as a compromise signal
+          description: >
+            Reused/revoked refresh token (entire session family revoked as a compromise signal), or PLT-007:
+            Problem type TENANT_INACTIVE (clinic suspended/offboarded) or SESSION_MAX_AGE (refresh family older than
+            app.auth.absolute-session-hours, 12 h; idle-lock unlock does not extend it)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /auth/logout:
@@ -387,7 +390,8 @@ paths:
     post:
       tags: [Auth]
       summary: End emergency access early (holder, or staff:edit)
-      x-required-permission: "holder of the grant OR staff:edit"
+      x-required-permission: authenticated
+      x-permission-check: "holder of the grant OR staff:edit"
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       responses:
         "204": { description: "Ended (idempotent); the elevated session is revoked" }
@@ -444,7 +448,8 @@ paths:
     get:
       tags: [Auth]
       summary: PLT-039 Owner's in-app read-volume alerts (one actor read more distinct patients in an hour than the limit; no patient data)
-      x-required-permission: owner
+      x-required-permission: authenticated
+      x-permission-check: owner
       responses:
         "200":
           description: Alerts for the caller's clinic, newest first (max 50)
@@ -712,7 +717,8 @@ paths:
       tags: [Owners]
       summary: List the caller's brands and the clinics under each
       description: Requires a pendingToken from /owners/auth/login — the purpose claim, checked server-side, gates this, not a module:action permission.
-      x-required-permission: authenticated
+      x-required-permission: public
+      x-permission-check: "pendingToken from /owners/auth/login (purpose claim)"
       responses:
         "200":
           description: OK
@@ -732,7 +738,8 @@ paths:
         "don't confirm existence" rule as row-level scoping elsewhere in this spec. The resulting
         token is indistinguishable in shape from a staff member's — every other endpoint in this
         spec works unchanged from here on.
-      x-required-permission: authenticated
+      x-required-permission: public
+      x-permission-check: "pendingToken from /owners/auth/login (purpose claim)"
       requestBody:
         required: true
         content:
@@ -750,6 +757,9 @@ paths:
               schema: { $ref: "#/components/schemas/TokenPair" }
         "401":
           description: Missing, invalid, or wrong-purpose token
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+        "403":
+          description: PLT-007 Problem type TENANT_INACTIVE - the clinic is suspended or offboarded
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -906,7 +916,8 @@ paths:
               required: [reason]
               properties: { reason: { type: string, minLength: 3 } }
       responses:
-        "204": { description: "Suspended; sessions killed < 30s, audit event written" }
+        "204": { description: "Suspended; every session on every device revoked at once (iam.session.revoked.v1), audit event written" }
+        "403": { description: "step-up-required, or STEP_UP_INVALID when the step-up token was minted in another session (PLT-007)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /staff/{id}/mfa/reset:
     post:
@@ -1096,7 +1107,7 @@ paths:
       tags: [Setup]
       summary: Mark a wizard step as skipped
       x-required-permission: setup:edit
-      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      parameters: [{ name: step, in: path, required: true, schema: { type: string } }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/SetupProgressUpdate" } } }
@@ -1109,7 +1120,7 @@ paths:
       tags: [Setup]
       summary: Mark a wizard step as done
       x-required-permission: setup:edit
-      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      parameters: [{ name: step, in: path, required: true, schema: { type: string } }]
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/SetupProgressUpdate" } } }
@@ -1391,13 +1402,49 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PatientWrite" } } }
       responses:
         "201": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
-        "400": { description: "validation-failed, guardian-required, guardian-not-found, or guardian-consent-required (guardianId without a valid guardianConsent)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "400": { description: "validation-failed (incl. ACC-028 phone: not a valid number for the clinic country, `errors[{field: phone}]`, code INVALID_PHONE), guardian-required, guardian-not-found, or guardian-consent-required (guardianId without a valid guardianConsent)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409":
           description: >
             Likely-duplicate match found (same phone digits, or same DOB + similar name) — client should
             offer merge instead of blind create, or resend with confirmedNotDuplicate=true after review.
             Each candidate carries matchScore (0..1) and matchedFields.
           content: { application/json: { schema: { type: object, properties: { candidates: { type: array, items: { $ref: "#/components/schemas/PatientMatchCandidate" } } } } } }
+
+  /patients/data-quality:
+    get:
+      tags: [Patients]
+      summary: Records needing correction (ACC-028)
+      description: >
+        issue=phone lists active patients whose stored phone failed per-country validation (phone_invalid, set by the
+        ACC-028 re-normalisation job); rawPhone is the stored value unchanged. Saving a valid phone (PATCH) removes the
+        row. Consent- and row-scope-gated like every patient read; ordered by patientId; `nextCursor` is opaque.
+      x-required-permission: patients:edit
+      parameters:
+        - { name: issue, in: query, required: true, schema: { type: string, enum: [phone] } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Data-quality page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [patientId, displayName, rawPhone]
+                      properties:
+                        patientId: { type: string, format: uuid }
+                        displayName: { type: string }
+                        rawPhone: { type: string }
+                  nextCursor: { type: string, nullable: true }
+        "400":
+          description: Unknown issue or limit (`validation-failed` / `validation`), malformed cursor (`invalid-cursor`)
+          content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
   /patients/registry:
     get:
@@ -1557,7 +1604,7 @@ paths:
         "200": { description: "Working hours", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/WorkingHours" } } } } }
     post:
       tags: [Queue]
-      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"
       description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       parameters: [{ $ref: "#/components/parameters/PathId" }]
       requestBody:
@@ -1575,7 +1622,7 @@ paths:
     put:
       tags: [Queue]
       summary: Replace one working-hours block of this doctor
-      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"
       description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       requestBody:
         required: true
@@ -1588,7 +1635,7 @@ paths:
     delete:
       tags: [Queue]
       summary: Delete one working-hours block of this doctor (existing appointments are not touched)
-      x-required-permission: "self (caller is doctor {id}) or setup:edit"
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"
       description: "DOC-R7: allowed when the caller IS doctor {id} (JWT subject), or holds setup:edit. queue:edit alone is not enough for another doctor's hours. Audited."
       responses:
         "204": { description: Deleted }
@@ -2224,7 +2271,7 @@ paths:
     get:
       tags: [Clinical]
       summary: "DOC-033. Drug name type-ahead for the prescription pad, built only from this tenant's pharmacy item master (active stocked items) and names it has prescribed before. Returns [] for q shorter than 2 characters. Names only, no PII. Not a clinical formulary; free-text entry always remains possible."
-      x-required-permission: clinical:view (or clinical:edit)
+      x-required-permission: "clinical:view | clinical:edit"
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
         - { name: limit, in: query, required: false, schema: { type: integer, default: 8, minimum: 1, maximum: 20 } }
@@ -2347,7 +2394,8 @@ paths:
     post:
       tags: [Clinical]
       summary: Sign. Only the visit's doctor or a holder of clinical:approve may sign (403 not-prescriber otherwise). CLN-005 - the caller must also be a registered clinician (staff isClinician + a registration number on file, else 403 not-licensed-clinician) with an in-date licence or an owner's unexpired override (else 403 licence-expired) and hold clinical:edit (else not-prescriber; an approve-only caller is let past the permission check so it gets the specific code). A break-glass session is refused with 403 break-glass-cannot-sign and an audit row (prescription.sign_refused). The signer and the registration number signed under are stored (signedBy, signedByRegistrationNo) and clinical.prescription.signed.v1 is published. Re-checks every warning server-side against the CURRENT register while holding the prescription row lock; 409 warning-unresolved while any allergy/pregnancy/controlled warning that needs a decision has none. After signing, the items cannot change (also enforced by a database trigger). DOC-R3 - the allergy statement checked at that moment is stored as allergySnapshot in the same update and never changes afterwards. Audited.
-      x-required-permission: clinical:edit
+      x-required-permission: "clinical:edit | clinical:approve | clinical:view"
+      x-permission-check: "visit doctor or clinical:approve, plus clinical:edit and CLN-005 licence (see summary)"
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Signed, content: { application/json: { schema: { $ref: "#/components/schemas/Prescription" } } } }
@@ -2522,7 +2570,8 @@ paths:
     post:
       tags: [Clinical]
       summary: Issue a draft. Requires the type's required fields (referral - referredTo, reason; certificate - purpose; visit_summary - at least one field; certificate period must not end before it starts) else 400 document-incomplete. Takes a snapshot of clinic / doctor / patient / visit values into header, stamps issuedBy / issuedAt, and from then on the document is immutable (also enforced by a database trigger). header.doctor.registrationNumber is the visit doctor's professional registration number at issue time (null when none is recorded). Only the visit's doctor or a holder of clinical:approve may issue (403 not-prescriber), as for signing a prescription; CLN-005 - the same licence rule applies (403 not-licensed-clinician, licence-expired; a break-glass session gets break-glass-cannot-sign with an audit row). Creating and editing drafts stays clinical:edit. Audited (clinical_document.issued; no clinical text in the audit row).
-      x-required-permission: clinical:edit
+      x-required-permission: "clinical:edit | clinical:approve"
+      x-permission-check: "visit doctor or clinical:approve, plus CLN-005 licence (see summary)"
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "200": { description: Issued, content: { application/json: { schema: { $ref: "#/components/schemas/ClinicalDocument" } } } }
@@ -2592,7 +2641,8 @@ paths:
         REC-060: recording needs clinical:create or clinical:edit. Changing a value that is already recorded for the visit
         (a non-null field sent with a different value) needs clinical:edit, else 403 vitals-correction-forbidden; filling a
         still-empty field or re-sending the same value is not a correction.
-      x-required-permission: "clinical:create or clinical:edit (correcting a recorded value: clinical:edit)"
+      x-required-permission: "clinical:create | clinical:edit"
+      x-permission-check: "correcting a recorded value: clinical:edit"
       parameters: [{ name: queueEntryId, in: path, required: true, schema: { type: string, format: uuid } }]
       requestBody:
         required: true
@@ -2810,6 +2860,90 @@ paths:
                   voidedCount: { type: integer, description: "Invoices voided on this clinic day (by voided_at)" }
                   voidedTotal: { type: number, description: "Sum of those invoices' total" }
                 additionalProperties: true
+        "403": { description: Forbidden }
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-005: close a clinic day (date defaults to today; a past day can be closed, and a reopened day closed again,
+        which recomputes expected cash and increments close.closeCount). Takes the per-tenant-day advisory lock shared with
+        checkout, payment, void, package sale and refund approval, so a racing payment is either counted or refused with
+        409 day-closed. The variance tolerance is the clinic policy cash_variance_tolerance (minor units; default 200 INR,
+        20 SAR/AED/QAR). Writes day_close_events + audit day_close.close and publishes billing.day.closed.v1.
+      x-required-permission: billing:approve
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [countedCash]
+              properties:
+                countedCash: { type: number, minimum: 0 }
+                note: { type: string, maxLength: 1000, description: "Required when |variance| > cashTolerance" }
+                date: { type: string, format: date, description: "Clinic day to close; default today; never a future day" }
+      responses:
+        "200": { description: DayCloseSummaryResponse (as GET; close.closeCount counts the closes) }
+        "400": { description: "variance-note-required, date-in-future, validation-failed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: Forbidden }
+        "409": { description: "day-already-closed, day-close-blocked", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /billing/day-close/reopen:
+    post:
+      tags: [Billing]
+      summary: >
+        Reopen a closed day with a reason (FIN-005: body date, else ?date=, else today). Writes day_close_events + audit
+        day_close.reopen and publishes billing.day.reopened.v1 ({ tenantId, date }; the free-text reason stays in audit_log).
+      x-required-permission: billing:approve
+      parameters:
+        - { name: date, in: query, required: false, schema: { type: string, format: date } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 500 }
+                date: { type: string, format: date }
+      responses:
+        "200": { description: DayCloseSummaryResponse }
+        "403": { description: Forbidden }
+        "409": { description: day-not-closed, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /billing/day-close/history:
+    get:
+      tags: [Billing]
+      summary: FIN-005 close/reopen history for clinic days in [from, to] (default last 31 days), newest first, keyset-paged.
+      x-required-permission: billing:view
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        date: { type: string, format: date }
+                        action: { type: string, enum: [close, reopen] }
+                        expectedCash: { type: number, nullable: true }
+                        countedCash: { type: number, nullable: true }
+                        variance: { type: number, nullable: true }
+                        note: { type: string, nullable: true, description: "Close note or reopen reason" }
+                        actorName: { type: string, nullable: true }
+                        at: { type: string, format: date-time }
+                  nextCursor: { type: string, nullable: true }
+        "400": { description: "invalid-cursor, invalid-range", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: Forbidden }
   /billing/invoices/{id}:
     get:
@@ -3188,7 +3322,8 @@ paths:
         null for unknown_account; never the PIN or typed email), platform_auth.mfa_challenged, platform_auth.mfa_failed,
         platform_auth.signed_out, platform_auth.session_revoked, platform_auth.refresh_reuse_detected,
         platform_plan.created, platform_plan.updated (before/after plan terms), platform_provisioning.job_created
-        (no owner contact details), platform_provisioning.job_approved, platform_provisioning.step_run, audit_log.export
+        (no owner contact details), platform_provisioning.job_approved, platform_provisioning.step_run,
+        platform_provisioning.job_rolled_back (after.compensated: step names in undo order), audit_log.export
         (when platform rows or no rows are exported). Tenant scope - platform_tenant.lifecycle_changed (fromStatus,
         toStatus, reason; also written by billing dunning transitions), platform_billing.subscription_created,
         platform_billing.subscription_updated, platform_billing.discount_requested, platform_billing.discount_auto_approved,
@@ -3377,6 +3512,15 @@ components:
         timeout 5 s / lock timeout 3 s) or no connection was free within 3 s (code DB_UNAVAILABLE). Safe to retry.
       headers:
         Retry-After: { schema: { type: integer } }
+      content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    RateLimited:
+      description: >-
+        PLT-008. Any endpoint except the OTP ones (always 202) can return this: a token bucket in Valkey is empty, per
+        tenant (default 600/min, burst 1,200, raised per plan), per user (120/min) or, before sign-in, per client IP
+        (20/min). type .../rate_limited, extra members dimension (tenant | user | ip) and retryAfterSeconds. Retry after
+        the Retry-After seconds, with jitter.
+      headers:
+        Retry-After: { schema: { type: integer, minimum: 1 } }
       content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
     PatientNotFound:
       description: >-
@@ -4104,6 +4248,7 @@ components:
 
     StepUpToken:
       type: object
+      description: PLT-007 - bound to the minting session (sid) and tenant; any other access token gets 403 STEP_UP_INVALID
       properties:
         stepUpToken: { type: string }
         expiresIn: { type: integer, example: 300 }

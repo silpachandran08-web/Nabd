@@ -1,5 +1,7 @@
 package com.nabd.hms.shared.idempotency;
 
+import com.nabd.hms.shared.Idempotent;
+
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,7 +60,7 @@ class S10QaPlt026IdempotencyTest extends ApiTestBase {
         if (key != null) h.set("Idempotency-Key", key);
         try {
             return new HttpEntity<>(objectMapper.writeValueAsString(body), h);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             throw new IllegalStateException(e);
         }
     }
@@ -179,12 +181,12 @@ class S10QaPlt026IdempotencyTest extends ApiTestBase {
         int before = IdempotencyEchoController.CALLS.get();
         assertThat(post("/v1/test-idem/echo", c.token(), key, Map.of("a", 1)).getStatusCode()).isEqualTo(HttpStatus.OK);
         ResponseEntity<Map> body2 = post("/v1/test-idem/echo", c.token(), key, Map.of("a", 2));
-        assertThat(body2.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(body2.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(body2.getBody().get("code")).isEqualTo("IDEMPOTENCY_KEY_REUSED");
         assertThat(body2.getHeaders().getFirst("Idempotent-Replayed")).isNull();
         // same key + same body on a different @Idempotent path is a different request too
         ResponseEntity<Map> path2 = post("/v1/queue/check-in", c.token(), key, Map.of("a", 1));
-        assertThat(path2.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(path2.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(path2.getBody().get("code")).isEqualTo("IDEMPOTENCY_KEY_REUSED");
         assertThat(IdempotencyEchoController.CALLS.get() - before).isEqualTo(1);
         // the original is untouched and still replays

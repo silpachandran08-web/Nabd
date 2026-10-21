@@ -131,11 +131,14 @@ class Artefacts(unittest.TestCase):
         self.assertNotIn("skipTests", d)
         self.assertRegex(d, r"USER\s+(nonroot|app|\d+)")
 
-    def test_testcontainers_pinned_in_the_pom_and_present_in_the_local_repo(self):
-        v = re.search(r"<testcontainers.version>([\d.]+)<", R("backend/pom.xml")).group(1)
-        self.assertGreaterEqual(tuple(map(int, v.split("."))), (1, 21, 0))
-        jar = os.path.expanduser("~/.m2/repository/org/testcontainers/testcontainers/%s" % v)
-        self.assertTrue(os.path.isdir(jar), jar)
+    def test_testcontainers_comes_from_the_boot_bom_and_is_present_in_the_local_repo(self):
+        # PLT-032: Boot 4 manages Testcontainers (2.0.x >= 1.21 that OPS-031 needs), so the pom carries no version property
+        self.assertNotIn("<testcontainers.version>", R("backend/pom.xml"))
+        base = os.path.expanduser("~/.m2/repository/org/testcontainers/testcontainers")
+        if not os.path.isdir(base):
+            self.skipTest("no local maven repository")
+        vs = [tuple(int(x) for x in d.split(".")[:3]) for d in os.listdir(base) if re.fullmatch(r"\d+\.\d+\.\d+", d)]
+        self.assertTrue(vs and max(vs) >= (1, 21, 0), vs)
 
     def test_no_dockerjava_override_left_in_the_repo(self):
         hits = [f for f in tracked() if f and f.endswith((".properties", "pom.xml", ".sh", ".yml", ".java")) and
@@ -143,11 +146,12 @@ class Artefacts(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_frontend_typecheck_runs_typegen_first_and_consult_flow_is_in_npm_test(self):
-        s = json.load(open("frontend/package.json"))["scripts"]
+        s = json.load(open("frontend/apps/staff-web/package.json"))["scripts"]
         self.assertRegex(s["typecheck"], r"^next typegen && tsc --noEmit")
-        self.assertIn("scripts/test-consult-flow.mjs", s["test:unit"])
+        # FEF-013: the consult-flow cases moved to Vitest in packages/domain (turbo runs its test script in CI)
+        self.assertIn("vitest run --coverage", json.load(open("frontend/packages/domain/package.json"))["scripts"]["test"])
         self.assertEqual(s["test"], "npm run -s test:unit")
-        self.assertIn("npm run -s typecheck", R(".github/workflows/ci.yml"))
+        self.assertIn("turbo run typecheck", R(".github/workflows/ci.yml"))  # FEF-012: turbo runs the app's typecheck script
 
     def test_every_workflow_parses_and_each_job_has_a_timeout(self):
         for f in ("ci.yml", "ci-selftest.yml", "prod-config.yml"):  # OPS-031 / OPS-003 workflows only

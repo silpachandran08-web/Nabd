@@ -255,7 +255,7 @@ class CheckoutApiTest extends ApiTestBase {
                         "quantity", 1, "unitPrice", 100, "taxRatePercent", 0)),
                 "discount", 500)), Map.class);
 
-        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(resp.getBody().get("type")).asString().contains("discount-exceeds-subtotal");
     }
 
@@ -282,7 +282,7 @@ class CheckoutApiTest extends ApiTestBase {
 
         ResponseEntity<Map> blocked = exchange("/v1/billing/invoices/" + invoiceId + "/payments", HttpMethod.POST,
                 authedJsonBody(token, Map.of("method", "cash", "amount", 1)), Map.class);
-        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY); // FIN-001: was 400 invoice-already-paid
+        assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT); // FIN-001: was 400 invoice-already-paid
     }
 
     @Test

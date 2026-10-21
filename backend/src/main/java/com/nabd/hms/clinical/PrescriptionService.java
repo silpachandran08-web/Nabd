@@ -1,5 +1,6 @@
 package com.nabd.hms.clinical;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
 import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
@@ -16,9 +17,9 @@ import com.nabd.hms.clinical.dto.RxDecisionView;
 import com.nabd.hms.clinical.dto.RxReasonOption;
 import com.nabd.hms.clinical.dto.RxWarningDecision;
 import com.nabd.hms.clinical.dto.RxWarningResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
@@ -43,7 +44,6 @@ import java.util.UUID;
 import static com.nabd.hms.clinical.AllergyModels.AllergyRow;
 import static com.nabd.hms.clinical.AllergyModels.AssessmentRow;
 import static com.nabd.hms.clinical.NoteModels.QueueEntryOwner;
-import static com.nabd.hms.clinical.PrescriptionModels.ActorInfo;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetItemRow;
 import static com.nabd.hms.clinical.PrescriptionModels.FavouriteSetRow;
 import static com.nabd.hms.clinical.PrescriptionModels.PrescriptionItemRow;
@@ -87,9 +87,12 @@ public class PrescriptionService {
     /** CLN-005: published on every successful sign (pharmacy worklist, comms, clinical-intelligence consume it). */
     public static final String SIGNED_EVENT = "clinical.prescription.signed.v1";
 
+    private final ActorDirectory actors;
+
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
                          AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
-                         SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher) {
+                         SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors) {
+        this.actors = actors;
         this.dictionaries = dictionaries;
         this.clinicalAuthority = clinicalAuthority;
         this.eventPublisher = eventPublisher;
@@ -116,7 +119,7 @@ public class PrescriptionService {
         java.time.ZoneId zone = clock.zone(tenantId);
         LocalDate today = clock.today(zone);
         if (DoseWeightPolicy.isAdult(dob, today)) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "adult-patient", "Adult patient",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "adult-patient", "Adult patient",
                     "Weight-based mg/kg dosing is for patients under 18; use the drug reference for adult doses.");
         }
         VitalsRepository.WeightReading reading = vitalsRepo.findLatestWeight(tenantId, patientId)
@@ -175,7 +178,7 @@ public class PrescriptionService {
         SafetyDictionary dict = dictionaryFor(tenantId);
         LocalDate today = clock.today(tenantId);
         List<PrescriptionItemRow> existing = repo.findItems(tenantId, prescriptionId);
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
 
         List<PrescriptionItemRow> rows = new ArrayList<>();
         List<StoredDecision> kept = new ArrayList<>();
@@ -248,7 +251,7 @@ public class PrescriptionService {
         UUID setId = repo.insertSet(tenantId, "standard".equals(scope) ? null : doctorId, req.name().trim(), "shared".equals(scope));
         repo.insertSetItems(tenantId, setId, req.items());
         // DOC-R2: creation is audited like update and delete (same before/after shape).
-        ActorInfo actor = repo.findActorInfo(tenantId, doctorId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, doctorId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", doctorId, actor.name(), actor.role(), ipAddress, "rx_set.created", "rx_set", setId,
                 null, Map.of("name", req.name().trim(), "shared", "shared".equals(scope), "standard", "standard".equals(scope),
                         "itemCount", req.items().size()));
@@ -301,7 +304,7 @@ public class PrescriptionService {
             repo.deleteSetItems(tenantId, setId);
             repo.insertSetItems(tenantId, setId, req.items());
         }
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.updated", "rx_set", setId,
                 Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null),
                 Map.of("name", name, "shared", shared, "standard", owner == null, "itemsReplaced", req.items() != null));
@@ -315,7 +318,7 @@ public class PrescriptionService {
         FavouriteSetRow set = repo.findSet(tenantId, setId).orElseThrow(this::notFound);
         requireVisible(set, callerStaffId);
         requireCanManage(set, callerStaffId, callerCanApprove, "delete");
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         repo.deleteSet(tenantId, setId); // items go with it (ON DELETE CASCADE); prescriptions already built from it are unaffected
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "rx_set.deleted", "rx_set", setId,
                 Map.of("name", set.name(), "shared", set.shared(), "standard", set.doctorId() == null), null);
@@ -357,7 +360,7 @@ public class PrescriptionService {
                         i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
                 .toList();
         PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "prescription.repeated_last",
                 "prescription", result.id(), null, Map.of("queueEntryId", queueEntryId.toString(),
                         "sourcePrescriptionId", last.id().toString(), "itemCount", items.size()));
@@ -449,7 +452,7 @@ public class PrescriptionService {
             // Cannot happen while we hold the row lock on a draft; never write a "signed" audit row for a no-op.
             return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
         }
-        ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         List<Map<String, Object>> finalItems = current.items().stream().map(i -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("drugName", i.drugName());
@@ -477,6 +480,8 @@ public class PrescriptionService {
         event.put("signedBy", callerStaffId.toString());
         event.put("dictionaryVersion", dict.label()); // CLN-004's safety dictionary the sign was checked against
         eventPublisher.publish(tenantId, SIGNED_EVENT, event);
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.RX_SIGNED, row.id(), Map.of("prescriptionId", row.id(),
+                "queueEntryId", queueEntryId, "signedBy", callerStaffId, "status", "signed")); // OPS-015; SIGNED_EVENT above is deprecated
         return toResponse(tenantId, repo.findByQueueEntry(tenantId, queueEntryId).orElseThrow(this::notFound));
     }
 
@@ -587,7 +592,7 @@ public class PrescriptionService {
         StoredAllergySnapshot s;
         try {
             s = objectMapper.readValue(json, StoredAllergySnapshot.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // Never print a guessed statement: an unreadable snapshot is surfaced as an error, not as "none".
             throw new IllegalStateException("stored prescription allergy snapshot is unreadable", e);
         }
@@ -715,7 +720,7 @@ public class PrescriptionService {
         }
         try {
             return objectMapper.readValue(json, DECISIONS);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             return List.of();
         }
     }
@@ -723,12 +728,12 @@ public class PrescriptionService {
     private String toJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("prescription decision is not serializable", e);
         }
     }
 
-    private void auditDecision(UUID tenantId, UUID staffId, ActorInfo actor, String ip, UUID prescriptionId,
+    private void auditDecision(UUID tenantId, UUID staffId, ActorDirectory.Actor actor, String ip, UUID prescriptionId,
                                PrescriptionItemRequest item, StoredDecision d, String phase) {
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("drugName", item.drugName());
@@ -750,7 +755,7 @@ public class PrescriptionService {
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, action, "prescription", prescriptionId, null, after);
     }
 
-    private void auditWithdrawn(UUID tenantId, UUID staffId, ActorInfo actor, String ip, UUID prescriptionId, String drugName,
+    private void auditWithdrawn(UUID tenantId, UUID staffId, ActorDirectory.Actor actor, String ip, UUID prescriptionId, String drugName,
                                 StoredDecision d) {
         auditService.record(tenantId, "staff", staffId, actor.name(), actor.role(), ip, "prescription.warning_decision_withdrawn",
                 "prescription", prescriptionId, Map.of("drugName", drugName, "warningKind", d.kind(), "reasonCode", d.reasonCode(),

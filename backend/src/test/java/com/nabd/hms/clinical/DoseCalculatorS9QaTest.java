@@ -76,12 +76,12 @@ class DoseCalculatorS9QaTest extends ApiTestBase {
         String adult = patient(c, c.today().minusYears(18));
         weigh(c, adult, 70.0); // a weight on file must not matter
         ResponseEntity<Map> r = dose(c, adult, "10");
-        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat((String) r.getBody().get("type")).endsWith("adult-patient");
         assertThat(r.getBody().get("totalDoseMg")).isNull();
 
         String old = patient(c, c.today().minusYears(60));
-        assertThat(dose(c, old, "10").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY); // adult check precedes no-weight 400
+        assertThat(dose(c, old, "10").getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT); // adult check precedes no-weight 400
     }
 
     @Test

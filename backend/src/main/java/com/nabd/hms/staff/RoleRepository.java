@@ -17,9 +17,11 @@ import static com.nabd.hms.staff.StaffRoleModels.RoleRow;
 class RoleRepository {
 
     private final JdbcTemplate jdbc;
+    private final com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions;
 
-    RoleRepository(JdbcTemplate jdbc) {
+    RoleRepository(JdbcTemplate jdbc, com.nabd.hms.common.SessionRevocation.RevokedSessions revokedSessions) {
         this.jdbc = jdbc;
+        this.revokedSessions = revokedSessions;
     }
 
     List<RoleRow> list(UUID tenantId) {
@@ -45,6 +47,15 @@ class RoleRepository {
                 name, grantsJson, mfaRequired, tenantId, id);
     }
 
+    /** PLT-007 AC3: grants live in the JWT, so a grant edit ends every live session of the role's holders; returns their staff ids. */
+    List<UUID> revokeHolderSessions(UUID tenantId, UUID roleId) {
+        List<java.util.Map<String, Object>> rows = jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = 'role_changed' " +
+                "WHERE tenant_id = ? AND revoked_at IS NULL AND staff_id IN (SELECT id FROM staff WHERE tenant_id = ? AND role_id = ?) " +
+                "RETURNING id, staff_id", tenantId, tenantId, roleId);
+        revokedSessions.revoked(rows.stream().map(r -> (UUID) r.get("id")).toList()); // OPS-020: Valkey revocation cache
+        return rows.stream().map(r -> (UUID) r.get("staff_id")).distinct().toList();
+    }
+
     /** PLT-016: back to the current preset definition; built_in is not filtered, so the Owner preset can move versions too. */
     void resetToPreset(UUID tenantId, UUID id, String grantsJson, int presetVersion) {
         jdbc.update("UPDATE roles SET grants = ?::jsonb, preset_version = ? WHERE tenant_id = ? AND id = ? AND preset_code IS NOT NULL",
@@ -57,16 +68,6 @@ class RoleRepository {
                 "WHERE s.tenant_id = ? AND s.id = ?", (rs, i) -> rs.getBoolean(1), tenantId, staffId).stream().findFirst().orElse(false));
     }
 
-    record ActorInfo(String name, String role) {
-    }
-
-    /** NB-056/057: audit_log's actor_name/actor_role snapshot — same per-module pattern as Patient/Nursing/Packages. */
-    Optional<ActorInfo> findActorInfo(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new ActorInfo(rs.getString("name"), rs.getString("role_name")),
-                tenantId, staffId).stream().findFirst();
-    }
 
     // ── delegations (NB-057) ─────────────────────────────────────────────
 
@@ -128,8 +129,8 @@ class RoleRepository {
     }
 
     void revokeSessions(UUID tenantId, UUID staffId, String reason) {
-        jdbc.update("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " +
-                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL", reason, tenantId, staffId);
+        revokedSessions.revoked(jdbc.queryForList("UPDATE sessions SET revoked_at = now(), revoked_reason = ? " + // OPS-020: Valkey cache
+                "WHERE tenant_id = ? AND staff_id = ? AND revoked_at IS NULL RETURNING id", UUID.class, reason, tenantId, staffId));
     }
 
     void revokeDelegation(UUID tenantId, UUID id) {

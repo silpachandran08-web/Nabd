@@ -1,5 +1,6 @@
 package com.nabd.hms.packages;
 
+import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.billing.CheckoutService;
 import com.nabd.hms.billing.dto.CheckoutRequest;
@@ -64,9 +65,15 @@ public class PackageInstanceService {
     private final com.nabd.hms.common.EventPublisher eventPublisher;
 
     private final ClinicClock clock;
+    private final com.nabd.hms.billing.DayCloseService dayClose;
+
+    private final ActorDirectory actors;
 
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
-                            AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher) {
+                            AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher, ActorDirectory actors,
+                            com.nabd.hms.billing.DayCloseService dayClose) {
+        this.actors = actors;
+        this.dayClose = dayClose;
         this.clock = clock;
         this.eventPublisher = eventPublisher;
         this.repo = repo;
@@ -223,13 +230,13 @@ public class PackageInstanceService {
         InstanceRow instance = repo.findInstance(tenantId, id).orElseThrow(this::notFound);
         LocalDate currentEnd = instance.validityEnd();
         if ("refunded".equals(instance.status()) || "cancelled".equals(instance.status())) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "instance-not-extendable", "Package cannot be extended",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "instance-not-extendable", "Package cannot be extended",
                     "This package is " + instance.status() + " and can no longer be extended.");
         }
         LocalDate today = clock.today(tenantId);
         LocalDate floor = currentEnd == null || currentEnd.isBefore(today) ? today : currentEnd;
         if (!req.newValidityEnd().isAfter(floor)) {
-            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "extension-not-later", "Extension must be later",
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "extension-not-later", "Extension must be later",
                     "The new validity end must be after " + floor + ".");
         }
         repo.extendValidity(tenantId, id, req.newValidityEnd());
@@ -347,6 +354,7 @@ public class PackageInstanceService {
             throw new ApiException(HttpStatus.FORBIDDEN, "same-user", "Self-approval blocked",
                     "A refund must be approved by someone other than whoever requested it.");
         }
+        dayClose.requireTodayOpen(tenantId); // FIN-005: the credit note lands on today; day lock before the instance lock
         repo.lockInstance(tenantId, refund.instanceId());
         refund = repo.findRefund(tenantId, refundId).orElseThrow(this::notFound); // re-read under the lock
         requirePending(refund);
@@ -403,7 +411,7 @@ public class PackageInstanceService {
     }
 
     private void audit(UUID tenantId, UUID callerStaffId, String action, UUID entityId, Object before, Object after) {
-        PackageModels.ActorInfo actor = repo.findActorInfo(tenantId, callerStaffId).orElseThrow(this::notFound);
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
                 action, "package_refund", entityId, before, after);
     }

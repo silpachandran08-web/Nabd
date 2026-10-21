@@ -56,8 +56,8 @@ class PhiMaskerTest {
         var ev = new ch.qos.logback.classic.spi.LoggingEvent("x", (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("t"),
                 ch.qos.logback.classic.Level.INFO, "sent to {} a@b.com", null, new Object[]{"+919876543210"});
         ev.setMDCPropertyMap(java.util.Map.of(RequestCorrelationFilter.MDC_KEY, "trace-1"));
-        var json = new com.fasterxml.jackson.databind.ObjectMapper().readTree(new PhiJsonEncoder().encode(ev));
-        assertThat(json.get("traceId").asText()).isEqualTo("trace-1");
-        assertThat(json.get("message").asText()).isEqualTo("sent to +91******3210 a***@***");
+        var json = new tools.jackson.databind.ObjectMapper().readTree(new PhiJsonEncoder().encode(ev));
+        assertThat(json.get("traceId").asString()).isEqualTo("trace-1");
+        assertThat(json.get("message").asString()).isEqualTo("sent to +91******3210 a***@***");
     }
 }

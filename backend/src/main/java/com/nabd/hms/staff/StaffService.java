@@ -7,6 +7,7 @@ import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.OpaqueTokens;
 import com.nabd.hms.common.StepUpVerifier;
 import com.nabd.hms.common.TenantContext;
+import com.nabd.hms.common.SessionRevocation;
 import com.nabd.hms.staff.dto.AcceptInviteRequest;
 import com.nabd.hms.staff.dto.AcceptedStaffIdentity;
 import com.nabd.hms.staff.dto.CallerInfo;
@@ -52,11 +53,14 @@ public class StaffService {
     private final EventPublisher eventPublisher;
 
     private final Clock clock;
+    private final com.nabd.hms.common.ClinicClock clinicClock;
 
     StaffService(StaffRepository staffRepo, RoleRepository roleRepo, TenantContext tenantContext,
                  PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService,
-                 GrantAuthority grantAuthority, EventPublisher eventPublisher, Clock clock) {
+                 GrantAuthority grantAuthority, EventPublisher eventPublisher, Clock clock,
+                 com.nabd.hms.common.ClinicClock clinicClock) {
         this.clock = clock;
+        this.clinicClock = clinicClock;
         this.staffRepo = staffRepo;
         this.roleRepo = roleRepo;
         this.tenantContext = tenantContext;
@@ -101,12 +105,13 @@ public class StaffService {
                     req.scopeOrDefault(), null);
         }
 
+        String mobile = com.nabd.hms.common.PhoneNumbers.require(req.mobilePhone(), java.util.Objects.requireNonNullElse(clinicClock.region(tenantId), "IN"), "mobilePhone"); // ACC-028
         UUID id = UUID.randomUUID();
         String rawToken = OpaqueTokens.generate();
         Instant expiresAt = Instant.now(clock).plus(72, ChronoUnit.HOURS);
         try {
             staffRepo.insertInvite(id, tenantId, req.roleId(), req.email().toLowerCase(), req.name(),
-                    req.mobilePhone(), req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy, req.departmentId());
+                    mobile, req.scopeOrDefault(), OpaqueTokens.sha256Hex(rawToken), expiresAt, invitedBy, req.departmentId());
         } catch (DataIntegrityViolationException e) {
             throw staffConflict(e);
         }
@@ -155,6 +160,7 @@ public class StaffService {
 
         staffRepo.update(tenantId, id, roleId, scope, fieldGrants, departmentId);
         log.info("staff {} updated by {} (role {}, scope {})", id, callerStaffId, roleId, scope);
+        staffChanged(tenantId, id, "updated");
 
         if (roleChanged || scopeChanged || fieldsChanged) {
             auditRoleChange(tenantId, caller, id, current, roleId, scope, fieldGrants, scopeChanged, ipAddress);
@@ -203,11 +209,25 @@ public class StaffService {
         auditService.record(tenantId, "staff", caller.id(), caller.name(), callerRole, ipAddress, "staff.role_changed", "staff", id,
                 Map.of("roleId", before.roleId(), "scope", before.scope(), "fieldGrants", before.fieldGrants()),
                 Map.of("roleId", roleId, "scope", scope, "fieldGrants", fieldGrants));
-        // ponytail: 'role_changed' is not in sessions.revoked_reason's CHECK yet (PLT-007 adds it); admin_revoke until then
-        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        revokeSessions(tenantId, id, "role_changed"); // PLT-007: the next sign-in carries the new grants
         eventPublisher.publish(tenantId, StaffRoleChangedHandler.TYPE, Map.of("tenantId", tenantId.toString(),
                 "staffId", id.toString(), "fromRoleId", before.roleId().toString(), "toRoleId", roleId.toString(),
                 "scopeChanged", scopeChanged));
+    }
+
+    /** PLT-007 + OPS-015: revoke every live session of one staff member in this transaction; the event lets caches and open tabs drop them. */
+    private int revokeSessions(UUID tenantId, UUID staffId, String reason) {
+        List<UUID> ids = staffRepo.revokeAllSessions(tenantId, staffId, reason);
+        if (!ids.isEmpty()) {
+            eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.SESSION_REVOKED, staffId,
+                    Map.of("staffId", staffId, "scope", "all_sessions", "reasonCode", reason, "status", "revoked"));
+        }
+        return ids.size();
+    }
+
+    private void staffChanged(UUID tenantId, UUID staffId, String status) {
+        eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.STAFF_CHANGED, staffId,
+                Map.of("staffId", staffId, "status", status));
     }
 
     @Transactional
@@ -216,7 +236,12 @@ public class StaffService {
         tenantContext.set(tenantId);
         staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
         staffRepo.suspend(tenantId, id);
-        staffRepo.revokeAllSessions(tenantId, id, "suspended");
+        int revoked = revokeSessions(tenantId, id, "suspended"); // NB-047: every device
+        staffChanged(tenantId, id, "suspended");
+        StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
+        auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(),
+                caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff"),
+                null, "staff.suspended", "staff", id, null, Map.of("sessionsRevoked", revoked));
         log.warn("staff {} suspended by {} (tenant {}) — all sessions killed", id, callerStaffId, tenantId);
     }
 
@@ -227,7 +252,7 @@ public class StaffService {
         tenantContext.set(tenantId);
         staffRepo.findById(tenantId, id).orElseThrow(this::notFound);
         staffRepo.resetMfa(tenantId, id);
-        staffRepo.revokeAllSessions(tenantId, id, "admin_revoke");
+        revokeSessions(tenantId, id, "admin_revoke");
         StaffRow caller = staffRepo.findById(tenantId, callerStaffId).orElse(null);
         String callerRole = caller == null ? "Staff" : roleRepo.findById(tenantId, caller.roleId()).map(r -> r.name()).orElse("Staff");
         auditService.record(tenantId, "staff", callerStaffId, caller == null ? "Staff" : caller.name(), callerRole,

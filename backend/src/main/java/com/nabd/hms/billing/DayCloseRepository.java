@@ -1,5 +1,6 @@
 package com.nabd.hms.billing;
 
+import com.nabd.hms.billing.dto.DayCloseHistoryResponse;
 import com.nabd.hms.billing.dto.DayCloseSummaryResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -20,7 +21,7 @@ class DayCloseRepository {
 
     record CloseRow(UUID id, String status, BigDecimal expectedCash, BigDecimal countedCash, BigDecimal variance,
                     String note, String closedByName, Instant closedAt, String reopenedByName, Instant reopenedAt,
-                    String reopenReason) {
+                    String reopenReason, int closeCount) {
     }
 
     private final JdbcTemplate jdbc;
@@ -124,7 +125,7 @@ class DayCloseRepository {
     Optional<CloseRow> findClose(UUID tenantId, LocalDate day) {
         return jdbc.query("""
                 SELECT c.id, c.status, c.expected_cash, c.counted_cash, c.variance, c.note, cb.name AS closed_by_name,
-                       c.closed_at, rb.name AS reopened_by_name, c.reopened_at, c.reopen_reason
+                       c.closed_at, rb.name AS reopened_by_name, c.reopened_at, c.reopen_reason, c.close_count
                 FROM day_closes c
                 JOIN staff cb ON cb.id = c.closed_by
                 LEFT JOIN staff rb ON rb.id = c.reopened_by
@@ -132,7 +133,8 @@ class DayCloseRepository {
                 """, (rs, i) -> new CloseRow(rs.getObject("id", UUID.class), rs.getString("status"),
                         rs.getBigDecimal("expected_cash"), rs.getBigDecimal("counted_cash"), rs.getBigDecimal("variance"),
                         rs.getString("note"), rs.getString("closed_by_name"), rs.getTimestamp("closed_at").toInstant(),
-                        rs.getString("reopened_by_name"), instant(rs.getTimestamp("reopened_at")), rs.getString("reopen_reason")),
+                        rs.getString("reopened_by_name"), instant(rs.getTimestamp("reopened_at")), rs.getString("reopen_reason"),
+                        rs.getInt("close_count")),
                 tenantId, Date.valueOf(day)).stream().findFirst();
     }
 
@@ -142,31 +144,66 @@ class DayCloseRepository {
                 Boolean.class, tenantId, Date.valueOf(day)));
     }
 
-    /** First close inserts; closing again after a reopen overwrites the counts and clears the reopen. */
-    UUID upsertClose(UUID tenantId, LocalDate day, BigDecimal expected, BigDecimal counted, BigDecimal variance,
-                     String note, UUID staffId) {
+    record Closed(UUID id, int closeCount) {
+    }
+
+    /** First close inserts; closing again after a reopen overwrites the counts, clears the reopen (it is kept in
+     * day_close_events) and bumps close_count. */
+    Closed upsertClose(UUID tenantId, LocalDate day, BigDecimal expected, BigDecimal counted, BigDecimal variance,
+                       String note, UUID staffId) {
         return jdbc.queryForObject("""
                 INSERT INTO day_closes (tenant_id, close_date, status, expected_cash, counted_cash, variance, note, closed_by)
                 VALUES (?, ?, 'closed', ?, ?, ?, ?, ?)
                 ON CONFLICT (tenant_id, close_date) DO UPDATE SET
                   status = 'closed', expected_cash = EXCLUDED.expected_cash, counted_cash = EXCLUDED.counted_cash,
                   variance = EXCLUDED.variance, note = EXCLUDED.note, closed_by = EXCLUDED.closed_by, closed_at = now(),
-                  reopened_by = NULL, reopened_at = NULL, reopen_reason = NULL
-                RETURNING id
-                """, UUID.class, tenantId, Date.valueOf(day), expected, counted, variance, note, staffId);
+                  reopened_by = NULL, reopened_at = NULL, reopen_reason = NULL, close_count = day_closes.close_count + 1
+                RETURNING id, close_count
+                """, (rs, i) -> new Closed(rs.getObject("id", UUID.class), rs.getInt("close_count")),
+                tenantId, Date.valueOf(day), expected, counted, variance, note, staffId);
+    }
+
+    /** FIN-005: serialises close, reopen and every billing write of one tenant-day (two-key transaction lock, released
+     * at commit). Close takes it before computing expected cash, so a payment either commits first and is counted, or
+     * waits and then sees the day closed. */
+    void lockDay(UUID tenantId, LocalDate day) {
+        jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtext(?), ?)", Object.class, "day-close:" + tenantId, (int) day.toEpochDay());
+    }
+
+    void insertEvent(UUID tenantId, UUID closeId, String action, BigDecimal expected, BigDecimal counted, BigDecimal variance,
+                     String note, UUID actorId) {
+        jdbc.update("INSERT INTO day_close_events (tenant_id, day_close_id, action, expected_cash, counted_cash, variance, note, actor_id) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", tenantId, closeId, action, expected, counted, variance, note, actorId);
+    }
+
+    /** One history row; the actor's name is resolved through iam's ActorDirectory (billing does not read staff). */
+    record HistoryRow(UUID id, LocalDate date, String action, java.math.BigDecimal expectedCash, java.math.BigDecimal countedCash,
+                      java.math.BigDecimal variance, String note, UUID actorId, Instant at) {
+        DayCloseHistoryResponse.Item withActorName(String actorName) {
+            return new DayCloseHistoryResponse.Item(id, date, action, expectedCash, countedCash, variance, note, actorName, at);
+        }
+    }
+
+    /** Newest first; (beforeAt, beforeId) is the keyset cursor of the previous page's last item, both null for page one. */
+    List<HistoryRow> history(UUID tenantId, LocalDate from, LocalDate to, Instant beforeAt, UUID beforeId, int limit) {
+        return jdbc.query("""
+                SELECT e.id, c.close_date, e.action, e.expected_cash, e.counted_cash, e.variance, e.note, e.actor_id, e.created_at
+                FROM day_close_events e
+                JOIN day_closes c ON c.id = e.day_close_id
+                WHERE e.tenant_id = ? AND c.close_date >= ? AND c.close_date <= ?
+                  AND (?::timestamptz IS NULL OR (e.created_at, e.id) < (?::timestamptz, ?::uuid))
+                ORDER BY e.created_at DESC, e.id DESC
+                LIMIT ?
+                """, (rs, i) -> new HistoryRow(rs.getObject("id", UUID.class), rs.getDate("close_date").toLocalDate(),
+                        rs.getString("action"), rs.getBigDecimal("expected_cash"), rs.getBigDecimal("counted_cash"),
+                        rs.getBigDecimal("variance"), rs.getString("note"), rs.getObject("actor_id", UUID.class),
+                        rs.getTimestamp("created_at").toInstant()),
+                tenantId, Date.valueOf(from), Date.valueOf(to), tsOrNull(beforeAt), tsOrNull(beforeAt), beforeId, limit);
     }
 
     void reopen(UUID tenantId, UUID closeId, UUID staffId, String reason) {
         jdbc.update("UPDATE day_closes SET status = 'reopened', reopened_by = ?, reopened_at = now(), reopen_reason = ? " +
                 "WHERE tenant_id = ? AND id = ?", staffId, reason, tenantId, closeId);
-    }
-
-    /** Actor snapshot for audit_log — same shape as PatientRepository.findActorInfo. */
-    Optional<String[]> actor(UUID tenantId, UUID staffId) {
-        return jdbc.query("SELECT s.name, r.name AS role_name FROM staff s JOIN roles r ON r.id = s.role_id " +
-                        "WHERE s.tenant_id = ? AND s.id = ?",
-                (rs, i) -> new String[]{rs.getString("name"), rs.getString("role_name")}, tenantId, staffId)
-                .stream().findFirst();
     }
 
     Optional<String> region(UUID tenantId) {
@@ -175,6 +212,10 @@ class DayCloseRepository {
 
     private static Timestamp ts(Instant i) {
         return Timestamp.from(i);
+    }
+
+    private static Timestamp tsOrNull(Instant i) {
+        return i == null ? null : Timestamp.from(i);
     }
 
     private static Instant instant(Timestamp t) {
