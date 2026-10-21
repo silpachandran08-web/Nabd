@@ -132,5 +132,5 @@ as in tests) and L2 in Valkey (`app.cache.config-l2-ttl-seconds`, default 3600),
 
 - A value written under an old version is unreachable once the version moves (AC "stale L2"); an L1 fill that raced an eviction is dropped (epoch check).
 - Stampede: one load per key per instance (single-flight future); across instances a `SET NX PX 5000` lock key (`...:v<ver>:lock`), the others poll L2 for up to 2 s, then load themselves.
-- Keys come only from `CacheKeyPolicy` (tenant id always present, PHI refused). `ConfigCacheRulesTest` forbids `nabd:cfg` literals outside `shared.cache`, `@Cacheable`, and any domain built from forbidden data classes.
+- Keys come only from `CacheKeyPolicy` (tenant id always present, PHI refused). `Ops021ConfigCacheApiTest` forbids `nabd:cfg` literals outside `shared.cache`, `@Cacheable`, and any domain built from forbidden data classes.
 - Valkey down: the DB answers, nothing is cached. Not built (OPS-021 subtasks): departments, workflows, templates, roles, entitlements loaders, opening-time warm-up.
