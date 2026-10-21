@@ -1094,6 +1094,52 @@ paths:
         "201": { description: "Branch", content: { application/json: { schema: { $ref: "#/components/schemas/Branch" } } } }
 
   # --------------------------------------------------------------- Setup
+  /setup/dpa:
+    get:
+      tags: [Setup]
+      summary: ADM-002 current DPA text for the clinic's market, acceptance status and data gate
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Status", content: { application/json: { schema: { $ref: "#/components/schemas/DpaStatus" } } } }
+
+  /setup/dpa/otp:
+    post:
+      tags: [Setup]
+      summary: ADM-002 send a one-time code to the owner's registered mobile (WhatsApp) to sign the DPA
+      x-required-permission: setup:edit
+      responses:
+        "200": { description: "Challenge", content: { application/json: { schema: { $ref: "#/components/schemas/DpaOtpChallenge" } } } }
+        "400": { description: "NO_MOBILE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "NOT_OWNER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "OTP_RATE_LIMITED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/dpa/accept:
+    post:
+      tags: [Setup]
+      summary: ADM-002 accept the DPA with the one-time code; opens the data gate when the clinic also has a plan
+      description: >
+        Owner only (the clinic's built-in Owner role) with setup:edit. Idempotency-Key required; a replay of an accepted
+        version returns the same acceptance. At most 5 wrong codes per challenge. eSignRef is reserved: a value is refused.
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DpaAcceptRequest" } } }
+      responses:
+        "201": { description: "Accepted", content: { application/json: { schema: { $ref: "#/components/schemas/DpaAcceptResponse" } } } }
+        "400": { description: "OTP_INVALID or ESIGN_NOT_SUPPORTED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "NOT_OWNER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "VERSION_SUPERSEDED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/dpa/acceptances/{id}/pdf:
+    get:
+      tags: [Setup]
+      summary: ADM-002 the signed DPA as a PDF
+      x-required-permission: setup:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: "PDF", content: { application/pdf: { schema: { type: string, format: binary } } } }
+        "404": { description: "Not found", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/checklist:
     get:
       tags: [Setup]
@@ -4511,6 +4557,9 @@ components:
           properties:
             confirmed: { type: boolean, description: "Must be true" }
             channel: { type: string, enum: [in_person, phone, written] }
+        synthetic:
+          type: [boolean, "null"]
+          description: "ADM-002. true marks a demo patient. While the clinic's data gate is demo_only only synthetic patients can be created; a real one returns 403 DPA_REQUIRED and writes nothing."
 
     PatientPatch:
       type: object
@@ -4742,6 +4791,50 @@ components:
         status: { type: string, enum: [pending, skipped, done] }
         skippedAt: { type: [string, "null"], format: date-time }
         doneAt: { type: [string, "null"], format: date-time }
+
+    DpaStatus:
+      type: object
+      required: [version, marketCode, html, dataGate, blockers]
+      properties:
+        version: { type: string }
+        marketCode: { type: string, description: "IN, KSA, AE or QA: IN says data fiduciary / data processor, the others controller / processor" }
+        html: { type: string, description: "The DPA text, server-escaped HTML" }
+        accepted:
+          type: [object, "null"]
+          properties:
+            version: { type: string }
+            at: { type: string, format: date-time }
+            by: { type: [string, "null"] }
+            method: { type: string }
+            acceptanceId: { type: string, format: uuid }
+        dataGate: { type: string, enum: [demo_only, live] }
+        blockers: { type: array, items: { type: string, enum: [DPA_REQUIRED, PLAN_REQUIRED] } }
+        reacceptDueBy: { type: [string, "null"], format: date-time, description: "Set when a newer DPA than the accepted one exists: show a non-blocking banner; the gate is never reset" }
+
+    DpaOtpChallenge:
+      type: object
+      required: [otpChallengeId, expiresAt]
+      properties:
+        otpChallengeId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+
+    DpaAcceptRequest:
+      type: object
+      required: [version, otpChallengeId, otp]
+      properties:
+        version: { type: string, minLength: 1 }
+        otpChallengeId: { type: string, format: uuid }
+        otp: { type: string, pattern: "^\\d{6}$" }
+        eSignRef: { type: [string, "null"], description: "Reserved for Aadhaar eSign / Nafath / UAE Pass; not built, a value is refused" }
+
+    DpaAcceptResponse:
+      type: object
+      required: [acceptanceId, dataGate, pdfUrl, blockers]
+      properties:
+        acceptanceId: { type: string, format: uuid }
+        dataGate: { type: string, enum: [demo_only, live] }
+        pdfUrl: { type: string }
+        blockers: { type: array, items: { type: string, enum: [PLAN_REQUIRED] } }
 
     SetupProgressUpdate:
       type: object

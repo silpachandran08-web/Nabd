@@ -9691,6 +9691,144 @@ paths:
       tags:
       - organization
       x-required-permission: setup:edit
+  /v1/setup/dpa:
+    get:
+      operationId: DpaController_status
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DpaStatusResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+  /v1/setup/dpa/accept:
+    post:
+      operationId: DpaController_accept
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DpaAcceptRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DpaAcceptResponse"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/dpa/acceptances/{id}/pdf:
+    get:
+      operationId: DpaController_pdf
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+  /v1/setup/dpa/otp:
+    post:
+      operationId: DpaController_requestOtp
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DpaOtpChallengeResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
   /v1/setup/export-jobs:
     get:
       operationId: SetupController_exportJobs
@@ -11474,6 +11612,20 @@ components:
           pattern: "^[0-9]{4,6}$"
       required:
       - pin
+    Accepted:
+      type: object
+      properties:
+        acceptanceId:
+          type: string
+        at:
+          type: string
+          format: date-time
+        by:
+          type: string
+        method:
+          type: string
+        version:
+          type: string
     ActivateRequest:
       type: object
       properties:
@@ -12986,6 +13138,68 @@ components:
           format: date-time
         weightStale:
           type: boolean
+    DpaAcceptRequest:
+      type: object
+      properties:
+        eSignRef:
+          type: string
+        otp:
+          type: string
+          minLength: 1
+          pattern: "\\d{6}"
+        otpChallengeId:
+          type: string
+          format: uuid
+        version:
+          type: string
+          minLength: 1
+      required:
+      - otp
+      - otpChallengeId
+      - version
+    DpaAcceptResponse:
+      type: object
+      properties:
+        acceptanceId:
+          type: string
+          format: uuid
+        blockers:
+          type: array
+          items:
+            type: string
+        dataGate:
+          type: string
+        pdfUrl:
+          type: string
+    DpaOtpChallengeResponse:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        otpChallengeId:
+          type: string
+          format: uuid
+    DpaStatusResponse:
+      type: object
+      properties:
+        accepted:
+          $ref: "#/components/schemas/Accepted"
+        blockers:
+          type: array
+          items:
+            type: string
+        dataGate:
+          type: string
+        html:
+          type: string
+        marketCode:
+          type: string
+        reacceptDueBy:
+          type: string
+          format: date-time
+        version:
+          type: string
     DrugSuggestionResponse:
       type: object
       properties:
@@ -14550,6 +14764,8 @@ components:
         phone:
           type: string
           minLength: 1
+        synthetic:
+          type: boolean
       required:
       - dob
       - gender

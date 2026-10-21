@@ -225,7 +225,9 @@ public abstract class ApiTestBase {
     protected SeededTenant seedTenant() {
         UUID id = UUID.randomUUID();
         String slug = "t" + id.toString().replace("-", "").substring(0, 12);
-        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, timezone) VALUES (?,?,?,?,?,'UTC')", // UTC as before OPS-061: the region default would move every suite's clinic day
+        // ADM-002: seeded clinics are 'live' (INSERT is not guarded) so the many tests that register patients keep working;
+        // DataGateApiTest flips a tenant back to demo_only to cover the gate. UTC as before OPS-061: the region default would move every suite's clinic day.
+        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, timezone, data_gate) VALUES (?,?,?,?,?,'UTC','live')",
                 id, slug, "Test Clinic " + slug, "IN", "active");
         // Every tenant gets a default department the moment it exists — same backfill guarantee
         // V37's migration gives every already-provisioned tenant, and ProvisioningStepRunner gives
