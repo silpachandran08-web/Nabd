@@ -1529,6 +1529,39 @@ paths:
       tags:
       - billing
       x-required-permission: billing:create
+  /v1/client-telemetry:
+    post:
+      operationId: ClientTelemetryController_ingest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Report"
+        required: true
+      responses:
+        "202":
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - shared
+      x-required-permission: isAuthenticated()
   /v1/clinical/allergies/{id}:
     patch:
       operationId: AllergyController_correct
@@ -15446,6 +15479,38 @@ components:
           minLength: 1
       required:
       - reason
+    Report:
+      type: object
+      properties:
+        kind:
+          type: string
+          minLength: 1
+          pattern: vital|error
+        message:
+          type: string
+          maxLength: 500
+          minLength: 0
+        metric:
+          type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "[A-Za-z0-9_.:-]+"
+        route:
+          type: string
+          maxLength: 200
+          minLength: 0
+        stackHash:
+          type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "[A-Za-z0-9]*"
+        value:
+          type: number
+          format: double
+      required:
+      - kind
+      - metric
+      - route
     RequestGrantRequest:
       type: object
       properties:

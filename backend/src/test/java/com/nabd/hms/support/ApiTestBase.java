@@ -46,6 +46,7 @@ import java.util.UUID;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate // PLT-032: Boot 4 no longer registers TestRestTemplate without it
+@org.junit.jupiter.api.extension.ExtendWith(LogPhiCaptureExtension.class) // OPS-028
 public abstract class ApiTestBase {
 
     protected static final String APP_ROLE = "nabd_app";

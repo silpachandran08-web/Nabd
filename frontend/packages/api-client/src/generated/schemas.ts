@@ -246,6 +246,7 @@ export const RefundResponseSchema = z.object({ amountOwed: z.number().optional()
 export const RefuseRequestSchema = z.object({ reason: z.string().min(1) });
 export const RegionSummaryResponseSchema = z.object({ activeClinicCount: z.number().int().optional(), clinicCount: z.number().int().optional(), currency: z.string().optional(), mrrCents: z.number().int().optional(), newClinicsLast30d: z.number().int().optional(), planMix: z.array(PlanMixResponseSchema).optional(), region: z.string().optional(), taxIdTypes: z.array(z.string()).optional(), userCount: z.number().int().optional() });
 export const RejectRefundRequestSchema = z.object({ reason: z.string().min(1) });
+export const ReportSchema = z.object({ kind: z.string().min(1), message: z.string().min(0).max(500).optional(), metric: z.string().min(0).max(64), route: z.string().min(0).max(200), stackHash: z.string().min(0).max(64).optional(), value: z.number().optional() });
 export const RequestGrantRequestSchema = z.object({ minutes: z.number().int().optional(), reason: z.string().min(0).max(500), scope: z.string().optional(), tenantId: z.string(), ticketId: z.string().optional() });
 export const RescheduleRequestSchema = z.object({ newStartTime: z.string() });
 export const RetentionResponseSchema = z.object({ avgVisitsPerPatient: z.number().optional(), repeatPatients: z.number().int().optional(), repeatRatePercent: z.number().optional(), totalPatients: z.number().int().optional() });
@@ -357,6 +358,7 @@ export const operationSchemas = {
   CheckoutController_voidInvoice: { body: VoidInvoiceRequestSchema, response: InvoiceResponseSchema },
   CheckoutController_otcCharges: { response: OtcChargesResponseSchema },
   CheckoutController_otcCheckout: { body: CheckoutRequestSchema, response: InvoiceResponseSchema },
+  ClientTelemetryController_ingest: { body: ReportSchema },
   AllergyController_correct: { body: AllergyCorrectionRequestSchema, response: AllergyResponseSchema },
   AllergyController_deactivate: { body: AllergyRemovalRequestSchema },
   ConditionController_due: { response: z.array(DueConditionResponseSchema) },

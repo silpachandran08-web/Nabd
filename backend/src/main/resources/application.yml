@@ -102,9 +102,7 @@ logging:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [reqId=%X{requestId:-none}] %logger{35} - %mask%n"
   level:
     root: INFO
-    # ponytail: no PHI-redaction scanner on top of this yet (NB-158) — logging code is
-    # hand-disciplined to pass IDs, not patient name/phone/DOB/national-ID: read PatientService
-    # before adding a new log line there.
+    # OPS-028: JSON logs masked by PhiMasker; scripts/log-phi-scan.py (source) and scripts/ci/log_phi_scan.py (log streams) check them.
     com.nabd.hms: INFO
 
 app:
