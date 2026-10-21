@@ -3635,6 +3635,43 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden: no audit_compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /organization/invoice-series:
+    get:
+      tags: [Organization]
+      summary: FIN-006 - list the facility's invoice, credit-note and receipt series (one row per kind and financial year)
+      x-required-permission: setup:view
+      responses:
+        "200":
+          description: Series rows
+          content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceSeriesList" } } }
+        "403": { description: "Forbidden: no setup:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /organization/invoice-series/{kind}:
+    put:
+      tags: [Organization]
+      summary: FIN-006 - set the prefix pattern of a series before its first use (pattern carries {FY}, e.g. SKN/{FY}/)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [invoice, credit_note, receipt] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prefixPattern]
+              properties:
+                prefixPattern: { type: string, maxLength: 40, example: "SKN/{FY}/" }
+                taxRegistrationId: { type: string, format: uuid }
+                fyStartMonth: { type: integer, minimum: 1, maximum: 12, description: "April in India, January elsewhere when omitted" }
+      responses:
+        "200":
+          description: The series
+          content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceSeries" } } }
+        "403": { description: "Forbidden: no setup:edit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "SERIES_IN_USE: numbers were already issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "NUMBER_TOO_LONG: over 16 characters for an Indian GSTIN; INVALID_PREFIX_PATTERN; INVALID_TAX_REGISTRATION (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3792,6 +3829,24 @@ components:
         sessionId: { type: [string, "null"], format: uuid }
         state: { type: string, enum: [in, paused, out] }
         since: { type: [string, "null"], format: date-time }
+    InvoiceSeries:
+      type: object
+      required: [id, kind, prefix, fiscalYear, nextNumber, prefixPattern, fyStartMonth, pad]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [invoice, credit_note, receipt] }
+        prefix: { type: string, example: "SKN/25-26/" }
+        fiscalYear: { type: string, example: "25-26" }
+        nextNumber: { type: integer, format: int64 }
+        taxRegistrationId: { type: string, format: uuid, nullable: true }
+        prefixPattern: { type: string, nullable: true }
+        fyStartMonth: { type: integer }
+        pad: { type: integer }
+    InvoiceSeriesList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/InvoiceSeries" } }
     ClinicalDocumentCreate:
       type: object
       required: [type]

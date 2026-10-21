@@ -69,9 +69,13 @@ public class PackageInstanceService {
 
     private final ActorDirectory actors;
 
+    private final com.nabd.hms.organization.api.SeriesAllocator series;
+
     PackageInstanceService(PackageRepository repo, TenantContext tenantContext, CheckoutService checkoutService,
                             AuditService auditService, ClinicClock clock, com.nabd.hms.common.EventPublisher eventPublisher, ActorDirectory actors,
-                            com.nabd.hms.billing.DayCloseService dayClose) {
+                            com.nabd.hms.billing.DayCloseService dayClose,
+                            com.nabd.hms.organization.api.SeriesAllocator series) {
+        this.series = series;
         this.actors = actors;
         this.dayClose = dayClose;
         this.clock = clock;
@@ -366,7 +370,7 @@ public class PackageInstanceService {
                     java.util.Map.of("requestedAmount", refund.refundAmount(), "currentAmount", current.refundAmount(),
                             "currentAmountOwed", current.amountOwed()));
         }
-        String creditNoteNumber = repo.nextCreditNoteNumber(tenantId);
+        String creditNoteNumber = series.allocate(com.nabd.hms.organization.api.SeriesAllocator.Kind.CREDIT_NOTE).formatted(); // FIN-006: own gapless series
         if (repo.approveRefund(tenantId, refundId, staffId, creditNoteNumber, current.refundAmount()) != 1) {
             throw alreadyDecided();
         }

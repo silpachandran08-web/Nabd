@@ -267,6 +267,10 @@ schemas:
       created_at: operational
       updated_at: operational
       close_count: operational
+      currency: operational
+      expected_cash_minor: financial
+      counted_cash_minor: financial
+      variance_minor: financial
     day_close_events:
       id: operational
       tenant_id: operational
@@ -441,6 +445,9 @@ schemas:
       recorded_at: operational
       reference: financial
       idempotency_key: operational
+      receipt_number: financial
+      currency: operational
+      amount_minor: financial
     invoice_series:
       id: operational
       tenant_id: operational
@@ -451,6 +458,9 @@ schemas:
       kind: operational
       created_at: operational
       updated_at: operational
+      fy_start_month: operational
+      prefix_pattern: operational
+      pad: operational
     invoices:
       id: operational
       tenant_id: operational
@@ -471,6 +481,15 @@ schemas:
       voided_by: operational
       void_reason: financial
       version: operational
+      invoice_series_id: operational
+      series_number: financial
+      currency: operational
+      subtotal_minor: financial
+      discount_minor: financial
+      tax_minor: financial
+      round_off_minor: financial
+      total_minor: financial
+      paid_minor: financial
     legal_entities:
       id: operational
       owner_id: operational
@@ -632,6 +651,9 @@ schemas:
       sold_by: operational
       created_at: operational
       updated_at: operational
+      currency: operational
+      sold_price_minor: financial
+      sold_tax_minor: financial
     package_items:
       id: operational
       tenant_id: operational
@@ -668,6 +690,11 @@ schemas:
       rejected_at: operational
       reject_reason: financial
       recomputed_amount: financial
+      currency: operational
+      used_list_value_minor: financial
+      refund_amount_minor: financial
+      amount_owed_minor: financial
+      recomputed_amount_minor: financial
     package_settings:
       tenant_id: operational
       price_floor_percent: financial
