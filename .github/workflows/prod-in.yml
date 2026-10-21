@@ -1,0 +1,82 @@
+# OPS-056: prod-in checks and digest promotion. The static job runs on PRs; promote and tls need the prod-in cluster, DNS and repo
+# variables/secrets (Needs external action) and never run on PRs.
+name: prod-in
+on:
+  pull_request:
+    paths: ["infra/prod-in/**", "infra/security/**", "infra/terraform/modules/cell/aws/edge_*.tf", ".github/workflows/prod-in.yml"]
+  schedule:
+    - cron: "17 3 * * *"   # daily TLS check
+  workflow_dispatch:
+    inputs:
+      core_image: { description: "ghcr.io/<org>/nabd-core@sha256:... (the digest that passed staging-in)", required: false }
+      web_image: { description: "ghcr.io/<org>/nabd-web@sha256:...", required: false }
+permissions:
+  contents: read
+jobs:
+  static:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q pyyaml python-hcl2
+      - run: python3 infra/prod-in/check_prod_in.py && python3 infra/prod-in/check_prod_in.py --selftest
+      - run: python3 infra/security/check_edge.py && python3 infra/security/check_edge.py --selftest
+      - run: python3 infra/terraform/check-terraform.py
+      - run: python3 scripts/ci/test_ops056.py
+
+  tls:
+    # testssl-style check of the public endpoints; set repo variable PROD_IN_HOSTS (space separated) once DNS exists.
+    if: vars.PROD_IN_HOSTS != '' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: python3 infra/security/tls_check.py ${{ vars.PROD_IN_HOSTS }} --http-port 80
+      - name: second opinion with the runner's openssl (TLS 1.1 must be refused)
+        run: |
+          for h in ${{ vars.PROD_IN_HOSTS }}; do
+            if echo | openssl s_client -connect "$h:443" -servername "$h" -tls1_1 2>/dev/null | grep -q "BEGIN CERTIFICATE"; then echo "$h accepts TLS 1.1"; exit 1; fi
+          done
+
+  promote:
+    if: github.event_name == 'workflow_dispatch' && inputs.core_image != ''
+    needs: static
+    runs-on: ubuntu-latest
+    environment: prod-in   # required reviewers on this environment = the release approval
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: sigstore/cosign-installer@v3.7.0
+      - name: Verify the cosign signature of both digests (keyless, signed by this repository's CI on main)
+        run: |
+          for img in "${{ inputs.core_image }}" "${{ inputs.web_image }}"; do
+            cosign verify "$img" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              --certificate-identity "https://github.com/${{ github.repository }}/.github/workflows/ci.yml@refs/heads/main"
+          done
+      - name: kubeconfigs
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.STAGING_IN_KUBECONFIG }}" | base64 -d > ~/.kube/staging
+          echo "${{ secrets.PROD_IN_KUBECONFIG }}" | base64 -d > ~/.kube/prod
+      - name: Digest must be the one staging-in is running (promote what was tested)
+        run: |
+          live=$(KUBECONFIG=~/.kube/staging kubectl -n staging-in get deploy core -o jsonpath='{.spec.template.spec.containers[0].image}')
+          [ "$live" = "${{ inputs.core_image }}" ] || { echo "staging-in runs $live, not the requested digest"; exit 1; }
+      - name: Render (refuses tags) and check
+        run: |
+          pip install -q pyyaml
+          python3 infra/prod-in/promote.py --core "${{ inputs.core_image }}" --web "${{ inputs.web_image }}" --out out
+      - name: Apply
+        env: { KUBECONFIG: /home/runner/.kube/prod }
+        run: |
+          kubectl apply -f out/verify-images.yaml
+          kubectl apply -f out/core.yaml -f out/worker.yaml -f out/bff.yaml -f out/targets.yaml
+          for d in core worker bff; do kubectl -n prod-in rollout status deploy/$d --timeout=10m; done
