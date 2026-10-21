@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /** Local/test fallback when app.whatsapp.access-token is blank — logs instead of sending. */
@@ -34,5 +35,11 @@ class LoggingWhatsAppClient implements WhatsAppClient {
     @Override
     public void editTemplate(String metaTemplateId, String headerText, String body, List<String> bodyExamples) {
         log.info("[MOCK WhatsApp] would resubmit template {}", metaTemplateId);
+    }
+
+    /** Nothing is ever really submitted, so nothing is ever found: a stranded 'submitting' row is deleted. */
+    @Override
+    public Optional<Submission> findTemplate(String metaName, String language) {
+        return Optional.empty();
     }
 }

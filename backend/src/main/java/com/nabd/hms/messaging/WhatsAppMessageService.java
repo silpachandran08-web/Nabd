@@ -2,6 +2,7 @@ package com.nabd.hms.messaging;
 
 import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.DomainEventType;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import org.springframework.http.HttpStatus;
@@ -58,5 +59,27 @@ public class WhatsAppMessageService {
         } catch (Exception e) {
             throw new IllegalArgumentException("WhatsApp template params are not serializable", e);
         }
+    }
+
+    /** COM-003: a send that is no longer wanted. True when it was stopped; false when it had already started
+     * sending (or is past it): a message that may be at the provider is never silently relabelled. */
+    @Transactional
+    public boolean cancel(UUID messageId) {
+        return stop(messageId, "cancelled");
+    }
+
+    /** COM-003: a send that missed its window (COM-023 decides the window; this is the state change). */
+    @Transactional
+    public boolean expire(UUID messageId) {
+        return stop(messageId, "expired");
+    }
+
+    @Transactional
+    boolean stop(UUID messageId, String status) {
+        if (!repo.markTerminal(messageId, status)) {
+            return false;
+        }
+        publisher.publish(tenantContext.current(), DomainEventType.COMMS_MESSAGE_STATUS_CHANGED, messageId, Map.of("messageId", messageId.toString(), "status", status));
+        return true;
     }
 }

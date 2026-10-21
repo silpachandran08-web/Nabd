@@ -59,10 +59,12 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     @Override
     public void handle(OutboxEvent event) throws Exception {
         UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("messageId").asString());
-        WhatsAppMessageRepository.Message msg = inTx(event, () -> claimForSend(id));
+        int[] attemptHolder = new int[1];
+        WhatsAppMessageRepository.Message msg = inTx(event, () -> claimForSend(id, attemptHolder));
         if (msg == null) {
             return;
         }
+        int attempt = attemptHolder[0];
         List<String> params = objectMapper.readValue(msg.paramsJson(), new TypeReference<>() { });
         String wamid;
         try {
@@ -72,22 +74,22 @@ class WhatsAppSendHandler implements OutboxEventHandler {
             // and stop. 429/5xx rethrow so the outbox backs off and retries.
             if (e.getStatusCode().is4xxClientError() && e.getStatusCode().value() != 429) {
                 inTx(event, () -> {
-                    repo.markFailed(id, "HTTP " + e.getStatusCode().value() + ": " + e.getResponseBodyAsString());
+                    repo.markFailed(id, "HTTP " + e.getStatusCode().value() + ": " + e.getResponseBodyAsString(), attempt);
                     return null;
                 });
                 return;
             }
-            requeue(event, id);
+            requeue(event, id, attempt);
             throw e;
         } catch (RuntimeException e) {
-            requeue(event, id); // timeout, connection refused, circuit open: the outbox retries with backoff
+            requeue(event, id, attempt); // timeout, connection refused, circuit open: the outbox retries with backoff
             throw e;
         }
-        inTx(event, () -> repo.markSent(id, wamid));
+        inTx(event, () -> repo.markSent(id, wamid, attempt)); // fenced: 0 rows when a newer attempt owns the message
     }
 
     /** Runs in the short first transaction. Returns the message to send, or null when there is nothing to send. */
-    private WhatsAppMessageRepository.Message claimForSend(UUID id) {
+    private WhatsAppMessageRepository.Message claimForSend(UUID id, int[] attemptOut) {
         WhatsAppMessageRepository.Message msg = repo.findForUpdate(id).orElse(null); // OPS-014: row lock, see findForUpdate
         if (msg == null || !("queued".equals(msg.status()) || "sending".equals(msg.status()))) {
             return null;
@@ -104,13 +106,13 @@ class WhatsAppSendHandler implements OutboxEventHandler {
             repo.markBlocked(id, "no active messaging consent");
             return null;
         }
-        repo.markSending(id);
+        attemptOut[0] = repo.markSending(id);
         return msg;
     }
 
-    private void requeue(OutboxEvent event, UUID id) {
+    private void requeue(OutboxEvent event, UUID id, int attempt) {
         inTx(event, () -> {
-            repo.requeue(id);
+            repo.requeue(id, attempt);
             return null;
         });
     }

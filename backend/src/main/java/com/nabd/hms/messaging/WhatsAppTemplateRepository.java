@@ -67,6 +67,36 @@ class WhatsAppTemplateRepository {
                 metaTemplateId);
     }
 
+    /** COM-003 phase 1: the row exists (and the name is taken) before Meta is called. */
+    UUID insertSubmitting(UUID tenantId, String name, String metaName, String language, String category, String headerText,
+                          String body, int paramCount) {
+        return jdbc.queryForObject("""
+                INSERT INTO whatsapp_templates (tenant_id, name, meta_name, language, category, header_text, body,
+                                                param_count, status, submitted_at)
+                VALUES (?,?,?,?,?,?,?,?,'submitting', now()) RETURNING id
+                """, UUID.class, tenantId, name, metaName, language, category, headerText, body, paramCount);
+    }
+
+    /** COM-003 phase 3: Meta's answer. Does nothing when the row is no longer 'submitting' (the reconciler got there first). */
+    int completeSubmission(UUID tenantId, UUID id, String status, String metaTemplateId) {
+        return jdbc.update("UPDATE whatsapp_templates SET status = ?, meta_template_id = ? WHERE tenant_id = ? AND id = ? AND status = 'submitting'",
+                status, metaTemplateId, tenantId, id);
+    }
+
+    int deleteSubmitting(UUID tenantId, UUID id) {
+        return jdbc.update("DELETE FROM whatsapp_templates WHERE tenant_id = ? AND id = ? AND status = 'submitting'", tenantId, id);
+    }
+
+    record Stale(UUID tenantId, UUID id, String metaName, String language) {
+    }
+
+    /** Cross-tenant by design — see stale_submitting_templates in V1861. */
+    List<Stale> staleSubmitting(int minutes, int limit) {
+        return jdbc.query("SELECT * FROM stale_submitting_templates(?, ?)", (rs, i) -> new Stale(
+                rs.getObject("tenant_id", UUID.class), rs.getObject("id", UUID.class), rs.getString("meta_name"),
+                rs.getString("language")), minutes, limit);
+    }
+
     void resubmitted(UUID tenantId, UUID id, String headerText, String body, int paramCount) {
         jdbc.update("""
                 UPDATE whatsapp_templates SET header_text = ?, body = ?, param_count = ?, status = 'pending',

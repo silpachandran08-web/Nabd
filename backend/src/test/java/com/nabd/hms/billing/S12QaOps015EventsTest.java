@@ -76,7 +76,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
             Map.entry("iam.role.changed.v1", List.of("roleId", "status")),
             Map.entry("iam.staff.changed.v1", List.of("staffId", "status")),
             Map.entry("iam.session.revoked.v1", List.of("staffId", "scope", "reasonCode", "status")),
-            Map.entry("billing.catalogue.changed.v1", List.of("chargeHeadId", "status")));
+            Map.entry("billing.catalogue.changed.v1", List.of("chargeHeadId", "status")),
+            Map.entry("comms.message.status_changed.v1", List.of("messageId", "status")));
 
     // ---------------- helpers ----------------
 
@@ -358,9 +359,10 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
                 .containsEntry("staffId", other.id().toString()).containsEntry("reasonCode", "role_changed").containsEntry("scope", "all_sessions");
         seen.addAll(types(evs));
 
-        // all 19 minus the one without a business action (doctor_status, see the known-defect test)
+        // every type minus the one without a business action (doctor_status, see the known-defect test) and the COM-003 one
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove("scheduling.doctor_status.changed.v1");
+        expected.remove("comms.message.status_changed.v1"); // COM-003: produced by WhatsAppMessageService.cancel/expire, proven in Com003ProviderApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));
