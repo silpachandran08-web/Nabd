@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:nabd:event-schema:scheduling.doctor_status.changed.v1",
   "title": "scheduling.doctor_status.changed.v1",
-  "description": "A doctor's availability status changed (no producer yet: no doctor-status action exists).",
+  "description": "A doctor's session state changed (in, paused, out): start, pause, resume, end, or the implicit start at the first in_consult (ACC-015).",
   "type": "object",
   "additionalProperties": false,
   "required": [

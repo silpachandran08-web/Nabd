@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:nabd:event-schema:visit.queue_entry.changed.v1",
   "title": "visit.queue_entry.changed.v1",
-  "description": "A queue entry changed status or priority.",
+  "description": "A queue entry changed status or priority, or its consult was extended.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -44,6 +44,11 @@
     },
     "priority": {
       "type": "boolean"
+    },
+    "extendedMinutes": {
+      "type": "integer",
+      "enum": [5, 10, 15],
+      "description": "ACC-015: the consult was extended by this many minutes (status unchanged)."
     },
     "version": {
       "type": "integer",

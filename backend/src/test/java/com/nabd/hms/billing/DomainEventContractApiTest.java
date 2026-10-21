@@ -267,7 +267,6 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
             seen.add(assertContract(t, env));
         }
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
-        expected.remove(DomainEventType.DOCTOR_STATUS_CHANGED.type()); // NOT MET: no doctor-status action exists to produce it
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

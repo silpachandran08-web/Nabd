@@ -1642,6 +1642,33 @@ paths:
         "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /doctors/{id}/session:
+    get:
+      tags: [Queue]
+      summary: "The doctor's session state today (ACC-015): in, paused or out"
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "State; sessionId and since are null when no session was started today", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorSession" } } } }
+
+  /doctors/{id}/session/{action}:
+    post:
+      tags: [Queue]
+      summary: "Start, pause, resume or end the doctor's session (ACC-015)"
+      x-required-permission: "hasAuthority('queue:edit') and (authentication.name == #id.toString() or hasAuthority('setup:edit'))"
+      description: "Own doctor with queue:edit, or a caller who also holds setup:edit (queue:manage does not exist). Audited; publishes scheduling.doctor_status.changed.v1. The first in_consult of the day starts a session implicitly."
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [start, pause, resume, end] } }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { reasonCode: { type: string, pattern: "^[a-z][a-z0-9_]{0,39}$" } } } } }
+      responses:
+        "200": { description: "New state", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorSession" } } } }
+        "403": { description: "Not the own doctor and no setup:edit" }
+        "409": { description: "Problem `invalid-session-state` (code INVALID_SESSION_STATE)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /doctors/{id}/leave:
     get:
       tags: [Queue]
@@ -1952,6 +1979,21 @@ paths:
                   newLeg: { $ref: "#/components/schemas/QueueEntry" }
         "400": { description: "transfer-reason-required / transfer-not-allowed / illegal-transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /queue/{id}/extend:
+    post:
+      tags: [Queue]
+      summary: "Extend the current consult by 5, 10 or 15 minutes (ACC-015); an event the ETA reads"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [minutes], properties: { minutes: { type: integer, enum: [5, 10, 15] } } } } }
+      responses:
+        "200": { description: "Recorded", content: { application/json: { schema: { type: object, properties: { queueEntryId: { type: string, format: uuid }, extendedBy: { type: integer } } } } } }
+        "400": { description: "minutes is not 5, 10 or 15", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Problem `not-in-consult` (code NOT_IN_CONSULT)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue/{id}/reorder:
     post:
@@ -3558,6 +3600,13 @@ components:
               page: { $ref: "#/components/schemas/PageMeta" }
 
   schemas:
+    DoctorSession:
+      type: object
+      required: [state]
+      properties:
+        sessionId: { type: [string, "null"], format: uuid }
+        state: { type: string, enum: [in, paused, out] }
+        since: { type: [string, "null"], format: date-time }
     ClinicalDocumentCreate:
       type: object
       required: [type]

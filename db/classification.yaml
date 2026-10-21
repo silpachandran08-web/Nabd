@@ -1154,3 +1154,33 @@ schemas:
       steps: operational
       toggle_keys: operational
       created_at: operational
+    queue_entry_events:
+      id: operational
+      tenant_id: operational
+      queue_entry_id: operational
+      encounter_id: operational
+      doctor_id: operational
+      clinic_date: operational
+      from_status: operational
+      to_status: operational
+      kind: operational
+      minutes: operational
+      occurred_at: operational
+      actor_id: operational
+      source: operational
+    doctor_sessions:
+      id: operational
+      tenant_id: operational
+      doctor_id: operational
+      clinic_date: operational
+      working_hours_id: operational
+      state: operational
+      started_at: operational
+      ended_at: operational
+    doctor_session_pauses:
+      id: operational
+      tenant_id: operational
+      session_id: operational
+      paused_at: operational
+      resumed_at: operational
+      reason_code: operational

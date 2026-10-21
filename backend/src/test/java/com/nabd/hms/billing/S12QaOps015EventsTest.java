@@ -11,7 +11,6 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaFieldAccess;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.postgresql.PGConnection;
 import org.postgresql.PGNotification;
@@ -272,8 +271,10 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         for (String[] step : new String[][]{{"checked_in", "waiting"}, {"waiting", "vitals_pending"}, {"vitals_pending", "vitals_done"},
                 {"vitals_done", "in_consult"}, {"in_consult", "checkout_pending"}}) {
             evs = eventsOf(t, () -> move(e, entry[0], step[1]));
-            assertThat(types(evs)).as("move to %s", step[1]).containsExactly("visit.queue_entry.changed.v1");
-            assertThat(data(evs.get(0))).containsEntry("status", step[1]).containsEntry("fromStatus", step[0]).containsEntry("entryId", entry[0]);
+            // ACC-015: the first in_consult of the day also starts the doctor's session
+            List<String> expectTypes = "in_consult".equals(step[1]) ? List.of("visit.queue_entry.changed.v1", "scheduling.doctor_status.changed.v1") : List.of("visit.queue_entry.changed.v1");
+            assertThat(types(evs)).as("move to %s", step[1]).containsExactlyInAnyOrderElementsOf(expectTypes);
+            assertThat(data(evs.stream().filter(x -> "visit.queue_entry.changed.v1".equals(x.get("type"))).findFirst().orElseThrow())).containsEntry("status", step[1]).containsEntry("fromStatus", step[0]).containsEntry("entryId", entry[0]);
             seen.addAll(types(evs));
         }
 
@@ -358,9 +359,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
                 .containsEntry("staffId", other.id().toString()).containsEntry("reasonCode", "role_changed").containsEntry("scope", "all_sessions");
         seen.addAll(types(evs));
 
-        // all 19 minus the one without a business action (doctor_status, see the known-defect test)
+        // all 19 (doctor_status is produced since ACC-015: the first in_consult starts the doctor's session)
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
-        expected.remove("scheduling.doctor_status.changed.v1");
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));
@@ -388,9 +388,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
                 .anySatisfy(x -> assertThat(data(x)).containsEntry("status", "waiting"));
     }
 
-    /** Criterion 2 needs a producer for every catalogue type. Fails: nothing in main code publishes DOCTOR_STATUS_CHANGED. */
+    /** Criterion 2 needs a producer for every catalogue type (DOCTOR_STATUS_CHANGED got one in ACC-015). */
     @Test
-    @Tag("known-defect-OPS-015")
     void ac2_everyCatalogueTypeHasAProducerCallSiteInMainCode() {
         JavaClasses main = new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.nabd.hms");
         Set<String> referenced = new TreeSet<>();
@@ -513,7 +512,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
 
         assertThat(since(t, m2).stream().map(x -> Long.parseLong((String) x.get("id"))).filter(id -> id <= m3).toList())
                 .as("duplicate check-in, then the 2 bookings").hasSize(2); // the two bookings only
-        assertThat(types(since(t, m3)).stream().filter(x -> x.startsWith("scheduling.")).toList()).as("clashing reschedule").isEmpty();
+        assertThat(types(since(t, m3)).stream().filter(x -> x.startsWith("scheduling.") && !x.equals("scheduling.doctor_status.changed.v1")).toList()).as("clashing reschedule").isEmpty(); // ACC-015: the later invoice fixture starts the doctor session (doctor_status is excluded above)
         assertThat(since(t, m4)).as("overpayment").isEmpty();
     }
 

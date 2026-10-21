@@ -56,6 +56,8 @@ export type ConditionResponse = { condition?: string; id?: string; patientId?: s
 export type ConditionWriteRequest = { condition: string; reviewDueDate?: string; };
 export type ConsentContactResponse = { email?: string; name?: string; phone?: string; };
 export type ConsentContactWriteRequest = { email: string; name: string; phone?: string; };
+export type ConsultExtendRequest = { minutes: number; };
+export type ConsultExtendResponse = { extendedBy?: number; queueEntryId?: string; };
 export type Counts = { appointments?: number; freeSlots?: number; walkIns?: number; };
 export type CreateProvisioningJobRequest = { brandName: string; ownerEmail: string; ownerMobile: string; ownerName: string; path: string; region: string; tenantName: string; tenantSlug: string; };
 export type CreateRequest = { body?: Record<string, string>; type?: string; };
@@ -84,6 +86,7 @@ export type DoctorDelayResponse = { active?: boolean; announcedAt?: string; anno
 export type DoctorLeaveResponse = { affectedPackagePatients?: Array<string>; dateFrom?: string; dateTo?: string; id?: string; reason?: string; };
 export type DoctorLeaveWriteRequest = { dateFrom: string; dateTo: string; reason?: string; };
 export type DoctorPunctualityResponse = { accessNote?: string; entries?: Array<Entry>; };
+export type DoctorSessionResponse = { sessionId?: string; since?: string; state?: string; };
 export type DocumentResponse = { body?: Record<string, string>; createdAt?: string; doctorId?: string; header?: Record<string, Record<string, unknown>>; id?: string; issuedAt?: string; issuedBy?: string; patientId?: string; queueEntryId?: string; status?: string; type?: string; updatedAt?: string; };
 export type DoseCalculationResponse = { mgPerKg?: number; ruleSource?: string; totalDoseMg?: number; weightKg?: number; weightRecordedAt?: string; weightStale?: boolean; };
 export type DrugSuggestionResponse = { code?: string; inStock?: boolean; name?: string; prescriptionOnly?: boolean; source?: string; };
@@ -246,6 +249,7 @@ export type ScheduleWeekResponse = { days?: Array<Day>; start?: string; today?: 
 export type SellPackageRequest = { packageId: string; patientId: string; paymentMethod: string; };
 export type Service = { name?: string; revenue?: number; };
 export type Session = { end?: string; label?: string; rows?: Array<Row>; start?: string; stepMinutes?: number; };
+export type SessionActionRequest = { reasonCode?: string; };
 export type SessionCount = { booked?: number; free?: number; label?: string; };
 export type SessionResponse = { current?: boolean; device?: string; id?: string; ip?: string; lastSeenAt?: string; };
 export type SetupChecklistItemResponse = { doneAt?: string; skippedAt?: string; status?: string; step?: string; };
@@ -421,6 +425,8 @@ export type Operations = {
   ScheduleController_clearDelay: { method: "post"; path: "/v1/doctors/{id}/delay/clear"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
   ScheduleController_listLeave: { method: "get"; path: "/v1/doctors/{id}/leave"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: Array<DoctorLeaveResponse> };
   ScheduleController_addLeave: { method: "post"; path: "/v1/doctors/{id}/leave"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: DoctorLeaveWriteRequest; response: DoctorLeaveResponse };
+  DoctorSessionController_today: { method: "get"; path: "/v1/doctors/{id}/session"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: DoctorSessionResponse };
+  DoctorSessionController_act: { method: "post"; path: "/v1/doctors/{id}/session/{action}"; permission: "hasAuthority('queue:edit') and (authentication.name == #id.toString() or hasAuthority('setup:edit'))"; pathParams: { id: string; action: string; }; query: never; body: SessionActionRequest; response: DoctorSessionResponse };
   ScheduleController_listWorkingHours: { method: "get"; path: "/v1/doctors/{id}/working-hours"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: Array<WorkingHoursResponse> };
   ScheduleController_addWorkingHours: { method: "post"; path: "/v1/doctors/{id}/working-hours"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; }; query: never; body: WorkingHoursWriteRequest; response: WorkingHoursResponse };
   ScheduleController_updateWorkingHours: { method: "put"; path: "/v1/doctors/{id}/working-hours/{hoursId}"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; hoursId: string; }; query: never; body: WorkingHoursWriteRequest; response: WorkingHoursResponse };
@@ -531,6 +537,7 @@ export type Operations = {
   QueueController_list: { method: "get"; path: "/v1/queue"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; departmentId?: string; date?: string; priority?: boolean; }; body: never; response: Array<QueueEntryResponse> };
   QueueController_checkIn: { method: "post"; path: "/v1/queue/check-in"; permission: "queue:create"; pathParams: never; query: never; body: CheckInRequest; response: QueueEntryResponse };
   QueueController_waitEstimate: { method: "get"; path: "/v1/queue/wait-estimate"; permission: "queue:view"; pathParams: never; query: { doctorId: string; }; body: never; response: WaitEstimateResponse };
+  QueueController_extend: { method: "post"; path: "/v1/queue/{id}/extend"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: ConsultExtendRequest; response: ConsultExtendResponse };
   QueueController_acknowledgePriority: { method: "post"; path: "/v1/queue/{id}/priority/acknowledge"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: QueueEntryResponse };
   QueueController_reorder: { method: "post"; path: "/v1/queue/{id}/reorder"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueReorderRequest; response: QueueEntryResponse };
   QueueController_updateStatus: { method: "patch"; path: "/v1/queue/{id}/status"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueStatusUpdateRequest; response: QueueEntryResponse };
