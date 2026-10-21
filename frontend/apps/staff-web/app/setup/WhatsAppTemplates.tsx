@@ -5,8 +5,8 @@ import styles from "./setup.module.css";
 import type { Problem } from "@nabd/api-client/types";
 
 type Template = {
-  id: string; name: string; language: string; category: "UTILITY" | "MARKETING"; headerText: string; body: string;
-  paramCount: number; status: "pending" | "approved" | "flagged" | "paused" | "disabled" | "rejected";
+  id: string; name: string; language: string; category: "UTILITY" | "MARKETING" | "AUTHENTICATION"; headerText: string; body: string;
+  paramCount: number; key: string; source: "catalogue" | "custom"; status: "queued" | "pending" | "approved" | "flagged" | "paused" | "disabled" | "rejected";
   rejectionReason: string | null; qualityRating: "GREEN" | "YELLOW" | "RED" | "UNKNOWN"; updatedAt: string;
 };
 type Draft = { name: string; language: string; category: "UTILITY" | "MARKETING"; body: string; examples: string[] };
@@ -23,9 +23,20 @@ const REJECTION_HELP: Record<string, string> = {
 };
 
 const STATUS_PILL: Record<Template["status"], string> = {
-  approved: styles.pillValid, flagged: styles.pillExpiring, pending: styles.pillPending,
+  queued: styles.pillPending, approved: styles.pillValid, flagged: styles.pillExpiring, pending: styles.pillPending,
   paused: styles.pillExpiring, disabled: styles.pillInactive, rejected: styles.pillExpired,
 };
+
+// COM-012: starter templates are named in plain words; owners only see their status (the platform team fixes rejections).
+const KEY_LABEL: Record<string, string> = {
+  appt_confirmed: "Appointment confirmed", appt_reminder_24h: "Reminder, 1 day before", appt_reminder_2h: "Reminder, 2 hours before",
+  appt_rescheduled: "Appointment moved", appt_cancelled_by_clinic: "Cancelled by the clinic", doctor_delay: "Doctor running late",
+  queue_your_turn: "Your turn is next", leave_now: "Time to leave", secure_link_ready: "Secure message ready",
+  recall_due: "Next visit due", review_request: "Review request", feedback_request: "Feedback request",
+  package_card: "Package card", package_expiry: "Package expiring", optout_confirm: "Stopped messages", otp_login: "Sign-in code",
+};
+const STATUS_LABEL: Partial<Record<Template["status"], string>> = { queued: "waiting to send" };
+const LANGUAGE_LABEL: Record<string, string> = { en: "English", hi: "Hindi", kn: "Kannada", te: "Telugu", ar: "Arabic" };
 
 /** Number of {{n}} slots in the body — drives how many example inputs are shown. */
 const slotCount = (body: string) => (body.match(/\{\{\d+\}\}/g) ?? []).length;
@@ -55,7 +66,7 @@ export default function WhatsAppTemplates({ authedFetch }: { authedFetch: (path:
   const startFix = (t: Template) => {
     setEditingId(t.id);
     setError(null);
-    setDraft({ name: t.name, language: t.language, category: t.category, body: t.body, examples: Array(t.paramCount).fill("") });
+    setDraft({ name: t.name, language: t.language, category: t.category as Draft["category"], body: t.body, examples: Array(t.paramCount).fill("") });
   };
 
   const cancel = () => { setEditingId(null); setDraft(EMPTY); setError(null); };
@@ -152,17 +163,17 @@ export default function WhatsAppTemplates({ authedFetch }: { authedFetch: (path:
             <tbody>
               {templates.map((t) => (
                 <tr key={t.id}>
-                  <td>{t.name}<br /><span className={styles.label}>{t.category === "UTILITY" ? "Utility" : "Marketing"}</span></td>
-                  <td>{t.language}</td>
+                  <td>{t.source === "catalogue" ? (KEY_LABEL[t.key] ?? t.key) : t.name}<br /><span className={styles.label}>{t.source === "catalogue" ? "Starter template" : t.category === "MARKETING" ? "Marketing" : "Utility"}</span></td>
+                  <td>{LANGUAGE_LABEL[t.language] ?? t.language}</td>
                   <td><strong>{t.headerText}</strong><br />{t.body}</td>
                   <td>
-                    <span className={`${styles.pill} ${STATUS_PILL[t.status]}`}>{t.status}</span>
+                    <span className={`${styles.pill} ${STATUS_PILL[t.status]}`}>{STATUS_LABEL[t.status] ?? t.status}</span>
                     {t.status === "rejected" && t.rejectionReason && (
                       <div className={styles.label}>{REJECTION_HELP[t.rejectionReason] ?? t.rejectionReason}</div>
                     )}
                   </td>
                   <td>{t.qualityRating === "UNKNOWN" ? "—" : t.qualityRating.toLowerCase()}</td>
-                  <td>{t.status === "rejected" && <button className={styles.smallBtn} onClick={() => startFix(t)}>Fix &amp; resubmit</button>}</td>
+                  <td>{t.status === "rejected" && t.source === "custom" && <button className={styles.smallBtn} onClick={() => startFix(t)}>Fix &amp; resubmit</button>}</td>
                 </tr>
               ))}
             </tbody>
