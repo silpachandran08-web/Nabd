@@ -1,0 +1,22 @@
+# OPS-056: cluster-side signature check (Kyverno). The pipeline verifies with cosign before it rolls out; this refuses any pod
+# whose image is not a digest signed by the CI workflow of this repository, even if someone bypasses the pipeline.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata: { name: nabd-verify-images }
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: signed-by-ci
+      match: { any: [{ resources: { kinds: [Pod], namespaces: [prod-in] } }] }
+      verifyImages:
+        - imageReferences: ["ghcr.io/REPLACE_ORG/nabd-*"]
+          required: true
+          mutateDigest: false
+          verifyDigest: true
+          attestors:
+            - entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: https://github.com/REPLACE_ORG/REPLACE_REPO/.github/workflows/ci.yml@refs/heads/main
+                    rekor: { url: https://rekor.sigstore.dev }

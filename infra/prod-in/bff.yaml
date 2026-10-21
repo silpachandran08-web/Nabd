@@ -1,0 +1,48 @@
+# OPS-056: prod-in staff-web / BFF (2 replicas). Image is promoted by digest (infra/prod-in/promote.py fills REPLACE_DIGEST; the Kyverno policy
+# verify-images.yaml refuses anything unsigned). Secret values come from the cell secret manager (OPS-058), synced into the
+# Secrets named below by the operator (Needs external action). Nothing here is applied from this sandbox.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: bff, namespace: prod-in }
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: bff }
+  template:
+    metadata:
+      labels: { app: bff }
+    spec:
+      terminationGracePeriodSeconds: 45
+      nodeSelector: { topology.kubernetes.io/region: ap-south-1 }   # Mumbai only; the cluster itself has no other region
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector: { matchLabels: { app: bff } }
+      containers:
+        - name: bff
+          image: ghcr.io/REPLACE_ORG/nabd-web@sha256:REPLACE_DIGEST
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: NEXT_PUBLIC_API_BASE_URL, value: "https://REPLACE_API_HOST/v1" }   # Mumbai ingress; also baked at image build time
+            - { name: NABD_CSP_MODE, value: enforce }
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 10
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "10"] }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: bff, namespace: prod-in }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: bff } }

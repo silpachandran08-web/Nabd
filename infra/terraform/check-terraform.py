@@ -33,6 +33,8 @@ UNTAGGABLE = {
     "random_password", "aws_secretsmanager_secret_version",
     "aws_cloudwatch_event_target", "aws_cloudwatch_log_resource_policy",
     "aws_autoscaling_group",  # tags come from tag blocks (propagate_at_launch)
+    "aws_acm_certificate_validation", "aws_route_table_association", "aws_wafv2_web_acl_association",
+    "aws_wafv2_web_acl_logging_configuration",  # OPS-056
 }
 REGION = re.compile(r"\b(ap|me|eu|us|af|ca|sa|il|mx)-(north|south|east|west|central|northeast|southeast)-\d\b")
 CRED = re.compile(r"(access_key|secret_key|aws-access-key-id|aws-secret-access-key|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\s*[=:]"
