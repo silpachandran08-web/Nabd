@@ -3,7 +3,8 @@ SET lock_timeout = '5s';
 -- failed write afterwards leaves a row the reconciler can adopt (Meta has it) or delete (Meta never got it).
 ALTER TABLE whatsapp_templates DROP CONSTRAINT whatsapp_templates_status_check;
 ALTER TABLE whatsapp_templates ADD CONSTRAINT whatsapp_templates_status_check
-  CHECK (status IN ('submitting', 'pending', 'approved', 'flagged', 'paused', 'disabled', 'rejected'));
+  CHECK (status IN ('submitting', 'pending', 'approved', 'flagged', 'paused', 'disabled', 'rejected')) NOT VALID;
+ALTER TABLE whatsapp_templates VALIDATE CONSTRAINT whatsapp_templates_status_check;
 ALTER TABLE whatsapp_templates ADD COLUMN submitted_at timestamptz;
 
 -- The reconciler works across tenants; the API role is RLS-bound, so it lists stale rows through this one narrow

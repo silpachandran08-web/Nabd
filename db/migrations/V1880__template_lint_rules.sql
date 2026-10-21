@@ -1,3 +1,4 @@
+SET lock_timeout = '5s';
 -- COM-014: PHI lint rules for WhatsApp templates. Platform reference data: no tenant_id, no RLS, SELECT-only for
 -- nabd_app (changes ship as migrations). deny_word patterns are matched anywhere in a body whatever its language; Latin
 -- terms match on word boundaries, Indic and Arabic terms as substrings (they inflect and agglutinate).
