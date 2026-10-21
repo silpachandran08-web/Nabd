@@ -56,6 +56,7 @@ public abstract class ApiTestBase {
     protected static final String REPORTS_ROLE_PW = "nabd_reports";
     protected static final String STAFF_PIN = "1234";
     /** RFC 6238 test-vector-style fixed secret — deterministic so tests can compute the current code. */
+    protected static final String INTERNAL_COMMS_TOKEN = java.util.UUID.randomUUID().toString();
     protected static final byte[] TOTP_SECRET = "12345678901234567890".getBytes(StandardCharsets.US_ASCII);
     protected static final String CRYPTO_KEY_B64 = Base64.getEncoder().encodeToString(new byte[32]);
 
@@ -125,6 +126,7 @@ public abstract class ApiTestBase {
         registry.add("spring.datasource.password", () -> APP_ROLE_PW);
         registry.add("spring.flyway.enabled", () -> "false"); // migrated as nabd_migrator above
         registry.add("app.crypto.key", () -> CRYPTO_KEY_B64);
+        registry.add("app.internal.comms-token", () -> INTERNAL_COMMS_TOKEN); // COM-004 claim-check service token
         // tests call OutboxDispatcher.poll() themselves; the background poll would race them for the same rows
         registry.add("app.outbox.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE));
         registry.add("app.registry.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // OPS-007: tests call drain() themselves

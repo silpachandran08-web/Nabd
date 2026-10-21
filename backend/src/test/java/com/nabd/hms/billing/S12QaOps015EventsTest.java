@@ -361,6 +361,8 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         // all 19 minus the one without a business action (doctor_status, see the known-defect test)
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove("scheduling.doctor_status.changed.v1");
+        expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type()); // COM-004: produced by NotificationService, contract-tested in NotificationContractApiTest
+        expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

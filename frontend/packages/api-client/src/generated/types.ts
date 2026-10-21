@@ -143,6 +143,8 @@ export type NoteAmendmentRequest = { assessment?: string; diagnosis?: string; ob
 export type NoteAmendmentResponse = { amendedBy?: string; assessment?: string; createdAt?: string; diagnosis?: string; id?: string; objective?: string; plan?: string; reason?: string; subjective?: string; };
 export type NoteResponse = { assessment?: string; diagnosis?: string; doctorId?: string; id?: string; objective?: string; patientId?: string; plan?: string; queueEntryId?: string; signedAt?: string; signedBy?: string; status?: string; subjective?: string; updatedAt?: string; };
 export type NoteUpsertRequest = { assessment?: string; diagnosis?: string; objective?: string; plan?: string; subjective?: string; };
+export type NotificationClaim = { consentClass?: string; language?: string; notAfter?: string; notBefore?: string; params?: Array<string>; purpose?: string; recipient?: NotificationClaimRecipient; requestId?: string; templateKey?: string; tenantId?: string; };
+export type NotificationClaimRecipient = { patientId?: string; phoneE164?: string; };
 export type OperatorLoginRequest = { email: string; pin: string; };
 export type OperatorProfileResponse = { email?: string; id?: string; name?: string; permissions?: Array<string>; role?: string; };
 export type OtcChargesResponse = { charges?: Array<ChargeResponse>; currency?: string; };
@@ -313,6 +315,7 @@ export type WorkspacesResponse = { brands?: Array<BrandWorkspaceResponse>; };
 
 export type Operations = {
   JwksController_jwks: { method: "get"; path: "/.well-known/jwks.json"; permission: "public"; pathParams: never; query: never; body: never; response: Record<string, Record<string, unknown>> };
+  NotificationClaimController_claim: { method: "get"; path: "/internal/v1/notification-requests/{id}"; permission: "public"; pathParams: { id: string; }; query: never; body: never; response: NotificationClaim };
   SafetyDictionaryController_listSafetyDictionaryVersions: { method: "get"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: never; response: Array<Record<string, Record<string, unknown>>> };
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: SafetyDictionaryBundle; response: Record<string, Record<string, unknown>> };
   SafetyDictionaryController_activateSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate"; permission: "safety_content:edit"; pathParams: { region: string; versionId: string; }; query: never; body: ActivateRequest; response: Record<string, Record<string, unknown>> };

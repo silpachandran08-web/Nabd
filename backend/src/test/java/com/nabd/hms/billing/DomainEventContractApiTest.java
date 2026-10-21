@@ -268,6 +268,8 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         }
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove(DomainEventType.DOCTOR_STATUS_CHANGED.type()); // NOT MET: no doctor-status action exists to produce it
+        expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type()); // COM-004: produced by NotificationService, contract-tested in NotificationContractApiTest
+        expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content
