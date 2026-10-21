@@ -8,7 +8,8 @@
     "./types": "./types.ts",
     "./generated": "./src/generated/index.ts",
     "./mocks": "./mocks/validating.ts",
-    "./queries": "./queries/keys.ts"
+    "./queries": "./queries/keys.ts",
+    "./sse": "./sse/index.ts"
   },
   "dependencies": {
     "zod": "4.4.3"

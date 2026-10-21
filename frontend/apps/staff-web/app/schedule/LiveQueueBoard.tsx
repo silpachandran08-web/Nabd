@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { usePolling } from "../lib/usePolling";
+import { useLiveRefresh } from "../lib/live";
 import { useLatestLoad } from "../lib/useLatestLoad";
 import type { QueueEntry } from "@nabd/domain";
 import styles from "./schedule.module.css";
@@ -66,6 +67,7 @@ export default function LiveQueueBoard({ doctors, names, authedFetch }: {
     void Promise.resolve().then(load);
   }, [load]);
   usePolling(load, POLL_MS);
+  useLiveRefresh(["queue"], load);
 
   if (error && !entries) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!entries) return <Skeleton rows={5} label="Loading live queue" />;

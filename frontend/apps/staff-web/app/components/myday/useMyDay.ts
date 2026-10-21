@@ -7,6 +7,7 @@ import { useLatestLoad } from "../../lib/useLatestLoad";
 import type { PatientSummary as PatientDetail, QueueEntry } from "@nabd/domain";
 import { apiFetch, goLogin } from "../../lib/apiClient";
 import { clinicTimeZoneReady, clinicToday } from "../../lib/clinicTime";
+import { useLiveRefresh } from "../../lib/live";
 
 
 // DTOs mirror the backend records exactly (queue/dto/*, clinical/dto/DueConditionResponse).
@@ -118,5 +119,6 @@ export function useMyDay() {
   }, [newSignal]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
+  useLiveRefresh(["queue", "roster", "doctor-delay", "wait-estimate"], load); // FEF-020; the Refresh button stays as a manual fallback
   return { data, loading, error, reload: load };
 }
