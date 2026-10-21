@@ -268,6 +268,9 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         }
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove(DomainEventType.DOCTOR_STATUS_CHANGED.type()); // NOT MET: no doctor-status action exists to produce it
+        // COM-001: produced by the WhatsApp webhook processor, not over this HTTP flow; WhatsAppInboxApiTest covers the producer
+        expected.remove(DomainEventType.INBOUND_RECEIVED.type());
+        expected.remove(DomainEventType.MESSAGE_STATUS_CHANGED.type());
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

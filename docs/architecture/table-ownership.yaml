@@ -26,7 +26,7 @@ modules:
     owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review]
     reads: []
   messaging:
-    owns: [whatsapp_messages, whatsapp_templates]
+    owns: [messaging_suppressions, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: []
   nursing:
     owns: [administration_orders, administration_records, procedure_orders, vaccine_records]

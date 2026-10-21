@@ -24,7 +24,9 @@ public enum DomainEventType {
     ROLE_CHANGED("iam.role.changed.v1", "core/iam"),
     STAFF_CHANGED("iam.staff.changed.v1", "core/iam"),
     SESSION_REVOKED("iam.session.revoked.v1", "core/iam"),
-    CATALOGUE_CHANGED("billing.catalogue.changed.v1", "core/billing");
+    CATALOGUE_CHANGED("billing.catalogue.changed.v1", "core/billing"),
+    INBOUND_RECEIVED("comms.inbound.received.v1", "core/messaging"),
+    MESSAGE_STATUS_CHANGED("comms.message.status_changed.v1", "core/messaging");
 
     private final String type;
     private final String source;

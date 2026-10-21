@@ -40,6 +40,9 @@ class WhatsAppMessagingApiTest extends ApiTestBase {
     private OutboxDispatcher dispatcher;
 
     @Autowired
+    private WhatsAppInboundProcessor inboundProcessor;
+
+    @Autowired
     private WhatsAppTemplateService templates;
 
     @Test
@@ -60,6 +63,7 @@ class WhatsAppMessagingApiTest extends ApiTestBase {
 
         assertThat(postWebhook(statusPayload(wamid, "read"), true).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(postWebhook(statusPayload(wamid, "delivered"), true).getStatusCode()).isEqualTo(HttpStatus.OK); // late, out of order
+        inboundProcessor.poll(); // COM-001: the webhook only stores; the processor applies, oldest first
         assertThat(statusOf(tenant.id(), id)).isEqualTo("read");
     }
 

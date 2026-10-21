@@ -41,6 +41,9 @@ class WhatsAppTemplateApiTest extends ApiTestBase {
     @Autowired
     private OutboxDispatcher dispatcher;
 
+    @Autowired
+    private WhatsAppInboundProcessor inboundProcessor; // COM-001: the webhook only stores the delivery; this applies it
+
     @Test
     void createdTemplateCarriesClinicNameAndCanBeSentOnlyBySlots() {
         SeededTenant tenant = seedTenant();
@@ -168,6 +171,7 @@ class WhatsAppTemplateApiTest extends ApiTestBase {
         headers.set("X-Hub-Signature-256", "sha256=" + hmac(body));
         assertThat(http.postForEntity(url("/v1/webhooks/whatsapp"), new HttpEntity<>(body, headers), Void.class)
                 .getStatusCode()).isEqualTo(HttpStatus.OK);
+        inboundProcessor.poll();
     }
 
     private static String hmac(String body) {

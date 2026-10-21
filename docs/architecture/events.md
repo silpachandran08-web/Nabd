@@ -67,7 +67,7 @@ Stream names for the relay are `ev:<region>:<domain>`, where `<domain>` is the f
 
 The relay passes it on as the CloudEvents `traceparent` extension, so one trace spans HTTP -> outbox -> consumer.
 
-## 5. Catalogue (19 types, `DomainEventType`)
+## 5. Catalogue (21 types, `DomainEventType`)
 
 | type | producer (business action) | data besides tenantId, version |
 |---|---|---|
@@ -90,6 +90,8 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `iam.staff.changed.v1` | StaffService.patch / suspend | staffId, status |
 | `iam.session.revoked.v1` | StaffService: role change, suspend, MFA reset (all sessions of the staff member) | staffId, scope, reasonCode, status |
 | `billing.catalogue.changed.v1` | SetupService.addCharge / updateCharge | chargeHeadId, status |
+| `comms.inbound.received.v1` | WhatsAppInboundProcessor, an inbound patient message routed to a clinic by its reply context (COM-001); never the text | inboundId, senderNumberId?, kind, buttonPayload?, replyToWamid?, receivedAt |
+| `comms.message.status_changed.v1` | WhatsAppInboundProcessor, a delivery callback that moved a message forward (COM-001; subject = message) | messageId, channel, status, errorCode?, at |
 
 The following producers belong to other stories and should publish against this catalogue when they land:
 

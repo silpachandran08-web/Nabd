@@ -215,6 +215,8 @@ schemas:
       created_at: operational
       captured_by: operational
       capture_channel: operational
+      source: operational
+      notice_version: operational
     crypto_reencrypt_progress:
       table_name: operational
       column_name: operational
@@ -1129,6 +1131,28 @@ schemas:
       created_at: operational
       updated_at: operational
       template_id: operational
+    whatsapp_inbound_events:
+      id: operational
+      tenant_id: operational
+      source: operational
+      dedupe_key: pii  # msg:<wamid> | st:<wamid>:<status> | tpl:...: ids and hashes only, no patient text
+      field: operational
+      phone_number_id: operational  # Meta id of the clinic's business number, not a patient phone
+      body_enc: phi  # raw webhook item incl. patient free text; AES-GCM at rest, purged after 30 days
+      status: operational
+      attempts: operational
+      locked_until: operational
+      received_at: operational
+      processed_at: operational
+      last_error_code: operational
+    messaging_suppressions:
+      id: operational
+      tenant_id: operational
+      phone_hash: pii  # HMAC-SHA256 of the E.164 number with a server pepper
+      purpose: operational
+      source: operational
+      created_at: operational
+      lifted_at: operational
     whatsapp_templates:
       id: operational
       tenant_id: operational
