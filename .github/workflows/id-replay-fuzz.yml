@@ -1,0 +1,33 @@
+# OPS-043: nightly cross-tenant id-replay fuzzer. Tenant A's token, tenant B's ids, every operation of api/openapi/core.yaml.
+# Any finding turns the run red and opens an S1 privacy defect carrying the (synthetic) request/response pairs.
+# Needs external action: the first scheduled run on GitHub (nothing here has run on Actions); the labels S1 and privacy must exist.
+name: id-replay-fuzz
+on:
+  schedule: [{ cron: "23 1 * * *" }]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - name: id replay (real API, negative control, DB oracle)
+        id: fuzz
+        working-directory: backend
+        run: mvn -B -q test -Dtest='IdReplayFuzzerApiTest,IdReplayFuzzerNegativeControlTest'
+      - name: open S1 privacy defect
+        if: failure() && steps.fuzz.outcome == 'failure'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          body="Cross-tenant id replay produced findings. Synthetic data only. Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ -f backend/target/id-replay-findings.json ]; then body="$body
+          $(head -c 6000 backend/target/id-replay-findings.json)"; fi
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "S1 privacy: cross-tenant leak found by id-replay fuzzer ($(date -u +%F))" --label "S1,privacy" --body "$body"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: id-replay-findings, path: backend/target/id-replay-findings.json, if-no-files-found: ignore }

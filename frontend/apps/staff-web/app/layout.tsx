@@ -4,6 +4,7 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import AppShell from "./AppShell";
 import IdleLockGuard from "./IdleLockGuard";
+import TelemetryReporter from "./TelemetryReporter";
 import { QueryProvider } from "./lib/query";
 import { LiveProvider } from "./lib/live";
 
@@ -24,6 +25,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={poppins.variable}>
       <body>
+        <TelemetryReporter />
         <IdleLockGuard>
           <QueryProvider><LiveProvider><AppShell>{children}</AppShell></LiveProvider></QueryProvider>
         </IdleLockGuard>

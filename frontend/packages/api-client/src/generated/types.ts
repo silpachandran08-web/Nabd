@@ -241,6 +241,7 @@ export type RegionPhoneRules = { countryCode?: string; nsnLength?: Array<number>
 export type RegionResponse = { cell?: string; code?: string; currency?: string; defaultTimezone?: string; minorUnits?: number; name?: string; phoneRules?: RegionPhoneRules; regulator?: string; standardTaxRate?: number; taxRegime?: string; };
 export type RegionSummaryResponse = { activeClinicCount?: number; clinicCount?: number; currency?: string; mrrCents?: number; newClinicsLast30d?: number; planMix?: Array<PlanMixResponse>; region?: string; taxIdTypes?: Array<string>; userCount?: number; };
 export type RejectRefundRequest = { reason: string; };
+export type Report = { kind: string; message?: string; metric: string; route: string; stackHash?: string; value?: number; };
 export type RequestGrantRequest = { minutes?: number; reason: string; scope?: string; tenantId: string; ticketId?: string; };
 export type RescheduleRequest = { newStartTime: string; };
 export type RetentionResponse = { avgVisitsPerPatient?: number; repeatPatients?: number; repeatRatePercent?: number; totalPatients?: number; };
@@ -373,6 +374,7 @@ export type Operations = {
   CheckoutController_voidInvoice: { method: "post"; path: "/v1/billing/invoices/{id}/void"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: VoidInvoiceRequest; response: InvoiceResponse };
   CheckoutController_otcCharges: { method: "get"; path: "/v1/billing/otc-charges"; permission: "billing:view"; pathParams: never; query: never; body: never; response: OtcChargesResponse };
   CheckoutController_otcCheckout: { method: "post"; path: "/v1/billing/otc-checkout"; permission: "billing:create"; pathParams: never; query: never; body: CheckoutRequest; response: InvoiceResponse };
+  ClientTelemetryController_ingest: { method: "post"; path: "/v1/client-telemetry"; permission: "isAuthenticated()"; pathParams: never; query: never; body: Report; response: void };
   AllergyController_correct: { method: "patch"; path: "/v1/clinical/allergies/{id}"; permission: "clinical:edit"; pathParams: { id: string; }; query: never; body: AllergyCorrectionRequest; response: AllergyResponse };
   AllergyController_deactivate: { method: "patch"; path: "/v1/clinical/allergies/{id}/deactivate"; permission: "clinical:edit"; pathParams: { id: string; }; query: never; body: AllergyRemovalRequest; response: void };
   ConditionController_due: { method: "get"; path: "/v1/clinical/conditions/due"; permission: "clinical:view"; pathParams: never; query: never; body: never; response: Array<DueConditionResponse> };

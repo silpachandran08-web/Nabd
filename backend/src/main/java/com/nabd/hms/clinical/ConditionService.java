@@ -42,6 +42,9 @@ public class ConditionService {
     @Transactional
     public ConditionResponse add(UUID tenantId, UUID patientId, UUID callerStaffId, ConditionWriteRequest req) {
         tenantContext.set(tenantId);
+        if (!repo.patientExists(tenantId, patientId)) { // OPS-043: a foreign patient id must not be stored
+            throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found.");
+        }
         UUID id = repo.insert(tenantId, patientId, req.condition(), req.reviewDueDate(), callerStaffId);
         return repo.findActiveByPatient(tenantId, patientId).stream()
                 .filter(c -> c.id().equals(id)).findFirst().map(this::toResponse).orElseThrow();

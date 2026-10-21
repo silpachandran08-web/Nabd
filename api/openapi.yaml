@@ -34,6 +34,7 @@ tags:
   - name: Reports
   - name: Platform
   - name: Packages
+  - name: Ops
 
 paths:
   # ---------------------------------------------------------------- JWKS (PLT-002)
@@ -3682,6 +3683,31 @@ paths:
         "403": { description: "Forbidden: no setup:edit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "SERIES_IN_USE: numbers were already issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "422": { description: "NUMBER_TOO_LONG: over 16 characters for an Indian GSTIN; INVALID_PREFIX_PATTERN; INVALID_TAX_REGISTRATION (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /client-telemetry:
+    post:
+      tags: [Ops]
+      summary: Ingest scrubbed web vitals and client errors (OPS-028)
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, metric, route]
+              properties:
+                kind: { type: string, enum: [vital, error] }
+                metric: { type: string, maxLength: 64 }
+                value: { type: number }
+                route: { type: string, maxLength: 200, description: "Path only; query string and fragment are cut" }
+                message: { type: string, maxLength: 500, description: Accepted, never stored or logged }
+                stackHash: { type: string, maxLength: 64 }
+      responses:
+        "202": { description: Accepted }
+        "400": { description: Invalid report }
+        "413": { description: "TOO_LARGE: body over 4096 bytes" }
+        "429": { description: RATE_LIMITED }
 
 components:
   securitySchemes:
