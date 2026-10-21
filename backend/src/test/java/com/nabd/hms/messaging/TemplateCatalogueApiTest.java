@@ -64,7 +64,7 @@ class TemplateCatalogueApiTest extends ApiTestBase {
         assertThat(TemplateCatalogueService.defaultLanguages("IN", "kn")).containsExactly("en", "hi", "kn");
         assertThat(TemplateCatalogueService.defaultLanguages("IN", "te")).containsExactly("en", "hi", "te");
         assertThat(TemplateCatalogueService.defaultLanguages("IN", "ta")).containsExactly("en", "hi");
-        assertThat(TemplateCatalogueService.defaultLanguages("KSA", "kn")).containsExactly("en");
+        assertThat(TemplateCatalogueService.defaultLanguages("SA", "kn")).containsExactly("en");
         assertThat(TemplateCatalogueService.defaultLanguages("QA", null)).containsExactly("en");
     }
 
@@ -106,7 +106,7 @@ class TemplateCatalogueApiTest extends ApiTestBase {
     void aTenantNeverSeesAnotherTenantsCatalogueRows() {
         SeededTenant a = seedTenant();
         SeededTenant b = seedTenant();
-        catalogueTemplates.instantiateDefaults(a.id(), "KSA");
+        catalogueTemplates.instantiateDefaults(a.id(), "SA");
         assertThat(exchange(LIST, HttpMethod.GET, authed(ownerToken(b)), List.class).getBody()).isEmpty();
         assertThat(exchange(LIST, HttpMethod.GET, authed(ownerToken(a)), List.class).getBody()).hasSize(16);
     }

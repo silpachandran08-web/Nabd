@@ -675,6 +675,8 @@ class S12QaEventPipelineTest extends ApiTestBase {
 
     @Test
     void ops017_ac4_versionGateIgnoresLowerAndEqualVersionsPerSubjectIncludingRealEventsOutOfOrder() throws Exception {
+        // check-ins now publish queue events that other consumers apply too: hold the relay so only the events fed by hand are delivered
+        relayBean.stop();
         U u = user();
         String p = patient(u.token);
         String other = patient(u.token);

@@ -28,14 +28,23 @@ public class TemplateCatalogueService implements CatalogueTemplates {
         this.tenantScope = tenantScope;
     }
 
-    /** India: English, Hindi and the clinic's state language (kn or te when known); GCC: English until Phase 4 Arabic. */
+    private static final java.util.Properties LANGS = loadLanguages();
+
+    private static java.util.Properties loadLanguages() {
+        var p = new java.util.Properties();
+        try (var in = TemplateCatalogueService.class.getResourceAsStream("/messaging/default-languages.properties")) {
+            p.load(in);
+        } catch (java.io.IOException | NullPointerException e) {
+            throw new IllegalStateException("default-languages.properties missing", e);
+        }
+        return p;
+    }
+
+    /** Per region from default-languages.properties (India: English, Hindi and the clinic's state language when listed; GCC: English until Phase 4 Arabic). */
     public static List<String> defaultLanguages(String region, String stateLanguage) {
-        List<String> out = new ArrayList<>(List.of("en"));
-        if ("IN".equals(region)) {
-            out.add("hi");
-            if ("kn".equals(stateLanguage) || "te".equals(stateLanguage)) {
-                out.add(stateLanguage);
-            }
+        List<String> out = new ArrayList<>(List.of(LANGS.getProperty(region + ".languages", LANGS.getProperty("default.languages")).split(",")));
+        if (stateLanguage != null && List.of(LANGS.getProperty(region + ".stateLanguages", "").split(",")).contains(stateLanguage)) {
+            out.add(stateLanguage);
         }
         return out;
     }

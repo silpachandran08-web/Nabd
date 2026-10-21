@@ -185,6 +185,7 @@ public class PatientService {
      * still answers an exact MRN, else 400 QUERY_TOO_SHORT. Ranked phone, MRN, then name by similarity; no cursor
      * (top-N, nextCursor null).
      */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: only called from list()'s tx
     private PatientPage search(UUID tenantId, String q, UUID scopedToDoctorId, int limit) {
         com.nabd.hms.common.PageRequest.limit(limit, 50);
         boolean phoneLike = q.matches("[0-9+()\\-\\s]+");

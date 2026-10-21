@@ -21,7 +21,6 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -71,7 +70,7 @@ public class DpaService {
         DpaStatusResponse.Accepted accepted = latest.map(a -> new DpaStatusResponse.Accepted(a.version(), a.acceptedAt(),
                 actors.findActor(tenantId, a.signerId()).map(ActorDirectory.Actor::name).orElse(null), a.method(), a.id().toString())).orElse(null);
         Instant due = latest.isPresent() && !DpaText.version().equals(latest.get().version())
-                ? LocalDate.parse(DpaText.publishedOn()).plusDays(DpaText.reacceptDays()).atStartOfDay().toInstant(ZoneOffset.UTC) : null;
+                ? LocalDate.parse(DpaText.publishedOn()).plusDays(DpaText.reacceptDays()).atStartOfDay(clinicClock.zone(tenantId)).toInstant() : null;
         return new DpaStatusResponse(DpaText.version(), market, html, accepted, live ? "live" : "demo_only", blockers(tenantId, live, latest.isPresent()), due);
     }
 

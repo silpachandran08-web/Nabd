@@ -28,7 +28,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -301,7 +300,7 @@ public class RealtimeHub {
     }
 
     private static String day(long ms) {
-        return Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate().toString();
+        return Instant.ofEpochMilli(ms).toString().substring(0, 10);
     }
 
     private static String streamKey(UUID tenantId, long ms) {

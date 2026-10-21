@@ -83,7 +83,7 @@ class InvoiceSeriesApiTest extends ApiTestBase {
         su.execute((java.sql.Connection c) -> {
             try (var st = c.createStatement()) {
                 st.execute("SET session_replication_role = replica");
-                st.execute("UPDATE tenants SET region = '" + region + "' WHERE id = '" + t.id() + "'");
+                st.execute("UPDATE tenants SET region_code = '" + region + "' WHERE id = '" + t.id() + "'");
                 st.execute("SET session_replication_role = origin");
             }
             return null;
@@ -180,7 +180,7 @@ class InvoiceSeriesApiTest extends ApiTestBase {
 
     @Test
     void gccSeriesRollOnFirstJanuary() {
-        SeededTenant tenant = tenantIn("KSA");
+        SeededTenant tenant = tenantIn("SA");
         assertThat(inTenantTx(tenant.id(), () -> service.allocate(Kind.INVOICE, LocalDate.of(2026, 12, 31))).formatted()).isEqualTo("INV-2026-000001");
         assertThat(inTenantTx(tenant.id(), () -> service.allocate(Kind.INVOICE, LocalDate.of(2027, 1, 1))).formatted()).isEqualTo("INV-2027-000001");
     }
@@ -193,7 +193,7 @@ class InvoiceSeriesApiTest extends ApiTestBase {
         assertThat(InvoiceSeriesService.fiscalYear(LocalDate.of(2026, 12, 31), 1)).isEqualTo("2026");
         assertThat(InvoiceSeriesService.fiscalYear(LocalDate.of(2027, 1, 1), 1)).isEqualTo("2027");
         assertThat(InvoiceSeriesService.defaultStartMonth("IN")).isEqualTo(4);
-        assertThat(InvoiceSeriesService.defaultStartMonth("KSA")).isEqualTo(1);
+        assertThat(InvoiceSeriesService.defaultStartMonth("SA")).isEqualTo(1);
     }
 
     @Test
@@ -323,7 +323,7 @@ class InvoiceSeriesApiTest extends ApiTestBase {
 
     @Test
     void everyMonetaryHeaderCarriesCurrencyAndMinorUnits() {
-        SeededTenant tenant = tenantIn("KSA");
+        SeededTenant tenant = tenantIn("SA");
         UUID staff = owner(tenant, "fin6m@a.com", "+919700006007").id();
         su.update("INSERT INTO day_closes (tenant_id, close_date, status, expected_cash, counted_cash, variance, closed_by) VALUES (?, '2026-01-02', 'closed', 100.10, 100.05, -0.05, ?)",
                 tenant.id(), staff);

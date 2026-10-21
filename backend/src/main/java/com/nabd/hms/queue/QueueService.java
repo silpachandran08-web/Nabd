@@ -110,7 +110,8 @@ public class QueueService {
             throw new ApiException(HttpStatus.NOT_FOUND, "patient-not-found", "Patient not found",
                     "That patient doesn't exist in this clinic.");
         }
-        if (!repo.staffExists(tenantId, req.doctorId())) {
+        var doctorDepartment = repo.findCheckInDepartment(tenantId, req.doctorId()); // also the doctor-exists check
+        if (doctorDepartment.isEmpty()) {
             throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found",
                     "That doctor doesn't exist in this clinic.");
         }
@@ -142,7 +143,7 @@ public class QueueService {
             throw alreadyCheckedIn(tenantId, req.appointmentId());
         }
 
-        UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
+        UUID departmentId = doctorDepartment.get(0);
         int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
@@ -326,7 +327,7 @@ public class QueueService {
     /** ACC-015: "Extend by N min" on a running consult; an event the ETA engine reads, and a queue change so desks refresh. */
     @Transactional
     public com.nabd.hms.queue.dto.ConsultExtendResponse extend(UUID tenantId, UUID callerStaffId, UUID id, int minutes) {
-        tenantContext.set(tenantId);
+        // tenant already bound by TenantTransactionBinder (PLT-019)
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
         if (!"in_consult".equals(current.status())) {
             throw new ApiException(HttpStatus.CONFLICT, "not-in-consult", "Not in consult",
@@ -342,6 +343,7 @@ public class QueueService {
     }
 
     /** ACC-015: one queue_entry_events row, in the caller's transaction. The doctor moving their own patient is source 'doctor'. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private void recordEvent(UUID tenantId, UUID entryId, String from, String to, String kind, Integer minutes, UUID callerStaffId, UUID doctorId) {
         eventRepo.record(tenantId, entryId, from, to, kind, minutes, clock.now(), callerStaffId,
                 callerStaffId.equals(doctorId) ? "doctor" : "desk");
