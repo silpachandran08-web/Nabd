@@ -22,7 +22,7 @@ function netLog(page) {
   const net = [];
   page.on('request', (r) => {
     const m = r.url().match(API_RE);
-    if (m && r.method() !== 'OPTIONS') net.push({ method: r.method(), path: m[2] + (m[3] ?? ''), t: Date.now() });
+    if (m && r.method() !== 'OPTIONS' && m[2] !== '/client-telemetry') net.push({ method: r.method(), path: m[2] + (m[3] ?? ''), t: Date.now() });
   });
   return net;
 }

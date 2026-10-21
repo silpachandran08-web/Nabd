@@ -43,6 +43,8 @@ export async function mockApi(page, log, handlers) {
     const url = new URL(req.url());
     log.apiHost = url.host;
     const path = url.pathname.replace(/^\/v1/, '') + url.search;
+    // OPS-028 TelemetryReporter beacon (web vitals): answered 202 and kept out of the request log, so request-count checks stay about the flow.
+    if (req.method() === 'POST' && path === '/client-telemetry') return route.fulfill({ headers: CORS, status: 202, body: '' });
     log.requests.push({ method: req.method(), path, body: req.postData(), auth: req.headers()['authorization'] ?? null });
     for (const [method, re, h] of handlers) {
       if (method !== '*' && method !== req.method()) continue;
