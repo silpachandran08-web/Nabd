@@ -4822,6 +4822,80 @@ paths:
       tags:
       - nursing
       x-required-permission: queue:view
+  /v1/organization/invoice-series:
+    get:
+      operationId: InvoiceSeriesController_list
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InvoiceSeriesListResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:view
+  /v1/organization/invoice-series/{kind}:
+    put:
+      operationId: InvoiceSeriesController_configure
+      parameters:
+      - in: path
+        name: kind
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceSeriesConfigRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InvoiceSeriesResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
   /v1/owners/auth/login:
     post:
       operationId: OwnerController_login
@@ -13466,6 +13540,56 @@ components:
           type: number
         total:
           type: number
+    InvoiceSeriesConfigRequest:
+      type: object
+      properties:
+        fyStartMonth:
+          type: integer
+          format: int32
+          maximum: 12
+          minimum: 1
+        prefixPattern:
+          type: string
+          maxLength: 40
+          minLength: 0
+        taxRegistrationId:
+          type: string
+          format: uuid
+      required:
+      - prefixPattern
+    InvoiceSeriesListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceSeriesResponse"
+    InvoiceSeriesResponse:
+      type: object
+      properties:
+        fiscalYear:
+          type: string
+        fyStartMonth:
+          type: integer
+          format: int32
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        nextNumber:
+          type: integer
+          format: int64
+        pad:
+          type: integer
+          format: int32
+        prefix:
+          type: string
+        prefixPattern:
+          type: string
+        taxRegistrationId:
+          type: string
+          format: uuid
     Item:
       type: object
       properties:

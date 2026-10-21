@@ -17,6 +17,8 @@ import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.organization.api.OrganizationConfig;
+import com.nabd.hms.organization.api.SeriesAllocator;
+import com.nabd.hms.shared.money.Money;
 import com.nabd.hms.queue.QueueService;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
 import org.slf4j.Logger;
@@ -70,11 +72,13 @@ public class CheckoutService {
     private final com.nabd.hms.pharmacy.RxGate rxGate;
 
     private final ActorDirectory actors;
+    private final SeriesAllocator series;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
-                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors) {
+                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors, SeriesAllocator series) {
+        this.series = series;
         this.actors = actors;
         this.rxGate = rxGate;
         this.visitCommands = visitCommands;
@@ -158,7 +162,7 @@ public class CheckoutService {
             }
             Totals t = computeTotals(lineItems, List.of(), BigDecimal.ZERO, req, canDiscount);
             invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
-                    t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId);
+                    t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
             repo.insertLineItems(tenantId, invoiceId, lineItems);
             repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
             auditPricing(tenantId, staffId, ip, invoiceId, lineItems, t.newDiscounts(), BigDecimal.ZERO);
@@ -244,7 +248,7 @@ public class CheckoutService {
         Totals t = computeTotals(items, List.of(), BigDecimal.ZERO, req, canDiscount);
 
         UUID invoiceId = repo.insertInvoice(tenantId, null, patientId != null ? patientId : rxPatient, null, t.subtotal(), t.discount(), t.tax(),
-                t.roundOff(), t.total(), staffId);
+                t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
         repo.insertLineItems(tenantId, invoiceId, items);
         repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
         if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
@@ -352,7 +356,8 @@ public class CheckoutService {
                     java.util.Map.of("balance", balance));
         }
         String reference = req.reference() == null || req.reference().isBlank() ? null : req.reference().trim();
-        UUID paymentId = repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId, reference, idempotencyKey);
+        UUID paymentId = repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId, reference, idempotencyKey,
+                series.allocate(SeriesAllocator.Kind.RECEIPT).formatted());
         BigDecimal newPaid = repo.sumPayments(tenantId, invoiceId);
         String newStatus = InvoiceStatus.derive(invoice.status(), invoice.total(), newPaid);
         repo.syncInvoicePaid(tenantId, invoiceId, newStatus);
@@ -365,11 +370,11 @@ public class CheckoutService {
         String currency = currencyFor(tenantId);
         eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.PAYMENT_RECORDED, paymentId, java.util.Map.of(
                 "invoiceId", invoiceId, "paymentId", paymentId, "method", req.method(),
-                "amountMinor", req.amount().movePointRight(2).longValueExact(), "currency", currency,
-                "balanceMinor", newBalance.movePointRight(2).longValueExact(), "status", newStatus));
+                "amountMinor", Money.of(req.amount(), currency).amountMinor(), "currency", currency,
+                "balanceMinor", Money.of(newBalance, currency).amountMinor(), "status", newStatus));
         if ("paid".equals(newStatus) && !"paid".equals(invoice.status())) {
             eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.INVOICE_PAID, invoiceId, java.util.Map.of(
-                    "invoiceId", invoiceId, "totalMinor", invoice.total().movePointRight(2).longValueExact(), "currency", currency,
+                    "invoiceId", invoiceId, "totalMinor", Money.of(invoice.total(), currency).amountMinor(), "currency", currency,
                     "status", "paid"));
         }
         log.info("payment recorded on invoice {} by {}: {} {} (tenant {})", invoiceId, staffId, req.amount(), req.method(), tenantId);

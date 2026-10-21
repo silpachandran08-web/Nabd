@@ -397,11 +397,6 @@ class PackageRepository {
         return count == null ? 0 : count;
     }
 
-    String nextCreditNoteNumber(UUID tenantId) {
-        long seq = jdbc.queryForObject("SELECT nextval('package_credit_note_seq')", Long.class);
-        return "CN-" + String.format("%06d", seq);
-    }
-
     /** FIN-004: compare-and-set on 'pending'; the caller already holds the instance row lock. */
     int approveRefund(UUID tenantId, UUID id, UUID approvedBy, String creditNoteNumber, BigDecimal recomputedAmount) {
         return jdbc.update("UPDATE package_refunds SET status = 'approved', approved_by = ?, credit_note_number = ?, " +

@@ -113,13 +113,15 @@ class CheckoutRepository {
         return Boolean.TRUE.equals(exists);
     }
 
-    /** invoice_number is DB-generated (DEFAULT nextval), so insert then read back rather than compute it here. */
+    /** FIN-006: the number comes from the facility's gapless series (allocated in this transaction); currency and *_minor are filled by the DB. */
     UUID insertInvoice(UUID tenantId, UUID queueEntryId, UUID patientId, UUID doctorId, BigDecimal subtotal,
-                        BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total, UUID createdBy) {
+                        BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total, UUID createdBy,
+                        com.nabd.hms.organization.api.SeriesAllocator.Allocation number) {
         return jdbc.queryForObject(
-                "INSERT INTO invoices (tenant_id, queue_entry_id, patient_id, doctor_id, subtotal, discount, tax, round_off, total, created_by) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?,?) RETURNING id",
-                UUID.class, tenantId, queueEntryId, patientId, doctorId, subtotal, discount, tax, roundOff, total, createdBy);
+                "INSERT INTO invoices (tenant_id, queue_entry_id, patient_id, doctor_id, subtotal, discount, tax, round_off, total, created_by, " +
+                        "invoice_number, invoice_series_id, series_number) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id",
+                UUID.class, tenantId, queueEntryId, patientId, doctorId, subtotal, discount, tax, roundOff, total, createdBy,
+                number.formatted(), number.seriesId(), number.number());
     }
 
     void insertLineItems(UUID tenantId, UUID invoiceId, List<LineItemInput> items) {
@@ -298,10 +300,10 @@ class CheckoutRepository {
     }
 
     UUID insertPayment(UUID tenantId, UUID invoiceId, String method, BigDecimal amount, UUID recordedBy,
-                       String reference, String idempotencyKey) {
-        return jdbc.queryForObject("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by, reference, idempotency_key) " +
-                "VALUES (?,?,?,?,?,?,?) RETURNING id", UUID.class,
-                tenantId, invoiceId, method, amount, recordedBy, reference, idempotencyKey);
+                       String reference, String idempotencyKey, String receiptNumber) {
+        return jdbc.queryForObject("INSERT INTO invoice_payments (tenant_id, invoice_id, method, amount, recorded_by, reference, idempotency_key, receipt_number) " +
+                "VALUES (?,?,?,?,?,?,?,?) RETURNING id", UUID.class,
+                tenantId, invoiceId, method, amount, recordedBy, reference, idempotencyKey, receiptNumber);
     }
 
     /** paid is always the sum of the payment rows, never an absolute value computed in Java. */
