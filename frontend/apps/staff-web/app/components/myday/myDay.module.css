@@ -58,3 +58,9 @@
   .qflags { grid-column: 2 / -1; justify-content: flex-start; max-inline-size: none; }
   .qrow > svg { display: none; }
 }
+
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nb-space-8) var(--nb-space-12); }
+.ctl { min-block-size: 44px; padding-inline: var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: 999px; background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.ctl:focus-visible { outline: 2px solid var(--nb-accent-500); outline-offset: 2px; }
+.ctl:disabled { opacity: 0.6; cursor: progress; }
+.ctlError { flex-basis: 100%; font-size: 12px; color: var(--nb-danger-500); }

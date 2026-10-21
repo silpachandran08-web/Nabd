@@ -76,10 +76,10 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `scheduling.appointment.rescheduled.v1` | AppointmentService.reschedule (subject = new appointment) | + previousAppointmentId, previousStartTime |
 | `scheduling.appointment.arrived.v1` | QueueService.checkIn with an appointment | appointmentId, doctorId, queueEntryId, status |
 | `visit.queue_entry.created.v1` | QueueService.checkIn, transfer (new leg) | entryId, doctorId, queueDate, status |
-| `visit.queue_entry.changed.v1` | every status move (CAS), priority reorder | entryId, doctorId, queueDate, status, fromStatus?, priority? |
+| `visit.queue_entry.changed.v1` | every status move (CAS), priority reorder, consult extend (ACC-015, stands in for `visit.consult.extended.v1`) | entryId, doctorId, queueDate, status, fromStatus?, priority?, extendedMinutes? |
 | `visit.completed.v1` | the checkout move to completed (subject = encounter) | encounterId, entryId, doctorId, queueDate, status |
 | `scheduling.doctor_delay.changed.v1` | ScheduleService.announceDelay / clearDelay | doctorId, delayId, delayMinutes, status |
-| `scheduling.doctor_status.changed.v1` | **no producer yet**: there is no doctor-status (available, break, away) action in the product | doctorId, status |
+| `scheduling.doctor_status.changed.v1` | DoctorSessionService start / pause / resume / end, implicit start at the first in_consult (ACC-015). Status in, paused, out. Replaces the story's `scheduling.doctor_session.changed.v1` | doctorId, status |
 | `clinical.rx.signed.v1` | PrescriptionService.sign | prescriptionId, queueEntryId, signedBy, status |
 | `clinical.allergy.changed.v1` | AllergyService add / correct / deactivate / no-known-allergies (subject = patient) | patientId, allergyId?, change, status |
 | `billing.invoice.paid.v1` | CheckoutService.recordPayment, when the invoice becomes paid | invoiceId, totalMinor, currency, status |
@@ -99,7 +99,6 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 The following producers belong to other stories and should publish against this catalogue when they land:
 
 - iam.session.revoked from logout, refresh-reuse and operator logout (PLT-007).
-- doctor_status once a doctor-status action exists.
 
 Deprecated, still published until their consumers move over (expand and contract):
 

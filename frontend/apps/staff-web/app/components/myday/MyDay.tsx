@@ -6,6 +6,8 @@ import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { DONE_STATUSES, WAITING_STATUSES } from "@nabd/domain";
 import { useMyDay } from "./useMyDay";
+import DoctorControls from "./DoctorControls";
+import { can } from "../../lib/permissions";
 import { clinicToday, formatClinicDate } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
 import { AppointmentsCard, ChronicDueCard, NeedsMeCard, NowNext, QueueList, SessionStrip } from "./MyDayParts";
@@ -48,6 +50,7 @@ export default function MyDay() {
         : data && (
           <>
             <SessionStrip data={data} seen={seen} total={active.length} />
+            {can("queue:edit") && <DoctorControls doctorId={data.selfId} inRoomId={inRoom?.id ?? null} onChanged={() => void reload()} />}
             <div className={styles.grid}>
               <div className={styles.col}>
                 <NowNext inRoom={inRoom} next={next} now={now} />
