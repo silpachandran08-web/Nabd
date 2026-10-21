@@ -29,6 +29,9 @@ class DomainEventHandlers {
                     if (t == DomainEventType.ORGANIZATION_CONFIG_CHANGED) {
                         continue; // OPS-020: TenantConfigEvictions consumes it (cache invalidation on every instance)
                     }
+                    if (t == DomainEventType.NOTIFICATION_REQUESTED) {
+                        continue; // COM-004: messaging.NotificationRequestedHandler consumes it
+                    }
                     registry.registerBeanDefinition("domainEventLogHandler." + t.type(),
                             new RootBeanDefinition(LogOnly.class, () -> new LogOnly(t.type())));
                 }

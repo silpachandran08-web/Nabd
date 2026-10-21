@@ -166,6 +166,8 @@ export const NoteAmendmentRequestSchema = z.object({ assessment: z.string().opti
 export const NoteAmendmentResponseSchema = z.object({ amendedBy: z.string().optional(), assessment: z.string().optional(), createdAt: z.string().optional(), diagnosis: z.string().optional(), id: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), reason: z.string().optional(), subjective: z.string().optional() });
 export const NoteResponseSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), doctorId: z.string().optional(), id: z.string().optional(), objective: z.string().optional(), patientId: z.string().optional(), plan: z.string().optional(), queueEntryId: z.string().optional(), signedAt: z.string().optional(), signedBy: z.string().optional(), status: z.string().optional(), subjective: z.string().optional(), updatedAt: z.string().optional() });
 export const NoteUpsertRequestSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), subjective: z.string().optional() });
+export const NotificationClaimRecipientSchema = z.object({ patientId: z.string().optional(), phoneE164: z.string().optional() });
+export const NotificationClaimSchema = z.object({ consentClass: z.string().optional(), language: z.string().optional(), notAfter: z.string().optional(), notBefore: z.string().optional(), params: z.array(z.string()).optional(), purpose: z.string().optional(), recipient: NotificationClaimRecipientSchema.optional(), requestId: z.string().optional(), templateKey: z.string().optional(), tenantId: z.string().optional() });
 export const OperatorLoginRequestSchema = z.object({ email: z.string().min(1), pin: z.string().min(1) });
 export const OperatorProfileResponseSchema = z.object({ email: z.string().optional(), id: z.string().optional(), name: z.string().optional(), permissions: z.array(z.string()).optional(), role: z.string().optional() });
 export const OtcChargesResponseSchema = z.object({ charges: z.array(ChargeResponseSchema).optional(), currency: z.string().optional() });
@@ -325,6 +327,7 @@ export const WorkspacesResponseSchema = z.object({ brands: z.array(BrandWorkspac
 
 export const operationSchemas = {
   JwksController_jwks: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  NotificationClaimController_claim: { response: NotificationClaimSchema },
   SafetyDictionaryController_listSafetyDictionaryVersions: { response: z.array(z.record(z.string(), z.record(z.string(), z.unknown()))) },
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { body: SafetyDictionaryBundleSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   SafetyDictionaryController_activateSafetyDictionaryVersion: { body: ActivateRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },

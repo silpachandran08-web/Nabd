@@ -2524,6 +2524,20 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryActive" } } } }
         "503": { description: "No active dictionary for the region (safety-dictionary-unavailable, problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /notification-requests/{id}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (comms-gateway service token)" }]
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Messaging]
+      summary: "COM-004. Claim check: render params and recipient of a pending notification request, for the Comms Gateway (header X-Internal-Token; the tenant comes from the request row). 410 code SUBJECT_GONE when the request was cancelled (appointment cancelled or moved), blocked for missing consent, or its params were purged."
+      x-required-permission: public
+      parameters: [{ name: X-Internal-Token, in: header, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: "OK: { requestId, tenantId, purpose, templateKey, language, params[], recipient{phoneE164, patientId?}, consentClass, notBefore?, notAfter? }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { description: "SUBJECT_GONE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /safety-dictionaries/{region}/versions:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
     parameters: [{ name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }]

@@ -47,11 +47,14 @@ public class AppointmentService {
     private final ClinicClock clock;
     private final SlotValidator slotValidator;
     private final EventPublisher events;
+    private final com.nabd.hms.shared.notify.NotificationPort notifications;
 
     AppointmentService(AppointmentRepository repo, ScheduleRepository scheduleRepo, QueueRepository queueRepo,
                         WaitlistService waitlistService, TenantContext tenantContext, ClinicClock clock,
-                        SlotValidator slotValidator, EventPublisher events) {
+                        SlotValidator slotValidator, EventPublisher events,
+                        com.nabd.hms.shared.notify.NotificationPort notifications) {
         this.events = events;
+        this.notifications = notifications;
         this.slotValidator = slotValidator;
         this.clock = clock;
         this.repo = repo;
@@ -108,6 +111,7 @@ public class AppointmentService {
         tenantContext.set(tenantId);
         AppointmentRow current = requireScheduled(tenantId, id);
         repo.cancel(tenantId, id, req.reason());
+        notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED); // COM-004: reminders about it are void
         log.info("appointment {} cancelled by {}", id, callerStaffId);
         published(tenantId, DomainEventType.APPOINTMENT_CANCELLED, id, current.doctorId(), current.startTime(), "cancelled", Map.of());
         waitlistService.onSlotFreed(tenantId, current.doctorId(), current.startTime());
@@ -121,6 +125,7 @@ public class AppointmentService {
         int slotMinutes = slotValidator.validate(tenantId, current.doctorId(), req.newStartTime(), clock.now());
 
         repo.cancel(tenantId, id, "rescheduled");
+        notifications.cancelBySubject("appointment", id, com.nabd.hms.shared.notify.CancelReason.SUBJECT_CHANGED);
         enforceSessionCapacity(tenantId, current.doctorId(), req.newStartTime()); // cancel above already freed this patient's own slot
         Instant newEnd = req.newStartTime().plus(slotMinutes, ChronoUnit.MINUTES);
         try {

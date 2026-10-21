@@ -156,6 +156,7 @@ class BreakGlassAuthzTest extends ApiTestBase {
         UUID grantId = UUID.fromString((String) r.getBody().get("grantId"));
         Instant before = Instant.now();
         dispatcher.poll();
+        dispatcher.poll(); // COM-004: the owner WhatsApp is now a notification request first, delivered on the next pass
 
         Map<String, Object> alert = inTenantTx(t.id(), () -> jdbc.queryForMap(
                 "SELECT message, created_at FROM break_glass_alerts WHERE grant_id = ? AND owner_staff_id = ?", grantId, owner.id()));

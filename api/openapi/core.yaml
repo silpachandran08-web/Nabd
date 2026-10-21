@@ -28,6 +28,37 @@ paths:
       tags:
       - config
       x-required-permission: public
+  /internal/v1/notification-requests/{id}:
+    get:
+      operationId: NotificationClaimController_claim
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: header
+        name: X-Internal-Token
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationClaim"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - messaging
+      x-required-permission: public
   /internal/v1/safety-dictionaries/{region}/versions:
     get:
       operationId: SafetyDictionaryController_listSafetyDictionaryVersions
@@ -14198,6 +14229,43 @@ components:
         plan:
           type: string
         subjective:
+          type: string
+    NotificationClaim:
+      type: object
+      properties:
+        consentClass:
+          type: string
+        language:
+          type: string
+        notAfter:
+          type: string
+          format: date-time
+        notBefore:
+          type: string
+          format: date-time
+        params:
+          type: array
+          items:
+            type: string
+        purpose:
+          type: string
+        recipient:
+          $ref: "#/components/schemas/NotificationClaimRecipient"
+        requestId:
+          type: string
+          format: uuid
+        templateKey:
+          type: string
+        tenantId:
+          type: string
+          format: uuid
+    NotificationClaimRecipient:
+      type: object
+      properties:
+        patientId:
+          type: string
+          format: uuid
+        phoneE164:
           type: string
     OperatorLoginRequest:
       type: object

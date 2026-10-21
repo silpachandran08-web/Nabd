@@ -1159,6 +1159,22 @@ schemas:
       offered_slot_start: operational
       offer_expires_at: operational
       booked_appointment_id: operational
+    notification_requests:
+      id: operational
+      tenant_id: operational
+      purpose: operational
+      subject_type: operational
+      subject_id: operational
+      recipient_patient_id: pii
+      params_enc: phi  # encrypted template slots (patient name, date, doctor, owner phone); purged 30 days after not_after
+      language: operational
+      priority: operational
+      channel_policy: operational
+      not_before: operational
+      not_after: operational
+      dedupe_key: operational
+      status: operational
+      created_at: operational
     whatsapp_messages:
       id: operational
       tenant_id: operational

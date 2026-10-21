@@ -144,7 +144,8 @@ public class SecurityConfig {
                                 "/v1/platform/auth/mfa/verify",
                                 "/v1/platform/auth/refresh",
                                 "/.well-known/jwks.json",
-                                "/v1/webhooks/whatsapp" // HMAC-signed by Meta, verified in WhatsAppWebhookController
+                                "/v1/webhooks/whatsapp", // HMAC-signed by Meta, verified in WhatsAppWebhookController
+                                "/internal/v1/notification-requests/*" // COM-004: internal service token, checked in NotificationClaimController
                         ).permitAll()
                         // PLT-001: a sid claim (staff/operator access token) or at least one granted authority
                         .anyRequest().access((authn, ctx) -> {

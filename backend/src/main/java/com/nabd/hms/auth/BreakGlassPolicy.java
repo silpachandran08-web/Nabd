@@ -12,5 +12,4 @@ final class BreakGlassPolicy {
     static final int MINUTES = 30;
     static final String ACTIVATED_EVENT = "iam.break_glass.activated.v1";
     static final String OWNER_WHATSAPP_EVENT = "iam.break_glass.owner_whatsapp.v1";
-    static final String WHATSAPP_TEMPLATE = "emergency_access_used";
 }
