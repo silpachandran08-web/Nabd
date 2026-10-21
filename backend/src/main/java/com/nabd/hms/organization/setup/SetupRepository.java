@@ -84,7 +84,7 @@ class SetupRepository {
 
     Optional<TenantProfileRow> findProfile(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, name, region, timezone, tax_id, tax_id_type, whatsapp_number, specialties, status, setup_completed_at " +
+                "SELECT id, name, region_code AS region, timezone, tax_id, tax_id_type, whatsapp_number, specialties, status, setup_completed_at " +
                         "FROM tenants WHERE id = ?", profileMapper(), tenantId).stream().findFirst();
     }
 

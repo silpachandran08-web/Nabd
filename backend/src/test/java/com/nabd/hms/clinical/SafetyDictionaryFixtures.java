@@ -17,7 +17,7 @@ final class SafetyDictionaryFixtures {
     static final SafetyDictionary IN = load("IN");
     static final SafetyDictionary SA = load("SA");
 
-    /** Tenant region value (IN / KSA) -> the dictionary the service would pick. */
+    /** Tenant region value (IN / SA) -> the dictionary the service would pick. */
     static SafetyDictionary forTenantRegion(String tenantRegion) {
         return "SA".equals(SafetyDictionary.regionOfTenant(tenantRegion)) ? SA : IN;
     }

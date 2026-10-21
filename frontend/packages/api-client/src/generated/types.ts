@@ -225,6 +225,10 @@ export type RefundPreviewResponse = { amountOwed?: number; items?: Array<RefundP
 export type RefundRequestRequest = { reason: string; };
 export type RefundResponse = { amountOwed?: number; createdAt?: string; creditNoteNumber?: string; id?: string; instanceId?: string; packageName?: string; patientName?: string; reason?: string; recomputedAmount?: number; refundAmount?: number; status?: string; usedListValue?: number; };
 export type RefuseRequest = { reason: string; };
+export type RegionChangeRequest = { regionCode: string; };
+export type RegionListResponse = { items?: Array<RegionResponse>; };
+export type RegionPhoneRules = { countryCode?: string; nsnLength?: Array<number>; };
+export type RegionResponse = { cell?: string; code?: string; currency?: string; defaultTimezone?: string; minorUnits?: number; name?: string; phoneRules?: RegionPhoneRules; regulator?: string; standardTaxRate?: number; taxRegime?: string; };
 export type RegionSummaryResponse = { activeClinicCount?: number; clinicCount?: number; currency?: string; mrrCents?: number; newClinicsLast30d?: number; planMix?: Array<PlanMixResponse>; region?: string; taxIdTypes?: Array<string>; userCount?: number; };
 export type RejectRefundRequest = { reason: string; };
 export type RequestGrantRequest = { minutes?: number; reason: string; scope?: string; tenantId: string; ticketId?: string; };
@@ -274,6 +278,7 @@ export type TaxBand = { ratePercent?: number; tax?: number; taxable?: number; };
 export type TemplateRequest = { body?: string; category?: string; examples?: Array<string>; language?: string; name?: string; };
 export type TemplateResponse = { body?: string; category?: string; headerText?: string; id?: string; language?: string; name?: string; paramCount?: number; qualityRating?: string; rejectionReason?: string; status?: string; updatedAt?: string; };
 export type TenantLifecycleResponse = { events?: Array<LifecycleEventResponse>; status?: string; tenantId?: string; };
+export type TenantRegionResponse = { regionCode?: string; tenantId?: string; };
 export type TenantSummaryResponse = { brandName?: string; createdAt?: string; id?: string; name?: string; ownerEmail?: string; ownerName?: string; privilegedMfaEnrolled?: number; privilegedMfaPercent?: number; privilegedUsers?: number; region?: string; slug?: string; status?: string; };
 export type Tender = { amount?: number; count?: number; method?: string; };
 export type TicketResponse = { createdAt?: string; description?: string; id?: string; priority?: string; raisedByEmail?: string; raisedByName?: string; raisedByRole?: string; resolvedAt?: string; slaBreached?: boolean; slaDueAt?: string; source?: string; status?: string; subject?: string; tenantId?: string; tenantName?: string; tenantSlug?: string; };
@@ -517,6 +522,7 @@ export type Operations = {
   ProvisioningController_get: { method: "get"; path: "/v1/platform/provisioning-jobs/{id}"; permission: "onboarding_provisioning:view"; pathParams: { id: string; }; query: never; body: never; response: ProvisioningJobResponse };
   ProvisioningController_advance: { method: "post"; path: "/v1/platform/provisioning-jobs/{id}/advance"; permission: "onboarding_provisioning:view"; pathParams: { id: string; }; query: never; body: never; response: ProvisioningJobResponse };
   ProvisioningController_approve: { method: "post"; path: "/v1/platform/provisioning-jobs/{id}/approve"; permission: "onboarding_provisioning:view"; pathParams: { id: string; }; query: never; body: never; response: ProvisioningJobResponse };
+  RegionController_list: { method: "get"; path: "/v1/platform/regions"; permission: "authenticated"; pathParams: never; query: never; body: never; response: RegionListResponse };
   SupportAccessController_listGrants: { method: "get"; path: "/v1/platform/support-access/grants"; permission: "support_access:view"; pathParams: never; query: never; body: never; response: Array<GrantResponse> };
   SupportAccessController_requestGrant: { method: "post"; path: "/v1/platform/support-access/grants"; permission: "support_access:request"; pathParams: never; query: never; body: RequestGrantRequest; response: GrantResponse };
   SupportAccessController_viewPatient: { method: "get"; path: "/v1/platform/support-access/grants/{id}/patients/{patientId}"; permission: "support_access:view"; pathParams: { id: string; patientId: string; }; query: never; body: never; response: PatientViewResponse };
@@ -527,6 +533,7 @@ export type Operations = {
   FleetController_summary: { method: "get"; path: "/v1/platform/tenants/summary"; permission: "clinics_fleet:view"; pathParams: never; query: never; body: never; response: FleetSummaryResponse };
   TenantLifecycleController_get: { method: "get"; path: "/v1/platform/tenants/{tenantId}/lifecycle"; permission: "tenant_detail:view"; pathParams: { tenantId: string; }; query: never; body: never; response: TenantLifecycleResponse };
   TenantLifecycleController_transition: { method: "post"; path: "/v1/platform/tenants/{tenantId}/lifecycle/transitions"; permission: "tenant_detail:edit"; pathParams: { tenantId: string; }; query: never; body: TransitionRequest; response: TenantLifecycleResponse };
+  TenantRegionController_change: { method: "patch"; path: "/v1/platform/tenants/{tenantId}/region"; permission: "tenant_detail:edit"; pathParams: { tenantId: string; }; query: never; body: RegionChangeRequest; response: TenantRegionResponse };
   TerritoryController_list: { method: "get"; path: "/v1/platform/territories"; permission: "territories:view"; pathParams: never; query: never; body: never; response: Array<RegionSummaryResponse> };
   QueueController_list: { method: "get"; path: "/v1/queue"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; departmentId?: string; date?: string; priority?: boolean; }; body: never; response: Array<QueueEntryResponse> };
   QueueController_checkIn: { method: "post"; path: "/v1/queue/check-in"; permission: "queue:create"; pathParams: never; query: never; body: CheckInRequest; response: QueueEntryResponse };
@@ -535,6 +542,7 @@ export type Operations = {
   QueueController_reorder: { method: "post"; path: "/v1/queue/{id}/reorder"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueReorderRequest; response: QueueEntryResponse };
   QueueController_updateStatus: { method: "patch"; path: "/v1/queue/{id}/status"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: QueueStatusUpdateRequest; response: QueueEntryResponse };
   QueueController_transfer: { method: "post"; path: "/v1/queue/{id}/transfer"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: TransferRequest; response: TransferResponse };
+  RegionController_list_1: { method: "get"; path: "/v1/regions"; permission: "authenticated"; pathParams: never; query: never; body: never; response: RegionListResponse };
   ReportsController_billingLeakage: { method: "get"; path: "/v1/reports/billing-leakage"; permission: "reports:view"; pathParams: never; query: { thresholdAmount?: number; }; body: never; response: BillingLeakageResponse };
   ReportsController_dailyMoney: { method: "get"; path: "/v1/reports/daily-money"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DailyMoneyResponse };
   ReportsController_doctorPunctuality: { method: "get"; path: "/v1/reports/doctor-punctuality"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DoctorPunctualityResponse };

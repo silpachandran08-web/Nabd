@@ -20,9 +20,9 @@ public final class PhoneNumbers {
     private PhoneNumbers() {
     }
 
-    /** Tenant region (IN, KSA, AE, QA) to the ISO country libphonenumber uses as the default. */
+    /** Tenant region_code to the ISO country libphonenumber uses as the default: the regions codes are ISO 3166 (OPS-061). */
     static String country(String region) {
-        return "KSA".equals(region) ? "SA" : region == null ? "IN" : region;
+        return region == null ? "IN" : region;
     }
 
     /** E.164 ("+971501234567") for a valid number, else null. */

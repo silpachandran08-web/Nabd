@@ -41,7 +41,7 @@ class SafetyLocaleS9QaTest {
         assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "WARFARIN", "pregnant")).isNotNull();
         assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "VALPROIC ACID", "lactating")).isNotNull();
         assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "BUPRENORPHINE")).isNotNull();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), "FENTANYL")).isNotNull();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("SA"), "FENTANYL")).isNotNull();
         assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "PARACETAMOL")).isNull();
     }
 
@@ -54,7 +54,7 @@ class SafetyLocaleS9QaTest {
             }
             sb.append('|').append(AllergyDrugClasses.classesOf(SafetyDictionaryFixtures.IN, d))
               .append('|').append(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), d))
-              .append('|').append(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), d))
+              .append('|').append(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("SA"), d))
               .append('|').append(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, d, "pregnant"))
               .append('|').append(RxSafetyChecks.pregnancyWarning(SafetyDictionaryFixtures.IN, d, "female", java.time.LocalDate.of(1995, 1, 1), java.time.LocalDate.of(2026, 1, 1)));
             out.add(sb.toString());

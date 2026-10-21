@@ -179,7 +179,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         LocalDate.parse((String) data(env).get("queueDate"));
         assertThat(env.get("subject")).isEqualTo(entry);
         assertThat(env.get("traceparent")).isEqualTo(TRACEPARENT);
-        assertThat(env.get("region")).isIn("in", "ksa");
+        assertThat(env.get("region")).isIn("in", "ae", "sa", "qa");
         // same transaction: the outbox row and the queue row were written by one transaction id
         Boolean sameTx = inTenantTx(e.tenant().id(), () -> jdbc.queryForObject(
                 "SELECT o.xmin::text = q.xmin::text FROM outbox_events o JOIN queue_entries q ON q.id = o.aggregate_id "
@@ -268,6 +268,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         }
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove(DomainEventType.DOCTOR_STATUS_CHANGED.type()); // NOT MET: no doctor-status action exists to produce it
+        expected.remove(DomainEventType.TENANT_REGION_PINNED.type()); // published by provisioning go-live: Ops061RegionsApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

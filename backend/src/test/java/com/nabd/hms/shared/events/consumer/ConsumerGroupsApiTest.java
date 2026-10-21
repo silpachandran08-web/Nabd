@@ -313,7 +313,7 @@ class ConsumerGroupsApiTest extends ApiTestBase {
         String scrape = scrape();
         assertThat(scrape).contains("consumer_lag_events{group=\"probe\",stream=\"ev:in:probe\"")
                 .contains("consumer_lag_seconds{group=\"projector\",stream=\"ev:in:clinical\"")
-                .contains("consumer_lag_events{group=\"projector\",stream=\"ev:ksa:clinical\"");
+                .contains("consumer_lag_events{group=\"projector\",stream=\"ev:sa:clinical\"");
 
         drain(groups);
         groups.refreshLag();
@@ -339,14 +339,14 @@ class ConsumerGroupsApiTest extends ApiTestBase {
 
     @Test
     void shippedDefaultsAndBackoff() {
-        ConsumerProperties d = new ConsumerProperties(true, "", List.of("in", "ksa"), 50, 60_000, 8, 1000, 30_000, 86_400);
+        ConsumerProperties d = new ConsumerProperties(true, "", List.of("in", "ae", "sa", "qa"), 50, 60_000, 8, 1000, 30_000, 86_400);
         assertThat(props.claimIdleMs()).isEqualTo(d.claimIdleMs());
         assertThat(props.maxAttempts()).isEqualTo(8);
-        assertThat(props.regions()).containsExactly("in", "ksa");
+        assertThat(props.regions()).containsExactly("in", "ae", "sa", "qa");
         ConsumerGroups g = replica("x", d);
         assertThat(List.of(0, 1, 2, 3, 6, 7, 8).stream().map(n -> g.backoff(n).toMillis()))
                 .containsExactly(0L, 1000L, 2000L, 4000L, 30_000L, 30_000L, 30_000L);
-        assertThat(groups.streams(probe)).containsExactly("ev:in:probe", "ev:ksa:probe");
+        assertThat(groups.streams(probe)).containsExactly("ev:in:probe", "ev:ae:probe", "ev:sa:probe", "ev:qa:probe");
     }
 
     // ---- helpers ----

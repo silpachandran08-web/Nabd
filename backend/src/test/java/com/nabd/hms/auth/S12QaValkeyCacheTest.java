@@ -191,7 +191,7 @@ class S12QaValkeyCacheTest extends ApiTestBase {
         Files.write(Path.of("target", "qa7-ops020-statements.txt"), out);
         System.out.println("QA7 OPS-020 statements per check-in: " + out.get(0));
         assertThat(warm).as("no liveness or tenant-zone lookup on a warm check-in")
-                .noneMatch(s -> s.contains("FROM sessions") || s.contains("timezone, region FROM tenants"));
+                .noneMatch(s -> s.contains("FROM sessions") || s.contains("t.region_code FROM tenants t"));
         assertThat(warm.size()).as("DB statements per warm check-in (AC: <= 6)").isLessThanOrEqualTo(6);
     }
 

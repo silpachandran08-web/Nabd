@@ -8,7 +8,7 @@ import { formatMoney } from "@nabd/domain";
 import { usePlatformFetch } from "../platformApi";
 
 // Matches GET /v1/platform/territories (TerritoryController). Region-level, not state-level — tenants
-// only carry a region (IN/KSA), no state/city field, and there's no aggregator-demand data yet (NB-227).
+// only carry a region (IN/AE/SA/QA), no state/city field, and there's no aggregator-demand data yet (NB-227).
 type PlanMix = { planCode: string; tenantCount: number };
 type RegionSummary = {
   region: string;
@@ -22,7 +22,7 @@ type RegionSummary = {
   newClinicsLast30d: number;
 };
 
-const REGION_NAME: Record<string, string> = { IN: "India", KSA: "Saudi Arabia" };
+const REGION_NAME: Record<string, string> = { IN: "India", AE: "United Arab Emirates", SA: "Saudi Arabia", QA: "Qatar" };
 
 export default function TerritoriesPage() {
   const fetchAuthed = usePlatformFetch();

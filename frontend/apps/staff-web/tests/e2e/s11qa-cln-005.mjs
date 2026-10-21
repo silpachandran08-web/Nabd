@@ -64,7 +64,7 @@ try {
 
   // D CLN-004: two warnings, each carries the source line; KSA region label; one dictionary read.
   s = await consult({
-    region: 'KSA', viewport: { width: 390, height: 844 },
+    region: 'SA', viewport: { width: 390, height: 844 },
     warnings: [W('allergy', 'Allergy: Penicillin (severe)'), W('controlled', 'SFDA-controlled substance: extra documentation required')],
     dict: { region: 'SA', version: 2, label: 'SA v2', approvedBy: 'QA CSO', approvedAt: '2026-10-01T00:00:00Z', source: 'Nabd CSO dictionary', controlledLabel: { en: 'SFDA-controlled substance', ar: 'x' } },
   });

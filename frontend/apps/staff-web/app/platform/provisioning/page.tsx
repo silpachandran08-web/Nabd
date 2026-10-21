@@ -21,6 +21,11 @@ type Step = {
   stepName: string; stepOrder: number; status: string;
   startedAt: string | null; completedAt: string | null; errorDetail: string | null;
 };
+// GET /v1/regions (OPS-061): the picker and its consequences come from the regions table, not from this file.
+type RegionRow = {
+  code: string; name: string; currency: string; taxRegime: string; standardTaxRate: number | null;
+  regulator: string; defaultTimezone: string;
+};
 type Job = {
   id: string; tenantSlug: string; tenantName: string; region: string; status: string; path: string;
   approvedAt: string | null; createdTenantId: string | null; steps: Step[];
@@ -110,6 +115,13 @@ export default function ProvisioningPage() {
   const [lifecycleSel, setLifecycleSel] = useState(LIFECYCLE_STATES[1].key);
 
   const authedFetch = usePlatformFetch();
+  const [regions, setRegions] = useState<RegionRow[]>([]);
+
+  useEffect(() => {
+    void authedFetch("/platform/regions").then(async (res) => {
+      if (res?.ok) setRegions((await res.json()).items ?? []);
+    }).catch(() => { /* the form still works: the server validates the code */ });
+  }, [authedFetch]);
 
   const load = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
@@ -290,9 +302,15 @@ export default function ProvisioningPage() {
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="region">Country &amp; data region</label>
                       <select id="region" className={styles.select} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
-                        <option value="IN">India</option>
-                        <option value="KSA">Saudi Arabia</option>
+                        {regions.length === 0 && <option value={form.region}>{form.region}</option>}
+                        {regions.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
                       </select>
+                      {regions.filter((r) => r.code === form.region).map((r) => (
+                        <p key={r.code} className={styles.formNote} data-testid="region-consequences">
+                          {r.currency}, {r.taxRegime === "NONE" ? "no VAT" : r.standardTaxRate == null ? r.taxRegime : `${r.taxRegime} ${r.standardTaxRate}%`},
+                          {" "}{r.defaultTimezone}, regulator {r.regulator}. Irreversible after go-live: the region cannot be changed later.
+                        </p>
+                      ))}
                     </div>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="ownerName">Owner name</label>

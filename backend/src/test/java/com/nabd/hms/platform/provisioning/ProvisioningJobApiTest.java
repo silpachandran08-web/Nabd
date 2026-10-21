@@ -279,7 +279,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
         ResponseEntity<Map> firstDone = exchange("/v1/platform/provisioning-jobs/" + firstJob, HttpMethod.GET, authed(token), Map.class);
         assertThat(firstDone.getBody().get("status")).isEqualTo("done");
 
-        UUID secondJob = createJob(token, "clinic-region-ksa", ownerEmail, "KSA"); // same owner, different region
+        UUID secondJob = createJob(token, "clinic-region-sa", ownerEmail, "SA"); // same owner, different region
         ResponseEntity<Map> resp = exchange("/v1/platform/provisioning-jobs/" + secondJob + "/advance",
                 HttpMethod.POST, authed(token), Map.class);
 
@@ -290,7 +290,7 @@ class ProvisioningJobApiTest extends ApiTestBase {
         assertThat(steps.get(0).get("errorDetail")).asString().contains("region");
 
         Integer tenantCount = jdbc.queryForObject(
-                "SELECT count(*) FROM tenants WHERE slug = ?::citext", Integer.class, "clinic-region-ksa");
+                "SELECT count(*) FROM tenants WHERE slug = ?::citext", Integer.class, "clinic-region-sa");
         assertThat(tenantCount).isEqualTo(0);
     }
 

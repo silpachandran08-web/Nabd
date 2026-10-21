@@ -232,24 +232,24 @@ class S11QaOutboxOtpTest extends SlowProviderTestBase {
         assertThat(left).containsExactlyInAnyOrder(done6d23h, dead89d23h, pending, late).doesNotContain(done7d1h, dead90d1h);
     }
 
-    // OPS-014 AC5: gauges per region (a KSA tenant's backlog shows under KSA), no tenant label anywhere in outbox_* lines
+    // OPS-014 AC5: gauges per region (an SA tenant's backlog shows under SA), no tenant label anywhere in outbox_* lines
     @Test
     void backlogGaugesSplitByRegionWithoutTenantLabels() throws Exception {
         SeededTenant ksa = seedTenant();
-        forceRegion(ksa.id(), "KSA");
+        forceRegion(ksa.id(), "SA");
         inTenantTx(ksa.id(), () -> jdbc.update("""
                 INSERT INTO outbox_events (tenant_id, event_type, payload, created_at) VALUES
                 (?, 'test.echo', '{}'::jsonb, now() - interval '300 seconds'), (?, 'test.echo', '{}'::jsonb, now())""", ksa.id(), ksa.id()));
         inTenantTx(ksa.id(), () -> jdbc.update("INSERT INTO outbox_events (tenant_id, event_type, payload, status, attempts) VALUES (?, 'test.echo', '{}'::jsonb, 'dead', 8)", ksa.id()));
         metrics.refresh();
 
-        assertThat(meters.get("outbox.pending.events").tag("region", "KSA").gauge().value()).isEqualTo(2);
-        assertThat(meters.get("outbox.dead.events").tag("region", "KSA").gauge().value()).isGreaterThanOrEqualTo(1);
-        assertThat(meters.get("outbox.oldest.pending.age.seconds").tag("region", "KSA").gauge().value()).isGreaterThanOrEqualTo(299);
+        assertThat(meters.get("outbox.pending.events").tag("region", "SA").gauge().value()).isEqualTo(2);
+        assertThat(meters.get("outbox.dead.events").tag("region", "SA").gauge().value()).isGreaterThanOrEqualTo(1);
+        assertThat(meters.get("outbox.oldest.pending.age.seconds").tag("region", "SA").gauge().value()).isGreaterThanOrEqualTo(299);
         String scrape = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://localhost:" + mgmtPort + "/actuator/prometheus"))
                 .GET().build(), HttpResponse.BodyHandlers.ofString()).body();
-        assertThat(scrape).contains("outbox_pending_events{region=\"KSA\"} 2.0", "outbox_dead_events{region=\"KSA\"}",
-                "outbox_oldest_pending_age_seconds{region=\"KSA\"}");
+        assertThat(scrape).contains("outbox_pending_events{region=\"SA\"} 2.0", "outbox_dead_events{region=\"SA\"}",
+                "outbox_oldest_pending_age_seconds{region=\"SA\"}");
         assertThat(scrape.lines().filter(l -> l.startsWith("outbox_")).filter(l -> l.contains("tenant") || l.contains(ksa.id().toString()))).isEmpty();
         inTenantTx(ksa.id(), () -> jdbc.update("UPDATE outbox_events SET status = 'done' WHERE tenant_id = ?", ksa.id()));
     }
@@ -258,7 +258,7 @@ class S11QaOutboxOtpTest extends SlowProviderTestBase {
     private static void forceRegion(java.util.UUID tenantId, String region) {
         try (java.sql.Connection c = superuserConnection(); java.sql.Statement st = c.createStatement()) {
             st.execute("SET session_replication_role = replica");
-            st.execute("UPDATE tenants SET region = '" + region + "' WHERE id = '" + tenantId + "'");
+            st.execute("UPDATE tenants SET region_code = '" + region + "' WHERE id = '" + tenantId + "'");
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException(e);
         }

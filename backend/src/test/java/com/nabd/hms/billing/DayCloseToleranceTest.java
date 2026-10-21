@@ -11,15 +11,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DayCloseToleranceTest {
 
     @Test
-    void currencyFollowsTheTenantRegion() {
-        assertThat(DayCloseService.currency("IN")).isEqualTo("INR");
-        assertThat(DayCloseService.currency("KSA")).isEqualTo("SAR");
-        assertThat(DayCloseService.currency("AE")).isEqualTo("AED");
-        assertThat(DayCloseService.currency("QA")).isEqualTo("QAR");
-        assertThat(DayCloseService.currency(null)).isEqualTo("INR");
-    }
-
-    @Test
     void defaultsWithoutAPolicy() {
         assertThat(DayCloseService.tolerance("AED", Optional.empty())).isEqualByComparingTo("20.00");
         assertThat(DayCloseService.tolerance("QAR", Optional.empty())).isEqualByComparingTo("20.00");

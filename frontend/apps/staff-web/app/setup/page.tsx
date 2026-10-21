@@ -352,8 +352,8 @@ function SetupPageInner() {
     if (await post("/setup/export-jobs", { exportType })) loadAll();
   };
 
-  // The API only accepts IN or KSA; default to the clinic's own region (fixed at provisioning).
-  const licenceRegion = getIdentity()?.tenantRegion === "KSA" ? "KSA" : "IN";
+  // The API accepts IN, AE, SA or QA; default to the clinic's own region (fixed at provisioning).
+  const licenceRegion = ["IN", "AE", "SA", "QA"].find((c) => c === getIdentity()?.tenantRegion) ?? "IN";
   const [newLicence, setNewLicence] = useState<Partial<Licence>>({ region: licenceRegion, licenceType: "clinician" });
   const addLicence = async (e: React.FormEvent) => {
     e.preventDefault();

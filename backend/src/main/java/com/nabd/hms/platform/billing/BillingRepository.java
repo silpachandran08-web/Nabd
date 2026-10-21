@@ -29,7 +29,7 @@ class BillingRepository {
     // (there's no one tenant to scope to — subscriptions span every tenant) — staff_counts_by_tenant()
     // is the SECURITY DEFINER escape hatch for that, same precedent as search_audit_log() (V16).
     private static final String SUBSCRIPTION_SELECT =
-            "SELECT s.id, s.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug, t.region, t.status AS tenant_status, " +
+            "SELECT s.id, s.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug, t.region_code AS region, t.status AS tenant_status, " +
                     "       s.plan_id, p.code AS plan_code, p.name AS plan_name, s.mrr_cents, s.currency, s.renewal_date, " +
                     "       p.seat_limit, COALESCE(sc.staff_count, 0) AS seats_used, s.created_at " +
                     "FROM master.subscriptions s " +
@@ -38,7 +38,7 @@ class BillingRepository {
                     "LEFT JOIN staff_counts_by_tenant() sc ON sc.tenant_id = t.id ";
 
     Optional<String> findTenantRegion(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region"), tenantId)
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region_code"), tenantId)
                 .stream().findFirst();
     }
 

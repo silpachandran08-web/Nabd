@@ -37,7 +37,7 @@ Its schema is `api/events/cloudevent.schema.json`.
 | `time` | the commit transaction's `created_at`, UTC RFC 3339 |
 | `subject` | the aggregate id (uuid) |
 | `tenantid` | the tenant uuid |
-| `region` | `in` or `ksa`, from `tenants.region` (extension attribute) |
+| `region` | the tenant's cell code: `in`, `ae`, `sa` or `qa`, from `tenants.region_code` (extension attribute, OPS-061) |
 | `traceparent` | W3C trace context of the HTTP request that published the event (see section 4). Absent for jobs |
 | `dataschema` | `urn:nabd:event-schema:<type>`, which is the `$id` of `api/events/<type>.schema.json` |
 | `datacontenttype` | `application/json` |
@@ -86,6 +86,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `billing.payment.recorded.v1` | CheckoutService.recordPayment (converted from the FIN-001 event; same keys) | invoiceId, paymentId, method, amountMinor, currency, balanceMinor, status |
 | `consent.changed.v1` | PatientService.withdrawConsent, guardian consent grant / withdraw | patientId, consentType, status |
 | `organization.config.changed.v1` | SetupService.updatePolicy, updateProfile (key only, never the value) | configKey, status |
+| `organization.tenant.region_pinned.v1` | ProvisioningStepRunner.goLive (OPS-061; the region is immutable from here). Consumer: the Control Plane cell-routing record, **needs external action** (the control-plane service is not in this repo) | regionCode, cell |
 | `iam.role.changed.v1` | RoleService.create / update / resetToPreset | roleId, status |
 | `iam.staff.changed.v1` | StaffService.patch / suspend | staffId, status |
 | `iam.session.revoked.v1` | StaffService: role change, suspend, MFA reset (all sessions of the staff member) | staffId, scope, reasonCode, status |
@@ -121,7 +122,7 @@ The app refuses to boot a consumer with no idempotency strategy, a duplicate gro
 
 ### 7.1 Stream entries
 
-- The consumer reads streams `ev:<region>:<domain>` for every region in `app.events.consumer.regions` (default `in,ksa`)
+- The consumer reads streams `ev:<region>:<domain>` for every region in `app.events.consumer.regions` (default `in,ae,sa,qa`)
   and every domain of its types. Entries of other types are acknowledged without calling the handler.
 - **Contract with OPS-016:** each stream entry has one field, `ce`, holding the structured envelope of section 2 as JSON.
   An entry without a valid envelope (specversion 1.0, id, type, tenantid, integral `data.version`) is dead-lettered at
@@ -215,7 +216,7 @@ succeeded. On any Valkey error the whole batch goes back to pending at once, `re
 relay backs off `error-backoff-ms` (1 s). Delivery is at-least-once: a batch whose XADDs partly succeeded is sent
 again, so consumers dedupe on the CloudEvents `id` (and the `version` gate, section 1).
 
-**Stream entries.** Stream `ev:<region>:<domain>` (`ev:in:visit`, `ev:ksa:billing`, ...). Each entry has one field,
+**Stream entries.** Stream `ev:<region>:<domain>` (`ev:in:visit`, `ev:sa:billing`, ...). Each entry has one field,
 `ce`, holding the structured CloudEvents envelope exactly as `outbox_cloudevents` renders it (section 2).
 
 **Retention.** `MAXLEN ~ 1,000,000` per stream (`app.relay.stream-maxlen`), approximate trimming (Valkey trims whole

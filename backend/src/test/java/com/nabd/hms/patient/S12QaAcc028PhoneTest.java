@@ -37,7 +37,7 @@ class S12QaAcc028PhoneTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         if (!"IN".equals(region)) {
             new JdbcTemplate(superuserDataSource()).execute(
-                    "SET session_replication_role = replica; UPDATE tenants SET region = '" + region + "' WHERE id = '" + t.id() + "'");
+                    "SET session_replication_role = replica; UPDATE tenants SET region_code = '" + region + "' WHERE id = '" + t.id() + "'");
         }
         return t;
     }
@@ -99,7 +99,7 @@ class S12QaAcc028PhoneTest extends ApiTestBase {
         assertStored(qa, owner(qa), "3312 3456", "+97433123456");
         SeededTenant in = tenant("IN");
         assertStored(in, owner(in), "098450 22110", "+919845022110");
-        SeededTenant sa = tenant("KSA");
+        SeededTenant sa = tenant("SA");
         assertStored(sa, owner(sa), "0501234567", "+966501234567");
     }
 
@@ -113,7 +113,7 @@ class S12QaAcc028PhoneTest extends ApiTestBase {
                 new String[]{"00974 3312 3456", "+97433123456"}));
         matrix.put("IN", List.of(new String[]{"98450 22110", "+919845022110"}, new String[]{"+91 98450 22110", "+919845022110"},
                 new String[]{"0091 98450 22110", "+919845022110"}, new String[]{"09845022110", "+919845022110"}));
-        matrix.put("KSA", List.of(new String[]{"501234567", "+966501234567"}, new String[]{"+966 50 123 4567", "+966501234567"},
+        matrix.put("SA", List.of(new String[]{"501234567", "+966501234567"}, new String[]{"+966 50 123 4567", "+966501234567"},
                 new String[]{"00966501234567", "+966501234567"}, new String[]{"٠٥٠١٢٣٤٥٦٧", "+966501234567"}));
         matrix.forEach((region, cases) -> {
             SeededTenant t = tenant(region);
@@ -142,9 +142,9 @@ class S12QaAcc028PhoneTest extends ApiTestBase {
         String tokIn = owner(in);
         assertFieldError(register(tokIn, "3312 3456"), "phone", "3312 3456");       // Qatar local in an India clinic
         assertStored(in, tokIn, "+974 3312 3456", "+97433123456");
-        SeededTenant sa = tenant("KSA");
+        SeededTenant sa = tenant("SA");
         String tokSa = owner(sa);
-        assertFieldError(register(tokSa, "98450 22110"), "phone", "98450 22110");   // India local in a KSA clinic
+        assertFieldError(register(tokSa, "98450 22110"), "phone", "98450 22110");   // India local in an SA clinic
         assertStored(sa, tokSa, "+971 50 123 4567", "+971501234567");
     }
 
@@ -218,10 +218,10 @@ class S12QaAcc028PhoneTest extends ApiTestBase {
         };
         int before = su.queryForObject("SELECT count(*) FROM master.provisioning_jobs", Integer.class);
         assertFieldError(job.apply("IN", "abc"), "ownerMobile", "abc");
-        assertFieldError(job.apply("KSA", "98450 22110"), "ownerMobile", "98450 22110");
+        assertFieldError(job.apply("SA", "98450 22110"), "ownerMobile", "98450 22110");
         assertThat(su.queryForObject("SELECT count(*) FROM master.provisioning_jobs", Integer.class)).as("no job for a refused mobile").isEqualTo(before);
 
-        ResponseEntity<Map> ksa = job.apply("KSA", "0501234567");
+        ResponseEntity<Map> ksa = job.apply("SA", "0501234567");
         assertThat(ksa.getStatusCode().is2xxSuccessful()).as(String.valueOf(ksa.getBody())).isTrue();
         assertThat(su.queryForObject("SELECT owner_mobile FROM master.provisioning_jobs WHERE id = ?::uuid", String.class, ksa.getBody().get("id")))
                 .isEqualTo("+966501234567");

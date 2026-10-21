@@ -80,7 +80,7 @@ final class RxSafetyChecks {
         return null;
     }
 
-    /** NB-111: correct rule set by tenant region (India Schedule H1 vs KSA SFDA list): the region's dictionary
+    /** NB-111: correct rule set by tenant region (each region's own list): the region's dictionary
      * carries both the list and the English label. */
     static String controlledSubstanceWarning(SafetyDictionary dict, String drugName) {
         return matches(drugName, dict.controlled()) ? dict.controlledLabel().get("en") + " — additional documentation required" : null;

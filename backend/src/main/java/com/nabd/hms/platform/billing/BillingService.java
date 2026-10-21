@@ -37,8 +37,11 @@ public class BillingService {
     private final BillingRepository repo;
     private final TenantLifecycleService lifecycleService;
     private final PlatformAudit audit;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
-    BillingService(BillingRepository repo, TenantLifecycleService lifecycleService, PlatformAudit audit) {
+    BillingService(BillingRepository repo, TenantLifecycleService lifecycleService, PlatformAudit audit,
+                   com.nabd.hms.organization.api.RegionRules regions) {
+        this.regions = regions;
         this.repo = repo;
         this.lifecycleService = lifecycleService;
         this.audit = audit;
@@ -64,7 +67,7 @@ public class BillingService {
         if (!repo.planExists(req.planId())) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested plan was not found.");
         }
-        String currency = "KSA".equals(region) ? "SAR" : "INR";
+        String currency = regions.region(region).currency();
         SubscriptionResponse before = repo.findByTenant(tenantId).map(this::toResponse).orElse(null);
         repo.upsert(tenantId, req.planId(), req.mrrCents(), currency, req.renewalDate());
         SubscriptionResponse after = getForTenant(tenantId);

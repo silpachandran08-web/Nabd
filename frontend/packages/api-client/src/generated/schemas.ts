@@ -244,6 +244,10 @@ export const RefundPreviewResponseSchema = z.object({ amountOwed: z.number().opt
 export const RefundRequestRequestSchema = z.object({ reason: z.string().min(1) });
 export const RefundResponseSchema = z.object({ amountOwed: z.number().optional(), createdAt: z.string().optional(), creditNoteNumber: z.string().optional(), id: z.string().optional(), instanceId: z.string().optional(), packageName: z.string().optional(), patientName: z.string().optional(), reason: z.string().optional(), recomputedAmount: z.number().optional(), refundAmount: z.number().optional(), status: z.string().optional(), usedListValue: z.number().optional() });
 export const RefuseRequestSchema = z.object({ reason: z.string().min(1) });
+export const RegionChangeRequestSchema = z.object({ regionCode: z.string().min(1) });
+export const RegionPhoneRulesSchema = z.object({ countryCode: z.string().optional(), nsnLength: z.array(z.number().int()).optional() });
+export const RegionResponseSchema = z.object({ cell: z.string().optional(), code: z.string().optional(), currency: z.string().optional(), defaultTimezone: z.string().optional(), minorUnits: z.number().int().optional(), name: z.string().optional(), phoneRules: RegionPhoneRulesSchema.optional(), regulator: z.string().optional(), standardTaxRate: z.number().optional(), taxRegime: z.string().optional() });
+export const RegionListResponseSchema = z.object({ items: z.array(RegionResponseSchema).optional() });
 export const RegionSummaryResponseSchema = z.object({ activeClinicCount: z.number().int().optional(), clinicCount: z.number().int().optional(), currency: z.string().optional(), mrrCents: z.number().int().optional(), newClinicsLast30d: z.number().int().optional(), planMix: z.array(PlanMixResponseSchema).optional(), region: z.string().optional(), taxIdTypes: z.array(z.string()).optional(), userCount: z.number().int().optional() });
 export const RejectRefundRequestSchema = z.object({ reason: z.string().min(1) });
 export const RequestGrantRequestSchema = z.object({ minutes: z.number().int().optional(), reason: z.string().min(0).max(500), scope: z.string().optional(), tenantId: z.string(), ticketId: z.string().optional() });
@@ -282,6 +286,7 @@ export const SupernumeraryToothRequestSchema = z.object({ nearToothNumber: z.num
 export const TemplateRequestSchema = z.object({ body: z.string().optional(), category: z.string().optional(), examples: z.array(z.string()).optional(), language: z.string().optional(), name: z.string().optional() });
 export const TemplateResponseSchema = z.object({ body: z.string().optional(), category: z.string().optional(), headerText: z.string().optional(), id: z.string().optional(), language: z.string().optional(), name: z.string().optional(), paramCount: z.number().int().optional(), qualityRating: z.string().optional(), rejectionReason: z.string().optional(), status: z.string().optional(), updatedAt: z.string().optional() });
 export const TenantLifecycleResponseSchema = z.object({ events: z.array(LifecycleEventResponseSchema).optional(), status: z.string().optional(), tenantId: z.string().optional() });
+export const TenantRegionResponseSchema = z.object({ regionCode: z.string().optional(), tenantId: z.string().optional() });
 export const TicketResponseSchema = z.object({ createdAt: z.string().optional(), description: z.string().optional(), id: z.string().optional(), priority: z.string().optional(), raisedByEmail: z.string().optional(), raisedByName: z.string().optional(), raisedByRole: z.string().optional(), resolvedAt: z.string().optional(), slaBreached: z.boolean().optional(), slaDueAt: z.string().optional(), source: z.string().optional(), status: z.string().optional(), subject: z.string().optional(), tenantId: z.string().optional(), tenantName: z.string().optional(), tenantSlug: z.string().optional() });
 export const TokenPairResponseSchema = z.object({ accessToken: z.string().optional(), expiresIn: z.number().int().optional(), refreshExpiresIn: z.number().int().optional(), refreshToken: z.string().optional() });
 export const ToothHistoryEntryResponseSchema = z.object({ action: z.string().optional(), actorName: z.string().optional(), actorRole: z.string().optional(), after: z.string().optional(), before: z.string().optional(), occurredAt: z.string().optional() });
@@ -519,6 +524,7 @@ export const operationSchemas = {
   ProvisioningController_get: { response: ProvisioningJobResponseSchema },
   ProvisioningController_advance: { response: ProvisioningJobResponseSchema },
   ProvisioningController_approve: { response: ProvisioningJobResponseSchema },
+  RegionController_list: { response: RegionListResponseSchema },
   SupportAccessController_listGrants: { response: z.array(GrantResponseSchema) },
   SupportAccessController_requestGrant: { body: RequestGrantRequestSchema, response: GrantResponseSchema },
   SupportAccessController_viewPatient: { response: PatientViewResponseSchema },
@@ -529,6 +535,7 @@ export const operationSchemas = {
   FleetController_summary: { response: FleetSummaryResponseSchema },
   TenantLifecycleController_get: { response: TenantLifecycleResponseSchema },
   TenantLifecycleController_transition: { body: TransitionRequestSchema, response: TenantLifecycleResponseSchema },
+  TenantRegionController_change: { body: RegionChangeRequestSchema, response: TenantRegionResponseSchema },
   TerritoryController_list: { response: z.array(RegionSummaryResponseSchema) },
   QueueController_list: { response: z.array(QueueEntryResponseSchema) },
   QueueController_checkIn: { body: CheckInRequestSchema, response: QueueEntryResponseSchema },
@@ -537,6 +544,7 @@ export const operationSchemas = {
   QueueController_reorder: { body: QueueReorderRequestSchema, response: QueueEntryResponseSchema },
   QueueController_updateStatus: { body: QueueStatusUpdateRequestSchema, response: QueueEntryResponseSchema },
   QueueController_transfer: { body: TransferRequestSchema, response: TransferResponseSchema },
+  RegionController_list_1: { response: RegionListResponseSchema },
   ReportsController_billingLeakage: { response: BillingLeakageResponseSchema },
   ReportsController_dailyMoney: { response: DailyMoneyResponseSchema },
   ReportsController_doctorPunctuality: { response: DoctorPunctualityResponseSchema },

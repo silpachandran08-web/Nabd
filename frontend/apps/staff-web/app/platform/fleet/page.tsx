@@ -34,7 +34,7 @@ type OperatorProfile = { permissions: string[] };
 // Matches GET /v1/platform/support-access/grants (SupportAccessController) — active count only.
 type SupportGrant = { active: boolean };
 
-const REGION_NAMES: Record<string, string> = { IN: "India", KSA: "Saudi Arabia" };
+const REGION_NAMES: Record<string, string> = { IN: "India", AE: "United Arab Emirates", SA: "Saudi Arabia", QA: "Qatar" };
 
 export default function FleetPage() {
   const router = useRouter();

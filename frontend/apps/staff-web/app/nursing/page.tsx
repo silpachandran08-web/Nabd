@@ -214,7 +214,7 @@ function NursingWorklist() {
     if (!mounted) return "";
     const now = new Date();
     const greg = now.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-    if (getIdentity()?.tenantRegion !== "KSA") return greg;
+    if (getIdentity()?.tenantRegion !== "SA") return greg;
     return `${new Intl.DateTimeFormat("en-SA-u-ca-islamic-umalqura", { day: "numeric", month: "long", year: "numeric" }).format(now)} · ${greg}`;
   })();
 

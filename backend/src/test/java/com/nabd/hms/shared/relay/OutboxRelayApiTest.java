@@ -286,15 +286,15 @@ class OutboxRelayApiTest extends ApiTestBase {
     @Test
     void streamEntriesCarryTheCloudEventsEnvelopeAndMaxlenTrimsApproximately() throws Exception {
         SeededTenant in = seedTenant();
-        UUID ksa = UUID.randomUUID(); // region is immutable after provisioning, so this tenant is created in KSA
+        UUID ksa = UUID.randomUUID(); // region is immutable after provisioning, so this tenant is created in SA
         String slug = "k" + ksa.toString().replace("-", "").substring(0, 12);
-        jdbc.update("INSERT INTO tenants (id, slug, name, region, status) VALUES (?,?,?,'KSA','active')", ksa, slug, "KSA " + slug);
+        jdbc.update("INSERT INTO tenants (id, slug, name, region, status) VALUES (?,?,?,'SA','active')", ksa, slug, "SA " + slug);
         OutboxRelay r = relay(new SimpleMeterRegistry(), props(10, 2000, 100));
         awaitTrue(5000, r::isLeader);
 
         long id = publishOne(in);
         long ksaId = publishOne(ksa);
-        awaitTrue(5000, () -> xlen("ev:in:visit") == 1 && xlen("ev:ksa:visit") == 1);
+        awaitTrue(5000, () -> xlen("ev:in:visit") == 1 && xlen("ev:sa:visit") == 1);
 
         JsonNode ce = entries("ev:in:visit").get(0);
         assertThat(ce.get("specversion").asString()).isEqualTo("1.0");
@@ -311,7 +311,7 @@ class OutboxRelayApiTest extends ApiTestBase {
         assertThat(ce.get("data").get("status").asString()).isEqualTo("waiting");
         String expected = inTenantTx(in.id(), () -> jdbc.queryForObject("SELECT envelope::text FROM outbox_cloudevents WHERE id = ?", String.class, id));
         assertThat(ce).isEqualTo(json.readTree(expected)); // exactly the one rendering (V1550)
-        assertThat(streamIds("ev:ksa:visit")).containsExactly(ksaId);
+        assertThat(streamIds("ev:sa:visit")).containsExactly(ksaId);
 
         publishMany(in, 1000); // MAXLEN ~ 100: whole nodes (100 entries) are trimmed, never below 100
         awaitTrue(10_000, () -> countStatus(in, "done") == 1001);

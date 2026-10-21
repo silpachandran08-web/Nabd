@@ -39,9 +39,10 @@ record SafetyDictionary(String region, int version, Instant approvedAt, String a
         return region + " v" + version;
     }
 
-    /** Tenants store IN or KSA (V1); dictionaries are keyed by the regional cell code (IN, SA, AE, QA). */
+    /** Dictionaries are keyed by the region code a tenant carries (OPS-061: IN, AE, SA, QA). An AE or QA clinic gets its own
+     * dictionary, or none (then prescribing refuses: no approved list yet), never India's list. No region on record: IN, as before. */
     static String regionOfTenant(String tenantRegion) {
-        return "KSA".equals(tenantRegion) ? "SA" : "IN";
+        return tenantRegion == null ? "IN" : tenantRegion;
     }
 
     /** Entries in load order (class order = first appearance). cross_reacts_to is the union over a class's rows. */

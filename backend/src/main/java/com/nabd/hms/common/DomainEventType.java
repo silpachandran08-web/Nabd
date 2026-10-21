@@ -21,6 +21,7 @@ public enum DomainEventType {
     PAYMENT_RECORDED("billing.payment.recorded.v1", "core/billing"),
     CONSENT_CHANGED("consent.changed.v1", "core/patient"),
     ORGANIZATION_CONFIG_CHANGED("organization.config.changed.v1", "core/organization"),
+    TENANT_REGION_PINNED("organization.tenant.region_pinned.v1", "core/organization"),
     ROLE_CHANGED("iam.role.changed.v1", "core/iam"),
     STAFF_CHANGED("iam.staff.changed.v1", "core/iam"),
     SESSION_REVOKED("iam.session.revoked.v1", "core/iam"),

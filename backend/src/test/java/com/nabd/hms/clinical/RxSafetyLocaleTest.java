@@ -34,7 +34,7 @@ class RxSafetyLocaleTest {
         assertThat(RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "IBUPROFEN", "NSAID")).isTrue();
         assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), "TRAMADOL")).isNotNull();
         assertThat(RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, "ISOTRETINOIN", "pregnant")).isNotNull();
-        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), "DIAZEPAM")).isNotNull();
+        assertThat(RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("SA"), "DIAZEPAM")).isNotNull();
     }
 
     @ParameterizedTest
@@ -57,7 +57,7 @@ class RxSafetyLocaleTest {
         for (String d : drugs) {
             boolean any = SafetyDictionaryFixtures.IN.classes().stream().anyMatch(c -> RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, d, c.id()));
             out.add(d + "|" + any + "|" + RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("IN"), d) + "|"
-                    + RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("KSA"), d) + "|" + RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, d, "pregnant"));
+                    + RxSafetyChecks.controlledSubstanceWarning(SafetyDictionaryFixtures.forTenantRegion("SA"), d) + "|" + RxSafetyChecks.recordedStatusWarning(SafetyDictionaryFixtures.IN, d, "pregnant"));
         }
         // keep the NSAID case greppable
         out.add("IBUPROFEN 400|" + RxSafetyChecks.allergyMatches(SafetyDictionaryFixtures.IN, "IBUPROFEN 400", "NSAID"));

@@ -11,7 +11,7 @@ final class TerritoryModels {
     }
 
     /**
-     * Scoped to the two real regions (IN, KSA) — tenants carry only a region, no state/city field, so
+     * Scoped to the regions table — tenants carry only a region, no state/city field, so
      * "Territories" here means region rollups, not state-level. Aggregator demand (the wireframe's
      * fifth column) is omitted: NB-227 (E19) hasn't shipped, so there's no demand data to show.
      */

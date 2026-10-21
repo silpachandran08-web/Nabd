@@ -46,12 +46,17 @@ class ProvisioningStepRunner {
     private final StaffService staffService;
     private final String frontendBaseUrl;
     private final OwnerService ownerService;
+    private final com.nabd.hms.common.EventPublisher events;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
     ProvisioningStepRunner(ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
-                            OwnerService ownerService) {
+                            OwnerService ownerService, com.nabd.hms.common.EventPublisher events,
+                            com.nabd.hms.organization.api.RegionRules regions) {
+        this.events = events;
+        this.regions = regions;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.wabaGateway = wabaGateway;
@@ -259,6 +264,9 @@ class ProvisioningStepRunner {
             throw new IllegalStateException("go_live ran before create_tenant recorded a tenant id");
         }
         lifecycleService.transition(tenantId, "trialing", job.requestedBy(), "provisioning completed", null);
+        // OPS-061: the region is now immutable; the control plane records the tenant's cell routing from this
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.TENANT_REGION_PINNED, tenantId,
+                java.util.Map.of("regionCode", job.region(), "cell", regions.region(job.region()).cell()));
     }
 
     private String writeGrantsJson(List<ModuleGrant> grants) {

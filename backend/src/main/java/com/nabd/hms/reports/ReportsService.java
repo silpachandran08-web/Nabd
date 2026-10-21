@@ -61,8 +61,11 @@ public class ReportsService {
     private final ClinicClock clock;
 
     private final ActorDirectory actors;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
-    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext, ClinicClock clock, ActorDirectory actors) {
+    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext, ClinicClock clock, ActorDirectory actors,
+                    com.nabd.hms.organization.api.RegionRules regions) {
+        this.regions = regions;
         this.actors = actors;
         this.clock = clock;
         this.repo = repo;
@@ -131,9 +134,9 @@ public class ReportsService {
         Instant start = r.from().atStartOfDay(zone).toInstant();
         Instant end = r.to().plusDays(1).atStartOfDay(zone).toInstant();
         boolean includesToday = !today.isBefore(r.from()) && !today.isAfter(r.to());
-        boolean ksa = "KSA".equals(repo.region(tenantId).orElse("IN"));
+        var region = regions.region(repo.region(tenantId).orElse("IN"));
         int[] bookings = repo.bookingsAndNoShows(tenantId, start, end, clock.now());
-        return new MoneyResponse(r.from(), r.to(), includesToday, ksa ? "SAR" : "INR", ksa ? "VAT" : "GST",
+        return new MoneyResponse(r.from(), r.to(), includesToday, region.currency(), region.taxRegime(),
                 repo.collectedOn(tenantId, start, end), repo.invoiceCountOn(tenantId, start, end),
                 repo.taxBilledBetween(tenantId, start, end), bookings[1], bookings[0],
                 includesToday ? repo.waitingNow(tenantId, today) : null,

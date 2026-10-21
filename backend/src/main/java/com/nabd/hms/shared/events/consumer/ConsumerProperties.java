@@ -10,7 +10,7 @@ import java.util.List;
 public record ConsumerProperties(
         @DefaultValue("true") boolean enabled,
         @DefaultValue("") String name,                 // consumer name inside each group; blank = host name
-        @DefaultValue({"in", "ksa"}) List<String> regions,
+        @DefaultValue({"in", "ae", "sa", "qa"}) List<String> regions,
         @DefaultValue("50") int batchSize,
         @DefaultValue("60000") long claimIdleMs,       // XAUTOCLAIM entries another consumer left pending this long
         @DefaultValue("8") int maxAttempts,            // failures before ev:<region>:dlq

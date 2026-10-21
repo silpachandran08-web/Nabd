@@ -26,7 +26,7 @@ class S12QaAcc028OtpLookupTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         if (!"IN".equals(region)) {
             new JdbcTemplate(superuserDataSource()).execute(
-                    "SET session_replication_role = replica; UPDATE tenants SET region = '" + region + "' WHERE id = '" + t.id() + "'");
+                    "SET session_replication_role = replica; UPDATE tenants SET region_code = '" + region + "' WHERE id = '" + t.id() + "'");
         }
         return t;
     }
@@ -66,7 +66,7 @@ class S12QaAcc028OtpLookupTest extends ApiTestBase {
         SeededTenant qa = tenant("QA");
         seedStaff(qa, seedFullAccessRole(qa.id()), "q1otp-qa-" + UUID.randomUUID() + "@a.com", "+97433129876", false);
         otpLogin(qa, "+97433129876", "3312 9876", "+974 3312 9876");
-        SeededTenant sa = tenant("KSA");
+        SeededTenant sa = tenant("SA");
         seedStaff(sa, seedFullAccessRole(sa.id()), "q1otp-sa-" + UUID.randomUUID() + "@a.com", "+966551239876", false);
         otpLogin(sa, "+966551239876", "055 123 9876", "00966551239876");
         SeededTenant in = tenant("IN");

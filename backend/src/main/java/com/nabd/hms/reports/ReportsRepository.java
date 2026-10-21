@@ -253,7 +253,7 @@ class ReportsRepository {
     }
 
     Optional<String> region(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
     }
 
     // NB-234: aggregate-only retention numbers — no per-patient row is ever returned from here.

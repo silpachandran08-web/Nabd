@@ -28,11 +28,11 @@ class TerritoryRepository {
 
     Map<String, ClinicCounts> clinicCounts() {
         return jdbc.query(
-                "SELECT region, count(*) AS total, " +
+                "SELECT region_code AS region, count(*) AS total, " +
                         "  count(*) FILTER (WHERE status IN ('active','trialing','overdue')) AS active, " +
                         "  count(*) FILTER (WHERE created_at > now() - interval '30 days') AS new_30d, " +
                         "  array_agg(DISTINCT tax_id_type) FILTER (WHERE tax_id_type IS NOT NULL) AS tax_types " +
-                        "FROM tenants GROUP BY region",
+                        "FROM tenants GROUP BY region_code",
                 rs -> {
                     Map<String, ClinicCounts> out = new java.util.HashMap<>();
                     while (rs.next()) {
@@ -47,8 +47,8 @@ class TerritoryRepository {
     // staff_counts_by_tenant() escape hatch BillingRepository uses for seat usage.
     Map<String, Long> userCounts() {
         return jdbc.query(
-                "SELECT t.region, COALESCE(sum(sc.staff_count), 0) AS n FROM tenants t " +
-                        "LEFT JOIN staff_counts_by_tenant() sc ON sc.tenant_id = t.id GROUP BY t.region",
+                "SELECT t.region_code AS region, COALESCE(sum(sc.staff_count), 0) AS n FROM tenants t " +
+                        "LEFT JOIN staff_counts_by_tenant() sc ON sc.tenant_id = t.id GROUP BY t.region_code",
                 rs -> {
                     Map<String, Long> out = new java.util.HashMap<>();
                     while (rs.next()) {
@@ -63,8 +63,8 @@ class TerritoryRepository {
 
     Map<String, RegionMrr> mrrByRegion() {
         return jdbc.query(
-                "SELECT t.region, s.currency, sum(s.mrr_cents) AS mrr FROM tenants t " +
-                        "JOIN master.subscriptions s ON s.tenant_id = t.id GROUP BY t.region, s.currency",
+                "SELECT t.region_code AS region, s.currency, sum(s.mrr_cents) AS mrr FROM tenants t " +
+                        "JOIN master.subscriptions s ON s.tenant_id = t.id GROUP BY t.region_code, s.currency",
                 rs -> {
                     Map<String, RegionMrr> out = new java.util.HashMap<>();
                     while (rs.next()) {
@@ -76,10 +76,10 @@ class TerritoryRepository {
 
     Map<String, List<PlanMixEntry>> planMixByRegion() {
         List<Object[]> rows = jdbc.query(
-                "SELECT t.region, p.code, count(*) AS n FROM tenants t " +
+                "SELECT t.region_code AS region, p.code, count(*) AS n FROM tenants t " +
                         "JOIN master.subscriptions s ON s.tenant_id = t.id " +
                         "JOIN master.plans p ON p.id = s.plan_id " +
-                        "GROUP BY t.region, p.code ORDER BY t.region, n DESC",
+                        "GROUP BY t.region_code, p.code ORDER BY t.region_code, n DESC",
                 (rs, i) -> new Object[]{rs.getString("region"), rs.getString("code"), rs.getLong("n")});
         return rows.stream().collect(Collectors.groupingBy(
                 r -> (String) r[0],

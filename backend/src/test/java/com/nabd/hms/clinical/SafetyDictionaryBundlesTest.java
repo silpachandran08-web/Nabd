@@ -52,7 +52,7 @@ class SafetyDictionaryBundlesTest {
 
     @Test
     void tenantRegionMapsToTheRegionalCell() {
-        assertThat(SafetyDictionary.regionOfTenant("KSA")).isEqualTo("SA");
+        assertThat(SafetyDictionary.regionOfTenant("SA")).isEqualTo("SA");
         assertThat(SafetyDictionary.regionOfTenant("IN")).isEqualTo("IN");
         assertThat(SafetyDictionary.regionOfTenant(null)).isEqualTo("IN");
     }
