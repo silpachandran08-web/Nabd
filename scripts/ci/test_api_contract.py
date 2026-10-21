@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OPS-035 artefact checks: python3 scripts/ci/test_api_contract.py (run from repo root).
 With OASDIFF=/path/to/oasdiff (or oasdiff on PATH) the fixture "PRs" also run through the real pinned oasdiff binary."""
-import importlib.util, json, os, shutil, subprocess, sys, tempfile, unittest
+import copy, datetime as dt, importlib.util, json, os, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 import yaml
@@ -74,6 +74,87 @@ class BreakingRule(unittest.TestCase):
             r = subprocess.run([sys.executable, "scripts/ci/api_contract.py", "breaking", f.name, str(FIX / head)], capture_output=True, text=True)
             os.unlink(f.name)
             self.assertEqual(r.returncode, rc, f"{head}: {r.stdout}")
+
+
+def post_finding(rule, text, path="/v1/things"):
+    return {"id": rule, "text": text, "level": 3, "operation": "POST", "path": path}
+
+
+def accepted_file(d, expires="2099-01-01", reason="proved unchanged at runtime", findings=None):
+    f = Path(d) / "accepted.yaml"
+    f.write_text(yaml.safe_dump({"groups": [{"name": "g", "reason": reason, "expires": expires, "findings": findings or []}]}))
+    return f
+
+
+ACC = {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/things",
+       "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+
+
+class ReviewedAcceptances(unittest.TestCase):
+    """The gate allows only an exact, reviewed, unexpired finding; every other break still blocks."""
+
+    def run_check(self, found, **kw):
+        with tempfile.TemporaryDirectory() as d:
+            return api_contract.check(found, spec("base-post.yaml"), api_contract.load_accepted(accepted_file(d, **kw), dt.date(2026, 11, 1)))
+
+    def test_exact_finding_is_allowed(self):
+        blocking, exempt = self.run_check([post_finding(ACC["rule"], ACC["text"])], findings=[ACC])
+        self.assertEqual(blocking, [])
+        self.assertIn("accepted: group g until 2099-01-01", exempt[0])
+
+    def test_same_rule_on_another_property_or_with_another_change_or_path_blocks(self):
+        for f in (post_finding(ACC["rule"], "the 'kind' request property's minLength was increased from '0' to '1'"),
+                  post_finding(ACC["rule"], "the 'name' request property's minLength was increased from '0' to '5'"),
+                  post_finding(ACC["rule"], ACC["text"], "/v1/other"),
+                  post_finding("request-property-became-required", "added the new required request property 'name'")):
+            blocking, exempt = self.run_check([f], findings=[ACC])
+            self.assertEqual((len(blocking), exempt), (1, []), f)
+
+    def test_expired_group_allows_nothing(self):
+        blocking, _ = self.run_check([post_finding(ACC["rule"], ACC["text"])], findings=[ACC], expires="2026-10-31")
+        self.assertEqual(len(blocking), 1)
+
+    def test_group_without_reason_or_date_is_refused(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(ValueError):
+                api_contract.load_accepted(accepted_file(d, reason=" ", findings=[ACC]))
+            with self.assertRaises(ValueError):
+                api_contract.load_accepted(accepted_file(d, expires=None, findings=[ACC]))
+
+    def test_committed_acceptances_are_complete_and_bounded(self):
+        groups = yaml.safe_load(open(api_contract.ACCEPTED))["groups"]
+        self.assertTrue(groups)
+        for g in groups:
+            self.assertTrue(g["reason"].strip() and g["findings"], g["name"])
+            self.assertLessEqual(g["expires"], dt.date(2027, 3, 31), g["name"])  # short-lived, never permanent
+        self.assertEqual({f["rule"] for g in groups for f in g["findings"]} - {
+            "request-property-min-length-increased", "request-property-type-changed", "request-property-min-items-increased",
+            "request-property-min-set", "request-property-removed", "response-property-type-changed",
+            "response-optional-property-removed"}, set())  # never a breaking rule that could hide a genuine break
+
+    @unittest.skipUnless(OASDIFF, "set OASDIFF to the pinned oasdiff binary")
+    def test_genuine_breaks_fail_through_real_oasdiff_with_the_committed_acceptances(self):
+        base = spec("base-post.yaml")
+        def mutate(fn):
+            h = copy.deepcopy(base)
+            fn(h["paths"]["/v1/things"]["post"])
+            return h
+        cases = {
+            "new required request property": lambda op: (op["requestBody"]["content"]["application/json"]["schema"].update(required=["extra"]),
+                                                          op["requestBody"]["content"]["application/json"]["schema"]["properties"].update(extra={"type": "string"})),
+            "removed response field": lambda op: op["responses"]["200"]["content"]["application/json"]["schema"]["properties"].pop("name"),
+            "tightened enum": lambda op: op["requestBody"]["content"]["application/json"]["schema"]["properties"]["kind"].update(enum=["a", "b"]),
+            "min length on a property outside the acceptances": lambda op: op["requestBody"]["content"]["application/json"]["schema"]["properties"]["name"].update(minLength=1),
+        }
+        with tempfile.TemporaryDirectory() as d:
+            for name, fn in cases.items():
+                head = Path(d) / "head.yaml"
+                head.write_text(yaml.safe_dump(mutate(fn)))
+                out = subprocess.run([OASDIFF, "breaking", str(FIX / "base-post.yaml"), str(head), "-f", "json"], capture_output=True, text=True, check=True).stdout
+                (Path(d) / "b.json").write_text(out)
+                r = subprocess.run([sys.executable, "scripts/ci/api_contract.py", "breaking", str(Path(d) / "b.json"), str(head)], capture_output=True, text=True)
+                self.assertEqual(r.returncode, 1, f"{name}: {r.stdout}")
+                self.assertIn("breaking change: POST /v1/things", r.stdout, name)
 
 
 class GeneratedClient(unittest.TestCase):

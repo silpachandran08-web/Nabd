@@ -1,0 +1,17 @@
+openapi: 3.0.1
+info: { title: fixture, version: "1" }
+paths:
+  /v1/things:
+    post:
+      operationId: Things_create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: { type: string }, kind: { type: string, enum: [a, b, c] } } }
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { type: object, properties: { id: { type: string }, name: { type: string } } }

@@ -1,0 +1,221 @@
+# Reviewed acceptances for the oasdiff breaking-change gate (scripts/ci/api_contract.py), found in the S13 investigation
+# (evidence: docs/architecture/api-contracts.md, section Accepted PLT-032 spec corrections). Exact match on rule + operation + path + text;
+# every group expires and then allows nothing. Add nothing here without proving the runtime behaviour did not change.
+groups:
+  - name: validators
+    reason: "Bean Validation constraints (@NotBlank, @Email, @NotEmpty, @Positive*, @DecimalMin) were already enforced by the same DTOs before PLT-032; springdoc 3 now documents them. No validation annotation changed between base and head; WireFormatParityApiTest gets 400 for the same inputs on both builds."
+    expires: 2026-12-31
+    findings:
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/break-glass/activate", "text": "the 'reasonCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/login", "text": "the 'email' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/login", "text": "the 'pin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/login", "text": "the 'tenantSlug' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-type-changed", "op": "POST", "path": "/v1/auth/login", "text": "the 'email' request property type/format changed from 'string'/'' to 'string'/'email'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/mfa/confirm", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/mfa/recovery-verify", "text": "the 'challengeToken' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/mfa/verify", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/otp/request", "text": "the 'mobilePhone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/otp/request", "text": "the 'tenantSlug' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/otp/verify", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/otp/verify", "text": "the 'mobilePhone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/otp/verify", "text": "the 'tenantSlug' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/change", "text": "the 'currentPin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/change", "text": "the 'newPin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/reset-confirm", "text": "the 'mobilePhone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/reset-confirm", "text": "the 'newPin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/reset-confirm", "text": "the 'tenantSlug' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/reset-confirm", "text": "the 'token' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/reset-request", "text": "the 'mobilePhone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/pin/reset-request", "text": "the 'tenantSlug' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/refresh", "text": "the 'refreshToken' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/auth/unlock", "text": "the 'pin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/billing/checkout/{queueEntryId}", "text": "the 'lineItems/items/chargeCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/billing/invoices/{id}/void", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/billing/otc-checkout", "text": "the 'lineItems/items/chargeCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/clinical/patients/{patientId}/allergies", "text": "the 'severity' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/clinical/patients/{patientId}/conditions", "text": "the 'condition' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PUT", "path": "/v1/clinical/patients/{patientId}/pregnancy-status", "text": "the 'status' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/clinical/prescriptions/{queueEntryId}", "text": "the 'items/items/overrides/items/kind' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/clinical/prescriptions/{queueEntryId}", "text": "the 'items/items/overrides/items/reasonCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/clinical/rx-sets", "text": "the 'items/items/overrides/items/kind' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/clinical/rx-sets", "text": "the 'items/items/overrides/items/reasonCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/clinical/rx-sets/{setId}", "text": "the 'items/items/overrides/items/kind' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/clinical/rx-sets/{setId}", "text": "the 'items/items/overrides/items/reasonCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/departments", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/departments/{id}", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/departments/{id}/workflow", "text": "the 'templateCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/nursing/administration-orders", "text": "the 'dose' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/nursing/administration-orders", "text": "the 'drugName' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/nursing/administration-orders/{id}/refuse", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/nursing/procedure-orders", "text": "the 'chargeCode' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/nursing/procedure-orders/{id}/consent", "text": "the 'signedName' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/login", "text": "the 'email' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/login", "text": "the 'pin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-type-changed", "op": "POST", "path": "/v1/owners/auth/login", "text": "the 'email' request property type/format changed from 'string'/'' to 'string'/'email'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/mfa/confirm", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/mfa/confirm", "text": "the 'setupToken' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/mfa/enroll", "text": "the 'setupToken' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/mfa/recovery-verify", "text": "the 'challengeToken' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/mfa/verify", "text": "the 'challengeToken' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/auth/mfa/verify", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/owners/invitations/{token}/accept", "text": "the 'pin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-items-increased", "op": "POST", "path": "/v1/packages", "text": "the 'items' request property's minItems was increased to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/packages", "text": "the 'items/items/name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/packages", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/packages/instances/{id}/extend", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/packages/instances/{id}/refund", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/packages/refunds/{id}/reject", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/packages/sell", "text": "the 'paymentMethod' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-items-increased", "op": "PATCH", "path": "/v1/packages/{id}", "text": "the 'items' request property's minItems was increased to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/packages/{id}", "text": "the 'items/items/name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/packages/{id}", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/patients", "text": "the 'gender' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/patients", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/patients", "text": "the 'phone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/pharmacy/items", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/pharmacy/items/{id}", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/pharmacy/rx-lines/search", "text": "the 'phone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/auth/login", "text": "the 'email' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/auth/login", "text": "the 'pin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-type-changed", "op": "POST", "path": "/v1/platform/auth/login", "text": "the 'email' request property type/format changed from 'string'/'' to 'string'/'email'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/auth/mfa/confirm", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/auth/mfa/verify", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/auth/refresh", "text": "the 'refreshToken' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/billing/discounts", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/billing/subscriptions/{tenantId}/transitions", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/billing/subscriptions/{tenantId}/transitions", "text": "the 'toStatus' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/plans", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/plans", "text": "the 'currency' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/plans", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/platform/plans/{id}", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/platform/plans/{id}", "text": "the 'currency' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/platform/plans/{id}", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'brandName' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'ownerEmail' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'ownerMobile' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'ownerName' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'path' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'region' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'tenantName' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'tenantSlug' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-type-changed", "op": "POST", "path": "/v1/platform/provisioning-jobs", "text": "the 'ownerEmail' request property type/format changed from 'string'/'' to 'string'/'email'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/support/tickets/{id}/transitions", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/support/tickets/{id}/transitions", "text": "the 'toStatus' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/tenants/{tenantId}/lifecycle/transitions", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/platform/tenants/{tenantId}/lifecycle/transitions", "text": "the 'toStatus' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/queue/{id}/status", "text": "the 'status' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-items-increased", "op": "POST", "path": "/v1/roles", "text": "the 'grants' request property's minItems was increased to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/roles", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/roles/delegations", "text": "the 'reason' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-items-increased", "op": "PATCH", "path": "/v1/roles/{id}", "text": "the 'grants' request property's minItems was increased to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/roles/{id}", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/charges", "text": "the 'category' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/charges", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/charges", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/charges/{id}", "text": "the 'category' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/charges/{id}", "text": "the 'code' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/charges/{id}", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/consent-contact", "text": "the 'email' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/consent-contact", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-type-changed", "op": "PATCH", "path": "/v1/setup/consent-contact", "text": "the 'email' request property type/format changed from 'string'/'' to 'string'/'email'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/export-jobs", "text": "the 'exportType' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/holidays", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/import-jobs", "text": "the 'fileName' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/import-jobs", "text": "the 'importType' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/licences", "text": "the 'licenceType' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/licences", "text": "the 'number' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/licences", "text": "the 'region' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/licences/{id}", "text": "the 'licenceType' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/licences/{id}", "text": "the 'number' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/licences/{id}", "text": "the 'region' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/policies/{key}", "text": "the 'value' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/profile", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "PATCH", "path": "/v1/setup/profile", "text": "the 'timezone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/setup/shifts", "text": "the 'patternJson' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/staff", "text": "the 'email' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/staff", "text": "the 'mobilePhone' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/staff", "text": "the 'name' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-type-changed", "op": "POST", "path": "/v1/staff", "text": "the 'email' request property type/format changed from 'string'/'' to 'string'/'email'"}
+      - {"rule": "request-property-min-length-increased", "op": "POST", "path": "/v1/staff/invitations/{token}/accept", "text": "the 'pin' request property's minLength was increased from '0' to '1'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/packages", "text": "the 'graceDays' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/packages", "text": "the 'items/items/quantity' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/packages", "text": "the 'validityDays' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/packages/{id}", "text": "the 'graceDays' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/packages/{id}", "text": "the 'items/items/quantity' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/packages/{id}", "text": "the 'validityDays' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/pharmacy/items", "text": "the 'price' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/pharmacy/items", "text": "the 'stockQty' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/pharmacy/items", "text": "the 'taxRatePercent' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/pharmacy/items/{id}", "text": "the 'price' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/pharmacy/items/{id}", "text": "the 'stockQty' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/pharmacy/items/{id}", "text": "the 'taxRatePercent' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/setup/charges", "text": "the 'baseAmount' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/setup/charges", "text": "the 'emergencyAmount' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/setup/charges", "text": "the 'followUpAmount' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "POST", "path": "/v1/setup/charges", "text": "the 'taxRatePercent' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/setup/charges/{id}", "text": "the 'baseAmount' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/setup/charges/{id}", "text": "the 'emergencyAmount' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/setup/charges/{id}", "text": "the 'followUpAmount' request property's min was set to '0.00'"}
+      - {"rule": "request-property-min-set", "op": "PATCH", "path": "/v1/setup/charges/{id}", "text": "the 'taxRatePercent' request property's min was set to '0.00'"}
+  - name: time
+    reason: "The old spec rendered java.time.LocalTime as an object {hour,minute,second,nano}; the wire was always the ISO string HH:mm:ss. WireFormatParityApiTest shows the same string request and response on both builds and a 4xx for an object request."
+    expires: 2026-12-31
+    findings:
+      - {"rule": "response-property-type-changed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "the '/items/endTime' response's property type/format changed from 'object'/'' to 'string'/'time-local' for status '200'"}
+      - {"rule": "response-property-type-changed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "the '/items/startTime' response's property type/format changed from 'object'/'' to 'string'/'time-local' for status '200'"}
+      - {"rule": "request-property-type-changed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "the 'endTime' request property type/format changed from 'object'/'' to 'string'/'time-local'"}
+      - {"rule": "request-property-type-changed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "the 'startTime' request property type/format changed from 'object'/'' to 'string'/'time-local'"}
+      - {"rule": "response-property-type-changed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "the 'endTime' response's property type/format changed from 'object'/'' to 'string'/'time-local' for status '200'"}
+      - {"rule": "response-property-type-changed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "the 'startTime' response's property type/format changed from 'object'/'' to 'string'/'time-local' for status '200'"}
+      - {"rule": "request-property-type-changed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "the 'endTime' request property type/format changed from 'object'/'' to 'string'/'time-local'"}
+      - {"rule": "request-property-type-changed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "the 'startTime' request property type/format changed from 'object'/'' to 'string'/'time-local'"}
+      - {"rule": "response-property-type-changed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "the 'endTime' response's property type/format changed from 'object'/'' to 'string'/'time-local' for status '200'"}
+      - {"rule": "response-property-type-changed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "the 'startTime' response's property type/format changed from 'object'/'' to 'string'/'time-local' for status '200'"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/endTime/hour' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/endTime/minute' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/endTime/nano' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/endTime/second' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/startTime/hour' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/startTime/minute' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/startTime/nano' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property '/items/startTime/second' from the response with the '200' status"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'endTime/hour'"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'endTime/minute'"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'endTime/nano'"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'endTime/second'"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'startTime/hour'"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'startTime/minute'"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'startTime/nano'"}
+      - {"rule": "request-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the request property 'startTime/second'"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'endTime/hour' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'endTime/minute' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'endTime/nano' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'endTime/second' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'startTime/hour' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'startTime/minute' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'startTime/nano' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "POST", "path": "/v1/doctors/{id}/working-hours", "text": "removed the optional property 'startTime/second' from the response with the '200' status"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'endTime/hour'"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'endTime/minute'"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'endTime/nano'"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'endTime/second'"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'startTime/hour'"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'startTime/minute'"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'startTime/nano'"}
+      - {"rule": "request-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the request property 'startTime/second'"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'endTime/hour' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'endTime/minute' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'endTime/nano' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'endTime/second' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'startTime/hour' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'startTime/minute' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'startTime/nano' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "PUT", "path": "/v1/doctors/{id}/working-hours/{hoursId}", "text": "removed the optional property 'startTime/second' from the response with the '200' status"}
+  - name: worklist
+    reason: "Two nested records named Item collided into one springdoc schema; the base spec showed the safety-dictionary Item (classId, lang, matchKind, value) for GET /v1/nursing/worklist. WorklistResponse.Item (entry, patient, vitals) is unchanged; the head names it WorklistItem."
+    expires: 2026-12-31
+    findings:
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/nursing/worklist", "text": "removed the optional property 'items/items/classId' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/nursing/worklist", "text": "removed the optional property 'items/items/lang' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/nursing/worklist", "text": "removed the optional property 'items/items/matchKind' from the response with the '200' status"}
+      - {"rule": "response-optional-property-removed", "op": "GET", "path": "/v1/nursing/worklist", "text": "removed the optional property 'items/items/value' from the response with the '200' status"}
