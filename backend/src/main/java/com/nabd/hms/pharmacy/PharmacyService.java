@@ -3,6 +3,8 @@ package com.nabd.hms.pharmacy;
 import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.DomainEventType;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemResponse;
@@ -38,8 +40,11 @@ public class PharmacyService {
     private final AuditService auditService;
 
     private final ActorDirectory actors;
+    private final EventPublisher events;
 
-    PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService, ActorDirectory actors) {
+    PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService, ActorDirectory actors,
+                    EventPublisher events) {
+        this.events = events;
         this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -93,6 +98,7 @@ public class PharmacyService {
         requireHybridMode(tenantId);
         String code = "PHM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         UUID id = repo.insertItem(tenantId, code, req);
+        catalogueChanged(tenantId, id, "added");
         int opening = req.stockQtyOrZero();
         if (opening > 0) {
             // Opening stock is a stock change like any other: it gets a movement row and an audit event.
@@ -110,7 +116,13 @@ public class PharmacyService {
         if (repo.updateItem(tenantId, id, req) == 0) {
             throw notFound();
         }
+        catalogueChanged(tenantId, id, "updated");
         return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+    }
+
+    /** OPS-021: pharmacy items are catalogue rows; a price or active change must reach the cached price catalogue too. */
+    private void catalogueChanged(UUID tenantId, UUID id, String status) {
+        events.publish(tenantId, DomainEventType.CATALOGUE_CHANGED, id, Map.of("chargeHeadId", id, "status", status));
     }
 
     /** V2-004: relative (delta) or stock-take (setTo) change, reason mandatory. The item row is locked, the new
@@ -153,6 +165,7 @@ public class PharmacyService {
         boolean active = Boolean.TRUE.equals(req.active());
         if (item.active() != active) {
             repo.setActive(tenantId, id, active);
+            catalogueChanged(tenantId, id, "updated");
             Map<String, Object> before = new LinkedHashMap<>();
             before.put("active", item.active());
             Map<String, Object> after = new LinkedHashMap<>();

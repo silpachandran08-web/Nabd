@@ -5,6 +5,7 @@ import com.nabd.hms.billing.CheckoutModels.PharmacyChargeRow;
 import com.nabd.hms.billing.dto.CheckoutRequest.DiscountRequest;
 import com.nabd.hms.billing.dto.LineItemRequest;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.shared.cache.ConfigCache;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -31,17 +32,35 @@ class BillingPricing {
     }
 
     private final CheckoutRepository repo;
+    private final ConfigCache configCache;
 
-    BillingPricing(CheckoutRepository repo) {
+    BillingPricing(CheckoutRepository repo, ConfigCache configCache) {
         this.repo = repo;
+        this.configCache = configCache;
+    }
+
+    /** OPS-021: prices come from the versioned config cache (price and active flag only; stock is never cached). */
+    private java.util.Map<String, PharmacyChargeRow> cachedCatalogue(UUID tenantId, List<String> codes,
+                                                                     java.util.function.Function<List<String>, java.util.Map<String, PharmacyChargeRow>> db) {
+        java.util.Map<String, PharmacyChargeRow> out = new java.util.HashMap<>();
+        for (String code : codes) {
+            PharmacyChargeRow row = configCache.get(tenantId, ConfigCache.Domain.CATALOGUE, code, PharmacyChargeRow.class,
+                    () -> db.apply(List.of(code)).get(code));
+            if (row != null) {
+                out.put(code, row);
+            }
+        }
+        return out;
     }
 
     /** trusted = a server-built bill (package sale): lines are not client input, so no catalogue/authority check. */
     List<LineItemInput> resolveLines(UUID tenantId, List<LineItemRequest> lines, boolean followUpEligible,
                                      boolean canDiscount, boolean trusted, UUID staffId) {
         List<LineItemInput> out = new ArrayList<>(lines.size());
+        List<String> codes = lines.stream().map(LineItemRequest::chargeCode).distinct().toList();
         java.util.Map<String, PharmacyChargeRow> catalogue = trusted ? java.util.Map.of()
-                : repo.findCatalogueCharges(tenantId, lines.stream().map(LineItemRequest::chargeCode).distinct().toList());
+                : configCache.enabled() ? cachedCatalogue(tenantId, codes, c -> repo.findCatalogueCharges(tenantId, c))
+                : repo.findCatalogueCharges(tenantId, codes);
         for (LineItemRequest li : lines) {
             PharmacyChargeRow c = catalogue.get(li.chargeCode());
             if (c != null && (c.stocked() || c.isRx()) && !c.active()) { // H-04: an inactive Rx code must not fall through to free text

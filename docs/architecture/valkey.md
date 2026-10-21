@@ -120,3 +120,17 @@ story in one class. Plain unit tests can build the production factory directly:
   mode on the logs and Prometheus scrape captured by `Ops020CacheApiTest` (CI stage 3).
 - Tests turn the zone cache off (`app.cache.tenant-config-ttl-seconds=0` in `src/test/resources/application.properties`)
   because fixtures edit `tenants.timezone` with plain SQL; `Ops020CacheApiTest` turns it back on.
+
+## Versioned tenant configuration cache (OPS-021)
+
+`shared.cache.ConfigCache`: L1 per instance (`app.cache.config-ttl-seconds`, default 300; soft refresh at half; 0 turns the cache off,
+as in tests) and L2 in Valkey (`app.cache.config-l2-ttl-seconds`, default 3600), both with +/-10% jitter.
+
+| Domain | Key | Version key | Invalidation |
+|---|---|---|---|
+| `CATALOGUE` (charge code -> price row used by checkout; never stock) | `nabd:cfg:t:<tenant>:catalogue:<code>:v<ver>` | `nabd:cfg:t:<tenant>:catalogue:ver` | `billing.catalogue.changed.v1` (setup charges and pharmacy items) -> group `cache-invalidator` -> `INCR` version (after commit) -> PUBLISH `<tenant>/CATALOGUE` on `nabd:cfg:changed` -> every instance drops L1 |
+
+- A value written under an old version is unreachable once the version moves (AC "stale L2"); an L1 fill that raced an eviction is dropped (epoch check).
+- Stampede: one load per key per instance (single-flight future); across instances a `SET NX PX 5000` lock key (`...:v<ver>:lock`), the others poll L2 for up to 2 s, then load themselves.
+- Keys come only from `CacheKeyPolicy` (tenant id always present, PHI refused). `ConfigCacheRulesTest` forbids `nabd:cfg` literals outside `shared.cache`, `@Cacheable`, and any domain built from forbidden data classes.
+- Valkey down: the DB answers, nothing is cached. Not built (OPS-021 subtasks): departments, workflows, templates, roles, entitlements loaders, opening-time warm-up.
