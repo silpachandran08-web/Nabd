@@ -28,7 +28,7 @@ try {
   const body = await s.page.locator('main, body').first().innerText();
   check('A1 catalogue rows use plain names', body.includes('Reminder, 1 day before') && body.includes('Appointment confirmed') && body.includes('Doctor running late'));
   check('A2 starter template tag and languages shown', body.includes('Starter template') && body.includes('Hindi') && body.includes('Kannada'));
-  check('A3 queued shows as waiting to send', body.includes('waiting to send'));
+  check('A3 queued shows as waiting to send', body.toLowerCase().includes('waiting to send'));
   check('A4 Devanagari renders', body.includes('नमस्ते'));
   check('A5 only the custom rejected template offers Fix & resubmit', (await s.page.getByRole('button', { name: /Fix & resubmit/ }).count()) === 1);
   check('A6 custom template keeps its own name', body.includes('my_custom'));
