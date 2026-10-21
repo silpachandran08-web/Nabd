@@ -3521,14 +3521,16 @@ paths:
                   regionCode: { type: string, enum: [IN, AE, SA, QA] }
         "404": { description: "Tenant not found", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "409": { description: "REGION_IMMUTABLE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-  # ------------------------------------------------- Platform console: support access (PLT-056)
+  # ------------------------------------------------- Platform console: support access (PLT-056, PLT-057)
   /platform/support-access/grants:
     post:
       tags: [Platform]
       summary: >
         Request a support grant for one tenant, one support ticket of that tenant and one scope, for 1-60 minutes
         (default 60). Errors 400 with code TICKET_REQUIRED, SCOPE_INVALID, DURATION_OUT_OF_RANGE, TICKET_INVALID
-        (ticket missing or of another tenant). A config_only grant never opens patient records (403 scope-not-permitted).
+        (ticket missing or of another tenant); 409 REQUEST_ALREADY_OPEN (same operator and ticket). A config_only grant never opens patient records (403 scope-not-permitted).
+        PLT-057: this only creates a request (status requested, 24 h deadline, no window). The clinic owner is notified in the app
+        and on WhatsApp; the window starts when the owner approves (POST /support-access/requests/{id}/decision).
       x-required-permission: support_access:request
       requestBody:
         required: true
@@ -3545,12 +3547,136 @@ paths:
                 minutes: { type: integer, minimum: 1, maximum: 60, default: 60 }
       responses:
         "201":
-          description: The grant (id, tenantId, ticketId, scope, operatorId, operatorName, operatorRole, reason, grantedAt, expiresAt, revokedAt, active)
+          description: The grant (id, tenantId, ticketId, scope, operatorId, operatorName, operatorRole, reason, grantedAt, expiresAt, revokedAt, active, status requested|active|declined|expired|revoked, minutes, windowStartedAt, windowEndsAt, declineNote). active is true only inside an owner-approved window.
           content:
             application/json:
               schema: { type: object }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden: no support_access:request (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /platform/support-access/grants/{id}/patients/{patientId}:
+    get:
+      tags: [Platform]
+      summary: >
+        PLT-057: redacted patient view. Only for the grant's own operator, scope redacted_patient_view, and only while the
+        owner-approved window is open (otherwise 403 GRANT_NOT_ACTIVE). Returns initials, masked phone (+91******3210),
+        birth year and MRN. No clinical field, no name, no full phone, no date of birth. Audited as patient.support_view.
+      x-required-permission: support_access:view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Redacted patient
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  initials: { type: string, example: AR }
+                  maskedPhone: { type: string, example: "+91******3210" }
+                  birthYear: { type: integer, example: 1990 }
+                  mrn: { type: string }
+        "403": { description: "GRANT_NOT_ACTIVE, not-your-grant or scope-not-permitted (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  # ------------------------------------------------- Clinic owner: support access requests (PLT-057)
+  /support-access/requests:
+    get:
+      tags: [Compliance]
+      summary: The clinic's support access requests, newest first. A request or window whose time ran out reads expired.
+      x-required-permission: compliance:view
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [requested, active, declined, expired, revoked] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: Requests of this clinic only
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        operatorName: { type: string }
+                        reason: { type: string }
+                        scope: { type: string, enum: [config_only, redacted_patient_view] }
+                        minutes: { type: integer }
+                        status: { type: string, enum: [requested, active, declined, expired, revoked] }
+                        requestedAt: { type: string, format: date-time }
+                        expiresAt: { type: string, format: date-time }
+                        windowStartedAt: { type: string, format: date-time, nullable: true }
+                        windowEndsAt: { type: string, format: date-time, nullable: true }
+                        declineNote: { type: string, nullable: true }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /support-access/requests/{id}/decision:
+    post:
+      tags: [Compliance]
+      summary: >
+        The owner approves or declines. Approval starts the window now (at most the requested minutes, 60 at the most) and
+        writes "support_access.session_started" to the clinic's audit log; decline writes support_access.declined.
+        Needs an Idempotency-Key. 409 ALREADY_DECIDED, 410 EXPIRED (not answered within 24 h), 404 for another clinic's request.
+      x-required-permission: compliance:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [active, declined] }
+                  windowEndsAt: { type: string, format: date-time, nullable: true }
+        "403": { description: "Forbidden: no compliance:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: ALREADY_DECIDED (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "410": { description: EXPIRED (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /support/tickets/redaction-preview:
+    post:
+      tags: [Support]
+      x-required-permission: authenticated
+      summary: >
+        PLT-057: what the ticket form shows before submitting. Returns the subject and description as they would be stored
+        (phone numbers, emails, national IDs, MRNs and this clinic's patient names replaced by [redacted]) and how many
+        replacements were made. Stores nothing. POST /support/tickets stores the redacted text only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, description]
+              properties:
+                subject: { type: string, maxLength: 200 }
+                description: { type: string, maxLength: 4000 }
+                priority: { type: string, enum: [low, normal, high, urgent] }
+      responses:
+        "200":
+          description: Redacted preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redactionCount: { type: integer }
+                  subject: { type: string }
+                  description: { type: string }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:
@@ -3567,7 +3693,7 @@ paths:
         toStatus, reason; also written by billing dunning transitions), platform_billing.subscription_created,
         platform_billing.subscription_updated, platform_billing.discount_requested, platform_billing.discount_auto_approved,
         platform_billing.discount_approved, platform_billing.discount_rejected, platform_ticket.status_changed (status
-        only), support_access.grant, support_access.revoke, patient.support_view, audit_log.export.
+        only), support_access.requested, support_access.session_started, support_access.declined, support_access.request_expired, support_access.session_ended, support_access.revoke, patient.support_view, audit_log.export.
       summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
       x-required-permission: audit_compliance:view
       x-plt-056: >

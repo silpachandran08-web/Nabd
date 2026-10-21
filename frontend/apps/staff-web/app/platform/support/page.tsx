@@ -37,8 +37,23 @@ const NEXT_ACTION: Record<string, { toStatus: string; label: string }> = {
   resolved: { toStatus: "closed", label: "Close" },
 };
 
+// PLT-057: how owners answered the access requests (GET /platform/support-access/grants). Support never sees clinical fields.
+type AccessStats = { total: number; approved: number; declined: number; expired: number; waiting: number };
+
+function statsOf(grants: { status: string; windowStartedAt: string | null }[]): AccessStats {
+  const n = (f: (g: { status: string; windowStartedAt: string | null }) => boolean) => grants.filter(f).length;
+  return {
+    total: grants.length,
+    approved: n((g) => g.windowStartedAt !== null), // a window opened, whatever became of it since
+    declined: n((g) => g.status === "declined"),
+    expired: n((g) => g.status === "expired" && g.windowStartedAt === null), // never answered
+    waiting: n((g) => g.status === "requested"),
+  };
+}
+
 export default function SupportTicketsPage() {
   const fetchAuthed = usePlatformFetch();
+  const [stats, setStats] = useState<AccessStats | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +81,20 @@ export default function SupportTicketsPage() {
     } finally {
       setLoading(false);
     }
+  }, [fetchAuthed]);
+
+  useEffect(() => {
+    // Absent, not an error, when the role cannot read grants (support_access:view).
+    void Promise.resolve().then(async () => {
+      try {
+        const res = await fetchAuthed("/platform/support-access/grants");
+        if (!res || !res.ok) return;
+        const grants: { status: string; windowStartedAt: string | null }[] = await res.json();
+        setStats(statsOf(grants));
+      } catch {
+        /* the tickets list is the page; the stats strip just stays hidden */
+      }
+    });
   }, [fetchAuthed]);
 
   useEffect(() => {
@@ -105,6 +134,12 @@ export default function SupportTicketsPage() {
         </div>
         {!loading && !error && !forbidden && <span className={styles.count}>{tickets.length} total</span>}
       </div>
+
+      {stats && (
+        <p className={styles.subtitle} data-testid="access-stats">
+          Clinical fields shown: 0 · Access requests: {stats.total} · Approved by owner: {stats.approved} · Declined: {stats.declined} · Expired unanswered: {stats.expired} · Waiting: {stats.waiting}
+        </p>
+      )}
 
       {actionError && <div className={styles.actionError} role="alert">{actionError}</div>}
 

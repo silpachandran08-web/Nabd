@@ -1,6 +1,5 @@
 package com.nabd.hms.platform.access;
 
-import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -15,7 +14,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SupportAccessApiTest extends ApiTestBase {
+class SupportAccessApiTest extends SupportAccessTestSupport {
 
     @Test
     void operatorRequestsGrantAndItAppearsInTheList() {
@@ -30,7 +29,8 @@ class SupportAccessApiTest extends ApiTestBase {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         Map<String, Object> body = resp.getBody();
         assertThat(body.get("operatorRole")).isEqualTo("support_engineer");
-        assertThat(body.get("active")).isEqualTo(true);
+        assertThat(body.get("status")).isEqualTo("requested"); // PLT-057: a request opens nothing until the owner approves
+        assertThat(body.get("active")).isEqualTo(false);
         assertThat(body.get("revokedAt")).isNull();
 
         ResponseEntity<Map[]> list = exchange("/v1/platform/support-access/grants", HttpMethod.GET, authed(token), Map[].class);
@@ -60,11 +60,13 @@ class SupportAccessApiTest extends ApiTestBase {
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
                 authedJsonBody(opToken, grantBody(tenant, "Support ticket follow-up")), Map.class);
         String grantId = (String) grant.getBody().get("id");
+        assertThat(decide(seedOwner(tenant).token(), grantId, "approve", null).getStatusCode()).isEqualTo(HttpStatus.OK); // PLT-057
 
         ResponseEntity<Map> view = exchange("/v1/platform/support-access/grants/" + grantId + "/patients/" + patientId,
                 HttpMethod.GET, authed(opToken), Map.class);
         assertThat(view.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(view.getBody()).containsKeys("mrn", "name", "phone", "dob", "gender", "status");
+        // PLT-057: initials, masked phone, birth year, MRN. Name, phone, dob, gender are no longer returned
+        assertThat(view.getBody().keySet()).containsExactlyInAnyOrder("initials", "maskedPhone", "birthYear", "mrn");
         assertThat(view.getBody()).doesNotContainKeys("allergies", "chronicConditions", "activePackages", "outstandingBalance");
 
         List<Map<String, Object>> auditRows = inTenantTx(tenant.id(), () -> jdbc.queryForList(
@@ -89,6 +91,7 @@ class SupportAccessApiTest extends ApiTestBase {
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
                 authedJsonBody(tokenA, grantBody(tenant, "A's investigation")), Map.class);
         String grantId = (String) grant.getBody().get("id");
+        assertThat(decide(seedOwner(tenant).token(), grantId, "approve", null).getStatusCode()).isEqualTo(HttpStatus.OK); // PLT-057: approved, still only A's
 
         SeededOperator opB = seedOperator("access-b@nabd.health", "support_engineer", false);
         String tokenB = platformLoginAndGetAccessToken(opB);
@@ -113,6 +116,7 @@ class SupportAccessApiTest extends ApiTestBase {
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
                 authedJsonBody(token, grantBody(tenant, "Will be revoked")), Map.class);
         String grantId = (String) grant.getBody().get("id");
+        assertThat(decide(seedOwner(tenant).token(), grantId, "approve", null).getStatusCode()).isEqualTo(HttpStatus.OK); // PLT-057
 
         ResponseEntity<Void> revokeResp = http.exchange(url("/v1/platform/support-access/grants/" + grantId + "/revoke"),
                 HttpMethod.POST, authed(token), Void.class);
@@ -143,10 +147,12 @@ class SupportAccessApiTest extends ApiTestBase {
         ResponseEntity<Map> grant = http.exchange(url("/v1/platform/support-access/grants"), HttpMethod.POST,
                 authedJsonBody(token, grantBody(tenant, "Will expire")), Map.class);
         String grantId = (String) grant.getBody().get("id");
+        assertThat(decide(seedOwner(tenant).token(), grantId, "approve", null).getStatusCode()).isEqualTo(HttpStatus.OK); // PLT-057
 
         // master.support_access_grants carries no RLS — a plain jdbc.update backdates it directly.
-        jdbc.update("UPDATE master.support_access_grants SET expires_at = ? WHERE id = ?",
-                Timestamp.from(Instant.now().minus(Duration.ofMinutes(1))), UUID.fromString(grantId));
+        jdbc.update("UPDATE master.support_access_grants SET expires_at = ?, window_ends_at = ?, window_started_at = ? WHERE id = ?",
+                Timestamp.from(Instant.now().minus(Duration.ofMinutes(1))), Timestamp.from(Instant.now().minus(Duration.ofMinutes(1))),
+                Timestamp.from(Instant.now().minus(Duration.ofMinutes(11))), UUID.fromString(grantId));
 
         ResponseEntity<Map> view = exchange("/v1/platform/support-access/grants/" + grantId + "/patients/" + patientId,
                 HttpMethod.GET, authed(token), Map.class);
