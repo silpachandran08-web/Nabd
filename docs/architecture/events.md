@@ -187,7 +187,8 @@ Redis 6.2) and `consumer_lag_seconds{group,stream}` (age of the oldest undeliver
 |---|---|---|---|---|
 | projector | DB_LEDGER | yes | `clinical.allergy.changed.v1` -> `RegistryProjector.project(patient)` | built (OPS-017); the V221 trigger poller stays until OPS-016 runs everywhere |
 | cache-invalidator | VALKEY_SET | no | `organization.config.changed.v1` -> `TenantConfigEvictions`: evicts the tenant's zone/region locally and PUBLISHes the tenant id on `nabd:cfg:changed`, which every instance subscribes to | built (OPS-020, FIX-C). A group delivers each entry to ONE replica, so the pub/sub broadcast is the fan-out to all instances. Without Valkey the outbox dispatcher calls the same bean |
-| eta-engine, sse-fanout, comms, edge-projector | | | | their own stories |
+| sse-fanout | VALKEY_SET | no | `visit.queue_entry.*`, `visit.eta.updated.v1` (no producer yet), `scheduling.doctor_status/doctor_delay.changed.v1`, `scheduling.appointment.booked/cancelled/rescheduled.v1`, and `iam.session.revoked/staff.changed/role.changed.v1` (close streams) -> `RealtimeHub.publish` | built (ACC-021), see valkey.md "Realtime (SSE)" |
+| eta-engine, comms, edge-projector | | | | their own stories |
 
 ## 8. Relay to Valkey Streams (OPS-016)
 

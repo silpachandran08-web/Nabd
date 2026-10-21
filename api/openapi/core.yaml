@@ -4446,6 +4446,42 @@ paths:
       - queue
       x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
         \ #id.toString()"
+  /v1/events:
+    get:
+      operationId: EventsController_stream
+      parameters:
+      - in: query
+        name: topics
+        required: false
+        schema:
+          type: string
+      - in: header
+        name: Last-Event-ID
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseEmitter"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - realtime
+      x-required-permission: authenticated
   /v1/nursing/activity/today:
     get:
       operationId: NursingController_activityToday
@@ -16391,6 +16427,12 @@ components:
           type: integer
           format: int64
         visitCount:
+          type: integer
+          format: int64
+    SseEmitter:
+      type: object
+      properties:
+        timeout:
           type: integer
           format: int64
     StaffInviteRequest:

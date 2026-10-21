@@ -276,6 +276,7 @@ export const SessionActionRequestSchema = z.object({ reasonCode: z.string().opti
 export const SessionResponseSchema = z.object({ current: z.boolean().optional(), device: z.string().optional(), id: z.string().optional(), ip: z.string().optional(), lastSeenAt: z.string().optional() });
 export const SetupChecklistItemResponseSchema = z.object({ doneAt: z.string().optional(), skippedAt: z.string().optional(), status: z.string().optional(), step: z.string().optional() });
 export const SourceBreakdownResponseSchema = z.object({ revenue: z.number().optional(), source: z.string().optional(), untaggedCount: z.number().int().optional(), visitCount: z.number().int().optional() });
+export const SseEmitterSchema = z.object({ timeout: z.number().int().optional() });
 export const StaffInviteRequestSchema = z.object({ departmentId: z.string().optional(), email: z.string().min(1), mobilePhone: z.string().min(1), name: z.string().min(1), roleId: z.string(), scope: z.string().optional() });
 export const StaffResponseSchema = z.object({ clinician: z.boolean().optional(), departmentId: z.string().optional(), email: z.string().optional(), emailVerified: z.boolean().optional(), fieldGrants: z.array(z.string()).optional(), id: z.string().optional(), lastSeenAt: z.string().optional(), loginFactors: z.array(z.string()).optional(), loginMethod: z.string().optional(), mobilePhone: z.string().optional(), mobileVerified: z.boolean().optional(), name: z.string().optional(), professionalRegistrationNo: z.string().optional(), roleId: z.string().optional(), scope: z.string().optional(), status: z.string().optional() });
 export const StaffInviteResponseSchema = z.object({ inviteToken: z.string().optional(), staff: StaffResponseSchema.optional() });
@@ -446,6 +447,7 @@ export const operationSchemas = {
   ScheduleController_addWorkingHours: { body: WorkingHoursWriteRequestSchema, response: WorkingHoursResponseSchema },
   ScheduleController_updateWorkingHours: { body: WorkingHoursWriteRequestSchema, response: WorkingHoursResponseSchema },
   ScheduleController_deleteWorkingHours: {  },
+  EventsController_stream: { response: SseEmitterSchema },
   NursingController_activityToday: { response: z.array(ActivityEntryResponseSchema) },
   NursingController_orderAdministration: { body: AdministrationOrderRequestSchema, response: AdministrationOrderResponseSchema },
   NursingController_administrationOrdersToday: { response: z.array(AdministrationOrderResponseSchema) },
