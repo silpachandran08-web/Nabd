@@ -14,7 +14,7 @@ const entry = (n, status, over = {}) => ({
 const patient = (id) => ({ id, mrn: `M-${id}`, name: `Pat ${id}`, phone: '', dob: '1990-01-01', gender: 'female', status: 'active', allergies: [], chronicConditions: [], activePackages: 0, lastVisitAt: null });
 const note = (n, text) => ({ id: `n${n}`, queueEntryId: `q${n}`, patientId: `p${n}`, doctorId: DOC, subjective: text, objective: '', assessment: '', plan: '', diagnosis: '', status: 'draft', signedAt: null, updatedAt: '2026-10-21T08:00:00Z' });
 const json = (route, body, status = 200) => route.fulfill({ status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body) });
-const dataReqs = (log) => log.requests.filter((r) => !/^\/(setup\/|schedule\/day)/.test(r.path));
+const dataReqs = (log) => log.requests.filter((r) => !/^\/(setup\/|schedule\/day|client-telemetry)/.test(r.path));
 const count = (log, re, method = 'GET') => log.requests.filter((r) => r.method === method && re.test(r.path)).length;
 const noOverflow = (page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 const cleanConsole = (log) => [...log.pageErrors, ...log.console.filter((x) => !/Failed to load resource|ERR_ABORTED|preloaded using link preload/.test(x))];
@@ -60,7 +60,7 @@ async function open(path, s, { perms = DOCTOR, viewport, wait = 400 } = {}) {
   const appts = Array.from({ length: 40 }, (_, i) => ({ id: `a${i + 1}`, patientId: `ap${i + 1}`, doctorId: DOC, startTime: NOW, endTime: NOW, status: 'booked', isFollowUp: false }));
   const { page, browser, log, headers } = await open('/my-day', { queue, appts }, { wait: 800 });
   const reqs = dataReqs(log);
-  check('AC1 My Day (30 queue + 40 appointments) makes <= 6 data requests', reqs.length <= 6, `${reqs.length}: ${reqs.map((r) => r.path.slice(0, 40)).join(' | ')}`);
+  check('AC1 My Day (30 queue + 40 appointments) makes <= 7 data requests (6 + ACC-015 GET /doctors/{id}/session)', reqs.length <= 7, `${reqs.length}: ${reqs.map((r) => r.path.slice(0, 90)).join(' | ')}`);
   const batch = log.requests.filter((r) => /^\/patients\/batch/.test(r.path));
   check('AC1 exactly one batched patient call carrying all 70 distinct patients', batch.length === 1 && decodeURIComponent(batch[0].path).split('ids=')[1].split(',').length === 70, `calls=${batch.length}`);
   check('AC1 zero per-patient GET /patients/{id}', count(log, /^\/patients\/[^/?]+$/) === 0);
