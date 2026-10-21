@@ -1,0 +1,73 @@
+# lang<TAB>body<TAB>phrase that must be reported (COM-014 forbidden-field catalogue)
+en	Hi {{1}}, your HbA1c result is ready.	HbA1c result
+en	Your diagnosis is available	diagnosis
+en	Your blood test is ready	blood test
+en	Your lab report is ready	lab report
+en	Take your tablet at 8	tablet
+en	Your prescription is ready	prescription
+en	Your pregnancy visit	pregnancy
+en	HIV follow up	HIV
+en	Mental health review	Mental health
+en	Your MRI is booked	MRI
+en	Your biopsy slot	biopsy
+en	Cancer clinic reminder	Cancer
+en	Diabetes check	Diabetes
+en	Your blood pressure was high	blood pressure
+en	RESULTS ready	RESULTS
+en	Your d​iagnosis is ready	diagnosis
+en	Your medicine is ready	medicine
+en	Your x-ray is ready	x-ray
+en	Abortion counselling slot	Abortion
+en	Hi {{1}}, your glucose reading	glucose
+en	Take penicillin twice a day	penicillin
+en	Your amoxil refill is due	amoxil
+hi	आपका निदान तैयार है	निदान
+hi	आपकी जांच रिपोर्ट आ गई	रिपोर्ट
+hi	परिणाम तैयार हैं	परिणाम
+hi	दवा लेने का समय	दवा
+hi	आपकी गर्भावस्था की मुलाकात	गर्भावस्था
+hi	एचआईवी परामर्श	एचआईवी
+hi	कैंसर क्लिनिक	कैंसर
+hi	मधुमेह की मुलाकात	मधुमेह
+hi	मानसिक स्वास्थ्य	मानसिक
+hi	रक्त जांच तैयार	रक्त जांच
+hi	इंजेक्शन का समय	इंजेक्शन
+hi	सर्जरी की तारीख	सर्जरी
+hi	आपका HbA1c परिणाम	परिणाम
+kn	ನಿಮ್ಮ ರೋಗನಿರ್ಣಯ ಸಿದ್ಧವಾಗಿದೆ	ರೋಗನಿರ್ಣಯ
+kn	ಫಲಿತಾಂಶ ಸಿದ್ಧವಾಗಿದೆ	ಫಲಿತಾಂಶ
+kn	ನಿಮ್ಮ ವರದಿ ಬಂದಿದೆ	ವರದಿ
+kn	ಔಷಧ ತೆಗೆದುಕೊಳ್ಳುವ ಸಮಯ	ಔಷಧ
+kn	ಮಾತ್ರೆ ತೆಗೆದುಕೊಳ್ಳಿ	ಮಾತ್ರೆ
+kn	ಗರ್ಭ ಭೇಟಿ	ಗರ್ಭ
+kn	ಎಚ್ಐವಿ ಸಲಹೆ	ಎಚ್ಐವಿ
+kn	ಕ್ಯಾನ್ಸರ್ ಕ್ಲಿನಿಕ್	ಕ್ಯಾನ್ಸರ್
+kn	ಮಧುಮೇಹ ಭೇಟಿ	ಮಧುಮೇಹ
+kn	ಮಾನಸಿಕ ಆರೋಗ್ಯ	ಮಾನಸಿಕ
+kn	ರಕ್ತ ಪರೀಕ್ಷೆ ಸಿದ್ಧ	ರಕ್ತ ಪರೀಕ್ಷೆ
+kn	ಶಸ್ತ್ರಚಿಕಿತ್ಸೆ ದಿನಾಂಕ	ಶಸ್ತ್ರಚಿಕಿತ್ಸೆ
+te	మీ రోగ నిర్ధారణ సిద్ధంగా ఉంది	రోగ నిర్ధారణ
+te	ఫలితం సిద్ధంగా ఉంది	ఫలితం
+te	మీ నివేదిక వచ్చింది	నివేదిక
+te	మందు వేసుకునే సమయం	మందు
+te	మాత్ర వేసుకోండి	మాత్ర
+te	గర్భం సందర్శన	గర్భం
+te	హెచ్ఐవి సలహా	హెచ్ఐవి
+te	క్యాన్సర్ క్లినిక్	క్యాన్సర్
+te	మధుమేహం సందర్శన	మధుమేహం
+te	మానసిక ఆరోగ్యం	మానసిక
+te	రక్త పరీక్ష సిద్ధం	రక్త పరీక్ష
+te	శస్త్రచికిత్స తేదీ	శస్త్రచికిత్స
+ar	تشخيصك جاهز	تشخيص
+ar	نتيجة الفحص جاهزة	نتيجة
+ar	تقريرك جاهز	تقرير
+ar	موعد الدواء	دواء
+ar	حبوب الصباح	حبوب
+ar	موعد الحقنة	حقنة
+ar	زيارة المرأة الحامل	حامل
+ar	عيادة السرطان	سرطان
+ar	متابعة السكري	سكري
+ar	الصحة النفسية	نفسي
+ar	فحص دم جاهز	فحص دم
+ar	موعد الأشعة	أشعة
+ar	موعد دَوَاء اليوم	دواء

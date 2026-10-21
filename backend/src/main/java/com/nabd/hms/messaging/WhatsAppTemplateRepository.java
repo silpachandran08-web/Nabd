@@ -15,7 +15,7 @@ class WhatsAppTemplateRepository {
 
     record Template(UUID id, String name, String metaName, String language, String category, String headerText,
                     String body, int paramCount, String status, String rejectionReason, String qualityRating,
-                    String metaTemplateId, Instant updatedAt) {
+                    String metaTemplateId, Instant updatedAt, String catalogueKey) {
 
         boolean sendable() {
             return "approved".equals(status) || "flagged".equals(status);
@@ -29,7 +29,7 @@ class WhatsAppTemplateRepository {
             rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("meta_name"), rs.getString("language"),
             rs.getString("category"), rs.getString("header_text"), rs.getString("body"), rs.getInt("param_count"),
             rs.getString("status"), rs.getString("rejection_reason"), rs.getString("quality_rating"),
-            rs.getString("meta_template_id"), rs.getTimestamp("updated_at").toInstant());
+            rs.getString("meta_template_id"), rs.getTimestamp("updated_at").toInstant(), rs.getString("catalogue_key"));
 
     private final JdbcTemplate jdbc;
 

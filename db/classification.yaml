@@ -1044,6 +1044,23 @@ schemas:
       registered: operational
       created_at: operational
       updated_at: operational
+    template_catalogue:
+      key: operational
+      language: operational
+      category: operational
+      body: operational
+      example_values: operational
+      slot_types: operational
+      buttons: operational
+      purpose: operational
+      version: operational
+    template_lint_rules:
+      id: operational
+      language: operational
+      kind: operational
+      pattern: operational
+      source: operational
+      version: operational
     tenant_lifecycle_events:
       id: operational
       tenant_id: operational
@@ -1145,6 +1162,12 @@ schemas:
       meta_template_id: operational
       created_at: operational
       updated_at: operational
+      catalogue_key: operational
+      catalogue_version: operational
+      buttons: operational
+      purpose: operational
+      submit_attempts: operational
+      next_attempt_at: operational
     workflow_definitions:
       id: operational
       code: operational
