@@ -29,6 +29,7 @@ UNTAGGABLE = {
     "aws_s3_bucket_replication_configuration", "aws_iam_role_policy", "aws_iam_role_policy_attachment",
     "aws_route53_record", "aws_db_instance_automated_backups_replication",
     "random_password", "aws_secretsmanager_secret_version",
+    "aws_cloudwatch_event_target", "aws_cloudwatch_log_resource_policy",
 }
 REGION = re.compile(r"\b(ap|me|eu|us|af|ca|sa|il|mx)-(north|south|east|west|central|northeast|southeast)-\d\b")
 CRED = re.compile(r"(access_key|secret_key|aws-access-key-id|aws-secret-access-key|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID)\s*[=:]"
