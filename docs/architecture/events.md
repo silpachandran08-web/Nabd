@@ -93,6 +93,8 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `billing.catalogue.changed.v1` | SetupService.addCharge / updateCharge | chargeHeadId, status |
 | `comms.notification.requested.v1` | NotificationService.request (COM-004), not when the patient has no consent | requestId, purpose, priority, channelPolicy, notBefore?, notAfter? |
 | `comms.notification.cancelled.v1` | NotificationService.cancelBySubject (appointment cancelled / rescheduled), consent withdrawn before the send | requestId, reason |
+| `comms.inbound.received.v1` | WhatsAppInboundProcessor, an inbound patient message routed to a clinic by its reply context (COM-001); never the text | inboundId, senderNumberId?, kind, buttonPayload?, replyToWamid?, receivedAt |
+| `comms.message.status_changed.v1` | WhatsAppInboundProcessor, a delivery callback that moved a message forward (COM-001; subject = message) | messageId, channel, status, errorCode?, at |
 
 The following producers belong to other stories and should publish against this catalogue when they land:
 

@@ -27,7 +27,9 @@ public enum DomainEventType {
     SESSION_REVOKED("iam.session.revoked.v1", "core/iam"),
     CATALOGUE_CHANGED("billing.catalogue.changed.v1", "core/billing"),
     NOTIFICATION_REQUESTED("comms.notification.requested.v1", "core/messaging"),
-    NOTIFICATION_CANCELLED("comms.notification.cancelled.v1", "core/messaging");
+    NOTIFICATION_CANCELLED("comms.notification.cancelled.v1", "core/messaging"),
+    INBOUND_RECEIVED("comms.inbound.received.v1", "core/messaging"),
+    MESSAGE_STATUS_CHANGED("comms.message.status_changed.v1", "core/messaging");
 
     private final String type;
     private final String source;

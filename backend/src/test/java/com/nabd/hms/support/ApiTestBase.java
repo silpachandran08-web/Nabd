@@ -129,6 +129,7 @@ public abstract class ApiTestBase {
         registry.add("app.internal.comms-token", () -> INTERNAL_COMMS_TOKEN); // COM-004 claim-check service token
         // tests call OutboxDispatcher.poll() themselves; the background poll would race them for the same rows
         registry.add("app.outbox.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE));
+        registry.add("app.whatsapp.inbound.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // COM-001: tests call WhatsAppInboundProcessor.poll() themselves
         registry.add("app.registry.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // OPS-007: tests call drain() themselves
         registry.add("app.registry.reconcile-cron", () -> "-"); // never fires; tests call runAll()
         // default 20/min is realistic for one browser, not for a suite of HTTP calls from one loopback IP

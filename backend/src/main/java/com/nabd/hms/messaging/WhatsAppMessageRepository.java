@@ -12,7 +12,7 @@ class WhatsAppMessageRepository {
 
     /** templateStatus is the template's status right now, not when queued — null for OTP-style sends. */
     record Message(UUID id, UUID patientId, String toPhone, String templateName, String language,
-                   String paramsJson, String status, String templateStatus) {
+                   String paramsJson, String status, String templateStatus, String templateKey, String templateCategory) {
     }
 
     private final JdbcTemplate jdbc;
@@ -33,14 +33,15 @@ class WhatsAppMessageRepository {
      * outbox event (one with an expired lease) serialize here and the second sees the first one's result. */
     Optional<Message> findForUpdate(UUID id) {
         return jdbc.query("""
-                SELECT m.*, t.status AS template_status FROM whatsapp_messages m
+                SELECT m.*, t.status AS template_status, t.name AS template_key, t.category AS template_category FROM whatsapp_messages m
                 LEFT JOIN whatsapp_templates t ON t.id = m.template_id
                 WHERE m.id = ?
                 FOR UPDATE OF m
                 """, (rs, i) -> new Message(
                 rs.getObject("id", UUID.class), rs.getObject("patient_id", UUID.class), rs.getString("to_phone"),
                 rs.getString("template_name"), rs.getString("language"), rs.getString("params"),
-                rs.getString("status"), rs.getString("template_status")), id).stream().findFirst();
+                rs.getString("status"), rs.getString("template_status"), rs.getString("template_key"),
+                rs.getString("template_category")), id).stream().findFirst();
     }
 
     /** Consents are append-only (a withdrawal is its own newer row — see PatientRepository), so the

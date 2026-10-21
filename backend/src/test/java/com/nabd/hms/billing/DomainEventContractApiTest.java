@@ -271,6 +271,9 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.TENANT_REGION_PINNED.type()); // published by provisioning go-live: Ops061RegionsApiTest
         expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type()); // COM-004: produced by NotificationService, contract-tested in NotificationContractApiTest
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
+        // COM-001: produced by the WhatsApp webhook processor, not over this HTTP flow; WhatsAppInboxApiTest covers the producer
+        expected.remove(DomainEventType.INBOUND_RECEIVED.type());
+        expected.remove(DomainEventType.MESSAGE_STATUS_CHANGED.type());
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

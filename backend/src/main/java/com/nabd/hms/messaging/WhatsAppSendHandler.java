@@ -36,9 +36,11 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     private final ObjectMapper objectMapper;
     private final TenantScope tenantScope;
     private final int inFlightSeconds;
+    private final OptOutRegistry optOut;
 
     WhatsAppSendHandler(WhatsAppMessageRepository repo, WhatsAppClient client, ObjectMapper objectMapper,
-                        TenantScope tenantScope, OutboxProperties outbox) {
+                        TenantScope tenantScope, OutboxProperties outbox, OptOutRegistry optOut) {
+        this.optOut = optOut;
         this.repo = repo;
         this.client = client;
         this.objectMapper = objectMapper;
@@ -59,7 +61,7 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     @Override
     public void handle(OutboxEvent event) throws Exception {
         UUID id = UUID.fromString(objectMapper.readTree(event.payloadJson()).path("messageId").asString());
-        WhatsAppMessageRepository.Message msg = inTx(event, () -> claimForSend(id));
+        WhatsAppMessageRepository.Message msg = inTx(event, () -> claimForSend(id, event.tenantId()));
         if (msg == null) {
             return;
         }
@@ -87,7 +89,7 @@ class WhatsAppSendHandler implements OutboxEventHandler {
     }
 
     /** Runs in the short first transaction. Returns the message to send, or null when there is nothing to send. */
-    private WhatsAppMessageRepository.Message claimForSend(UUID id) {
+    private WhatsAppMessageRepository.Message claimForSend(UUID id, UUID tenantId) {
         WhatsAppMessageRepository.Message msg = repo.findForUpdate(id).orElse(null); // OPS-014: row lock, see findForUpdate
         if (msg == null || !("queued".equals(msg.status()) || "sending".equals(msg.status()))) {
             return null;
@@ -104,8 +106,22 @@ class WhatsAppSendHandler implements OutboxEventHandler {
             repo.markBlocked(id, "no active messaging consent");
             return null;
         }
+        if (!isOptOutConfirmation(msg) && optedOut(tenantId, msg)) {
+            repo.markBlocked(id, "recipient opted out"); // COM-002: STOP by phone, also for sends with no patient record
+            return null;
+        }
         repo.markSending(id);
         return msg;
+    }
+
+    /** The confirmations of an opt-out / opt-in are the one message allowed to an opted-out number (utility, Meta policy). */
+    private static boolean isOptOutConfirmation(WhatsAppMessageRepository.Message msg) {
+        return OptOutService.CONFIRM_STOP.equals(msg.templateKey()) || OptOutService.CONFIRM_START.equals(msg.templateKey());
+    }
+
+    private boolean optedOut(UUID tenantId, WhatsAppMessageRepository.Message msg) {
+        return optOut.isSuppressed(tenantId, msg.toPhone(), OptOutRegistry.MESSAGING)
+                || ("MARKETING".equals(msg.templateCategory()) && optOut.isSuppressed(tenantId, msg.toPhone(), OptOutRegistry.MARKETING));
     }
 
     private void requeue(OutboxEvent event, UUID id) {

@@ -358,13 +358,16 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
                 .containsEntry("staffId", other.id().toString()).containsEntry("reasonCode", "role_changed").containsEntry("scope", "all_sessions");
         seen.addAll(types(evs));
 
-        // every type minus the one without a business action (doctor_status, see the known-defect test) and the one that
-        // provisioning go-live publishes (region_pinned, OPS-061: Ops061RegionsApiTest)
+        // every type minus the one without a business action (doctor_status, see the known-defect test) and the ones produced
+        // outside this HTTP flow: region_pinned (OPS-061, Ops061RegionsApiTest), notification.* (COM-004, NotificationContractApiTest),
+        // inbound.received and message.status_changed (COM-001, WhatsAppInboxApiTest)
         Set<String> expected = Arrays.stream(DomainEventType.values()).map(DomainEventType::type).collect(Collectors.toCollection(TreeSet::new));
         expected.remove("scheduling.doctor_status.changed.v1");
         expected.remove("organization.tenant.region_pinned.v1");
-        expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type()); // COM-004: produced by NotificationService, contract-tested in NotificationContractApiTest
+        expected.remove(DomainEventType.NOTIFICATION_REQUESTED.type());
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
+        expected.remove("comms.inbound.received.v1");
+        expected.remove("comms.message.status_changed.v1");
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

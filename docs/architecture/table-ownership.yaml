@@ -26,7 +26,7 @@ modules:
     owns: [break_glass_alerts, break_glass_grants, login_attempts, mfa_recovery_codes, otp_requests, otp_send_counters, owner_mfa_recovery_codes, role_delegations, roles, session_cache_revocations, sessions, staff, staff_clinician_review]
     reads: []
   messaging:
-    owns: [notification_requests, whatsapp_messages, whatsapp_templates]
+    owns: [messaging_suppressions, notification_requests, whatsapp_inbound_events, whatsapp_messages, whatsapp_templates]
     reads: [consents, patients]  # COM-004: consent check and recipient phone; replaced by patient.api.ConsentRegistry (IDC-002) when it lands
   nursing:
     owns: [administration_orders, administration_records, procedure_orders, vaccine_records]
