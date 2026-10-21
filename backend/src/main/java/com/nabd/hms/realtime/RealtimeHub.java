@@ -209,7 +209,8 @@ public class RealtimeHub {
     }
 
     /** Every 25 s: heartbeat to every stream (proxies keep the connection), close streams whose token has expired. */
-    @Scheduled(fixedDelayString = "${app.realtime.heartbeat-ms:25000}") // no @SchedulerLock: every pod serves its own connections
+    // OPS-013: no @SchedulerLock on purpose: every pod serves its own connections
+    @Scheduled(fixedDelayString = "${app.realtime.heartbeat-ms:25000}")
     public void heartbeat() {
         Instant now = clock.instant();
         String data = json.createObjectNode().put("type", "heartbeat").put("id", "hb").put("v", now.toEpochMilli()).toString();

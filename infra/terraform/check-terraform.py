@@ -73,7 +73,7 @@ def check_pooler(tf_dir, rtype, body, where, known, errors):
             n = as_int(body.get(k), known)
             if n is None or n < 2:
                 errors.append(f"pooler: {where} needs {k} >= 2 (PgBouncer HA, OPS-055)")
-    if rtype == "aws_lb" and (body.get("internal") is not True or str(body.get("load_balancer_type")).strip('"') != "network"):
+    if rtype == "aws_lb" and where.endswith("aws_lb.pooler") and (body.get("internal") is not True or str(body.get("load_balancer_type")).strip('"') != "network"):
         errors.append(f"pooler: {where} must be an internal network load balancer")
     if rtype == "aws_launch_template":
         if "required" not in str(body.get("metadata_options", "")):
@@ -84,7 +84,8 @@ def check_pooler(tf_dir, rtype, body, where, known, errors):
         errors.append(f"pooler: {where} must pin max_connections (pool sizes are checked against it)")
     if rtype == "aws_db_instance" and not body.get("max_allocated_storage"):
         errors.append(f"pooler: {where} needs max_allocated_storage (storage autoscaling)")
-    if rtype == "aws_security_group" and "0.0.0.0/0" in str(body.get("ingress", "")):
+    # the one public door is the OPS-056 edge (edge_*.tf); cell.rego holds it to 443 and the WAF
+    if rtype == "aws_security_group" and "0.0.0.0/0" in str(body.get("ingress", "")) and "/edge_" not in "/" + where:
         errors.append(f"safety: {where} opens ingress to the internet")
 
 
