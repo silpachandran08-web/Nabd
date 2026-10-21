@@ -32,8 +32,9 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "staging"
-  dns_zone    = "test.cells.nabd.internal"
+  pgbouncer_ami_id = "ami-0123456789abcdef0"
+  environment      = "staging"
+  dns_zone         = "test.cells.nabd.internal"
 }
 
 run "in_cell_mumbai_with_hyderabad_dr" {

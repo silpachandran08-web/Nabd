@@ -1,0 +1,128 @@
+{
+ "resource_changes": [
+  {
+   "address": "aws_db_instance.this",
+   "mode": "managed",
+   "type": "aws_db_instance",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "publicly_accessible": false,
+     "storage_encrypted": true,
+     "backup_retention_period": 35,
+     "deletion_protection": true,
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "phi"
+     },
+     "multi_az": true,
+     "allocated_storage": 500,
+     "max_allocated_storage": 2048
+    }
+   }
+  },
+  {
+   "address": "aws_db_parameter_group.this",
+   "mode": "managed",
+   "type": "aws_db_parameter_group",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "phi"
+     },
+     "parameter": [
+      {
+       "name": "max_connections",
+       "value": "200"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "address": "aws_autoscaling_group.pooler",
+   "mode": "managed",
+   "type": "aws_autoscaling_group",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "name": "nabd-in-prod-pgbouncer",
+     "min_size": 2
+    }
+   }
+  },
+  {
+   "address": "aws_lb.pooler",
+   "mode": "managed",
+   "type": "aws_lb",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "name": "nabd-in-prod-pooler",
+     "internal": true,
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "network"
+     }
+    }
+   }
+  },
+  {
+   "address": "aws_launch_template.pooler",
+   "mode": "managed",
+   "type": "aws_launch_template",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "name_prefix": "nabd-in-prod-pgbouncer-",
+     "metadata_options": [
+      {
+       "http_tokens": "required"
+      }
+     ],
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "network"
+     }
+    }
+   }
+  },
+  {
+   "address": "aws_cloudwatch_metric_alarm.pool_wait",
+   "mode": "managed",
+   "type": "aws_cloudwatch_metric_alarm",
+   "change": {
+    "actions": [
+     "create"
+    ],
+    "after": {
+     "metric_name": "AvgWaitTimeMs",
+     "threshold": 100,
+     "period": 60,
+     "evaluation_periods": 5,
+     "tags": {
+      "cell": "in",
+      "service": "nabd-core",
+      "data_class": "ops"
+     }
+    }
+   }
+  }
+ ]
+}

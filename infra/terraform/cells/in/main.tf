@@ -13,6 +13,12 @@ variable "environment" { type = string }
 variable "vpc_cidr" { type = string }
 variable "db_instance_class" { type = string }
 variable "dns_zone" { type = string }
+variable "pgbouncer_ami_id" {
+  type    = string
+  default = "" # set after the AMI bake (infra/pgbouncer/AMI.md); empty fails the plan on purpose
+}
+variable "db_allocated_storage_gb" { type = number }
+variable "db_max_allocated_storage_gb" { type = number }
 
 # No credentials here: CI gets short-lived ones via GitHub OIDC (bootstrap/aws), operators via SSO.
 provider "aws" {
@@ -38,6 +44,11 @@ module "cell" {
   vpc_cidr          = var.vpc_cidr
   db_instance_class = var.db_instance_class
   dns_zone          = var.dns_zone
+
+  # OPS-055
+  pgbouncer_ami_id            = var.pgbouncer_ami_id
+  db_allocated_storage_gb     = var.db_allocated_storage_gb
+  db_max_allocated_storage_gb = var.db_max_allocated_storage_gb
 }
 
 output "cell" { value = module.cell.cell }
@@ -48,3 +59,4 @@ output "kms" { value = module.cell.kms }
 output "dns" { value = module.cell.dns }
 output "backup" { value = module.cell.backup }
 output "dr" { value = module.cell.dr }
+output "data_tier" { value = module.cell.data_tier }

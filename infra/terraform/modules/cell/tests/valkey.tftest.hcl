@@ -35,13 +35,14 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "prod"
-  dns_zone    = "valkey.cells.nabd.internal"
-  cell        = "in"
-  country     = "IN"
-  region      = "ap-south-1"
-  dr_region   = "ap-south-2"
-  azs         = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
+  pgbouncer_ami_id = "ami-0123456789abcdef0"
+  environment      = "prod"
+  dns_zone         = "valkey.cells.nabd.internal"
+  cell             = "in"
+  country          = "IN"
+  region           = "ap-south-1"
+  dr_region        = "ap-south-2"
+  azs              = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
 }
 
 run "in_cell_valkey_is_tls_only_encrypted_and_replicated_across_zones" {
