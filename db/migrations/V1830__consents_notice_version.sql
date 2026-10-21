@@ -32,13 +32,16 @@ ALTER TABLE consents
   ADD COLUMN witness_staff_id  uuid REFERENCES staff(id),
   ADD COLUMN evidence          jsonb;
 ALTER TABLE consents ADD CONSTRAINT consents_channel_check
-  CHECK (channel IS NULL OR channel IN ('DESK', 'WHATSAPP', 'ASSISTED', 'PORTAL'));
+  CHECK (channel IS NULL OR channel IN ('DESK', 'WHATSAPP', 'ASSISTED', 'PORTAL')) NOT VALID;
 ALTER TABLE consents ADD CONSTRAINT consents_notice_pair_check
-  CHECK ((notice_version IS NULL) = (language IS NULL));
+  CHECK ((notice_version IS NULL) = (language IS NULL)) NOT VALID;
 -- MATCH SIMPLE: rows without a notice (legacy, withdrawals) skip the check; any row that names one joins exactly one notice.
 ALTER TABLE consents ADD CONSTRAINT consents_notice_fk
   FOREIGN KEY (tenant_id, notice_version, language) REFERENCES privacy_notices (tenant_id, version, language);
 
 ALTER TABLE consents DROP CONSTRAINT consents_consent_type_check;
 ALTER TABLE consents ADD CONSTRAINT consents_consent_type_check
-  CHECK (consent_type IN ('treatment', 'data_processing', 'messaging', 'guardian_access', 'marketing'));
+  CHECK (consent_type IN ('treatment', 'data_processing', 'messaging', 'guardian_access', 'marketing')) NOT VALID;
+ALTER TABLE consents VALIDATE CONSTRAINT consents_channel_check;
+ALTER TABLE consents VALIDATE CONSTRAINT consents_notice_pair_check;
+ALTER TABLE consents VALIDATE CONSTRAINT consents_consent_type_check;
