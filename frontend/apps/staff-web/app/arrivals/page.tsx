@@ -303,14 +303,14 @@ function ArrivalsPageInner() {
     setNewPatientMode(false);
     setDuplicateCandidates([]);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (value.trim().length < 2) {
+    if (value.trim().length < 3) { // OPS-009: the API answers 400 QUERY_TOO_SHORT below 3 characters
       setSearchResults([]);
       return;
     }
     searchTimer.current = setTimeout(async () => {
       const page = await api.get<PatientPage>(`/patients?q=${encodeURIComponent(value.trim())}`).catch(() => null);
-      if (page) setSearchResults(page.data ?? []);
-    }, 300);
+      setSearchResults(page?.data ?? []);
+    }, 150);
   }
 
   function openModal() {
@@ -902,12 +902,12 @@ function ArrivalsPageInner() {
                 <div className={styles.searchResults}>
                   {searchResults.map((p) => (
                     <button type="button" key={p.id} className={styles.searchResultRow} onClick={() => { setSelectedPatient(p); setSearchResults([]); }}>
-                      {p.name} · {p.phone} · {p.mrn}
+                      {p.name} · {p.phone} · {p.mrn}{p.matchedOn && <span style={{ opacity: 0.7 }}> · matched on {p.matchedOn}</span>}
                     </button>
                   ))}
                 </div>
               )}
-              {grants.patientsCreate && !selectedPatient && patientQuery.trim().length >= 2 && searchResults.length === 0 && !newPatientMode && (
+              {grants.patientsCreate && !selectedPatient && patientQuery.trim().length >= 3 && searchResults.length === 0 && !newPatientMode && (
                 <button type="button" className={styles.linkBtn} style={{ marginTop: "8px" }} onClick={() => setNewPatientMode(true)}>
                   No match — register a new patient
                 </button>

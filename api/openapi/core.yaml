@@ -15097,6 +15097,8 @@ components:
           format: uuid
         isMinor:
           type: boolean
+        matchedOn:
+          type: string
         mrn:
           type: string
         name:

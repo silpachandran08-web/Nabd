@@ -812,6 +812,9 @@ schemas:
       guardian_review_kept_at: operational
       guardian_review_kept_by: operational
       phone_invalid: pii
+      phone_digits: pii
+      phone_last10: pii
+      name_search: pii
     pharmacy_settings:
       tenant_id: operational
       mode: operational
