@@ -1,0 +1,14 @@
+# OPS-026: Loki, S3 chunks in the cell's log bucket (SSE-KMS by bucket default). 180 d = CERT-In (IN). Audit-relevant streams are ALSO archived
+# object-locked by the Collector (awss3/audit_logs); Loki itself can only expire, so it is not the immutable copy.
+auth_enabled: false
+server: { http_listen_port: 3100 }
+common:
+  path_prefix: /var/loki
+  replication_factor: 1
+  ring: { kvstore: { store: inmemory } }
+  storage: { s3: { bucketnames: "${OBS_LOG_BUCKET}", region: "${OBS_REGION}", s3forcepathstyle: false, sse: { type: SSE-KMS, kms_key_id: "${OBS_KMS_KEY_ARN}" } } }
+schema_config:
+  configs: [{ from: "2026-01-01", store: tsdb, object_store: s3, schema: v13, index: { prefix: index_, period: 24h } }]
+limits_config:
+  retention_period: 4320h   # 180 d
+compactor: { working_directory: /var/loki/compactor, retention_enabled: true, delete_request_store: s3 }

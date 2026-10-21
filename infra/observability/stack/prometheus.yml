@@ -1,0 +1,19 @@
+# OPS-026/027: per-cell Prometheus. Retention flags (start args, not file settings):
+#   --storage.tsdb.retention.time=395d --web.enable-remote-write-receiver --web.enable-lifecycle
+# Shortcut: plain Prometheus does not downsample; the "13 months downsampled" target needs Thanos/Mimir compaction (open, see report).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 30s
+  external_labels: { cell: "${CELL}", region: "${CELL_REGION}" }   # set by the deploy; one Prometheus per cell, no cross-cell federation
+rule_files:
+  - /etc/prometheus/rules/*.yml
+alerting:
+  alertmanagers:
+    - static_configs: [{ targets: ["alertmanager.obs.cell.internal:9093"] }]
+scrape_configs:
+  - job_name: core
+    metrics_path: /actuator/prometheus
+    scheme: https
+    dns_sd_configs: [{ names: ["core.cell.internal"], type: A, port: 8443 }]
+  - job_name: otel-collector
+    static_configs: [{ targets: ["otel-collector.obs.cell.internal:8888"] }]

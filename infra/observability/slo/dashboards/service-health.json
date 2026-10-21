@@ -1,0 +1,234 @@
+{
+ "editable": false,
+ "panels": [
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "reqps"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 0
+   },
+   "id": 1,
+   "targets": [
+    {
+     "expr": "sum(rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[5m]))",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Request rate",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 0
+   },
+   "id": 2,
+   "targets": [
+    {
+     "expr": "sum(rate(http_server_requests_seconds_count{status=~\"5..\",uri!~\"/actuator.*\"}[5m])) / sum(rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[5m]))",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Error ratio (5xx)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 8
+   },
+   "id": 3,
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_requests_seconds_bucket{uri!~\"/actuator.*\"}[5m])))",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Latency p99",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 8
+   },
+   "id": 4,
+   "targets": [
+    {
+     "expr": "max(outbox_oldest_pending_age_seconds)",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Outbox oldest pending (s)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 16
+   },
+   "id": 5,
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(realtime_event_to_screen_seconds_bucket[5m])))",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "SSE connections / event-to-screen p95 (ACC-021, pending)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 16
+   },
+   "id": 6,
+   "targets": [
+    {
+     "expr": "waba_quality_rating",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "WhatsApp sender quality (1 red, 2 yellow, 3 green; Comms, pending)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 24
+   },
+   "id": 7,
+   "targets": [
+    {
+     "expr": "max by (group, stream) (consumer_lag_seconds)",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Consumer / read-model lag (s)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    }
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 12,
+    "x": 12,
+    "y": 24
+   },
+   "id": 8,
+   "targets": [
+    {
+     "expr": "sum(increase(nabd_telemetry_denylisted_spans_total[1h])) + sum(increase(nabd_telemetry_denylisted_logs_total[1h]))",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Telemetry dropped by PHI denylist",
+   "type": "stat"
+  }
+ ],
+ "refresh": "1m",
+ "schemaVersion": 39,
+ "tags": [
+  "nabd",
+  "ops-027"
+ ],
+ "time": {
+  "from": "now-28d",
+  "to": "now"
+ },
+ "title": "Nabd service health: RED, outbox, SSE, WhatsApp, read-model lag",
+ "uid": "nabd-service",
+ "version": 1
+}

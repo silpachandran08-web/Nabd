@@ -1,0 +1,23 @@
+# OPS-026/027: observability config checks (collector denylist and egress, retention, SLO rules, promtool unit tests, runbook links).
+name: observability
+on:
+  pull_request:
+    paths: ["infra/observability/**", "infra/terraform/modules/cell/aws/monitoring_slo_*", "infra/terraform/modules/cell/aws/variables_ops026.tf", "docs/runbooks/**", "scripts/ci/test_ops026_ops027.py", ".github/workflows/observability.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  PROMETHEUS_VERSION: "2.55.1"
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: promtool
+        run: |
+          curl -sSL "https://github.com/prometheus/prometheus/releases/download/v${PROMETHEUS_VERSION}/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" | tar -xz --strip-components=1 "prometheus-${PROMETHEUS_VERSION}.linux-amd64/promtool"
+          echo "PROMTOOL=$PWD/promtool" >> "$GITHUB_ENV"
+      - run: pip install python-hcl2 pyyaml && python3 -m unittest scripts.ci.test_ops026_ops027 && python3 infra/observability/verify_trace.py --selftest

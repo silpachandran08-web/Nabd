@@ -25,7 +25,7 @@ WORKFLOW = ROOT.parents[1] / ".github" / "workflows" / "infra.yml"
 # Resource types whose AWS schema has no `tags` argument.
 UNTAGGABLE = {
     "terraform_data", "aws_kms_alias", "aws_s3_bucket_public_access_block", "aws_s3_bucket_versioning",
-    "aws_s3_bucket_server_side_encryption_configuration", "aws_s3_bucket_object_lock_configuration",
+    "aws_s3_bucket_server_side_encryption_configuration", "aws_s3_bucket_object_lock_configuration", "aws_s3_bucket_lifecycle_configuration",
     "aws_s3_bucket_replication_configuration", "aws_iam_role_policy", "aws_iam_role_policy_attachment",
     "aws_route53_record", "aws_db_instance_automated_backups_replication",
     "random_password", "aws_secretsmanager_secret_version",

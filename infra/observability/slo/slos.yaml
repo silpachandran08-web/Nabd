@@ -1,0 +1,134 @@
+# OPS-027: SLO definitions as code (OpenSLO v1 shape, 28 d window). `python3 generate.py` turns this into slo.rules.yml and the Grafana dashboards;
+# CI fails if the generated files are stale. {{w}} in a query is replaced by each burn-rate window. One Prometheus per cell: no cell label in queries.
+# annotations.nabd.io/status: live = metric exists in Core today; pending = metric contract proposed here, emitter is another story (see report).
+# annotations.nabd.io/contract-target: DEC-36 is open, so dashboards draw the contract line next to the internal target.
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: staff-api-availability
+  displayName: Staff API availability
+  annotations: { nabd.io/service: core, nabd.io/status: live, nabd.io/contract-target: "99.5" }
+spec:
+  service: core
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(http_server_requests_seconds_count{status!~"5..",uri!~"/actuator.*"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: availability, target: 0.999 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: checkin-queue-latency
+  displayName: Check-in and queue actions under 500 ms
+  # Needs the 500ms histogram bucket: management.metrics.distribution.slo.http.server.requests in application.yml (added with OPS-027).
+  annotations: { nabd.io/service: core, nabd.io/status: live }
+spec:
+  service: core
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(http_server_requests_seconds_bucket{uri=~"/v1/queue.*",method!="GET",le="0.5"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(http_server_requests_seconds_count{uri=~"/v1/queue.*",method!="GET"}[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: under-500ms, target: 0.99 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: event-to-screen-2s
+  displayName: Event to screen under 2 s
+  # Emitter: ACC-021 (SSE). Proposed metric: realtime_event_to_screen_seconds{le} histogram (client-reported or server delivery lag).
+  annotations: { nabd.io/service: realtime, nabd.io/status: pending }
+spec:
+  service: realtime
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(realtime_event_to_screen_seconds_bucket{le="2"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(realtime_event_to_screen_seconds_count[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: under-2s, target: 0.95 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: event-to-screen-5s
+  displayName: Event to screen under 5 s
+  annotations: { nabd.io/service: realtime, nabd.io/status: pending }
+spec:
+  service: realtime
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(realtime_event_to_screen_seconds_bucket{le="5"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(realtime_event_to_screen_seconds_count[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: under-5s, target: 0.99 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: reminders-in-window
+  displayName: Reminders sent inside their window
+  # Emitter: Comms. Proposed counters: reminders_due_total, reminders_sent_in_window_total.
+  annotations: { nabd.io/service: comms, nabd.io/status: pending }
+spec:
+  service: comms
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(reminders_sent_in_window_total[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(reminders_due_total[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: in-window, target: 0.99 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: delay-broadcast-60s
+  displayName: Delay broadcast under 60 s
+  # Emitter: Comms. Proposed histogram: delay_broadcast_seconds{le}.
+  annotations: { nabd.io/service: comms, nabd.io/status: pending }
+spec:
+  service: comms
+  indicator:
+    spec:
+      ratioMetric:
+        counter: true
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum(rate(delay_broadcast_seconds_bucket{le="60"}[{{w}}]))' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'sum(rate(delay_broadcast_seconds_count[{{w}}]))' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: under-60s, target: 0.99 }]
+---
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: outbox-oldest-pending-30s
+  displayName: Outbox oldest pending under 30 s
+  # Gauge outbox_oldest_pending_age_seconds (OPS-014), sampled each minute: good = minutes at or under 30 s.
+  annotations: { nabd.io/service: core-worker, nabd.io/status: live }
+spec:
+  service: core-worker
+  indicator:
+    spec:
+      ratioMetric:
+        good:  { metricSource: { type: Prometheus, spec: { query: 'sum_over_time((max(outbox_oldest_pending_age_seconds) <= bool 30)[{{w}}:1m])' } } }
+        total: { metricSource: { type: Prometheus, spec: { query: 'count_over_time(max(outbox_oldest_pending_age_seconds)[{{w}}:1m])' } } }
+  timeWindow: [{ duration: 28d, isRolling: true }]
+  budgetingMethod: Occurrences
+  objectives: [{ displayName: under-30s, target: 0.99 }]

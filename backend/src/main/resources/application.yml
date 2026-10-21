@@ -73,6 +73,11 @@ management:
     web:
       exposure:
         include: health,prometheus
+  # OPS-027: the 500 ms / 2 s buckets the latency SLOs read (http_server_requests_seconds_bucket{le="0.5"}).
+  metrics:
+    distribution:
+      slo:
+        http.server.requests: 100ms,500ms,2s
   endpoint:
     health:
       probes:
