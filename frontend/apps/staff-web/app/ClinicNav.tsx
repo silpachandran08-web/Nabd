@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminOrdersQuery, prefix, queueQuery } from "./lib/query";
+import { useLiveTick } from "./lib/live";
 import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
 import { initials } from "@nabd/domain";
@@ -199,6 +200,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     void qc.refetchQueries({ queryKey: adminOrdersQuery().queryKey, type: "active" });
   }, [pathname, qc]);
 
+  const queueTick = useLiveTick(["queue"]); // FEF-020: a live queue message re-reads the My Day badge
   // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view).
   // The JWT subject is the staff id (AuthService.mintTokenPair); no queue:view = no badge.
   useEffect(() => {
@@ -218,7 +220,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       })
       .catch(() => {});
     return () => { cancelled = true; ctrl.abort(); };
-  }, [pathname, skip]);
+  }, [pathname, skip, queueTick]);
 
   // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
   useEffect(() => {

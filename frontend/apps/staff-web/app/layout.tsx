@@ -5,6 +5,7 @@ import "./globals.css";
 import AppShell from "./AppShell";
 import IdleLockGuard from "./IdleLockGuard";
 import { QueryProvider } from "./lib/query";
+import { LiveProvider } from "./lib/live";
 
 // DESIGN.md §2.1 — weights 400/500/600/700 only, Poppins is the only Latin family.
 const poppins = Poppins({
@@ -24,7 +25,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={poppins.variable}>
       <body>
         <IdleLockGuard>
-          <QueryProvider><AppShell>{children}</AppShell></QueryProvider>
+          <QueryProvider><LiveProvider><AppShell>{children}</AppShell></LiveProvider></QueryProvider>
         </IdleLockGuard>
       </body>
     </html>

@@ -6,6 +6,7 @@ import styles from "./topBar.module.css";
 import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./lib/session";
 import { can } from "./lib/permissions";
 import type { AppPermission } from "@nabd/api-client/types";
+import { useLiveStatus } from "./lib/live";
 import { API_BASE, FAIL_LIMIT, PROBE_MS, nextConn, watchApiFetch } from "./lib/connection";
 
 const SEARCH_INPUT_ID = "nb-global-search";
@@ -62,6 +63,7 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
 
   useEffect(() => watchApiFetch((e) => setConn((s) => nextConn(s, e))), []);
 
+  const live = useLiveStatus();
   const degraded = conn.fails >= FAIL_LIMIT;
   useEffect(() => {
     // While degraded nothing else may call the API, so probe; any non-5xx answer (even 404) proves it is reachable.
@@ -112,8 +114,12 @@ export default function TopBar({ collapsed, onToggleCollapse }: { collapsed: boo
     ? ["Offline", true, "Changes can't be saved until you reconnect."]
     : degraded
     ? ["Reconnecting", true, "The server isn't answering. Changes may not be saved."]
+    : live === "reconnecting"
+    ? ["Reconnecting", true, "Live updates are paused. This screen refreshes once a minute until the connection is back."]
     : conn.slow
     ? ["Slow connection", true, "The server is answering slowly. Wait for saves to finish."]
+    : live === "live"
+    ? ["Live", false, "Changes from other desks appear here within seconds."]
     : ["Online", false, ""];
 
   return (
