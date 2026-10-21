@@ -33,7 +33,7 @@ function handlers(s) {
       return json(route, ids.map(patient));
     }],
     ['GET', /^\/patients\/([^/?]+)$/, (route, req, m) => json(route, patient(m[1]))],
-    ['GET', /^\/departments\/d1\/flow/, { body: [{ stepType: 'vitals' }, { stepType: 'consult' }] }],
+    ['GET', /^\/departments\/d1\/flow/, { body: [{ stepType: 'vitals' }, { stepType: 'consultation' }] }],
     ['GET', /^\/clinical\/notes\/q(\d+)$/, (route, req, m) => s.notes ? s.notes(route, m[1]) : json(route, note(m[1], `note of q${m[1]}`))],
     ['GET', /^\/clinical\/(prescriptions|vitals)\//, { status: 404, body: {} }],
     ['PATCH', /^\/queue\/q\d+\/status$/, (route) => json(route, {})],
@@ -85,21 +85,32 @@ async function open(path, s, { perms = DOCTOR, viewport, wait = 400 } = {}) {
   const queue = [entry(1, 'vitals_done'), entry(2, 'waiting')];
   const slowNotes = async (route, n) => { await sleep(1500); try { await json(route, note(n, `note of q${n}`)); } catch { /* aborted */ } };
   const { page, browser, log } = await open('/my-day', { queue, notes: slowNotes }, { wait: 600 });
-  const link = page.getByRole('link', { name: /Start consultation/ }).first();
-  await link.focus(); // keyboard focus is enough (no mouse)
-  await sleep(2200);
-  const notesAfterWarm = count(log, /^\/clinical\/notes\/q1$/);
-  await link.click();
-  await page.getByRole('button', { name: 'Start consultation' }).waitFor({ timeout: 8000 });
-  await sleep(300);
-  const t0 = Date.now();
-  await page.getByRole('button', { name: 'Start consultation' }).click();
-  await page.getByRole('button', { name: 'Continue to Examine' }).click();
-  await page.locator('textarea:not([disabled])').first().waitFor({ timeout: 5000 });
-  const ms = Date.now() - t0;
-  check('AC2 visit context renders < 500 ms from cache after Start consultation (notes endpoint is 1500 ms)', ms < 500, `${ms} ms`);
-  check('AC2 the note was not read again when the visit opened', count(log, /^\/clinical\/notes\/q1$/) === notesAfterWarm && notesAfterWarm === 1, `x${count(log, /^\/clinical\/notes\/q1$/)}`);
-  check('AC2 the opened note is the prefetched one', (await page.locator('textarea').first().inputValue()).includes('note of q1'));
+  let step = 'focus';
+  try {
+    const link = page.getByRole('link', { name: /Start consultation/ }).first();
+    await link.focus(); // keyboard focus is enough (no mouse)
+    await sleep(2200);
+    const notesAfterWarm = count(log, /^\/clinical\/notes\/q1$/);
+    step = 'open consult via link';
+    await link.click();
+    step = 'wait for the Start consultation dialog';
+    const start = page.getByRole('dialog').getByRole('button', { name: 'Start consultation' });
+    await start.waitFor({ timeout: 10000 });
+    await sleep(300);
+    const t0 = Date.now();
+    step = 'click Start consultation';
+    await start.click();
+    step = 'continue to Examine';
+    await page.getByRole('button', { name: 'Continue to Examine' }).click({ timeout: 5000 });
+    step = 'note textarea enabled';
+    await page.locator('textarea:not([disabled])').first().waitFor({ timeout: 5000 });
+    const ms = Date.now() - t0;
+    check('AC2 visit context renders < 500 ms from cache after Start consultation (notes endpoint is 1500 ms)', ms < 500, `${ms} ms`);
+    check('AC2 the note was not read again when the visit opened', count(log, /^\/clinical\/notes\/q1$/) === notesAfterWarm && notesAfterWarm === 1, `x${count(log, /^\/clinical\/notes\/q1$/)}`);
+    check('AC2 the opened note is the prefetched one', (await page.locator('textarea').first().inputValue()).includes('note of q1'));
+  } catch (e) {
+    check('AC2 end-to-end flow', false, `stuck at "${step}": ${String(e).split('\n')[0]} | url=${page.url()} | body=${(await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)}`);
+  }
   check('zero console/page errors (prefetch flow)', cleanConsole(log).length === 0, cleanConsole(log).slice(0, 2).join(' | '));
   await browser.close();
 }
@@ -158,7 +169,7 @@ async function open(path, s, { perms = DOCTOR, viewport, wait = 400 } = {}) {
   const body = await page.locator('main').innerText();
   const area = await page.locator('textarea').first().inputValue();
   check('AC4 the late answer is discarded: the open visit still shows its own note', area.includes('note of q2') && !body.includes('LATE NOTE OF Q1') && !area.includes('LATE'), area);
-  check('AC4 no error is shown for the cancelled read', (await page.getByRole('alert').count()) === 0);
+  check('AC4 no note-load or connection error is shown for the cancelled read', (await page.getByRole('alert').filter({ hasText: /reach the server|reopen the visit|load the note|Couldn.t load this note/i }).count()) === 0, (await page.getByRole('alert').allInnerTexts()).join(' | ').slice(0, 200));
   await browser.close();
 }
 

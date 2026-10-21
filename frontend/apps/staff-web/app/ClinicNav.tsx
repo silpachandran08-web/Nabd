@@ -4,11 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminOrdersQuery, prefix, queueQuery } from "./lib/query";
+import { adminOrdersQuery, doctorQueueQuery, prefix, queueQuery } from "./lib/query";
 import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
 import { initials } from "@nabd/domain";
-import { decodeAccessToken, getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
+import { selfStaffId } from "./lib/doctorQueries";
+import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 // Same "waiting" bucket as the Arrivals page's own tab counts (arrivals/page.tsx bucketOf).
@@ -144,7 +145,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [showClinic, setShowClinic] = useState(false);
   const [plan, setPlan] = useState<{ plan: string | null; status: string; branchesUsed: number; branchesLimit: number } | null>(null);
   const [canReturnToWorkspaces, setCanReturnToWorkspaces] = useState(false);
-  const [myDayBadge, setMyDayBadge] = useState<Record<string, number>>({});
 
   // Escape closes the mobile More menu and hands focus back to its button.
   useEffect(() => {
@@ -184,9 +184,13 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // queue entries (queue:view) and today's administration orders not yet given (nursing:view).
   const priorityRows = useQuery({ ...queueQuery(true), enabled: nurseNav && perms.includes("queue:view") }).data;
   const adminRows = useQuery({ ...adminOrdersQuery(), enabled: nurseNav && perms.includes("nursing:view") }).data;
+  // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view). The JWT subject
+  // is the staff id (AuthService.mintTokenPair). FEF-016: the same query My Day and the consult queue read.
+  const me = skip ? "" : selfStaffId();
+  const myDayRows = useQuery({ ...doctorQueueQuery(me), enabled: !!me && isDoctorNav(perms) && perms.includes("queue:view") }).data;
   const count = <T,>(rows: T[] | undefined, keep: (r: T) => boolean) => (Array.isArray(rows) ? rows.filter(keep).length : undefined);
   const badges: Record<string, number | undefined> = {
-    ...myDayBadge,
+    [MY_DAY_HREF]: count(myDayRows, (r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status ?? "")),
     "/arrivals": count(queueRows, (r) => WAITING_STATUSES.includes(r.status ?? "")),
     "/billing": count(queueRows, (r) => r.status === "checkout_pending"),
     "nursing:priority": count(priorityRows, () => true),
@@ -198,27 +202,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     void qc.refetchQueries({ queryKey: prefix("queue"), type: "active" });
     void qc.refetchQueries({ queryKey: adminOrdersQuery().queryKey, type: "active" });
   }, [pathname, qc]);
-
-  // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view).
-  // The JWT subject is the staff id (AuthService.mintTokenPair); no queue:view = no badge.
-  useEffect(() => {
-    const perms = getPermissions();
-    if (skip || !isDoctorNav(perms) || !perms.includes("queue:view")) return;
-    const token = localStorage.getItem("nabd_access_token");
-    const me = token ? decodeAccessToken(token)?.sub : undefined;
-    if (!token || !me) return;
-    const ctrl = new AbortController();
-    let cancelled = false;
-    void fetch(`${API_BASE}/queue?doctorId=${encodeURIComponent(me)}`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
-      .then(async (res) => {
-        if (cancelled || !res.ok) return;
-        const rows: { status: string; doctorId?: string }[] = await res.json();
-        if (cancelled || !Array.isArray(rows)) return;
-        setMyDayBadge({ [MY_DAY_HREF]: rows.filter((r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status)).length });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; ctrl.abort(); };
-  }, [pathname, skip]);
 
   // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
   useEffect(() => {

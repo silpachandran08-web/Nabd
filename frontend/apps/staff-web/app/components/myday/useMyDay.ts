@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AppointmentPage as GAppointmentPage, AppointmentResponse, PageMeta, DoctorDelayResponse, DueConditionResponse, WaitEstimateResponse } from "@nabd/api-client/generated";
 import type { PatientSummary as PatientDetail, QueueEntry } from "@nabd/domain";
 import { can } from "../../lib/permissions";
 import { api, ApiError } from "../../lib/api";
-import { key } from "../../lib/query";
+import { doctorQueueQuery, key } from "../../lib/query";
 import { loadPatients, selfStaffId, type Need } from "../../lib/doctorQueries";
 import { clinicTimeZoneReady, clinicToday } from "../../lib/clinicTime";
 
@@ -37,6 +37,7 @@ const NO_SERVER = "Couldn't reach the server. Check your connection and try agai
 export function useMyDay() {
   const qc = useQueryClient();
   const selfId = selfStaffId();
+  const forceFresh = useRef(false); // set by Refresh: the queue is read again even if the sidebar badge just read it
   const q = useQuery({
     queryKey: key("my-day", { doctorId: selfId }),
     enabled: !!selfId,
@@ -46,9 +47,11 @@ export function useMyDay() {
         try { return { state: "ok", data: pick(await api.get<unknown>(path, { signal })) }; }
         catch (e) { if (signal.aborted) throw e; return { state: "unavailable" }; }
       };
+      const queueStale = forceFresh.current ? 0 : 2000;
+      forceFresh.current = false;
       const today = clinicToday(await clinicTimeZoneReady()); // the clinic's date, not the device's (FEF-011)
       const [entries, appointments, delay, wait, due] = await Promise.all([
-        api.get<QueueEntry[]>(`/queue?doctorId=${selfId}`, { signal }),
+        qc.fetchQuery({ ...doctorQueueQuery(selfId), staleTime: queueStale }) as Promise<QueueEntry[]>, // joins the sidebar badge's request
         part(`/appointments?doctorId=${selfId}&date=${today}&limit=100`, (j) => j as AppointmentPage),
         part(`/doctors/${selfId}/delay`, (j) => ((j as DoctorDelay[]).find((d) => d.active) ?? null)),
         part(`/queue/wait-estimate?doctorId=${selfId}`, (j) => j as WaitEstimate),
@@ -69,7 +72,12 @@ export function useMyDay() {
     },
   });
 
-  const reload = useCallback(async () => { await qc.cancelQueries({ queryKey: key("my-day", { doctorId: selfId }) }); await q.refetch(); }, [qc, q, selfId]);
+  // The newest Refresh wins (FEF-004): whatever is still in flight, including the queue read, is cancelled first.
+  const reload = useCallback(async () => {
+    forceFresh.current = true;
+    await Promise.all([qc.cancelQueries({ queryKey: key("my-day", { doctorId: selfId }) }), qc.cancelQueries({ queryKey: doctorQueueQuery(selfId).queryKey })]);
+    await q.refetch();
+  }, [qc, q, selfId]);
   const error = q.error ? (q.error instanceof ApiError ? "Couldn't load today's queue. Try again." : NO_SERVER) : null;
   return { data: q.data ?? null, loading: q.isPending, error, reload };
 }

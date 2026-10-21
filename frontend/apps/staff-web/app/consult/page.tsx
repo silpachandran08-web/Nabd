@@ -44,7 +44,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { STALE } from "@nabd/api-client/queries";
 import type { NoteAmendmentResponse, NoteResponse, StaffRosterEntry, TransferTargetResponse } from "@nabd/api-client/generated";
 import { api, ApiError } from "../lib/api";
-import { key } from "../lib/query";
+import { doctorQueueQuery, key, queueQuery } from "../lib/query";
 import { responseFetch } from "../lib/responseFetch";
 import { type Need, dropVisitReads, FRESH_MS, loadPatients, prefetchVisit, selfStaffId, visitIsWarm, visitReadKey, visitRead } from "../lib/doctorQueries";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
@@ -199,7 +199,7 @@ export default function ConsultPage() {
   // FEF-016: every consult call goes through the shared api client (token, refresh, timeout, retry, Idempotency-Key).
   const authedFetch = useCallback<AuthedFetch>(async (path, init) => {
     const res = await responseFetch(path, init);
-    if (init?.method && init.method !== "GET") dropVisitReads(qc);
+    if (init?.method && init.method !== "GET" && path.startsWith("/clinical/")) dropVisitReads(qc); // a queue move leaves the note and Rx untouched
     return res;
   }, [qc]);
 
@@ -216,7 +216,7 @@ export default function ConsultPage() {
     // LIVE-09: no queue:view, no request; same "no access" state the 403 used to produce.
     if (!can("queue:view")) { setForbidden(true); setLoading(false); return; }
     try {
-      const entries = await qc.fetchQuery({ queryKey: key("queue", which === "mine" ? { doctorId: self } : {}), staleTime: 0, queryFn: ({ signal }) => api.get<QueueEntry[]>(which === "mine" ? `/queue?doctorId=${self}` : "/queue", { signal }) });
+      const entries = await qc.fetchQuery(which === "mine" ? { ...doctorQueueQuery(self), staleTime: 2000 } : queueQuery()) as QueueEntry[];
       // One batched read for every distinct patient (the detail carries the allergy, chronic-condition and package
       // flags shown in the list); patients already in the cache (prefetched, or read by My Day) are not asked for again.
       const details = can("patients:view") ? await loadPatients(qc, entries.map((e) => e.patientId)) : new Map<string, PatientDetail>();
