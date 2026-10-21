@@ -32,13 +32,14 @@ class OtpOutbox {
     }
 
     /** purpose: 'login' or 'pin_reset'. TenantContext must already be set (it is, in AuthService). */
-    void queue(UUID tenantId, UUID staffId, String purpose, String code, Instant expiresAt) {
+    UUID queue(UUID tenantId, UUID staffId, String purpose, String code, Instant expiresAt) {
         UUID id = UUID.randomUUID(); // known before the insert: the ciphertext's AAD binds it to this row (PLT-044)
         jdbc.update("""
                 INSERT INTO otp_requests (id, tenant_id, staff_id, purpose, code_enc, expires_at) VALUES (?,?,?,?,?,?)
                 """, id, tenantId, staffId, purpose, cipher.encrypt(code.getBytes(StandardCharsets.UTF_8), aad(tenantId, id)),
                 Timestamp.from(expiresAt));
         publisher.publish(tenantId, EVENT_TYPE, Map.of("tenantId", tenantId.toString(), "otpRequestId", id.toString(), "channel", "whatsapp"));
+        return id;
     }
 
     static FieldCipher.Aad aad(UUID tenantId, UUID otpRequestId) {

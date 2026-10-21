@@ -34,7 +34,7 @@ modules:
   organization:
     # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
     # organization.department / organization.setup); other modules use organization.api.
-    owns: [attendance_records, clinic_holidays, clinic_policies, clinic_setup_progress, data_export_jobs, data_import_jobs, department_transfers, department_workflow_selection, departments, licence_registry, service_points, staff_shifts, workflow_definitions]
+    owns: [attendance_records, clinic_holidays, clinic_policies, clinic_setup_progress, data_export_jobs, data_import_jobs, department_transfers, department_workflow_selection, departments, dpa_acceptances, licence_registry, service_points, staff_shifts, workflow_definitions]
     reads: []
   owner:
     owns: [legal_entities, owners, tax_registrations]

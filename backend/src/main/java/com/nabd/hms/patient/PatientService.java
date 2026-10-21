@@ -56,10 +56,12 @@ public class PatientService {
     private final com.nabd.hms.common.EventPublisher events;
 
     private final ActorDirectory actors;
+    private final com.nabd.hms.organization.api.DataGatePort dataGate; // ADM-002
 
     PatientService(PatientRepository repo, TenantContext tenantContext, FieldCipher cipher,
                     StepUpVerifier stepUpVerifier, StaffService staffService, AuditService auditService, ClinicClock clock,
-                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors) {
+                    com.nabd.hms.common.EventPublisher events, ActorDirectory actors, com.nabd.hms.organization.api.DataGatePort dataGate) {
+        this.dataGate = dataGate;
         this.events = events;
         this.actors = actors;
         this.clock = clock;
@@ -202,6 +204,10 @@ public class PatientService {
     public Object register(UUID tenantId, UUID callerStaffId, PatientWriteRequest req) {
         requireVerifiedAndResolveScope(tenantId, callerStaffId);
         tenantContext.set(tenantId);
+        boolean synthetic = Boolean.TRUE.equals(req.synthetic());
+        if (!synthetic) {
+            dataGate.requireRealData(); // ADM-002: DPA_REQUIRED before anything is read or written; demo (synthetic) patients pass
+        }
         validateGuardian(tenantId, req);
         if (req.guardianId() != null) {
             requireGuardianConsent(req.guardianConsent());
@@ -223,7 +229,7 @@ public class PatientService {
         UUID id = UUID.randomUUID();
         byte[] nationalIdEnc = encryptOrNull(tenantId, id, req.nationalId());
         repo.insert(id, tenantId, req.name(), phone, req.dob(), req.gender(),
-                req.guardianId(), req.address(), nationalIdEnc);
+                req.guardianId(), req.address(), nationalIdEnc, synthetic);
         if (req.guardianId() != null) {
             grantGuardianConsent(tenantId, callerStaffId, id, req.guardianId(), req.guardianConsent().channel());
         }

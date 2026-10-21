@@ -2,6 +2,7 @@
 
 export type AcceptInviteRequest = { pin: string; };
 export type AcceptOwnerInviteRequest = { pin: string; };
+export type Accepted = { acceptanceId?: string; at?: string; by?: string; method?: string; version?: string; };
 export type ActivateRequest = { csoApprovalRef: string; reason: string; };
 export type ActiveStaff = { departmentName?: string; inConsult?: boolean; name?: string; roleName?: string; signedInAt?: string; staffId?: string; };
 export type ActivityEntryResponse = { activity?: string; kind?: string; occurredAt?: string; patientName?: string; };
@@ -86,6 +87,10 @@ export type DoctorLeaveWriteRequest = { dateFrom: string; dateTo: string; reason
 export type DoctorPunctualityResponse = { accessNote?: string; entries?: Array<Entry>; };
 export type DocumentResponse = { body?: Record<string, string>; createdAt?: string; doctorId?: string; header?: Record<string, Record<string, unknown>>; id?: string; issuedAt?: string; issuedBy?: string; patientId?: string; queueEntryId?: string; status?: string; type?: string; updatedAt?: string; };
 export type DoseCalculationResponse = { mgPerKg?: number; ruleSource?: string; totalDoseMg?: number; weightKg?: number; weightRecordedAt?: string; weightStale?: boolean; };
+export type DpaAcceptRequest = { eSignRef?: string; otp: string; otpChallengeId: string; version: string; };
+export type DpaAcceptResponse = { acceptanceId?: string; blockers?: Array<string>; dataGate?: string; pdfUrl?: string; };
+export type DpaOtpChallengeResponse = { expiresAt?: string; otpChallengeId?: string; };
+export type DpaStatusResponse = { accepted?: Accepted; blockers?: Array<string>; dataGate?: string; html?: string; marketCode?: string; reacceptDueBy?: string; version?: string; };
 export type DrugSuggestionResponse = { code?: string; inStock?: boolean; name?: string; prescriptionOnly?: boolean; source?: string; };
 export type DueConditionResponse = { condition?: string; id?: string; patientId?: string; patientName?: string; reviewDueDate?: string; };
 export type EncounterListItem = { amendmentCount?: number; documentsDraft?: number; documentsIssued?: number; noteSignedAt?: string; noteState?: string; occurredAt?: string; patientId?: string; patientMrn?: string; patientName?: string; queueDate?: string; queueEntryId?: string; rxItemCount?: number; rxStatus?: string; visitStatus?: string; };
@@ -173,7 +178,7 @@ export type PatientPatchRequest = { address?: string; dob?: string; gender?: str
 export type PatientRegistryResponse = { counts?: Record<string, number>; hasMore?: boolean; matchedTotal?: number; page?: PageMeta; rows?: Array<Row>; total?: number; };
 export type PatientResponse = { dob?: string; gender?: string; id?: string; isMinor?: boolean; mrn?: string; name?: string; phone?: string; status?: string; };
 export type PatientViewResponse = { dob?: string; gender?: string; id?: string; mrn?: string; name?: string; phone?: string; status?: string; };
-export type PatientWriteRequest = { address?: string; confirmedNotDuplicate?: boolean; dob: string; gender: string; guardianConsent?: GuardianConsent; guardianId?: string; name: string; nationalId?: string; phone: string; };
+export type PatientWriteRequest = { address?: string; confirmedNotDuplicate?: boolean; dob: string; gender: string; guardianConsent?: GuardianConsent; guardianId?: string; name: string; nationalId?: string; phone: string; synthetic?: boolean; };
 export type PaymentRequest = { amount: number; method: string; reference?: string; };
 export type PaymentResponse = { amount?: number; id?: string; idempotencyKey?: string; method?: string; recordedAt?: string; };
 export type PaymentSplit = { amount?: number; method?: string; };
@@ -564,6 +569,10 @@ export type Operations = {
   SetupController_skipStep: { method: "post"; path: "/v1/setup/checklist/{step}/skip"; permission: "setup:edit"; pathParams: { step: string; }; query: never; body: never; response: void };
   SetupController_consentContact: { method: "get"; path: "/v1/setup/consent-contact"; permission: "setup:view"; pathParams: never; query: never; body: never; response: ConsentContactResponse };
   SetupController_updateConsentContact: { method: "patch"; path: "/v1/setup/consent-contact"; permission: "setup:edit"; pathParams: never; query: never; body: ConsentContactWriteRequest; response: ConsentContactResponse };
+  DpaController_status: { method: "get"; path: "/v1/setup/dpa"; permission: "setup:view"; pathParams: never; query: never; body: never; response: DpaStatusResponse };
+  DpaController_accept: { method: "post"; path: "/v1/setup/dpa/accept"; permission: "setup:edit"; pathParams: never; query: never; body: DpaAcceptRequest; response: DpaAcceptResponse };
+  DpaController_pdf: { method: "get"; path: "/v1/setup/dpa/acceptances/{id}/pdf"; permission: "setup:view"; pathParams: { id: string; }; query: never; body: never; response: string };
+  DpaController_requestOtp: { method: "post"; path: "/v1/setup/dpa/otp"; permission: "setup:edit"; pathParams: never; query: never; body: never; response: DpaOtpChallengeResponse };
   SetupController_exportJobs: { method: "get"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<ExportJobResponse> };
   SetupController_createExportJob: { method: "post"; path: "/v1/setup/export-jobs"; permission: "setup:view"; pathParams: never; query: never; body: ExportJobRequest; response: ExportJobResponse };
   SetupController_holidays: { method: "get"; path: "/v1/setup/holidays"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<ClinicHolidayResponse> };

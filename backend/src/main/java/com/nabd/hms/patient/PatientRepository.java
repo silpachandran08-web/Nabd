@@ -363,10 +363,10 @@ class PatientRepository {
     }
 
     void insert(UUID id, UUID tenantId, String name, String phone, LocalDate dob, String gender,
-                UUID guardianId, String address, byte[] nationalIdEnc) {
-        jdbc.update("INSERT INTO patients (id, tenant_id, name, phone, dob, gender, guardian_id, address, national_id_enc) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?)",
-                id, tenantId, name, phone, Date.valueOf(dob), gender, guardianId, address, nationalIdEnc);
+                UUID guardianId, String address, byte[] nationalIdEnc, boolean synthetic) {
+        jdbc.update("INSERT INTO patients (id, tenant_id, name, phone, dob, gender, guardian_id, address, national_id_enc, is_synthetic) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, name, phone, Date.valueOf(dob), gender, guardianId, address, nationalIdEnc, synthetic);
     }
 
     /**

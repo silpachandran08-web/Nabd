@@ -9,6 +9,7 @@ import { can } from "../../lib/permissions";
 import { MODE_DESC, ModeChangeDialog, type PharmacyMode } from "../../components/setup/PharmacyPanel";
 import pharmacyStyles from "../../components/setup/pharmacy.module.css";
 import { apiFetch, goLogin } from "../../lib/apiClient";
+import DpaPanel from "../../components/setup/DpaPanel";
 import type { Problem } from "@nabd/api-client/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -302,6 +303,8 @@ function SetupWizard() {
                 </ul>
               </>
             )}
+            <h2 className={styles.cardTitle}>Data processing agreement</h2>
+            <DpaPanel authedFetch={authedFetch} />
           </div>
         );
       default:

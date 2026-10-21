@@ -9,6 +9,7 @@ import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { apiFetch, goLogin } from "../lib/apiClient";
+import { DpaReacceptBanner } from "../components/setup/DpaPanel";
 import { initials } from "@nabd/domain";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -188,6 +189,7 @@ export default function OverviewPage() {
 
   return (
     <main className={styles.page}>
+      {can("setup:view") && <DpaReacceptBanner authedFetch={authedFetch} />}
       <h1 className={styles.title}>Today at a glance</h1>
       <p className={styles.subtitle}>
         {today.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}

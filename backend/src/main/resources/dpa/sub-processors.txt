@@ -1,0 +1,4 @@
+Render|API hosting
+Neon|Database hosting
+Vercel|Static web hosting (no patient data)
+Meta Platforms (WhatsApp Cloud API)|Messaging delivery

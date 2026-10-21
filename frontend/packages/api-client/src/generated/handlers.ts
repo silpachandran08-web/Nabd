@@ -263,6 +263,10 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.post(`${baseUrl}/v1/setup/checklist/:step/skip`, () => new HttpResponse(null, { status: 200 })), // SetupController_skipStep
     http.get(`${baseUrl}/v1/setup/consent-contact`, () => HttpResponse.json({"email":"string","name":"string","phone":"string"}, { status: 200 })), // SetupController_consentContact
     http.patch(`${baseUrl}/v1/setup/consent-contact`, () => HttpResponse.json({"email":"string","name":"string","phone":"string"}, { status: 200 })), // SetupController_updateConsentContact
+    http.get(`${baseUrl}/v1/setup/dpa`, () => HttpResponse.json({"accepted":{"acceptanceId":"string","at":"2026-01-01T00:00:00Z","by":"string","method":"string","version":"string"},"blockers":["string"],"dataGate":"string","html":"string","marketCode":"string","reacceptDueBy":"2026-01-01T00:00:00Z","version":"string"}, { status: 200 })), // DpaController_status
+    http.post(`${baseUrl}/v1/setup/dpa/accept`, () => HttpResponse.json({"acceptanceId":"00000000-0000-7000-8000-000000000000","blockers":["string"],"dataGate":"string","pdfUrl":"string"}, { status: 201 })), // DpaController_accept
+    http.get(`${baseUrl}/v1/setup/dpa/acceptances/:id/pdf`, () => HttpResponse.json("AA==", { status: 200 })), // DpaController_pdf
+    http.post(`${baseUrl}/v1/setup/dpa/otp`, () => HttpResponse.json({"expiresAt":"2026-01-01T00:00:00Z","otpChallengeId":"00000000-0000-7000-8000-000000000000"}, { status: 200 })), // DpaController_requestOtp
     http.get(`${baseUrl}/v1/setup/export-jobs`, () => HttpResponse.json([{"createdAt":"2026-01-01T00:00:00Z","errorMessage":"string","exportType":"string","id":"string","resultUrl":"string","status":"string"}], { status: 200 })), // SetupController_exportJobs
     http.post(`${baseUrl}/v1/setup/export-jobs`, () => HttpResponse.json({"createdAt":"2026-01-01T00:00:00Z","errorMessage":"string","exportType":"string","id":"string","resultUrl":"string","status":"string"}, { status: 200 })), // SetupController_createExportJob
     http.get(`${baseUrl}/v1/setup/holidays`, () => HttpResponse.json([{"holidayDate":"2026-01-01","id":"string","name":"string","recurring":false}], { status: 200 })), // SetupController_holidays
@@ -313,4 +317,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 299;
+export const operationCount = 303;

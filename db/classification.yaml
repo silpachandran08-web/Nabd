@@ -350,6 +350,17 @@ schemas:
       end_time: operational
       slot_minutes: operational
       max_patients: operational
+    dpa_acceptances:
+      id: operational
+      tenant_id: operational
+      dpa_version: operational
+      signer_owner_id: operational
+      method: operational
+      signed_pdf_key: operational
+      signed_pdf: pii
+      pdf_sha256: operational
+      ip: pii
+      accepted_at: operational
     favourite_rx_set_items:
       id: operational
       tenant_id: operational
@@ -523,6 +534,7 @@ schemas:
       created_at: operational
       updated_at: operational
     otp_requests:
+      attempts: operational
       id: operational
       tenant_id: operational
       staff_id: operational
@@ -754,6 +766,7 @@ schemas:
       change_seq: operational
       updated_at: operational
     patients:
+      is_synthetic: operational
       id: operational
       tenant_id: operational
       mrn: pii
@@ -1074,6 +1087,7 @@ schemas:
       name: operational
       region: operational
       status: operational
+      data_gate: operational
       created_at: operational
       updated_at: operational
       brand_id: operational

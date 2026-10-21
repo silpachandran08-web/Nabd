@@ -20,7 +20,9 @@ public record PatientWriteRequest(
         // this is a different person (e.g. a child on a parent's number). Absent = old behaviour.
         Boolean confirmedNotDuplicate,
         // CGV-005: evidence that the guardian agreed; required whenever guardianId is supplied.
-        GuardianConsent guardianConsent
+        GuardianConsent guardianConsent,
+        // ADM-002: true marks a demo patient; only these may be created while the clinic's data gate is demo_only.
+        Boolean synthetic
 ) {
     public record GuardianConsent(Boolean confirmed, String channel) {
     }
