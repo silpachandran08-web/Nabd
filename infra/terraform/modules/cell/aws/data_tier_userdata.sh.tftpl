@@ -1,0 +1,19 @@
+#!/bin/bash
+# OPS-055: boot script for a PgBouncer host. Fails closed: a pooler older than 1.21 never starts (prepared statements).
+set -euo pipefail
+ver=$(pgbouncer --version | grep -oE '[0-9]+\.[0-9]+' | head -1)
+if [ "$(printf '%s\n1.21\n' "$ver" | sort -V | head -1)" != "1.21" ]; then echo "PgBouncer $ver < 1.21" >&2; shutdown -h now; exit 1; fi
+install -d -m 750 -o pgbouncer -g pgbouncer /etc/pgbouncer
+cat > /etc/pgbouncer/pgbouncer.ini <<'INI'
+${ini}
+INI
+auth_pw=$(aws secretsmanager get-secret-value --region ${region} --secret-id ${auth_secret_arn} --query SecretString --output text)
+stats_pw=$(aws secretsmanager get-secret-value --region ${region} --secret-id ${stats_secret_arn} --query SecretString --output text)
+umask 077
+printf '"pgbouncer_auth" "%s"\n"pgbouncer_stats" "%s"\n' "$auth_pw" "$stats_pw" > /etc/pgbouncer/userlist.txt
+openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -subj "/CN=pgbouncer" -keyout /etc/pgbouncer/client.key -out /etc/pgbouncer/client.crt
+printf 'PGBOUNCER_STATS_PW=%s\nPOOL_DB_ID=${db_identifier}\nAWS_REGION=${region}\n' "$stats_pw" > /etc/pgbouncer/metrics.env
+chown pgbouncer:pgbouncer /etc/pgbouncer/*
+systemctl enable --now pgbouncer
+# pool-metrics.py is baked into the AMI (infra/pgbouncer/AMI.md); one sample a minute.
+echo '* * * * * root . /etc/pgbouncer/metrics.env && /usr/local/bin/pool-metrics.py --host 127.0.0.1 --instance "$(hostname)"' > /etc/cron.d/nabd-pool-metrics
