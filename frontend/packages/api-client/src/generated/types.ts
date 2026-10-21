@@ -86,6 +86,7 @@ export type DoctorLeaveWriteRequest = { dateFrom: string; dateTo: string; reason
 export type DoctorPunctualityResponse = { accessNote?: string; entries?: Array<Entry>; };
 export type DocumentResponse = { body?: Record<string, string>; createdAt?: string; doctorId?: string; header?: Record<string, Record<string, unknown>>; id?: string; issuedAt?: string; issuedBy?: string; patientId?: string; queueEntryId?: string; status?: string; type?: string; updatedAt?: string; };
 export type DoseCalculationResponse = { mgPerKg?: number; ruleSource?: string; totalDoseMg?: number; weightKg?: number; weightRecordedAt?: string; weightStale?: boolean; };
+export type DrugKnowledgeBaseSource = { configured?: boolean; dataMonth?: string; source?: string; };
 export type DrugSuggestionResponse = { code?: string; inStock?: boolean; name?: string; prescriptionOnly?: boolean; source?: string; };
 export type DueConditionResponse = { condition?: string; id?: string; patientId?: string; patientName?: string; reviewDueDate?: string; };
 export type EncounterListItem = { amendmentCount?: number; documentsDraft?: number; documentsIssued?: number; noteSignedAt?: string; noteState?: string; occurredAt?: string; patientId?: string; patientMrn?: string; patientName?: string; queueDate?: string; queueEntryId?: string; rxItemCount?: number; rxStatus?: string; visitStatus?: string; };
@@ -362,6 +363,7 @@ export type Operations = {
   ClinicalDocumentController_get: { method: "get"; path: "/v1/clinical/documents/{id}"; permission: "clinical:view"; pathParams: { id: string; }; query: never; body: never; response: DocumentResponse };
   ClinicalDocumentController_update: { method: "patch"; path: "/v1/clinical/documents/{id}"; permission: "clinical:edit"; pathParams: { id: string; }; query: never; body: UpdateRequest; response: DocumentResponse };
   ClinicalDocumentController_issue: { method: "post"; path: "/v1/clinical/documents/{id}/issue"; permission: "clinical:edit | clinical:approve"; pathParams: { id: string; }; query: never; body: never; response: DocumentResponse };
+  DrugKnowledgeBaseController_get: { method: "get"; path: "/v1/clinical/drug-knowledge-base"; permission: "clinical:view | clinical:edit"; pathParams: never; query: never; body: never; response: DrugKnowledgeBaseSource };
   PrescriptionController_searchDrugs: { method: "get"; path: "/v1/clinical/drugs/search"; permission: "clinical:view | clinical:edit"; pathParams: never; query: { q: string; limit?: number; }; body: never; response: Array<DrugSuggestionResponse> };
   EncounterListController_list: { method: "get"; path: "/v1/clinical/encounters"; permission: "clinical:view"; pathParams: never; query: { state?: string; from?: string; to?: string; limit?: number; cursor?: string; }; body: never; response: EncounterListPage };
   NoteTemplateController_list: { method: "get"; path: "/v1/clinical/note-templates"; permission: "clinical:view"; pathParams: never; query: never; body: never; response: Array<TemplateResponse> };

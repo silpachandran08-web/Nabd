@@ -26,6 +26,7 @@ import PackageSessionCard from "../components/consult/PackageSessionCard";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import { useSafetyDictionarySource } from "../components/consult/safetyDictionary";
+import { useDrugKbAttribution } from "../components/consult/drugKnowledgeBase";
 import RxPad from "../components/consult/RxPad";
 import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
@@ -221,6 +222,7 @@ export default function ConsultPage() {
 
   const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, unavailable ? null : activeEntry?.patientId ?? null, activeEntry?.id ?? null);
   const rxSource = useSafetyDictionarySource(authedFetch);
+  const drugKb = useDrugKbAttribution(authedFetch);
 
   const load = useCallback(async (which: "mine" | "all" = "mine") => {
     setLoading(true);
@@ -1205,6 +1207,7 @@ export default function ConsultPage() {
                     </div>
                   ))}
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
+                  {drugKb && <p data-testid="drug-kb-attribution" style={{ fontSize: "12px", color: "var(--nb-text-tertiary)", margin: "var(--nb-space-8) 0 0" }}>{drugKb}</p>}
 
                   {!(pat && age(pat.dob) >= 18) && <div className={styles.previousMeds}>
                     <DoseCalculator key={activeEntry.patientId} authedFetch={authedFetch} patientId={activeEntry.patientId} queueEntryId={activeEntry.id} canRecordWeight={can("clinical:edit")} onWeightRecorded={reloadCtx} />

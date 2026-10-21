@@ -104,6 +104,7 @@ export const DoctorLeaveWriteRequestSchema = z.object({ dateFrom: z.string(), da
 export const DoctorPunctualityResponseSchema = z.object({ accessNote: z.string().optional(), entries: z.array(EntrySchema).optional() });
 export const DocumentResponseSchema = z.object({ body: z.record(z.string(), z.string()).optional(), createdAt: z.string().optional(), doctorId: z.string().optional(), header: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), id: z.string().optional(), issuedAt: z.string().optional(), issuedBy: z.string().optional(), patientId: z.string().optional(), queueEntryId: z.string().optional(), status: z.string().optional(), type: z.string().optional(), updatedAt: z.string().optional() });
 export const DoseCalculationResponseSchema = z.object({ mgPerKg: z.number().optional(), ruleSource: z.string().optional(), totalDoseMg: z.number().optional(), weightKg: z.number().optional(), weightRecordedAt: z.string().optional(), weightStale: z.boolean().optional() });
+export const DrugKnowledgeBaseSourceSchema = z.object({ configured: z.boolean().optional(), dataMonth: z.string().optional(), source: z.string().optional() });
 export const DrugSuggestionResponseSchema = z.object({ code: z.string().optional(), inStock: z.boolean().optional(), name: z.string().optional(), prescriptionOnly: z.boolean().optional(), source: z.string().optional() });
 export const DueConditionResponseSchema = z.object({ condition: z.string().optional(), id: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), reviewDueDate: z.string().optional() });
 export const EncounterListItemSchema = z.object({ amendmentCount: z.number().int().optional(), documentsDraft: z.number().int().optional(), documentsIssued: z.number().int().optional(), noteSignedAt: z.string().optional(), noteState: z.string().optional(), occurredAt: z.string().optional(), patientId: z.string().optional(), patientMrn: z.string().optional(), patientName: z.string().optional(), queueDate: z.string().optional(), queueEntryId: z.string().optional(), rxItemCount: z.number().int().optional(), rxStatus: z.string().optional(), visitStatus: z.string().optional() });
@@ -364,6 +365,7 @@ export const operationSchemas = {
   ClinicalDocumentController_get: { response: DocumentResponseSchema },
   ClinicalDocumentController_update: { body: UpdateRequestSchema, response: DocumentResponseSchema },
   ClinicalDocumentController_issue: { response: DocumentResponseSchema },
+  DrugKnowledgeBaseController_get: { response: DrugKnowledgeBaseSourceSchema },
   PrescriptionController_searchDrugs: { response: z.array(DrugSuggestionResponseSchema) },
   EncounterListController_list: { response: EncounterListPageSchema },
   NoteTemplateController_list: { response: z.array(TemplateResponseSchema) },

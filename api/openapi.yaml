@@ -2412,6 +2412,14 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryActive" } } } }
         "503": { description: "No active dictionary for the region (safety-dictionary-unavailable, problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /clinical/drug-knowledge-base:
+    get:
+      tags: [Clinical]
+      summary: "CLN-018. Attribution of the licensed drug knowledge base behind the drug data ('Drug data - <source> <dataMonth>' under the Rx pad). configured=false until a licence is signed and a feed is loaded (then nothing is shown). Attribution only: no KB content is returned (licence: no bulk KB content through public APIs; the drug typeahead is capped at 20)."
+      x-required-permission: "clinical:view | clinical:edit"
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DrugKnowledgeBaseSource" } } } }
+
   /safety-dictionaries/{region}/versions:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
     parameters: [{ name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }]
@@ -4046,6 +4054,13 @@ components:
         safetyDictionaryVersion:
           type: [string, "null"]
           description: "CLN-004. Safety dictionary version active when the prescription was signed (e.g. 'IN v1'); null for a draft or a prescription signed before V1211."
+    DrugKnowledgeBaseSource:
+      type: object
+      required: [configured]
+      properties:
+        configured: { type: boolean }
+        source: { type: [string, "null"], description: "Licensed KB name as agreed in the licence attribution clause" }
+        dataMonth: { type: [string, "null"], pattern: '^\d{4}-(0[1-9]|1[0-2])$', example: "2026-10" }
     SafetyDictionaryActive:
       type: object
       properties:
