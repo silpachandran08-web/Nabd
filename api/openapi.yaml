@@ -3825,7 +3825,7 @@ paths:
     post:
       tags: [Ops]
       summary: Ingest scrubbed web vitals and client errors (OPS-028)
-      x-required-permission: authenticated
+      x-required-permission: isAuthenticated()
       requestBody:
         required: true
         content:
