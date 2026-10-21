@@ -183,7 +183,7 @@ class Com003ProviderApiTest extends SlowProviderTestBase {
         assertThat(envelopes.get(0)).contains("\"status\": \"cancelled\"").contains(ids.get(0).toString());
         assertThat(envelopes.get(1)).contains("\"status\": \"expired\"");
         Map<String, Object> data = (Map<String, Object>) objectMapper.readValue(envelopes.get(0), Map.class).get("data");
-        assertThat(data.keySet()).as("exactly the schema's fields, no phone or text").containsExactlyInAnyOrder("tenantId", "messageId", "status", "version");
+        assertThat(data.keySet()).as("exactly the schema's fields, no phone or text").containsExactlyInAnyOrder("at", "channel", "messageId", "status", "tenantId", "version");
     }
 
     @Test
