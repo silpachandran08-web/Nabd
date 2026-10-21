@@ -215,6 +215,11 @@ schemas:
       created_at: operational
       captured_by: operational
       capture_channel: operational
+      notice_version: operational
+      language: operational
+      channel: operational
+      witness_staff_id: operational
+      evidence: pii
     crypto_reencrypt_progress:
       table_name: operational
       column_name: operational
@@ -851,6 +856,17 @@ schemas:
       safety_dictionary_version: operational
       signed_by: operational
       signed_by_registration_no: pii
+    privacy_notices:
+      id: operational
+      tenant_id: operational
+      version: operational
+      language: operational
+      template_key: operational
+      body_md: operational
+      mandatory_hash: operational
+      effective_from: operational
+      created_by: operational
+      created_at: operational
     procedure_orders:
       id: operational
       tenant_id: operational

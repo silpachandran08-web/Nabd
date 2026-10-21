@@ -1,6 +1,6 @@
 # Threat model: EP08 Consent and privacy notices
 
-Status: Draft, recorded before the first EP08 build sprint (S4) (T-077). Needs security-privacy review and DPO approval.
+Status: Draft, recorded before the first EP08 build sprint (S4) (T-077). Needs security-privacy review and DPO approval. Purposes, defaults and notice model: docs/adr/0018-consent-purposes-and-notices.md (IDC-002).
 Scope: consent capture at the desk, in WhatsApp and in assisted mode; processing default-deny; withdrawal propagation;
 PHI-safe patient notifications. Stories IDC-002, IDC-004, IDC-005, IDC-006, IDC-007, COM-014, ACC-006.
 Tasks T-104, T-137, T-138, T-126, T-302 (consent schema later: T-249).
