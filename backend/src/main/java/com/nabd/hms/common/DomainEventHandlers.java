@@ -26,8 +26,8 @@ class DomainEventHandlers {
             @Override
             public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
                 for (DomainEventType t : DomainEventType.values()) {
-                    if (t == DomainEventType.ORGANIZATION_CONFIG_CHANGED) {
-                        continue; // OPS-020: TenantConfigEvictions consumes it (cache invalidation on every instance)
+                    if (t == DomainEventType.ORGANIZATION_CONFIG_CHANGED || t == DomainEventType.CATALOGUE_CHANGED) {
+                        continue; // OPS-020: TenantConfigEvictions consumes it (cache invalidation on every instance; OPS-021 also the catalogue event)
                     }
                     if (t == DomainEventType.NOTIFICATION_REQUESTED) {
                         continue; // COM-004: messaging.NotificationRequestedHandler consumes it

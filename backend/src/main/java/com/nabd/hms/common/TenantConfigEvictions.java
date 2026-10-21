@@ -1,9 +1,11 @@
 package com.nabd.hms.common;
 
+import com.nabd.hms.shared.cache.ConfigCache;
 import com.nabd.hms.shared.events.consumer.EventConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -31,13 +33,21 @@ public class TenantConfigEvictions implements OutboxEventHandler, EventConsumer 
     private final ClinicClock clinicClock;
     private final ObjectProvider<StringRedisTemplate> valkey;
     private final ObjectProvider<RedisConnectionFactory> valkeyFactory;
+    private final ConfigCache configCache;
     private volatile RedisConnection subscription;
 
     public TenantConfigEvictions(ClinicClock clinicClock, ObjectProvider<StringRedisTemplate> valkey,
                                  ObjectProvider<RedisConnectionFactory> valkeyFactory) {
+        this(clinicClock, valkey, valkeyFactory, null);
+    }
+
+    @Autowired
+    public TenantConfigEvictions(ClinicClock clinicClock, ObjectProvider<StringRedisTemplate> valkey,
+                                 ObjectProvider<RedisConnectionFactory> valkeyFactory, ConfigCache configCache) {
         this.clinicClock = clinicClock;
         this.valkey = valkey;
         this.valkeyFactory = valkeyFactory;
+        this.configCache = configCache;
     }
 
     @Override
@@ -47,7 +57,7 @@ public class TenantConfigEvictions implements OutboxEventHandler, EventConsumer 
 
     @Override
     public void handle(OutboxEvent event) {
-        evictEverywhere(event.tenantId());
+        changed(event.eventType(), event.tenantId());
     }
 
     @Override
@@ -57,7 +67,7 @@ public class TenantConfigEvictions implements OutboxEventHandler, EventConsumer 
 
     @Override
     public Set<String> types() {
-        return Set.of(eventType());
+        return Set.of(eventType(), DomainEventType.CATALOGUE_CHANGED.type()); // OPS-021: + the cached price catalogue
     }
 
     @Override
@@ -67,20 +77,33 @@ public class TenantConfigEvictions implements OutboxEventHandler, EventConsumer 
 
     @Override
     public void handle(Event event) {
-        evictEverywhere(event.tenantId());
+        changed(event.type(), event.tenantId());
     }
 
-    private void evictEverywhere(UUID tenantId) {
+    /** OPS-021: a versioned domain (price catalogue) bumps its version first (only now, after commit), then broadcasts; the zone just evicts. */
+    void changed(String type, UUID tenantId) {
+        ConfigCache.Domain domain = ConfigCache.Domain.forEvent(type);
+        if (domain == null || configCache == null) {
+            evictEverywhere(tenantId, null);
+        } else if (tenantId != null) {
+            configCache.invalidate(tenantId, domain); // throws if Valkey is down: the group/outbox retries, nothing is lost
+            evictEverywhere(tenantId, domain);
+        }
+    }
+
+    private void evictEverywhere(UUID tenantId, ConfigCache.Domain domain) {
         if (tenantId == null) {
             return; // tenant config only
         }
-        clinicClock.evict(tenantId);
+        if (domain == null) {
+            clinicClock.evict(tenantId);
+        }
         StringRedisTemplate t = valkey.getIfAvailable();
         if (t == null) {
             return; // no Valkey (single instance / dev): the local eviction is all there is
         }
         try {
-            t.convertAndSend(CHANNEL, tenantId.toString());
+            t.convertAndSend(CHANNEL, domain == null ? tenantId.toString() : tenantId + "/" + domain.name());
         } catch (RuntimeException e) {
             log.warn("config change of tenant {} not broadcast (Valkey unavailable); other instances refresh within the cache TTL", tenantId);
         }
@@ -111,11 +134,37 @@ public class TenantConfigEvictions implements OutboxEventHandler, EventConsumer 
         }
     }
 
-    private void evict(byte[] tenantId) {
+    private void evict(byte[] message) {
         try {
-            clinicClock.evict(UUID.fromString(new String(tenantId, StandardCharsets.UTF_8)));
+            String[] m = new String(message, StandardCharsets.UTF_8).split("/"); // "<tenant>" (zone) or "<tenant>/<DOMAIN>" (OPS-021)
+            UUID tenantId = UUID.fromString(m[0]);
+            if (m.length == 1) {
+                clinicClock.evict(tenantId);
+            } else if (configCache != null) {
+                configCache.evictLocal(tenantId, ConfigCache.Domain.valueOf(m[1]));
+            }
         } catch (IllegalArgumentException e) {
             log.warn("ignored a malformed config invalidation message"); // never echo the payload
+        }
+    }
+
+    /** Regions without Valkey: the outbox dispatcher delivers the catalogue event (DomainEventHandlers skips it) to the same logic. */
+    @Component
+    static class CatalogueChangedHandler implements OutboxEventHandler {
+        private final TenantConfigEvictions evictions;
+
+        CatalogueChangedHandler(TenantConfigEvictions evictions) {
+            this.evictions = evictions;
+        }
+
+        @Override
+        public String eventType() {
+            return DomainEventType.CATALOGUE_CHANGED.type();
+        }
+
+        @Override
+        public void handle(OutboxEvent event) {
+            evictions.changed(event.eventType(), event.tenantId());
         }
     }
 }
