@@ -472,6 +472,7 @@ export const operationSchemas = {
   PackageController_deactivate: { response: PackageResponseSchema },
   PatientController_list: { response: PatientPageSchema },
   PatientController_register: { body: PatientWriteRequestSchema, response: z.record(z.string(), z.unknown()) },
+  PatientBatchController_batch: { response: z.array(PatientDetailResponseSchema) },
   PatientController_dataQuality: { response: DataQualityPageSchema },
   PatientController_guardianReviewsDue: { response: z.array(GuardianReviewResponseSchema) },
   PatientController_undoMerge: {  },
