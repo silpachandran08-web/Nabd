@@ -76,8 +76,11 @@ owner,GET /v1/packages/settings,packages:view,allow
 owner,GET /v1/packages/{id},packages:view,allow
 owner,GET /v1/patients,patients:view,allow
 owner,GET /v1/patients/batch,patients:view,allow
+owner,GET /v1/patients/by-phone,patients:view,allow
 owner,GET /v1/patients/data-quality,patients:edit,allow
+owner,GET /v1/patients/duplicate-suggestions,patients:delete,allow
 owner,GET /v1/patients/guardian-reviews-due,patients:view,allow
+owner,GET /v1/patients/merges,patients:delete,allow
 owner,GET /v1/patients/registry,patients:view,allow
 owner,GET /v1/patients/{id},patients:view,allow
 owner,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
@@ -223,6 +226,7 @@ owner,POST /v1/packages/sell,packages:create,allow
 owner,POST /v1/packages/{id}/activate,packages:edit,allow
 owner,POST /v1/packages/{id}/deactivate,packages:edit,allow
 owner,POST /v1/patients,patients:create,allow
+owner,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,allow
 owner,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
 owner,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -352,8 +356,11 @@ owner_doctor,GET /v1/packages/settings,packages:view,allow
 owner_doctor,GET /v1/packages/{id},packages:view,allow
 owner_doctor,GET /v1/patients,patients:view,allow
 owner_doctor,GET /v1/patients/batch,patients:view,allow
+owner_doctor,GET /v1/patients/by-phone,patients:view,allow
 owner_doctor,GET /v1/patients/data-quality,patients:edit,allow
+owner_doctor,GET /v1/patients/duplicate-suggestions,patients:delete,allow
 owner_doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
+owner_doctor,GET /v1/patients/merges,patients:delete,allow
 owner_doctor,GET /v1/patients/registry,patients:view,allow
 owner_doctor,GET /v1/patients/{id},patients:view,allow
 owner_doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
@@ -499,6 +506,7 @@ owner_doctor,POST /v1/packages/sell,packages:create,allow
 owner_doctor,POST /v1/packages/{id}/activate,packages:edit,allow
 owner_doctor,POST /v1/packages/{id}/deactivate,packages:edit,allow
 owner_doctor,POST /v1/patients,patients:create,allow
+owner_doctor,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,allow
 owner_doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
 owner_doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -628,8 +636,11 @@ doctor,GET /v1/packages/settings,packages:view,allow
 doctor,GET /v1/packages/{id},packages:view,allow
 doctor,GET /v1/patients,patients:view,allow
 doctor,GET /v1/patients/batch,patients:view,allow
+doctor,GET /v1/patients/by-phone,patients:view,allow
 doctor,GET /v1/patients/data-quality,patients:edit,allow
+doctor,GET /v1/patients/duplicate-suggestions,patients:delete,deny-403
 doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
+doctor,GET /v1/patients/merges,patients:delete,deny-403
 doctor,GET /v1/patients/registry,patients:view,allow
 doctor,GET /v1/patients/{id},patients:view,allow
 doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
@@ -775,6 +786,7 @@ doctor,POST /v1/packages/sell,packages:create,allow
 doctor,POST /v1/packages/{id}/activate,packages:edit,allow
 doctor,POST /v1/packages/{id}/deactivate,packages:edit,allow
 doctor,POST /v1/patients,patients:create,allow
+doctor,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -904,8 +916,11 @@ nurse,GET /v1/packages/settings,packages:view,allow
 nurse,GET /v1/packages/{id},packages:view,allow
 nurse,GET /v1/patients,patients:view,allow
 nurse,GET /v1/patients/batch,patients:view,allow
+nurse,GET /v1/patients/by-phone,patients:view,allow
 nurse,GET /v1/patients/data-quality,patients:edit,allow
+nurse,GET /v1/patients/duplicate-suggestions,patients:delete,deny-403
 nurse,GET /v1/patients/guardian-reviews-due,patients:view,allow
+nurse,GET /v1/patients/merges,patients:delete,deny-403
 nurse,GET /v1/patients/registry,patients:view,allow
 nurse,GET /v1/patients/{id},patients:view,allow
 nurse,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
@@ -1051,6 +1066,7 @@ nurse,POST /v1/packages/sell,packages:create,deny-403
 nurse,POST /v1/packages/{id}/activate,packages:edit,allow
 nurse,POST /v1/packages/{id}/deactivate,packages:edit,allow
 nurse,POST /v1/patients,patients:create,deny-403
+nurse,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 nurse,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 nurse,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 nurse,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -1180,8 +1196,11 @@ receptionist,GET /v1/packages/settings,packages:view,allow
 receptionist,GET /v1/packages/{id},packages:view,allow
 receptionist,GET /v1/patients,patients:view,allow
 receptionist,GET /v1/patients/batch,patients:view,allow
+receptionist,GET /v1/patients/by-phone,patients:view,allow
 receptionist,GET /v1/patients/data-quality,patients:edit,allow
+receptionist,GET /v1/patients/duplicate-suggestions,patients:delete,deny-403
 receptionist,GET /v1/patients/guardian-reviews-due,patients:view,allow
+receptionist,GET /v1/patients/merges,patients:delete,deny-403
 receptionist,GET /v1/patients/registry,patients:view,allow
 receptionist,GET /v1/patients/{id},patients:view,allow
 receptionist,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
@@ -1327,6 +1346,7 @@ receptionist,POST /v1/packages/sell,packages:create,allow
 receptionist,POST /v1/packages/{id}/activate,packages:edit,deny-403
 receptionist,POST /v1/packages/{id}/deactivate,packages:edit,deny-403
 receptionist,POST /v1/patients,patients:create,allow
+receptionist,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 receptionist,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 receptionist,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 receptionist,POST /v1/patients/{id}/guardian/review,patients:edit,allow
@@ -1456,8 +1476,11 @@ frontdesk_vitals,GET /v1/packages/settings,packages:view,allow
 frontdesk_vitals,GET /v1/packages/{id},packages:view,allow
 frontdesk_vitals,GET /v1/patients,patients:view,allow
 frontdesk_vitals,GET /v1/patients/batch,patients:view,allow
+frontdesk_vitals,GET /v1/patients/by-phone,patients:view,allow
 frontdesk_vitals,GET /v1/patients/data-quality,patients:edit,allow
+frontdesk_vitals,GET /v1/patients/duplicate-suggestions,patients:delete,deny-403
 frontdesk_vitals,GET /v1/patients/guardian-reviews-due,patients:view,allow
+frontdesk_vitals,GET /v1/patients/merges,patients:delete,deny-403
 frontdesk_vitals,GET /v1/patients/registry,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{id},patients:view,allow
 frontdesk_vitals,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
@@ -1603,6 +1626,7 @@ frontdesk_vitals,POST /v1/packages/sell,packages:create,allow
 frontdesk_vitals,POST /v1/packages/{id}/activate,packages:edit,deny-403
 frontdesk_vitals,POST /v1/packages/{id}/deactivate,packages:edit,deny-403
 frontdesk_vitals,POST /v1/patients,patients:create,allow
+frontdesk_vitals,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 frontdesk_vitals,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 frontdesk_vitals,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/guardian/review,patients:edit,allow

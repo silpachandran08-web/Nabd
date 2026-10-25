@@ -43,7 +43,7 @@ modules:
     owns: [package_eligible_doctors, package_instance_events, package_instance_items, package_instances, package_items, package_redemptions, package_refunds, package_settings, packages]
     reads: []
   patient:
-    owns: [consents, internal_patient_refs, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
+    owns: [consents, internal_patient_refs, patient_duplicate_dismissals, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
     reads: []
   pharmacy:
     owns: [pharmacy_settings, pharmacy_stock_movements]

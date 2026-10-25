@@ -117,6 +117,7 @@ export const DpaStatusResponseSchema = z.object({ accepted: AcceptedSchema.optio
 export const DrugKnowledgeBaseSourceSchema = z.object({ configured: z.boolean().optional(), dataMonth: z.string().optional(), source: z.string().optional() });
 export const DrugSuggestionResponseSchema = z.object({ code: z.string().optional(), inStock: z.boolean().optional(), name: z.string().optional(), prescriptionOnly: z.boolean().optional(), source: z.string().optional() });
 export const DueConditionResponseSchema = z.object({ condition: z.string().optional(), id: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), reviewDueDate: z.string().optional() });
+export const DuplicateSuggestionPageSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
 export const EncounterListItemSchema = z.object({ amendmentCount: z.number().int().optional(), documentsDraft: z.number().int().optional(), documentsIssued: z.number().int().optional(), noteSignedAt: z.string().optional(), noteState: z.string().optional(), occurredAt: z.string().optional(), patientId: z.string().optional(), patientMrn: z.string().optional(), patientName: z.string().optional(), queueDate: z.string().optional(), queueEntryId: z.string().optional(), rxItemCount: z.number().int().optional(), rxStatus: z.string().optional(), visitStatus: z.string().optional() });
 export const EncounterListPageSchema = z.object({ data: z.array(EncounterListItemSchema).optional(), page: PageMetaSchema.optional() });
 export const EncounterResponseSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), doctorId: z.string().optional(), medications: z.string().optional(), occurredAt: z.string().optional(), queueEntryId: z.string().optional() });
@@ -144,6 +145,8 @@ export const GrantResponseSchema = z.object({ active: z.boolean().optional(), de
 export const GuardianConsentSchema = z.object({ channel: z.string().optional(), confirmed: z.boolean().optional() });
 export const GuardianReviewDecisionRequestSchema = z.object({ decision: z.string() });
 export const GuardianReviewResponseSchema = z.object({ dob: z.string().optional(), guardianId: z.string().optional(), guardianName: z.string().optional(), mrn: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional() });
+export const MemberSchema = z.object({ age: z.number().int().optional(), displayName: z.string().optional(), guardianId: z.string().optional(), lastVisitAt: z.string().optional(), patientId: z.string().optional(), relation: z.string().optional(), sex: z.string().optional() });
+export const HouseholdResponseSchema = z.object({ household: z.array(MemberSchema).optional() });
 export const ImportJobRequestSchema = z.object({ fileName: z.string().min(1), importType: z.string().min(1) });
 export const ImportJobResponseSchema = z.object({ createdAt: z.string().optional(), errorMessage: z.string().optional(), fileName: z.string().optional(), id: z.string().optional(), importType: z.string().optional(), resultUrl: z.string().optional(), status: z.string().optional() });
 export const InstanceEventResponseSchema = z.object({ actorName: z.string().optional(), createdAt: z.string().optional(), delta: z.number().int().optional(), eventType: z.string().optional(), note: z.string().optional() });
@@ -257,6 +260,7 @@ export const QueueEntryResponseSchema = z.object({ ageYears: z.number().int().op
 export const QueueReorderRequestSchema = z.object({ priority: z.boolean(), reason: z.string().min(3).max(2147483647) });
 export const QueueStatusUpdateRequestSchema = z.object({ expectedStatus: z.string().optional(), status: z.string().min(1) });
 export const RaiseTicketRequestSchema = z.object({ description: z.string().min(0).max(4000), priority: z.string().optional(), subject: z.string().min(0).max(200) });
+export const RecentMergesSchema = z.object({ items: z.array(ItemSchema).optional() });
 export const RecoveryVerifyRequestSchema = z.object({ challengeToken: z.string().min(1), recoveryCode: z.string().min(0).max(32) });
 export const RecoveryVerifyResponseSchema = z.object({ accessToken: z.string().optional(), expiresIn: z.number().int().optional(), refreshToken: z.string().optional(), remainingCodes: z.number().int().optional() });
 export const RedactionPreviewSchema = z.object({ description: z.string().optional(), redactionCount: z.number().int().optional(), subject: z.string().optional() });
@@ -517,8 +521,12 @@ export const operationSchemas = {
   PatientController_list: { response: PatientPageSchema },
   PatientController_register: { body: PatientWriteRequestSchema, response: z.record(z.string(), z.unknown()) },
   PatientBatchController_batch: { response: z.array(PatientDetailResponseSchema) },
+  PatientController_byPhone: { response: HouseholdResponseSchema },
   PatientController_dataQuality: { response: DataQualityPageSchema },
+  PatientController_duplicateSuggestions: { response: DuplicateSuggestionPageSchema },
+  PatientController_dismissSuggestion: {  },
   PatientController_guardianReviewsDue: { response: z.array(GuardianReviewResponseSchema) },
+  PatientController_recentMerges: { response: RecentMergesSchema },
   PatientController_undoMerge: {  },
   PatientController_registry: { response: PatientRegistryResponseSchema },
   PatientController_get: { response: PatientDetailResponseSchema },
