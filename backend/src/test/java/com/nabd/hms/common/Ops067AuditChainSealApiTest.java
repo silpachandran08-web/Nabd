@@ -33,7 +33,7 @@ class Ops067AuditChainSealApiTest extends ApiTestBase {
     @Autowired MeterRegistry meters;
 
     private AuditChainSealer sealer(String key) {
-        return new AuditChainSealer(jdbc, tenantScope, meters, key);
+        return new AuditChainSealer(jdbc, tenantScope, meters, key, java.time.Clock.systemUTC());
     }
 
     private void record(UUID t) {

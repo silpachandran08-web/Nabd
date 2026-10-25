@@ -89,7 +89,9 @@ class LogPhiLeakTest extends ApiTestBase {
                         return bean;
                     }
                     return (WhatsAppOtpSender) (phone, code) -> {
-                        SENT_SECRETS.add(code);
+                        if (phone.endsWith("9812340077")) { // dispatcher.poll() also drains other tests' pending OTP events: record only this test's sends
+                            SENT_SECRETS.add(code);
+                        }
                         real.send(phone, code);
                     };
                 }
