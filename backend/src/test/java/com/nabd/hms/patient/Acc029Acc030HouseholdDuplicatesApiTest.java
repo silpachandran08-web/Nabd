@@ -161,6 +161,7 @@ class Acc029Acc030HouseholdDuplicatesApiTest extends ApiTestBase {
         JdbcTemplate su = new JdbcTemplate(superuserDataSource());
         su.update("INSERT INTO patients (tenant_id, name, phone, dob, gender) SELECT ?, 'Bulk ' || g, '+91' || (6000000000 + g)::text, date '1970-01-01' + (g % 20000), 'male' FROM generate_series(1, 200000) g", t.id());
         su.execute("ANALYZE patients");
+        su.update("DELETE FROM registry_dirty WHERE tenant_id = ?", t.id()); // the bulk rows are never read via the registry; left queued they make every later drain() time out on this tenant
         String mother = register(token, "Perf Mother", "+919877700041", "1988-04-02", null);
         register(token, "Perf Child", "+919877700041", LocalDate.now().minusYears(5).toString(), UUID.fromString(mother));
         for (int i = 0; i < 5; i++) household(token, "9877700041"); // warm up
@@ -311,6 +312,7 @@ class Acc029Acc030HouseholdDuplicatesApiTest extends ApiTestBase {
         JdbcTemplate su = new JdbcTemplate(superuserDataSource());
         su.update("INSERT INTO patients (tenant_id, name, phone, dob, gender) SELECT ?, 'Bulk ' || g || ' Person', '+91' || (6000000000 + g)::text, date '1970-01-01' + (g % 20000), 'male' FROM generate_series(1, 20000) g", t.id());
         su.execute("ANALYZE patients");
+        su.update("DELETE FROM registry_dirty WHERE tenant_id = ?", t.id()); // the bulk rows are never read via the registry; left queued they make every later drain() time out on this tenant
         register(token, N1, "+919877700099", "1990-01-01", null);
         register(token, N2, "+919877700099", "1991-02-02", null);
         long worst = 0;

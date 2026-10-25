@@ -56,15 +56,19 @@ public class RegistryProjector {
         drainLock.lock();
         try {
             for (UUID tenantId : tx.execute(s -> repo.dirtyTenants(100))) {
-                int claimed;
-                do {
-                    claimed = tx.execute(s -> {
-                        tenantContext.set(tenantId);
-                        List<UUID> ids = repo.claimDirty(tenantId, BATCH);
-                        publish(tenantId, repo.upsert(tenantId, ids));
-                        return ids.size();
-                    });
-                } while (claimed == BATCH);
+                try { // one tenant's failing batch (e.g. a statement timeout) must not starve the others
+                    int claimed;
+                    do {
+                        claimed = tx.execute(s -> {
+                            tenantContext.set(tenantId);
+                            List<UUID> ids = repo.claimDirty(tenantId, BATCH);
+                            publish(tenantId, repo.upsert(tenantId, ids));
+                            return ids.size();
+                        });
+                    } while (claimed == BATCH);
+                } catch (RuntimeException e) {
+                    log.warn("registry projector pass failed for tenant {}: {}", tenantId, e.toString());
+                }
             }
         } catch (RuntimeException e) {
             // rows stay queued (same transaction), the next poll retries; reconciliation is the backstop
