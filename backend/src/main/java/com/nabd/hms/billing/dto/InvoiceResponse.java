@@ -9,5 +9,6 @@ public record InvoiceResponse(UUID id, String invoiceNumber, UUID queueEntryId, 
                                UUID doctorId, String doctorName, String currency, BigDecimal subtotal,
                                BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,
                                BigDecimal paid, BigDecimal balanceDue, String status,
-                               List<LineItemResponse> lineItems, List<PaymentResponse> payments, Instant createdAt) {
+                               List<LineItemResponse> lineItems, List<PaymentResponse> payments, Instant createdAt,
+                               String documentTitle, String buyerGstin) {
 }

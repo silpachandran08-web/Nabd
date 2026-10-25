@@ -10,7 +10,7 @@
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
 modules:
   billing:
-    owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_payments, invoices]
+    owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoices, tax_rules]
     reads: []
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, favourite_rx_set_items, ingredients, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]
