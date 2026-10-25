@@ -17,7 +17,7 @@ export const AllergySchema = z.object({ reaction: z.string().optional(), severit
 export const AllergyCorrectionRequestSchema = z.object({ category: z.string().optional(), reaction: z.string().min(0).max(500).optional(), reason: z.string().min(0).max(500), severity: z.string().optional(), source: z.string().optional(), substance: z.string().min(0).max(200).optional() });
 export const AllergyEventResponseSchema = z.object({ actorId: z.string().optional(), actorName: z.string().optional(), after: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), allergyId: z.string().optional(), before: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), event: z.string().optional(), id: z.string().optional(), occurredAt: z.string().optional(), reason: z.string().optional(), substance: z.string().optional() });
 export const AllergyRemovalRequestSchema = z.object({ reason: z.string().min(0).max(500).optional() });
-export const AllergyResponseSchema = z.object({ active: z.boolean().optional(), category: z.string().optional(), deactivatedAt: z.string().optional(), deactivatedByName: z.string().optional(), deactivatedReason: z.string().optional(), id: z.string().optional(), patientId: z.string().optional(), reaction: z.string().optional(), recordedAt: z.string().optional(), recordedBy: z.string().optional(), recordedByName: z.string().optional(), severity: z.string().optional(), source: z.string().optional(), substance: z.string().optional(), updatedAt: z.string().optional() });
+export const AllergyResponseSchema = z.object({ active: z.boolean().optional(), category: z.string().optional(), deactivatedAt: z.string().optional(), deactivatedByName: z.string().optional(), deactivatedReason: z.string().optional(), id: z.string().optional(), patientId: z.string().optional(), reaction: z.string().optional(), recordedAt: z.string().optional(), recordedBy: z.string().optional(), recordedByName: z.string().optional(), severity: z.string().optional(), source: z.string().optional(), substance: z.string().optional(), unconfirmed: z.boolean().optional(), updatedAt: z.string().optional() });
 export const AllergyStatusResponseSchema = z.object({ activeCount: z.number().int().optional(), documentedAt: z.string().optional(), documentedBy: z.string().optional(), documentedByName: z.string().optional(), state: z.string().optional() });
 export const AllergyWriteRequestSchema = z.object({ category: z.string().optional(), reaction: z.string().min(0).max(500).optional(), severity: z.string().min(1), source: z.string().optional(), substance: z.string().min(0).max(200) });
 export const AppointmentResponseSchema = z.object({ cancelReason: z.string().optional(), doctorId: z.string().optional(), endTime: z.string().optional(), id: z.string().optional(), isFollowUp: z.boolean().optional(), patientId: z.string().optional(), startTime: z.string().optional(), status: z.string().optional() });
@@ -142,8 +142,17 @@ export const GrantResponseSchema = z.object({ active: z.boolean().optional(), de
 export const GuardianConsentSchema = z.object({ channel: z.string().optional(), confirmed: z.boolean().optional() });
 export const GuardianReviewDecisionRequestSchema = z.object({ decision: z.string() });
 export const GuardianReviewResponseSchema = z.object({ dob: z.string().optional(), guardianId: z.string().optional(), guardianName: z.string().optional(), mrn: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional() });
-export const ImportJobRequestSchema = z.object({ fileName: z.string().min(1), importType: z.string().min(1) });
-export const ImportJobResponseSchema = z.object({ createdAt: z.string().optional(), errorMessage: z.string().optional(), fileName: z.string().optional(), id: z.string().optional(), importType: z.string().optional(), resultUrl: z.string().optional(), status: z.string().optional() });
+export const ImportColumnSchema = z.object({ source: z.string().min(1), target: z.string().min(1) });
+export const ImportDecisionSchema = z.object({ action: z.string().min(1), row: z.number().int().optional() });
+export const ImportCommitRequestSchema = z.object({ duplicateDecisions: z.array(ImportDecisionSchema).optional() });
+export const ImportCommitResponseSchema = z.object({ status: z.string().optional() });
+export const ImportDuplicateRowSchema = z.object({ decision: z.string().optional(), dob: z.string().optional(), mobileEnding: z.string().optional(), name: z.string().optional(), reason: z.string().optional(), row: z.number().int().optional() });
+export const ImportDuplicatePageSchema = z.object({ items: z.array(ImportDuplicateRowSchema).optional(), nextAfterRow: z.number().int().optional() });
+export const ImportJobRequestSchema = z.object({ fileName: z.string().optional(), importType: z.string().min(1), sourceFormat: z.string().optional(), uploadId: z.string().optional() });
+export const ImportJobResponseSchema = z.object({ createdAt: z.string().optional(), diff: z.record(z.string(), z.unknown()).optional(), errorMessage: z.string().optional(), fileName: z.string().optional(), id: z.string().optional(), importType: z.string().optional(), mapping: z.record(z.string(), z.unknown()).optional(), resultUrl: z.string().optional(), rowsDone: z.number().int().optional(), rowsTotal: z.number().int().optional(), status: z.string().optional() });
+export const ImportMappingRequestSchema = z.object({ columns: z.array(ImportColumnSchema), dateFormat: z.string().optional() });
+export const ImportMappingResponseSchema = z.object({ diff: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), sample: z.array(z.record(z.string(), z.string())).optional() });
+export const ImportUploadResponseSchema = z.object({ fileName: z.string().optional(), sizeBytes: z.number().int().optional(), sourceFormat: z.string().optional(), uploadId: z.string().optional() });
 export const InstanceEventResponseSchema = z.object({ actorName: z.string().optional(), createdAt: z.string().optional(), delta: z.number().int().optional(), eventType: z.string().optional(), note: z.string().optional() });
 export const InstanceItemResponseSchema = z.object({ allocatedPrice: z.number().optional(), id: z.string().optional(), itemType: z.string().optional(), name: z.string().optional(), quantityConsumed: z.number().int().optional(), quantityTotal: z.number().int().optional(), taxRatePercent: z.number().optional(), unitListPrice: z.number().optional() });
 export const InstanceResponseSchema = z.object({ events: z.array(InstanceEventResponseSchema).optional(), graceDays: z.number().int().optional(), id: z.string().optional(), invoiceId: z.string().optional(), invoiceNumber: z.string().optional(), items: z.array(InstanceItemResponseSchema).optional(), packageId: z.string().optional(), packageName: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), soldPrice: z.number().optional(), soldTax: z.number().optional(), status: z.string().optional(), validityEnd: z.string().optional(), validityStart: z.string().optional() });
@@ -625,6 +634,12 @@ export const operationSchemas = {
   SetupController_deleteHoliday: {  },
   SetupController_importJobs: { response: z.array(ImportJobResponseSchema) },
   SetupController_createImportJob: { body: ImportJobRequestSchema, response: ImportJobResponseSchema },
+  ImportController_job: { response: ImportJobResponseSchema },
+  ImportController_commit: { body: ImportCommitRequestSchema, response: ImportCommitResponseSchema },
+  ImportController_duplicates: { response: ImportDuplicatePageSchema },
+  ImportController_errors: { response: z.string() },
+  ImportController_mapping: { body: ImportMappingRequestSchema, response: ImportMappingResponseSchema },
+  ImportController_upload: { body: z.string(), response: ImportUploadResponseSchema },
   SetupController_licences: { response: z.array(LicenceResponseSchema) },
   SetupController_addLicence: { body: LicenceWriteRequestSchema, response: LicenceResponseSchema },
   SetupController_updateLicence: { body: LicenceWriteRequestSchema, response: LicenceResponseSchema },

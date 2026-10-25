@@ -244,7 +244,7 @@ class Adm002DpaGateApiTest extends ApiTestBase {
 
     @Test
     void everyPatientCreatingPathGoesThroughTheGatedService() throws Exception {
-        // table-driven over the code base: the only INSERT INTO patients is PatientRepository.insert, called only by PatientService.register
+        // table-driven over the code base: INSERT INTO patients only in PatientRepository.insert (called only by PatientService.register) and PatientDirectoryJdbc.createImported (ADM-012, calls the gate itself)
         try (Stream<Path> files = Files.walk(Path.of("src/main/java"))) {
             List<Path> inserting = files.filter(p -> p.toString().endsWith(".java")).filter(p -> {
                 try {
@@ -253,7 +253,8 @@ class Adm002DpaGateApiTest extends ApiTestBase {
                     throw new IllegalStateException(e);
                 }
             }).toList();
-            assertThat(inserting).extracting(p -> p.getFileName().toString()).containsExactly("PatientRepository.java");
+            assertThat(inserting).extracting(p -> p.getFileName().toString()).containsExactlyInAnyOrder("PatientRepository.java", "PatientDirectoryJdbc.java"); // ADM-012: the import path, gated inside createImported
+            assertThat(Files.readString(Path.of("src/main/java/com/nabd/hms/patient/PatientDirectoryJdbc.java"))).contains("gate.requireRealData()");
         }
         String svc = Files.readString(Path.of("src/main/java/com/nabd/hms/patient/PatientService.java"));
         assertThat(svc.indexOf("dataGate.requireRealData()")).isPositive().isLessThan(svc.indexOf("repo.insert("));

@@ -10539,6 +10539,276 @@ paths:
       tags:
       - organization
       x-required-permission: setup:edit
+  /v1/setup/import-jobs/{id}:
+    get:
+      operationId: ImportController_job
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ImportJobResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/import-jobs/{id}/commit:
+    post:
+      operationId: ImportController_commit
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportCommitRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ImportCommitResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/import-jobs/{id}/duplicates:
+    get:
+      operationId: ImportController_duplicates
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: afterRow
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+          maximum: 100
+          minimum: 1
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ImportDuplicatePage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/import-jobs/{id}/errors.csv:
+    get:
+      operationId: ImportController_errors
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/import-jobs/{id}/mapping:
+    put:
+      operationId: ImportController_mapping
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportMappingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ImportMappingResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
+  /v1/setup/import-uploads:
+    post:
+      operationId: ImportController_upload
+      parameters:
+      - in: query
+        name: fileName
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: format
+        required: true
+        schema:
+          type: string
+          pattern: xlsx|csv
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+              format: byte
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ImportUploadResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - organization
+      x-required-permission: setup:edit
   /v1/setup/licences:
     get:
       operationId: SetupController_licences
@@ -12497,6 +12767,8 @@ components:
           type: string
         substance:
           type: string
+        unconfirmed:
+          type: boolean
         updatedAt:
           type: string
           format: date-time
@@ -14314,18 +14586,86 @@ components:
           format: uuid
         patientName:
           type: string
+    ImportColumn:
+      type: object
+      properties:
+        source:
+          type: string
+          minLength: 1
+        target:
+          type: string
+          minLength: 1
+      required:
+      - source
+      - target
+    ImportCommitRequest:
+      type: object
+      properties:
+        duplicateDecisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportDecision"
+          maxItems: 100000
+          minItems: 0
+    ImportCommitResponse:
+      type: object
+      properties:
+        status:
+          type: string
+    ImportDecision:
+      type: object
+      properties:
+        action:
+          type: string
+          minLength: 1
+          pattern: skip|merge|create
+        row:
+          type: integer
+          format: int32
+      required:
+      - action
+    ImportDuplicatePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportDuplicateRow"
+        nextAfterRow:
+          type: integer
+          format: int32
+    ImportDuplicateRow:
+      type: object
+      properties:
+        decision:
+          type: string
+        dob:
+          type: string
+        mobileEnding:
+          type: string
+        name:
+          type: string
+        reason:
+          type: string
+        row:
+          type: integer
+          format: int32
     ImportJobRequest:
       type: object
       properties:
         fileName:
           type: string
-          minLength: 1
         importType:
           type: string
           minLength: 1
           pattern: patients|appointments|invoices|charges
+        sourceFormat:
+          type: string
+          pattern: xlsx|csv
+        uploadId:
+          type: string
+          format: uuid
       required:
-      - fileName
       - importType
     ImportJobResponse:
       type: object
@@ -14333,6 +14673,8 @@ components:
         createdAt:
           type: string
           format: date-time
+        diff:
+          type: object
         errorMessage:
           type: string
         fileName:
@@ -14341,10 +14683,57 @@ components:
           type: string
         importType:
           type: string
+        mapping:
+          type: object
         resultUrl:
           type: string
+        rowsDone:
+          type: integer
+          format: int32
+        rowsTotal:
+          type: integer
+          format: int32
         status:
           type: string
+    ImportMappingRequest:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportColumn"
+          maxItems: 40
+          minItems: 0
+        dateFormat:
+          type: string
+      required:
+      - columns
+    ImportMappingResponse:
+      type: object
+      properties:
+        diff:
+          type: object
+          additionalProperties:
+            type: object
+        sample:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+    ImportUploadResponse:
+      type: object
+      properties:
+        fileName:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int32
+        sourceFormat:
+          type: string
+        uploadId:
+          type: string
+          format: uuid
     InstanceEventResponse:
       type: object
       properties:
