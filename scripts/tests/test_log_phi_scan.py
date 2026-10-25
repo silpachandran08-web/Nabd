@@ -17,5 +17,10 @@ class T(unittest.TestCase):
         self.assertFalse(scan('class A { void f() { log.info("code token reason {} {}", id, note.id()); } }'))
     def test_marker_suppresses(self):
         self.assertFalse(scan('class A { void f() { log.info("x {}", token); // log-phi-ok: queue number\n } }'))
+    def test_class_name_needs_reviewed_marker(self):
+        self.assertTrue(scan('class A { void f() { log.warn("x {}", e.getClass().getSimpleName()); } }'))
+        self.assertFalse(scan('class A { void f() { log.warn("x {}", e.getClass().getSimpleName()); // log-phi-ok: class name\n } }'))
+    def test_main_tree_is_clean(self):
+        self.assertEqual(s.scan([str(pathlib.Path(__file__).parents[2] / 'backend/src/main/java')]), [])
 
 unittest.main()

@@ -70,7 +70,7 @@ class OptOutService {
     private void confirm(UUID tenant, String phone, String templateName) {
         Optional<WhatsAppTemplateRepository.Template> t = templates.findByName(tenant, templateName, "en");
         if (t.isEmpty() || !t.get().sendable() || t.get().paramCount() != 0) {
-            log.info("no sendable '{}' template for tenant {}: confirmation not sent", templateName, tenant);
+            log.info("no sendable '{}' template for tenant {}: confirmation not sent", templateName, tenant); // log-phi-ok: template name is a system constant, not patient data
             return;
         }
         messages.queueTemplate(null, "+" + phone, templateName, "en", List.of());

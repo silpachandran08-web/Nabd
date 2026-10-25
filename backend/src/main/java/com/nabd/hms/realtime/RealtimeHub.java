@@ -203,7 +203,7 @@ public class RealtimeHub {
                 }
             }
         } catch (RuntimeException e) {
-            log.warn("realtime message dropped: {}", e.getClass().getSimpleName());
+            log.warn("realtime message dropped: {}", e.getClass().getSimpleName()); // log-phi-ok: exception class name
         }
     }
 
@@ -241,7 +241,7 @@ public class RealtimeHub {
                     return StreamId.parse(last.get(0).getId().getValue());
                 }
             } catch (RuntimeException e) {
-                log.warn("realtime cursor unavailable: {}", e.getClass().getSimpleName());
+                log.warn("realtime cursor unavailable: {}", e.getClass().getSimpleName()); // log-phi-ok: exception class name
             }
         }
         return new StreamId(now, 0);
@@ -263,7 +263,7 @@ public class RealtimeHub {
                 }
             }
         } catch (RuntimeException e) {
-            log.warn("realtime replay unavailable: {}", e.getClass().getSimpleName());
+            log.warn("realtime replay unavailable: {}", e.getClass().getSimpleName()); // log-phi-ok: exception class name
         }
         return out;
     }

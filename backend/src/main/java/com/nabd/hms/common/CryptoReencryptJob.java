@@ -90,7 +90,7 @@ public class CryptoReencryptJob {
                 }
             }
         } catch (RuntimeException e) {
-            log.warn("crypto re-encrypt paused ({}); resumes from its checkpoint next interval", e.getClass().getSimpleName());
+            log.warn("crypto re-encrypt paused ({}); resumes from its checkpoint next interval", e.getClass().getSimpleName()); // log-phi-ok: exception class name
         }
     }
 

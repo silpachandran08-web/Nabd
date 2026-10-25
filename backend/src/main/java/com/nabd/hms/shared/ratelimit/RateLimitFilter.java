@@ -138,7 +138,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             events.publish(tenant, EXCEEDED_EVENT, Map.of("tenantId", tenant.toString(), "dimension", dim,
                     "keyHash", hash(b.key()), "limit", b.perMinute(), "windowSeconds", 60));
         } catch (RuntimeException e) { // the 429 still goes out; the counter above already recorded the hit
-            log.warn("could not publish {}: {}", EXCEEDED_EVENT, e.getClass().getSimpleName());
+            log.warn("could not publish {}: {}", EXCEEDED_EVENT, e.getClass().getSimpleName()); // log-phi-ok: exception class name
         }
     }
 

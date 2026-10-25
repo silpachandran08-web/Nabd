@@ -143,7 +143,7 @@ public class RoleService {
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null, "role.reset_to_preset", "role", id,
                 Map.of("presetVersion", String.valueOf(current.presetVersion()), "grants", readGrants(current.grantsJson())),
                 Map.of("presetVersion", String.valueOf(after.presetVersion()), "grants", readGrants(after.grantsJson())));
-        log.info("role {} reset to preset {} v{} by {} (tenant {})", id, preset.code(), RolePresets.VERSION, callerStaffId, tenantId);
+        log.info("role {} reset to preset {} v{} by {} (tenant {})", id, preset.code(), RolePresets.VERSION, callerStaffId, tenantId); // log-phi-ok: preset code is a system constant
         return toResponse(after);
     }
 
