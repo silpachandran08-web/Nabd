@@ -6,7 +6,7 @@ import AccessGate from "../components/ui/AccessGate";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
-import { apiFetch } from "../lib/apiClient";
+import { api, ApiError } from "../lib/api";
 
 // PLT-057. Matches GET /v1/support-access/requests and POST /v1/support-access/requests/{id}/decision.
 type Req = {
@@ -33,9 +33,7 @@ function Inner() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const res = await apiFetch("/support-access/requests");
-      if (!res.ok) throw new Error(String(res.status));
-      setItems((await res.json()).items);
+      setItems((await api.get<{ items: Req[] }>("/support-access/requests")).items);
     } catch {
       setError("Couldn't load support access requests. Try again.");
     }
@@ -46,16 +44,12 @@ function Inner() {
     setActing(id);
     setActionError(null);
     try {
-      const res = await apiFetch(`/support-access/requests/${id}/decision`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, note: decision === "decline" ? note[id] || undefined : undefined }),
-      });
-      if (res.status === 409) setActionError("This request was already answered.");
-      else if (res.status === 410) setActionError("This request expired before you answered.");
-      else if (!res.ok) setActionError("Couldn't save your answer. Try again.");
+      await api.post(`/support-access/requests/${id}/decision`, { decision, note: decision === "decline" ? note[id] || undefined : undefined });
       await load();
-    } catch {
-      setActionError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      setActionError(status === 409 ? "This request was already answered." : status === 410 ? "This request expired before you answered." : status ? "Couldn't save your answer. Try again." : "Couldn't reach the server. Check your connection and try again.");
+      await load();
     } finally {
       setActing(null);
     }

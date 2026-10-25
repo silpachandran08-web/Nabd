@@ -6,13 +6,11 @@ import { decodeAccessToken, landingPathFor } from "../../lib/session";
 import { storeTokens } from "../../lib/apiClient";
 import styles from "../../login/login.module.css";
 import MfaEnrolCard from "../../components/MfaEnrolCard";
-import type { Problem } from "@nabd/api-client/types";
+import { publicApi, ApiError, reasonText } from "../../lib/api";
 
 // Matches POST /v1/staff/invitations/{token}/accept (StaffController.acceptInvite) — used by both
 // regular staff invites (staff/page.tsx) and the owner invite provisioning now sends (NB-353).
 type TokenPair = { accessToken: string; refreshToken: string; expiresIn: number };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function AcceptInvitePage() {
   const router = useRouter();
@@ -36,27 +34,17 @@ export default function AcceptInvitePage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/staff/invitations/${token}/accept`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setFormError((body as Problem).detail || "That invite link is invalid or has expired.");
-        return;
-      }
+      const body = await publicApi.post<TokenPair | { setupToken: string }>(`/staff/invitations/${token}/accept`, { pin }, { keepSession: true });
       if ("setupToken" in body) {
         setSetupToken(body.setupToken);
         return;
       }
-      const pair = body as TokenPair;
-      storeTokens(pair);
+      storeTokens(body);
       // Land where the role works (as login does); /account when the role has no home worklist.
-      const claims = decodeAccessToken(pair.accessToken);
+      const claims = decodeAccessToken(body.accessToken);
       router.replace(landingPathFor(claims?.permissions ?? [], claims?.owner === true));
-    } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.detail || "That invite link is invalid or has expired." : reasonText(err, ""));
     } finally {
       setLoading(false);
     }
@@ -74,7 +62,7 @@ export default function AcceptInvitePage() {
               <button className={styles.submit} type="button" onClick={() => router.replace("/login")}>Sign in now</button>
             </>
           ) : (
-            <MfaEnrolCard enrollUrl={`${API_BASE}/auth/mfa/enroll`} confirmUrl={`${API_BASE}/auth/mfa/confirm`} setupToken={setupToken}
+            <MfaEnrolCard enrollPath="/auth/mfa/enroll" confirmPath="/auth/mfa/confirm" setupToken={setupToken}
               subtitle="Your role requires an authenticator app before you can sign in."
               onDone={(b) => setRecoveryCodes((b as { recoveryCodes?: string[] } | null)?.recoveryCodes ?? [])} />
           )}

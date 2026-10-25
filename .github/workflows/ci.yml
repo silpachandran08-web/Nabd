@@ -75,7 +75,7 @@ jobs:
         working-directory: frontend
         run: |
           pnpm install --frozen-lockfile
-          pnpm turbo run typecheck lint check:permissions
+          pnpm turbo run typecheck lint check:permissions check:raw-api
       - name: OpenAPI valid
         run: pip install -q openapi-spec-validator && python3 -m openapi_spec_validator api/openapi.yaml
       - name: Event schemas (OPS-015 catalogue, PHI denylist, envelope < 2 KB) and the gate's own tests

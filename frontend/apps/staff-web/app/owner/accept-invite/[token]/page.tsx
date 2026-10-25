@@ -3,15 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import styles from "../../../login/login.module.css";
-import type { Problem } from "@nabd/api-client/types";
+import { publicApi, ApiError, reasonText } from "../../../lib/api";
 
 // Matches POST /v1/owners/invitations/{token}/accept (OwnerController) — sets this owner's
 // top-level account PIN (separate from any per-clinic staff PIN) and, like staff's own accept-invite,
 // logs them straight in: here that means handing back a pending workspace token, not real clinic
 // tokens, since which clinic to enter still isn't chosen yet.
 type PendingWorkspaceToken = { pendingToken: string; expiresIn: number };
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function OwnerAcceptInvitePage() {
   const router = useRouter();
@@ -32,26 +30,16 @@ export default function OwnerAcceptInvitePage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/owners/invitations/${token}/accept`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pin }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setFormError((body as Problem).detail || "That invite link is invalid or has expired.");
-        return;
-      }
+      const body = await publicApi.post<PendingWorkspaceToken | { setupToken: string }>(`/owners/invitations/${token}/accept`, { pin }, { keepSession: true });
       if ("setupToken" in body) { // PLT-005: owners must enrol an authenticator before any workspace
         sessionStorage.setItem("nabd_owner_setup_token", body.setupToken); // read once by /owner/login
         router.replace("/owner/login");
         return;
       }
-      const pair = body as PendingWorkspaceToken;
-      sessionStorage.setItem("nabd_owner_pending_token", pair.pendingToken);
+      sessionStorage.setItem("nabd_owner_pending_token", body.pendingToken);
       router.replace("/owner/workspaces");
-    } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.detail || "That invite link is invalid or has expired." : reasonText(err, ""));
     } finally {
       setLoading(false);
     }

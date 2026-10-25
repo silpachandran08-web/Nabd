@@ -1,19 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import styles from "./account.module.css";
-import { apiFetch, goLogin, storeTokens } from "../lib/apiClient";
-import type { Problem } from "@nabd/api-client/types";
+import { storeTokens } from "../lib/apiClient";
+import { api, reasonText } from "../lib/api";
 
 // E05: self-service security — MFA enrollment (NB-042), session list/revoke (NB-043), and
 // self-activated emergency access (NB-048). All work against a normal logged-in access token.
 type Session = { id: string; device: string | null; ip: string | null; lastSeenAt: string; current: boolean };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
 export default function AccountPage() {
-  const router = useRouter();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,44 +26,17 @@ export default function AccountPage() {
   const [bgError, setBgError] = useState<string | null>(null);
   const [bgActive, setBgActive] = useState(false);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await authedFetch("/auth/sessions");
-      if (!res) return;
-      if (!res.ok) {
-        setError("Couldn't load your sessions.");
-        return;
-      }
-      setSessions(await res.json());
-    } catch {
-      setError("Couldn't reach the server.");
+      setSessions(await api.get<Session[]>("/auth/sessions"));
+    } catch (e) {
+      setError(reasonText(e, "Couldn't load your sessions."));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -75,9 +44,10 @@ export default function AccountPage() {
 
   async function revoke(id: string) {
     setError(null);
-    const res = await authedFetch(`/auth/sessions/${id}`, { method: "DELETE" });
-    if (res && !res.ok) {
-      setError("Couldn't revoke that session.");
+    try {
+      await api.delete(`/auth/sessions/${id}`);
+    } catch (e) {
+      setError(reasonText(e, "Couldn't revoke that session."));
       return;
     }
     setSessions((prev) => prev.filter((s) => s.id !== id));
@@ -86,13 +56,13 @@ export default function AccountPage() {
   async function startEnroll() {
     setMfaError(null);
     setRecoveryCodes(null);
-    const res = await authedFetch("/auth/mfa/enroll", { method: "POST" });
-    if (!res) return;
-    if (!res.ok) {
-      setMfaError("Couldn't start setup.");
+    let body: { secretBase32: string };
+    try {
+      body = await api.post<{ secretBase32: string }>("/auth/mfa/enroll");
+    } catch (e) {
+      setMfaError(reasonText(e, "Couldn't start setup."));
       return;
     }
-    const body = await res.json();
     setSecretBase32(body.secretBase32);
     setEnrolling(true);
     setCode("");
@@ -103,16 +73,11 @@ export default function AccountPage() {
     setMfaError(null);
     setMfaBusy(true);
     try {
-      const res = await authedFetch("/auth/mfa/confirm", { method: "POST", body: JSON.stringify({ code }) });
-      if (!res) return;
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "", detail: "That code didn't match." }));
-        setMfaError(body.detail || "That code didn't match.");
-        return;
-      }
-      const body = await res.json();
+      const body = await api.post<{ recoveryCodes: string[] }>("/auth/mfa/confirm", { code });
       setRecoveryCodes(body.recoveryCodes);
       setEnrolling(false);
+    } catch (e) {
+      setMfaError(reasonText(e, "That code didn't match."));
     } finally {
       setMfaBusy(false);
     }
@@ -127,17 +92,11 @@ export default function AccountPage() {
     }
     setBgBusy(true);
     try {
-      const res = await authedFetch("/auth/break-glass/activate", { method: "POST", body: JSON.stringify({ reasonCode: "other", reasonText: bgReason.trim() }) });
-      if (!res) return;
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't activate emergency access." }));
-        setBgError(body.detail || "Couldn't activate emergency access.");
-        return;
-      }
-      const body = await res.json();
-      storeTokens(body);
+      storeTokens(await api.post<Parameters<typeof storeTokens>[0]>("/auth/break-glass/activate", { reasonCode: "other", reasonText: bgReason.trim() }));
       setBgActive(true);
       setBgReason("");
+    } catch (e) {
+      setBgError(reasonText(e, "Couldn't activate emergency access."));
     } finally {
       setBgBusy(false);
     }

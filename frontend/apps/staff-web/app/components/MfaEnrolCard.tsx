@@ -2,15 +2,15 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import styles from "../login/login.module.css";
-import type { Problem } from "@nabd/api-client/types";
+import { publicApi, ApiError, reasonText } from "../lib/api";
 
 // PLT-005: the forced-enrolment step (owner and platform sign-in). The setup token only opens the
 // enrol/confirm pair and travels in the body (PLT-001). onDone receives the confirm response body
 // (null for a 204), so each caller decides what comes next.
 
-export default function MfaEnrolCard({ enrollUrl, confirmUrl, setupToken, subtitle, onDone }: {
-  enrollUrl: string;
-  confirmUrl: string;
+export default function MfaEnrolCard({ enrollPath, confirmPath, setupToken, subtitle, onDone }: {
+  enrollPath: string; // paths under the API base, e.g. "/auth/mfa/enroll"
+  confirmPath: string;
   setupToken: string;
   subtitle: string;
   onDone: (body: unknown) => void;
@@ -23,38 +23,24 @@ export default function MfaEnrolCard({ enrollUrl, confirmUrl, setupToken, subtit
 
   useEffect(() => {
     let live = true;
-    fetch(enrollUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ setupToken }) })
-      .then(async (res) => {
-        const body = await res.json().catch(() => null);
-        if (!live) return;
-        if (!res.ok || !body) setError((body as Problem | null)?.detail || "Couldn't start authenticator setup. Sign in again.");
-        else setSecret(body);
-      })
-      .catch(() => live && setError("Couldn't reach the server. Check your connection and try again."));
+    publicApi.post<{ secretBase32: string; otpauthUri: string }>(enrollPath, { setupToken }, { keepSession: true })
+      .then((body) => { if (live) setSecret(body); })
+      .catch((e) => { if (live) setError(e instanceof ApiError ? e.detail || "Couldn't start authenticator setup. Sign in again." : reasonText(e, "")); });
     return () => { live = false; };
-  }, [enrollUrl, setupToken, attempt]);
+  }, [enrollPath, setupToken, attempt]);
 
   async function confirm(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(confirmUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ setupToken, code }),
-      });
-      const body = res.status === 204 ? null : await res.json().catch(() => null);
-      if (!res.ok) {
-        setCode("");
-        setError(res.status === 423 ? "Too many failed attempts. Try again later."
-          : res.status === 401 ? "That code didn't match. Check your authenticator app and try again."
-          : (body as Problem | null)?.detail || "Couldn't confirm the code.");
-        return;
-      }
-      onDone(body);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      onDone(await publicApi.post<unknown>(confirmPath, { setupToken, code }, { keepSession: true }) ?? null);
+    } catch (err) {
+      if (!(err instanceof ApiError)) { setError(reasonText(err, "")); return; }
+      setCode("");
+      setError(err.status === 423 ? "Too many failed attempts. Try again later."
+        : err.status === 401 ? "That code didn't match. Check your authenticator app and try again."
+        : err.detail || "Couldn't confirm the code.");
     } finally {
       setLoading(false);
     }

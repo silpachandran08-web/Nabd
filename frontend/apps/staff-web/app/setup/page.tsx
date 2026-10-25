@@ -12,10 +12,11 @@ import PatientImport from "../components/setup/PatientImport";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity, regionLabel } from "../lib/session";
-import { apiFetch, goLogin } from "../lib/apiClient";
-import type { Problem } from "@nabd/api-client/types";
+import { api, ApiError, reasonText } from "../lib/api";
+import { intentKeys } from "@nabd/api-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+// FEF-018: one idempotency key per save intent, so a retry after a dropped answer cannot double-apply.
+const intents = intentKeys();
 
 
 type ChecklistItem = { step: string; status: "pending" | "skipped" | "done"; skippedAt: string | null; doneAt: string | null };
@@ -113,37 +114,18 @@ function SetupPageInner() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) {
-      goLogin();
-      return null;
-    }
-    const res = await apiFetch(path, {
-      ...init,
-      headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-    if (res.status === 401) {
-      localStorage.removeItem("nabd_access_token");
-      goLogin();
-      return null;
-    }
-    return res;
-  }, [router]);
-
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const fetchJson = async <T,>(path: string): Promise<T | null> => {
-        const res = await authedFetch(path);
-        if (!res) return null;
-        if (!res.ok) {
-          const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-          setError(p.detail || `Failed to load ${path}`);
+        try {
+          return await api.get<T>(path);
+        } catch (e) {
+          if (!(e instanceof ApiError)) throw e;
+          setError(reasonText(e, `Failed to load ${path}`));
           return null;
         }
-        return res.json();
       };
       const wanted = new Set(TAB_DATA[tab] ?? []);
       const [cl, pr, ch, po, co, ho, sh, su, ij, ej, li, st] = await Promise.all([
@@ -172,12 +154,12 @@ function SetupPageInner() {
       if (ej) setExportJobs(ej);
       if (li) setLicences(li);
       if (st) setStaff(st);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      setError(reasonText(e, ""));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, tab]);
+  }, [tab]);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body itself never calls setState
@@ -190,27 +172,22 @@ function SetupPageInner() {
     });
   }, [loadAll]);
 
-  const post = async (path: string, body: unknown) => {
-    const res = await authedFetch(path, { method: "POST", body: JSON.stringify(body) });
-    if (!res) return false;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-      setError(p.detail || "Request failed");
+  // A failed save keeps the form as it is: the tab stays, and a banner offers Retry (same body, same Idempotency-Key).
+  const [saveFail, setSaveFail] = useState<{ message: string; retry: () => void } | null>(null);
+  const mutate = async (method: "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<boolean> => {
+    const name = `${method} ${path}`;
+    try {
+      await api.request(method, path, { body, idempotencyKey: intents.get(name, body) });
+      intents.done(name);
+      setSaveFail(null);
+      return true;
+    } catch (e) {
+      setSaveFail({ message: reasonText(e, "Request failed"), retry: () => { void mutate(method, path, body).then((ok) => { if (ok) void loadAll(); }); } });
       return false;
     }
-    return true;
   };
-
-  const patch = async (path: string, body: unknown) => {
-    const res = await authedFetch(path, { method: "PATCH", body: JSON.stringify(body) });
-    if (!res) return false;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-      setError(p.detail || "Request failed");
-      return false;
-    }
-    return true;
-  };
+  const post = (path: string, body: unknown) => mutate("POST", path, body);
+  const patch = (path: string, body: unknown) => mutate("PATCH", path, body);
 
   const markStep = async (step: string, status: "skipped" | "done") => {
     if (await post(`/setup/checklist/${step}/${status === "skipped" ? "skip" : "complete"}`, { status })) {
@@ -220,8 +197,8 @@ function SetupPageInner() {
 
   // A failed save stays inline (unlike the shared patch(), which swaps the whole tab for an
   // error view) so the owner's edits are not lost.
-  const saveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const saveProfile = async (e?: React.FormEvent<HTMLFormElement>) => {
+    e?.preventDefault();
     if (!profile || profileSaving) return;
     setNotice(null);
     setProfileError(null);
@@ -235,17 +212,11 @@ function SetupPageInner() {
     };
     setProfileSaving(true);
     try {
-      const res = await authedFetch("/setup/profile", { method: "PATCH", body: JSON.stringify(body) });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem | null = await res.json().catch(() => null);
-        setProfileError(res.status === 403 ? "Your role can't change the clinic profile." : p?.detail || "Couldn't save the profile. Try again.");
-        return;
-      }
-      setProfile(await res.json());
+      setProfile(await api.patch<Profile>("/setup/profile", body, { idempotencyKey: intents.get("profile", body) }));
+      intents.done("profile");
       setNotice("Profile saved.");
-    } catch {
-      setProfileError("Couldn't reach the server. Your changes are still here; try again.");
+    } catch (e) {
+      setProfileError(e instanceof ApiError && e.status === 403 ? "Your role can't change the clinic profile." : e instanceof ApiError && e.status < 500 ? e.detail || "Couldn't save the profile. Try again." : `${reasonText(e, "")} Your changes are still here.`);
     } finally {
       setProfileSaving(false);
     }
@@ -296,8 +267,7 @@ function SetupPageInner() {
   };
 
   const deleteHoliday = async (id: string) => {
-    const res = await authedFetch(`/setup/holidays/${id}`, { method: "DELETE" });
-    if (res?.ok) loadAll();
+    if (await mutate("DELETE", `/setup/holidays/${id}`)) loadAll();
   };
 
   const [newShift, setNewShift] = useState<Partial<Shift>>({ patternJson: "{}" });
@@ -314,19 +284,13 @@ function SetupPageInner() {
     setPayrollLoading(true);
     setPayrollError(null);
     try {
-      const res = await authedFetch(`/setup/payroll-export?month=${encodeURIComponent(month)}`);
-      if (!res) return;
-      if (res.ok) setPayroll(await res.json());
-      else {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-        setPayrollError(p.detail || "Couldn't load the payroll export.");
-      }
-    } catch {
-      setPayrollError("Couldn't reach the server. Check your connection and try again.");
+      setPayroll(await api.get<PayrollRow[]>(`/setup/payroll-export?month=${encodeURIComponent(month)}`));
+    } catch (e) {
+      setPayrollError(e instanceof ApiError && e.status < 500 ? e.detail || "Couldn't load the payroll export." : reasonText(e, ""));
     } finally {
       setPayrollLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     if (tab !== "payroll") return;
@@ -399,7 +363,12 @@ function SetupPageInner() {
             {profile && (
               <form onSubmit={saveProfile}>
                 {notice && <div className={styles.notice} role="status"><Icon name="check" size={14} /> {notice}</div>}
-                {profileError && <div className={styles.errorState} role="alert">{profileError}</div>}
+                {profileError && (
+                  <div className={styles.errorState} role="alert">
+                    {profileError}{" "}
+                    <button type="button" className={styles.wizardBtn} disabled={profileSaving} onClick={() => void saveProfile()}>Try again</button>
+                  </div>
+                )}
                 {!canEditProfile && <p className={styles.regionNote}>View only: your role can&apos;t change the clinic profile.</p>}
                 <fieldset className={styles.plainFieldset} disabled={!canEditProfile || profileSaving}>
                 <div className={styles.field}>
@@ -817,7 +786,7 @@ function SetupPageInner() {
           </div>
         );
       case "whatsapp":
-        return <WhatsAppTemplates authedFetch={authedFetch} />;
+        return <WhatsAppTemplates />;
       default:
         return null;
     }
@@ -841,6 +810,12 @@ function SetupPageInner() {
         ))}
       </div>
 
+      {saveFail && (
+        <div className={styles.errorState} role="alert">
+          {saveFail.message}{" "}
+          <button type="button" className={styles.wizardBtn} onClick={saveFail.retry}>Retry</button>
+        </div>
+      )}
       {renderContent()}
     </main>
   );

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:permissions": "node scripts/check-permission-rendering.mjs",
+    "check:raw-api": "node scripts/check-raw-api.mjs",
     "typegen": "next typegen",
     "typecheck": "next typegen && tsc --noEmit",
     "test:unit": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/unit/*.test.mjs",

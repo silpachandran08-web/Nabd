@@ -5,31 +5,24 @@ import styles from "./dpa.module.css";
 import wizard from "../../setup/wizard/wizard.module.css";
 import { ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
+import { api, reasonText } from "../../lib/api";
 import { blockerText, otpValid, reacceptBanner, showSigning, type DpaStatus } from "../../lib/dpa";
 
-type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-
-async function problem(res: Response): Promise<{ type: string; detail: string }> {
-  const p = await res.json().catch(() => null);
-  return { type: String(p?.type ?? ""), detail: p?.detail || "Request failed" };
-}
-
-function useDpa(authedFetch: AuthedFetch) {
+function useDpa() {
   const [status, setStatus] = useState<DpaStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // no setState before the first await, so the effect below never sets state synchronously
   const fetchStatus = useCallback(async () => {
     try {
-      const res = await authedFetch("/setup/dpa");
-      if (res && res.ok) { setStatus((await res.json()) as DpaStatus); setError(null); }
-      else if (res) setError((await problem(res)).detail);
-    } catch {
-      setError("Could not load the agreement. Check your connection.");
+      setStatus(await api.get<DpaStatus>("/setup/dpa"));
+      setError(null);
+    } catch (e) {
+      setError(reasonText(e, "Could not load the agreement."));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load; state is set after the awaited fetch
   useEffect(() => { void fetchStatus(); }, [fetchStatus]);
   const reload = useCallback(() => { setLoading(true); return fetchStatus(); }, [fetchStatus]);
@@ -37,15 +30,15 @@ function useDpa(authedFetch: AuthedFetch) {
 }
 
 /** Non-blocking notice for a live clinic when a newer DPA than the accepted one exists. Renders nothing otherwise. */
-export function DpaReacceptBanner({ authedFetch }: { authedFetch: AuthedFetch }) {
-  const { status } = useDpa(authedFetch);
+export function DpaReacceptBanner() {
+  const { status } = useDpa();
   const text = reacceptBanner(status);
   return text ? <div className={styles.banner} role="status">{text}</div> : null;
 }
 
 /** The DPA step: plain summary, full text on demand, OTP confirmation, signed PDF download. */
-export default function DpaPanel({ authedFetch }: { authedFetch: AuthedFetch }) {
-  const { status, error, loading, reload } = useDpa(authedFetch);
+export default function DpaPanel() {
+  const { status, error, loading, reload } = useDpa();
   const [challenge, setChallenge] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,30 +53,28 @@ export default function DpaPanel({ authedFetch }: { authedFetch: AuthedFetch }) 
 
   async function sendCode() {
     setBusy(true); setFail(null); setMsg(null);
-    const res = await authedFetch("/setup/dpa/otp", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: "{}" });
-    if (res?.ok) { setChallenge(((await res.json()) as { otpChallengeId: string }).otpChallengeId); setMsg("A code was sent to your registered mobile."); }
-    else if (res) setFail((await problem(res)).detail);
+    try {
+      setChallenge((await api.post<{ otpChallengeId: string }>("/setup/dpa/otp", {})).otpChallengeId);
+      setMsg("A code was sent to your registered mobile.");
+    } catch (e) { setFail(reasonText(e, "Request failed")); }
     setBusy(false);
   }
 
   async function sign() {
     if (!challenge || !status) return;
     setBusy(true); setFail(null); setMsg(null);
-    const res = await authedFetch("/setup/dpa/accept", {
-      method: "POST",
-      headers: { "Idempotency-Key": crypto.randomUUID() },
-      body: JSON.stringify({ version: status.version, otpChallengeId: challenge, otp }),
-    });
-    if (res?.ok) { setOtp(""); setChallenge(null); await reload(); setMsg("Agreement signed."); }
-    else if (res) setFail((await problem(res)).detail);
+    try {
+      await api.post("/setup/dpa/accept", { version: status.version, otpChallengeId: challenge, otp });
+      setOtp(""); setChallenge(null); await reload(); setMsg("Agreement signed.");
+    } catch (e) { setFail(reasonText(e, "Request failed")); }
     setBusy(false);
   }
 
   async function download() {
     if (!status?.accepted) return;
-    const res = await authedFetch(`/setup/dpa/acceptances/${status.accepted.acceptanceId}/pdf`);
-    if (!res || !res.ok) { setFail("Could not download the signed PDF."); return; }
-    const url = URL.createObjectURL(await res.blob());
+    let blob: Blob;
+    try { blob = await api.get<Blob>(`/setup/dpa/acceptances/${status.accepted.acceptanceId}/pdf`, { as: "blob" }); } catch { setFail("Could not download the signed PDF."); return; }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "nabd-dpa.pdf"; a.click();
     URL.revokeObjectURL(url);

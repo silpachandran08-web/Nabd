@@ -10,8 +10,6 @@ export type OperatorProfile = {
   permissions: string[];
 };
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
 export type Surface = {
   /** "" = every signed-in operator (Command Centre has no surface permission of its own). */
   permission: string;

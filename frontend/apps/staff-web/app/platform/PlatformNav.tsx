@@ -8,7 +8,7 @@ import Icon from "../components/ui/Icon";
 import { Skeleton } from "../components/ui/StateViews";
 import { initials as initialsOf } from "@nabd/domain";
 import { groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
-import { hasPlatformSession, platformLogout, usePlatformFetch } from "./platformApi";
+import { hasPlatformSession, platformApi, platformLogout } from "./platformApi";
 
 // Every /platform/* page used to be a dead end: only the Command Centre
 // landing page (page.tsx) rendered the surface list, so navigating into any
@@ -18,7 +18,6 @@ import { hasPlatformSession, platformLogout, usePlatformFetch } from "./platform
 export function PlatformNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const fetchAuthed = usePlatformFetch();
   const [profile, setProfile] = useState<OperatorProfile | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0); // bumped by Retry
@@ -28,13 +27,11 @@ export function PlatformNav() {
     if (!hasPlatformSession()) return;
     let cancelled = false;
     (async () => {
-      const res = await fetchAuthed("/platform/auth/me");
-      if (cancelled || !res) return;
-      if (res.ok) { setProfile(await res.json()); setFailed(false); }
-      else setFailed(true);
+      const me = await platformApi.get<OperatorProfile>("/platform/auth/me");
+      if (!cancelled) { setProfile(me); setFailed(false); }
     })().catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
-  }, [pathname, fetchAuthed, attempt]);
+  }, [pathname, attempt]);
 
   if (pathname === "/platform/login") return null;
 
