@@ -114,8 +114,16 @@ export const DpaAcceptRequestSchema = z.object({ eSignRef: z.string().optional()
 export const DpaAcceptResponseSchema = z.object({ acceptanceId: z.string().optional(), blockers: z.array(z.string()).optional(), dataGate: z.string().optional(), pdfUrl: z.string().optional() });
 export const DpaOtpChallengeResponseSchema = z.object({ expiresAt: z.string().optional(), otpChallengeId: z.string().optional() });
 export const DpaStatusResponseSchema = z.object({ accepted: AcceptedSchema.optional(), blockers: z.array(z.string()).optional(), dataGate: z.string().optional(), html: z.string().optional(), marketCode: z.string().optional(), reacceptDueBy: z.string().optional(), version: z.string().optional() });
+export const DrugClassSchema = z.object({ id: z.string().optional(), name: z.string().optional() });
+export const DrugIngredientSchema = z.object({ amount: z.number().optional(), id: z.string().optional(), name: z.string().optional(), unit: z.string().optional() });
+export const DrugSourceSchema = z.object({ kb: z.string().optional(), month: z.string().optional() });
+export const DrugDetailSchema = z.object({ brand: z.string().optional(), classes: z.array(DrugClassSchema).optional(), form: z.string().optional(), generic: z.array(z.string()).optional(), id: z.string().optional(), ingredients: z.array(DrugIngredientSchema).optional(), lactationNote: z.string().optional(), pregnancyCategory: z.string().optional(), route: z.string().optional(), schedule: z.array(z.string()).optional(), source: DrugSourceSchema.optional(), status: z.string().optional(), strength: z.string().optional() });
 export const DrugKnowledgeBaseSourceSchema = z.object({ configured: z.boolean().optional(), dataMonth: z.string().optional(), source: z.string().optional() });
+export const DrugLinkRequestSchema = z.object({ drugId: z.string().min(0).max(80) });
+export const DrugMasterActivateRequestSchema = z.object({ csoAckRef: z.string().min(0).max(200).optional() });
+export const DrugMasterImportRequestSchema = z.object({ dryRun: z.boolean().optional(), feedUri: z.string().min(0).max(300), kind: z.string().min(1) });
 export const DrugSuggestionResponseSchema = z.object({ code: z.string().optional(), inStock: z.boolean().optional(), name: z.string().optional(), prescriptionOnly: z.boolean().optional(), source: z.string().optional() });
+export const DrugSummarySchema = z.object({ brand: z.string().optional(), form: z.string().optional(), generic: z.array(z.string()).optional(), id: z.string().optional(), schedule: z.array(z.string()).optional(), strength: z.string().optional() });
 export const DueConditionResponseSchema = z.object({ condition: z.string().optional(), id: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), reviewDueDate: z.string().optional() });
 export const DuplicateSuggestionPageSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
 export const EncounterListItemSchema = z.object({ amendmentCount: z.number().int().optional(), documentsDraft: z.number().int().optional(), documentsIssued: z.number().int().optional(), noteSignedAt: z.string().optional(), noteState: z.string().optional(), occurredAt: z.string().optional(), patientId: z.string().optional(), patientMrn: z.string().optional(), patientName: z.string().optional(), queueDate: z.string().optional(), queueEntryId: z.string().optional(), rxItemCount: z.number().int().optional(), rxStatus: z.string().optional(), visitStatus: z.string().optional() });
@@ -221,7 +229,7 @@ export const PatientViewResponseSchema = z.object({ birthYear: z.number().int().
 export const PatientWriteRequestSchema = z.object({ address: z.string().optional(), confirmedNotDuplicate: z.boolean().optional(), dob: z.string(), gender: z.string().min(1), guardianConsent: GuardianConsentSchema.optional(), guardianId: z.string().optional(), name: z.string().min(1), nationalId: z.string().optional(), phone: z.string().min(1), synthetic: z.boolean().optional() });
 export const PaymentRequestSchema = z.object({ amount: z.number().gte(0.01), method: z.string(), reference: z.string().min(0).max(100).optional() });
 export const PayrollExportRowResponseSchema = z.object({ days: z.number().int().optional(), hours: z.number().optional(), notes: z.string().optional(), role: z.string().optional(), salary: z.number().optional(), staffId: z.string().optional(), staffName: z.string().optional() });
-export const PharmacyItemResponseSchema = z.object({ active: z.boolean().optional(), code: z.string().optional(), hsnCode: z.string().optional(), id: z.string().optional(), isRx: z.boolean().optional(), name: z.string().optional(), price: z.number().optional(), stockQty: z.number().int().optional(), taxRatePercent: z.number().optional() });
+export const PharmacyItemResponseSchema = z.object({ active: z.boolean().optional(), code: z.string().optional(), drugId: z.string().optional(), hsnCode: z.string().optional(), id: z.string().optional(), isRx: z.boolean().optional(), name: z.string().optional(), price: z.number().optional(), stockQty: z.number().int().optional(), taxRatePercent: z.number().optional() });
 export const PharmacyItemStatusRequestSchema = z.object({ active: z.boolean(), reason: z.string().min(0).max(500).optional() });
 export const PharmacyItemWriteRequestSchema = z.object({ hsnCode: z.string().optional(), isRx: z.boolean().optional(), name: z.string().min(1), price: z.number().gte(0), stockQty: z.number().int().gte(0).optional(), taxRatePercent: z.number().gte(0).optional() });
 export const PharmacySettingsResponseSchema = z.object({ mode: z.string().optional() });
@@ -354,6 +362,9 @@ export const WorkspacesResponseSchema = z.object({ brands: z.array(BrandWorkspac
 
 export const operationSchemas = {
   JwksController_jwks: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  DrugMasterImportController_start: { body: DrugMasterImportRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  DrugMasterImportController_status: { response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  DrugMasterImportController_activate: { body: DrugMasterActivateRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   NotificationClaimController_claim: { response: NotificationClaimSchema },
   SafetyDictionaryController_listSafetyDictionaryVersions: { response: z.array(z.record(z.string(), z.record(z.string(), z.unknown()))) },
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { body: SafetyDictionaryBundleSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
@@ -407,7 +418,9 @@ export const operationSchemas = {
   ClinicalDocumentController_update: { body: UpdateRequestSchema, response: DocumentResponseSchema },
   ClinicalDocumentController_issue: { response: DocumentResponseSchema },
   DrugKnowledgeBaseController_get: { response: DrugKnowledgeBaseSourceSchema },
+  DrugMasterController_search: { response: z.array(DrugSummarySchema) },
   PrescriptionController_searchDrugs: { response: z.array(DrugSuggestionResponseSchema) },
+  DrugMasterController_detail: { response: DrugDetailSchema },
   EncounterListController_list: { response: EncounterListPageSchema },
   NoteTemplateController_list: { response: z.array(TemplateResponseSchema) },
   NoteTemplateController_create: { body: CreateRequestSchema, response: TemplateResponseSchema },
@@ -539,6 +552,7 @@ export const operationSchemas = {
   PharmacyController_items: { response: z.array(PharmacyItemResponseSchema) },
   PharmacyController_addItem: { body: PharmacyItemWriteRequestSchema, response: PharmacyItemResponseSchema },
   PharmacyController_updateItem: { body: PharmacyItemWriteRequestSchema, response: PharmacyItemResponseSchema },
+  PharmacyController_linkDrug: { body: DrugLinkRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   PharmacyController_setStatus: { body: PharmacyItemStatusRequestSchema, response: PharmacyItemResponseSchema },
   PharmacyController_adjustStock: { body: PharmacyStockAdjustmentRequestSchema, response: PharmacyItemResponseSchema },
   PharmacyController_stockMovements: { response: z.array(PharmacyStockMovementResponseSchema) },

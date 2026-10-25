@@ -126,6 +126,7 @@ schemas:
       session_id: operational
       deactivated_by: operational
     charge_catalogue:
+      drug_id: operational
       id: operational
       tenant_id: operational
       code: operational
@@ -1053,6 +1054,58 @@ schemas:
       mfa_required: operational
       preset_code: operational
       preset_version: operational
+    drug_classes:
+      id: operational
+      name: operational
+    drug_ingredients:
+      drug_id: operational
+      ingredient_id: operational
+      amount: operational
+      unit: operational
+    drug_master:
+      id: operational
+      region: operational
+      kb_id: operational
+      brand: operational
+      strength: operational
+      form: operational
+      route: operational
+      schedule: operational
+      pregnancy_category: operational
+      lactation_note: operational
+      status: operational
+      version: operational
+      import_id: operational
+      search_text: operational
+    drug_master_imports:
+      id: operational
+      region: operational
+      kind: operational
+      dry_run: operational
+      status: operational
+      feed_checksum: operational
+      kb: operational
+      data_month: operational
+      version: operational
+      base_version: operational
+      diff: operational
+      classes: operational
+      error: operational
+      cso_ack_ref: operational
+      created_by: operational
+      started_at: operational
+      finished_at: operational
+      activated_at: operational
+    drug_master_stage:
+      import_id: operational
+      kb_id: operational
+      product: operational
+    ingredients:
+      id: operational
+      name: operational
+      inn: operational
+      synonyms: operational
+      class_ids: operational
     safety_dictionary_entries:
       id: operational
       version_id: operational

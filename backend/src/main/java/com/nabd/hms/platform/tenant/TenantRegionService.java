@@ -28,6 +28,12 @@ public class TenantRegionService {
         this.tx = new TransactionTemplate(txManager);
     }
 
+    /** CLN-019: the tenants of a region (regional reference data changes fan out per tenant). */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public java.util.List<UUID> tenantIdsIn(String regionCode) {
+        return repo.tenantIdsIn(regionCode);
+    }
+
     public TenantRegionResponse change(UUID tenantId, String regionCode) {
         try {
             // the refused UPDATE rolls its own transaction back; the 409 is built outside it

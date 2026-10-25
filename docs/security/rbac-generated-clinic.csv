@@ -10,6 +10,7 @@ owner,DELETE /v1/roles/delegations/{id},staff:edit,allow
 owner,DELETE /v1/setup/holidays/{id},setup:edit,allow
 owner,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,allow
 owner,DELETE /v1/waitlist/{id},queue:edit,allow
+owner,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 owner,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 owner,GET /v1/appointments,queue:view,allow
 owner,GET /v1/appointments/callback-list,queue:view,allow
@@ -25,7 +26,9 @@ owner,GET /v1/billing/otc-charges,billing:view,allow
 owner,GET /v1/clinical/conditions/due,clinical:view,allow
 owner,GET /v1/clinical/documents/{id},clinical:view,allow
 owner,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
+owner,GET /v1/clinical/drugs,clinical:view|pharmacy:view,allow
 owner,GET /v1/clinical/drugs/search,clinical:edit|clinical:view,allow
+owner,GET /v1/clinical/drugs/{drugId},clinical:view|pharmacy:view,allow
 owner,GET /v1/clinical/encounters,clinical:view,allow
 owner,GET /v1/clinical/note-templates,clinical:view,allow
 owner,GET /v1/clinical/notes/{queueEntryId},clinical:view,allow
@@ -175,6 +178,8 @@ owner,PATCH /v1/setup/whatsapp-templates/{id},setup:edit,allow
 owner,PATCH /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,allow
 owner,PATCH /v1/specialty/dental/patients/{patientId}/chart/{toothNumber},specialty_dental:edit,allow
 owner,PATCH /v1/staff/{id},staff:edit,allow
+owner,POST /internal/v1/drug-master/imports,kb_import:edit,deny-401
+owner,POST /internal/v1/drug-master/imports/{importId}/activate,kb_import:edit,deny-401
 owner,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 owner,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 owner,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
@@ -280,6 +285,7 @@ owner,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-
 owner,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 owner,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
 owner,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
 owner_doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 owner_doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
@@ -290,6 +296,7 @@ owner_doctor,DELETE /v1/roles/delegations/{id},staff:edit,allow
 owner_doctor,DELETE /v1/setup/holidays/{id},setup:edit,allow
 owner_doctor,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,allow
 owner_doctor,DELETE /v1/waitlist/{id},queue:edit,allow
+owner_doctor,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 owner_doctor,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 owner_doctor,GET /v1/appointments,queue:view,allow
 owner_doctor,GET /v1/appointments/callback-list,queue:view,allow
@@ -305,7 +312,9 @@ owner_doctor,GET /v1/billing/otc-charges,billing:view,allow
 owner_doctor,GET /v1/clinical/conditions/due,clinical:view,allow
 owner_doctor,GET /v1/clinical/documents/{id},clinical:view,allow
 owner_doctor,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
+owner_doctor,GET /v1/clinical/drugs,clinical:view|pharmacy:view,allow
 owner_doctor,GET /v1/clinical/drugs/search,clinical:edit|clinical:view,allow
+owner_doctor,GET /v1/clinical/drugs/{drugId},clinical:view|pharmacy:view,allow
 owner_doctor,GET /v1/clinical/encounters,clinical:view,allow
 owner_doctor,GET /v1/clinical/note-templates,clinical:view,allow
 owner_doctor,GET /v1/clinical/notes/{queueEntryId},clinical:view,allow
@@ -455,6 +464,8 @@ owner_doctor,PATCH /v1/setup/whatsapp-templates/{id},setup:edit,allow
 owner_doctor,PATCH /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,allow
 owner_doctor,PATCH /v1/specialty/dental/patients/{patientId}/chart/{toothNumber},specialty_dental:edit,allow
 owner_doctor,PATCH /v1/staff/{id},staff:edit,allow
+owner_doctor,POST /internal/v1/drug-master/imports,kb_import:edit,deny-401
+owner_doctor,POST /internal/v1/drug-master/imports/{importId}/activate,kb_import:edit,deny-401
 owner_doctor,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 owner_doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 owner_doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
@@ -560,6 +571,7 @@ owner_doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edi
 owner_doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 owner_doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner_doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner_doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
 owner_doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
 doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
@@ -570,6 +582,7 @@ doctor,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
 doctor,DELETE /v1/setup/holidays/{id},setup:edit,deny-403
 doctor,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,allow
 doctor,DELETE /v1/waitlist/{id},queue:edit,allow
+doctor,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 doctor,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 doctor,GET /v1/appointments,queue:view,allow
 doctor,GET /v1/appointments/callback-list,queue:view,allow
@@ -585,7 +598,9 @@ doctor,GET /v1/billing/otc-charges,billing:view,allow
 doctor,GET /v1/clinical/conditions/due,clinical:view,allow
 doctor,GET /v1/clinical/documents/{id},clinical:view,allow
 doctor,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
+doctor,GET /v1/clinical/drugs,clinical:view|pharmacy:view,allow
 doctor,GET /v1/clinical/drugs/search,clinical:edit|clinical:view,allow
+doctor,GET /v1/clinical/drugs/{drugId},clinical:view|pharmacy:view,allow
 doctor,GET /v1/clinical/encounters,clinical:view,allow
 doctor,GET /v1/clinical/note-templates,clinical:view,allow
 doctor,GET /v1/clinical/notes/{queueEntryId},clinical:view,allow
@@ -735,6 +750,8 @@ doctor,PATCH /v1/setup/whatsapp-templates/{id},setup:edit,deny-403
 doctor,PATCH /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,allow
 doctor,PATCH /v1/specialty/dental/patients/{patientId}/chart/{toothNumber},specialty_dental:edit,allow
 doctor,PATCH /v1/staff/{id},staff:edit,deny-403
+doctor,POST /internal/v1/drug-master/imports,kb_import:edit,deny-401
+doctor,POST /internal/v1/drug-master/imports/{importId}/activate,kb_import:edit,deny-401
 doctor,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
@@ -840,6 +857,7 @@ doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allo
 doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 nurse,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 nurse,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
@@ -850,6 +868,7 @@ nurse,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
 nurse,DELETE /v1/setup/holidays/{id},setup:edit,deny-403
 nurse,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,deny-403
 nurse,DELETE /v1/waitlist/{id},queue:edit,allow
+nurse,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 nurse,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 nurse,GET /v1/appointments,queue:view,allow
 nurse,GET /v1/appointments/callback-list,queue:view,allow
@@ -865,7 +884,9 @@ nurse,GET /v1/billing/otc-charges,billing:view,deny-403
 nurse,GET /v1/clinical/conditions/due,clinical:view,allow
 nurse,GET /v1/clinical/documents/{id},clinical:view,allow
 nurse,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
+nurse,GET /v1/clinical/drugs,clinical:view|pharmacy:view,allow
 nurse,GET /v1/clinical/drugs/search,clinical:edit|clinical:view,allow
+nurse,GET /v1/clinical/drugs/{drugId},clinical:view|pharmacy:view,allow
 nurse,GET /v1/clinical/encounters,clinical:view,allow
 nurse,GET /v1/clinical/note-templates,clinical:view,allow
 nurse,GET /v1/clinical/notes/{queueEntryId},clinical:view,allow
@@ -1015,6 +1036,8 @@ nurse,PATCH /v1/setup/whatsapp-templates/{id},setup:edit,deny-403
 nurse,PATCH /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,deny-403
 nurse,PATCH /v1/specialty/dental/patients/{patientId}/chart/{toothNumber},specialty_dental:edit,deny-403
 nurse,PATCH /v1/staff/{id},staff:edit,deny-403
+nurse,POST /internal/v1/drug-master/imports,kb_import:edit,deny-401
+nurse,POST /internal/v1/drug-master/imports/{importId}/activate,kb_import:edit,deny-401
 nurse,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 nurse,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 nurse,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
@@ -1120,6 +1143,7 @@ nurse,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 nurse,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 nurse,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 nurse,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+nurse,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 nurse,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 receptionist,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 receptionist,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
@@ -1130,6 +1154,7 @@ receptionist,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
 receptionist,DELETE /v1/setup/holidays/{id},setup:edit,deny-403
 receptionist,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,deny-403
 receptionist,DELETE /v1/waitlist/{id},queue:edit,allow
+receptionist,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 receptionist,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 receptionist,GET /v1/appointments,queue:view,allow
 receptionist,GET /v1/appointments/callback-list,queue:view,allow
@@ -1145,7 +1170,9 @@ receptionist,GET /v1/billing/otc-charges,billing:view,allow
 receptionist,GET /v1/clinical/conditions/due,clinical:view,deny-403
 receptionist,GET /v1/clinical/documents/{id},clinical:view,deny-403
 receptionist,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-403
+receptionist,GET /v1/clinical/drugs,clinical:view|pharmacy:view,allow
 receptionist,GET /v1/clinical/drugs/search,clinical:edit|clinical:view,deny-403
+receptionist,GET /v1/clinical/drugs/{drugId},clinical:view|pharmacy:view,allow
 receptionist,GET /v1/clinical/encounters,clinical:view,deny-403
 receptionist,GET /v1/clinical/note-templates,clinical:view,deny-403
 receptionist,GET /v1/clinical/notes/{queueEntryId},clinical:view,deny-403
@@ -1295,6 +1322,8 @@ receptionist,PATCH /v1/setup/whatsapp-templates/{id},setup:edit,deny-403
 receptionist,PATCH /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,deny-403
 receptionist,PATCH /v1/specialty/dental/patients/{patientId}/chart/{toothNumber},specialty_dental:edit,deny-403
 receptionist,PATCH /v1/staff/{id},staff:edit,deny-403
+receptionist,POST /internal/v1/drug-master/imports,kb_import:edit,deny-401
+receptionist,POST /internal/v1/drug-master/imports/{importId}/activate,kb_import:edit,deny-401
 receptionist,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 receptionist,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 receptionist,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
@@ -1400,6 +1429,7 @@ receptionist,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edi
 receptionist,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 receptionist,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 receptionist,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+receptionist,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 receptionist,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
@@ -1410,6 +1440,7 @@ frontdesk_vitals,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
 frontdesk_vitals,DELETE /v1/setup/holidays/{id},setup:edit,deny-403
 frontdesk_vitals,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,deny-403
 frontdesk_vitals,DELETE /v1/waitlist/{id},queue:edit,allow
+frontdesk_vitals,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 frontdesk_vitals,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 frontdesk_vitals,GET /v1/appointments,queue:view,allow
 frontdesk_vitals,GET /v1/appointments/callback-list,queue:view,allow
@@ -1425,7 +1456,9 @@ frontdesk_vitals,GET /v1/billing/otc-charges,billing:view,allow
 frontdesk_vitals,GET /v1/clinical/conditions/due,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/documents/{id},clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
+frontdesk_vitals,GET /v1/clinical/drugs,clinical:view|pharmacy:view,allow
 frontdesk_vitals,GET /v1/clinical/drugs/search,clinical:edit|clinical:view,allow
+frontdesk_vitals,GET /v1/clinical/drugs/{drugId},clinical:view|pharmacy:view,allow
 frontdesk_vitals,GET /v1/clinical/encounters,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/note-templates,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/notes/{queueEntryId},clinical:view,allow
@@ -1575,6 +1608,8 @@ frontdesk_vitals,PATCH /v1/setup/whatsapp-templates/{id},setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},specialty_dental:edit,deny-403
 frontdesk_vitals,PATCH /v1/specialty/dental/patients/{patientId}/chart/{toothNumber},specialty_dental:edit,deny-403
 frontdesk_vitals,PATCH /v1/staff/{id},staff:edit,deny-403
+frontdesk_vitals,POST /internal/v1/drug-master/imports,kb_import:edit,deny-401
+frontdesk_vitals,POST /internal/v1/drug-master/imports/{importId}/activate,kb_import:edit,deny-401
 frontdesk_vitals,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
 frontdesk_vitals,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 frontdesk_vitals,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
@@ -1680,4 +1715,5 @@ frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 frontdesk_vitals,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 frontdesk_vitals,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+frontdesk_vitals,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 frontdesk_vitals,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403

@@ -7,7 +7,7 @@ import java.util.UUID;
 class PharmacyModels {
 
     record PharmacyItemRow(UUID id, String code, String name, boolean isRx, String hsnCode, BigDecimal price,
-                            BigDecimal taxRatePercent, int stockQty, boolean active) {
+                            BigDecimal taxRatePercent, int stockQty, boolean active, String drugId) {
     }
 
     record StockMovementRow(UUID id, String kind, int delta, int qtyBefore, int qtyAfter, String reason, UUID actorId,

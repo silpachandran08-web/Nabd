@@ -96,8 +96,16 @@ export type DpaAcceptRequest = { eSignRef?: string; otp: string; otpChallengeId:
 export type DpaAcceptResponse = { acceptanceId?: string; blockers?: Array<string>; dataGate?: string; pdfUrl?: string; };
 export type DpaOtpChallengeResponse = { expiresAt?: string; otpChallengeId?: string; };
 export type DpaStatusResponse = { accepted?: Accepted; blockers?: Array<string>; dataGate?: string; html?: string; marketCode?: string; reacceptDueBy?: string; version?: string; };
+export type DrugClass = { id?: string; name?: string; };
+export type DrugDetail = { brand?: string; classes?: Array<DrugClass>; form?: string; generic?: Array<string>; id?: string; ingredients?: Array<DrugIngredient>; lactationNote?: string; pregnancyCategory?: string; route?: string; schedule?: Array<string>; source?: DrugSource; status?: string; strength?: string; };
+export type DrugIngredient = { amount?: number; id?: string; name?: string; unit?: string; };
 export type DrugKnowledgeBaseSource = { configured?: boolean; dataMonth?: string; source?: string; };
+export type DrugLinkRequest = { drugId: string; };
+export type DrugMasterActivateRequest = { csoAckRef?: string; };
+export type DrugMasterImportRequest = { dryRun?: boolean; feedUri: string; kind: string; };
+export type DrugSource = { kb?: string; month?: string; };
 export type DrugSuggestionResponse = { code?: string; inStock?: boolean; name?: string; prescriptionOnly?: boolean; source?: string; };
+export type DrugSummary = { brand?: string; form?: string; generic?: Array<string>; id?: string; schedule?: Array<string>; strength?: string; };
 export type DueConditionResponse = { condition?: string; id?: string; patientId?: string; patientName?: string; reviewDueDate?: string; };
 export type DuplicateSuggestionPage = { items?: Array<Item>; nextCursor?: string; };
 export type EncounterListItem = { amendmentCount?: number; documentsDraft?: number; documentsIssued?: number; noteSignedAt?: string; noteState?: string; occurredAt?: string; patientId?: string; patientMrn?: string; patientName?: string; queueDate?: string; queueEntryId?: string; rxItemCount?: number; rxStatus?: string; visitStatus?: string; };
@@ -201,7 +209,7 @@ export type PaymentRequest = { amount: number; method: string; reference?: strin
 export type PaymentResponse = { amount?: number; id?: string; idempotencyKey?: string; method?: string; recordedAt?: string; };
 export type PaymentSplit = { amount?: number; method?: string; };
 export type PayrollExportRowResponse = { days?: number; hours?: number; notes?: string; role?: string; salary?: number; staffId?: string; staffName?: string; };
-export type PharmacyItemResponse = { active?: boolean; code?: string; hsnCode?: string; id?: string; isRx?: boolean; name?: string; price?: number; stockQty?: number; taxRatePercent?: number; };
+export type PharmacyItemResponse = { active?: boolean; code?: string; drugId?: string; hsnCode?: string; id?: string; isRx?: boolean; name?: string; price?: number; stockQty?: number; taxRatePercent?: number; };
 export type PharmacyItemStatusRequest = { active: boolean; reason?: string; };
 export type PharmacyItemWriteRequest = { hsnCode?: string; isRx?: boolean; name: string; price: number; stockQty?: number; taxRatePercent?: number; };
 export type PharmacySettingsResponse = { mode?: string; };
@@ -352,6 +360,9 @@ export type WorkspacesResponse = { brands?: Array<BrandWorkspaceResponse>; };
 
 export type Operations = {
   JwksController_jwks: { method: "get"; path: "/.well-known/jwks.json"; permission: "public"; pathParams: never; query: never; body: never; response: Record<string, Record<string, unknown>> };
+  DrugMasterImportController_start: { method: "post"; path: "/internal/v1/drug-master/imports"; permission: "kb_import:edit"; pathParams: never; query: never; body: DrugMasterImportRequest; response: Record<string, Record<string, unknown>> };
+  DrugMasterImportController_status: { method: "get"; path: "/internal/v1/drug-master/imports/{importId}"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
+  DrugMasterImportController_activate: { method: "post"; path: "/internal/v1/drug-master/imports/{importId}/activate"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: DrugMasterActivateRequest; response: Record<string, Record<string, unknown>> };
   NotificationClaimController_claim: { method: "get"; path: "/internal/v1/notification-requests/{id}"; permission: "public"; pathParams: { id: string; }; query: never; body: never; response: NotificationClaim };
   SafetyDictionaryController_listSafetyDictionaryVersions: { method: "get"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: never; response: Array<Record<string, Record<string, unknown>>> };
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: SafetyDictionaryBundle; response: Record<string, Record<string, unknown>> };
@@ -405,7 +416,9 @@ export type Operations = {
   ClinicalDocumentController_update: { method: "patch"; path: "/v1/clinical/documents/{id}"; permission: "clinical:edit"; pathParams: { id: string; }; query: never; body: UpdateRequest; response: DocumentResponse };
   ClinicalDocumentController_issue: { method: "post"; path: "/v1/clinical/documents/{id}/issue"; permission: "clinical:edit | clinical:approve"; pathParams: { id: string; }; query: never; body: never; response: DocumentResponse };
   DrugKnowledgeBaseController_get: { method: "get"; path: "/v1/clinical/drug-knowledge-base"; permission: "clinical:view | clinical:edit"; pathParams: never; query: never; body: never; response: DrugKnowledgeBaseSource };
+  DrugMasterController_search: { method: "get"; path: "/v1/clinical/drugs"; permission: "clinical:view | pharmacy:view"; pathParams: never; query: { q: string; limit?: number; }; body: never; response: Array<DrugSummary> };
   PrescriptionController_searchDrugs: { method: "get"; path: "/v1/clinical/drugs/search"; permission: "clinical:view | clinical:edit"; pathParams: never; query: { q: string; limit?: number; }; body: never; response: Array<DrugSuggestionResponse> };
+  DrugMasterController_detail: { method: "get"; path: "/v1/clinical/drugs/{drugId}"; permission: "clinical:view | pharmacy:view"; pathParams: { drugId: string; }; query: never; body: never; response: DrugDetail };
   EncounterListController_list: { method: "get"; path: "/v1/clinical/encounters"; permission: "clinical:view"; pathParams: never; query: { state?: string; from?: string; to?: string; limit?: number; cursor?: string; }; body: never; response: EncounterListPage };
   NoteTemplateController_list: { method: "get"; path: "/v1/clinical/note-templates"; permission: "clinical:view"; pathParams: never; query: never; body: never; response: Array<TemplateResponse> };
   NoteTemplateController_create: { method: "post"; path: "/v1/clinical/note-templates"; permission: "clinical:edit"; pathParams: never; query: never; body: CreateRequest; response: TemplateResponse };
@@ -537,6 +550,7 @@ export type Operations = {
   PharmacyController_items: { method: "get"; path: "/v1/pharmacy/items"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: Array<PharmacyItemResponse> };
   PharmacyController_addItem: { method: "post"; path: "/v1/pharmacy/items"; permission: "pharmacy:edit"; pathParams: never; query: never; body: PharmacyItemWriteRequest; response: PharmacyItemResponse };
   PharmacyController_updateItem: { method: "patch"; path: "/v1/pharmacy/items/{id}"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: PharmacyItemWriteRequest; response: PharmacyItemResponse };
+  PharmacyController_linkDrug: { method: "put"; path: "/v1/pharmacy/items/{id}/drug-link"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: DrugLinkRequest; response: Record<string, Record<string, unknown>> };
   PharmacyController_setStatus: { method: "patch"; path: "/v1/pharmacy/items/{id}/status"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: PharmacyItemStatusRequest; response: PharmacyItemResponse };
   PharmacyController_adjustStock: { method: "post"; path: "/v1/pharmacy/items/{id}/stock-adjustments"; permission: "pharmacy:edit"; pathParams: { id: string; }; query: never; body: PharmacyStockAdjustmentRequest; response: PharmacyItemResponse };
   PharmacyController_stockMovements: { method: "get"; path: "/v1/pharmacy/items/{id}/stock-movements"; permission: "pharmacy:view"; pathParams: { id: string; }; query: never; body: never; response: Array<PharmacyStockMovementResponse> };
@@ -703,6 +717,7 @@ export type Permission =
   | "departments:delete"
   | "departments:edit"
   | "departments:view"
+  | "kb_import:edit"
   | "messaging_operations:override"
   | "nursing:create"
   | "nursing:edit"

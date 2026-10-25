@@ -2898,6 +2898,76 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DrugKnowledgeBaseSource" } } } }
 
+  /clinical/drugs/{drugId}:
+    get:
+      tags: [Clinical]
+      summary: "CLN-019. Drug master detail from the regional drug master (generic ingredients with strengths, classes, schedule flags, pregnancy category, source KB and data month). A product retired in the KB is still returned (status retired) so existing prescriptions resolve. Reference data, no PHI."
+      x-required-permission: "clinical:view | pharmacy:view"
+      parameters: [{ name: drugId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DrugDetail" } } } }
+        "404": { description: "DRUG_NOT_FOUND (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/drugs:
+    get:
+      tags: [Clinical]
+      summary: "CLN-019. Typeahead over the active products of the caller's region (prefix match on brand, ingredient, strength, form). Retired products are never returned. limit 1-100 (default 20)."
+      x-required-permission: "clinical:view | pharmacy:view"
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DrugSummary" } } } } }
+  /pharmacy/items/{id}/drug-link:
+    put:
+      tags: [Pharmacy]
+      summary: "CLN-019. Map a pharmacy item to a drug master product. Pricing and stock are untouched; suggestedIsRx is true when the product carries a schedule flag (a suggestion only, the clinic's isRx stays as set). Hybrid mode only. 404 DRUG_NOT_FOUND for an unknown or retired product. Audited (pharmacy.item_drug_linked)."
+      x-required-permission: pharmacy:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [drugId], properties: { drugId: { type: string, maxLength: 80 } } } } }
+      responses:
+        "200": { description: Linked, content: { application/json: { schema: { type: object, properties: { itemId: { type: string, format: uuid }, drugId: { type: string }, suggestedIsRx: { type: boolean } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /drug-master/imports:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-019. Start a KB drug master import. feedUri is file:<name> inside the cell's configured feed directory (the licensed feed delivery is external). Dry run by default: parse, validate and diff only, never activatable. The same feed content returns the existing import. 202 {importId, status}; poll GET /drug-master/imports/{importId}. Audited."
+      x-required-permission: kb_import:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [feedUri, kind], properties: { feedUri: { type: string }, kind: { type: string, enum: [full, delta] }, dryRun: { type: boolean, default: true } } } } }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { type: object, properties: { importId: { type: string, format: uuid }, status: { type: string } } } } } }
+        "422": { description: "FEED_INVALID or FEED_UNSUPPORTED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "503": { description: "FEED_IMPORT_DISABLED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /drug-master/imports/{importId}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    parameters: [{ name: importId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: "CLN-019. Import status (running, validated, active, failed, superseded) with the dry-run diff {added, changed, retired, safetyRelevant, samples} once validated, or the error of a failed import."
+      x-required-permission: kb_import:edit
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /drug-master/imports/{importId}/activate:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    parameters: [{ name: importId, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-019. Activate a validated, non-dry-run import in one transaction (the version switch). csoAckRef is required when the diff changes schedule, pregnancy category or ingredients of existing products (409 CSO_ACK_REQUIRED); 409 IMPORT_INVALID when the import is not validated, was a dry run, or the active version moved since validation. Re-activating the active import returns its version. Publishes clinical.drug_master.version_activated.v1 per tenant of the region. Audited."
+      x-required-permission: kb_import:edit
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { csoAckRef: { type: string, maxLength: 200 } } } } }
+      responses:
+        "200": { description: Active, content: { application/json: { schema: { type: object, properties: { version: { type: integer } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "IMPORT_INVALID or CSO_ACK_REQUIRED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /safety-dictionaries/{region}/versions:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
     parameters: [{ name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }]
@@ -4734,6 +4804,31 @@ components:
         ruleSource: { type: string }
         weightRecordedAt: { type: [string, "null"], format: date-time, description: When the weight used was recorded. Null when unknown (weight saved before the date was tracked); never estimated from the visit row time. Clients should treat null as stale. }
         weightStale: { type: boolean, description: "True when the weight is older than the policy window (30 days under 2 years of age, 90 days otherwise; CSO to confirm) or its date is unknown." }
+    DrugDetail:
+      type: object
+      properties:
+        id: { type: string }
+        brand: { type: string }
+        generic: { type: array, items: { type: string } }
+        strength: { type: [string, "null"] }
+        form: { type: [string, "null"] }
+        route: { type: [string, "null"] }
+        schedule: { type: array, items: { type: string } }
+        pregnancyCategory: { type: [string, "null"] }
+        lactationNote: { type: [string, "null"] }
+        status: { type: string, enum: [active, retired] }
+        ingredients: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string }, amount: { type: [number, "null"] }, unit: { type: [string, "null"] } } } }
+        classes: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string } } } }
+        source: { type: object, properties: { kb: { type: [string, "null"] }, month: { type: [string, "null"] } } }
+    DrugSummary:
+      type: object
+      properties:
+        id: { type: string }
+        brand: { type: string }
+        strength: { type: [string, "null"] }
+        form: { type: [string, "null"] }
+        generic: { type: array, items: { type: string } }
+        schedule: { type: array, items: { type: string } }
     PharmacyItem:
       type: object
       properties:
@@ -4746,6 +4841,7 @@ components:
         taxRatePercent: { type: number }
         stockQty: { type: integer, minimum: 0 }
         active: { type: boolean }
+        drugId: { type: [string, "null"], description: "CLN-019: linked drug master product" }
     PharmacyStockAdjustment:
       type: object
       required: [reason]
