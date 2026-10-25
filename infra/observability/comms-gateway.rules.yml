@@ -1,0 +1,45 @@
+# COM-007.5: Comms Gateway alerts (/actuator/prometheus of services/comms-gateway). Wiring into the cell Prometheus is Needs external action.
+# comms_send_total{outcome} and the webhook timer http_server_requests_seconds{uri="/webhooks/..."} are emitted by the sender/webhook
+# stories (COM-008, COM-011, COM-001 move); consumer_* are emitted by this module. SLO: 99% of reminders inside the window (doc06 7.6).
+groups:
+  - name: comms-gateway
+    rules:
+      - alert: CommsSendSloFastBurn
+        # 99% target = 1% budget; page when 14.4x the budget burns over both 1 h and 5 min
+        expr: |
+          (sum(rate(comms_send_total{outcome!="sent"}[1h])) / sum(rate(comms_send_total[1h])) > 14.4 * 0.01)
+          and
+          (sum(rate(comms_send_total{outcome!="sent"}[5m])) / sum(rate(comms_send_total[5m])) > 14.4 * 0.01)
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "Comms send outcomes burn the reminder SLO budget 14.4x faster than allowed"
+          runbook: docs/runbooks/comms-gateway.md
+      - alert: CommsSendSloSlowBurn
+        expr: sum(rate(comms_send_total{outcome!="sent"}[6h])) / sum(rate(comms_send_total[6h])) > 6 * 0.01
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Comms send outcomes burn the reminder SLO budget 6x faster than allowed over 6 h"
+          runbook: docs/runbooks/comms-gateway.md
+      - alert: CommsWebhookAckSlow
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{application="comms-gateway",uri=~"/webhooks.*"}[5m]))) > 0.1
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "Meta webhook ack p95 is above 100 ms"
+          runbook: docs/runbooks/comms-gateway.md
+      - alert: CommsConsumerLagging
+        expr: max(consumer_lag_seconds{group="comms"}) > 5
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "The comms consumer group is more than 5 s behind"
+          runbook: docs/runbooks/comms-gateway.md
+      - alert: CommsDeadLetter
+        expr: sum(increase(consumer_dlq_total{group="comms"}[5m])) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "The comms consumer moved an event to ev:<region>:dlq"
+          runbook: docs/runbooks/comms-gateway.md
