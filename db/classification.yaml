@@ -204,6 +204,11 @@ schemas:
       updated_at: operational
       diagnosis: phi
       signed_by: operational
+    comms_cutover_flags:
+      tenant_id: operational
+      remote: operational
+      legacy_readonly: operational
+      updated_at: operational
     consents:
       id: operational
       tenant_id: operational

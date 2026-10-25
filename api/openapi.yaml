@@ -2624,6 +2624,21 @@ paths:
         "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "410": { description: "SUBJECT_GONE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /consents:export:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (comms-gateway service token)" }]
+    get:
+      tags: [Messaging]
+      summary: "COM-008. Paged latest channel consent (messaging, marketing) per patient and purpose, for the Comms Gateway's nightly reconciliation (header X-Internal-Token). version is the outbox id of the latest consent.changed.v1 event (0 if none)."
+      x-required-permission: public
+      parameters:
+        - { name: X-Internal-Token, in: header, required: true, schema: { type: string } }
+        - { name: tenantId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: since, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: "OK: { items: [{ patientId, purpose, granted, version, at }], nextCursor? }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/drug-knowledge-base:
     get:
       tags: [Clinical]

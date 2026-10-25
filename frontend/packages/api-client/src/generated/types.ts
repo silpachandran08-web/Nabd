@@ -184,6 +184,7 @@ export type PackageSettingsWriteRequest = { priceFloorPercent: number; };
 export type PackageWriteRequest = { description?: string; eligibleDoctorIds?: Array<string>; graceDays?: number; items: Array<PackageItemInput>; name: string; packageType?: string; price: number; refundNote?: string; speciality?: string; taxInclusive?: boolean; validityDays?: number; validityStarts?: string; };
 export type Packages = { sessionsOwed?: number; soldToday?: number; };
 export type PackagesReportResponse = { expiredWithValue?: Array<ExpiredWithValue>; from?: string; redemption?: Redemption; salesByDay?: Array<SalesDay>; to?: string; };
+export type Page = { items?: Array<Item>; nextCursor?: string; };
 export type PageMeta = { limit?: number; nextCursor?: string; };
 export type PatientDetailResponse = { activePackages?: number; allergies?: Array<string>; chronicConditions?: Array<string>; dob?: string; gender?: string; guardianConsentGrantedAt?: string; guardianId?: string; guardianName?: string; guardianReviewKeptAt?: string; id?: string; isMinor?: boolean; lastVisit?: string; lastVisitAt?: string; mrn?: string; name?: string; outstandingBalance?: number; phone?: string; status?: string; };
 export type PatientPage = { data?: Array<PatientResponse>; page?: PageMeta; };
@@ -346,6 +347,7 @@ export type WorkspacesResponse = { brands?: Array<BrandWorkspaceResponse>; };
 
 export type Operations = {
   JwksController_jwks: { method: "get"; path: "/.well-known/jwks.json"; permission: "public"; pathParams: never; query: never; body: never; response: Record<string, Record<string, unknown>> };
+  ConsentExportController_export: { method: "get"; path: "/internal/v1/consents:export"; permission: "authenticated"; pathParams: never; query: { tenantId: string; since?: string; cursor?: string; }; body: never; response: Page };
   NotificationClaimController_claim: { method: "get"; path: "/internal/v1/notification-requests/{id}"; permission: "public"; pathParams: { id: string; }; query: never; body: never; response: NotificationClaim };
   SafetyDictionaryController_listSafetyDictionaryVersions: { method: "get"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: never; response: Array<Record<string, Record<string, unknown>>> };
   SafetyDictionaryController_uploadSafetyDictionaryVersion: { method: "post"; path: "/internal/v1/safety-dictionaries/{region}/versions"; permission: "safety_content:edit"; pathParams: { region: string; }; query: never; body: SafetyDictionaryBundle; response: Record<string, Record<string, unknown>> };
