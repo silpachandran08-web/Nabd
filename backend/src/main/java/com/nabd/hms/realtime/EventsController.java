@@ -50,7 +50,7 @@ class EventsController {
         } else {
             for (String name : topics.split(",")) {
                 RealtimeTopic t = RealtimeTopic.parse(name.trim()).orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST,
-                        "INVALID_TOPIC", "Unknown topic", "Topics are queue, nursing, doctor-status, requests, exceptions."));
+                        "INVALID_TOPIC", "Unknown topic", "Topics are queue, nursing, doctor-status, requests, exceptions, messages."));
                 wanted.add(t);
             }
         }

@@ -9,7 +9,8 @@ public enum RealtimeTopic {
     NURSING("nursing", "nursing:view"),
     DOCTOR_STATUS("doctor-status", "queue:view"),
     REQUESTS("requests", "scheduling:review"),
-    EXCEPTIONS("exceptions", "queue:view");
+    EXCEPTIONS("exceptions", "queue:view"),
+    MESSAGES("messages", "patients:view"); // COM-006: delivery ticks on the patient file
 
     private final String wire;
     private final String permission;

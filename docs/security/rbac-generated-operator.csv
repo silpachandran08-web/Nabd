@@ -83,6 +83,7 @@ super_admin,GET /v1/patients/data-quality,patients:edit,deny-401
 super_admin,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 super_admin,GET /v1/patients/registry,patients:view,deny-401
 super_admin,GET /v1/patients/{id},patients:view,deny-401
+super_admin,GET /v1/patients/{patientId}/messages,patients:view,deny-401
 super_admin,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/items,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -365,6 +366,7 @@ implementation,GET /v1/patients/data-quality,patients:edit,deny-401
 implementation,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 implementation,GET /v1/patients/registry,patients:view,deny-401
 implementation,GET /v1/patients/{id},patients:view,deny-401
+implementation,GET /v1/patients/{patientId}/messages,patients:view,deny-401
 implementation,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/items,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -647,6 +649,7 @@ support_engineer,GET /v1/patients/data-quality,patients:edit,deny-401
 support_engineer,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 support_engineer,GET /v1/patients/registry,patients:view,deny-401
 support_engineer,GET /v1/patients/{id},patients:view,deny-401
+support_engineer,GET /v1/patients/{patientId}/messages,patients:view,deny-401
 support_engineer,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/items,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -929,6 +932,7 @@ billing,GET /v1/patients/data-quality,patients:edit,deny-401
 billing,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 billing,GET /v1/patients/registry,patients:view,deny-401
 billing,GET /v1/patients/{id},patients:view,deny-401
+billing,GET /v1/patients/{patientId}/messages,patients:view,deny-401
 billing,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/items,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -1211,6 +1215,7 @@ sre,GET /v1/patients/data-quality,patients:edit,deny-401
 sre,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 sre,GET /v1/patients/registry,patients:view,deny-401
 sre,GET /v1/patients/{id},patients:view,deny-401
+sre,GET /v1/patients/{patientId}/messages,patients:view,deny-401
 sre,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/items,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -1493,6 +1498,7 @@ commercial,GET /v1/patients/data-quality,patients:edit,deny-401
 commercial,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 commercial,GET /v1/patients/registry,patients:view,deny-401
 commercial,GET /v1/patients/{id},patients:view,deny-401
+commercial,GET /v1/patients/{patientId}/messages,patients:view,deny-401
 commercial,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/items,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -1775,6 +1781,7 @@ compliance_dpo,GET /v1/patients/data-quality,patients:edit,deny-401
 compliance_dpo,GET /v1/patients/guardian-reviews-due,patients:view,deny-401
 compliance_dpo,GET /v1/patients/registry,patients:view,deny-401
 compliance_dpo,GET /v1/patients/{id},patients:view,deny-401
+compliance_dpo,GET /v1/patients/{patientId}/messages,patients:view,deny-401
 compliance_dpo,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/items,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401

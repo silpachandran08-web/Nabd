@@ -11,14 +11,19 @@ class TemplateWhatsAppOtpSender implements WhatsAppOtpSender {
 
     private final WhatsAppClient client;
     private final WhatsAppProperties props;
+    private final OtpGatewayClient gateway;
 
-    TemplateWhatsAppOtpSender(WhatsAppClient client, WhatsAppProperties props) {
+    TemplateWhatsAppOtpSender(WhatsAppClient client, WhatsAppProperties props, OtpGatewayClient gateway) {
         this.client = client;
         this.props = props;
+        this.gateway = gateway;
     }
 
     @Override
     public void send(String mobilePhone, String code) {
+        if (gateway.send(mobilePhone, code, "staff_login", props.otpLanguage())) { // COM-009: Comms Gateway first, 3 s budget
+            return;
+        }
         client.sendOtp(mobilePhone, props.otpTemplate(), props.otpLanguage(), code);
     }
 }

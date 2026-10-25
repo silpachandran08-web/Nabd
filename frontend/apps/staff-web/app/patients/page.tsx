@@ -22,6 +22,7 @@ import type { Vitals } from "../components/consult/shared";
 import { age, DEFAULT_START_STATUS, initials, statusBeforeConsult, statusSequence, type PatientSummary } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
+import PatientMessages from "./PatientMessages";
 
 // Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
 type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
@@ -145,7 +146,7 @@ function PatientsList() {
   const [drawerPatient, setDrawerPatient] = useState<PatientDetail | null>(null);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [drawerId, setDrawerId] = useState<string | null>(null); // set while the drawer is open (or loading)
-  const [drawerTab, setDrawerTab] = useState<"overview" | "dental">("overview");
+  const [drawerTab, setDrawerTab] = useState<"overview" | "dental" | "messages">("overview");
 
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   // Severity starts unset: an unknown severity must never be guessed, so Add stays unavailable until a clinician picks one.
@@ -842,14 +843,15 @@ function PatientsList() {
                 </div>
               )}
 
-              {canDental && (
-                <div className={styles.drawerTabs}>
-                  <button className={drawerTab === "overview" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("overview")}>Overview</button>
-                  <button className={drawerTab === "dental" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("dental")}>Dental chart</button>
-                </div>
-              )}
+              <div className={styles.drawerTabs}>
+                <button className={drawerTab === "overview" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("overview")}>Overview</button>
+                {canDental && <button className={drawerTab === "dental" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("dental")}>Dental chart</button>}
+                <button className={drawerTab === "messages" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setDrawerTab("messages")}>Messages</button>
+              </div>
 
-              {drawerTab === "dental" && canDental ? (
+              {drawerTab === "messages" ? (
+                <PatientMessages patientId={drawerPatient.id} authedFetch={authedFetch} />
+              ) : drawerTab === "dental" && canDental ? (
                 <>
                   <div className={styles.numberingToggle}>
                     <button className={numbering === "fdi" ? styles.drawerTabActive : styles.drawerTab} onClick={() => setNumbering("fdi")}>FDI</button>

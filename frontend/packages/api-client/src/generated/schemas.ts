@@ -219,6 +219,7 @@ export const PackageWriteRequestSchema = z.object({ description: z.string().opti
 export const RedemptionSchema = z.object({ sessionsRedeemed: z.number().int().optional(), sessionsSold: z.number().int().optional() });
 export const SalesDaySchema = z.object({ amount: z.number().optional(), count: z.number().int().optional(), date: z.string().optional() });
 export const PackagesReportResponseSchema = z.object({ expiredWithValue: z.array(ExpiredWithValueSchema).optional(), from: z.string().optional(), redemption: RedemptionSchema.optional(), salesByDay: z.array(SalesDaySchema).optional(), to: z.string().optional() });
+export const PageSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
 export const PatientDetailResponseSchema = z.object({ activePackages: z.number().int().optional(), allergies: z.array(z.string()).optional(), chronicConditions: z.array(z.string()).optional(), dob: z.string().optional(), gender: z.string().optional(), guardianConsentGrantedAt: z.string().optional(), guardianId: z.string().optional(), guardianName: z.string().optional(), guardianReviewKeptAt: z.string().optional(), id: z.string().optional(), isMinor: z.boolean().optional(), lastVisit: z.string().optional(), lastVisitAt: z.string().optional(), mrn: z.string().optional(), name: z.string().optional(), outstandingBalance: z.number().optional(), phone: z.string().optional(), status: z.string().optional() });
 export const PatientResponseSchema = z.object({ dob: z.string().optional(), gender: z.string().optional(), id: z.string().optional(), isMinor: z.boolean().optional(), matchedOn: z.string().optional(), mrn: z.string().optional(), name: z.string().optional(), phone: z.string().optional(), status: z.string().optional() });
 export const PatientPageSchema = z.object({ data: z.array(PatientResponseSchema).optional(), page: PageMetaSchema.optional() });
@@ -548,6 +549,7 @@ export const operationSchemas = {
   PatientController_revokeGuardian: {  },
   PatientController_keepGuardian: { body: GuardianReviewDecisionRequestSchema, response: PatientDetailResponseSchema },
   PatientController_merge: { body: MergeRequestSchema, response: PatientDetailResponseSchema },
+  PatientMessagesController_messages: { response: PageSchema },
   PharmacyController_dispensingQueue: { response: z.array(DispensingQueueEntryResponseSchema) },
   PharmacyController_items: { response: z.array(PharmacyItemResponseSchema) },
   PharmacyController_addItem: { body: PharmacyItemWriteRequestSchema, response: PharmacyItemResponseSchema },

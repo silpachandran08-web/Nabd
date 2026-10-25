@@ -123,8 +123,8 @@ story in one class. Plain unit tests can build the production factory directly:
 
 ## Realtime (SSE, ACC-021)
 
-`GET /v1/events?topics=queue,nursing,doctor-status,requests,exceptions` (`com.nabd.hms.realtime`). Topic permissions:
-queue/doctor-status/exceptions need `queue:view`, nursing `nursing:view`, requests `scheduling:review` (no role grant
+`GET /v1/events?topics=queue,nursing,doctor-status,requests,exceptions,messages` (`com.nabd.hms.realtime`). Topic permissions:
+queue/doctor-status/exceptions need `queue:view`, messages `patients:view`, nursing `nursing:view`, requests `scheduling:review` (no role grant
 produces that authority yet, so the `requests` topic is 403 for everyone until one does).
 
 | Key / channel | Content | TTL |

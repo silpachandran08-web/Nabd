@@ -1735,6 +1735,40 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /patients/{patientId}/messages:
+    get:
+      tags: [Patients]
+      summary: Message history with delivery status, newest first (COM-006). Template name, plain-language purpose, status, time, failure reason; never the rendered body or the phone number. PHI read logged.
+      x-required-permission: patients:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 50, default: 50 } }
+      responses:
+        "200":
+          description: One page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        channel: { type: string, enum: [whatsapp] }
+                        purpose: { type: string }
+                        templateName: { type: string }
+                        status: { type: string, enum: [scheduled, queued, sending, sent, delivered, read, failed, blocked, cancelled, expired] }
+                        statusAt: { type: string, format: date-time }
+                        failureReason: { type: string, nullable: true, description: "Plain words, e.g. Not on WhatsApp, Opted out, Template paused by Meta; only for failed or blocked" }
+                        fallbackOf: { type: string, format: uuid, nullable: true, description: "Reserved for the SMS fallback (COM-027)" }
+                  nextCursor: { type: string, nullable: true }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /patients/{id}/merge:
     post:
       tags: [Patients]
@@ -2244,13 +2278,13 @@ paths:
         `event: heartbeat` every 25 s. Reconnect with `Last-Event-ID` within 5 minutes to replay missed deltas without a new snapshot.
         The stream ends when the access token expires, when the user's role/status changes or a session is revoked; reconnect with the current token.
         Deltas carry ids, statuses and versions only, never names.
-        Per topic: queue, doctor-status, exceptions need queue:view; nursing needs nursing:view; requests needs scheduling:review (403 TOPIC_FORBIDDEN otherwise).
+        Per topic: queue, doctor-status, exceptions need queue:view; messages (COM-006, delivery ticks) needs patients:view; nursing needs nursing:view; requests needs scheduling:review (403 TOPIC_FORBIDDEN otherwise).
       x-required-permission: authenticated
       parameters:
         - name: topics
           in: query
           required: false
-          description: "Comma list of queue, nursing, doctor-status, requests, exceptions. Omitted = every topic the caller may see."
+          description: "Comma list of queue, nursing, doctor-status, requests, exceptions, messages. Omitted = every topic the caller may see."
           schema: { type: string }
         - name: Last-Event-ID
           in: header

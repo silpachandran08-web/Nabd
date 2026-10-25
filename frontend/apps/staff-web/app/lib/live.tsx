@@ -24,6 +24,7 @@ function topicsFor(): string[] {
   const t: string[] = [];
   if (all || perms.includes("queue:view")) t.push("queue", "doctor-status");
   if (all || perms.includes("nursing:view")) t.push("nursing");
+  if (all || perms.includes("patients:view")) t.push("messages"); // COM-006: delivery ticks on the patient file
   return t;
 }
 

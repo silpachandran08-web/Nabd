@@ -123,6 +123,25 @@ class RealtimeSseApiTest extends ApiTestBase {
         assertThat(s.pollDelta(600)).as("redelivery produced no second delta").isNull();
     }
 
+    // ---- COM-006: a message status change reaches an open patient file ----
+
+    @Test
+    void messageStatusChangeReachesTheMessagesTopicWithinTwoSecondsForPatientsViewOnly() throws Exception {
+        assertThat(get(token(queueOnly), "messages").statusCode()).isEqualTo(403); // no patients:view
+        Stream s = connectReady(token(fullStaff), "messages");
+        UUID msg = UUID.randomUUID();
+        long t0 = System.nanoTime();
+        xadd("ev:in:comms", envelope(nextId(), "comms.message.status_changed.v1", msg, Map.of("tenantId", tenant.id().toString(),
+                "messageId", msg.toString(), "channel", "whatsapp", "status", "read", "at", Instant.now().toString(), "version", 1)));
+        drain();
+        JsonNode d = s.nextDelta(2000).json();
+        assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0)).isLessThan(2000);
+        assertThat(d.path("type").asString()).isEqualTo("comms.message.status_changed.v1");
+        assertThat(d.path("id").asString()).isEqualTo(msg.toString());
+        assertThat(d.path("topic").asString()).isEqualTo("messages");
+        assertThat(d.path("fields").path("status").asString()).isEqualTo("read");
+    }
+
     // ---- 2. resume ----
 
     @Test
