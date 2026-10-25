@@ -44,7 +44,7 @@ class PlatformPermissionsTest {
     @Test
     void complianceDpoReachesAuditButNotBillingOrProvisioning() {
         assertThat(PlatformPermissions.forRole("compliance_dpo"))
-                .contains("audit_compliance:view")
+                .contains("audit_compliance:view", "audit_compliance:values")
                 .doesNotContain("billing_revenue:view", "pricing_packaging:view",
                         "onboarding_provisioning:view", "provisioning_jobs:view");
     }

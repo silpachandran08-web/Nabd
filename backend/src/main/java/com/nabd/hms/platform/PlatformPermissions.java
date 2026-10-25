@@ -51,6 +51,7 @@ final class PlatformPermissions {
             "support_access:request", Set.of("super_admin", "implementation", "support_engineer"), // PLT-056
             "safety_content:edit", Set.of("super_admin"), // CLN-004: upload / record CSO approval / activate the safety dictionary
             "kb_import:edit", Set.of("super_admin"), // CLN-019: import / activate a drug master KB feed
+            "audit_compliance:values", Set.of("compliance_dpo"), // FEF-019: lets the console show the DPO-only before/after control from permissions; AuditSearchService still enforces the role
             "tenant_detail:edit", Set.of("super_admin") // V3-001: suspend / offboard / reactivate a clinic; shortcut: implementation excluded until the role spec says otherwise
     );
 
