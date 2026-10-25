@@ -1,5 +1,6 @@
 "use client";
 
+import { seatMeter } from "../lib/entitlements";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./setup.module.css";
@@ -25,7 +26,7 @@ type ConsentContact = { name: string; email: string; phone: string | null };
 type Holiday = { id: string; holidayDate: string; name: string; recurring: boolean };
 type Shift = { id: string; staffId: string; staffName: string | null; patternJson: string; effectiveFrom: string; effectiveTo: string | null };
 type PayrollRow = { staffId: string; staffName: string; role: string; days: number; hours: number; salary: number; notes: string };
-type Subscription = { plan: string | null; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number };
+type Subscription = { plan: string | null; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number; modules?: { code: string; enabled: boolean }[]; killedFeatures?: string[]; seatsUsed?: number; seatsLimit?: number | null };
 type ImportJob = { id: string; importType: string; fileName: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type ExportJob = { id: string; exportType: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type Licence = { id: string; licenceType: string; holderId: string | null; holderName: string | null; number: string; issuingBody: string | null; expiryDate: string; region: string; status: string };
@@ -726,6 +727,19 @@ function SetupPageInner() {
                 </tbody>
               </table>
             </div>
+            {subscription.seatsUsed !== undefined && (
+              <p data-testid="seat-meter"><strong>Staff seats:</strong> {seatMeter(subscription.seatsUsed, subscription.seatsLimit ?? null).label}</p>
+            )}
+            {subscription.modules && (
+              <>
+                <h3 className={styles.cardTitle}>Modules</h3>
+                <ul data-testid="module-list">
+                  {subscription.modules.map((m) => (
+                    <li key={m.code}>{m.code.replace(/_/g, " ")}: {subscription.killedFeatures?.includes(m.code) ? "switched off by Nabd" : m.enabled ? "included" : "not in your plan"}</li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         );
       case "data":

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./fleet.module.css";
-import { usePlatformFetch } from "../platformApi";
+import { useOperatorAccess, usePlatformFetch } from "../platformApi";
+import Link from "next/link";
 import { ErrorState, Skeleton, EmptyState } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { TenantStatusPill } from "../../components/platform/statusPills";
@@ -47,6 +48,7 @@ export default function FleetPage() {
   const [forbidden, setForbidden] = useState(false);
   const [summary, setSummary] = useState<FleetSummary | null>(null);
   const [canRequestSupportAccess, setCanRequestSupportAccess] = useState(false);
+  const canSwitchFeatures = useOperatorAccess().isSuper; // PLT-059: tenant_detail:edit (super_admin)
   const [activeSupportSessions, setActiveSupportSessions] = useState<number | null>(null);
 
   const fetchPage = useCallback(async (cursor: string | null, append: boolean) => {
@@ -171,6 +173,7 @@ export default function FleetPage() {
                     <th>Owner</th>
                     <th>Privileged MFA</th>
                     {canRequestSupportAccess && <th></th>}
+                    {canSwitchFeatures && <th></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -199,6 +202,7 @@ export default function FleetPage() {
                           <button className={styles.actionBtn} onClick={() => requestSupportAccessFor(t.id)}>Support access</button>
                         </td>
                       )}
+                      {canSwitchFeatures && <td><Link className={styles.actionBtn} href={`/platform/fleet/${t.id}/features`}>Features</Link></td>}
                     </tr>
                   ))}
                 </tbody>
