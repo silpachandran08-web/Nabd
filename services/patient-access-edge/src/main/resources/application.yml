@@ -1,0 +1,29 @@
+# ACC-039 Patient Access Edge. Everything environment-specific comes from env vars; no secrets in this file.
+server:
+  port: ${PORT:8080}
+spring:
+  application.name: patient-access-edge
+  datasource:
+    url: ${EDGE_DB_URL:jdbc:postgresql://localhost:5432/edge}
+    username: ${EDGE_DB_USER:edge_app}
+    password: ${EDGE_DB_PASSWORD:}
+    hikari.maximum-pool-size: ${EDGE_DB_POOL:10}
+  # Migrations run as a separate job with the migrator role (it needs BYPASSRLS for edge_purge_expired); off in the app.
+  flyway:
+    enabled: ${EDGE_FLYWAY:false}
+  data.redis:
+    url: ${VALKEY_URL:redis://localhost:6379}
+    connect-timeout: 500ms
+    timeout: 250ms
+  task.scheduling.pool.size: 4
+management:
+  # Metrics and health live on their own port: never routed by the ingress, so the internet only sees /healthz.
+  server.port: ${MANAGEMENT_PORT:8081}
+  endpoints.web.exposure.include: health,prometheus
+edge:
+  region: ${EDGE_REGION:in}
+  core-url: ${EDGE_CORE_URL:}
+  core-token: ${EDGE_CORE_TOKEN:}
+  comms-url: ${EDGE_COMMS_URL:}
+  comms-token: ${EDGE_COMMS_TOKEN:}
+  button-key: ${EDGE_BUTTON_KEY:}
