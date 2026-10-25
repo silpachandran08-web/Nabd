@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
+import { ApiError, api } from "../lib/api";
 import { useLiveRefresh } from "../lib/live";
 import { tickOf } from "./messageTicks";
 import styles from "./patientMessages.module.css";
@@ -10,11 +11,10 @@ import pageStyles from "./patients.module.css";
 // COM-006: GET /v1/patients/{id}/messages. Only these fields are relied on; extras are ignored.
 export type MessageItem = { id: string; purpose?: string; templateName: string; status: string; statusAt: string; failureReason?: string | null };
 type Page = { items: MessageItem[]; nextCursor?: string | null };
-type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 
 /** Patient file > Messages: what this patient was sent and whether it arrived. The list refreshes by itself when a
  * delivery status changes (SSE topic "messages"). Without patients:view the endpoint is 403 and the tab shows nothing. */
-export default function PatientMessages({ patientId, authedFetch }: { patientId: string; authedFetch: AuthedFetch }) {
+export default function PatientMessages({ patientId }: { patientId: string }) {
   const [items, setItems] = useState<MessageItem[] | null>(null);
   const [next, setNext] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -23,13 +23,15 @@ export default function PatientMessages({ patientId, authedFetch }: { patientId:
   const seq = useRef(0); // a slow load for an earlier patient never lands in a later one
 
   const fetchPage = useCallback(async (cursor: string | null): Promise<Page | null> => {
-    const res = await authedFetch(`/patients/${patientId}/messages${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
-    if (!res) return null;
-    if (res.status === 403) { setDenied(true); return null; }
-    if (!res.ok) throw new Error(String(res.status));
-    const body = (await res.json()) as Partial<Page>;
+    let body: Partial<Page>;
+    try {
+      body = await api.get<Partial<Page>>(`/patients/${patientId}/messages${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) { setDenied(true); return null; }
+      throw e;
+    }
     return { items: Array.isArray(body.items) ? body.items : [], nextCursor: body.nextCursor ?? null };
-  }, [authedFetch, patientId]);
+  }, [patientId]);
 
   const load = useCallback(async () => {
     const mine = ++seq.current;

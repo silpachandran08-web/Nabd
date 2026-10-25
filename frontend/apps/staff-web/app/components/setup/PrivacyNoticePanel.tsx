@@ -6,13 +6,13 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "../../setup/setup.module.css";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
-import { apiFetch } from "../../lib/apiClient";
+import { ApiError, api } from "../../lib/api";
 import { requestStepUpToken } from "../../lib/stepUp";
 import { currentOf, historyOf, isStepUpCode, languageLabel, lockedClausesIntact, type NoticeVersion } from "../../lib/privacyNotice";
 
-async function detail(res: Response, fallback: string): Promise<string> {
-  if (res.status >= 500) return "The server had a problem. Try again in a moment.";
-  return ((await res.json().catch(() => null)) as { detail?: string } | null)?.detail || fallback;
+function detail(e: ApiError, fallback: string): string {
+  if (e.status >= 500) return "The server had a problem. Try again in a moment.";
+  return e.detail || fallback;
 }
 
 export default function PrivacyNoticePanel() {
@@ -28,11 +28,9 @@ export default function PrivacyNoticePanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch("/settings/privacy/privacy-notice");
-      if (!res.ok) { setError(await detail(res, "Could not load the privacy notices.")); return; }
-      const list = ((await res.json()) as { versions: NoticeVersion[] }).versions;
+      const list = (await api.get<{ versions: NoticeVersion[] }>("/settings/privacy/privacy-notice")).versions;
       setVersions(list); setError(null);
-    } catch { setError("Could not reach the server. Check your connection."); }
+    } catch (e) { setError(e instanceof ApiError ? detail(e, "Could not load the privacy notices.") : "Could not reach the server. Check your connection."); }
   }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load; state is set after the awaited fetch
   useEffect(() => { void load(); }, [load]);
@@ -58,14 +56,14 @@ export default function PrivacyNoticePanel() {
     const su = await requestStepUpToken(code);
     if ("error" in su) { setFail(su.error); setBusy(false); return; }
     try {
-      const res = await apiFetch("/settings/privacy/privacy-notice", {
-        method: "PUT", headers: { "Content-Type": "application/json", "X-Step-Up-Token": su.token },
-        body: JSON.stringify({ language: cur.language, bodyMd: draft, basedOnTemplate: cur.templateKey, baseVersion: cur.version }),
-      });
-      if (res.ok) { setOk(`Version ${((await res.json()) as { version: string }).version} published. Patients are asked to re-acknowledge at their next visit.`); setCode(""); await load(); }
-      else if (res.status === 409) { setFail("The notice changed since you opened it. Reloaded; apply your edit again."); await load(); }
-      else setFail(await detail(res, "Could not publish."));
-    } catch { setFail("Could not reach the server. Check your connection."); }
+      const res = await api.put<{ version: string }>("/settings/privacy/privacy-notice",
+        { language: cur.language, bodyMd: draft, basedOnTemplate: cur.templateKey, baseVersion: cur.version }, { headers: { "X-Step-Up-Token": su.token } });
+      setOk(`Version ${res.version} published. Patients are asked to re-acknowledge at their next visit.`); setCode(""); await load();
+    } catch (e) {
+      if (!(e instanceof ApiError)) setFail("Could not reach the server. Check your connection.");
+      else if (e.status === 409) { setFail("The notice changed since you opened it. Reloaded; apply your edit again."); await load(); }
+      else setFail(detail(e, "Could not publish."));
+    }
     setBusy(false);
   }
 

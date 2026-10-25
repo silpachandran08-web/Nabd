@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import styles from "../../setup/setup.module.css";
 import { ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
-import { apiFetch } from "../../lib/apiClient";
+import { ApiError, api } from "../../lib/api";
 import { requestStepUpToken } from "../../lib/stepUp";
 
 type Abdm = { enabled: boolean; hfrVerified: boolean; hfrId: string | null };
@@ -22,11 +22,9 @@ export default function AbdmCard() {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiFetch("/settings/integrations/abdm");
-      if (!res.ok) { setError("Could not load the ABDM settings."); return; }
-      const body = (await res.json()) as Abdm;
+      const body = await api.get<Abdm>("/settings/integrations/abdm");
       setS(body); setHfr(body.hfrId ?? ""); setError(null);
-    } catch { setError("Could not reach the server. Check your connection."); }
+    } catch (e) { setError(e instanceof ApiError ? "Could not load the ABDM settings." : "Could not reach the server. Check your connection."); }
   }, []);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- initial load; state is set after the awaited fetch
   useEffect(() => { void load(); }, [load]);
@@ -39,13 +37,12 @@ export default function AbdmCard() {
     const su = await requestStepUpToken(code);
     if ("error" in su) { setFail(su.error); setBusy(false); return; }
     try {
-      const res = await apiFetch("/settings/integrations/abdm", {
-        method: "PUT", headers: { "Content-Type": "application/json", "X-Step-Up-Token": su.token },
-        body: JSON.stringify(enabled ? { enabled, hfrId: hfr.trim() } : { enabled }),
-      });
-      if (res.ok) { setCode(""); await load(); }
-      else setFail(res.status === 422 ? "This facility id is not in the Health Facility Registry." : res.status === 503 ? "ABDM cannot be reached right now. Try again later." : "Could not save.");
-    } catch { setFail("Could not reach the server. Check your connection."); }
+      await api.put("/settings/integrations/abdm", enabled ? { enabled, hfrId: hfr.trim() } : { enabled }, { headers: { "X-Step-Up-Token": su.token } });
+      setCode(""); await load();
+    } catch (e) {
+      setFail(!(e instanceof ApiError) ? "Could not reach the server. Check your connection."
+        : e.status === 422 ? "This facility id is not in the Health Facility Registry." : e.status === 503 ? "ABDM cannot be reached right now. Try again later." : "Could not save.");
+    }
     setBusy(false);
   }
 

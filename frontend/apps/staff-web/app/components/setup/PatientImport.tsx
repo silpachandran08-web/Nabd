@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import s from "./patientImport.module.css";
 import Dialog from "../ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
-import { apiFetch, uuidv7 } from "../../lib/apiClient";
+import { ApiError, api } from "../../lib/api";
 
 // ADM-012: upload -> dry-run diff -> mapping -> commit -> progress. Mounted by the setup page only for setup:edit.
 // Nothing is written to patients until the owner taps "Import"; the commit runs in the background.
@@ -34,10 +34,10 @@ const FAIL_TEXT: Record<string, string> = {
   CHUNK_FAILED: "The import stopped after repeated failures. Nothing was created twice; contact support to resume.",
 };
 
-async function problem(res: Response, fallback: string): Promise<string> {
-  const p = await res.json().catch(() => null);
-  if (res.status === 403 && /DPA_REQUIRED/.test(p?.type ?? "")) return "Sign the data processing agreement and choose a plan before importing real patients.";
-  return p?.detail || fallback;
+function problem(e: unknown, fallback: string): string {
+  if (!(e instanceof ApiError)) return "Could not reach the server.";
+  if (e.status === 403 && /DPA_REQUIRED/.test(String(e.problem.type ?? ""))) return "Sign the data processing agreement and choose a plan before importing real patients.";
+  return e.detail || fallback;
 }
 
 export default function PatientImport() {
@@ -71,11 +71,9 @@ export default function PatientImport() {
     let live = true;
     const t = setTimeout(async () => {
       try {
-        const res = await apiFetch(`/setup/import-jobs/${job.id}`);
-        if (!live) return;
-        if (res.ok) adopt((await res.json()) as Job);
-        else setError(await problem(res, "Could not read the import progress."));
-      } catch { if (live) setError("Could not reach the server. Retrying…"); }
+        const j = await api.get<Job>(`/setup/import-jobs/${job.id}`);
+        if (live) adopt(j);
+      } catch (e) { if (live) setError(e instanceof ApiError ? problem(e, "Could not read the import progress.") : "Could not reach the server. Retrying…"); }
     }, 1500);
     return () => { live = false; clearTimeout(t); };
   }, [job, status, adopt]);
@@ -85,13 +83,13 @@ export default function PatientImport() {
     try {
       const format = /\.xlsx$/i.test(file.name) ? "xlsx" : /\.csv$/i.test(file.name) ? "csv" : null;
       if (!format) { setError("Choose an .xlsx or .csv file."); return; }
-      const up = await apiFetch(`/setup/import-uploads?fileName=${encodeURIComponent(file.name)}&format=${format}`, { method: "POST", body: file, headers: { "Content-Type": "application/octet-stream" } });
-      if (!up.ok) { setError(await problem(up, "Upload failed.")); return; }
-      const { uploadId } = await up.json();
-      const created = await apiFetch("/setup/import-jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId, importType: "patients", sourceFormat: format }) });
-      if (!created.ok) { setError(await problem(created, "Could not start the import.")); return; }
-      adopt((await created.json()) as Job);
-    } catch { setError("Could not reach the server."); } finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
+      let step = "Upload failed.";
+      try {
+        const { uploadId } = await api.post<{ uploadId: string }>(`/setup/import-uploads?fileName=${encodeURIComponent(file.name)}&format=${format}`, undefined, { rawBody: file, headers: { "Content-Type": "application/octet-stream" } });
+        step = "Could not start the import.";
+        adopt(await api.post<Job>("/setup/import-jobs", { uploadId, importType: "patients", sourceFormat: format }));
+      } catch (e) { setError(problem(e, step)); }
+    } finally { setBusy(false); if (fileRef.current) fileRef.current.value = ""; }
   }
 
   async function saveMapping() {
@@ -99,13 +97,11 @@ export default function PatientImport() {
     setBusy(true); setError(null);
     try {
       const cols = Object.entries(columns).filter(([, src]) => src).map(([target, source]) => ({ source, target }));
-      const res = await apiFetch(`/setup/import-jobs/${job.id}/mapping`, { method: "PUT", headers: { "Content-Type": "application/json", "Idempotency-Key": uuidv7() }, body: JSON.stringify({ columns: cols, dateFormat }) });
-      if (!res.ok) { setError(await problem(res, "Could not apply the mapping.")); return; }
-      const body = await res.json();
+      const body = await api.put<{ sample?: Record<string, string>[]; diff: Diff }>(`/setup/import-jobs/${job.id}/mapping`, { columns: cols, dateFormat });
       setSample(body.sample ?? []);
       setDups(null); setDecisions({});
       setJob({ ...job, diff: body.diff, mapping: { headers: job.mapping?.headers, columns: cols, dateFormat } });
-    } catch { setError("Could not reach the server."); } finally { setBusy(false); }
+    } catch (e) { setError(problem(e, "Could not apply the mapping.")); } finally { setBusy(false); }
   }
 
   const loadDups = useCallback(async (id: string) => {
@@ -114,15 +110,13 @@ export default function PatientImport() {
       const all: Dup[] = [];
       let after = 0;
       for (;;) {
-        const res = await apiFetch(`/setup/import-jobs/${id}/duplicates?afterRow=${after}&limit=100`);
-        if (!res.ok) { setDupError(await problem(res, "Could not load the possible duplicates.")); return; }
-        const page = await res.json();
+        const page = await api.get<{ items: Dup[]; nextAfterRow?: number | null }>(`/setup/import-jobs/${id}/duplicates?afterRow=${after}&limit=100`);
         all.push(...page.items);
         if (page.nextAfterRow == null) break;
         after = page.nextAfterRow;
       }
       setDups(all);
-    } catch { setDupError("Could not reach the server."); }
+    } catch (e) { setDupError(problem(e, "Could not load the possible duplicates.")); }
   }, []);
 
   async function openDrawer() {
@@ -133,9 +127,10 @@ export default function PatientImport() {
 
   async function downloadErrors() {
     if (!job) return;
-    const res = await apiFetch(`/setup/import-jobs/${job.id}/errors.csv`);
-    if (!res.ok) { setError(await problem(res, "Could not download the error report.")); return; }
-    const url = URL.createObjectURL(await res.blob());
+    let blob: Blob;
+    try { blob = await api.get<Blob>(`/setup/import-jobs/${job.id}/errors.csv`, { as: "blob" }); }
+    catch (e) { setError(problem(e, "Could not download the error report.")); return; }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = "import-errors.csv"; a.click();
     URL.revokeObjectURL(url);
@@ -146,10 +141,9 @@ export default function PatientImport() {
     setBusy(true); setError(null);
     try {
       const duplicateDecisions = Object.entries(decisions).map(([row, action]) => ({ row: Number(row), action }));
-      const res = await apiFetch(`/setup/import-jobs/${job.id}/commit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ duplicateDecisions }) });
-      if (!res.ok) { setError(await problem(res, "Could not start the import.")); return; }
+      await api.post(`/setup/import-jobs/${job.id}/commit`, { duplicateDecisions });
       setJob({ ...job, status: "importing", rowsDone: 0 });
-    } catch { setError("Could not reach the server."); } finally { setBusy(false); }
+    } catch (e) { setError(problem(e, "Could not start the import.")); } finally { setBusy(false); }
   }
 
   function downloadTemplate() {

@@ -4,7 +4,6 @@
   "app/ClinicNav.tsx",
   "app/IdleLockGuard.tsx",
   "app/TopBar.tsx",
-  "app/billing/page.tsx",
   "app/components/consult/AllergyRegister.tsx",
   "app/components/consult/DentalDrawer.tsx",
   "app/components/consult/DoctorOrders.tsx",
@@ -40,16 +39,6 @@
   "app/lib/session.ts",
   "app/lib/useRxSets.ts",
   "app/login/page.tsx",
-  "app/nursing/page.tsx",
-  "app/packages/page.tsx",
-  "app/patients/GuardianReviews.tsx",
-  "app/patients/PhoneDataQuality.tsx",
-  "app/patients/RegistryDialogs.tsx",
-  "app/patients/page.tsx",
-  "app/schedule/AppointmentActions.tsx",
-  "app/schedule/LiveQueueBoard.tsx",
-  "app/schedule/NewAppointmentDialog.tsx",
-  "app/schedule/WaitlistPanel.tsx",
-  "app/schedule/page.tsx"
+  "app/nursing/page.tsx"
  ]
 }

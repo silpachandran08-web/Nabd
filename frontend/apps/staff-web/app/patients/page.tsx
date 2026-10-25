@@ -724,7 +724,7 @@ function PatientsList() {
           onFixed={() => { setFlash("Mobile number corrected."); void load(q, filter); }} />
       )}
       {reviewingDuplicates && (
-        <DuplicateSuggestions authedFetch={authedFetch} onClose={() => setReviewingDuplicates(false)} onChanged={() => void load(q, filter)} />
+        <DuplicateSuggestions onClose={() => setReviewingDuplicates(false)} onChanged={() => void load(q, filter)} />
       )}
       {registering && (
         <RegisterDialog onClose={() => setRegistering(false)}
@@ -773,7 +773,7 @@ function PatientsList() {
               </div>
 
               {drawerTab === "messages" ? (
-                <PatientMessages patientId={drawerPatient.id} authedFetch={authedFetch} />
+                <PatientMessages patientId={drawerPatient.id} />
               ) : drawerTab === "dental" && canDental ? (
                 <>
                   <div className={styles.numberingToggle}>

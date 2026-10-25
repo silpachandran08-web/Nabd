@@ -59,7 +59,7 @@ export type ClientOptions = {
 
 /** `as: "blob" | "text"` returns the body as a Blob / string (file downloads, CSV); errors are still parsed as Problem+JSON. */
 export type RequestOptions = {
-  body?: unknown; signal?: AbortSignal; idempotencyKey?: string; as?: "blob" | "text"; headers?: Record<string, string>;
+  body?: unknown; /** Sent as-is (a File, a Blob): set Content-Type in `headers`. */ rawBody?: BodyInit; signal?: AbortSignal; idempotencyKey?: string; as?: "blob" | "text"; headers?: Record<string, string>;
   /** A 401 is the answer (e.g. a wrong MFA code), not an expired session: no refresh, no sign-out. */
   keepSession?: boolean;
 };
@@ -88,7 +88,7 @@ export function createClient(o: ClientOptions) {
     const lang = o.language ? o.language() : typeof navigator !== "undefined" ? navigator.language : undefined;
     if (lang) headers["Accept-Language"] = lang;
     try {
-      return await doFetch(url, { method, headers, body: opts.body === undefined ? undefined : JSON.stringify(opts.body), signal: ctl.signal });
+      return await doFetch(url, { method, headers, body: opts.rawBody ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)), signal: ctl.signal });
     } catch (e) {
       if (timedOut) throw new TimeoutError(timeoutMs);
       throw e;

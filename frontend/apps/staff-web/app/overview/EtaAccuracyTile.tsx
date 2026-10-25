@@ -2,27 +2,25 @@
 
 import { useCallback, useEffect, useState } from "react";
 import styles from "./overview.module.css";
+import { api } from "../lib/api";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
 import { dailyShare, sparkline, type EtaDay, type EtaItem } from "../lib/etaAccuracy";
 
 type State = { kind: "loading" } | { kind: "error" } | { kind: "ready"; days: EtaDay[] };
 
 /** ACC-019: yesterday's share of visits called within ±10 min of the time we showed, with the last 14 days. Owner overview only (reports:view). */
-export default function EtaAccuracyTile({ authedFetch }: { authedFetch: (path: string) => Promise<Response | null> }) {
+export default function EtaAccuracyTile() {
   const [state, setState] = useState<State>({ kind: "loading" });
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
     try {
-      const res = await authedFetch("/reports/eta-accuracy");
-      if (!res) return;
-      if (!res.ok) { setState({ kind: "error" }); return; }
-      const body = (await res.json()) as { items?: EtaItem[] };
+      const body = await api.get<{ items?: EtaItem[] }>("/reports/eta-accuracy");
       setState({ kind: "ready", days: dailyShare(body.items ?? []) });
     } catch {
       setState({ kind: "error" });
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 

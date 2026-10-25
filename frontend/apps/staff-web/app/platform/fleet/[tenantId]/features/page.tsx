@@ -92,7 +92,7 @@ export default function TenantFeaturesPage() {
         : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
-              <thead><tr><th>Feature</th><th>State</th><th>Reason</th><th>Expires</th></tr></thead>
+              <thead><tr><th scope="col">Feature</th><th scope="col">State</th><th scope="col">Reason</th><th scope="col">Expires</th></tr></thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.code} data-testid={`override-${r.code}`}>

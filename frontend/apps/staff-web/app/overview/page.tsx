@@ -218,7 +218,7 @@ export default function OverviewPage() {
 
       <div className={styles.columns}>
         <div className={styles.column}>
-          {can("reports:view") && <EtaAccuracyTile authedFetch={authedFetch} />}
+          {can("reports:view") && <EtaAccuracyTile />}
           <section className={styles.card} aria-label="Payment split">
             <div className={styles.cardLabel}>Payment split</div>
             {splitTotal === 0 ? (
