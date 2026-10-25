@@ -25,6 +25,9 @@ class Fin008Fin009TaxApiTest extends ApiTestBase {
     private static final String KA = "29ABCDE1234F1Z5", MH = "27ABCDE1234F1Z5";
     private int seq = 0;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    com.nabd.hms.common.ClinicClock clinicClock;
+
     private record Env(SeededTenant tenant, SeededStaff owner, String token) {
     }
 
@@ -180,16 +183,17 @@ class Fin008Fin009TaxApiTest extends ApiTestBase {
         Env e = env();
         String code = String.valueOf(CODES.getAndIncrement());
         JdbcTemplate a = admin();
+        java.time.LocalDate day = clinicClock.today(e.tenant().id()); // the clinic's day, not the DB/JVM/system date
         a.update("INSERT INTO tax_rules (jurisdiction, category, tax_category, rate, effective_from, effective_to, source_note) " +
-                "VALUES ('IN', ?, 'taxable', 5, DATE '2020-01-01', current_date, 'test')", code);
+                "VALUES ('IN', ?, 'taxable', 5, DATE '2020-01-01', ?, 'test')", code, day);
         a.update("INSERT INTO tax_rules (jurisdiction, category, tax_category, rate, effective_from, source_note) " +
-                "VALUES ('IN', ?, 'taxable', 12, current_date + 1, 'test')", code);
+                "VALUES ('IN', ?, 'taxable', 12, ?, 'test')", code, day.plusDays(1));
         head(e, "MED", 1000, 99, "taxable", code, false, false); // the head's own rate (99) must not win over the rule
         ResponseEntity<Map> today = checkout(e, Map.of("lineItems", List.of(line("MED", 1))));
         assertThat(d(today.getBody().get("tax"))).isEqualTo(50.0);
         // tomorrow arrives: the old rule ends, the new one is in force
-        a.update("UPDATE tax_rules SET effective_to = current_date - 1 WHERE category = ? AND effective_from = DATE '2020-01-01'", code);
-        a.update("UPDATE tax_rules SET effective_from = current_date WHERE category = ? AND rate = 12", code);
+        a.update("UPDATE tax_rules SET effective_to = ? WHERE category = ? AND effective_from = DATE '2020-01-01'", day.minusDays(1), code);
+        a.update("UPDATE tax_rules SET effective_from = ? WHERE category = ? AND rate = 12", day, code);
         ResponseEntity<Map> fresh = checkout(e, Map.of("lineItems", List.of(line("MED", 1))));
         assertThat(d(fresh.getBody().get("tax"))).isEqualTo(120.0);
         ResponseEntity<Map> reprint = exchange("/v1/billing/invoices/" + today.getBody().get("id"), HttpMethod.GET, authed(e.token()), Map.class);

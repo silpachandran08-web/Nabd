@@ -85,6 +85,9 @@ class Acc029Acc030HouseholdDuplicatesApiTest extends ApiTestBase {
         return all;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    com.nabd.hms.common.ClinicClock clinicClock;
+
     // ---------------------------------------------------------------- ACC-029
 
     @Test
@@ -92,8 +95,8 @@ class Acc029Acc030HouseholdDuplicatesApiTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         String token = owner(t, "h1@a.com", "+919300000101");
         String mother = register(token, "Mona Said", "+919877700001", "1988-04-02", null);
-        String kid1 = register(token, "Kid One", "+919877700001", LocalDate.now().minusYears(6).toString(), UUID.fromString(mother));
-        String kid2 = register(token, "Kid Two", "+919877700002", LocalDate.now().minusYears(3).toString(), UUID.fromString(mother)); // own phone, guardian has the searched one
+        String kid1 = register(token, "Kid One", "+919877700001", clinicClock.today(t.id()).minusYears(6).toString(), UUID.fromString(mother));
+        String kid2 = register(token, "Kid Two", "+919877700002", clinicClock.today(t.id()).minusYears(3).toString(), UUID.fromString(mother)); // own phone, guardian has the searched one
         register(token, "Stranger", "+919877700003", "1990-01-01", null);
         UUID doctor = UUID.randomUUID();
         inTenantTx(t.id(), () -> jdbc.update("INSERT INTO queue_entries (id, tenant_id, patient_id, doctor_id, queue_date, token_number, status, department_id, created_at, updated_at) " +
@@ -142,7 +145,7 @@ class Acc029Acc030HouseholdDuplicatesApiTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         String token = owner(t, "h4@a.com", "+919300000105");
         String mother = register(token, "Log Mother", "+919877700031", "1988-04-02", null);
-        register(token, "Log Child", "+919877700031", LocalDate.now().minusYears(5).toString(), UUID.fromString(mother));
+        register(token, "Log Child", "+919877700031", clinicClock.today(t.id()).minusYears(5).toString(), UUID.fromString(mother));
         household(token, "9877700031");
         long deadline = System.currentTimeMillis() + 15_000;
         int rows = 0;
@@ -163,7 +166,7 @@ class Acc029Acc030HouseholdDuplicatesApiTest extends ApiTestBase {
         su.execute("ANALYZE patients");
         su.update("DELETE FROM registry_dirty WHERE tenant_id = ?", t.id()); // the bulk rows are never read via the registry; left queued they make every later drain() time out on this tenant
         String mother = register(token, "Perf Mother", "+919877700041", "1988-04-02", null);
-        register(token, "Perf Child", "+919877700041", LocalDate.now().minusYears(5).toString(), UUID.fromString(mother));
+        register(token, "Perf Child", "+919877700041", clinicClock.today(t.id()).minusYears(5).toString(), UUID.fromString(mother));
         for (int i = 0; i < 5; i++) household(token, "9877700041"); // warm up
         List<Long> ms = new ArrayList<>();
         for (int i = 0; i < 40; i++) {
