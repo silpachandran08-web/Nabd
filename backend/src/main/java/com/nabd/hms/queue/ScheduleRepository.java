@@ -49,6 +49,12 @@ class ScheduleRepository {
                 workingHoursMapper(), doctorId);
     }
 
+    /** ACC-038: every doctor of the tenant that has working hours (the Edge availability projection). */
+    List<UUID> doctorsWithHours(UUID tenantId) {
+        return jdbc.query("SELECT DISTINCT doctor_id FROM doctor_working_hours WHERE tenant_id = ? ORDER BY doctor_id",
+                (rs, i) -> rs.getObject(1, UUID.class), tenantId);
+    }
+
     List<WorkingHoursRow> findForDay(UUID doctorId, int dayOfWeek) {
         return jdbc.query(
                 "SELECT id, doctor_id, day_of_week, start_time, end_time, slot_minutes, max_patients " +

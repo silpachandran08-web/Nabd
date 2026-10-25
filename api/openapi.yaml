@@ -69,6 +69,26 @@ paths:
                         e: { type: string }
                         use: { type: string, enum: [sig] }
                         alg: { type: string, enum: [RS256] }
+  /.well-known/jwks/{population}.json:
+    servers:
+      - url: /
+    parameters: [{ name: population, in: path, required: true, schema: { type: string, enum: [staff, owner, platform] } }]
+    get:
+      tags: [Auth]
+      summary: "PLT-009. Public verification keys of one token population (staff, owner or platform): exactly 2 (active + next/previous kid), no private material. Each population has its own issuer (https://api.nabd.health/<population>) and keys; rotating one never touches another. The legacy /.well-known/jwks.json (and ?population=) serves the same sets, staff by default. The internal (service) population is not published: 404."
+      security: []
+      x-required-permission: public
+      responses:
+        "200":
+          description: JWKS, Cache-Control public max-age=300
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys: { type: array, minItems: 2, maxItems: 2, items: { type: object, required: [kid, kty, n, e, use, alg] } }
+        "404": { description: "Unknown or unpublished population" }
   # ---------------------------------------------------------------- Auth
   /auth/login:
     post:
@@ -2624,6 +2644,77 @@ paths:
         "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
         "410": { description: "SUBJECT_GONE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/availability:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Queue]
+      summary: "ACC-038. Authoritative availability for the Edge projection: per doctor, one session per working-hours block per day, mode slots (free slot starts) or tokens (places left of a capped session). specialtyCode is accepted but not applied (Core has no specialty data yet). Service token aud=internal (iss https://api.nabd.health/internal) naming the tenant in its tenants claim, behind a client certificate; another tenant is 403."
+      x-required-permission: authenticated
+      parameters:
+        - { name: doctorId, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: specialtyCode, in: query, required: false, schema: { type: string } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date }, description: "At most 14 days after from" }
+      responses:
+        "200": { description: "{ doctors: [{ doctorId, sessions: [{ id, date, mode, slots?, tokensLeft? }] }], v }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "No client certificate, or not an aud=internal service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "This service identity may not act for that tenant (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/households/{phoneHash}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, description: "SHA-256, lower-case hex, of the verified phone's E.164 digits without +", schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    get:
+      tags: [Patients]
+      summary: "ACC-038. Household of a WhatsApp-verified phone: the patients registered on it plus their dependants. Returns only patientRef (opaque, per tenant), firstName, age band (0-4, 5-11, 12-17, 18-39, 40-59, 60+), relation (self, guardian, dependent) and isGuardian; never a date of birth or full name. Audited as 'patient via edge'."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ members: [{ patientRef, firstName, age, relation, isGuardian }] }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tenants/{tid}/appointments:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-038. Book an appointment for a patient reference. Idempotency-Key (UUID) is required (400 IDEMPOTENCY_KEY_REQUIRED); a replay returns the identical status and body. Same slot rules as staff booking; the last slot raced by two patients gives one 201 and one 409 SLOT_TAKEN. Audited as 'patient via edge' with the patientRef."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [patientRef, doctorId, startTime], properties: { patientRef: { type: string }, doctorId: { type: string, format: uuid }, startTime: { type: string, format: date-time } } } } }
+      responses:
+        "201": { description: "{ appointmentId, status }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed, or unknown patientRef (NOT_OWNER) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "SLOT_TAKEN (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/appointments/{id}/{action}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [confirm, reschedule, cancel] } }
+    post:
+      tags: [Queue]
+      summary: "ACC-038. Confirm, reschedule or cancel the patient's own appointment on their behalf. reasonCode (lower-case code, 3-40 characters) is required to cancel, newStartTime to reschedule (the response then carries the new appointment id). Idempotency-Key required. Core has no separate 'confirmed' state: confirm validates ownership and status, records the confirmation in the audit trail and answers status scheduled."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [patientRef], properties: { patientRef: { type: string }, newStartTime: { type: string, format: date-time }, reasonCode: { type: string, pattern: "^[a-z0-9_]{3,40}$" } } } } }
+      responses:
+        "200": { description: "{ appointmentId, status }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed, or the appointment is not this patient's (NOT_OWNER) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "SLOT_TAKEN or APPOINTMENT_ARRIVED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "INSIDE_CANCELLATION_WINDOW: the clinic's cancellation_window_hours policy applies (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /clinical/drug-knowledge-base:
     get:
       tags: [Clinical]
