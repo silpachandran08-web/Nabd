@@ -89,6 +89,7 @@ owner,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
 owner,GET /v1/platform/billing/subscriptions,billing_revenue:view,deny-401
 owner,GET /v1/platform/plans,pricing_packaging:view,deny-401
+owner,GET /v1/platform/plans/{id}/versions,pricing_packaging:view,deny-401
 owner,GET /v1/platform/provisioning-jobs,onboarding_provisioning:view,deny-401
 owner,GET /v1/platform/provisioning-jobs/{id},onboarding_provisioning:view,deny-401
 owner,GET /v1/platform/support-access/grants,support_access:view,deny-401
@@ -96,6 +97,7 @@ owner,GET /v1/platform/support-access/grants/{id}/patients/{patientId},support_a
 owner,GET /v1/platform/support/tickets,support_tickets:view,deny-401
 owner,GET /v1/platform/tenants,clinics_fleet:view,deny-401
 owner,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
+owner,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 owner,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner,GET /v1/platform/territories,territories:view,deny-401
 owner,GET /v1/queue,queue:view,allow
@@ -276,6 +278,8 @@ owner,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-
 owner,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 owner,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
+owner,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 owner,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
 owner_doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 owner_doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
@@ -365,6 +369,7 @@ owner_doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 owner_doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
 owner_doctor,GET /v1/platform/billing/subscriptions,billing_revenue:view,deny-401
 owner_doctor,GET /v1/platform/plans,pricing_packaging:view,deny-401
+owner_doctor,GET /v1/platform/plans/{id}/versions,pricing_packaging:view,deny-401
 owner_doctor,GET /v1/platform/provisioning-jobs,onboarding_provisioning:view,deny-401
 owner_doctor,GET /v1/platform/provisioning-jobs/{id},onboarding_provisioning:view,deny-401
 owner_doctor,GET /v1/platform/support-access/grants,support_access:view,deny-401
@@ -372,6 +377,7 @@ owner_doctor,GET /v1/platform/support-access/grants/{id}/patients/{patientId},su
 owner_doctor,GET /v1/platform/support/tickets,support_tickets:view,deny-401
 owner_doctor,GET /v1/platform/tenants,clinics_fleet:view,deny-401
 owner_doctor,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
+owner_doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 owner_doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner_doctor,GET /v1/platform/territories,territories:view,deny-401
 owner_doctor,GET /v1/queue,queue:view,allow
@@ -552,6 +558,8 @@ owner_doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edi
 owner_doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 owner_doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner_doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner_doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
+owner_doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 owner_doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
 doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
@@ -641,6 +649,7 @@ doctor,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 doctor,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
 doctor,GET /v1/platform/billing/subscriptions,billing_revenue:view,deny-401
 doctor,GET /v1/platform/plans,pricing_packaging:view,deny-401
+doctor,GET /v1/platform/plans/{id}/versions,pricing_packaging:view,deny-401
 doctor,GET /v1/platform/provisioning-jobs,onboarding_provisioning:view,deny-401
 doctor,GET /v1/platform/provisioning-jobs/{id},onboarding_provisioning:view,deny-401
 doctor,GET /v1/platform/support-access/grants,support_access:view,deny-401
@@ -648,6 +657,7 @@ doctor,GET /v1/platform/support-access/grants/{id}/patients/{patientId},support_
 doctor,GET /v1/platform/support/tickets,support_tickets:view,deny-401
 doctor,GET /v1/platform/tenants,clinics_fleet:view,deny-401
 doctor,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
+doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 doctor,GET /v1/platform/territories,territories:view,deny-401
 doctor,GET /v1/queue,queue:view,allow
@@ -828,6 +838,8 @@ doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allo
 doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
+doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 nurse,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 nurse,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
@@ -917,6 +929,7 @@ nurse,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 nurse,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
 nurse,GET /v1/platform/billing/subscriptions,billing_revenue:view,deny-401
 nurse,GET /v1/platform/plans,pricing_packaging:view,deny-401
+nurse,GET /v1/platform/plans/{id}/versions,pricing_packaging:view,deny-401
 nurse,GET /v1/platform/provisioning-jobs,onboarding_provisioning:view,deny-401
 nurse,GET /v1/platform/provisioning-jobs/{id},onboarding_provisioning:view,deny-401
 nurse,GET /v1/platform/support-access/grants,support_access:view,deny-401
@@ -924,6 +937,7 @@ nurse,GET /v1/platform/support-access/grants/{id}/patients/{patientId},support_a
 nurse,GET /v1/platform/support/tickets,support_tickets:view,deny-401
 nurse,GET /v1/platform/tenants,clinics_fleet:view,deny-401
 nurse,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
+nurse,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 nurse,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 nurse,GET /v1/platform/territories,territories:view,deny-401
 nurse,GET /v1/queue,queue:view,allow
@@ -1104,6 +1118,8 @@ nurse,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 nurse,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 nurse,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 nurse,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+nurse,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
+nurse,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 nurse,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 receptionist,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 receptionist,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
@@ -1193,6 +1209,7 @@ receptionist,GET /v1/platform/audit-log/export,audit_compliance:view,deny-401
 receptionist,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
 receptionist,GET /v1/platform/billing/subscriptions,billing_revenue:view,deny-401
 receptionist,GET /v1/platform/plans,pricing_packaging:view,deny-401
+receptionist,GET /v1/platform/plans/{id}/versions,pricing_packaging:view,deny-401
 receptionist,GET /v1/platform/provisioning-jobs,onboarding_provisioning:view,deny-401
 receptionist,GET /v1/platform/provisioning-jobs/{id},onboarding_provisioning:view,deny-401
 receptionist,GET /v1/platform/support-access/grants,support_access:view,deny-401
@@ -1200,6 +1217,7 @@ receptionist,GET /v1/platform/support-access/grants/{id}/patients/{patientId},su
 receptionist,GET /v1/platform/support/tickets,support_tickets:view,deny-401
 receptionist,GET /v1/platform/tenants,clinics_fleet:view,deny-401
 receptionist,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
+receptionist,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 receptionist,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 receptionist,GET /v1/platform/territories,territories:view,deny-401
 receptionist,GET /v1/queue,queue:view,allow
@@ -1380,6 +1398,8 @@ receptionist,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edi
 receptionist,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 receptionist,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 receptionist,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+receptionist,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
+receptionist,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 receptionist,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
@@ -1469,6 +1489,7 @@ frontdesk_vitals,GET /v1/platform/audit-log/export,audit_compliance:view,deny-40
 frontdesk_vitals,GET /v1/platform/billing/discounts,billing_revenue:view,deny-401
 frontdesk_vitals,GET /v1/platform/billing/subscriptions,billing_revenue:view,deny-401
 frontdesk_vitals,GET /v1/platform/plans,pricing_packaging:view,deny-401
+frontdesk_vitals,GET /v1/platform/plans/{id}/versions,pricing_packaging:view,deny-401
 frontdesk_vitals,GET /v1/platform/provisioning-jobs,onboarding_provisioning:view,deny-401
 frontdesk_vitals,GET /v1/platform/provisioning-jobs/{id},onboarding_provisioning:view,deny-401
 frontdesk_vitals,GET /v1/platform/support-access/grants,support_access:view,deny-401
@@ -1476,6 +1497,7 @@ frontdesk_vitals,GET /v1/platform/support-access/grants/{id}/patients/{patientId
 frontdesk_vitals,GET /v1/platform/support/tickets,support_tickets:view,deny-401
 frontdesk_vitals,GET /v1/platform/tenants,clinics_fleet:view,deny-401
 frontdesk_vitals,GET /v1/platform/tenants/summary,clinics_fleet:view,deny-401
+frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 frontdesk_vitals,GET /v1/platform/territories,territories:view,deny-401
 frontdesk_vitals,GET /v1/queue,queue:view,allow
@@ -1656,4 +1678,6 @@ frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 frontdesk_vitals,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 frontdesk_vitals,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+frontdesk_vitals,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
+frontdesk_vitals,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
 frontdesk_vitals,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
