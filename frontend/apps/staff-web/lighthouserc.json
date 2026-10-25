@@ -1,0 +1,27 @@
+{
+  "nabdBudgets": {
+    "lcpMs": 3000,
+    "bundleKB": 1536,
+    "routes": ["/login", "/arrivals", "/consult", "/checkout/otc", "/my-day"]
+  },
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "formFactor": "mobile",
+        "screenEmulation": { "mobile": true, "width": 360, "height": 640, "deviceScaleFactor": 2.625, "disabled": false },
+        "emulatedUserAgent": "Mozilla/5.0 (Linux; Android 11; Moto G Power) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
+        "throttlingMethod": "simulate",
+        "throttling": { "rttMs": 300, "throughputKbps": 700, "requestLatencyMs": 1125, "downloadThroughputKbps": 700, "uploadThroughputKbps": 700, "cpuSlowdownMultiplier": 4 },
+        "onlyCategories": ["performance"]
+      },
+      "puppeteerScript": "./scripts/lhci-auth.cjs"
+    },
+    "assert": {
+      "assertions": {
+        "largest-contentful-paint": ["error", { "maxNumericValue": 3000, "aggregationMethod": "median" }]
+      }
+    }
+  }
+}

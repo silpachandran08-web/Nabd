@@ -69,3 +69,10 @@ jobs:
       app_url: ${{ needs.deploy.outputs.app_url }}
       api_url: ${{ needs.deploy.outputs.api_url }}
       seed_artifact: preview-seed
+
+  perf:   # OPS-039: Lighthouse 3G budget on the preview
+    needs: deploy
+    uses: ./.github/workflows/perf-budget.yml
+    with:
+      app_url: ${{ needs.deploy.outputs.app_url }}
+      api_url: ${{ needs.deploy.outputs.api_url }}

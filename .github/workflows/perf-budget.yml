@@ -1,0 +1,81 @@
+# OPS-039: front-end performance budget (FRD NFR-02). Budgets live in frontend/apps/staff-web/lighthouserc.json.
+#  bundle: every PR that touches the frontend; initial JS+CSS per route < 1.5 MB gzip, else the job fails.
+#  lighthouse: called by preview.yml with the preview URL; 3G + Moto G class, median of 3 runs, LCP < 3 s per route.
+# Both post one PR comment (route, metric, budget, largest chunks). Needs external action: a real PR run, and
+# vars.PERF_LOGIN (an `email|pin` synthetic login from the preview seed) for the signed-in routes.
+name: perf-budget
+on:
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/perf-budget.yml"]
+  workflow_call:
+    inputs:
+      app_url: { type: string, required: true }
+      api_url: { type: string, required: true }
+permissions:
+  contents: read
+  pull-requests: write
+env:
+  NODE_VERSION: "22"
+  LHCI_VERSION: "0.15.1"
+
+jobs:
+  bundle:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults: { run: { working-directory: frontend/apps/staff-web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+        working-directory: frontend
+      - run: pnpm exec next build
+        env: { NEXT_TELEMETRY_DISABLED: "1" }
+      - name: unit fixtures (a breach fails)
+        run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tests/unit/perf-budget.test.mjs
+      - name: bundle budget
+        id: gate
+        run: node scripts/perf-budget.mjs bundle --out "$RUNNER_TEMP/bundle.md" || echo "rc=1" >> "$GITHUB_OUTPUT"
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = "<!-- perf-budget-bundle -->\n" + require("fs").readFileSync(process.env.RUNNER_TEMP + "/bundle.md", "utf8");
+            const { data } = await github.rest.issues.listComments({ ...context.repo, issue_number: context.issue.number, per_page: 100 });
+            const old = data.find((c) => c.body.startsWith("<!-- perf-budget-bundle -->"));
+            if (old) await github.rest.issues.updateComment({ ...context.repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+      - run: test -z "${{ steps.gate.outputs.rc }}"
+
+  lighthouse:
+    if: github.event_name == 'workflow_call'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5   # gate runtime < 5 min: 5 routes x 3 runs
+    defaults: { run: { working-directory: frontend/apps/staff-web } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: sign in as the synthetic doctor (token stays in this job)
+        run: |
+          IFS='|' read -r e p <<< "${{ vars.PERF_LOGIN }}"
+          t=$(curl -fsS -X POST "${{ inputs.api_url }}/auth/login" -H 'content-type: application/json' -d "{\"email\":\"$e\",\"pin\":\"$p\"}" | node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0,"utf8")).accessToken)')
+          echo "::add-mask::$t"; echo "PERF_ACCESS_TOKEN=$t" >> "$GITHUB_ENV"
+      - name: Lighthouse (3G, Moto G class, 3 runs per route)
+        run: |
+          urls=$(node -e 'const r=require("./lighthouserc.json").nabdBudgets.routes;console.log(r.map(p=>"--collect.url=${{ inputs.app_url }}"+p).join(" "))')
+          npx --yes @lhci/cli@$LHCI_VERSION collect --config=lighthouserc.json $urls
+      - name: LCP budget
+        id: gate
+        run: node scripts/perf-budget.mjs lhci --out "$RUNNER_TEMP/lcp.md" || echo "rc=1" >> "$GITHUB_OUTPUT"
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = "<!-- perf-budget-lcp -->\n" + require("fs").readFileSync(process.env.RUNNER_TEMP + "/lcp.md", "utf8");
+            const { data } = await github.rest.issues.listComments({ ...context.repo, issue_number: context.issue.number, per_page: 100 });
+            const old = data.find((c) => c.body.startsWith("<!-- perf-budget-lcp -->"));
+            if (old) await github.rest.issues.updateComment({ ...context.repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+      - run: test -z "${{ steps.gate.outputs.rc }}"
