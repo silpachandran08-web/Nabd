@@ -34,7 +34,7 @@ modules:
   organization:
     # PLT-033: departments, service points, workflow definitions, clinic policies and setup (packages
     # organization.department / organization.setup); other modules use organization.api.
-    owns: [attendance_records, clinic_holidays, clinic_policies, clinic_setup_progress, data_export_jobs, data_import_jobs, department_transfers, department_workflow_selection, departments, dpa_acceptances, invoice_series, licence_registry, regions, service_points, staff_shifts, workflow_definitions]
+    owns: [attendance_records, clinic_holidays, clinic_policies, clinic_setup_progress, data_export_jobs, data_import_jobs, data_import_rows, data_import_uploads, department_transfers, department_workflow_selection, departments, dpa_acceptances, invoice_series, licence_registry, regions, service_points, staff_shifts, workflow_definitions]
     reads: [tenants]  # FIN-006: InvoiceSeriesService checks the tenant's tax_registration_id (needs architecture review)
   owner:
     owns: [legal_entities, owners, tax_registrations]

@@ -247,6 +247,12 @@ schemas:
       created_at: operational
       updated_at: operational
     data_import_jobs:
+      upload_id: operational
+      mapping: operational
+      diff_summary: operational
+      rows_total: operational
+      rows_done: operational
+      last_chunk: operational
       id: operational
       tenant_id: operational
       import_type: operational
@@ -257,6 +263,26 @@ schemas:
       requested_by: operational
       created_at: operational
       updated_at: operational
+    data_import_rows:
+      id: operational
+      tenant_id: operational
+      job_id: operational
+      row_no: operational
+      payload_enc: phi
+      outcome: operational
+      decision: operational
+      error_code: operational
+      patient_id: pii
+    data_import_uploads:
+      id: operational
+      tenant_id: operational
+      file_name: operational
+      source_format: operational
+      size_bytes: operational
+      content_enc: phi
+      scan_status: operational
+      created_by: operational
+      created_at: operational
     day_closes:
       id: operational
       tenant_id: operational
@@ -729,6 +755,7 @@ schemas:
       created_at: operational
       updated_at: operational
     patient_allergies:
+      unconfirmed: operational
       id: operational
       tenant_id: operational
       patient_id: pii
@@ -814,6 +841,7 @@ schemas:
       change_seq: operational
       updated_at: operational
     patients:
+      legacy_record_no: pii
       is_synthetic: operational
       id: operational
       tenant_id: operational

@@ -159,6 +159,7 @@ export default function AllergyRegister({
                       <strong>{a.substance}</strong>
                       <StatusPill tone={SEVERITY_TONE[a.severity] ?? "neutral"} icon="alert" label={a.severity} />
                       <span className={s.muted}>{label(CATEGORIES, a.category)}</span>
+                      {a.unconfirmed && <StatusPill tone="warn" icon="alert" label="Imported, doctor to confirm" />}
                     </div>
                     <div className={s.muted}>
                       {a.reaction ? `${a.reaction} · ` : ""}{when(a.recordedAt)}{a.recordedByName ? ` · ${a.recordedByName}` : ""} · {label(SOURCES, a.source)}

@@ -1423,7 +1423,84 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/ImportJobRequest" } } }
       responses:
-        "201": { description: "Created import job", content: { application/json: { schema: { $ref: "#/components/schemas/ImportJob" } } } }
+        "201": { description: "Created import job. With uploadId (ADM-012) the job starts in status validating; 403 DPA_REQUIRED while the clinic is demo_only, 415 UNSUPPORTED_FILE.", content: { application/json: { schema: { $ref: "#/components/schemas/ImportJob" } } } }
+
+  /setup/import-uploads:
+    post:
+      tags: [Setup]
+      summary: Upload the patient file (xlsx or csv) for an import job (ADM-012)
+      description: The raw file is the request body (application/octet-stream), at most 25 MB. 403 DPA_REQUIRED while the clinic is demo_only, 415 UNSUPPORTED_FILE, 413 FILE_TOO_LARGE.
+      x-required-permission: setup:edit
+      parameters:
+        - { name: fileName, in: query, required: true, schema: { type: string } }
+        - { name: format, in: query, required: true, schema: { type: string, enum: [xlsx, csv] } }
+      requestBody:
+        required: true
+        content: { application/octet-stream: { schema: { type: string, format: binary } } }
+      responses:
+        "201": { description: "Stored", content: { application/json: { schema: { $ref: "#/components/schemas/ImportUploadResponse" } } } }
+
+  /setup/import-jobs/{id}:
+    get:
+      tags: [Setup]
+      summary: One import job with its diff, mapping and progress (ADM-012)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Import job", content: { application/json: { schema: { $ref: "#/components/schemas/ImportJob" } } } }
+
+  /setup/import-jobs/{id}/mapping:
+    put:
+      tags: [Setup]
+      summary: Save the column mapping and re-run the dry run (ADM-012)
+      description: Only while the job is at the review step (status dry_run), else 409 DIFF_STALE. 422 REQUIRED_FIELD_UNMAPPED unless name, mobile, dob and sex are mapped. Nothing is written to patients.
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ImportMappingRequest" } } }
+      responses:
+        "200": { description: "Dry-run diff and a sample", content: { application/json: { schema: { $ref: "#/components/schemas/ImportMappingResponse" } } } }
+
+  /setup/import-jobs/{id}/commit:
+    post:
+      tags: [Setup]
+      summary: Commit the dry-run result (ADM-012)
+      description: Runs in the background in chunks of 500, each chunk one transaction, resumable. Possible duplicates without a decision are skipped. 409 DIFF_STALE unless the job is at the review step or a decision names a row that is not a duplicate.
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ImportCommitRequest" } } }
+      responses:
+        "202": { description: "Accepted", content: { application/json: { schema: { $ref: "#/components/schemas/ImportCommitResponse" } } } }
+
+  /setup/import-jobs/{id}/duplicates:
+    get:
+      tags: [Setup]
+      summary: Possible duplicates of the dry run, keyed by file row (ADM-012)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: afterRow, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { description: "Page of possible duplicates", content: { application/json: { schema: { $ref: "#/components/schemas/ImportDuplicatePage" } } } }
+
+  /setup/import-jobs/{id}/errors.csv:
+    get:
+      tags: [Setup]
+      summary: Download the error report of the dry run (row, code, reason) (ADM-012)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "CSV", content: { text/csv: { schema: { type: string } } } }
 
   /setup/export-jobs:
     get:
@@ -4383,6 +4460,7 @@ components:
         deactivatedReason: { type: [string, "null"], description: "Why the entry was removed; null while active" }
         deactivatedAt: { type: [string, "null"], format: date-time }
         deactivatedByName: { type: [string, "null"] }
+        unconfirmed: { type: boolean, description: "ADM-012: imported from a legacy list, a doctor still has to confirm it; a clinician correction clears it" }
     AllergyWrite:
       type: object
       required: [substance, severity]
@@ -5556,17 +5634,85 @@ components:
         id: { type: string, format: uuid }
         importType: { type: string, enum: [patients, appointments, invoices, charges] }
         fileName: { type: string }
-        status: { type: string, enum: [pending, validating, importing, done, failed] }
+        status: { type: string, enum: [pending, validating, dry_run, awaiting_commit, importing, done, failed] }
         resultUrl: { type: [string, "null"] }
         errorMessage: { type: [string, "null"] }
         createdAt: { type: [string, "null"], format: date-time }
+        rowsTotal: { type: [integer, "null"] }
+        rowsDone: { type: [integer, "null"] }
+        diff: { type: [object, "null"], additionalProperties: true, description: "ready, duplicates, errors, total (needsMapping when a required column is unmapped); after the commit created, merged, skipped, errors" }
+        mapping: { type: [object, "null"], additionalProperties: true, description: "headers, columns [{source, target}], dateFormat" }
 
     ImportJobRequest:
       type: object
-      required: [importType, fileName]
+      required: [importType]
+      description: fileName for the legacy stub job; uploadId (with optional sourceFormat) starts the staged patient import.
       properties:
         importType: { type: string, enum: [patients, appointments, invoices, charges] }
         fileName: { type: string }
+        uploadId: { type: string, format: uuid }
+        sourceFormat: { type: string, enum: [xlsx, csv] }
+
+    ImportUploadResponse:
+      type: object
+      properties:
+        uploadId: { type: string, format: uuid }
+        fileName: { type: string }
+        sourceFormat: { type: string, enum: [xlsx, csv] }
+        sizeBytes: { type: integer }
+
+    ImportColumn:
+      type: object
+      required: [source, target]
+      properties:
+        source: { type: string, description: "Header text in the file" }
+        target: { type: string, enum: [name, mobile, dob, sex, oldRecordNo, allergies] }
+
+    ImportMappingRequest:
+      type: object
+      required: [columns]
+      properties:
+        columns: { type: array, items: { $ref: "#/components/schemas/ImportColumn" } }
+        dateFormat: { type: string, enum: [dd/MM/yyyy, MM/dd/yyyy, dd-MM-yyyy, dd.MM.yyyy, yyyy-MM-dd], default: dd/MM/yyyy }
+
+    ImportMappingResponse:
+      type: object
+      properties:
+        diff: { type: object, additionalProperties: true }
+        sample: { type: array, items: { type: object, additionalProperties: { type: string } } }
+
+    ImportDecision:
+      type: object
+      required: [row, action]
+      properties:
+        row: { type: integer, description: "Row number as in the spreadsheet (header = 1)" }
+        action: { type: string, enum: [skip, merge, create] }
+
+    ImportCommitRequest:
+      type: object
+      properties:
+        duplicateDecisions: { type: array, items: { $ref: "#/components/schemas/ImportDecision" } }
+
+    ImportCommitResponse:
+      type: object
+      properties:
+        status: { type: string, enum: [importing] }
+
+    ImportDuplicateRow:
+      type: object
+      properties:
+        row: { type: integer }
+        reason: { type: string, enum: [DUP_FILE, DUP_REGISTRY] }
+        name: { type: string }
+        mobileEnding: { type: string, description: "Last 4 digits" }
+        dob: { type: string, format: date }
+        decision: { type: [string, "null"], enum: [skip, merge, create, null] }
+
+    ImportDuplicatePage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ImportDuplicateRow" } }
+        nextAfterRow: { type: [integer, "null"] }
 
     ExportJob:
       type: object

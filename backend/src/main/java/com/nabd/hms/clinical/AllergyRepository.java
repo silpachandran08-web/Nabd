@@ -75,7 +75,7 @@ class AllergyRepository {
     void applyCorrection(UUID tenantId, UUID id, String substance, String category, String severity, String reaction,
                          String source, UUID updatedBy) {
         jdbc.update("UPDATE patient_allergies SET substance = ?, category = ?, severity = ?, reaction = ?, source = ?, " +
-                        "updated_by = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
+                        "updated_by = ?, updated_at = now(), unconfirmed = false WHERE tenant_id = ? AND id = ?",
                 substance, category, severity, reaction, source, updatedBy, tenantId, id);
     }
 
@@ -145,6 +145,6 @@ class AllergyRepository {
                 rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant(),
                 rs.getString("deactivated_by") == null ? null : UUID.fromString(rs.getString("deactivated_by")),
                 rs.getTimestamp("deactivated_at") == null ? null : rs.getTimestamp("deactivated_at").toInstant(),
-                rs.getString("deactivation_reason"));
+                rs.getString("deactivation_reason"), rs.getBoolean("unconfirmed"));
     }
 }

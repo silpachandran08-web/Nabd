@@ -272,7 +272,7 @@ public class AllergyService {
     private AllergyResponse toResponse(AllergyRow a, String recordedByName, String deactivatedByName) {
         return new AllergyResponse(a.id(), a.patientId(), a.substance(), a.severity(), a.reaction(), a.active(),
                 a.recordedBy(), a.recordedAt(), a.category(), a.source(), recordedByName, a.updatedAt(),
-                a.deactivationReason(), a.deactivatedAt(), deactivatedByName);
+                a.deactivationReason(), a.deactivatedAt(), deactivatedByName, a.unconfirmed());
     }
 
     private ApiException reasonRequired() {

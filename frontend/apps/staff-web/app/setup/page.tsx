@@ -8,6 +8,7 @@ import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
 import Icon from "../components/ui/Icon";
 import AccessGate from "../components/ui/AccessGate";
+import PatientImport from "../components/setup/PatientImport";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity, regionLabel } from "../lib/session";
@@ -342,10 +343,6 @@ function SetupPageInner() {
     a.download = `payroll-${payrollMonth}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const createImport = async (importType: string) => {
-    if (await post("/setup/import-jobs", { importType, fileName: `${importType}-import.csv` })) loadAll();
   };
 
   const createExport = async (exportType: string) => {
@@ -732,11 +729,13 @@ function SetupPageInner() {
         return (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Self-serve data import & export</h2>
-            <div className={styles.row}>
+            {can("setup:edit") && (
               <div className={styles.field}>
                 <label className={styles.label}>Import patients</label>
-                <button className={styles.btnPrimary} onClick={() => createImport("patients")}>Start import job</button>
+                <PatientImport />
               </div>
+            )}
+            <div className={styles.row}>
               <div className={styles.field}>
                 <label className={styles.label}>Export full tenant</label>
                 <button className={styles.btnPrimary} onClick={() => createExport("full_tenant")}>Start export job</button>

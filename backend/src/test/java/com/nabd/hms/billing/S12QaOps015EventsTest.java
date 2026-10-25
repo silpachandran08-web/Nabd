@@ -369,6 +369,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.NOTIFICATION_CANCELLED.type());
         expected.remove("comms.inbound.received.v1");
         expected.remove("comms.message.status_changed.v1");
+        expected.remove("organization.import.completed.v1"); // ADM-012: produced by the import worker, Adm012ImportApiTest
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));
