@@ -1,0 +1,41 @@
+# OPS-057: nightly run against prod-in. The report is stored as an artifact (90 days); a failure opens an S1 privacy defect.
+# The live-endpoint export needs the PROD_IN_KUBECONFIG secret (Needs external action); without it the nightly checks the repo config only.
+name: residency-nightly
+on:
+  schedule: [{ cron: "17 21 * * *" }]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  prod-in:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: prod-in
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q pyyaml
+      - name: Export live endpoints (non-secret env of the prod-in workloads)
+        env: { KUBECONFIG_B64: "${{ secrets.PROD_IN_KUBECONFIG }}" }
+        run: |
+          echo '[]' > live.json
+          if [ -n "$KUBECONFIG_B64" ]; then
+            echo "$KUBECONFIG_B64" | base64 -d > "$RUNNER_TEMP/kc" && export KUBECONFIG="$RUNNER_TEMP/kc"
+            kubectl -n prod-in get deploy,cronjob -o json | python3 -c 'import json,re,sys; print(json.dumps(sorted(set(re.findall(r"https?://([A-Za-z0-9_.-]+)", sys.stdin.read())))))' > live.json
+          fi
+      - name: Egress test against prod-in
+        id: egress
+        run: python3 infra/residency/check_egress.py --cell in --endpoints-file live.json --report residency-report.json
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        with: { name: "residency-report-prod-in-${{ github.run_id }}", path: residency-report.json, retention-days: 90 }
+      - name: Open an S1 privacy defect on failure
+        if: steps.egress.outcome == 'failure'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          python3 -c 'import json; print("\n".join("- " + v for v in json.load(open("residency-report.json"))["violations"]))' > body.md
+          gh issue create --title "S1 privacy defect: PHI residency egress test failed on prod-in" --label "S1,privacy-defect" \
+            --body "$(printf 'The nightly residency check found endpoints outside the cell. Report: %s/%s/actions/runs/%s\n\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"; cat body.md)"
+          exit 1
