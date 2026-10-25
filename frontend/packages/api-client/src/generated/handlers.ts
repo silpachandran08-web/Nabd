@@ -131,6 +131,8 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.put(`${baseUrl}/v1/doctors/:id/working-hours/:hoursId`, () => HttpResponse.json({"dayOfWeek":0,"endTime":"string","id":"00000000-0000-7000-8000-000000000000","maxPatients":0,"slotMinutes":0,"startTime":"string"}, { status: 200 })), // ScheduleController_updateWorkingHours
     http.delete(`${baseUrl}/v1/doctors/:id/working-hours/:hoursId`, () => new HttpResponse(null, { status: 200 })), // ScheduleController_deleteWorkingHours
     http.get(`${baseUrl}/v1/events`, () => HttpResponse.json({"timeout":0}, { status: 200 })), // EventsController_stream
+    http.get(`${baseUrl}/v1/me/preferences`, () => HttpResponse.json({"clinicDefaultLocale":"string","digitStyle":"string","uiLocale":"string","uiTheme":"string"}, { status: 200 })), // MePreferencesController_get
+    http.put(`${baseUrl}/v1/me/preferences`, () => HttpResponse.json({"digitStyle":"string","uiLocale":"string","uiTheme":"string"}, { status: 200 })), // MePreferencesController_put
     http.get(`${baseUrl}/v1/nursing/activity/today`, () => HttpResponse.json([{"activity":"string","kind":"string","occurredAt":"2026-01-01T00:00:00Z","patientName":"string"}], { status: 200 })), // NursingController_activityToday
     http.post(`${baseUrl}/v1/nursing/administration-orders`, () => HttpResponse.json({"createdAt":"2026-01-01T00:00:00Z","dose":"string","drugName":"string","id":"00000000-0000-7000-8000-000000000000","orderedByName":"string","patientId":"00000000-0000-7000-8000-000000000000","patientName":"string","queueEntryId":"00000000-0000-7000-8000-000000000000","recordedAt":"2026-01-01T00:00:00Z","recordedByName":"string","refuseReason":"string","route":"string","site":"string","status":"string","witnessedByName":"string"}, { status: 201 })), // NursingController_orderAdministration
     http.get(`${baseUrl}/v1/nursing/administration-orders/today`, () => HttpResponse.json([{"createdAt":"2026-01-01T00:00:00Z","dose":"string","drugName":"string","id":"00000000-0000-7000-8000-000000000000","orderedByName":"string","patientId":"00000000-0000-7000-8000-000000000000","patientName":"string","queueEntryId":"00000000-0000-7000-8000-000000000000","recordedAt":"2026-01-01T00:00:00Z","recordedByName":"string","refuseReason":"string","route":"string","site":"string","status":"string","witnessedByName":"string"}], { status: 200 })), // NursingController_administrationOrdersToday
@@ -336,4 +338,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 322;
+export const operationCount = 324;
