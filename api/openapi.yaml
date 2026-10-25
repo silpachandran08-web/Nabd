@@ -4417,6 +4417,7 @@ paths:
       tags: [Platform]
       summary: ADM-034. Public plan comparison for a market (no auth, Cache-Control public 5 min)
       security: []
+      x-required-permission: public
       parameters:
         - { name: market, in: query, required: false, schema: { type: string } }
       responses:

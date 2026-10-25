@@ -118,7 +118,7 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e.authenticationEntryPoint(SecurityConfig::unauthenticated).accessDeniedHandler(SecurityConfig::forbidden));
     }
 
-    private static void resourceServer(HttpSecurity http, org.springframework.security.oauth2.jwt.JwtDecoder decoder,
+    static void resourceServer(HttpSecurity http, org.springframework.security.oauth2.jwt.JwtDecoder decoder,
             Converter<org.springframework.security.oauth2.jwt.Jwt, AbstractAuthenticationToken> converter) throws Exception {
         http.oauth2ResourceServer(oauth2 -> oauth2
                 .authenticationEntryPoint((req, res, ex) -> {
@@ -162,6 +162,7 @@ public class SecurityConfig {
                 .addFilterAfter(idempotencyFilter, BEARER)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/internal/v1/notification-requests/*").permitAll() // COM-004: its own service token, checked in NotificationClaimController
+                        .requestMatchers("/internal/v1/consents:export").permitAll() // COM-008: same service token, checked in ConsentExportController
                         .anyRequest().access((authn, ctx) -> authenticated(authn)));
         harden(http);
         resourceServer(http, decoder, jwtAuthenticationConverter);
