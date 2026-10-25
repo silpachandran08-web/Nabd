@@ -17,9 +17,16 @@ type Plan = {
   currency: string;
   seatLimit: number;
   active: boolean;
+  version?: number;
+  pricingBasis?: string;
+  branchLimit?: number | null;
+  modules?: string[];
 };
 
-const emptyForm = { code: "", name: "", monthlyPrice: "", currency: "INR", seatLimit: "", active: true };
+// ADM-034: the closed module list (server: PlanEntitlements.MODULES).
+const MODULES = ["queue_eta", "whatsapp_booking", "emr_erx", "billing", "pharmacy_external", "pharmacy_inhouse", "lab", "packages", "branded_site", "hr", "insurance", "ipd", "patient_app", "ai_safety"];
+
+const emptyForm = { code: "", name: "", monthlyPrice: "", currency: "INR", seatLimit: "", active: true, pricingBasis: "per_clinic", branchLimit: "", modules: [] as string[] };
 
 export default function PlansPage() {
   const access = useOperatorAccess();
@@ -59,6 +66,9 @@ export default function PlansPage() {
       currency: p.currency,
       seatLimit: p.seatLimit.toString(),
       active: p.active,
+      pricingBasis: p.pricingBasis ?? "per_clinic",
+      branchLimit: p.branchLimit?.toString() ?? "",
+      modules: p.modules ?? [],
     });
     setFormError(null);
   }
@@ -80,7 +90,9 @@ export default function PlansPage() {
     }
     setSaving(true);
     try {
-      const body = { code: form.code, name: form.name, monthlyPriceCents, currency: form.currency, seatLimit, active: form.active };
+      const branches = form.branchLimit ? parseInt(form.branchLimit, 10) : undefined;
+      const body = { code: form.code, name: form.name, monthlyPriceCents, currency: form.currency, seatLimit, active: form.active,
+        pricingBasis: form.pricingBasis, modules: form.modules, limits: { seats: seatLimit, branches } };
       if (editingId) await platformApi.patch(`/platform/plans/${editingId}`, body);
       else await platformApi.post("/platform/plans", body);
       cancelEdit();
@@ -121,8 +133,31 @@ export default function PlansPage() {
             <select id="currency" className={styles.select} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>
               <option value="INR">INR</option>
               <option value="SAR">SAR</option>
+              <option value="AED">AED</option>
+              <option value="QAR">QAR</option>
             </select>
           </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="basis">Priced</label>
+            <select id="basis" className={styles.select} value={form.pricingBasis} onChange={(e) => setForm({ ...form, pricingBasis: e.target.value })}>
+              <option value="per_clinic">Per clinic (flat)</option>
+              <option value="per_doctor">Per doctor</option>
+            </select>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="branches">Branch limit</label>
+            <input id="branches" type="number" min="1" step="1" className={styles.input} value={form.branchLimit}
+              onChange={(e) => setForm({ ...form, branchLimit: e.target.value })} />
+          </div>
+          <fieldset className={styles.field} data-testid="module-checklist">
+            <legend className={styles.label}>Modules included</legend>
+            {MODULES.map((m) => (
+              <label key={m} className={styles.checkboxField}>
+                <input type="checkbox" checked={form.modules.includes(m)}
+                  onChange={(e) => setForm({ ...form, modules: e.target.checked ? [...form.modules, m] : form.modules.filter((x) => x !== m) })} /> {m.replace(/_/g, " ")}
+              </label>
+            ))}
+          </fieldset>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="seats">Seat limit</label>
             <input id="seats" type="number" min="1" step="1" className={styles.input} value={form.seatLimit}
@@ -159,6 +194,8 @@ export default function PlansPage() {
                   <th scope="col">Name</th>
                   <th scope="col">Monthly price</th>
                   <th scope="col">Seat limit</th>
+                  <th scope="col">Modules</th>
+                  <th scope="col">Version</th>
                   <th scope="col">Status</th>
                   {access.canBill && <th scope="col"></th>}
                 </tr>
@@ -170,6 +207,8 @@ export default function PlansPage() {
                     <td>{p.name}</td>
                     <td>{formatMoney(p.monthlyPriceCents / 100, p.currency)}</td>
                     <td>{p.seatLimit}</td>
+                    <td>{p.modules?.length ?? 0}</td>
+                    <td>v{p.version ?? 1}</td>
                     <td><PlanStatusPill active={p.active} /></td>
                     {access.canBill && <td><button className={styles.actionBtn} onClick={() => startEdit(p)}>Edit</button></td>}
                   </tr>

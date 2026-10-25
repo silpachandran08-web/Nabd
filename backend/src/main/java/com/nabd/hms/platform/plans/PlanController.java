@@ -38,6 +38,11 @@ public class PlanController {
         return service.list();
     }
 
+    @GetMapping("/{id}/versions")
+    public List<com.nabd.hms.platform.plans.dto.PlanVersionResponse> versions(@PathVariable UUID id) {
+        return service.versions(id);
+    }
+
     @PostMapping
     public ResponseEntity<PlanResponse> create(@Valid @RequestBody PlanWriteRequest req, @AuthenticationPrincipal Jwt jwt,
                                                HttpServletRequest http) {

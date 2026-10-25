@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import ClinicNav from "./ClinicNav";
+import EntitlementsBanner from "./EntitlementsBanner";
 import { useClinicTimeZoneBoot } from "./lib/useClinicTimeZone";
 import TopBar from "./TopBar";
 import RouteChrome from "./RouteChrome";
@@ -48,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </Suspense>
       <div className="appShellContent">
         <TopBar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
-        <div className="appShellBody" id="app-body">{children}</div>
+        <div className="appShellBody" id="app-body"><EntitlementsBanner />{children}</div>
       </div>
     </div>
   );

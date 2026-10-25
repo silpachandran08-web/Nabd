@@ -250,6 +250,7 @@ public class SecurityConfig {
                                 "/v1/staff/invitations/*/accept",
                                 "/.well-known/jwks.json",
                                 "/.well-known/jwks/*.json", // PLT-009: one JWKS per population
+                                "/v1/plans/catalogue", // ADM-034: public plan comparison
                                 "/v1/webhooks/whatsapp", // HMAC-signed by Meta, verified in WhatsAppWebhookController
                                 "/internal/v1/notification-requests/*", // COM-004: internal service token, checked in NotificationClaimController
                                 "/internal/v1/consents:export" // COM-008: same service token, checked in ConsentExportController

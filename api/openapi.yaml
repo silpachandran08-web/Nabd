@@ -4311,6 +4311,100 @@ paths:
         "409": { description: "SERIES_IN_USE: numbers were already issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "422": { description: "NUMBER_TOO_LONG: over 16 characters for an Indian GSTIN; INVALID_PREFIX_PATTERN; INVALID_TAX_REGISTRATION (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /me/entitlements:
+    get:
+      tags: [Setup]
+      summary: PLT-059. What this clinic may use (modules, killed features, seat limit) so staff-web hides navigation it does not have
+      x-required-permission: isAuthenticated()
+      responses:
+        "200":
+          description: Entitlements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules: { type: array, items: { type: object, properties: { code: { type: string }, enabled: { type: boolean } } } }
+                  killedFeatures: { type: array, items: { type: string } }
+                  seatLimit: { type: [integer, "null"] }
+        "403": { description: "Not a clinic session" }
+  /plans/catalogue:
+    get:
+      tags: [Platform]
+      summary: ADM-034. Public plan comparison for a market (no auth, Cache-Control public 5 min)
+      security: []
+      parameters:
+        - { name: market, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Active plans offered in the market (current version)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code: { type: string }
+                    name: { type: string }
+                    priceMinor: { type: integer }
+                    currency: { type: string, enum: [INR, SAR, AED, QAR] }
+                    pricingBasis: { type: string, enum: [per_clinic, per_doctor] }
+                    modules: { type: array, items: { type: string } }
+                    limits: { type: object, properties: { seats: { type: integer }, branches: { type: [integer, "null"] }, visitsPerMonth: { type: [integer, "null"] } } }
+  /platform/tenants/{tenantId}/features:
+    get:
+      tags: [Platform]
+      summary: PLT-059. A clinic's feature overrides
+      x-required-permission: tenant_detail:view
+      parameters:
+        - { name: tenantId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Overrides }
+  /platform/tenants/{tenantId}/features/{code}:
+    put:
+      tags: [Platform]
+      summary: >
+        PLT-059. Set a per-clinic override (on, off, kill) with a reason and optional expiry; audited, effective within 60 s.
+        kill answers 503 FEATURE_DISABLED on the clinic's writes, off answers 403 MODULE_NOT_IN_PLAN. Unknown code 404 UNKNOWN_FEATURE.
+      x-required-permission: tenant_detail:edit
+      parameters:
+        - { name: tenantId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state, reason]
+              properties:
+                state: { type: string, enum: [on, off, kill] }
+                reason: { type: string, maxLength: 500 }
+                expiresAt: { type: [string, "null"], format: date-time }
+      responses:
+        "200": { description: Override saved }
+        "404": { description: UNKNOWN_FEATURE or unknown clinic }
+  /platform/kill-switches/{code}:
+    put:
+      tags: [Platform]
+      summary: PLT-059. Global kill switch, evaluated before any clinic override; no clinic can use the feature within 60 s
+      x-required-permission: tenant_detail:edit
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [active, reason]
+              properties:
+                active: { type: boolean }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200": { description: Switch saved }
+        "404": { description: UNKNOWN_FEATURE }
   /client-telemetry:
     post:
       tags: [Ops]
@@ -5862,7 +5956,11 @@ components:
         whatsappMessagesUsed: { type: integer }
         whatsappMessagesLimit: { type: integer }
         branchesUsed: { type: integer }
-        branchesLimit: { type: integer }
+        branchesLimit: { type: integer, description: "The plan's branch limit when the plan has one (PLT-059)" }
+        modules: { type: array, items: { type: object, properties: { code: { type: string }, enabled: { type: boolean } } }, description: "PLT-059: effective state of every module" }
+        killedFeatures: { type: array, items: { type: string }, description: "PLT-059: features switched off by a kill switch; staff-web shows a banner" }
+        seatsUsed: { type: integer, description: "PLT-059: invited + active staff; suspended do not count" }
+        seatsLimit: { type: [integer, "null"], description: "PLT-059: null = unlimited" }
 
     ImportJob:
       type: object

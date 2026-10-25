@@ -59,9 +59,14 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     private final com.nabd.hms.common.EventPublisher events;
 
     private final com.nabd.hms.common.TenantScope tenantScope;
+    private final com.nabd.hms.organization.api.Entitlements entitlements;
+    private final com.nabd.hms.iam.api.ActorDirectory actors;
 
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
-                 com.nabd.hms.common.TenantScope tenantScope) {
+                 com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.organization.api.Entitlements entitlements,
+                 com.nabd.hms.iam.api.ActorDirectory actors) {
+        this.actors = actors;
+        this.entitlements = entitlements;
         this.tenantScope = tenantScope;
         this.events = events;
         this.clock = clock;
@@ -257,8 +262,14 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
         if (s == null) {
             throw new ApiException(HttpStatus.NOT_FOUND, "tenant-not-found", "Tenant not found", "Tenant not found");
         }
+        int branchLimit = entitlements.branchLimit();
+        int seatLimit = entitlements.seatLimit();
+        var modules = entitlements.modules();
         return new SubscriptionSummaryResponse(s.plan(), s.status(), s.patientsUsed(), s.patientsLimit(),
-                s.messagesUsed(), s.messagesLimit(), s.branchesUsed(), s.branchesLimit());
+                s.messagesUsed(), s.messagesLimit(), s.branchesUsed(), branchLimit == Integer.MAX_VALUE ? s.branchesLimit() : branchLimit,
+                modules.entrySet().stream().map(e -> new SubscriptionSummaryResponse.ModuleState(e.getKey(), e.getValue())).toList(),
+                modules.keySet().stream().filter(entitlements::killed).toList(),
+                actors.seatsInUse(tenantId), seatLimit == Integer.MAX_VALUE ? null : (long) seatLimit);
     }
 
     @Transactional

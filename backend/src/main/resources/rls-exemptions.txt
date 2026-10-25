@@ -5,3 +5,4 @@ master.support_tickets          # operator plane (master schema): platform-conso
 master.support_access_grants    # operator plane: grants clinics give to support, managed by operators
 master.subscriptions            # operator plane: billing
 master.discount_requests        # operator plane: commercial approvals
+master.tenant_feature_overrides # operator plane: per-clinic feature switches, read by tenant_id only (PLT-059)

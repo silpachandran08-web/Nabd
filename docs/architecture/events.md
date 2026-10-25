@@ -97,6 +97,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `organization.import.completed.v1` | ImportWorker, when a patient import job (ADM-012) finishes its last chunk. Consumers (control-plane provisioning, core reporting): **needs external action** / not built yet | jobId, importType, created, merged, skipped, errors |
 | `comms.message.status_changed.v1` | WhatsAppInboundProcessor, a delivery callback that moved a message forward (COM-001; subject = message), or WhatsAppMessageService.cancel / expire (COM-003: status cancelled or expired) | messageId, channel, status, errorCode?, at |
 | `clinical.drug_master.version_activated.v1` | DrugMasterImportService.activate (CLN-019): one event per tenant of the region after the drug master version switch. Consumers: core cache refresh (log-only handler, nothing cached yet), clinical-intelligence KB copy refresh and staff-web index refresh (**need external action**, those consumers are not in this repo) | region, drugMasterVersion, added, changed, retired |
+| `platform.entitlements.changed.v1` | FeatureSwitchController.set (per-clinic override / kill), BillingService.upsert (plan or plan-version move). Not sent for a global kill switch or a plan publish: those change no clinic's pinned plan, replicas converge on the 60 s snapshot TTL (PLT-059) | changedCodes[] |
 
 The following producers belong to other stories and should publish against this catalogue when they land:
 
