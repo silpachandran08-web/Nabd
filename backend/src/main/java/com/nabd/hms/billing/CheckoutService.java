@@ -333,7 +333,7 @@ public class CheckoutService {
                     lr.taxes().stream().map(x -> new com.nabd.hms.billing.dto.QuoteResponse.Tax(x.type(), x.ratePercent(), x.amountMinor())).toList()));
         }
         return new com.nabd.hms.billing.dto.QuoteResponse(t.computation().currency(), t.computation().documentType(), lines,
-                new com.nabd.hms.billing.dto.QuoteResponse.Totals(res.subtotalMinor(), res.discountMinor(), res.taxMinor(), res.roundOffMinor(), res.totalMinor()));
+                new com.nabd.hms.billing.dto.QuoteResponse.QuoteTotals(res.subtotalMinor(), res.discountMinor(), res.taxMinor(), res.roundOffMinor(), res.totalMinor()));
     }
 
     /** FIN-003: one audit row per price override / free-text line and per discount (before/after). */
