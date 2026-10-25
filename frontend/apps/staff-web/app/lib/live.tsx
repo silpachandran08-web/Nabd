@@ -10,7 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createApplier, createLiveStream, LIVE_RESOURCES, type LiveStatus } from "@nabd/api-client/sse";
 import { COOKIE_AUTH } from "./bffShim";
 import { prefix } from "./query";
-import { getPermissions, isOwner, SHELL_SKIP_PREFIXES } from "./session";
+import { getPermissions, SHELL_SKIP_PREFIXES } from "./session";
 
 export type LiveState = LiveStatus | "off";
 type Listener = (resources: readonly string[]) => void;
@@ -19,11 +19,10 @@ const LiveCtx = createContext<Ctx>({ status: "off", subscribe: () => () => {} })
 
 /** Topics this session may read (the server filters too: 403 TOPIC_FORBIDDEN). */
 function topicsFor(): string[] {
-  const all = isOwner();
   const perms = getPermissions();
   const t: string[] = [];
-  if (all || perms.includes("queue:view")) t.push("queue", "doctor-status");
-  if (all || perms.includes("nursing:view")) t.push("nursing");
+  if (perms.includes("queue:view")) t.push("queue", "doctor-status");
+  if (perms.includes("nursing:view")) t.push("nursing");
   return t;
 }
 

@@ -187,5 +187,5 @@ operator,compliance_dpo,messaging_operations,
 operator,compliance_dpo,platform_health,
 operator,compliance_dpo,aggregator_demand,
 operator,compliance_dpo,support_access,
-operator,compliance_dpo,audit_compliance,view
+operator,compliance_dpo,audit_compliance,view|values
 operator,compliance_dpo,safety_content,

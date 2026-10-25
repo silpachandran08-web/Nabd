@@ -9,6 +9,7 @@ import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
 import { initials } from "@nabd/domain";
 import { selfStaffId } from "./lib/doctorQueries";
+import { usePermissions } from "./lib/usePermissions";
 import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
@@ -135,6 +136,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
+  const tokenGrants = usePermissions().permissions; // FEF-019: changes when a token refresh brings a new role, so the nav follows without re-login
   const [permissions, setPermissions] = useState<string[] | null>(null);
   const [owner, setOwner] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
@@ -174,7 +176,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     setPermissions(skip ? [] : getPermissions());
     setIdentity(skip ? null : getIdentity());
     setOwner(skip ? false : isOwner());
-  }, [pathname, skip]);
+  }, [pathname, skip, tokenGrants]);
 
   // The Receptionist sidebar's count badges: today's waiting arrivals and visits sent to checkout, off
   // today's queue. FEF-015: the same query (key and request) Arrivals reads, so the two share one GET /queue.

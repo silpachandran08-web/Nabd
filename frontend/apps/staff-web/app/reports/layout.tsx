@@ -1,0 +1,6 @@
+import AccessGate from "../components/ui/AccessGate";
+
+// FEF-019: the gate decides before the page mounts, so a role without the grant sends no request that would 403.
+export default function ReportsLayout({ children }: { children: React.ReactNode }) {
+  return <AccessGate permission="reports:view" surface="reports">{children}</AccessGate>;
+}

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { type OperatorProfile } from "./surfaces";
 import { platformFetch, platformLoginPath } from "./platformSession";
+import { capabilitiesFrom, type OperatorCapabilities } from "./capabilities";
 
 // Authed fetch + session helpers live in platformSession.ts (no React there, so it is unit-tested).
 export {
@@ -32,17 +33,13 @@ export async function problemDetail(res: Response, fallback: string): Promise<st
   return p?.detail || fallback;
 }
 
-// Write authority is derived from the role code returned by GET /platform/auth/me, mirroring the
-// wireframe's pxCanWrite / pxCanBill / pxIsSuper flags (SSA-02). The server stays the authority —
+// Write authority is derived from the permissions returned by GET /platform/auth/me (capabilities.ts),
+// mirroring the wireframe's pxCanWrite / pxCanBill / pxIsSuper flags (SSA-02). The server stays the authority —
 // this only keeps actions a role cannot perform out of the DOM ("absent, not disabled").
-export type OperatorAccess = {
+export type OperatorAccess = OperatorCapabilities & {
   profile: OperatorProfile | null;
   /** false until /auth/me has answered; while false, write controls stay absent (safe default). */
   ready: boolean;
-  canWrite: boolean; // super_admin, implementation — tenants, provisioning
-  canBill: boolean; // super_admin, billing — plans, subscriptions, discount requests (server: billing_revenue:edit)
-  isSuper: boolean; // super_admin — discount approvals above the cap (server: billing_revenue:approve, V2-005)
-  readOnly: boolean; // commercial, compliance_dpo — wireframe's read-only note
 };
 
 export function useOperatorAccess(): OperatorAccess {
@@ -65,13 +62,5 @@ export function useOperatorAccess(): OperatorAccess {
     return () => { cancelled = true; };
   }, [fetchAuthed]);
 
-  const role = profile?.role ?? "";
-  return {
-    profile,
-    ready,
-    canWrite: role === "super_admin" || role === "implementation",
-    canBill: role === "super_admin" || role === "billing",
-    isSuper: role === "super_admin",
-    readOnly: role === "commercial" || role === "compliance_dpo",
-  };
+  return { profile, ready, ...capabilitiesFrom(profile?.permissions) };
 }

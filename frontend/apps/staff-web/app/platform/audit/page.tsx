@@ -112,7 +112,7 @@ function exportCsv(rows: AuditEntry[]) {
 export default function AuditLogPage() {
   const fetchAuthed = usePlatformFetch();
   // PLT-056: before/after come back only for compliance_dpo, on request, with a reason (audited server-side).
-  const isDpo = useOperatorAccess().profile?.role === "compliance_dpo";
+  const isDpo = useOperatorAccess().canSeeValues;
   const [valuesReason, setValuesReason] = useState("");
   const [valuesOn, setValuesOn] = useState(false);
   const [rows, setRows] = useState<AuditEntry[]>([]);

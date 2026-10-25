@@ -50,6 +50,7 @@ final class PlatformPermissions {
             "messaging_operations:override", Set.of("super_admin"), // COM-014: override a template PHI-lint false positive (audited)
             "support_access:request", Set.of("super_admin", "implementation", "support_engineer"), // PLT-056
             "safety_content:edit", Set.of("super_admin"), // CLN-004: upload / record CSO approval / activate the safety dictionary
+            "audit_compliance:values", Set.of("compliance_dpo"), // FEF-019: lets the console show the DPO-only before/after control from permissions; AuditSearchService still enforces the role
             "tenant_detail:edit", Set.of("super_admin") // V3-001: suspend / offboard / reactivate a clinic; shortcut: implementation excluded until the role spec says otherwise
     );
 
