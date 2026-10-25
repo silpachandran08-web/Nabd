@@ -176,7 +176,8 @@ app:
     read-timeout-ms: 5000
     circuit-failure-threshold: 5
     circuit-open-seconds: 30
-    providers: {}
+    providers:
+      comms-gateway: { connect-timeout-ms: 1000, read-timeout-ms: 2000 } # COM-009: OTP budget 3 s
   whatsapp:
     # Meta WhatsApp Cloud API. Blank access token = LoggingWhatsAppClient (logs, never sends) —
     # every local/test run, same as spring.mail.host above.
@@ -189,6 +190,11 @@ app:
     otp-template: ${WHATSAPP_OTP_TEMPLATE:nabd_login_otp}
     otp-language: ${WHATSAPP_OTP_LANGUAGE:en}
     log-otp: ${WHATSAPP_LOG_OTP:false}         # OtpLoggingGuard refuses to boot in prod when true; the sender no longer logs codes
+  comms:
+    gateway: # COM-009: blank base-url = no gateway, OTPs use the in-process sender
+      base-url: ${COMMS_GATEWAY_URL:}
+      service-token: ${COMMS_GATEWAY_TOKEN:}
+      otp-cutover: ${COMMS_OTP_CUTOVER:false} # true = no in-process fallback; 503 with a retry hint when the gateway is down
   crypto:
     # base64, 32 bytes (AES-256) each, no code defaults (FieldCipher refuses to boot without a key).
     # PLT-044: legacy key: reads pre-PLT-044 values and, outside prod with no keyring, doubles as kid 1.
