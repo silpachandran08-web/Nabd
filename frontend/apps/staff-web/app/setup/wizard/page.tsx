@@ -355,7 +355,7 @@ function SetupWizard() {
         </div>
       </div>
       {confirmMode && pharmacyMode && (
-        <ModeChangeDialog from={savedMode} to={pharmacyMode} authedFetch={authedFetch} onClose={() => setConfirmMode(false)} onSaved={() => void pharmacySaved()} />
+        <ModeChangeDialog from={savedMode} to={pharmacyMode} onClose={() => setConfirmMode(false)} onSaved={() => void pharmacySaved()} />
       )}
     </main>
   );

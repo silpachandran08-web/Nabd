@@ -3,17 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import Dialog from "../components/ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
-import type { Problem } from "@nabd/api-client/types";
-import { phoneFieldError } from "./RegistryDialogs";
+import { api } from "../lib/api";
+import type { Full } from "../lib/gen";
+import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
+import { phoneFieldText } from "./RegistryDialogs";
+import type { DataQualityItem, DataQualityPage } from "@nabd/api-client/generated";
 import styles from "./patients.module.css";
 
 // ACC-028: GET /v1/patients/data-quality?issue=phone (patients:edit). Legacy numbers that failed validation keep their
 // raw value; the desk corrects each one here with PATCH /v1/patients/{id} {phone}, which clears the flag.
-type Item = { patientId: string; displayName: string; rawPhone: string | null };
-type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
+type Item = Full<DataQualityItem, "rawPhone">;
 
 /** "Numbers to fix" list: paged (Load more), each row opens the phone edit form. The caller renders it only with patients:edit. */
-export default function PhoneDataQuality({ authedFetch, onClose, onFixed }: { authedFetch: AuthedFetch; onClose: () => void; onFixed: () => void }) {
+export default function PhoneDataQuality({ onClose, onFixed }: { onClose: () => void; onFixed: () => void }) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -24,19 +26,16 @@ export default function PhoneDataQuality({ authedFetch, onClose, onFixed }: { au
     setFailed(false);
     setMore(after !== null);
     try {
-      const res = await authedFetch(`/patients/data-quality?issue=phone&limit=50${after ? `&cursor=${encodeURIComponent(after)}` : ""}`);
-      if (!res) return;
-      if (!res.ok) { setFailed(true); return; }
-      const page: { items?: Item[]; nextCursor?: string | null } = await res.json();
-      setItems((prev) => [...(after ? prev ?? [] : []), ...(page.items ?? [])]);
+      const page = await api.get<DataQualityPage>(`/patients/data-quality?issue=phone&limit=50${after ? `&cursor=${encodeURIComponent(after)}` : ""}`);
+      setItems((prev) => [...(after ? prev ?? [] : []), ...((page.items ?? []) as unknown as Item[])]);
       setCursor(page.nextCursor ?? null);
     } catch { setFailed(true); } finally { setMore(false); }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => { void Promise.resolve().then(() => load(null)); }, [load]);
 
   if (editing) {
-    return <FixPhone authedFetch={authedFetch} item={editing} onClose={() => setEditing(null)}
+    return <FixPhone item={editing} onClose={() => setEditing(null)}
       onSaved={() => { setItems((l) => (l ?? []).filter((x) => x.patientId !== editing.patientId)); setEditing(null); onFixed(); }} />;
   }
   return (
@@ -67,20 +66,18 @@ export default function PhoneDataQuality({ authedFetch, onClose, onFixed }: { au
 }
 
 /** The patient's phone edit form (PATCH /v1/patients/{id}); the server's field error names the clinic country. */
-function FixPhone({ authedFetch, item, onClose, onSaved }: { authedFetch: AuthedFetch; item: Item; onClose: () => void; onSaved: () => void }) {
+function FixPhone({ item, onClose, onSaved }: { item: Item; onClose: () => void; onSaved: () => void }) {
   const [phone, setPhone] = useState(item.rawPhone ?? "");
-  const [error, setError] = useState<string | null>(null);
+  const fe = useFormErrors("dq", { phone: "Mobile" });
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    setSaving(true); setError(null);
+    if (saving) return;
+    setSaving(true); fe.clear();
     try {
-      const res = await authedFetch(`/patients/${item.patientId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone }) });
-      if (!res) return;
-      if (res.ok) { onSaved(); return; }
-      const p: Problem | null = await res.json().catch(() => null);
-      setError((res.status === 400 && phoneFieldError(p)) || p?.detail || "Couldn't save the number. It is unchanged.");
-    } catch { setError("Couldn't reach the server. The number is unchanged."); } finally { setSaving(false); }
+      await api.patch(`/patients/${item.patientId}`, { phone });
+      onSaved();
+    } catch (e) { fe.fail(e, "Couldn't save the number. It is unchanged."); } finally { setSaving(false); }
   }
 
   return (
@@ -88,9 +85,10 @@ function FixPhone({ authedFetch, item, onClose, onSaved }: { authedFetch: Authed
       <form onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <label className={styles.fieldLabel} htmlFor="dq-phone">Mobile</label>
         <input id="dq-phone" className={styles.input} value={phone} inputMode="tel" autoFocus
-          aria-invalid={error ? true : undefined} aria-describedby={error ? "dq-phone-error" : undefined}
-          onChange={(e) => { setPhone(e.target.value); setError(null); }} />
-        {error && <div id="dq-phone-error" className={styles.errorInline} role="alert">{error}</div>}
+          {...fe.attrs("phone")}
+          onChange={(e) => { setPhone(e.target.value); fe.clearField("phone"); }} />
+        <FieldError fe={fe} name="phone" className={styles.errorInline} text={phoneFieldText} />
+        <ErrorSummary fe={fe} className={styles.errorInline} />
         <div style={{ display: "flex", gap: "var(--nb-space-8)", marginBlockStart: "var(--nb-space-16)" }}>
           <button type="button" className={styles.secondaryBtn} style={{ minBlockSize: 44 }} onClick={onClose}>Back</button>
           <button type="submit" className={styles.primaryBtn} style={{ minBlockSize: 44 }} disabled={saving || !phone.trim()}>{saving ? "Saving…" : "Save number"}</button>

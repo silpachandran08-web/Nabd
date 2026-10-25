@@ -13307,13 +13307,23 @@ components:
         paymentCountToday:
           type: integer
           format: int32
+    DataQualityItem:
+      type: object
+      properties:
+        displayName:
+          type: string
+        patientId:
+          type: string
+          format: uuid
+        rawPhone:
+          type: string
     DataQualityPage:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Item"
+            $ref: "#/components/schemas/DataQualityItem"
         nextCursor:
           type: string
     Day:
@@ -13339,13 +13349,37 @@ components:
         unbilledConsultations:
           type: integer
           format: int32
+    DayCloseHistoryItem:
+      type: object
+      properties:
+        action:
+          type: string
+        actorName:
+          type: string
+        at:
+          type: string
+          format: date-time
+        countedCash:
+          type: number
+        date:
+          type: string
+          format: date
+        expectedCash:
+          type: number
+        id:
+          type: string
+          format: uuid
+        note:
+          type: string
+        variance:
+          type: number
     DayCloseHistoryResponse:
       type: object
       properties:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Item"
+            $ref: "#/components/schemas/DayCloseHistoryItem"
         nextCursor:
           type: string
     DayCloseRequest:
@@ -13641,7 +13675,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/Item"
+            $ref: "#/components/schemas/DispensingQueueItem"
         patientId:
           type: string
           format: uuid
@@ -13657,6 +13691,22 @@ components:
           type: string
           format: date-time
         token:
+          type: integer
+          format: int32
+    DispensingQueueItem:
+      type: object
+      properties:
+        dosage:
+          type: string
+        drugName:
+          type: string
+        duration:
+          type: string
+        frequency:
+          type: string
+        instructions:
+          type: string
+        stockQty:
           type: integer
           format: int32
     Doctor:
@@ -15491,10 +15541,72 @@ components:
         rows:
           type: array
           items:
-            $ref: "#/components/schemas/Row"
+            $ref: "#/components/schemas/PatientRegistryRow"
         total:
           type: integer
           format: int32
+    PatientRegistryRow:
+      type: object
+      properties:
+        age:
+          type: integer
+          format: int32
+        allergy:
+          type: string
+        archived:
+          type: boolean
+        balanceDue:
+          type: boolean
+        condition:
+          type: string
+        duplicate:
+          type: boolean
+        followUpDue:
+          type: boolean
+        gender:
+          type: string
+        id:
+          type: string
+          format: uuid
+        lastVisit:
+          type: string
+          format: date
+        minor:
+          type: boolean
+        mrn:
+          type: string
+        name:
+          type: string
+        nextAppointment:
+          type: string
+          format: date-time
+        nextAppointmentId:
+          type: string
+          format: uuid
+        nextAppointmentToday:
+          type: boolean
+        nextDoctorId:
+          type: string
+          format: uuid
+        nextDoctorName:
+          type: string
+        packageSessionsTotal:
+          type: integer
+          format: int32
+        packageSessionsUsed:
+          type: integer
+          format: int32
+        phone:
+          type: string
+        queueStatus:
+          type: string
+        queueToken:
+          type: integer
+          format: int32
+        tags:
+          type: array
+          items:
+            type: string
     PatientResponse:
       type: object
       properties:
