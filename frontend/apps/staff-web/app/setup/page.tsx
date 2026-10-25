@@ -6,6 +6,8 @@ import styles from "./setup.module.css";
 import WhatsAppTemplates from "./WhatsAppTemplates";
 import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
+import PrivacyNoticePanel from "../components/setup/PrivacyNoticePanel";
+import AbdmCard from "../components/setup/AbdmCard";
 import Icon from "../components/ui/Icon";
 import AccessGate from "../components/ui/AccessGate";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
@@ -38,6 +40,8 @@ const TABS = [
   { key: "charges", label: "Charges" },
   { key: "policies", label: "Policies" },
   { key: "consent", label: "Consent" },
+  { key: "privacy", label: "Privacy notice" },
+  { key: "integrations", label: "Integrations" },
   { key: "whatsapp", label: "WhatsApp" },
   { key: "holidays", label: "Holidays" },
   { key: "shifts", label: "Shifts" },
@@ -365,6 +369,8 @@ function SetupPageInner() {
   };
 
   const renderContent = () => {
+    if (tab === "privacy") return <PrivacyNoticePanel />;
+    if (tab === "integrations") return <AbdmCard />;
     if (tab === "pharmacy") return canPharmacy ? <PharmacyPanel authedFetch={authedFetch} /> : null;
     if (loading && (TAB_DATA[tab]?.length ?? 0) > 0) return <div className={styles.card}><Skeleton rows={5} label="Loading" /></div>;
     if (error) return <div className={styles.card}><ErrorState message={error} onRetry={loadAll} /></div>;

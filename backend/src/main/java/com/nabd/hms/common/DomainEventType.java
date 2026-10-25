@@ -29,7 +29,8 @@ public enum DomainEventType {
     NOTIFICATION_REQUESTED("comms.notification.requested.v1", "core/messaging"),
     NOTIFICATION_CANCELLED("comms.notification.cancelled.v1", "core/messaging"),
     INBOUND_RECEIVED("comms.inbound.received.v1", "core/messaging"),
-    MESSAGE_STATUS_CHANGED("comms.message.status_changed.v1", "core/messaging");
+    MESSAGE_STATUS_CHANGED("comms.message.status_changed.v1", "core/messaging"),
+    PRIVACY_NOTICE_PUBLISHED("organization.privacy_notice.published.v1", "core/organization");
 
     private final String type;
     private final String source;

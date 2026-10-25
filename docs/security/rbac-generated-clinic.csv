@@ -80,6 +80,7 @@ owner,GET /v1/patients/data-quality,patients:edit,allow
 owner,GET /v1/patients/guardian-reviews-due,patients:view,allow
 owner,GET /v1/patients/registry,patients:view,allow
 owner,GET /v1/patients/{id},patients:view,allow
+owner,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 owner,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner,GET /v1/pharmacy/items,pharmacy:view,allow
 owner,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -116,6 +117,8 @@ owner,GET /v1/roles/delegations,staff:view,allow
 owner,GET /v1/roles/{id},staff:view,allow
 owner,GET /v1/schedule/day,queue:view,allow
 owner,GET /v1/schedule/week,queue:view,allow
+owner,GET /v1/settings/integrations/abdm,setup:view,allow
+owner,GET /v1/settings/privacy/privacy-notice,setup:view,allow
 owner,GET /v1/setup/charges,setup:view,allow
 owner,GET /v1/setup/checklist,setup:view,allow
 owner,GET /v1/setup/consent-contact,setup:view,allow
@@ -227,6 +230,7 @@ owner,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
 owner,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner,POST /v1/patients/{id}/merge,patients:delete,allow
+owner,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 owner,POST /v1/pharmacy/items,pharmacy:edit,allow
 owner,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,allow
 owner,POST /v1/pharmacy/rx-lines/search,billing:create,allow
@@ -276,7 +280,10 @@ owner,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-
 owner,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 owner,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner,PUT /v1/settings/integrations/abdm,setup:edit,allow
+owner,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
 owner,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
+owner,PUT /v1/staff/{id}/hpr,staff:edit,allow
 owner_doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 owner_doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
 owner_doctor,DELETE /v1/departments/{id},departments:delete,allow
@@ -356,6 +363,7 @@ owner_doctor,GET /v1/patients/data-quality,patients:edit,allow
 owner_doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
 owner_doctor,GET /v1/patients/registry,patients:view,allow
 owner_doctor,GET /v1/patients/{id},patients:view,allow
+owner_doctor,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 owner_doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -392,6 +400,8 @@ owner_doctor,GET /v1/roles/delegations,staff:view,allow
 owner_doctor,GET /v1/roles/{id},staff:view,allow
 owner_doctor,GET /v1/schedule/day,queue:view,allow
 owner_doctor,GET /v1/schedule/week,queue:view,allow
+owner_doctor,GET /v1/settings/integrations/abdm,setup:view,allow
+owner_doctor,GET /v1/settings/privacy/privacy-notice,setup:view,allow
 owner_doctor,GET /v1/setup/charges,setup:view,allow
 owner_doctor,GET /v1/setup/checklist,setup:view,allow
 owner_doctor,GET /v1/setup/consent-contact,setup:view,allow
@@ -503,6 +513,7 @@ owner_doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
 owner_doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/merge,patients:delete,allow
+owner_doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 owner_doctor,POST /v1/pharmacy/items,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,allow
 owner_doctor,POST /v1/pharmacy/rx-lines/search,billing:create,allow
@@ -552,7 +563,10 @@ owner_doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edi
 owner_doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 owner_doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner_doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
+owner_doctor,PUT /v1/settings/integrations/abdm,setup:edit,allow
+owner_doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
 owner_doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,allow
+owner_doctor,PUT /v1/staff/{id}/hpr,staff:edit,allow
 doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
 doctor,DELETE /v1/departments/{id},departments:delete,deny-403
@@ -632,6 +646,7 @@ doctor,GET /v1/patients/data-quality,patients:edit,allow
 doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
 doctor,GET /v1/patients/registry,patients:view,allow
 doctor,GET /v1/patients/{id},patients:view,allow
+doctor,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -668,6 +683,8 @@ doctor,GET /v1/roles/delegations,staff:view,deny-403
 doctor,GET /v1/roles/{id},staff:view,deny-403
 doctor,GET /v1/schedule/day,queue:view,allow
 doctor,GET /v1/schedule/week,queue:view,allow
+doctor,GET /v1/settings/integrations/abdm,setup:view,deny-403
+doctor,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
 doctor,GET /v1/setup/charges,setup:view,deny-403
 doctor,GET /v1/setup/checklist,setup:view,deny-403
 doctor,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -779,6 +796,7 @@ doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 doctor,POST /v1/patients/{id}/merge,patients:delete,deny-403
+doctor,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 doctor,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 doctor,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
@@ -828,7 +846,10 @@ doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allo
 doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+doctor,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
+doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 doctor,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
+doctor,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
 nurse,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 nurse,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
 nurse,DELETE /v1/departments/{id},departments:delete,deny-403
@@ -908,6 +929,7 @@ nurse,GET /v1/patients/data-quality,patients:edit,allow
 nurse,GET /v1/patients/guardian-reviews-due,patients:view,allow
 nurse,GET /v1/patients/registry,patients:view,allow
 nurse,GET /v1/patients/{id},patients:view,allow
+nurse,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 nurse,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -944,6 +966,8 @@ nurse,GET /v1/roles/delegations,staff:view,deny-403
 nurse,GET /v1/roles/{id},staff:view,deny-403
 nurse,GET /v1/schedule/day,queue:view,allow
 nurse,GET /v1/schedule/week,queue:view,allow
+nurse,GET /v1/settings/integrations/abdm,setup:view,deny-403
+nurse,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
 nurse,GET /v1/setup/charges,setup:view,deny-403
 nurse,GET /v1/setup/checklist,setup:view,deny-403
 nurse,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -1055,6 +1079,7 @@ nurse,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 nurse,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 nurse,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 nurse,POST /v1/patients/{id}/merge,patients:delete,deny-403
+nurse,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 nurse,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 nurse,POST /v1/pharmacy/rx-lines/search,billing:create,deny-403
@@ -1104,7 +1129,10 @@ nurse,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 nurse,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
 nurse,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 nurse,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+nurse,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
+nurse,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 nurse,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
+nurse,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
 receptionist,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 receptionist,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 receptionist,DELETE /v1/departments/{id},departments:delete,deny-403
@@ -1184,6 +1212,7 @@ receptionist,GET /v1/patients/data-quality,patients:edit,allow
 receptionist,GET /v1/patients/guardian-reviews-due,patients:view,allow
 receptionist,GET /v1/patients/registry,patients:view,allow
 receptionist,GET /v1/patients/{id},patients:view,allow
+receptionist,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 receptionist,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -1220,6 +1249,8 @@ receptionist,GET /v1/roles/delegations,staff:view,deny-403
 receptionist,GET /v1/roles/{id},staff:view,deny-403
 receptionist,GET /v1/schedule/day,queue:view,allow
 receptionist,GET /v1/schedule/week,queue:view,allow
+receptionist,GET /v1/settings/integrations/abdm,setup:view,deny-403
+receptionist,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
 receptionist,GET /v1/setup/charges,setup:view,deny-403
 receptionist,GET /v1/setup/checklist,setup:view,deny-403
 receptionist,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -1331,6 +1362,7 @@ receptionist,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
 receptionist,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 receptionist,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 receptionist,POST /v1/patients/{id}/merge,patients:delete,deny-403
+receptionist,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 receptionist,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 receptionist,POST /v1/pharmacy/rx-lines/search,billing:create,allow
@@ -1380,7 +1412,10 @@ receptionist,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edi
 receptionist,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 receptionist,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 receptionist,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+receptionist,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
+receptionist,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 receptionist,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
+receptionist,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 frontdesk_vitals,DELETE /v1/departments/{id},departments:delete,deny-403
@@ -1460,6 +1495,7 @@ frontdesk_vitals,GET /v1/patients/data-quality,patients:edit,allow
 frontdesk_vitals,GET /v1/patients/guardian-reviews-due,patients:view,allow
 frontdesk_vitals,GET /v1/patients/registry,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{id},patients:view,allow
+frontdesk_vitals,GET /v1/patients/{patientId}/privacy-notice,patients:view,allow
 frontdesk_vitals,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -1496,6 +1532,8 @@ frontdesk_vitals,GET /v1/roles/delegations,staff:view,deny-403
 frontdesk_vitals,GET /v1/roles/{id},staff:view,deny-403
 frontdesk_vitals,GET /v1/schedule/day,queue:view,allow
 frontdesk_vitals,GET /v1/schedule/week,queue:view,allow
+frontdesk_vitals,GET /v1/settings/integrations/abdm,setup:view,deny-403
+frontdesk_vitals,GET /v1/settings/privacy/privacy-notice,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/charges,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/checklist,setup:view,deny-403
 frontdesk_vitals,GET /v1/setup/consent-contact,setup:view,deny-403
@@ -1607,6 +1645,7 @@ frontdesk_vitals,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-40
 frontdesk_vitals,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/merge,patients:delete,deny-403
+frontdesk_vitals,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,allow
 frontdesk_vitals,POST /v1/pharmacy/items,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-403
 frontdesk_vitals,POST /v1/pharmacy/rx-lines/search,billing:create,allow
@@ -1656,4 +1695,7 @@ frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
 frontdesk_vitals,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 frontdesk_vitals,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
+frontdesk_vitals,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
+frontdesk_vitals,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-403
+frontdesk_vitals,PUT /v1/staff/{id}/hpr,staff:edit,deny-403

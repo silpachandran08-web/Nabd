@@ -18,6 +18,10 @@ modules:
   common:
     owns: [audit_chain_heads, audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
     reads: []
+  identity:
+    # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
+    owns: [tenant_integrations_abdm]
+    reads: []
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff
     # are this module until they move under com.nabd.hms.iam; other modules look staff up via iam.api.ActorDirectory
@@ -43,8 +47,8 @@ modules:
     owns: [package_eligible_doctors, package_instance_events, package_instance_items, package_instances, package_items, package_redemptions, package_refunds, package_settings, packages]
     reads: []
   patient:
-    owns: [consents, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
-    reads: []
+    owns: [consents, notice_templates, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
+    reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
     owns: [pharmacy_settings, pharmacy_stock_movements]
     reads: []

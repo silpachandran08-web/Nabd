@@ -1310,6 +1310,90 @@ paths:
         "200": { description: "Updated policy", content: { application/json: { schema: { $ref: "#/components/schemas/Policy" } } } }
         "422": { description: "Value out of range (session.idle_lock_minutes must be a whole number 2-30)" }
 
+  /settings/privacy/privacy-notice:
+    get:
+      tags: [Setup]
+      summary: Privacy notice versions per language (IDC-003); the current version carries its text and locked clauses
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Versions, newest first per language", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticeVersions" } } } }
+    put:
+      tags: [Setup]
+      summary: Publish a new notice version. The locked clauses of the template must stay verbatim and in order (422 mandatory-clause-locked); a stale baseVersion is 409 version-conflict
+      x-required-permission: setup:edit
+      x-step-up: true
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticePublishRequest" } } }
+      responses:
+        "200": { description: "Published", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticePublished" } } } }
+        "409": { description: "version-conflict (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "mandatory-clause-locked | unknown-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /patients/{patientId}/privacy-notice:
+    get:
+      tags: [Patients]
+      summary: Does this patient need to re-acknowledge a newer privacy notice (IDC-003)
+      x-required-permission: patients:view
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: "Status", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticeStatus" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /patients/{patientId}/privacy-notice/acknowledge:
+    post:
+      tags: [Patients]
+      summary: One-tap desk acknowledgement of the current notice (a new consent row; nothing is rewritten)
+      x-required-permission: patients:edit
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: "Status after acknowledging", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticeStatus" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /settings/integrations/abdm:
+    get:
+      tags: [Setup]
+      summary: ABDM switch and HFR status (IDC-016); off by default
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Settings", content: { application/json: { schema: { $ref: "#/components/schemas/AbdmSettings" } } } }
+    put:
+      tags: [Setup]
+      summary: Enable ABDM (verifies the HFR id first) or switch it off
+      x-required-permission: setup:edit
+      x-step-up: true
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AbdmSettingsRequest" } } }
+      responses:
+        "200": { description: "Settings", content: { application/json: { schema: { $ref: "#/components/schemas/AbdmSettings" } } } }
+        "422": { description: "hfr-not-found | invalid-hfr-id (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "503": { description: "abdm-unavailable | abdm-not-configured (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /staff/{id}/hpr:
+    put:
+      tags: [Staff]
+      summary: Verify a doctor's HPR id against the Health Professional Registry and store it (needs ABDM enabled; 409 abdm-disabled otherwise)
+      x-required-permission: staff:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StaffHprRequest" } } }
+      responses:
+        "200": { description: "Stored", content: { application/json: { schema: { $ref: "#/components/schemas/StaffHpr" } } } }
+        "409": { description: "abdm-disabled (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "hpr-not-found (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /public/notices/{tenantSlug}/{version}:
+    get:
+      tags: [Setup]
+      summary: Public privacy notice page for one clinic, version and language (IDC-003); HTML, no PHI, ETag and public cache headers
+      security: []
+      x-required-permission: public
+      parameters:
+        - { name: tenantSlug, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+        - { name: lang, in: query, required: false, schema: { type: string, default: en } }
+      responses:
+        "200": { description: "The notice page", content: { text/html: { schema: { type: string } } } }
+        "304": { description: "Not modified" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /setup/consent-contact:
     get:
       tags: [Setup]
@@ -5244,6 +5328,66 @@ components:
       properties:
         value: { type: string }
 
+    PrivacyNoticeVersions:
+      type: object
+      required: [versions]
+      properties:
+        versions:
+          type: array
+          items:
+            type: object
+            required: [version, language, effectiveFrom, mandatoryHash, templateKey, legalReviewed, current]
+            properties:
+              version: { type: string }
+              language: { type: string }
+              effectiveFrom: { type: string, format: date-time }
+              mandatoryHash: { type: string }
+              templateKey: { type: string }
+              legalReviewed: { type: boolean, description: "false until the DPO has approved the template wording" }
+              current: { type: boolean }
+              bodyMd: { type: [string, "null"], description: "Only on the current version" }
+              lockedClauses: { type: [array, "null"], items: { type: string } }
+    PrivacyNoticePublishRequest:
+      type: object
+      required: [language, bodyMd, basedOnTemplate]
+      properties:
+        language: { type: string }
+        bodyMd: { type: string, maxLength: 50000 }
+        basedOnTemplate: { type: string }
+        baseVersion: { type: string, description: "The version being edited; a different current version is 409" }
+    PrivacyNoticePublished:
+      type: object
+      required: [version]
+      properties: { version: { type: string } }
+    PrivacyNoticeStatus:
+      type: object
+      required: [needsReAcknowledgement]
+      properties:
+        needsReAcknowledgement: { type: boolean }
+        acceptedVersion: { type: [string, "null"] }
+        currentVersion: { type: [string, "null"] }
+        language: { type: [string, "null"] }
+    AbdmSettings:
+      type: object
+      required: [enabled, hfrVerified]
+      properties:
+        enabled: { type: boolean }
+        hfrVerified: { type: boolean }
+        hfrId: { type: [string, "null"] }
+    AbdmSettingsRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        hfrId: { type: string, maxLength: 40 }
+    StaffHprRequest:
+      type: object
+      required: [hprId]
+      properties: { hprId: { type: string, pattern: "^[A-Za-z0-9@._-]{3,60}$" } }
+    StaffHpr:
+      type: object
+      required: [staffId, hprId, hprVerified]
+      properties: { staffId: { type: string, format: uuid }, hprId: { type: string }, hprVerified: { type: boolean } }
     ConsentContact:
       type: object
       properties:

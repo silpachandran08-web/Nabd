@@ -273,6 +273,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         // COM-001: produced by the WhatsApp webhook processor, not over this HTTP flow; WhatsAppInboxApiTest covers the producer
         expected.remove(DomainEventType.INBOUND_RECEIVED.type());
         expected.remove(DomainEventType.MESSAGE_STATUS_CHANGED.type());
+        expected.remove(DomainEventType.PRIVACY_NOTICE_PUBLISHED.type()); // IDC-003: Idc003PrivacyNoticeApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

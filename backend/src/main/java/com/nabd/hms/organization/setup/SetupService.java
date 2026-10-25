@@ -60,8 +60,11 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
 
     private final com.nabd.hms.common.TenantScope tenantScope;
 
+    private final com.nabd.hms.patient.api.PrivacyNotices privacyNotices;
+
     SetupService(SetupRepository repo, TenantContext tenantContext, Clock clock, com.nabd.hms.common.EventPublisher events,
-                 com.nabd.hms.common.TenantScope tenantScope) {
+                 com.nabd.hms.common.TenantScope tenantScope, com.nabd.hms.patient.api.PrivacyNotices privacyNotices) {
+        this.privacyNotices = privacyNotices;
         this.tenantScope = tenantScope;
         this.events = events;
         this.clock = clock;
@@ -193,6 +196,7 @@ public class SetupService implements com.nabd.hms.organization.api.ClinicPolicie
     public ConsentContactResponse updateConsentContact(UUID tenantId, UUID callerStaffId, ConsentContactWriteRequest req) {
         tenantContext.set(tenantId);
         repo.updateConsentContact(tenantId, req);
+        privacyNotices.seedInitial(); // IDC-003: the first saved grievance contact gives the clinic its v1 notices
         log.info("consent contact updated for tenant {} by {}", tenantId, callerStaffId);
         return new ConsentContactResponse(req.name(), req.email(), req.phone());
     }

@@ -41,7 +41,8 @@ public class OpenApiConfig {
             "/v1/owners/auth/mfa/*", "/v1/platform/auth/mfa/enroll", "/v1/platform/auth/mfa/confirm", // PLT-005: challenge/setup token in the body
             "/v1/platform/auth/login", "/v1/platform/auth/mfa/verify", "/v1/platform/auth/refresh",
             "/.well-known/jwks.json", "/v1/webhooks/whatsapp",
-            "/internal/v1/notification-requests/*"); // COM-004: service token, not a bearer
+            "/internal/v1/notification-requests/*", // COM-004: service token, not a bearer
+            "/v1/public/notices/*/*", "/abdm/v3/callbacks/**"); // IDC-003 public page, IDC-016 gateway-signed callbacks (PublicEndpointsSecurityConfig)
 
     private static final Pattern AUTHORITY = Pattern.compile("'([^']+)'");
     /** OPS-035: only a plain OR-chain of hasAuthority/hasAnyAuthority becomes "a | b"; any other SpEL is written verbatim. */
