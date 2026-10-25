@@ -58,7 +58,7 @@ try {
   await s.page.keyboard.press('3'); await sleep(200); // focus is in the search box: a digit is typed, not a pick
   check('F6 digits typed in the search box do not pick a row', (await grp.count()) === 0 || (await search.inputValue()).endsWith('3'));
   await search.fill('+91 98777 00001'); await sleep(600);
-  await s.page.locator('body').click({ position: { x: 5, y: 5 } }); await s.page.keyboard.press('2'); await sleep(300);
+  await search.press('Tab'); await s.page.keyboard.press('2'); await sleep(300); // Tab moves focus from the field to the first row
   check('F7 key 2 outside the field picks the second row', /Member 2/.test(await s.page.getByRole('dialog').innerText()) && (await s.page.getByRole('button', { name: 'Change' }).count()) === 1);
   check('F8 zero console errors', noise(s.log).length === 0, JSON.stringify(noise(s.log)));
   dumpLog('f', s.log); await s.browser.close(); s = null;
