@@ -3408,6 +3408,39 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MoneyReport" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /reports/eta-accuracy:
+    get:
+      tags: [Reports]
+      summary: "ACC-019 - ETA accuracy per clinic day and doctor (rolled up hourly for the previous clinic day, so yesterday is in place by 06:00 local). from/to are clinic days, inclusive; default is the 14 days ending yesterday; 400 invalid-range when from is after to or the range exceeds 93 days. maeMin is the mean absolute error of the p50 time in minutes, p80HitRate the share of visits called at or before the promised p80 time, within10Pct the share within +/-10 min. lowConfidence is true when the clinic had fewer than 30 visits that day (no drift alert fires for it). Aggregates only, no patient data."
+      x-required-permission: reports:view
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: doctorId, in: query, required: false, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [clinicDate, doctorId, n, maeMin, p80HitRate]
+                      properties:
+                        clinicDate: { type: string, format: date }
+                        doctorId: { type: string, format: uuid }
+                        n: { type: integer }
+                        maeMin: { type: number }
+                        p80HitRate: { type: number }
+                        within10Pct: { type: number }
+                        lowConfidence: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Caller lacks reports:view }
   /reports/sources:
     get:
       tags: [Reports]

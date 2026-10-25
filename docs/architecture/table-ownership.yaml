@@ -52,7 +52,7 @@ modules:
     owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.operators, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, tenant_lifecycle_events, tenants]
     reads: []
   queue:
-    owns: [appointments, doctor_delays, doctor_leave, doctor_session_pauses, doctor_sessions, doctor_working_hours, queue_entries, queue_entry_events, waitlist_entries]
+    owns: [appointments, doctor_delays, doctor_leave, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, queue_entries, queue_entry_events, waitlist_entries]
     reads: []
   shared:
     owns: [idempotency_keys, projector_applied_events, shedlock]

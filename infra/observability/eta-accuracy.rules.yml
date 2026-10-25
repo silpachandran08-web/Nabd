@@ -1,0 +1,16 @@
+# ACC-019: ETA drift alert. Metrics: nabd_eta_p80_coverage (share of calls in the last 3 h at or before the promised p80 time),
+# nabd_eta_visits_today (EtaAccuracyMetrics; tenant label is a hash, top-N tenants + "other").
+# Drift goes to the Patient Access rotation as a ticket-class alert, NOT a page (severity=warning routes to ticket in alertmanager.in.yml;
+# team=patient-access is the label the ticket webhook uses to pick the rotation). A clinic under 30 visits today is low-confidence: no alert.
+# Metrics refresh every 5 min, so for: 5m keeps detection inside the 15 minute target.
+# Wiring this file into the cell's Prometheus, and the staging drift injection, are Needs external action.
+groups:
+  - name: nabd-eta-accuracy
+    rules:
+      - alert: NabdEtaP80CoverageDrift
+        expr: nabd_eta_p80_coverage{tenant!="other"} < 0.70 and on (tenant) nabd_eta_visits_today{tenant!="other"} >= 30
+        for: 5m
+        labels: { severity: warning, team: patient-access }
+        annotations:
+          summary: "ETA P80 coverage below 70% for clinic {{ $labels.tenant }} (hashed id): promises are being broken"
+          runbook: docs/architecture/eta-accuracy.md

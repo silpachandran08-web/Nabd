@@ -1319,6 +1319,26 @@ schemas:
       occurred_at: operational
       actor_id: operational
       source: operational
+    eta_prediction_log:
+      id: operational
+      tenant_id: operational
+      queue_entry_id: operational
+      appointment_id: operational
+      doctor_id: operational
+      clinic_date: operational
+      predicted_at: operational
+      p50_at: operational
+      p80_at: operational
+      horizon_min: operational
+      actual_called_at: operational
+    eta_accuracy_daily:
+      tenant_id: operational
+      doctor_id: operational
+      clinic_date: operational
+      n: operational
+      mae_s: operational
+      p80_hit_rate: operational
+      within10_pct: operational
     doctor_sessions:
       id: operational
       tenant_id: operational

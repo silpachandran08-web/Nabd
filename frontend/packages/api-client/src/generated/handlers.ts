@@ -252,6 +252,7 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
     http.get(`${baseUrl}/v1/reports/billing-leakage`, () => HttpResponse.json({"entries":[{"patientId":"00000000-0000-7000-8000-000000000000","patientName":"string","priorNoShowCount":0}],"rule":"string","thresholdAmount":0}, { status: 200 })), // ReportsController_billingLeakage
     http.get(`${baseUrl}/v1/reports/daily-money`, () => HttpResponse.json({"billedToday":0,"collectedToday":0,"invoiceCountToday":0,"outstandingTotal":0,"paymentCountToday":0}, { status: 200 })), // ReportsController_dailyMoney
     http.get(`${baseUrl}/v1/reports/doctor-punctuality`, () => HttpResponse.json({"accessNote":"string","entries":[{"patientId":"00000000-0000-7000-8000-000000000000","patientName":"string","priorNoShowCount":0}]}, { status: 200 })), // ReportsController_doctorPunctuality
+    http.get(`${baseUrl}/v1/reports/eta-accuracy`, () => HttpResponse.json({"items":[{"clinicDate":"2026-01-01","doctorId":"00000000-0000-7000-8000-000000000000","lowConfidence":false,"maeMin":0,"n":0,"p80HitRate":0,"within10Pct":0}]}, { status: 200 })), // EtaAccuracyController_get
     http.get(`${baseUrl}/v1/reports/export`, () => HttpResponse.json("string", { status: 200 })), // ReportsController_export
     http.get(`${baseUrl}/v1/reports/money`, () => HttpResponse.json({"billsRaised":0,"bookings":0,"collected":0,"currency":"string","from":"2026-01-01","includesToday":false,"noShows":0,"taxCollected":0,"taxLabel":"string","tender":[{"amount":0,"count":0,"method":"string"}],"to":"2026-01-01","topServices":[{"name":"string","revenue":0}],"waitingNow":0}, { status: 200 })), // ReportsController_money
     http.get(`${baseUrl}/v1/reports/no-show-risk`, () => HttpResponse.json({"entries":[{"patientId":"00000000-0000-7000-8000-000000000000","patientName":"string","priorNoShowCount":0}],"rule":"string"}, { status: 200 })), // ReportsController_noShowRisk
@@ -336,4 +337,4 @@ export function createHandlers<H>({ http, HttpResponse }: MswApi<H>, baseUrl = "
   ];
 }
 
-export const operationCount = 322;
+export const operationCount = 323;

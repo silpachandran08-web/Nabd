@@ -121,6 +121,8 @@ export const EncounterListItemSchema = z.object({ amendmentCount: z.number().int
 export const EncounterListPageSchema = z.object({ data: z.array(EncounterListItemSchema).optional(), page: PageMetaSchema.optional() });
 export const EncounterResponseSchema = z.object({ assessment: z.string().optional(), diagnosis: z.string().optional(), doctorId: z.string().optional(), medications: z.string().optional(), occurredAt: z.string().optional(), queueEntryId: z.string().optional() });
 export const EncounterPageSchema = z.object({ data: z.array(EncounterResponseSchema).optional(), page: PageMetaSchema.optional() });
+export const EtaAccuracyItemSchema = z.object({ clinicDate: z.string().optional(), doctorId: z.string().optional(), lowConfidence: z.boolean().optional(), maeMin: z.number().optional(), n: z.number().int().optional(), p80HitRate: z.number().optional(), within10Pct: z.number().optional() });
+export const EtaAccuracyResponseSchema = z.object({ items: z.array(EtaAccuracyItemSchema).optional() });
 export const ExpiredWithValueSchema = z.object({ expiredOn: z.string().optional(), instanceId: z.string().optional(), packageName: z.string().optional(), patientName: z.string().optional(), remainingValue: z.number().optional() });
 export const ExpiringSoonResponseSchema = z.object({ alertTier: z.number().int().optional(), expiresOn: z.string().optional(), instanceId: z.string().optional(), packageName: z.string().optional(), patientName: z.string().optional(), quantityConsumed: z.number().int().optional(), quantityTotal: z.number().int().optional(), reminderSentForTier: z.boolean().optional(), valueLeft: z.number().optional() });
 export const ExportJobRequestSchema = z.object({ exportType: z.string().min(1) });
@@ -588,6 +590,7 @@ export const operationSchemas = {
   ReportsController_billingLeakage: { response: BillingLeakageResponseSchema },
   ReportsController_dailyMoney: { response: DailyMoneyResponseSchema },
   ReportsController_doctorPunctuality: { response: DoctorPunctualityResponseSchema },
+  EtaAccuracyController_get: { response: EtaAccuracyResponseSchema },
   ReportsController_export: { response: z.string() },
   ReportsController_money: { response: MoneyResponseSchema },
   ReportsController_noShowRisk: { response: NoShowRiskResponseSchema },
