@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@nabd/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./packages.module.css";
@@ -80,7 +81,7 @@ type SoldInvoice = {
 const EMPTY_ITEM: ItemDraft = { itemType: "service_session", name: "", quantity: "1", unitListPrice: "0", taxRatePercent: "0" };
 
 function money(n: number): string {
-  return n.toFixed(2);
+  return formatNumber(n, { min: 2, max: 2 });
 }
 
 export default function PackagesPage() {
