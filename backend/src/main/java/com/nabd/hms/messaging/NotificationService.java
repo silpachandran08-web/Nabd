@@ -50,10 +50,12 @@ public class NotificationService implements NotificationPort {
     private final ClinicClock clock;
     private final TenantScope tenantScope;
     private final TransactionTemplate tx;
+    private final CommsCutover cutover;
 
     NotificationService(NotificationRequestRepository repo, WhatsAppTemplateRepository templates, WhatsAppMessageService whatsApp,
                         EventPublisher publisher, TenantContext tenantContext, FieldCipher cipher, ObjectMapper json, ClinicClock clock,
-                        TenantScope tenantScope, PlatformTransactionManager txManager) {
+                        TenantScope tenantScope, PlatformTransactionManager txManager, CommsCutover cutover) {
+        this.cutover = cutover;
         this.tenantScope = tenantScope;
         this.tx = new TransactionTemplate(txManager);
         this.repo = repo;
@@ -129,6 +131,9 @@ public class NotificationService implements NotificationPort {
         var row = repo.find(tenantId, id).orElse(null);
         if (row == null || !"requested".equals(row.status())) {
             return; // redelivery, or cancelled/blocked meanwhile
+        }
+        if (cutover.remote(tenantId)) {
+            return; // COM-008: the Comms Gateway owns this tenant's sends; the row stays 'requested' for its claim
         }
         Instant now = clock.now();
         if (row.notAfter() != null && now.isAfter(row.notAfter())) {
