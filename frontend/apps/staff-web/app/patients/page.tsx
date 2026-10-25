@@ -23,42 +23,35 @@ import { age, DEFAULT_START_STATUS, initials, statusBeforeConsult, statusSequenc
 import { apiFetch, goLogin } from "../lib/apiClient";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
 import PatientMessages from "./PatientMessages";
+import { staleMessage } from "../lib/queueMove";
+import { ErrorSummary, FieldError, failText, useFormErrors } from "../lib/formErrors";
+import { prefix, queueQuery } from "../lib/query";
+import { useQueryClient } from "@tanstack/react-query";
 
-// Matches GET /v1/patients and GET /v1/patients/{id} (PatientController).
-type Patient = { id: string; mrn: string; name: string; phone: string; dob: string; gender: string; status: string };
-type PatientDetail = PatientSummary & {
-  lastVisit?: string | null; // LIVE-03: same definition as the registry list (date)
-  isMinor: boolean;
-  guardianId: string | null;
-  guardianName: string | null;
-  guardianConsentGrantedAt: string | null;
-};
+import type {
+  AllergyResponse, AllergyStatusResponse, ConditionResponse, EncounterResponse, PatientDetailResponse, PatientRegistryResponse, PatientRegistryRow,
+  PrescriptionResponse, QueueEntryResponse, ToothHistoryEntryResponse, ToothResponse,
+} from "@nabd/api-client/generated";
+import { api, ApiError } from "../lib/api";
+import type { Full } from "../lib/gen";
+
+type PatientDetail = PatientSummary & Full<Pick<PatientDetailResponse, "isMinor" | "guardianId" | "guardianName" | "guardianConsentGrantedAt" | "lastVisit">,
+  "guardianId" | "guardianName" | "guardianConsentGrantedAt" | "lastVisit">;
 // GET /clinical/patients/{id}/allergies/status. "not_assessed" (nobody asked) is NOT "none_documented".
-type AllergyStatus = { state: "recorded" | "none_documented" | "not_assessed"; activeCount: number; documentedByName: string | null; documentedAt: string | null };
-type Allergy = {
-  id: string; substance: string; severity: string; reaction: string | null; active: boolean;
-  category?: string | null; recordedByName?: string | null; recordedAt?: string;
-  deactivatedReason?: string | null; deactivatedAt?: string | null; deactivatedByName?: string | null;
-};
+type AllergyStatus = Full<AllergyStatusResponse, "documentedByName" | "documentedAt"> & { state: "recorded" | "none_documented" | "not_assessed" };
+type Allergy = Full<Pick<AllergyResponse, "id" | "substance" | "severity" | "active">> & Pick<AllergyResponse, "category" | "recordedByName" | "recordedAt" | "deactivatedReason" | "deactivatedAt" | "deactivatedByName"> & { reaction: string | null };
 const ALLERGY_CATEGORIES = [
   { id: "drug", label: "Drug / medicine" }, { id: "food", label: "Food" },
   { id: "environmental", label: "Environmental" }, { id: "other", label: "Other" },
 ];
 const categoryLabel = (id?: string | null) => ALLERGY_CATEGORIES.find((c) => c.id === id)?.label;
-type Condition = { id: string; condition: string; status: string; reviewDueDate: string | null };
-// GET /v1/patients/registry (PatientController.registry → PatientRegistryResponse)
-type RegistryRow = {
-  id: string; mrn: string; name: string; phone: string; age: number; gender: string; minor: boolean;
-  lastVisit: string | null; nextAppointment: string | null; nextDoctorName: string | null; nextDoctorId: string | null;
-  nextAppointmentId: string | null; nextAppointmentToday: boolean;
-  packageSessionsUsed: number | null; packageSessionsTotal: number | null; condition: string | null; followUpDue: boolean;
-  allergy: string | null; balanceDue: boolean; duplicate: boolean; archived: boolean;
-  queueToken: number | null; queueStatus: string | null; tags: string[];
-};
+type Condition = Full<Pick<ConditionResponse, "id" | "condition" | "status" | "reviewDueDate">, "reviewDueDate">;
+// GET /v1/patients/registry (PatientRegistryRow in the generated client).
+type RegistryRow = Full<PatientRegistryRow, "lastVisit" | "nextAppointment" | "nextDoctorName" | "nextDoctorId" | "nextAppointmentId" | "packageSessionsUsed" | "packageSessionsTotal" | "condition" | "allergy" | "queueToken" | "queueStatus">;
 // OPS-008: keyset paging; page.nextCursor fetches the next page of the same filter + q.
-type Registry = { total: number; counts: Record<string, number>; rows: RegistryRow[]; matchedTotal?: number; page?: { nextCursor: string | null } };
+type Registry = Omit<Full<PatientRegistryResponse>, "rows" | "page" | "matchedTotal" | "hasMore"> & { rows: RegistryRow[]; matchedTotal?: number; page?: { nextCursor?: string | null } };
 // Today's queue entry for the drawer patient (GET /v1/queue, QueueEntryResponse subset).
-type TodayVisit = { id: string; patientId: string; doctorId: string; departmentId: string; status: string; tokenNumber: number };
+type TodayVisit = Full<Pick<QueueEntryResponse, "id" | "patientId" | "doctorId" | "departmentId" | "status" | "tokenNumber">>;
 const VISIT_DONE = ["completed", "cancelled", "no_show", "transferred_out"];
 // Drawer wording for today's visit (shorter than the queue board labels), keyed by queue status.
 const TODAY_STATUS_LABEL: Record<string, string> = {
@@ -89,15 +82,11 @@ function nextLabel(r: RegistryRow): string {
     : at.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
   return r.nextDoctorName ? `${when} · ${r.nextDoctorName}` : when;
 }
-type PrescriptionItem = { id: string; drugName: string; dosage: string | null; frequency: string | null; duration: string | null };
-type Prescription = { id: string; status: string; signedAt: string | null; items: PrescriptionItem[] };
-type Encounter = { queueEntryId: string; occurredAt: string; diagnosis: string | null; assessment: string | null; medications: string | null };
-type Tooth = { id: string; toothNumber: number; status: string; note: string | null; isSupernumerary: boolean };
-type ToothHistoryEntry = {
-  actorName: string; actorRole: string; action: string; before: string | null; after: string | null; occurredAt: string;
-};
+type Prescription = Full<Pick<PrescriptionResponse, "id" | "status" | "signedAt" | "items">, "signedAt" | "items"> & { items: Full<NonNullable<PrescriptionResponse["items"]>[number], "dosage" | "frequency" | "duration">[] };
+type Encounter = Full<EncounterResponse, "diagnosis" | "assessment" | "medications">;
+type Tooth = Full<ToothResponse, "note">;
+type ToothHistoryEntry = Full<ToothHistoryEntryResponse, "before" | "after">;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const FDI_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28,
   48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 const TOOTH_STATUSES = ["healthy", "decayed", "filled", "missing", "crown", "root_canal"] as const;
@@ -166,7 +155,8 @@ function PatientsList() {
   const [rxLoad, setRxLoad] = useState<"loading" | "ok" | "error">("loading");
   const [timelineLoad, setTimelineLoad] = useState<"loading" | "ok" | "error">("loading");
   // A write that failed must say so — never leave the clinician thinking an allergy/guardian change landed.
-  const [actionError, setActionError] = useState<string | null>(null);
+  const fe = useFormErrors("pt", { substance: "Substance", severity: "Severity", reaction: "Reaction", category: "Category", condition: "Condition", reviewDueDate: "Review due date" });
+  const qc = useQueryClient();
   const openSeq = useRef(0); // guards against a slow earlier drawer load landing in a later patient's drawer
 
   const [conditions, setConditions] = useState<Condition[]>([]);
@@ -199,27 +189,6 @@ function PatientsList() {
     return numbering === "universal" ? `#${FDI_TO_UNIVERSAL[fdiNumber]}` : String(fdiNumber);
   }
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
-
   useEffect(() => {
     void Promise.resolve().then(() => {
       // Actions a role can't take are absent, not disabled (RBAC matrix rule). UI gating only —
@@ -239,25 +208,17 @@ function PatientsList() {
       try {
         const params = new URLSearchParams({ filter: which });
         if (query.trim()) params.set("q", query.trim());
-        const res = await authedFetch(`/patients/registry?${params}`);
-        if (!res || seq !== loadSeq.current) return; // a newer search is in flight
-        if (res.status === 403) {
-          setForbidden(true);
-          return;
-        }
-        if (!res.ok) {
-          setError("Couldn't load patients. Try again.");
-          return;
-        }
-        const body: Registry = await res.json();
-        if (seq === loadSeq.current) { setRegistry(body); setMoreState("idle"); }
-      } catch {
-        if (seq === loadSeq.current) setError("Couldn't reach the server. Check your connection and try again.");
+        const body = await api.get<Registry>(`/patients/registry?${params}`);
+        if (seq === loadSeq.current) { setRegistry(body); setMoreState("idle"); } // else a newer search is in flight
+      } catch (e) {
+        if (seq !== loadSeq.current) return;
+        if (e instanceof ApiError && e.status === 403) setForbidden(true);
+        else setError(e instanceof ApiError ? "Couldn't load patients. Try again." : "Couldn't reach the server. Check your connection and try again.");
       } finally {
         if (seq === loadSeq.current) setLoading(false);
       }
     },
-    [authedFetch]
+    []
   );
 
   // OPS-008: the next keyset page of the same filter + search, appended (infinite scroll; the button is the keyboard path).
@@ -269,17 +230,14 @@ function PatientsList() {
     try {
       const params = new URLSearchParams({ filter, cursor: nextCursor });
       if (q.trim()) params.set("q", q.trim());
-      const res = await authedFetch(`/patients/registry?${params}`);
+      const body = await api.get<Registry>(`/patients/registry?${params}`);
       if (seq !== loadSeq.current) return; // filter or search changed meanwhile
-      if (!res?.ok) { setMoreState("error"); return; }
-      const body: Registry = await res.json();
-      if (seq !== loadSeq.current) return;
       setRegistry((prev) => prev && { ...body, rows: [...prev.rows, ...body.rows] });
       setMoreState("idle");
     } catch {
       if (seq === loadSeq.current) setMoreState("error");
     }
-  }, [authedFetch, filter, q, nextCursor, moreState]);
+  }, [filter, q, nextCursor, moreState]);
 
   useEffect(() => {
     const el = moreRef.current;
@@ -302,7 +260,7 @@ function PatientsList() {
 
   async function openDrawer(id: string) {
     const seq = ++openSeq.current;
-    setActionError(null);
+    fe.clear();
     setRxLoad("loading");
     setTimelineLoad("loading");
     setDrawerId(id);
@@ -335,72 +293,66 @@ function PatientsList() {
     setStartError(null);
     // Only patients the registry shows in today's queue have a visit to look up.
     if (registry?.rows.some((r) => r.id === id && r.queueToken != null)) void loadTodayVisit(id, seq);
-    let res: Response | null;
+    let detail: PatientDetail;
     try {
-      res = await authedFetch(`/patients/${id}`);
-    } catch {
-      setDrawerError("Couldn't reach the server. Check your connection and try again.");
+      detail = await api.get<PatientDetail>(`/patients/${id}`);
+    } catch (e) {
+      if (seq === openSeq.current) setDrawerError(e instanceof ApiError ? "Couldn't load this patient." : "Couldn't reach the server. Check your connection and try again.");
       return;
     }
-    if (!res || seq !== openSeq.current) return;
-    if (!res.ok) {
-      setDrawerError("Couldn't load this patient.");
-      return;
-    }
-    const detail: PatientDetail = await res.json();
     if (seq !== openSeq.current) return;
     setDrawerPatient(detail);
     if (clinicalView) {
       void refreshAllergies(id, seq);
       void refreshConditions(id, seq);
-
       try {
-        const rxRes = await authedFetch(`/clinical/patients/${id}/prescriptions`);
+        const rx = await api.get<Prescription[]>(`/clinical/patients/${id}/prescriptions`);
         if (seq !== openSeq.current) return;
-        if (rxRes?.ok) { setPrescriptions(await rxRes.json()); setRxLoad("ok"); } else if (rxRes) setRxLoad("error");
-
-        const tlRes = await authedFetch(`/clinical/patients/${id}/timeline?limit=10`);
+        setPrescriptions(rx);
+        setRxLoad("ok");
+      } catch { if (seq === openSeq.current) setRxLoad("error"); }
+      try {
+        const page = await api.get<{ data: Encounter[]; page: { nextCursor: string | null } }>(`/clinical/patients/${id}/timeline?limit=10`);
         if (seq !== openSeq.current) return;
-        if (tlRes?.ok) {
-          const page = await tlRes.json();
-          setTimeline(page.data);
-          setTimelineCursor(page.page.nextCursor);
-          setTimelineLoad("ok");
-        } else if (tlRes) setTimelineLoad("error");
-      } catch {
-        if (seq === openSeq.current) { setRxLoad((v) => (v === "ok" ? v : "error")); setTimelineLoad("error"); }
-      }
+        setTimeline(page.data);
+        setTimelineCursor(page.page.nextCursor);
+        setTimelineLoad("ok");
+      } catch { if (seq === openSeq.current) setTimelineLoad("error"); }
     }
 
     if (canDental) {
       try {
-        const chartRes = await authedFetch(`/specialty/dental/patients/${id}/chart`);
-        if (seq === openSeq.current && chartRes?.ok) setChart(await chartRes.json());
+        const teeth = await api.get<Tooth[]>(`/specialty/dental/patients/${id}/chart`);
+        if (seq === openSeq.current) setChart(teeth);
       } catch { /* chart stays empty; tooth edits re-fetch nothing */ }
     }
+  }
+
+  /** The write landed; re-read the header. A failed re-read keeps the last values (never reports the write as failed). */
+  async function refreshPatient(id: string) {
+    try {
+      const detail = await api.get<PatientDetail>(`/patients/${id}`);
+      setDrawerPatient(detail);
+      void qc.invalidateQueries({ queryKey: prefix("patient") }); // names on Arrivals follow a correction
+    } catch { /* keep the last values */ }
   }
 
   async function loadTodayVisit(patientId: string, seq: number) {
     if (!can("queue:view")) return;
     try {
-      const res = await authedFetch("/queue");
-      if (seq !== openSeq.current || !res?.ok) return;
-      const list: TodayVisit[] = await res.json();
+      const list = (await qc.fetchQuery(queueQuery())) as unknown as TodayVisit[]; // same key as the sidebar badge
+      if (seq !== openSeq.current) return;
       const open = list.filter((e) => e.patientId === patientId && !VISIT_DONE.includes(e.status));
       const me = selfId();
       const entry = open.find((e) => e.doctorId === me) ?? open[0] ?? null;
-      if (seq !== openSeq.current) return;
       setVisit(entry);
       if (entry && clinicalView) void loadVisitVitals(entry.id, seq);
       if (entry) {
         // An unreadable flow falls back to the default pipeline (vitals first), as /consult does.
         let start: string | null = DEFAULT_START_STATUS;
         try {
-          const fRes = await authedFetch(`/departments/${entry.departmentId}/flow`);
-          if (fRes?.ok) {
-            const steps: { stepType: string }[] = await fRes.json();
-            start = statusBeforeConsult(statusSequence(steps.map((x) => x.stepType)));
-          }
+          const steps = await api.get<{ stepType: string }[]>(`/departments/${entry.departmentId}/flow`);
+          start = statusBeforeConsult(statusSequence(steps.map((x) => x.stepType)));
         } catch { /* keep the default */ }
         if (seq === openSeq.current) setVisitStartStatus(start);
       }
@@ -410,29 +362,23 @@ function PatientsList() {
   async function loadVisitVitals(entryId: string, seq = openSeq.current) {
     setVisitVitals({ status: "loading", data: null });
     try {
-      const res = await authedFetch(`/clinical/vitals/${entryId}`);
-      if (seq !== openSeq.current || !res) return;
-      if (res.ok) setVisitVitals({ status: "ok", data: await res.json() });
-      else setVisitVitals({ status: res.status === 404 ? "none" : "error", data: null });
-    } catch {
-      if (seq === openSeq.current) setVisitVitals({ status: "error", data: null });
+      const data = await api.get<Vitals>(`/clinical/vitals/${entryId}`);
+      if (seq === openSeq.current) setVisitVitals({ status: "ok", data });
+    } catch (e) {
+      if (seq === openSeq.current) setVisitVitals({ status: e instanceof ApiError && e.status === 404 ? "none" : "error", data: null });
     }
   }
 
   /** Same transition the consult workspace's Start uses (PATCH status in_consult); /consult?entry= then opens the visit. */
   async function startConsultation(entry: TodayVisit) {
+    if (starting) return;
     setStarting(true);
     setStartError(null);
     try {
-      const res = await authedFetch(`/queue/${entry.id}/status`, { method: "PATCH", body: moveBody("in_consult", entry.status) });
-      if (!res) return;
-      if (!res.ok) {
-        setStartError(await moveErrorMessage(res, "Couldn't start the consultation."));
-        return;
-      }
+      await api.patch(`/queue/${entry.id}/status`, { status: "in_consult", expectedStatus: entry.status });
       router.push(`/consult?entry=${encodeURIComponent(entry.id)}`);
-    } catch {
-      setStartError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      setStartError((e instanceof ApiError && staleMessage(e.problem)) || failText(e, "Couldn't start the consultation."));
     } finally {
       setStarting(false);
     }
@@ -442,13 +388,10 @@ function PatientsList() {
     if (!timelineCursor) return;
     setTimelineLoadingMore(true);
     try {
-      const res = await authedFetch(`/clinical/patients/${patientId}/timeline?limit=10&cursor=${encodeURIComponent(timelineCursor)}`);
-      if (res?.ok) {
-        const page = await res.json();
-        setTimeline((prev) => [...prev, ...page.data]);
-        setTimelineCursor(page.page.nextCursor);
-      }
-    } finally {
+      const page = await api.get<{ data: Encounter[]; page: { nextCursor: string | null } }>(`/clinical/patients/${patientId}/timeline?limit=10&cursor=${encodeURIComponent(timelineCursor)}`);
+      setTimeline((prev) => [...prev, ...page.data]);
+      setTimelineCursor(page.page.nextCursor);
+    } catch { /* the button stays; the person can press it again */ } finally {
       setTimelineLoadingMore(false);
     }
   }
@@ -457,16 +400,14 @@ function PatientsList() {
     // The status is dropped first so a stale "none documented" can never sit next to a changed register.
     setAllergyStatus(null);
     try {
-      const [res, stRes] = await Promise.all([
-        authedFetch(`/clinical/patients/${patientId}/allergies`),
-        authedFetch(`/clinical/patients/${patientId}/allergies/status`),
+      const [list, status] = await Promise.all([
+        api.get<Allergy[]>(`/clinical/patients/${patientId}/allergies`),
+        api.get<AllergyStatus>(`/clinical/patients/${patientId}/allergies/status`),
       ]);
       if (seq !== openSeq.current) return;
-      if (res?.ok && stRes?.ok) {
-        setAllergies(await res.json());
-        setAllergyStatus(await stRes.json());
-        setAllergyLoad("ok");
-      } else if (res || stRes) setAllergyLoad("error");
+      setAllergies(list);
+      setAllergyStatus(status);
+      setAllergyLoad("ok");
     } catch {
       if (seq === openSeq.current) setAllergyLoad("error");
     }
@@ -475,148 +416,131 @@ function PatientsList() {
   async function loadRemoved(patientId: string) {
     setRemovedError(false);
     try {
-      const res = await authedFetch(`/clinical/patients/${patientId}/allergies?includeInactive=true`);
-      if (res?.ok) setRemovedAllergies(((await res.json()) as Allergy[]).filter((x) => !x.active));
-      else if (res) setRemovedError(true);
+      setRemovedAllergies((await api.get<Allergy[]>(`/clinical/patients/${patientId}/allergies?includeInactive=true`)).filter((x) => !x.active));
     } catch {
       setRemovedError(true);
     }
   }
 
   async function addAllergy() {
-    if (!drawerPatient || !newAllergy.substance.trim() || !newAllergy.severity) return;
+    if (!drawerPatient || !newAllergy.substance.trim() || !newAllergy.severity || allergyBusy) return;
     setAllergyBusy(true);
-    setActionError(null);
+    fe.clear();
+    let saved = false;
     try {
-      const res = await authedFetch(`/clinical/patients/${drawerPatient.id}/allergies`, {
-        method: "POST",
-        body: JSON.stringify({ ...newAllergy, category: newAllergy.category || undefined }),
-      });
-      if (res?.ok) {
-        setNewAllergy({ substance: "", category: "", severity: "", reaction: "" });
-        refreshAllergies(drawerPatient.id);
-        if (showRemoved) void loadRemoved(drawerPatient.id);
-        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-        if (pRes?.ok) setDrawerPatient(await pRes.json());
-      } else if (res) setActionError("Couldn't save the allergy. It has NOT been recorded.");
-    } catch {
-      setActionError("Couldn't reach the server. The allergy has NOT been recorded.");
+      await api.post(`/clinical/patients/${drawerPatient.id}/allergies`, { ...newAllergy, category: newAllergy.category || undefined });
+      saved = true;
+    } catch (e) {
+      fe.fail(e, e instanceof ApiError ? "Couldn't save the allergy. It has NOT been recorded." : "Couldn't reach the server. The allergy has NOT been recorded.");
     } finally {
       setAllergyBusy(false);
     }
+    if (!saved) return;
+    setNewAllergy({ substance: "", category: "", severity: "", reaction: "" });
+    void refreshAllergies(drawerPatient.id);
+    if (showRemoved) void loadRemoved(drawerPatient.id);
+    await refreshPatient(drawerPatient.id);
   }
 
   async function deactivateAllergy(reason: string) {
-    if (!drawerPatient || !removeAllergy) return;
+    if (!drawerPatient || !removeAllergy || confirmBusy) return;
     setConfirmBusy(true);
     setConfirmError(null);
+    let removed = false;
     try {
-      const res = await authedFetch(`/clinical/allergies/${removeAllergy.id}/deactivate`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
-      });
-      if (res?.ok) {
-        // Drop the removed name now; the refresh below is not awaited and the banner must not keep naming it.
-        const gone = removeAllergy;
-        setAllergies((l) => l.filter((x) => x.id !== gone.id));
-        setDrawerPatient((p) => (p ? { ...p, allergies: p.allergies.filter((n) => n !== gone.substance) } : p));
-        setRemoveAllergy(null);
-        refreshAllergies(drawerPatient.id);
-        if (showRemoved) void loadRemoved(drawerPatient.id);
-        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-        if (pRes?.ok) setDrawerPatient(await pRes.json());
-      } else if (res) setConfirmError("Couldn't remove the allergy. It is still on record.");
-    } catch {
-      setConfirmError("Couldn't reach the server. The allergy is still on record.");
+      await api.patch(`/clinical/allergies/${removeAllergy.id}/deactivate`, { reason });
+      removed = true;
+    } catch (e) {
+      setConfirmError(e instanceof ApiError ? "Couldn't remove the allergy. It is still on record." : "Couldn't reach the server. The allergy is still on record.");
     } finally {
       setConfirmBusy(false);
     }
+    if (!removed) return;
+    // Drop the removed name now; the refresh below is not awaited and the banner must not keep naming it.
+    const gone = removeAllergy;
+    setAllergies((l) => l.filter((x) => x.id !== gone.id));
+    setDrawerPatient((p) => (p ? { ...p, allergies: p.allergies.filter((n) => n !== gone.substance) } : p));
+    setRemoveAllergy(null);
+    void refreshAllergies(drawerPatient.id);
+    if (showRemoved) void loadRemoved(drawerPatient.id);
+    await refreshPatient(drawerPatient.id);
   }
 
   async function refreshConditions(patientId: string, seq = openSeq.current) {
     try {
-      const res = await authedFetch(`/clinical/patients/${patientId}/conditions`);
+      const list = await api.get<Condition[]>(`/clinical/patients/${patientId}/conditions`);
       if (seq !== openSeq.current) return;
-      if (res?.ok) { setConditions(await res.json()); setConditionLoad("ok"); } else if (res) setConditionLoad("error");
+      setConditions(list);
+      setConditionLoad("ok");
     } catch {
       if (seq === openSeq.current) setConditionLoad("error");
     }
   }
 
   async function addCondition() {
-    if (!drawerPatient || !newCondition.condition.trim()) return;
+    if (!drawerPatient || !newCondition.condition.trim() || conditionBusy) return;
     setConditionBusy(true);
-    setActionError(null);
+    fe.clear();
+    let saved = false;
     try {
-      const res = await authedFetch(`/clinical/patients/${drawerPatient.id}/conditions`, {
-        method: "POST",
-        body: JSON.stringify({ condition: newCondition.condition, reviewDueDate: newCondition.reviewDueDate || null }),
-      });
-      if (res?.ok) {
-        setNewCondition({ condition: "", reviewDueDate: "" });
-        refreshConditions(drawerPatient.id);
-        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-        if (pRes?.ok) setDrawerPatient(await pRes.json());
-        void load(q, filter); // Follow-up due flag/count may have changed
-      } else if (res) setActionError("Couldn't save the condition. It has NOT been recorded.");
-    } catch {
-      setActionError("Couldn't reach the server. The condition has NOT been recorded.");
+      await api.post(`/clinical/patients/${drawerPatient.id}/conditions`, { condition: newCondition.condition, reviewDueDate: newCondition.reviewDueDate || null });
+      saved = true;
+    } catch (e) {
+      fe.fail(e, e instanceof ApiError ? "Couldn't save the condition. It has NOT been recorded." : "Couldn't reach the server. The condition has NOT been recorded.");
     } finally {
       setConditionBusy(false);
     }
+    if (!saved) return;
+    setNewCondition({ condition: "", reviewDueDate: "" });
+    void refreshConditions(drawerPatient.id);
+    void load(q, filter); // Follow-up due flag/count may have changed
+    await refreshPatient(drawerPatient.id);
   }
 
   /** NB-085 / CGV-001: dedicated DELETE /patients/{id}/guardian (204). It touches only the guardian link,
    * so address and national ID can never be wiped; the server audits it and withdraws the
    * guardian_access consent in the same write. */
   async function revokeGuardian() {
-    if (!drawerPatient) return;
+    if (!drawerPatient || confirmBusy) return;
     setConfirmBusy(true);
     setConfirmError(null);
+    let revoked = false;
     try {
-      const res = await authedFetch(`/patients/${drawerPatient.id}/guardian`, { method: "DELETE" });
-      if (res?.ok) {
-        setConfirmGuardian(false);
-        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-        if (pRes?.ok) setDrawerPatient(await pRes.json());
-        void load(q, filter);
-      } else if (res) setConfirmError("Couldn't revoke guardian access. It is still active.");
-    } catch {
-      setConfirmError("Couldn't reach the server. Guardian access is still active.");
+      await api.delete(`/patients/${drawerPatient.id}/guardian`);
+      revoked = true;
+    } catch (e) {
+      setConfirmError(e instanceof ApiError ? "Couldn't revoke guardian access. It is still active." : "Couldn't reach the server. Guardian access is still active.");
     } finally {
       setConfirmBusy(false);
     }
+    if (!revoked) return;
+    setConfirmGuardian(false);
+    void load(q, filter);
+    await refreshPatient(drawerPatient.id);
   }
 
   async function resolveCondition(id: string) {
     if (!drawerPatient) return;
-    setActionError(null);
+    fe.clear();
     try {
-      const res = await authedFetch(`/clinical/conditions/${id}/resolve`, { method: "PATCH" });
-      if (res?.ok) {
-        refreshConditions(drawerPatient.id);
-        const pRes = await authedFetch(`/patients/${drawerPatient.id}`);
-        if (pRes?.ok) setDrawerPatient(await pRes.json());
-        void load(q, filter); // Follow-up due flag/count may have changed
-      } else if (res) setActionError("Couldn't resolve the condition. It is still active.");
-    } catch {
-      setActionError("Couldn't reach the server. The condition is still active.");
+      await api.patch(`/clinical/conditions/${id}/resolve`);
+    } catch (e) {
+      fe.set(e instanceof ApiError ? "Couldn't resolve the condition. It is still active." : "Couldn't reach the server. The condition is still active.");
+      return;
     }
+    void refreshConditions(drawerPatient.id);
+    void load(q, filter); // Follow-up due flag/count may have changed
+    await refreshPatient(drawerPatient.id);
   }
 
   async function setToothStatus(toothNumber: number, status: string) {
     if (!drawerPatient) return;
     setChartBusy(toothNumber);
     try {
-      const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/${toothNumber}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
-      if (res?.ok) {
-        const updated: Tooth = await res.json();
-        setChart((prev) => [...prev.filter((t) => !(t.toothNumber === toothNumber && !t.isSupernumerary)), updated]);
-      }
+      const updated = await api.patch<Tooth>(`/specialty/dental/patients/${drawerPatient.id}/chart/${toothNumber}`, { status });
+      setChart((prev) => [...prev.filter((t) => !(t.toothNumber === toothNumber && !t.isSupernumerary)), updated]);
+    } catch (e) {
+      fe.set(failText(e, "Couldn't update the tooth. It is unchanged."));
     } finally {
       setChartBusy(null);
     }
@@ -626,15 +550,11 @@ function PatientsList() {
     if (!drawerPatient) return;
     setSupernumeraryBusy("new");
     try {
-      const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary`, {
-        method: "POST",
-        body: JSON.stringify(newSupernumerary),
-      });
-      if (res?.ok) {
-        const added: Tooth = await res.json();
-        setChart((prev) => [...prev, added]);
-        setNewSupernumerary({ nearToothNumber: 11, status: "healthy", note: "" });
-      }
+      const added = await api.post<Tooth>(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary`, newSupernumerary);
+      setChart((prev) => [...prev, added]);
+      setNewSupernumerary({ nearToothNumber: 11, status: "healthy", note: "" });
+    } catch (e) {
+      fe.set(failText(e, "Couldn't add the tooth. It has NOT been recorded."));
     } finally {
       setSupernumeraryBusy(null);
     }
@@ -644,14 +564,10 @@ function PatientsList() {
     if (!drawerPatient) return;
     setSupernumeraryBusy(id);
     try {
-      const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
-      if (res?.ok) {
-        const updated: Tooth = await res.json();
-        setChart((prev) => prev.map((t) => (t.id === id ? updated : t)));
-      }
+      const updated = await api.patch<Tooth>(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary/${id}`, { status });
+      setChart((prev) => prev.map((t) => (t.id === id ? updated : t)));
+    } catch (e) {
+      fe.set(failText(e, "Couldn't update the tooth. It is unchanged."));
     } finally {
       setSupernumeraryBusy(null);
     }
@@ -661,10 +577,10 @@ function PatientsList() {
     if (!drawerPatient) return;
     setSupernumeraryBusy(id);
     try {
-      const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary/${id}`, {
-        method: "DELETE",
-      });
-      if (res?.ok) setChart((prev) => prev.filter((t) => t.id !== id));
+      await api.delete(`/specialty/dental/patients/${drawerPatient.id}/chart/supernumerary/${id}`);
+      setChart((prev) => prev.filter((t) => t.id !== id));
+    } catch (e) {
+      fe.set(failText(e, "Couldn't remove the tooth. It is still on the chart."));
     } finally {
       setSupernumeraryBusy(null);
     }
@@ -674,8 +590,9 @@ function PatientsList() {
     if (!drawerPatient) return;
     setHistoryToothId(id);
     setHistoryEntries([]);
-    const res = await authedFetch(`/specialty/dental/patients/${drawerPatient.id}/chart/entries/${id}/history`);
-    if (res?.ok) setHistoryEntries(await res.json());
+    try {
+      setHistoryEntries(await api.get<ToothHistoryEntry[]>(`/specialty/dental/patients/${drawerPatient.id}/chart/entries/${id}/history`));
+    } catch { /* the history panel stays empty */ }
   }
 
   return (
@@ -723,7 +640,7 @@ function PatientsList() {
 
       {flash && <div className={styles.flash} role="status">{flash}</div>}
 
-      {!forbidden && <GuardianReviews authedFetch={authedFetch} canAct={patientsEdit} onOpen={(id) => void openDrawer(id)} onChanged={() => void load(q, filter)} />}
+      {!forbidden && <GuardianReviews canAct={patientsEdit} onOpen={(id) => void openDrawer(id)} onChanged={() => void load(q, filter)} />}
 
       <div className={styles.card}>
         {loading ? (
@@ -797,14 +714,14 @@ function PatientsList() {
           onDone={(token) => { setFlash(`${checkInFor.name} checked in · T-${token}`); setCheckInFor(null); void load(q, filter); }} />
       )}
       {fixingPhones && (
-        <PhoneDataQuality authedFetch={authedFetch} onClose={() => setFixingPhones(false)}
+        <PhoneDataQuality onClose={() => setFixingPhones(false)}
           onFixed={() => { setFlash("Mobile number corrected."); void load(q, filter); }} />
       )}
       {reviewingDuplicates && (
         <DuplicateSuggestions authedFetch={authedFetch} onClose={() => setReviewingDuplicates(false)} onChanged={() => void load(q, filter)} />
       )}
       {registering && (
-        <RegisterDialog authedFetch={authedFetch} onClose={() => setRegistering(false)}
+        <RegisterDialog onClose={() => setRegistering(false)}
           onRegistered={(id) => { setRegistering(false); setFlash("Patient registered."); void load(q, filter); void openDrawer(id); }}
           onOpenExisting={(id) => { setRegistering(false); void openDrawer(id); }} />
       )}
@@ -946,7 +863,7 @@ function PatientsList() {
                 </>
               ) : (
                 <>
-                  {actionError && <div className={styles.errorInline} role="alert">{actionError}</div>}
+                  <ErrorSummary fe={fe} className={styles.errorInline} />
                   {/* Never assert "no known allergies" for a role that can't see the allergy data. */}
                   {(() => {
                     const names = [...new Set([...drawerPatient.allergies, ...allergies.filter((x) => x.active).map((x) => x.substance)])];
@@ -1046,10 +963,12 @@ function PatientsList() {
                         )}
                         {clinicalEdit && (
                           <div className={styles.allergyForm}>
-                            <input className={styles.smallInput} aria-label="Condition" placeholder="Condition" value={newCondition.condition}
-                              onChange={(e) => setNewCondition((p) => ({ ...p, condition: e.target.value }))} />
-                            <input className={styles.smallInput} aria-label="Review due date" type="date" value={newCondition.reviewDueDate}
-                              onChange={(e) => setNewCondition((p) => ({ ...p, reviewDueDate: e.target.value }))} />
+                            <input className={styles.smallInput} aria-label="Condition" placeholder="Condition" value={newCondition.condition} {...fe.attrs("condition")}
+                              onChange={(e) => { fe.clearField("condition"); setNewCondition((p) => ({ ...p, condition: e.target.value })); }} />
+                            <FieldError fe={fe} name="condition" className={styles.errorInline} />
+                            <input className={styles.smallInput} aria-label="Review due date" type="date" value={newCondition.reviewDueDate} {...fe.attrs("reviewDueDate")}
+                              onChange={(e) => { fe.clearField("reviewDueDate"); setNewCondition((p) => ({ ...p, reviewDueDate: e.target.value })); }} />
+                            <FieldError fe={fe} name="reviewDueDate" className={styles.errorInline} />
                             <button className={styles.linkBtn} disabled={conditionBusy || !newCondition.condition.trim()} onClick={addCondition}>Add</button>
                           </div>
                         )}
@@ -1082,17 +1001,19 @@ function PatientsList() {
                               <option value="">Category (optional)</option>
                               {ALLERGY_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
                             </select>
-                            <input className={styles.smallInput} aria-label="Substance" placeholder="Substance" value={newAllergy.substance}
-                              onChange={(e) => setNewAllergy((p) => ({ ...p, substance: e.target.value }))} />
-                            <select className={styles.smallInput} aria-label="Severity" value={newAllergy.severity}
-                              onChange={(e) => setNewAllergy((p) => ({ ...p, severity: e.target.value }))}>
+                            <input className={styles.smallInput} aria-label="Substance" placeholder="Substance" value={newAllergy.substance} {...fe.attrs("substance")}
+                              onChange={(e) => { fe.clearField("substance"); setNewAllergy((p) => ({ ...p, substance: e.target.value })); }} />
+                            <FieldError fe={fe} name="substance" className={styles.errorInline} />
+                            <select className={styles.smallInput} aria-label="Severity" value={newAllergy.severity} {...fe.attrs("severity")}
+                              onChange={(e) => { fe.clearField("severity"); setNewAllergy((p) => ({ ...p, severity: e.target.value })); }}>
                               <option value="" disabled>Severity…</option>
                               <option value="mild">mild</option>
                               <option value="moderate">moderate</option>
                               <option value="severe">severe</option>
                             </select>
-                            <input className={styles.smallInput} aria-label="Reaction" placeholder="Reaction (optional)" value={newAllergy.reaction}
-                              onChange={(e) => setNewAllergy((p) => ({ ...p, reaction: e.target.value }))} />
+                            <input className={styles.smallInput} aria-label="Reaction" placeholder="Reaction (optional)" value={newAllergy.reaction} {...fe.attrs("reaction")}
+                              onChange={(e) => { fe.clearField("reaction"); setNewAllergy((p) => ({ ...p, reaction: e.target.value })); }} />
+                            <FieldError fe={fe} name="reaction" className={styles.errorInline} />
                             <button className={styles.linkBtn} disabled={allergyBusy || !newAllergy.substance.trim() || !newAllergy.severity} onClick={addAllergy}>Add</button>
                           </div>
                         )}

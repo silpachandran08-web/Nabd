@@ -1,5 +1,6 @@
 package com.nabd.hms.patient.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -21,6 +22,7 @@ public record PatientRegistryResponse(int total, Map<String, Integer> counts, Li
      * tags: which filters this patient falls under (recent, followup, package, balance, duplicate,
      * archived). nextAppointmentToday/Id/DoctorId let Check in attach to today's booking.
      */
+    @Schema(name = "PatientRegistryRow")
     public record Row(UUID id, String mrn, String name, String phone, int age, String gender, boolean minor,
                       LocalDate lastVisit, Instant nextAppointment, String nextDoctorName, UUID nextDoctorId,
                       UUID nextAppointmentId, boolean nextAppointmentToday,

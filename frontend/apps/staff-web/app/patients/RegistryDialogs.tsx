@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./patients.module.css";
 import StatusPill from "../components/ui/StatusPill";
-import { fingerprint, submitKeyed } from "../lib/idempotency";
-import type { Problem } from "@nabd/api-client/types";
+import { api, ApiError, intentKeys } from "../lib/api";
+import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
+import type { PatientPage } from "@nabd/api-client/generated";
+import type { DuplicateCandidate } from "@nabd/api-client/types";
 import { age } from "@nabd/domain";
 import { clinicToday } from "../lib/clinicTime";
 
-type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
-type Candidate = { patientId: string; name: string; phone: string; matchScore: number };
+type Candidate = DuplicateCandidate;
 
 // PatientMatchCandidateResponse.matchScore is a 0-1 fraction (1.0 = exact phone match, else name similarity).
 function formatScore(score: number): string {
@@ -29,19 +30,18 @@ function useEscape(onClose: () => void) {
   }, [onClose]);
 }
 
-/** ACC-028: the server's field error for the phone (it names the clinic country), shown under the input. */
-export function phoneFieldError(p: Problem | null): string | null {
-  const e = p?.errors?.find((x) => x.field === "phone");
-  return e ? `Mobile ${e.message}.` : null;
-}
+/** ACC-028: the server's field error for the phone names the clinic country; it reads "Mobile <message>." under the input. */
+export const phoneFieldText = (message: string) => `Mobile ${message}.`;
+
+const REGISTER_LABELS = { name: "Full name", phone: "Mobile", gender: "Sex", address: "Address", nationalId: "National ID", guardianId: "Guardian" };
 
 /**
  * Register patient (POST /v1/patients). A minor needs a guardian (NB-080). If the server finds
  * likely existing records (409), they're shown first; "Different person" re-sends with
  * confirmedNotDuplicate, and the record then shows under Duplicate review unless it's family.
  */
-export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExisting }: {
-  authedFetch: AuthedFetch; onClose: () => void; onRegistered: (id: string) => void; onOpenExisting: (id: string) => void;
+export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
+  onClose: () => void; onRegistered: (id: string) => void; onOpenExisting: (id: string) => void;
 }) {
   const [form, setForm] = useState({ name: "", phone: "", dob: "", gender: "", address: "", nationalId: "" });
   const [guardianQuery, setGuardianQuery] = useState("");
@@ -50,9 +50,9 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [consent, setConsent] = useState(false);
   const [channel, setChannel] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const fe = useFormErrors("reg", REGISTER_LABELS);
   const [saving, setSaving] = useState(false);
+  const keys = useRef(intentKeys()); // one Idempotency-Key per registration intent, reused when the same request is re-sent
   useEscape(onClose);
 
   const minor = !!form.dob && age(form.dob, clinicToday()) < 18;
@@ -65,44 +65,37 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
         if (!cancelled) setGuardianResults([]);
         return;
       }
-      const res = await authedFetch(`/patients?q=${encodeURIComponent(q)}&limit=6`);
-      if (cancelled || !res?.ok) return;
-      const page: { data: { id: string; name: string; phone: string }[] } = await res.json();
-      if (!cancelled) setGuardianResults(page.data);
+      try {
+        const page = await api.get<PatientPage>(`/patients?q=${encodeURIComponent(q)}&limit=6`);
+        if (!cancelled) setGuardianResults((page.data ?? []) as { id: string; name: string; phone: string }[]);
+      } catch { /* the list stays empty; typing again retries */ }
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [guardianQuery, authedFetch]);
+  }, [guardianQuery]);
 
   async function send(confirmed: boolean) {
+    if (saving) return;
     setSaving(true);
-    setError(null);
+    fe.clear();
+    const body = {
+      name: form.name.trim(), phone: form.phone.trim(), dob: form.dob, gender: form.gender,
+      address: form.address.trim() || null, ...(form.nationalId.trim() ? { nationalId: form.nationalId.trim() } : {}), guardianId: minor ? guardian?.id ?? null : null,
+      ...(minor && guardian ? { guardianConsent: { confirmed: true, channel } } : {}),
+      ...(confirmed ? { confirmedNotDuplicate: true } : {}),
+    };
     try {
-      const body = {
-        name: form.name.trim(), phone: form.phone.trim(), dob: form.dob, gender: form.gender,
-        address: form.address.trim() || null, ...(form.nationalId.trim() ? { nationalId: form.nationalId.trim() } : {}), guardianId: minor ? guardian?.id ?? null : null,
-        ...(minor && guardian ? { guardianConsent: { confirmed: true, channel } } : {}),
-        ...(confirmed ? { confirmedNotDuplicate: true } : {}),
-      };
-      const res = await submitKeyed(authedFetch, "/patients", body, `reg.${fingerprint(JSON.stringify(body))}`);
-      if (!res) return;
-      if (res.status === 409) {
-        const dup: { candidates: Candidate[] } = await res.json();
-        setCandidates(dup.candidates);
-        return;
-      }
-      if (!res.ok) {
-        const p: Problem | null = await res.json().catch(() => null);
-        const fieldErr = res.status === 400 ? phoneFieldError(p) : null;
-        if (fieldErr) {
-          setCandidates(null);
-          setPhoneError(fieldErr);
-        } else setError(p?.detail || p?.title || "Couldn't register the patient.");
-        return;
-      }
-      const created: { id: string } = await res.json();
+      const created = await api.post<{ id: string }>("/patients", body, { idempotencyKey: keys.current.get("register", body) });
+      keys.current.done("register");
       onRegistered(created.id);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && Array.isArray(e.problem.candidates)) {
+        setCandidates(e.problem.candidates as Candidate[]); // a definitive answer: the next send is a new intent
+        keys.current.done("register");
+      } else {
+        if (e instanceof ApiError && e.status === 400 && e.errors.length) setCandidates(null);
+        if (e instanceof ApiError && e.status >= 500) fe.set(e.detail || e.title || "Couldn't register the patient."); // front desk reads the server's reason here
+        else fe.fail(e, "Couldn't register the patient.");
+      }
     } finally {
       setSaving(false);
     }
@@ -125,7 +118,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
                 <button type="button" className={styles.secondaryBtn} onClick={() => onOpenExisting(c.patientId)}>Open</button>
               </div>
             ))}
-            {error && <div className={styles.errorState} role="alert">{error}</div>}
+            <ErrorSummary fe={fe} className={styles.errorState} />
             <div className={styles.dialogActions}>
               <button type="button" className={styles.secondaryBtn} onClick={() => setCandidates(null)}>Back</button>
               <button type="button" className={styles.primaryBtn} disabled={saving} onClick={() => void send(true)}>
@@ -136,33 +129,37 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
         ) : (
           <>
             <label className={styles.fieldLabel} htmlFor="reg-name">Full name</label>
-            <input id="reg-name" className={styles.input} value={form.name} autoFocus onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input id="reg-name" className={styles.input} value={form.name} autoFocus {...fe.attrs("name")} onChange={(e) => { fe.clearField("name"); setForm({ ...form, name: e.target.value }); }} />
+            <FieldError fe={fe} name="name" className={styles.errorInline} />
             <label className={styles.fieldLabel} htmlFor="reg-phone">Mobile</label>
             <input id="reg-phone" className={styles.input} value={form.phone} inputMode="tel" placeholder="+91 98765 43210"
-              aria-invalid={phoneError ? true : undefined} aria-describedby={phoneError ? "reg-phone-error" : undefined}
-              onChange={(e) => { setForm({ ...form, phone: e.target.value }); setPhoneError(null); }} />
-            {phoneError && <div id="reg-phone-error" className={styles.errorInline} role="alert">{phoneError}</div>}
+              {...fe.attrs("phone")}
+              onChange={(e) => { setForm({ ...form, phone: e.target.value }); fe.clearField("phone"); }} />
+            <FieldError fe={fe} name="phone" className={styles.errorInline} text={phoneFieldText} />
             <div className={styles.fieldRow}>
               <div>
                 <label className={styles.fieldLabel} htmlFor="reg-dob">Date of birth</label>
-                <input id="reg-dob" type="date" className={styles.input} value={form.dob} max={new Date().toLocaleDateString("en-CA")}
-                  onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+                <input id="reg-dob" type="date" className={styles.input} value={form.dob} max={new Date().toLocaleDateString("en-CA")} {...fe.attrs("dob")}
+                  onChange={(e) => { fe.clearField("dob"); setForm({ ...form, dob: e.target.value }); }} />
+                <FieldError fe={fe} name="dob" className={styles.errorInline} />
               </div>
               <div>
                 <label className={styles.fieldLabel} htmlFor="reg-gender">Sex</label>
-                <select id="reg-gender" className={styles.input} value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+                <select id="reg-gender" className={styles.input} value={form.gender} {...fe.attrs("gender")} onChange={(e) => { fe.clearField("gender"); setForm({ ...form, gender: e.target.value }); }}>
                   <option value="">Choose</option>
                   <option value="female">Female</option>
                   <option value="male">Male</option>
                   <option value="other">Other</option>
                 </select>
+                <FieldError fe={fe} name="gender" className={styles.errorInline} />
               </div>
             </div>
             <label className={styles.fieldLabel} htmlFor="reg-address">Address (optional)</label>
             <input id="reg-address" className={styles.input} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
             {/* shortcut: no format check (Aadhaar/Iqama rules are not in the contract), when the clinic region rules are agreed. Write-only: the API never returns it. */}
             <label className={styles.fieldLabel} htmlFor="reg-national-id">National ID, Aadhaar or Iqama (optional)</label>
-            <input id="reg-national-id" className={styles.input} value={form.nationalId} autoComplete="off" onChange={(e) => setForm({ ...form, nationalId: e.target.value })} />
+            <input id="reg-national-id" className={styles.input} value={form.nationalId} autoComplete="off" {...fe.attrs("nationalId")} onChange={(e) => { fe.clearField("nationalId"); setForm({ ...form, nationalId: e.target.value }); }} />
+            <FieldError fe={fe} name="nationalId" className={styles.errorInline} />
             {minor && (
               <>
                 <label className={styles.fieldLabel} htmlFor="reg-guardian">Guardian (required for under-18s)</label>
@@ -191,7 +188,7 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
                 )}
               </>
             )}
-            {error && <div className={styles.errorState} role="alert">{error}</div>}
+            <ErrorSummary fe={fe} className={styles.errorState} />
             <div className={styles.dialogActions}>
               <button type="button" className={styles.secondaryBtn} onClick={onClose}>Cancel</button>
               <button type="submit" className={styles.primaryBtn} disabled={saving || !ready}>{saving ? "Registering…" : "Register patient"}</button>

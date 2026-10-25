@@ -10,17 +10,19 @@ import Link from "next/link";
 import Dialog from "../ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
+import { api, ApiError } from "../../lib/api";
+import { ErrorSummary, FieldError, useFormErrors } from "../../lib/formErrors";
+import type { Full } from "../../lib/gen";
+import type { DispensingQueueEntryResponse, DispensingQueueItem, PharmacyItemResponse, PharmacySettingsResponse } from "@nabd/api-client/generated";
 
 // Fed only by /pharmacy/* so a pharmacy-only user never touches /setup/*, and a Setup user without
 // pharmacy:view never sees this tab's 403 as a page-level error (PHA-002). It owns its own loading.
 export type PharmacyMode = "external" | "hybrid" | "in_house";
-type PharmacySettings = { mode: PharmacyMode };
-type PharmacyItem = { id: string; code: string; name: string; isRx: boolean; hsnCode: string | null; price: number; taxRatePercent: number; stockQty: number; active: boolean };
-type DispensingQueueEntry = {
-  prescriptionId: string; queueEntryId: string; token?: string | number | null; patientName: string; doctorName: string; signedAt: string;
-  items: { stockQty?: number | null; drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null }[];
+type PharmacySettings = Omit<Full<PharmacySettingsResponse>, "mode"> & { mode: PharmacyMode };
+type PharmacyItem = Full<PharmacyItemResponse, "hsnCode">;
+type DispensingQueueEntry = Omit<Full<DispensingQueueEntryResponse>, "items" | "token"> & {
+  token?: number | null; items: Full<DispensingQueueItem, "stockQty" | "dosage" | "frequency" | "duration" | "instructions">[];
 };
-type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 
 export const MODE_LABEL: Record<PharmacyMode, string> = { external: "External", hybrid: "Hybrid", in_house: "In-house" };
 export const MODE_DESC: Record<PharmacyMode, string> = {
@@ -38,10 +40,9 @@ const RULES: { label: string; hybrid: boolean; inHouse: boolean }[] = [
   { label: "Stock alerts (not yet available)", hybrid: false, inHouse: false },
 ];
 
-async function problemText(res: Response): Promise<string> {
-  const p = await res.json().catch(() => null);
-  return p?.detail || "Request failed";
-}
+/** The server's reason for a refusal, or the offline line when there was no answer. */
+const problemText = (e: unknown): string =>
+  e instanceof ApiError ? e.detail || "Request failed" : "Couldn't reach the server. Check your connection and try again.";
 
 function Mark({ on }: { on: boolean }) {
   return on
@@ -53,24 +54,25 @@ function Mark({ on }: { on: boolean }) {
 // In-house is Phase 3 and not selectable (the server answers 400 mode-not-available).
 export const MODE_REASON_MIN = 3;
 export const MODE_REASON_MAX = 200;
-export function ModeChangeDialog({ from, to, authedFetch, onClose, onSaved }: {
-  from: PharmacyMode | null; to: PharmacyMode; authedFetch: AuthedFetch; onClose: () => void; onSaved: () => void;
+export function ModeChangeDialog({ from, to, onClose, onSaved }: {
+  from: PharmacyMode | null; to: PharmacyMode; onClose: () => void; onSaved: () => void;
 }) {
   const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const fe = useFormErrors("pm", { reason: "Reason", mode: "Mode" });
   const [busy, setBusy] = useState(false);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const r = reason.trim();
-    if (r.length < MODE_REASON_MIN || r.length > MODE_REASON_MAX) { setError(`A reason is required (${MODE_REASON_MIN}-${MODE_REASON_MAX} characters).`); return; }
+    if (r.length < MODE_REASON_MIN || r.length > MODE_REASON_MAX) { fe.set(`A reason is required (${MODE_REASON_MIN}-${MODE_REASON_MAX} characters).`); return; }
+    if (busy) return;
     setBusy(true);
+    fe.clear();
     try {
-      const res = await authedFetch("/pharmacy/settings", { method: "PATCH", body: JSON.stringify({ mode: to, reason: r }) });
-      if (!res) return;
-      if (!res.ok) { setError(await problemText(res)); return; }
+      await api.patch("/pharmacy/settings", { mode: to, reason: r });
       onSaved();
-    } catch {
-      setError("Couldn't reach the server. Nothing was changed; try again.");
+    } catch (err) {
+      if (err instanceof ApiError) fe.fail(err, "Request failed");
+      else fe.set("Couldn't reach the server. Nothing was changed; try again.");
     } finally {
       setBusy(false);
     }
@@ -88,10 +90,11 @@ export function ModeChangeDialog({ from, to, authedFetch, onClose, onSaved }: {
         <div className={styles.field}>
           <label className={styles.label} htmlFor="pm-reason">Reason (required)</label>
           <input id="pm-reason" className={styles.input} autoFocus minLength={MODE_REASON_MIN} maxLength={MODE_REASON_MAX} required
-            value={reason} onChange={(e) => { setReason(e.target.value); setError(null); }} aria-describedby="pm-reason-hint" />
+            value={reason} {...fe.attrs("reason")} onChange={(e) => { setReason(e.target.value); fe.clear(); }} aria-describedby={fe.fields.reason ? "pm-reason-error pm-reason-hint" : "pm-reason-hint"} />
+          <FieldError fe={fe} name="reason" className={ph.sub} />
           <div id="pm-reason-hint" className={ph.sub}>{MODE_REASON_MIN}-{MODE_REASON_MAX} characters. Recorded in the audit log with the old and new mode.</div>
         </div>
-        {error && <div className={`${ph.notice} ${ph.noticeError}`} role="alert"><Icon name="alert" size={14} /> {error}</div>}
+        <ErrorSummary fe={fe} className={`${ph.notice} ${ph.noticeError}`} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Cancel</button>
           <button type="submit" className={styles.btnPrimary} disabled={busy}>{busy ? "Saving…" : from === "hybrid" ? "Confirm downgrade" : "Confirm switch"}</button>
@@ -123,7 +126,7 @@ export function HardRuleCard() {
   );
 }
 
-export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetch }) {
+export default function PharmacyPanel() {
   const canEdit = can("pharmacy:edit"); // the API gates every write behind pharmacy:edit; pharmacy:view is read-only
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -150,44 +153,43 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
   const reasonRef = useRef<HTMLInputElement>(null);
   const [newItem, setNewItem] = useState<Partial<PharmacyItem>>({ isRx: false, stockQty: 0, taxRatePercent: 0 });
 
+  const afe = useFormErrors("ph", { name: "Name", price: "Price", taxRatePercent: "Tax rate", stockQty: "Stock qty", hsnCode: "HSN code", isRx: "Rx" });
+  const efe = useFormErrors("pe", { name: "Name", price: "Price", taxRatePercent: "Tax rate", hsnCode: "HSN code", isRx: "Rx" });
+  const jfe = useFormErrors("pa", { delta: "Change", setTo: "Counted total", reason: "Reason" });
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    try {
-      type R = { aborted: boolean; error: string | null; data: unknown };
-      const get = async (path: string): Promise<R> => {
-        const res = await authedFetch(path);
-        if (!res) return { aborted: true, error: null, data: null };
-        if (!res.ok) return { aborted: false, error: await problemText(res), data: null };
-        return { aborted: false, error: null, data: await res.json() };
-      };
-      const [s, i, q] = await Promise.all([get("/pharmacy/settings"), get("/pharmacy/items"), get("/pharmacy/dispensing-queue")]);
-      if (s.aborted || i.aborted || q.aborted) return;
-      if (s.error) { setLoadError(s.error); return; }
-      setSettings(s.data as PharmacySettings);
-      if (i.error) { setLoadError(i.error); return; }
-      setItems(i.data as PharmacyItem[]);
-      if (q.error) setQueueError(q.error); else { setQueue(q.data as DispensingQueueEntry[]); setQueueError(null); }
-    } catch {
-      setLoadError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setLoading(false);
+    const [s, i, q] = await Promise.allSettled([
+      api.get<PharmacySettings>("/pharmacy/settings"),
+      api.get<PharmacyItem[]>("/pharmacy/items"),
+      api.get<DispensingQueueEntry[]>("/pharmacy/dispensing-queue"),
+    ]);
+    if (s.status === "rejected") setLoadError(problemText(s.reason));
+    else {
+      setSettings(s.value);
+      if (i.status === "rejected") setLoadError(problemText(i.reason));
+      else {
+        setItems(i.value);
+        if (q.status === "rejected") setQueueError(problemText(q.reason)); else { setQueue(q.value); setQueueError(null); }
+      }
     }
-  }, [authedFetch]);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const send = async (method: "POST" | "PATCH", path: string, body: unknown): Promise<boolean> => {
+  /** A write to /pharmacy/*; a refusal goes to `fe` (field errors beside the inputs) or, with none given, to the page notice. */
+  const send = async (method: "POST" | "PATCH", path: string, body: unknown, fe?: ReturnType<typeof useFormErrors>): Promise<boolean> => {
+    fe?.clear();
     try {
-      const res = await authedFetch(path, { method, body: JSON.stringify(body) });
-      if (!res) return false;
-      if (!res.ok) { setNotice({ text: await problemText(res), error: true }); return false; }
+      await (method === "POST" ? api.post(path, body) : api.patch(path, body));
       return true;
-    } catch {
-      setNotice({ text: "Couldn't reach the server. Check your connection and try again.", error: true });
+    } catch (err) {
+      if (fe) fe.fail(err, "Request failed"); else setNotice({ text: problemText(err), error: true });
       return false;
     }
   };
@@ -221,18 +223,17 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
     if (!delta && qty < 0) { setAdjusting({ ...adjusting, error: "A counted total cannot be negative." }); return; }
     if (delta && adjusting.item.stockQty + qty < 0) { setAdjusting({ ...adjusting, error: `Only ${adjusting.item.stockQty} in stock, so it cannot go down by ${-qty}.` }); return; }
     if (reason.length < 3) { setAdjusting({ ...adjusting, error: "A reason is required (at least 3 characters)." }); reasonRef.current?.focus(); return; }
+    if (adjustBusy) return;
     setAdjustBusy(true);
+    jfe.clear();
     try {
-      const res = await authedFetch(`/pharmacy/items/${adjusting.item.id}/stock-adjustments`, {
-        method: "POST", body: JSON.stringify(delta ? { delta: qty, reason } : { setTo: qty, reason }),
-      });
-      if (!res) return;
-      if (!res.ok) { setAdjusting({ ...adjusting, error: await problemText(res) }); return; }
+      await api.post(`/pharmacy/items/${adjusting.item.id}/stock-adjustments`, delta ? { delta: qty, reason } : { setTo: qty, reason });
       setNotice({ text: `Stock of ${adjusting.item.name} updated.` });
       setAdjusting(null);
       await load(); // the server's count is authoritative: a concurrent sale or second pharmacist shows up here
-    } catch {
-      setAdjusting({ ...adjusting, error: "Couldn't reach the server. Nothing was changed; try again." });
+    } catch (err) {
+      if (err instanceof ApiError) jfe.fail(err, "Request failed");
+      else setAdjusting({ ...adjusting, error: "Couldn't reach the server. Nothing was changed; try again." });
     } finally {
       setAdjustBusy(false);
     }
@@ -261,7 +262,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
     e.preventDefault();
     if (!editing) return;
     if (!editing.name.trim() || !(editing.price >= 0)) return;
-    if (await send("PATCH", `/pharmacy/items/${editing.id}`, itemBody(editing))) {
+    if (await send("PATCH", `/pharmacy/items/${editing.id}`, itemBody(editing), efe)) {
       setNotice({ text: `${editing.name} saved.` });
       setEditing(null);
       await load();
@@ -272,7 +273,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
     e.preventDefault();
     if (!newItem.name || newItem.price == null) return;
     setNotice(null);
-    if (await send("POST", "/pharmacy/items", newItem)) {
+    if (await send("POST", "/pharmacy/items", newItem, afe)) {
       setNotice({ text: `${newItem.name} added.` });
       setNewItem({ isRx: false, stockQty: 0, taxRatePercent: 0 });
       await load();
@@ -323,23 +324,28 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
                 <div className={ph.formRow}>
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor="ph-name">Name</label>
-                    <input id="ph-name" className={styles.input} value={newItem.name ?? ""} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} />
+                    <input id="ph-name" className={styles.input} value={newItem.name ?? ""} {...afe.attrs("name")} onChange={(e) => { afe.clearField("name"); setNewItem({ ...newItem, name: e.target.value }); }} />
+                    <FieldError fe={afe} name="name" className={ph.sub} />
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor="ph-price">Price</label>
-                    <input id="ph-price" className={styles.input} type="number" step="0.01" min="0" value={newItem.price ?? ""} onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })} />
+                    <input id="ph-price" className={styles.input} type="number" step="0.01" min="0" value={newItem.price ?? ""} {...afe.attrs("price")} onChange={(e) => { afe.clearField("price"); setNewItem({ ...newItem, price: Number(e.target.value) }); }} />
+                    <FieldError fe={afe} name="price" className={ph.sub} />
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor="ph-tax">Tax rate %</label>
-                    <input id="ph-tax" className={styles.input} type="number" step="0.01" min="0" value={newItem.taxRatePercent ?? 0} onChange={(e) => setNewItem({ ...newItem, taxRatePercent: Number(e.target.value) })} />
+                    <input id="ph-tax" className={styles.input} type="number" step="0.01" min="0" value={newItem.taxRatePercent ?? 0} {...afe.attrs("taxRatePercent")} onChange={(e) => { afe.clearField("taxRatePercent"); setNewItem({ ...newItem, taxRatePercent: Number(e.target.value) }); }} />
+                    <FieldError fe={afe} name="taxRatePercent" className={ph.sub} />
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor="ph-stock">Stock qty</label>
-                    <input id="ph-stock" className={styles.input} type="number" min="0" value={newItem.stockQty ?? 0} onChange={(e) => setNewItem({ ...newItem, stockQty: Number(e.target.value) })} />
+                    <input id="ph-stock" className={styles.input} type="number" min="0" value={newItem.stockQty ?? 0} {...afe.attrs("stockQty")} onChange={(e) => { afe.clearField("stockQty"); setNewItem({ ...newItem, stockQty: Number(e.target.value) }); }} />
+                    <FieldError fe={afe} name="stockQty" className={ph.sub} />
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor="ph-hsn">HSN code</label>
-                    <input id="ph-hsn" className={styles.input} value={newItem.hsnCode ?? ""} onChange={(e) => setNewItem({ ...newItem, hsnCode: e.target.value })} />
+                    <input id="ph-hsn" className={styles.input} value={newItem.hsnCode ?? ""} {...afe.attrs("hsnCode")} onChange={(e) => { afe.clearField("hsnCode"); setNewItem({ ...newItem, hsnCode: e.target.value }); }} />
+                    <FieldError fe={afe} name="hsnCode" className={ph.sub} />
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label} htmlFor="ph-rx">Rx</label>
@@ -349,6 +355,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
                     </select>
                   </div>
                 </div>
+                <ErrorSummary fe={afe} className={`${ph.notice} ${ph.noticeError}`} />
                 <div className={styles.actions}>
                   <button className={styles.btnPrimary} type="submit">Add item</button>
                 </div>
@@ -445,28 +452,33 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
         </>
       )}
 
-      {switchTo && <ModeChangeDialog from={mode} to={switchTo} authedFetch={authedFetch} onClose={closeSwitch} onSaved={() => void modeSaved()} />}
+      {switchTo && <ModeChangeDialog from={mode} to={switchTo} onClose={closeSwitch} onSaved={() => void modeSaved()} />}
 
       {editing && (
         <Dialog title={`Edit ${editing.name}`} size="drawer" onClose={closeEdit}>
           <form onSubmit={saveEdit}>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-name">Name</label>
-              <input id="pe-name" className={styles.input} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} required />
+              <input id="pe-name" className={styles.input} value={editing.name} {...efe.attrs("name")} onChange={(e) => { efe.clearField("name"); setEditing({ ...editing, name: e.target.value }); }} required />
+              <FieldError fe={efe} name="name" className={ph.sub} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-price">Price</label>
-              <input id="pe-price" className={styles.input} type="number" step="0.01" min="0" value={editing.price} onChange={(e) => setEditing({ ...editing, price: Number(e.target.value) })} required />
+              <input id="pe-price" className={styles.input} type="number" step="0.01" min="0" value={editing.price} {...efe.attrs("price")} onChange={(e) => { efe.clearField("price"); setEditing({ ...editing, price: Number(e.target.value) }); }} required />
+              <FieldError fe={efe} name="price" className={ph.sub} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-tax">Tax rate %</label>
-              <input id="pe-tax" className={styles.input} type="number" step="0.01" min="0" value={editing.taxRatePercent} onChange={(e) => setEditing({ ...editing, taxRatePercent: Number(e.target.value) })} />
+              <input id="pe-tax" className={styles.input} type="number" step="0.01" min="0" value={editing.taxRatePercent} {...efe.attrs("taxRatePercent")} onChange={(e) => { efe.clearField("taxRatePercent"); setEditing({ ...editing, taxRatePercent: Number(e.target.value) }); }} />
+              <FieldError fe={efe} name="taxRatePercent" className={ph.sub} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pe-hsn">HSN code</label>
-              <input id="pe-hsn" className={styles.input} value={editing.hsnCode ?? ""} onChange={(e) => setEditing({ ...editing, hsnCode: e.target.value })} />
+              <input id="pe-hsn" className={styles.input} value={editing.hsnCode ?? ""} {...efe.attrs("hsnCode")} onChange={(e) => { efe.clearField("hsnCode"); setEditing({ ...editing, hsnCode: e.target.value }); }} />
+              <FieldError fe={efe} name="hsnCode" className={ph.sub} />
             </div>
             <label className={ph.check}><input type="checkbox" checked={editing.isRx} onChange={(e) => setEditing({ ...editing, isRx: e.target.checked })} /> Prescription only (Rx)</label>
+            <ErrorSummary fe={efe} className={`${ph.notice} ${ph.noticeError}`} />
             <div className={styles.actions}>
               <button type="button" className={styles.btn} onClick={closeEdit}>Cancel</button>
               <button type="submit" className={styles.btnPrimary}>Save item</button>
@@ -488,13 +500,16 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pa-qty">{adjusting.mode === "delta" ? "Change (negative to remove)" : "Counted total"}</label>
-              <input id="pa-qty" className={styles.input} type="number" step="1" value={adjusting.qty} onChange={(e) => setAdjusting({ ...adjusting, qty: e.target.value, error: null })} required />
+              <input id="pa-qty" className={styles.input} type="number" step="1" value={adjusting.qty} {...jfe.attrs(adjusting.mode === "delta" ? "delta" : "setTo")} onChange={(e) => { jfe.clear(); setAdjusting({ ...adjusting, qty: e.target.value, error: null }); }} required />
+              <FieldError fe={jfe} name={adjusting.mode === "delta" ? "delta" : "setTo"} className={ph.sub} />
             </div>
             <div className={styles.field}>
               <label className={styles.label} htmlFor="pa-reason">Reason (required)</label>
-              <input id="pa-reason" ref={reasonRef} className={styles.input} maxLength={500} placeholder="e.g. Supplier delivery, damaged, stock-take" value={adjusting.reason} onChange={(e) => setAdjusting({ ...adjusting, reason: e.target.value, error: null })} required />
+              <input id="pa-reason" ref={reasonRef} className={styles.input} maxLength={500} placeholder="e.g. Supplier delivery, damaged, stock-take" value={adjusting.reason} {...jfe.attrs("reason")} onChange={(e) => { jfe.clearField("reason"); setAdjusting({ ...adjusting, reason: e.target.value, error: null }); }} required />
+              <FieldError fe={jfe} name="reason" className={ph.sub} />
             </div>
             {adjusting.error && <div className={`${ph.notice} ${ph.noticeError}`} role="alert"><Icon name="alert" size={14} /> {adjusting.error}</div>}
+            <ErrorSummary fe={jfe} className={`${ph.notice} ${ph.noticeError}`} />
             <div className={styles.actions}>
               <button type="button" className={styles.btn} onClick={closeAdjust}>Cancel</button>
               <button type="submit" className={styles.btnPrimary} disabled={adjustBusy}>{adjustBusy ? "Saving…" : "Record change"}</button>

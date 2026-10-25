@@ -1,20 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Dialog from "../components/ui/Dialog";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { clinicTime } from "./NewAppointmentDialog";
 import styles from "./schedule.module.css";
-import type { Problem } from "@nabd/api-client/types";
+import { api, ApiError } from "../lib/api";
+import { key } from "../lib/query";
+import { ErrorSummary, FieldError, failText, useFormErrors } from "../lib/formErrors";
+import { usePatientSearch, type PatientHit } from "../lib/usePatientSearch";
+import type { Full } from "../lib/gen";
+import type { WaitlistEntryResponse } from "@nabd/api-client/generated";
 
 // WaitlistController (/v1/waitlist): GET ?doctorId= (queue:view), POST {doctorId, patientId}
 // (queue:create), POST /{id}/accept (queue:edit), DELETE /{id} (queue:edit). Response = WaitlistEntryResponse.
-type WaitlistEntry = {
-  id: string; doctorId: string; patientId: string; patientName: string; joinedAt: string; status: string;
-  offeredSlotStart: string | null; offerExpiresAt: string | null; bookedAppointmentId: string | null;
-};
-type Patient = { id: string; mrn: string; name: string; phone: string };
+type WaitlistEntry = Full<WaitlistEntryResponse, "offeredSlotStart" | "offerExpiresAt" | "bookedAppointmentId">;
+type Patient = PatientHit;
 
 const STATUS: Record<string, { tone: PillTone; label: string }> = {
   waiting: { tone: "info", label: "Waiting" },
@@ -28,6 +31,19 @@ function remaining(expiresAt: string, now: number): string {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/** FEF-017: the offer countdown. It owns the 1 s tick, so only this cell re-renders each second, not the panel.
+ * When the offer lapses it says so once (`onLapse`), and the panel reloads to show the server's re-offer. */
+export function Countdown({ expiresAt, onLapse, className }: { expiresAt: string; onLapse: () => void; className?: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const lapsed = new Date(expiresAt).getTime() <= now;
+  useEffect(() => { if (lapsed) onLapse(); }, [lapsed, onLapse]);
+  return <span className={className} data-testid="offer-countdown">{remaining(expiresAt, now)} left</span>;
+}
+
 /**
  * Waitlist overlay (wireframe "waitlist", "Offer the freed slot"). The server runs the offer flow:
  * when an appointment is cancelled, WaitlistService offers the freed slot to the doctor's oldest
@@ -36,130 +52,94 @@ function remaining(expiresAt: string, now: number): string {
  * book an open offer once the patient says yes (accept, queue:edit) or remove an entry (queue:edit).
  * There is no endpoint to push an offer by hand or send it on WhatsApp, so no such button exists.
  */
-export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch, onClose, onBooked }: {
+export default function WaitlistPanel({ doctors, timezone, canJoin, onClose, onBooked }: {
   doctors: { id: string; name: string }[];
   timezone: string;
   canJoin: boolean;
-  authedFetch: (path: string, init?: RequestInit) => Promise<Response | null>;
   onClose: () => void;
   onBooked: () => void;
 }) {
-  const [entries, setEntries] = useState<WaitlistEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [doctorFilter, setDoctorFilter] = useState("all");
   const [removing, setRemoving] = useState<string | null>(null);
   const [accepting, setAccepting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const fe = useFormErrors("wl", { doctorId: "Doctor", patientId: "Patient" });
   const [notice, setNotice] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const [lapsedIds, setLapsedIds] = useState<ReadonlySet<string>>(new Set());
 
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Patient[]>([]);
+  const { results, empty: noMatch } = usePatientSearch(query, 8);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [joinDoctor, setJoinDoctor] = useState(doctors[0]?.id ?? "");
 
-  const load = useCallback(async () => {
-    try {
-      const res = await Promise.all(doctors.map((d) => authedFetch(`/waitlist?doctorId=${encodeURIComponent(d.id)}`)));
-      if (res.some((r) => !r)) return;
-      if (res.some((r) => !r!.ok)) {
-        setError("Couldn't load the waitlist.");
-        return;
-      }
-      const lists = await Promise.all(res.map((r) => r!.json() as Promise<WaitlistEntry[]>));
-      setEntries(lists.flat().sort((a, b) => a.joinedAt.localeCompare(b.joinedAt)));
-      setNow(Date.now());
-      setError(null);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
-    }
-  }, [authedFetch, doctors]);
-
-  useEffect(() => { void Promise.resolve().then(load); }, [load]);
-
-  // Countdown for open offers; when one lapses, reload so the server's re-offer cascade shows up.
-  const hasOffer = !!entries?.some((e) => e.status === "offered");
-  useEffect(() => {
-    if (!hasOffer) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, [hasOffer]);
-  const lapsed = !!entries?.some((e) => e.status === "offered" && !!e.offerExpiresAt && new Date(e.offerExpiresAt).getTime() <= now);
-  useEffect(() => { if (lapsed) void Promise.resolve().then(load); }, [lapsed, load]);
-
-  // Patient search for the add form, debounced (same endpoint as New appointment).
-  useEffect(() => {
-    const q = query.trim();
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      if (q.length < 2) { if (!cancelled) setResults([]); return; }
-      const res = await authedFetch(`/patients?q=${encodeURIComponent(q)}&limit=8`);
-      if (cancelled || !res?.ok) return;
-      const page: { data: Patient[] } = await res.json();
-      if (!cancelled) setResults(page.data);
-    }, 250);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [query, authedFetch]);
-
-  async function problem(res: Response, fallback: string) {
-    const p: Problem | null = await res.json().catch(() => null);
-    return p?.detail || fallback;
-  }
+  const ids = doctors.map((d) => d.id).join(",");
+  const listQ = useQuery({
+    queryKey: key("waitlist", { doctors: ids }),
+    queryFn: async ({ signal }) => (await Promise.all(doctors.map((d) => api.get<WaitlistEntry[]>(`/waitlist?doctorId=${encodeURIComponent(d.id)}`, { signal }))))
+      .flat().sort((a, b) => a.joinedAt.localeCompare(b.joinedAt)),
+    staleTime: 0,
+  });
+  const entries = listQ.data ?? null;
+  const loadedAt = listQ.dataUpdatedAt;
+  const error = listQ.isError ? (listQ.error instanceof ApiError ? "Couldn't load the waitlist." : "Couldn't reach the server. Check your connection and try again.") : null;
+  const { refetch } = listQ;
+  const load = useCallback(async () => { setLapsedIds(new Set()); await refetch(); }, [refetch]);
+  // An offer that ran out: hide its Book button at once and reload so the server's re-offer cascade shows up.
+  const lapse = useCallback((id: string) => {
+    setLapsedIds((s) => (s.has(id) ? s : new Set(s).add(id)));
+    void refetch();
+  }, [refetch]);
 
   async function join(e: React.FormEvent) {
     e.preventDefault();
-    if (!patient || !joinDoctor) return;
+    if (!patient || !joinDoctor || busy) return;
     setBusy(true);
-    setActionError(null);
+    fe.clear();
+    let added = false;
     try {
-      const res = await authedFetch("/waitlist", { method: "POST", body: JSON.stringify({ doctorId: joinDoctor, patientId: patient.id }) });
-      if (!res) return;
-      if (!res.ok) { setActionError(await problem(res, "Couldn't add to the waitlist.")); return; }
-      setNotice(`${patient.name} added to the waitlist.`);
-      setAdding(false); setPatient(null); setQuery(""); setResults([]);
-      await load();
-    } catch {
-      setActionError("Couldn't reach the server. Check your connection and try again.");
+      await api.post("/waitlist", { doctorId: joinDoctor, patientId: patient.id });
+      added = true;
+    } catch (err) {
+      fe.fail(err, "Couldn't add to the waitlist.");
     } finally {
       setBusy(false);
     }
+    if (!added) return;
+    setNotice(`${patient.name} added to the waitlist.`);
+    setAdding(false); setPatient(null); setQuery("");
+    await load();
   }
 
   async function accept(w: WaitlistEntry) {
+    if (busy) return;
     setBusy(true);
-    setActionError(null);
+    fe.clear();
     try {
-      const res = await authedFetch(`/waitlist/${w.id}/accept`, { method: "POST" });
-      if (!res) return;
+      await api.post(`/waitlist/${w.id}/accept`);
       setAccepting(null);
-      if (!res.ok) {
-        setActionError(await problem(res, "Couldn't book this offer."));
-        await load();
-        return;
-      }
       setNotice(`${w.patientName} booked${w.offeredSlotStart ? ` at ${clinicTime(w.offeredSlotStart, timezone)}` : ""}.`);
       await load();
       onBooked();
-    } catch {
-      setActionError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      setAccepting(null);
+      fe.set(failText(err, "Couldn't book this offer."));
+      await load();
     } finally {
       setBusy(false);
     }
   }
 
   async function remove(id: string) {
+    if (busy) return;
     setBusy(true);
-    setActionError(null);
+    fe.clear();
     try {
-      const res = await authedFetch(`/waitlist/${id}`, { method: "DELETE" });
-      if (!res) return;
-      if (!res.ok) { setActionError(await problem(res, "Couldn't remove this entry. Try again.")); return; }
+      await api.delete(`/waitlist/${id}`);
       setRemoving(null);
       await load();
-    } catch {
-      setActionError("Couldn't reach the server. Check your connection and try again.");
+    } catch (err) {
+      fe.set(failText(err, "Couldn't remove this entry. Try again."));
     } finally {
       setBusy(false);
     }
@@ -188,7 +168,7 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
           {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
         {canJoin && !adding && (
-          <button type="button" className={styles.btnPrimary} onClick={() => { setActionError(null); setNotice(null); setAdding(true); }}>
+          <button type="button" className={styles.btnPrimary} onClick={() => { fe.clear(); setNotice(null); setAdding(true); }}>
             + Add to waitlist
           </button>
         )}
@@ -223,7 +203,7 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
                     ))}
                   </div>
                 )}
-                {query.trim().length >= 2 && results.length === 0 && (
+                {noMatch && (
                   <div className={styles.resultSub}>No matching patients — register them from Live Queue first.</div>
                 )}
               </>
@@ -231,9 +211,11 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
           </div>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="wl-doctor">Doctor</label>
-            <select id="wl-doctor" className={styles.input} value={joinDoctor} onChange={(e) => setJoinDoctor(e.target.value)}>
+            <select id="wl-doctor" className={styles.input} value={joinDoctor} {...fe.attrs("doctorId")} onChange={(e) => { fe.clearField("doctorId"); setJoinDoctor(e.target.value); }}>
               {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
+            <FieldError fe={fe} name="doctorId" className={styles.resultSub} />
+            <FieldError fe={fe} name="patientId" className={styles.resultSub} />
           </div>
           <div className={styles.actions}>
             <button type="button" className={styles.btn} onClick={() => setAdding(false)}>Cancel</button>
@@ -243,9 +225,9 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
       )}
 
       {notice && <div className={styles.resultSub} role="status">{notice}</div>}
-      {actionError && <div className={styles.error} role="alert">{actionError}</div>}
+      <ErrorSummary fe={fe} className={styles.error} />
 
-      {error ? <ErrorState message={error} onRetry={() => { setError(null); void load(); }} />
+      {error ? <ErrorState message={error} onRetry={() => void load()} />
         : !entries ? <Skeleton rows={4} label="Loading waitlist" />
         : shown.length === 0 ? <EmptyState title="Nobody is on the waitlist" hint="Patients waiting for an earlier slot appear here." icon="list" />
         : (
@@ -254,7 +236,7 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
               const doctor = doctors.find((d) => d.id === w.doctorId)?.name;
               const st = STATUS[w.status] ?? { tone: "neutral" as const, label: w.status.replace(/_/g, " ") };
               const p = priority.get(w.id);
-              const offerOpen = w.status === "offered" && !!w.offerExpiresAt && new Date(w.offerExpiresAt).getTime() > now;
+              const offerOpen = w.status === "offered" && !!w.offerExpiresAt && new Date(w.offerExpiresAt).getTime() > loadedAt && !lapsedIds.has(w.id);
               const active = w.status === "waiting" || w.status === "offered";
               const sub = [
                 p && `Priority ${p}`,
@@ -269,7 +251,7 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
                     <span className={styles.resultSub}>{sub}</span>
                     <span style={{ display: "inline-flex", gap: "var(--nb-space-8)", alignItems: "center" }}>
                       <StatusPill tone={st.tone} label={st.label} />
-                      {offerOpen && <span className={styles.resultSub}>{remaining(w.offerExpiresAt!, now)} left</span>}
+                      {offerOpen && <Countdown expiresAt={w.offerExpiresAt!} className={styles.resultSub} onLapse={() => lapse(w.id)} />}
                     </span>
                   </div>
                   {removing === w.id ? (
@@ -289,11 +271,11 @@ export default function WaitlistPanel({ doctors, timezone, canJoin, authedFetch,
                   ) : active ? (
                     <div className={styles.waitConfirm}>
                       {offerOpen && (
-                        <button type="button" className={styles.btnPrimary} onClick={() => { setActionError(null); setRemoving(null); setAccepting(w.id); }}>
+                        <button type="button" className={styles.btnPrimary} onClick={() => { fe.clear(); setRemoving(null); setAccepting(w.id); }}>
                           Book offered slot
                         </button>
                       )}
-                      <button type="button" className={styles.btn} onClick={() => { setActionError(null); setAccepting(null); setRemoving(w.id); }}>Remove</button>
+                      <button type="button" className={styles.btn} onClick={() => { fe.clear(); setAccepting(null); setRemoving(w.id); }}>Remove</button>
                     </div>
                   ) : null}
                 </li>

@@ -1,41 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import styles from "./billing.module.css";
 import { getIdentity, getPermissions } from "../lib/session";
 import { can } from "../lib/permissions";
 import Icon, { type IconName } from "../components/ui/Icon";
 import { isKsa, paymentMethodLabel } from "@nabd/domain";
-import { apiFetch, goLogin } from "../lib/apiClient";
-import type { Problem } from "@nabd/api-client/types";
+import { api, ApiError } from "../lib/api";
+import { getter, key } from "../lib/query";
+import { useHasMounted } from "../lib/useHasMounted";
+import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
+import type { Full } from "../lib/gen";
+import type { Close as GClose, DayCloseHistoryItem, DayCloseSummaryResponse, Method as GMethod, Outstanding as GOutstanding, TaxBand as GTaxBand, Totals as GTotals, Unbilled as GUnbilled } from "@nabd/api-client/generated";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
-// Matches GET /v1/billing/day-close (DayCloseController → DayCloseSummaryResponse).
-type Summary = {
-  date: string; today: boolean; currency: string; taxLabel: string; cashTolerance: number;
-  totals: { billed: number; bills: number; collected: number; payments: number; tax: number };
-  methods: { method: "cash" | "card" | "upi" | "other"; amount: number; transactions: number }[];
-  outstanding: { amount: number; patients: number; bills: number };
-  pendingCheckouts: number;
-  unbilled: { queueEntryId: string; token: number; patientName: string; doctorName: string | null; endedAt: string }[];
-  taxBands: { ratePercent: number; taxable: number; tax: number }[];
-  splitPaymentBills: number;
-  // OWN-019 (S7 contract): invoices voided that day; optional so an older backend still renders "—".
-  voidedCount?: number | null; voidedTotal?: number | null;
-  close: {
-    status: "closed" | "reopened"; expectedCash: number; countedCash: number; variance: number; note: string | null;
-    closedByName: string; closedAt: string; reopenedByName: string | null; reopenedAt: string | null; reopenReason: string | null;
-    closeCount?: number; // FIN-005
-  } | null;
+// GET /v1/billing/day-close (DayCloseController → DayCloseSummaryResponse), with the always-sent fields marked present.
+type Summary = Omit<Full<DayCloseSummaryResponse, "close" | "voidedCount" | "voidedTotal">, "totals" | "methods" | "outstanding" | "unbilled" | "taxBands" | "close"> & {
+  totals: Full<GTotals>; methods: Full<GMethod>[]; outstanding: Full<GOutstanding>; unbilled: Full<GUnbilled, "doctorName">[]; taxBands: Full<GTaxBand>[];
+  close: Full<GClose, "note" | "reopenedByName" | "reopenedAt" | "reopenReason"> | null;
 };
 // FIN-005: GET /v1/billing/day-close/history — every close and reopen, newest first.
-type HistoryItem = {
-  id: string; date: string; action: "close" | "reopen"; expectedCash: number | null; countedCash: number | null;
-  variance: number | null; note: string | null; actorName: string | null; at: string;
-};
+type HistoryItem = Full<DayCloseHistoryItem, "expectedCash" | "countedCash" | "variance" | "note" | "actorName">;
 
 // The wireframe's unlock reasons; "Other" takes free text.
 const REOPEN_REASONS = ["Missing bill found afterwards", "Cash count entered incorrectly", "Payment method recorded wrongly"];
@@ -48,103 +34,56 @@ function formatDate(iso: string): string {
 const time = (instant: string) => new Date(instant).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 export default function BillingPage() {
-  const router = useRouter();
-  const [s, setS] = useState<Summary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [forbidden, setForbidden] = useState(false);
-  const [canApprove, setCanApprove] = useState(false);
-  const [canSetup, setCanSetup] = useState(false);
-  const [canOtc, setCanOtc] = useState(false); // PHA-010: counter sale entry, absent unless allowed
-  const [region, setRegion] = useState<string | undefined>(undefined);
+  const qc = useQueryClient();
+  const mounted = useHasMounted(); // permissions live in the browser: role-dependent controls wait for hydration
   const [counted, setCounted] = useState(""); // cash counted, as typed
   const [dialog, setDialog] = useState<"close" | "reopen" | null>(null);
   const [day, setDay] = useState<string | null>(null); // FIN-005: picked past day; null = today
   const [todayIso, setTodayIso] = useState<string | null>(null);
-  const [history, setHistory] = useState<HistoryItem[] | null>(null);
-  const [historyError, setHistoryError] = useState(false);
+  const canApprove = mounted && getPermissions().includes("billing:approve");
+  const canSetup = mounted && can("setup:view");
+  const region = mounted ? getIdentity()?.tenantRegion : undefined;
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  // PHA-010: counter sales exist only in hybrid/in_house pharmacy mode and need billing:create.
+  // otc-charges needs only billing:view and returns 409 in external mode, so a 200 means counter sales
+  // are available (no pharmacy:view needed). Any failure leaves the button absent.
+  const otcQ = useQuery({ queryKey: key("otc-available"), queryFn: getter<unknown>("/billing/otc-charges"), enabled: mounted && can("billing:create") && can("billing:view"), staleTime: 60_000 });
+  const canOtc = otcQ.isSuccess;
 
-  const loadHistory = useCallback(async (date: string) => {
-    setHistory(null);
-    setHistoryError(false);
-    try {
-      const res = await authedFetch(`/billing/day-close/history?from=${date}&to=${date}`);
-      if (!res) return;
-      if (!res.ok) { setHistoryError(true); return; }
-      setHistory((await res.json()).items ?? []);
-    } catch {
-      setHistoryError(true);
-    }
-  }, [authedFetch]);
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      setCanApprove(getPermissions().includes("billing:approve"));
-      setCanSetup(can("setup:view"));
-      setRegion(getIdentity()?.tenantRegion);
-      // PHA-010: counter sales exist only in hybrid/in_house pharmacy mode and need billing:create.
-      // otc-charges needs only billing:view and returns 409 in external mode, so a 200 means counter sales
-      // are available (no pharmacy:view needed). Any failure leaves the button absent.
-      if (can("billing:create") && can("billing:view")) {
-        void authedFetch("/billing/otc-charges").then((r) => setCanOtc(!!r?.ok)).catch(() => {});
-      }
-      const res = await authedFetch(day ? `/billing/day-close?date=${day}` : "/billing/day-close");
-      if (!res) return;
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load today's billing. Try again.");
-        return;
-      }
-      const summary = await res.json();
-      setS(summary);
-      if (summary.today) setTodayIso(summary.date);
-      void loadHistory(summary.date);
-      // The owner top bar's "Start day close" lands here with ?action=close.
-      if (new URLSearchParams(window.location.search).get("action") === "close"
-        && getPermissions().includes("billing:approve") && summary.today && summary.close?.status !== "closed") {
-        setDialog("close");
-      }
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
-    }
-  }, [authedFetch, day, loadHistory]);
-
+  const summaryKey = key("day-close", { day: day ?? "today" });
+  const sumQ = useQuery({ queryKey: summaryKey, queryFn: getter<Summary>(day ? `/billing/day-close?date=${day}` : "/billing/day-close"), placeholderData: keepPreviousData });
+  const s = sumQ.data ?? null;
+  const histQ = useQuery({ queryKey: key("day-close-history", { date: s?.date }), queryFn: getter<{ items?: HistoryItem[] }>(`/billing/day-close/history?from=${s?.date}&to=${s?.date}`), enabled: !!s });
+  const history = histQ.data ? histQ.data.items ?? [] : null;
+  const historyError = histQ.isError;
+  const forbidden = sumQ.error instanceof ApiError && sumQ.error.status === 403;
+  const error = !sumQ.error || forbidden ? null : sumQ.error instanceof ApiError ? "Couldn't load today's billing. Try again." : "Couldn't reach the server. Check your connection and try again.";
+  const sToday = s?.today ? s.date : null;
   useEffect(() => {
-    // Deferred to a microtask so the effect body never calls setState synchronously
-    // (react-hooks/set-state-in-effect) — same as the other clinic pages.
-    void Promise.resolve().then(load);
-  }, [load]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- remembers the clinic's today (the date picker's max) once a "today" summary has loaded
+    if (sToday) setTodayIso(sToday);
+  }, [sToday]);
+  // The owner top bar's "Start day close" lands here with ?action=close; once, when the first summary arrives.
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (!s || autoOpened.current) return;
+    autoOpened.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-shot URL signal, consumed once
+    if (new URLSearchParams(window.location.search).get("action") === "close" && canApprove && s.today && s.close?.status !== "closed") setDialog("close");
+  }, [s, canApprove]);
+  /** A close or unlock answered with the new summary: show it and re-read the history. */
+  const applied = (next: Summary) => {
+    qc.setQueryData(summaryKey, next);
+    void qc.invalidateQueries({ queryKey: key("day-close-history", { date: next.date }) });
+    setDialog(null);
+  };
 
   if (forbidden) return <main className={styles.page}><p className={styles.state}>You don&apos;t have access to billing.</p></main>;
   if (error && !s) return <main className={styles.page}><div className={styles.error} role="alert">{error}</div></main>;
   if (!s) return <main className={styles.page}><p className={styles.state}>Loading…</p></main>;
 
   const money = new Intl.NumberFormat(s.currency === "SAR" ? "en-SA" : "en-IN", { style: "currency", currency: s.currency, minimumFractionDigits: 2 });
-  const m = Object.fromEntries(s.methods.map((x) => [x.method, x])) as Record<Summary["methods"][number]["method"], Summary["methods"][number]>;
+  const m = Object.fromEntries(s.methods.map((x) => [x.method, x])) as Record<"cash" | "card" | "upi" | "other", Summary["methods"][number]>;
   const closed = s.close?.status === "closed";
   const reopened = s.close?.status === "reopened";
   const blocked = !closed && s.unbilled.length > 0;
@@ -351,10 +290,10 @@ export default function BillingPage() {
 
       {dialog === "close" && (
         <CloseDialog summary={s} money={money} counted={counted} setCounted={setCounted} variance={variance} beyond={beyond}
-          authedFetch={authedFetch} onClose={() => setDialog(null)} onDone={(next) => { setS(next); setDialog(null); setCounted(""); void loadHistory(next.date); }} />
+          onClose={() => setDialog(null)} onDone={(next) => { applied(next); setCounted(""); }} />
       )}
       {dialog === "reopen" && (
-        <ReopenDialog date={s.date} authedFetch={authedFetch} onClose={() => setDialog(null)} onDone={(next) => { setS(next); setDialog(null); void loadHistory(next.date); }} />
+        <ReopenDialog date={s.date} onClose={() => setDialog(null)} onDone={applied} />
       )}
     </main>
   );
@@ -368,20 +307,14 @@ function useEscape(onClose: () => void) {
   }, [onClose]);
 }
 
-async function problemDetail(res: Response, fallback: string): Promise<string> {
-  const p: Problem = await res.json().catch(() => ({ title: "Error", detail: fallback }));
-  return p.detail || p.title || fallback;
-}
-
 /** The wireframe's three checks — pending issues, cash count, variance — then close. The server re-checks all of them. */
-function CloseDialog({ summary, money, counted, setCounted, variance, beyond, authedFetch, onClose, onDone }: {
+function CloseDialog({ summary, money, counted, setCounted, variance, beyond, onClose, onDone }: {
   summary: Summary; money: Intl.NumberFormat; counted: string; setCounted: (v: string) => void;
   variance: number | null; beyond: boolean;
-  authedFetch: (path: string, init?: RequestInit) => Promise<Response | null>;
   onClose: () => void; onDone: (s: Summary) => void;
 }) {
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const fe = useFormErrors("close", { countedCash: "Counted cash", note: "Note", date: "Day" });
   const [saving, setSaving] = useState(false);
   useEscape(onClose);
   const blocked = summary.unbilled.length > 0;
@@ -389,20 +322,13 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     setSaving(true);
-    setError(null);
+    fe.clear();
     try {
-      const res = await authedFetch("/billing/day-close", {
-        method: "POST", body: JSON.stringify({ countedCash: Number(counted), note: note.trim() || null, date: summary.date }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setError(await problemDetail(res, "Couldn't close the day."));
-        return;
-      }
-      onDone(await res.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      onDone(await api.post<Summary>("/billing/day-close", { countedCash: Number(counted), note: note.trim() || null, date: summary.date }));
+    } catch (err) {
+      fe.fail(err, "Couldn't close the day.");
     } finally {
       setSaving(false);
     }
@@ -417,6 +343,7 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
           <span className={blocked ? styles.amtBad : styles.amtOk}>{blocked ? `${summary.unbilled.length} blocking` : "None"}</span></div>
         <div className={styles.step}><span>2. Cash count</span>
           <span className={variance === null ? styles.amtWarn : styles.amt}>{variance === null ? "Required" : money.format(Number(counted))}</span></div>
+        <FieldError fe={fe} name="countedCash" className={styles.lineSub} />
         <div className={styles.step}><span>3. Variance</span>
           <span className={variance === null ? styles.amtMuted : beyond ? styles.amtBad : styles.amtOk}>
             {variance === null ? "—" : (variance > 0 ? "+" : variance < 0 ? "−" : "") + money.format(Math.abs(variance))}
@@ -425,8 +352,8 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
         {!blocked && variance === null && (
           <div className={styles.field}>
             <label className={styles.countLabel} htmlFor="close-counted">Counted cash</label>
-            <input id="close-counted" className={styles.input} type="number" min="0" step="0.01" value={counted} autoFocus
-              onChange={(e) => setCounted(e.target.value)} />
+            <input id="close-counted" className={styles.input} type="number" min="0" step="0.01" value={counted} autoFocus {...fe.attrs("countedCash")}
+              onChange={(e) => { fe.clearField("countedCash"); setCounted(e.target.value); }} />
           </div>
         )}
         {!blocked && variance !== null && (
@@ -434,10 +361,11 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
             <label className={styles.countLabel} htmlFor="close-note">
               Note{beyond ? ` (required — off by more than ${money.format(Number(summary.cashTolerance))})` : " (optional)"}
             </label>
-            <textarea id="close-note" className={styles.textarea} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
+            <textarea id="close-note" className={styles.textarea} maxLength={1000} value={note} {...fe.attrs("note")} onChange={(e) => { fe.clearField("note"); setNote(e.target.value); }} />
+            <FieldError fe={fe} name="note" className={styles.lineSub} />
           </div>
         )}
-        {error && <div className={styles.error} role="alert" style={{ marginTop: 12 }}>{error}</div>}
+        <ErrorSummary fe={fe} className={styles.error} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Cancel</button>
           <button type="submit" className={styles.btnPrimary} disabled={!canSubmit || saving}>{saving ? "Closing…" : "Close the day"}</button>
@@ -447,32 +375,26 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
   );
 }
 
-function ReopenDialog({ date, authedFetch, onClose, onDone }: {
+function ReopenDialog({ date, onClose, onDone }: {
   date: string;
-  authedFetch: (path: string, init?: RequestInit) => Promise<Response | null>;
   onClose: () => void; onDone: (s: Summary) => void;
 }) {
   const [choice, setChoice] = useState<string>("");
   const [other, setOther] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const fe = useFormErrors("reopen", { reason: "Reason", date: "Day" });
   const [saving, setSaving] = useState(false);
   useEscape(onClose);
   const reason = choice === "other" ? other.trim() : choice;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
     setSaving(true);
-    setError(null);
+    fe.clear();
     try {
-      const res = await authedFetch("/billing/day-close/reopen", { method: "POST", body: JSON.stringify({ reason, date }) });
-      if (!res) return;
-      if (!res.ok) {
-        setError(await problemDetail(res, "Couldn't unlock the day."));
-        return;
-      }
-      onDone(await res.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      onDone(await api.post<Summary>("/billing/day-close/reopen", { reason, date }));
+    } catch (err) {
+      fe.fail(err, "Couldn't unlock the day.");
     } finally {
       setSaving(false);
     }
@@ -487,7 +409,7 @@ function ReopenDialog({ date, authedFetch, onClose, onDone }: {
           <legend className={styles.countLabel}>Reason (required)</legend>
           {[...REOPEN_REASONS, "other"].map((r) => (
             <label key={r} className={styles.radio}>
-              <input type="radio" name="reopen-reason" value={r} checked={choice === r} onChange={() => setChoice(r)} />
+              <input type="radio" name="reopen-reason" value={r} checked={choice === r} {...fe.attrs("reason")} onChange={() => { fe.clearField("reason"); setChoice(r); }} />
               {r === "other" ? "Other" : r}
             </label>
           ))}
@@ -496,7 +418,8 @@ function ReopenDialog({ date, authedFetch, onClose, onDone }: {
           <input aria-label="Other reason" maxLength={500} className={styles.input} style={{ width: "100%", marginTop: 8 }} value={other} autoFocus
             onChange={(e) => setOther(e.target.value)} placeholder="What needs correcting?" />
         )}
-        {error && <div className={styles.error} role="alert" style={{ marginTop: 12 }}>{error}</div>}
+        <FieldError fe={fe} name="reason" className={styles.lineSub} />
+        <ErrorSummary fe={fe} className={styles.error} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Cancel</button>
           <button type="submit" className={styles.btnPrimary} disabled={!reason || saving}>{saving ? "Unlocking…" : "Unlock day"}</button>

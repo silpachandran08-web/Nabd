@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import styles from "./packages.module.css";
 import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
@@ -9,45 +9,28 @@ import { ErrorState, Skeleton } from "../components/ui/StateViews";
 import { PAYMENT_METHODS, paymentMethodLabel, formatMoney } from "@nabd/domain";
 import { getIdentity } from "../lib/session";
 import { eventLabel } from "./eventLabel";
-import { apiFetch, goLogin } from "../lib/apiClient";
-import type { Problem } from "@nabd/api-client/types";
+import { api, ApiError, intentKeys } from "../lib/api";
+import { key, prefix } from "../lib/query";
+import { ErrorSummary, FieldError, useFormErrors, type FormErrors } from "../lib/formErrors";
+import { usePatientSearch } from "../lib/usePatientSearch";
+import type { Full } from "../lib/gen";
+import type {
+  ExpiringSoonResponse, InstanceEventResponse, InstanceItemResponse, InstanceResponse, InvoiceResponse, LiabilityResponse, LineItemResponse,
+  PackageItemResponse, PackageResponse, PackageSettingsResponse, RefundPreviewResponse, RefundResponse, StaffRosterEntry,
+} from "@nabd/api-client/generated";
 
-// Matches GET/POST/PATCH /v1/packages/** (PackageController) — E14 Treatment Packages.
-type PackageItem = { id: string; itemType: string; name: string; quantity: number; unitListPrice: number; taxRatePercent: number; listValue: number };
-type PackageT = {
-  id: string; name: string; packageType: string; speciality: string | null; description: string | null; status: string;
-  price: number; taxInclusive: boolean; validityDays: number; validityStarts: string; graceDays: number; refundNote: string | null;
-  listValue: number; saveAmount: number; savePercent: number; priceFloor: number; belowFloor: boolean;
-  eligibleDoctorIds: string[]; items: PackageItem[]; doctorLeaveWarning: string | null;
+// GET/POST/PATCH /v1/packages/** (PackageController) — the generated types, with the fields the server always sends marked present.
+type PackageT = Omit<Full<PackageResponse, "speciality" | "description" | "refundNote" | "doctorLeaveWarning">, "items"> & { items: Full<PackageItemResponse>[] };
+type InstanceT = Omit<Full<InstanceResponse, "validityStart" | "validityEnd" | "events">, "items" | "events"> & {
+  items: Full<InstanceItemResponse>[]; events: Full<InstanceEventResponse, "note" | "delta">[] | null;
 };
-type InstanceItem = { id: string; itemType: string; name: string; quantityTotal: number; quantityConsumed: number; unitListPrice: number; allocatedPrice: number; taxRatePercent: number };
-type InstanceEvent = { eventType: string; note: string | null; delta: number | null; actorName: string; createdAt: string };
-type InstanceT = {
-  id: string; packageId: string; packageName: string; patientId: string; patientName: string;
-  invoiceId: string; invoiceNumber: string; soldPrice: number; soldTax: number;
-  validityStart: string | null; validityEnd: string | null; graceDays: number; status: string;
-  items: InstanceItem[]; events: InstanceEvent[] | null;
-};
-type RefundT = {
-  id: string; instanceId: string; patientName: string; packageName: string; reason: string;
-  usedListValue: number; refundAmount: number; amountOwed: number; status: string; creditNoteNumber: string | null; createdAt: string;
-  recomputedAmount?: number | null;
-};
-type ExpiringT = {
-  instanceId: string; patientName: string; packageName: string; quantityConsumed: number; quantityTotal: number;
-  expiresOn: string; valueLeft: number; alertTier: number; reminderSentForTier: boolean;
-};
-type LiabilityT = {
-  activePatientPackages: number; sessionsOwed: number; remainingListValue: number; remainingAllocatedValue: number;
-  inGracePeriod: number; expiringIn30Days: number; potentialExpiryLoss: number; refundsAwaitingApproval: number;
-};
-type SettingsT = { priceFloorPercent: number };
-type StaffOption = { id: string; name: string };
-type PatientOption = { id: string; name: string; phone: string; mrn: string };
+type RefundT = Full<RefundResponse, "creditNoteNumber" | "recomputedAmount">;
+type ExpiringT = Full<ExpiringSoonResponse>;
+type LiabilityT = Full<LiabilityResponse>;
+type StaffOption = Full<StaffRosterEntry>;
 type ItemDraft = { itemType: string; name: string; quantity: string; unitListPrice: string; taxRatePercent: string };
 type Tab = "packages" | "active" | "sales" | "sessions" | "expiring" | "refunds" | "liability" | "settings";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const TABS: { key: Tab; label: string }[] = [
   { key: "packages", label: "Packages" },
   { key: "active", label: "Active patient packages" },
@@ -72,98 +55,61 @@ const SELL_STEPS = ["Patient", "Package", "Eligibility", "Review", "Payment", "I
 const BLOCKING_STATUSES = ["active", "grace", "expired"];
 // Invoice issued by POST /packages/sell, read back from GET /billing/invoices/{id} (billing:view) so the
 // final step shows the server's own net / tax / total and per-line tax, never a client-side estimate.
-type SoldInvoice = {
-  id: string; invoiceNumber: string; currency: string; subtotal: number; tax: number; roundOff: number; total: number;
-  paid: number; status: string;
-  lineItems: { chargeName: string; quantity: number; unitPrice: number; taxRatePercent: number; lineTotal: number }[];
-};
+type SoldInvoice = Omit<Full<InvoiceResponse>, "lineItems"> & { lineItems: Full<LineItemResponse>[] };
 const EMPTY_ITEM: ItemDraft = { itemType: "service_session", name: "", quantity: "1", unitListPrice: "0", taxRatePercent: "0" };
 
 function money(n: number): string {
   return n.toFixed(2);
 }
 
-export default function PackagesPage() {
-  const router = useRouter();
-  const [tab, setTab] = useState<Tab>("packages");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [forbidden, setForbidden] = useState(false);
+/** The words a person sees for a refused request: the server's reason, or the offline line. */
+const why = (e: unknown, fallback: string) =>
+  e instanceof ApiError ? e.detail || fallback : "Could not reach the server. Check your connection and try again.";
 
-  const [packages, setPackages] = useState<PackageT[]>([]);
-  const [instances, setInstances] = useState<InstanceT[]>([]);
-  const [refunds, setRefunds] = useState<RefundT[]>([]);
-  const [expiring, setExpiring] = useState<ExpiringT[]>([]);
-  const [liability, setLiability] = useState<LiabilityT | null>(null);
-  const [floorInput, setFloorInput] = useState("");
-  const [staff, setStaff] = useState<StaffOption[]>([]);
+export default function PackagesPage() {
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<Tab>("packages");
+  const [floorEdit, setFloorEdit] = useState<string | null>(null);
 
   const [catalogueFilter, setCatalogueFilter] = useState<"all" | "on_sale" | "draft" | "inactive">("all");
   const [mode, setMode] = useState<"list" | "form" | "sell">("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   const [selectedInstance, setSelectedInstance] = useState<InstanceT | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const fe = useFormErrors("pk", { newValidityEnd: "New expiry date", reason: "Reason", priceFloorPercent: "Price floor", expectedAmount: "Amount" }); // page actions
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
-
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [pkgRes, instRes, refundRes, expRes, liabRes, settingsRes, staffRes] = await Promise.all([
-        authedFetch("/packages"), authedFetch("/packages/instances"), authedFetch("/packages/refunds"),
-        authedFetch("/packages/expiring-soon"), authedFetch("/packages/liability"), authedFetch("/packages/settings"),
-        can("queue:view") ? authedFetch("/staff/roster") : null,
+  // One bundle for the screen: the catalogue and the instances must load (403 = no access); the rest are best effort.
+  const bundleQ = useQuery({
+    queryKey: key("packages"),
+    queryFn: async ({ signal }) => {
+      const get = <T,>(path: string) => api.get<T>(path, { signal });
+      const [pkgs, insts, refunds, expiring, liability, settings, staff] = await Promise.allSettled([
+        get<PackageT[]>("/packages"), get<InstanceT[]>("/packages/instances"), get<RefundT[]>("/packages/refunds"),
+        get<ExpiringT[]>("/packages/expiring-soon"), get<LiabilityT>("/packages/liability"), get<Full<PackageSettingsResponse>>("/packages/settings"),
+        can("queue:view") ? get<StaffOption[]>("/staff/roster") : Promise.resolve([] as StaffOption[]),
       ]);
-      if (!pkgRes) return;
-      if (pkgRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!pkgRes.ok || !instRes?.ok) {
-        setError("Couldn't load treatment packages. Try again.");
-        return;
-      }
-      setPackages(await pkgRes.json());
-      setInstances(await instRes.json());
-      if (refundRes?.ok) setRefunds(await refundRes.json());
-      if (expRes?.ok) setExpiring(await expRes.json());
-      if (liabRes?.ok) setLiability(await liabRes.json());
-      if (settingsRes?.ok) {
-        const s: SettingsT = await settingsRes.json();
-        setFloorInput(String(s.priceFloorPercent));
-      }
-      if (staffRes?.ok) setStaff(await staffRes.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setLoading(false);
-    }
-  }, [authedFetch]);
-
-  useEffect(() => {
-    void Promise.resolve().then(loadAll);
-  }, [loadAll]);
+      if (pkgs.status === "rejected") throw pkgs.reason;
+      if (insts.status === "rejected") throw insts.reason;
+      const ok = <T,>(r: PromiseSettledResult<T>, d: T): T => (r.status === "fulfilled" ? r.value : d);
+      return {
+        packages: pkgs.value, instances: insts.value, refunds: ok(refunds, [] as RefundT[]), expiring: ok(expiring, [] as ExpiringT[]),
+        liability: ok<LiabilityT | null>(liability, null), floor: settings.status === "fulfilled" ? String(settings.value.priceFloorPercent) : "",
+        staff: ok(staff, [] as StaffOption[]),
+      };
+    },
+  });
+  const packages = bundleQ.data?.packages ?? [];
+  const instances = bundleQ.data?.instances ?? [];
+  const refunds = bundleQ.data?.refunds ?? [];
+  const expiring = bundleQ.data?.expiring ?? [];
+  const liability = bundleQ.data?.liability ?? null;
+  const staff = bundleQ.data?.staff ?? [];
+  const floorInput = floorEdit ?? bundleQ.data?.floor ?? "";
+  const loading = bundleQ.isPending;
+  const forbidden = bundleQ.error instanceof ApiError && bundleQ.error.status === 403;
+  const error = !bundleQ.error || forbidden ? null : bundleQ.error instanceof ApiError ? "Couldn't load treatment packages. Try again." : "Couldn't reach the server. Check your connection and try again.";
+  /** Re-read everything on the screen (resolves when the refetch is done). */
+  const loadAll = useCallback(() => qc.invalidateQueries({ queryKey: prefix("packages") }), [qc]);
 
   // ── new / edit package form ─────────────────────────────────────────────
   const [formName, setFormName] = useState("");
@@ -178,13 +124,13 @@ export default function PackagesPage() {
   const [formRefundNote, setFormRefundNote] = useState("");
   const [formDoctorIds, setFormDoctorIds] = useState<string[]>([]);
   const [formItems, setFormItems] = useState<ItemDraft[]>([{ ...EMPTY_ITEM }]);
-  const [formError, setFormError] = useState<string | null>(null);
+  const ffe = useFormErrors("pkf", { name: "Package name", price: "Price", validityDays: "Validity", graceDays: "Grace days", packageType: "Package type", speciality: "Speciality", description: "Description", refundNote: "Refund note", eligibleDoctorIds: "Doctors" });
   const [saving, setSaving] = useState(false);
 
   function resetForm() {
     setFormName(""); setFormType("combination"); setFormSpeciality(""); setFormDescription("");
     setFormPrice("0"); setFormTaxInclusive(false); setFormValidityDays("90"); setFormValidityStarts("purchase_date");
-    setFormGraceDays("7"); setFormRefundNote(""); setFormDoctorIds([]); setFormItems([{ ...EMPTY_ITEM }]); setFormError(null);
+    setFormGraceDays("7"); setFormRefundNote(""); setFormDoctorIds([]); setFormItems([{ ...EMPTY_ITEM }]); ffe.clear();
   }
 
   function openNewForm() {
@@ -199,7 +145,7 @@ export default function PackagesPage() {
     setFormValidityStarts(p.validityStarts); setFormGraceDays(String(p.graceDays)); setFormRefundNote(p.refundNote ?? "");
     setFormDoctorIds(p.eligibleDoctorIds);
     setFormItems(p.items.map((i) => ({ itemType: i.itemType, name: i.name, quantity: String(i.quantity), unitListPrice: String(i.unitListPrice), taxRatePercent: String(i.taxRatePercent) })));
-    setFormError(null);
+    ffe.clear();
     setEditingId(p.id);
     setMode("form");
   }
@@ -209,10 +155,11 @@ export default function PackagesPage() {
 
   async function submitForm(e: React.FormEvent) {
     e.preventDefault();
-    setFormError(null);
+    if (saving) return;
+    ffe.clear();
     const items = formItems.filter((i) => i.name.trim().length > 0);
     if (items.length === 0) {
-      setFormError("Add at least one included item.");
+      ffe.set("Add at least one included item.");
       return;
     }
     setSaving(true);
@@ -224,70 +171,51 @@ export default function PackagesPage() {
         eligibleDoctorIds: formDoctorIds,
         items: items.map((i) => ({ itemType: i.itemType, name: i.name, quantity: Number(i.quantity) || 1, unitListPrice: Number(i.unitListPrice) || 0, taxRatePercent: Number(i.taxRatePercent) || 0 })),
       };
-      const res = await authedFetch(editingId ? `/packages/${editingId}` : "/packages", {
-        method: editingId ? "PATCH" : "POST",
-        body: JSON.stringify(body),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save the package." }));
-        setFormError(p.detail || "Couldn't save the package.");
-        return;
-      }
+      await (editingId ? api.patch(`/packages/${editingId}`, body) : api.post("/packages", body));
       setMode("list");
       await loadAll();
+    } catch (err) {
+      if (err instanceof ApiError && !(err.status === 400 && err.errors.length)) ffe.set(err.detail || "Couldn't save the package.");
+      else ffe.fail(err, "Couldn't save the package.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function activate(id: string) {
-    setActionError(null);
-    const res = await authedFetch(`/packages/${id}/activate`, { method: "POST" });
-    if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't activate." }));
-      setActionError(p.detail || "Couldn't activate.");
+  /** Activate or deactivate a catalogue package. */
+  async function setOnSale(id: string, on: boolean) {
+    fe.clear();
+    try {
+      await api.post(`/packages/${id}/${on ? "activate" : "deactivate"}`);
+    } catch (err) {
+      fe.set(why(err, on ? "Couldn't activate." : "Couldn't deactivate."));
       return;
     }
     await loadAll();
   }
-
-  async function deactivate(id: string) {
-    setActionError(null);
-    const res = await authedFetch(`/packages/${id}/deactivate`, { method: "POST" });
-    if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't deactivate." }));
-      setActionError(p.detail || "Couldn't deactivate.");
-      return;
-    }
-    await loadAll();
-  }
+  const activate = (id: string) => setOnSale(id, true);
+  const deactivate = (id: string) => setOnSale(id, false);
 
   // ── sell flow ────────────────────────────────────────────────────────────
   const [sellQuery, setSellQuery] = useState("");
-  const [sellResults, setSellResults] = useState<PatientOption[]>([]);
-  const [sellPatient, setSellPatient] = useState<PatientOption | null>(null);
+  const [sellPatient, setSellPatient] = useState<{ id: string; name: string; phone: string; mrn: string } | null>(null);
+  const { results: sellResults } = usePatientSearch(sellPatient ? "" : sellQuery, 10);
   const [sellPackageId, setSellPackageId] = useState("");
   const [sellMethod, setSellMethod] = useState("");
   const [sellStep, setSellStep] = useState(0);
   const [sold, setSold] = useState<InstanceT | null>(null);
   const [soldInvoice, setSoldInvoice] = useState<SoldInvoice | null>(null);
-  const [sellError, setSellError] = useState<string | null>(null);
+  const sfe = useFormErrors("pks", { patientId: "Patient", packageId: "Package", paymentMethod: "Payment method" });
   const [selling, setSelling] = useState(false);
+  const sellKeys = useRef(intentKeys()); // one Idempotency-Key per sale intent, reused when the same sale is re-sent after an error
 
-  async function onSellQueryChange(value: string) {
+  function onSellQueryChange(value: string) {
     setSellQuery(value);
     setSellPatient(null);
-    if (value.trim().length < 2) {
-      setSellResults([]);
-      return;
-    }
-    const res = await authedFetch(`/patients?q=${encodeURIComponent(value.trim())}`);
-    if (res?.ok) setSellResults((await res.json()).data);
   }
 
   function openSellForm() {
-    setSellQuery(""); setSellResults([]); setSellPatient(null); setSellPackageId(""); setSellMethod(""); setSellError(null);
+    setSellQuery(""); setSellPatient(null); setSellPackageId(""); setSellMethod(""); sfe.clear();
     setSellStep(0); setSold(null); setSoldInvoice(null);
     setMode("sell");
   }
@@ -295,41 +223,37 @@ export default function PackagesPage() {
   const sellPackage = packages.find((p) => p.id === sellPackageId) ?? null;
 
   async function submitSale() {
-    setSellError(null);
+    if (selling) return;
+    sfe.clear();
     if (!sellPatient || !sellPackageId) {
-      setSellError("Pick a patient and a package.");
+      sfe.set("Pick a patient and a package.");
       return;
     }
     if (!sellMethod) {
-      setSellError("Choose a payment method.");
+      sfe.set("Choose a payment method.");
       return;
     }
     setSelling(true);
+    const body = { patientId: sellPatient.id, packageId: sellPackageId, paymentMethod: sellMethod };
+    let instance: InstanceT;
     try {
-      const res = await authedFetch("/packages/sell", {
-        method: "POST",
-        body: JSON.stringify({ patientId: sellPatient.id, packageId: sellPackageId, paymentMethod: sellMethod }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't sell the package." }));
-        setSellError(p.detail || "Couldn't sell the package.");
-        return;
-      }
-      const instance: InstanceT = await res.json();
-      // The invoice exists from here on: stay in the wizard on the "Invoice & card" step.
-      setSold(instance);
-      setSellStep(5);
-      if (can("billing:view")) {
-        const invRes = await authedFetch(`/billing/invoices/${instance.invoiceId}`).catch(() => null);
-        if (invRes?.ok) setSoldInvoice(await invRes.json());
-      }
-      await loadAll();
-    } catch {
-      setSellError("Couldn't reach the server. The sale may or may not have gone through: check Active patient packages before trying again.");
-    } finally {
+      instance = await api.post<InstanceT>("/packages/sell", body, { idempotencyKey: sellKeys.current.get("sell", body) });
+      sellKeys.current.done("sell");
+    } catch (err) {
+      if (err instanceof ApiError && !(err.status === 400 && err.errors.length)) sfe.set(err.detail || "Couldn't sell the package.");
+      else if (err instanceof ApiError) sfe.fail(err, "Couldn't sell the package.");
+      else sfe.set("Couldn't reach the server. The sale may or may not have gone through: check Active patient packages before trying again.");
       setSelling(false);
+      return;
     }
+    // The invoice exists from here on: stay in the wizard on the "Invoice & card" step.
+    setSold(instance);
+    setSellStep(5);
+    if (can("billing:view")) {
+      try { setSoldInvoice(await api.get<SoldInvoice>(`/billing/invoices/${instance.invoiceId}`)); } catch { /* the sale stands; the summary falls back to the instance */ }
+    }
+    await loadAll();
+    setSelling(false);
   }
 
   // ── instance actions ─────────────────────────────────────────────────────
@@ -337,68 +261,63 @@ export default function PackagesPage() {
   // endpoint does — so the detail view keeps its own freshly-fetched copy instead of looking itself
   // up in that list.
   async function loadSelectedInstance(id: string) {
-    const res = await authedFetch(`/packages/instances/${id}`);
-    if (res?.ok) setSelectedInstance(await res.json());
+    try { setSelectedInstance(await api.get<InstanceT>(`/packages/instances/${id}`)); } catch { /* the detail keeps its last copy */ }
   }
 
   async function openInstance(id: string) {
-    setActionError(null);
+    fe.clear();
     setSelectedInstanceId(id);
     await loadSelectedInstance(id);
   }
 
-  async function book(itemId: string) {
-    setActionError(null);
-    const res = await authedFetch(`/packages/instances/items/${itemId}/book`, { method: "POST" });
-    await afterInstanceAction(res);
-  }
-
-  async function redeem(itemId: string) {
-    setActionError(null);
-    const res = await authedFetch(`/packages/instances/items/${itemId}/redeem`, { method: "POST" });
-    await afterInstanceAction(res);
-  }
-
-  async function afterInstanceAction(res: Response | null) {
-    if (res && !res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Action failed." }));
-      setActionError(p.detail || "Action failed.");
+  /** Run one write on an instance: a refusal shows beside its field / in the summary; the screen is always re-read after. */
+  async function act(call: () => Promise<unknown>, fallback: string): Promise<boolean> {
+    let ok = true;
+    try { await call(); } catch (err) {
+      ok = false;
+      if (err instanceof ApiError && err.status === 400 && err.errors.length) fe.fail(err, fallback); else fe.set(why(err, fallback));
     }
     await loadAll();
     if (selectedInstanceId) await loadSelectedInstance(selectedInstanceId);
+    return ok;
+  }
+
+  async function book(itemId: string) {
+    fe.clear();
+    await act(() => api.post(`/packages/instances/items/${itemId}/book`), "Action failed.");
+  }
+
+  async function redeem(itemId: string) {
+    fe.clear();
+    await act(() => api.post(`/packages/instances/items/${itemId}/redeem`), "Action failed.");
   }
 
   const [extendDate, setExtendDate] = useState("");
   const [extendReason, setExtendReason] = useState("");
   async function submitExtend(instanceId: string) {
     if (!extendDate || !extendReason.trim()) {
-      setActionError("Pick a new date and give a reason.");
+      fe.set("Pick a new date and give a reason.");
       return;
     }
-    const res = await authedFetch(`/packages/instances/${instanceId}/extend`, {
-      method: "POST", body: JSON.stringify({ newValidityEnd: extendDate, reason: extendReason }),
-    });
+    fe.clear();
     setExtendDate(""); setExtendReason("");
-    await afterInstanceAction(res);
+    await act(() => api.post(`/packages/instances/${instanceId}/extend`, { newValidityEnd: extendDate, reason: extendReason }), "Action failed.");
   }
 
-  const [refundPreview, setRefundPreview] = useState<{ paid: number; usedListValue: number; refundAmount: number; amountOwed: number } | null>(null);
+  const [refundPreview, setRefundPreview] = useState<Full<RefundPreviewResponse, never> | null>(null);
   const [refundReason, setRefundReason] = useState("");
   async function loadRefundPreview(instanceId: string) {
-    const res = await authedFetch(`/packages/instances/${instanceId}/refund-preview`);
-    if (res?.ok) setRefundPreview(await res.json());
+    try { setRefundPreview(await api.get<Full<RefundPreviewResponse>>(`/packages/instances/${instanceId}/refund-preview`)); } catch { /* the button stays; press it again */ }
   }
   async function submitRefundRequest(instanceId: string) {
     if (!refundReason.trim()) {
-      setActionError("Give a refund reason.");
+      fe.set("Give a refund reason.");
       return;
     }
-    const res = await authedFetch(`/packages/instances/${instanceId}/refund`, {
-      method: "POST", body: JSON.stringify({ reason: refundReason }),
-    });
+    fe.clear();
+    const reason = refundReason;
     setRefundReason(""); setRefundPreview(null);
-    await afterInstanceAction(res);
-    if (res?.ok) {
+    if (await act(() => api.post(`/packages/instances/${instanceId}/refund`, { reason }), "Action failed.")) {
       setSelectedInstanceId(null);
       setSelectedInstance(null);
       setTab("refunds");
@@ -409,59 +328,54 @@ export default function PackagesPage() {
   const [deciding, setDeciding] = useState<{ refund: RefundT; current: number; owed: number; changed: boolean } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   async function openDecision(r: RefundT) {
-    setActionError(null); setRejectReason("");
-    const res = await authedFetch(`/packages/instances/${r.instanceId}/refund-preview`);
-    if (!res?.ok) { setActionError("Could not load the current refund amount. Try again."); return; }
-    const p = await res.json();
-    setDeciding({ refund: r, current: p.refundAmount, owed: p.amountOwed, changed: p.refundAmount !== r.refundAmount });
+    fe.clear(); setRejectReason("");
+    try {
+      const p = await api.get<Full<RefundPreviewResponse>>(`/packages/instances/${r.instanceId}/refund-preview`);
+      setDeciding({ refund: r, current: p.refundAmount, owed: p.amountOwed, changed: p.refundAmount !== r.refundAmount });
+    } catch { fe.set("Could not load the current refund amount. Try again."); }
   }
   const decideLock = useRef(false); // synchronous guard (as in checkout): a double-click must never send a second decision
   async function decide(fn: () => Promise<void>) {
     if (decideLock.current) return;
     decideLock.current = true;
-    try { await fn(); } catch {
-      setActionError("Could not reach the server. Check your connection and try again."); // fetch rejects on network failure
-    } finally { decideLock.current = false; }
+    try { await fn(); } finally { decideLock.current = false; }
   }
   const approveRefund = () => decide(async () => {
     if (!deciding) return;
-    setActionError(null);
-    const res = await authedFetch(`/packages/refunds/${deciding.refund.id}/approve`, {
-      method: "POST", body: JSON.stringify({ expectedAmount: deciding.current }),
-    });
-    if (res?.status === 409) {
-      const p = await res.clone().json().catch(() => null);
+    fe.clear();
+    try {
+      await api.post(`/packages/refunds/${deciding.refund.id}/approve`, { expectedAmount: deciding.current });
+    } catch (err) {
+      const p = err instanceof ApiError && err.status === 409 ? err.problem : null;
       if (p && String(p.type).endsWith("amount-changed")) {
-        setDeciding({ ...deciding, current: p.currentAmount, owed: p.currentAmountOwed ?? deciding.owed, changed: true });
+        setDeciding({ ...deciding, current: p.currentAmount as number, owed: (p.currentAmountOwed as number | undefined) ?? deciding.owed, changed: true });
         return;
       }
+      fe.set(why(err, "Action failed."));
+      await loadAll();
+      return;
     }
-    if (res?.ok) setDeciding(null);
-    await afterInstanceAction(res);
+    setDeciding(null);
+    await act(async () => {}, "Action failed.");
   });
   const rejectRefund = () => decide(async () => {
     if (!deciding) return;
-    if (!rejectReason.trim()) { setActionError("Give a reason to reject."); return; }
-    setActionError(null);
-    const res = await authedFetch(`/packages/refunds/${deciding.refund.id}/reject`, {
-      method: "POST", body: JSON.stringify({ reason: rejectReason }),
-    });
-    if (res?.ok) setDeciding(null);
-    await afterInstanceAction(res);
+    if (!rejectReason.trim()) { fe.set("Give a reason to reject."); return; }
+    fe.clear();
+    const id = deciding.refund.id;
+    const ok = await act(() => api.post(`/packages/refunds/${id}/reject`, { reason: rejectReason }), "Action failed.");
+    if (ok) setDeciding(null);
   });
 
   const [reminderNotice, setReminderNotice] = useState<string | null>(null);
   async function sendReminder(instanceId: string) {
     // The endpoint only records the reminder; nothing is messaged (COM-044 wires real sending).
     setReminderNotice(null);
-    const res = await authedFetch(`/packages/instances/${instanceId}/send-reminder`, { method: "POST" });
-    if (res?.ok) setReminderNotice("Recorded. No message was sent.");
-    await afterInstanceAction(res);
+    if (await act(() => api.post(`/packages/instances/${instanceId}/send-reminder`), "Action failed.")) setReminderNotice("Recorded. No message was sent.");
   }
 
   async function saveSettings() {
-    const res = await authedFetch("/packages/settings", { method: "PATCH", body: JSON.stringify({ priceFloorPercent: Number(floorInput) || 0 }) });
-    await afterInstanceAction(res);
+    if (await act(() => api.patch("/packages/settings", { priceFloorPercent: Number(floorInput) || 0 }), "Action failed.")) setFloorEdit(null);
   }
 
   if (loading) return <main className={styles.page}><Skeleton rows={6} label="Loading treatment packages" /></main>;
@@ -494,12 +408,12 @@ export default function PackagesPage() {
         )}
       </div>
 
-      {actionError && <div className={styles.bannerWarn}>{actionError}</div>}
+      <ErrorSummary fe={fe} className={styles.bannerWarn} />
 
       {selectedInstanceId && selectedInstance ? (
         <InstanceDetail
           instance={selectedInstance}
-          canEdit={canEdit} canApprove={canApprove}
+          canEdit={canEdit} canApprove={canApprove} fe={fe}
           onBook={book}
           onRedeem={redeem}
           extendDate={extendDate} setExtendDate={setExtendDate}
@@ -516,7 +430,8 @@ export default function PackagesPage() {
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label}>Package name</label>
-              <input className={styles.input} value={formName} onChange={(e) => setFormName(e.target.value)} required />
+              <input className={styles.input} value={formName} {...ffe.attrs("name")} onChange={(e) => { ffe.clearField("name"); setFormName(e.target.value); }} required />
+              <FieldError fe={ffe} name="name" className={styles.muted} />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Package type</label>
@@ -576,7 +491,8 @@ export default function PackagesPage() {
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label}>Package price ({money(formListValue)} list value)</label>
-              <input className={styles.input} type="number" step="0.01" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
+              <input className={styles.input} type="number" step="0.01" value={formPrice} {...ffe.attrs("price")} onChange={(e) => { ffe.clearField("price"); setFormPrice(e.target.value); }} />
+              <FieldError fe={ffe} name="price" className={styles.muted} />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Patient saves</label>
@@ -589,7 +505,8 @@ export default function PackagesPage() {
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label}>Validity period (days)</label>
-              <input className={styles.input} type="number" value={formValidityDays} onChange={(e) => setFormValidityDays(e.target.value)} />
+              <input className={styles.input} type="number" value={formValidityDays} {...ffe.attrs("validityDays")} onChange={(e) => { ffe.clearField("validityDays"); setFormValidityDays(e.target.value); }} />
+              <FieldError fe={ffe} name="validityDays" className={styles.muted} />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Validity starts</label>
@@ -602,7 +519,8 @@ export default function PackagesPage() {
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label}>Grace period (days)</label>
-              <input className={styles.input} type="number" value={formGraceDays} onChange={(e) => setFormGraceDays(e.target.value)} />
+              <input className={styles.input} type="number" value={formGraceDays} {...ffe.attrs("graceDays")} onChange={(e) => { ffe.clearField("graceDays"); setFormGraceDays(e.target.value); }} />
+              <FieldError fe={ffe} name="graceDays" className={styles.muted} />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Allowed doctors (blank = all)</label>
@@ -624,7 +542,7 @@ export default function PackagesPage() {
           </div>
           <p className={styles.muted}>Full payment only in this build — scheduled instalments and pay-per-session are a later phase.</p>
 
-          {formError && <div className={styles.errorState}>{formError}</div>}
+          <ErrorSummary fe={ffe} className={styles.errorState} />
           <div className={styles.actions}>
             <button type="button" className={styles.btn} onClick={() => setMode("list")}>Cancel</button>
             <button type="submit" className={styles.btnPrimary} disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Save as draft"}</button>
@@ -655,7 +573,7 @@ export default function PackagesPage() {
                   <input id="sell-patient" className={styles.input} placeholder="Search patient by name or phone…" value={sellQuery} onChange={(e) => onSellQueryChange(e.target.value)} />
                   {sellResults.map((p) => (
                     <button type="button" key={p.id} className={`${styles.btn} ${styles.resultBtn}`}
-                      onClick={() => { setSellPatient(p); setSellResults([]); }}>{p.name} · {p.phone} · {p.mrn}</button>
+                      onClick={() => setSellPatient(p)}>{p.name} · {p.phone} · {p.mrn}</button>
                   ))}
                 </>
               )}
@@ -789,10 +707,10 @@ export default function PackagesPage() {
             </>
           )}
 
-          {sellError && <div className={styles.errorState} role="alert">{sellError}</div>}
+          <ErrorSummary fe={sfe} className={styles.errorState} />
           <div className={styles.actions}>
             {sellStep < 5 && <button type="button" className={styles.btn} onClick={() => setMode("list")}>Cancel</button>}
-            {sellStep > 0 && sellStep < 5 && <button type="button" className={styles.btn} onClick={() => { setSellError(null); setSellStep(sellStep - 1); }}>Back</button>}
+            {sellStep > 0 && sellStep < 5 && <button type="button" className={styles.btn} onClick={() => { sfe.clear(); setSellStep(sellStep - 1); }}>Back</button>}
             {sellStep < 4 && (
               <button type="button" className={styles.btnPrimary}
                 disabled={(sellStep === 0 && !sellPatient) || (sellStep >= 1 && !sellPackageId)
@@ -982,7 +900,7 @@ export default function PackagesPage() {
               <h2 className={styles.cardTitle}>Pricing rules</h2>
               <div className={styles.field}>
                 <label className={styles.label}>Price floor (% of list value — never silently overridable)</label>
-                <input className={styles.input} type="number" step="0.1" value={floorInput} onChange={(e) => setFloorInput(e.target.value)} style={{ maxWidth: "160px" }} />
+                <input className={styles.input} type="number" step="0.1" value={floorInput} {...fe.attrs("priceFloorPercent")} onChange={(e) => { fe.clearField("priceFloorPercent"); setFloorEdit(e.target.value); }} style={{ maxWidth: "160px" }} />
               </div>
               <div className={styles.actions} style={{ justifyContent: "flex-start" }}>
                 <button className={styles.btnPrimary} onClick={saveSettings}>Save</button>
@@ -1036,11 +954,11 @@ function InstanceTable({ instances, onOpen, showInvoice }: { instances: Instance
 }
 
 function InstanceDetail({
-  instance, canEdit, canApprove, onBook, onRedeem, extendDate, setExtendDate, extendReason, setExtendReason, onExtend,
+  instance, canEdit, canApprove, fe, onBook, onRedeem, extendDate, setExtendDate, extendReason, setExtendReason, onExtend,
   refundPreview, onLoadRefundPreview, refundReason, setRefundReason, onRequestRefund,
 }: {
   instance: InstanceT;
-  canEdit: boolean; canApprove: boolean;
+  canEdit: boolean; canApprove: boolean; fe: FormErrors;
   onBook: (itemId: string) => void;
   onRedeem: (itemId: string) => void;
   extendDate: string; setExtendDate: (v: string) => void;
@@ -1097,11 +1015,13 @@ function InstanceDetail({
           <h2 className={styles.cardTitle}>Extend (manager approval required)</h2>
           <div className={styles.field}>
             <label className={styles.label}>New expiry date</label>
-            <input className={styles.input} type="date" value={extendDate} onChange={(e) => setExtendDate(e.target.value)} />
+            <input className={styles.input} type="date" value={extendDate} {...fe.attrs("newValidityEnd")} onChange={(e) => { fe.clearField("newValidityEnd"); setExtendDate(e.target.value); }} />
+            <FieldError fe={fe} name="newValidityEnd" className={styles.muted} />
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Reason</label>
-            <input className={styles.input} value={extendReason} onChange={(e) => setExtendReason(e.target.value)} />
+            <input className={styles.input} value={extendReason} {...fe.attrs("reason")} onChange={(e) => { fe.clearField("reason"); setExtendReason(e.target.value); }} />
+            <FieldError fe={fe} name="reason" className={styles.muted} />
           </div>
           <button className={styles.btn} onClick={onExtend}>Extend</button>
         </div>}

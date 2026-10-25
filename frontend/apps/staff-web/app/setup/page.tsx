@@ -362,7 +362,7 @@ function SetupPageInner() {
   };
 
   const renderContent = () => {
-    if (tab === "pharmacy") return canPharmacy ? <PharmacyPanel authedFetch={authedFetch} /> : null;
+    if (tab === "pharmacy") return canPharmacy ? <PharmacyPanel /> : null;
     if (loading && (TAB_DATA[tab]?.length ?? 0) > 0) return <div className={styles.card}><Skeleton rows={5} label="Loading" /></div>;
     if (error) return <div className={styles.card}><ErrorState message={error} onRetry={loadAll} /></div>;
 
