@@ -88,6 +88,7 @@ super_admin,GET /v1/patients/merges,patients:delete,deny-401
 super_admin,GET /v1/patients/registry,patients:view,deny-401
 super_admin,GET /v1/patients/{id},patients:view,deny-401
 super_admin,GET /v1/patients/{patientId}/messages,patients:view,deny-401
+super_admin,GET /v1/patients/{patientId}/privacy-notice,patients:view,deny-401
 super_admin,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/items,pharmacy:view,deny-401
 super_admin,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -127,6 +128,8 @@ super_admin,GET /v1/roles/delegations,staff:view,deny-401
 super_admin,GET /v1/roles/{id},staff:view,deny-401
 super_admin,GET /v1/schedule/day,queue:view,deny-401
 super_admin,GET /v1/schedule/week,queue:view,deny-401
+super_admin,GET /v1/settings/integrations/abdm,setup:view,deny-401
+super_admin,GET /v1/settings/privacy/privacy-notice,setup:view,deny-401
 super_admin,GET /v1/setup/charges,setup:view,deny-401
 super_admin,GET /v1/setup/checklist,setup:view,deny-401
 super_admin,GET /v1/setup/consent-contact,setup:view,deny-401
@@ -246,6 +249,7 @@ super_admin,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
 super_admin,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 super_admin,POST /v1/patients/{id}/merge,patients:delete,deny-401
+super_admin,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 super_admin,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 super_admin,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 super_admin,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
@@ -300,8 +304,11 @@ super_admin,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 super_admin,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 super_admin,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,allow
 super_admin,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,allow
+super_admin,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
+super_admin,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 super_admin,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 super_admin,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
+super_admin,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 implementation,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 implementation,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 implementation,DELETE /v1/departments/{id},departments:delete,deny-401
@@ -389,6 +396,7 @@ implementation,GET /v1/patients/merges,patients:delete,deny-401
 implementation,GET /v1/patients/registry,patients:view,deny-401
 implementation,GET /v1/patients/{id},patients:view,deny-401
 implementation,GET /v1/patients/{patientId}/messages,patients:view,deny-401
+implementation,GET /v1/patients/{patientId}/privacy-notice,patients:view,deny-401
 implementation,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/items,pharmacy:view,deny-401
 implementation,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -428,6 +436,8 @@ implementation,GET /v1/roles/delegations,staff:view,deny-401
 implementation,GET /v1/roles/{id},staff:view,deny-401
 implementation,GET /v1/schedule/day,queue:view,deny-401
 implementation,GET /v1/schedule/week,queue:view,deny-401
+implementation,GET /v1/settings/integrations/abdm,setup:view,deny-401
+implementation,GET /v1/settings/privacy/privacy-notice,setup:view,deny-401
 implementation,GET /v1/setup/charges,setup:view,deny-401
 implementation,GET /v1/setup/checklist,setup:view,deny-401
 implementation,GET /v1/setup/consent-contact,setup:view,deny-401
@@ -547,6 +557,7 @@ implementation,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
 implementation,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 implementation,POST /v1/patients/{id}/merge,patients:delete,deny-401
+implementation,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 implementation,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 implementation,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 implementation,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
@@ -601,8 +612,11 @@ implementation,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 implementation,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 implementation,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 implementation,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+implementation,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
+implementation,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 implementation,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 implementation,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
+implementation,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 support_engineer,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 support_engineer,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 support_engineer,DELETE /v1/departments/{id},departments:delete,deny-401
@@ -690,6 +704,7 @@ support_engineer,GET /v1/patients/merges,patients:delete,deny-401
 support_engineer,GET /v1/patients/registry,patients:view,deny-401
 support_engineer,GET /v1/patients/{id},patients:view,deny-401
 support_engineer,GET /v1/patients/{patientId}/messages,patients:view,deny-401
+support_engineer,GET /v1/patients/{patientId}/privacy-notice,patients:view,deny-401
 support_engineer,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/items,pharmacy:view,deny-401
 support_engineer,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -729,6 +744,8 @@ support_engineer,GET /v1/roles/delegations,staff:view,deny-401
 support_engineer,GET /v1/roles/{id},staff:view,deny-401
 support_engineer,GET /v1/schedule/day,queue:view,deny-401
 support_engineer,GET /v1/schedule/week,queue:view,deny-401
+support_engineer,GET /v1/settings/integrations/abdm,setup:view,deny-401
+support_engineer,GET /v1/settings/privacy/privacy-notice,setup:view,deny-401
 support_engineer,GET /v1/setup/charges,setup:view,deny-401
 support_engineer,GET /v1/setup/checklist,setup:view,deny-401
 support_engineer,GET /v1/setup/consent-contact,setup:view,deny-401
@@ -848,6 +865,7 @@ support_engineer,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-40
 support_engineer,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 support_engineer,POST /v1/patients/{id}/merge,patients:delete,deny-401
+support_engineer,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 support_engineer,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 support_engineer,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 support_engineer,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
@@ -902,8 +920,11 @@ support_engineer,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 support_engineer,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 support_engineer,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 support_engineer,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+support_engineer,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
+support_engineer,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 support_engineer,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 support_engineer,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
+support_engineer,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 billing,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 billing,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 billing,DELETE /v1/departments/{id},departments:delete,deny-401
@@ -991,6 +1012,7 @@ billing,GET /v1/patients/merges,patients:delete,deny-401
 billing,GET /v1/patients/registry,patients:view,deny-401
 billing,GET /v1/patients/{id},patients:view,deny-401
 billing,GET /v1/patients/{patientId}/messages,patients:view,deny-401
+billing,GET /v1/patients/{patientId}/privacy-notice,patients:view,deny-401
 billing,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/items,pharmacy:view,deny-401
 billing,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -1030,6 +1052,8 @@ billing,GET /v1/roles/delegations,staff:view,deny-401
 billing,GET /v1/roles/{id},staff:view,deny-401
 billing,GET /v1/schedule/day,queue:view,deny-401
 billing,GET /v1/schedule/week,queue:view,deny-401
+billing,GET /v1/settings/integrations/abdm,setup:view,deny-401
+billing,GET /v1/settings/privacy/privacy-notice,setup:view,deny-401
 billing,GET /v1/setup/charges,setup:view,deny-401
 billing,GET /v1/setup/checklist,setup:view,deny-401
 billing,GET /v1/setup/consent-contact,setup:view,deny-401
@@ -1149,6 +1173,7 @@ billing,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
 billing,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 billing,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 billing,POST /v1/patients/{id}/merge,patients:delete,deny-401
+billing,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 billing,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 billing,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 billing,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
@@ -1203,8 +1228,11 @@ billing,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 billing,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 billing,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 billing,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+billing,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
+billing,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 billing,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 billing,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
+billing,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 sre,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 sre,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 sre,DELETE /v1/departments/{id},departments:delete,deny-401
@@ -1292,6 +1320,7 @@ sre,GET /v1/patients/merges,patients:delete,deny-401
 sre,GET /v1/patients/registry,patients:view,deny-401
 sre,GET /v1/patients/{id},patients:view,deny-401
 sre,GET /v1/patients/{patientId}/messages,patients:view,deny-401
+sre,GET /v1/patients/{patientId}/privacy-notice,patients:view,deny-401
 sre,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/items,pharmacy:view,deny-401
 sre,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -1331,6 +1360,8 @@ sre,GET /v1/roles/delegations,staff:view,deny-401
 sre,GET /v1/roles/{id},staff:view,deny-401
 sre,GET /v1/schedule/day,queue:view,deny-401
 sre,GET /v1/schedule/week,queue:view,deny-401
+sre,GET /v1/settings/integrations/abdm,setup:view,deny-401
+sre,GET /v1/settings/privacy/privacy-notice,setup:view,deny-401
 sre,GET /v1/setup/charges,setup:view,deny-401
 sre,GET /v1/setup/checklist,setup:view,deny-401
 sre,GET /v1/setup/consent-contact,setup:view,deny-401
@@ -1450,6 +1481,7 @@ sre,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
 sre,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 sre,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 sre,POST /v1/patients/{id}/merge,patients:delete,deny-401
+sre,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 sre,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 sre,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 sre,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
@@ -1504,8 +1536,11 @@ sre,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 sre,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 sre,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 sre,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+sre,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
+sre,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 sre,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 sre,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
+sre,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 commercial,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 commercial,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 commercial,DELETE /v1/departments/{id},departments:delete,deny-401
@@ -1593,6 +1628,7 @@ commercial,GET /v1/patients/merges,patients:delete,deny-401
 commercial,GET /v1/patients/registry,patients:view,deny-401
 commercial,GET /v1/patients/{id},patients:view,deny-401
 commercial,GET /v1/patients/{patientId}/messages,patients:view,deny-401
+commercial,GET /v1/patients/{patientId}/privacy-notice,patients:view,deny-401
 commercial,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/items,pharmacy:view,deny-401
 commercial,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -1632,6 +1668,8 @@ commercial,GET /v1/roles/delegations,staff:view,deny-401
 commercial,GET /v1/roles/{id},staff:view,deny-401
 commercial,GET /v1/schedule/day,queue:view,deny-401
 commercial,GET /v1/schedule/week,queue:view,deny-401
+commercial,GET /v1/settings/integrations/abdm,setup:view,deny-401
+commercial,GET /v1/settings/privacy/privacy-notice,setup:view,deny-401
 commercial,GET /v1/setup/charges,setup:view,deny-401
 commercial,GET /v1/setup/checklist,setup:view,deny-401
 commercial,GET /v1/setup/consent-contact,setup:view,deny-401
@@ -1751,6 +1789,7 @@ commercial,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
 commercial,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 commercial,POST /v1/patients/{id}/merge,patients:delete,deny-401
+commercial,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 commercial,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 commercial,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 commercial,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
@@ -1805,8 +1844,11 @@ commercial,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 commercial,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 commercial,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 commercial,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+commercial,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
+commercial,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 commercial,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 commercial,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
+commercial,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 compliance_dpo,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 compliance_dpo,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 compliance_dpo,DELETE /v1/departments/{id},departments:delete,deny-401
@@ -1894,6 +1936,7 @@ compliance_dpo,GET /v1/patients/merges,patients:delete,deny-401
 compliance_dpo,GET /v1/patients/registry,patients:view,deny-401
 compliance_dpo,GET /v1/patients/{id},patients:view,deny-401
 compliance_dpo,GET /v1/patients/{patientId}/messages,patients:view,deny-401
+compliance_dpo,GET /v1/patients/{patientId}/privacy-notice,patients:view,deny-401
 compliance_dpo,GET /v1/pharmacy/dispensing-queue,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/items,pharmacy:view,deny-401
 compliance_dpo,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,deny-401
@@ -1933,6 +1976,8 @@ compliance_dpo,GET /v1/roles/delegations,staff:view,deny-401
 compliance_dpo,GET /v1/roles/{id},staff:view,deny-401
 compliance_dpo,GET /v1/schedule/day,queue:view,deny-401
 compliance_dpo,GET /v1/schedule/week,queue:view,deny-401
+compliance_dpo,GET /v1/settings/integrations/abdm,setup:view,deny-401
+compliance_dpo,GET /v1/settings/privacy/privacy-notice,setup:view,deny-401
 compliance_dpo,GET /v1/setup/charges,setup:view,deny-401
 compliance_dpo,GET /v1/setup/checklist,setup:view,deny-401
 compliance_dpo,GET /v1/setup/consent-contact,setup:view,deny-401
@@ -2052,6 +2097,7 @@ compliance_dpo,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-401
 compliance_dpo,POST /v1/patients/{id}/consent/withdraw,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/guardian/review,patients:edit,deny-401
 compliance_dpo,POST /v1/patients/{id}/merge,patients:delete,deny-401
+compliance_dpo,POST /v1/patients/{patientId}/privacy-notice/acknowledge,patients:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/items,pharmacy:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/items/{id}/stock-adjustments,pharmacy:edit,deny-401
 compliance_dpo,POST /v1/pharmacy/rx-lines/search,billing:create,deny-401
@@ -2106,5 +2152,8 @@ compliance_dpo,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 compliance_dpo,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 compliance_dpo,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 compliance_dpo,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+compliance_dpo,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
+compliance_dpo,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 compliance_dpo,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
 compliance_dpo,PUT /v1/staff/{id}/clinical-licence,staff:edit,deny-401
+compliance_dpo,PUT /v1/staff/{id}/hpr,staff:edit,deny-401

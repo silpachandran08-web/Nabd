@@ -61,6 +61,27 @@ paths:
       tags:
       - config
       x-required-permission: public
+  /abdm/v3/callbacks/**:
+    post:
+      operationId: AbdmCallbackController_callback
+      parameters:
+      - in: header
+        name: Authorization
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - identity
+      x-required-permission: public
   /internal/v1/consents:export:
     get:
       operationId: ConsentExportController_export
@@ -7574,6 +7595,82 @@ paths:
       tags:
       - patient
       x-required-permission: patients:view
+  /v1/patients/{patientId}/privacy-notice:
+    get:
+      operationId: NoticeController_status
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PrivacyNoticeStatus"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:view
+  /v1/patients/{patientId}/privacy-notice/acknowledge:
+    post:
+      operationId: NoticeController_acknowledge
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PrivacyNoticeStatus"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: patients:edit
   /v1/pharmacy/dispensing-queue:
     get:
       operationId: PharmacyController_dispensingQueue
@@ -9756,6 +9853,42 @@ paths:
       tags:
       - platform
       x-required-permission: territories:view
+  /v1/public/notices/{tenantSlug}/{version}:
+    get:
+      operationId: PublicNoticeController_page
+      parameters:
+      - in: path
+        name: tenantSlug
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: version
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: lang
+        required: false
+        schema:
+          type: string
+          default: en
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: public
   /v1/queue:
     get:
       operationId: QueueController_list
@@ -11019,6 +11152,152 @@ paths:
       tags:
       - queue
       x-required-permission: queue:view
+  /v1/settings/integrations/abdm:
+    get:
+      operationId: AbdmController_get
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AbdmSettings"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - identity
+      x-required-permission: setup:view
+    put:
+      operationId: AbdmController_put
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AbdmSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AbdmSettings"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - identity
+      x-required-permission: setup:edit
+  /v1/settings/privacy/privacy-notice:
+    get:
+      operationId: NoticeController_versions
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PrivacyNoticeVersions"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: setup:view
+    put:
+      operationId: NoticeController_publish
+      parameters:
+      - in: header
+        name: X-Step-Up-Token
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivacyNoticePublishRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PrivacyNoticePublished"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - patient
+      x-required-permission: setup:edit
   /v1/setup/charges:
     get:
       operationId: SetupController_charges
@@ -13220,6 +13499,50 @@ paths:
       tags:
       - staff
       x-required-permission: staff:edit
+  /v1/staff/{id}/hpr:
+    put:
+      operationId: StaffHprController_put
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffHprRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/StaffHpr"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - staff
+      x-required-permission: staff:edit
   /v1/staff/{id}/mfa/reset:
     post:
       operationId: StaffController_resetMfa
@@ -13673,6 +13996,26 @@ paths:
       x-required-permission: public
 components:
   schemas:
+    AbdmSettings:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        hfrId:
+          type: string
+        hfrVerified:
+          type: boolean
+    AbdmSettingsRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        hfrId:
+          type: string
+          maxLength: 40
+          minLength: 0
+      required:
+      - enabled
     AcceptInviteRequest:
       type: object
       properties:
@@ -18313,6 +18656,76 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Component"
+    PrivacyNoticePublishRequest:
+      type: object
+      properties:
+        baseVersion:
+          type: string
+          description: The version being edited; a different current version gives
+            409 version-conflict
+        basedOnTemplate:
+          type: string
+          maxLength: 60
+          minLength: 0
+        bodyMd:
+          type: string
+          maxLength: 50000
+          minLength: 0
+        language:
+          type: string
+          minLength: 1
+          pattern: "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$"
+      required:
+      - basedOnTemplate
+      - bodyMd
+      - language
+    PrivacyNoticePublished:
+      type: object
+      properties:
+        version:
+          type: string
+    PrivacyNoticeStatus:
+      type: object
+      properties:
+        acceptedVersion:
+          type: string
+        currentVersion:
+          type: string
+        language:
+          type: string
+        needsReAcknowledgement:
+          type: boolean
+    PrivacyNoticeVersion:
+      type: object
+      properties:
+        bodyMd:
+          type: string
+        current:
+          type: boolean
+        effectiveFrom:
+          type: string
+          format: date-time
+        language:
+          type: string
+        legalReviewed:
+          type: boolean
+        lockedClauses:
+          type: array
+          items:
+            type: string
+        mandatoryHash:
+          type: string
+        templateKey:
+          type: string
+        version:
+          type: string
+    PrivacyNoticeVersions:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrivacyNoticeVersion"
     Problem:
       type: object
       description: RFC 7807 problem+json (GlobalExceptionHandler)
@@ -19312,6 +19725,24 @@ components:
         timeout:
           type: integer
           format: int64
+    StaffHpr:
+      type: object
+      properties:
+        hprId:
+          type: string
+        hprVerified:
+          type: boolean
+        staffId:
+          type: string
+    StaffHprRequest:
+      type: object
+      properties:
+        hprId:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9@._-]{3,60}$"
+      required:
+      - hprId
     StaffInviteRequest:
       type: object
       properties:
