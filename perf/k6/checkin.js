@@ -19,7 +19,7 @@ export const options = {
   summaryTrendStats: ['p(50)', 'p(95)', 'p(99)', 'max', 'count'],
 };
 
-const today = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10); // seed tenants are Asia/Kolkata
+export const today = () => new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10); // seed tenants are Asia/Kolkata
 
 /** Per tenant: today's bookings (appointment check-ins) and registry patients without one (walk-ins). */
 export function setup() {

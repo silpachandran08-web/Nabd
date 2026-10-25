@@ -49,7 +49,7 @@ export function token(acc) {
 export const auth = (t, extra = {}) => ({ headers: { Authorization: `Bearer ${t}`, ...extra } });
 
 /** p50/p95/p99 and error rate per tagged request name, the shape perf/report.mjs reads. */
-export function summarize(data, profile) {
+export function summarize(data, profile, file = profile) {
   const out = { profile, generatedAt: new Date().toISOString(), env: { base: BASE, tenants: TENANTS, rate: __ENV.RATE, duration: __ENV.DURATION }, endpoints: {} };
   for (const [key, m] of Object.entries(data.metrics)) {
     const hit = key.match(/^http_req_duration\{name:(.+)\}$/);
@@ -62,5 +62,5 @@ export function summarize(data, profile) {
   out.custom = Object.fromEntries(Object.entries(data.metrics).filter(([k]) => /^(duplicate_tokens|checkins|dropped_iterations)$/.test(k)).map(([k, m]) => [k, m.values]));
   out.thresholds = Object.fromEntries(Object.entries(data.metrics).filter(([, m]) => m.thresholds)
     .map(([k, m]) => [k, Object.fromEntries(Object.entries(m.thresholds).map(([t, v]) => [t, v.ok]))]));
-  return { [`${__ENV.OUT || '.'}/${profile}-summary.json`]: JSON.stringify(out, null, 2), stdout: JSON.stringify(out.overall) + '\n' };
+  return { [`${__ENV.OUT || '.'}/${file}-summary.json`]: JSON.stringify(out, null, 2), stdout: JSON.stringify(out.overall) + '\n' };
 }
