@@ -136,6 +136,13 @@ app:
     # Documented env var names (APP_JWT_KEYS_* still win via relaxed binding).
     keys-file: ${JWT_KEYS_FILE:}
     keys-json: ${JWT_KEYS_JSON:}
+    # PLT-009: one key set per token population (the prod profile refuses to boot without each)
+    owner: { keys-file: "${JWT_OWNER_KEYS_FILE:}", keys-json: "${JWT_OWNER_KEYS_JSON:}" }
+    platform: { keys-file: "${JWT_PLATFORM_KEYS_FILE:}", keys-json: "${JWT_PLATFORM_KEYS_JSON:}" }
+    internal: { jwks-file: "${JWT_INTERNAL_JWKS_FILE:}", jwks-json: "${JWT_INTERNAL_JWKS_JSON:}" }  # PUBLIC keys of the calling services
+  internal:  # ACC-038: /internal/v1 chain. A client certificate is always required under the prod profile.
+    require-client-cert: ${INTERNAL_REQUIRE_CLIENT_CERT:false}
+    client-cert-header: ${INTERNAL_CLIENT_CERT_HEADER:}   # set when the ingress terminates mTLS and forwards the verified cert's SHA-256 thumbprint
   outbox:
     poll-interval-ms: 2000
     batch-size: 20

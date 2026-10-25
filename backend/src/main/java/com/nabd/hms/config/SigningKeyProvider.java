@@ -31,15 +31,22 @@ public interface SigningKeyProvider {
             + "or JWT_KEYS_JSON (a JWKS with 2 RSA private keys). Refusing to boot under the prod profile without them.";
 
     static SigningKeyProvider from(Environment env) {
-        String file = env.getProperty("app.jwt.keys-file", "");
-        String json = env.getProperty("app.jwt.keys-json", "");
+        return from(env, "app.jwt", "JWT_KEYS_FILE", "JWT_KEYS_JSON");
+    }
+
+    /** PLT-009: one key set per token population, each under its own property prefix / env var pair. */
+    static SigningKeyProvider from(Environment env, String prefix, String fileVar, String jsonVar) {
+        String file = env.getProperty(prefix + ".keys-file", "");
+        String json = env.getProperty(prefix + ".keys-json", "");
         try {
             if (!file.isBlank()) return of(Files.readString(Path.of(file), StandardCharsets.UTF_8));
         } catch (IOException e) {
-            throw new IllegalStateException("JWT_KEYS_FILE is set but unreadable: " + file);
+            throw new IllegalStateException(fileVar + " is set but unreadable: " + file);
         }
         if (!json.isBlank()) return of(json);
-        if (env.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"))) throw new IllegalStateException(MISSING);
+        if (env.acceptsProfiles(org.springframework.core.env.Profiles.of("prod")))
+            throw new IllegalStateException("JWT_KEYS_FILE".equals(fileVar) ? MISSING
+                    : "JWT signing keys are not configured: set " + fileVar + " or " + jsonVar + ". Refusing to boot under the prod profile without them.");
         return ephemeral();
     }
 

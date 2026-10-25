@@ -41,6 +41,7 @@ public class IdempotencyFilter extends OncePerRequestFilter {
 
     public static final String HEADER = "Idempotency-Key";
     public static final String REPLAYED = "Idempotent-Replayed";
+    private static final java.util.regex.Pattern INTERNAL_TENANT = java.util.regex.Pattern.compile("^/internal/v1/tenants/([^/]+)/.*$");
     private static final Logger log = LoggerFactory.getLogger(IdempotencyFilter.class);
 
     private final ObjectProvider<RequestMappingHandlerMapping> mappings; // lazy: MVC beans are not ready while SecurityConfig builds
@@ -63,6 +64,13 @@ public class IdempotencyFilter extends OncePerRequestFilter {
         UUID key = parse(rawKey);
         UUID tenant = parse(jwt.getToken().getClaimAsString("tenantId"));
         UUID actor = parse(jwt.getToken().getSubject());
+        if (tenant == null && "internal".equals(jwt.getToken().getClaimAsString("typ"))) { // ACC-038: a service token keys on (path tenant, service id)
+            java.util.regex.Matcher m = INTERNAL_TENANT.matcher(request.getRequestURI());
+            if (m.matches() && jwt.getToken().getSubject() != null) {
+                tenant = parse(m.group(1));
+                actor = UUID.nameUUIDFromBytes(("service:" + jwt.getToken().getSubject()).getBytes(StandardCharsets.UTF_8));
+            }
+        }
         if (tenant == null || actor == null) { // not a staff token: leave the 401/403 to the normal chain
             chain.doFilter(request, response);
             return;

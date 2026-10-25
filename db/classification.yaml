@@ -402,6 +402,11 @@ schemas:
       response_body_enc: phi  # uncertain: cached responses of clinical endpoints
       created_at: operational
       expires_at: operational
+    internal_patient_refs:
+      tenant_id: operational
+      patient_ref: pii  # opaque random token that stands in for a patient toward the Edge; it identifies a patient only through this table
+      patient_id: pii
+      created_at: operational
     invoice_discounts:
       id: operational
       tenant_id: operational

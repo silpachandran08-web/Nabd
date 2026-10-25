@@ -10,7 +10,8 @@ public enum TokenType {
     MFA_PENDING("mfa_pending", Audience.MFA, Audience.PLATFORM_MFA),
     MFA_SETUP("mfa_setup", Audience.MFA, Audience.PLATFORM_MFA),
     STEP_UP("step_up", Audience.STEP_UP),
-    OWNER_SELECT("owner_select", Audience.OWNER_SELECT);
+    OWNER_SELECT("owner_select", Audience.OWNER_SELECT),
+    INTERNAL("internal", Audience.INTERNAL); // PLT-009: only /internal/v1/** accepts it
 
     public static final String CLAIM = "typ";
 
