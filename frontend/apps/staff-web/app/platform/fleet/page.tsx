@@ -164,13 +164,13 @@ export default function FleetPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Clinic</th>
-                    <th>Region</th>
-                    <th>Status</th>
-                    <th>Brand</th>
-                    <th>Owner</th>
-                    <th>Privileged MFA</th>
-                    {canRequestSupportAccess && <th></th>}
+                    <th scope="col">Clinic</th>
+                    <th scope="col">Region</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Brand</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Privileged MFA</th>
+                    {canRequestSupportAccess && <th scope="col"></th>}
                   </tr>
                 </thead>
                 <tbody>

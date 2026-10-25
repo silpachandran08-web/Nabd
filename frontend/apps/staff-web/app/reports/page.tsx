@@ -402,7 +402,7 @@ export default function ReportsPage() {
           <div className={styles.muted}>No visits recorded yet.</div>
         ) : (
           <div style={{ overflowX: "auto" }}><table className={styles.table}>
-            <thead><tr><th>Source</th><th>Visits</th><th>Revenue{m ? ` (${m.currency})` : ""}</th></tr></thead>
+            <thead><tr><th scope="col">Source</th><th scope="col">Visits</th><th scope="col">Revenue{m ? ` (${m.currency})` : ""}</th></tr></thead>
             <tbody>
               {sources.map((s) => (
                 <tr key={s.source}><td>{s.source.replace("_", " ")}</td><td>{s.visitCount}</td>
@@ -434,7 +434,7 @@ export default function ReportsPage() {
             <div className={styles.muted}>No payments recorded yet.</div>
           ) : (
             <div style={{ overflowX: "auto" }}><table className={styles.table}>
-              <thead><tr><th>Staff</th><th>Handled</th><th>Collected</th><th>Payments</th><th>Discounts</th><th>Overrides</th></tr></thead>
+              <thead><tr><th scope="col">Staff</th><th scope="col">Handled</th><th scope="col">Collected</th><th scope="col">Payments</th><th scope="col">Discounts</th><th scope="col">Overrides</th></tr></thead>
               <tbody>
                 {staffPerf.rows.map((s) => (
                   <tr key={s.staffId}><td>{s.staffName}</td><td>{dash(s.handledCount)}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td><td>{dash(s.discountCount)}</td><td>{dash(s.overrideCount)}</td></tr>
@@ -548,7 +548,7 @@ export default function ReportsPage() {
                 <div className={styles.muted}>No expired packages with value left.</div>
               ) : (
                 <div style={{ overflowX: "auto" }}><table className={styles.table}>
-                  <thead><tr><th>Patient</th><th>Package</th><th>Expired on</th><th>Value left</th>{canEdit && <th>Action</th>}</tr></thead>
+                  <thead><tr><th scope="col">Patient</th><th scope="col">Package</th><th scope="col">Expired on</th><th scope="col">Value left</th>{canEdit && <th scope="col">Action</th>}</tr></thead>
                   <tbody>
                     {expired.map((e) => (
                       <tr key={e.instanceId}>
@@ -603,7 +603,7 @@ export default function ReportsPage() {
             <div className={styles.muted}>No billing leakage found.</div>
           ) : (
             <table className={styles.table}>
-              <thead><tr><th>Patient</th><th>Charge</th><th>Amount</th><th>Completed</th></tr></thead>
+              <thead><tr><th scope="col">Patient</th><th scope="col">Charge</th><th scope="col">Amount</th><th scope="col">Completed</th></tr></thead>
               <tbody>
                 {leakage.entries.map((e) => (
                   <tr key={e.procedureOrderId}>
@@ -651,7 +651,7 @@ export default function ReportsPage() {
             <div className={styles.muted}>Nobody flagged today.</div>
           ) : (
             <table className={styles.table}>
-              <thead><tr><th>Patient</th><th>Prior no-shows</th></tr></thead>
+              <thead><tr><th scope="col">Patient</th><th scope="col">Prior no-shows</th></tr></thead>
               <tbody>
                 {noShowRisk.entries.map((e) => (
                   <tr key={e.patientId}><td>{e.patientName}</td><td>{e.priorNoShowCount}</td></tr>
@@ -676,7 +676,7 @@ export default function ReportsPage() {
                 <div className={styles.muted}>No delays in the last 90 days.</div>
               ) : (
                 <table className={styles.table}>
-                  <thead><tr><th>Doctor</th><th>Delay events</th><th>Avg minutes</th><th>Same-day repeat</th></tr></thead>
+                  <thead><tr><th scope="col">Doctor</th><th scope="col">Delay events</th><th scope="col">Avg minutes</th><th scope="col">Same-day repeat</th></tr></thead>
                   <tbody>
                     {punctuality.entries.map((e) => (
                       <tr key={e.doctorId}>

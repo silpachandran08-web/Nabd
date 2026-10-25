@@ -329,7 +329,7 @@ export default function BillingPage() {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Clinic</th><th>Plan</th><th>MRR</th><th>Renewal</th><th>Seats</th><th>Status</th>{access.canBill && <th></th>}
+                      <th scope="col">Clinic</th><th scope="col">Plan</th><th scope="col">MRR</th><th scope="col">Renewal</th><th scope="col">Seats</th><th scope="col">Status</th>{access.canBill && <th scope="col"></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -403,7 +403,7 @@ export default function BillingPage() {
                 <table className={styles.table}>
                   <thead>
                     <tr>
-                      <th>Clinic</th><th>Requested by</th><th>%</th><th>Reason</th><th>Status</th><th>Reviewed by</th>{access.isSuper && <th></th>}
+                      <th scope="col">Clinic</th><th scope="col">Requested by</th><th scope="col">%</th><th scope="col">Reason</th><th scope="col">Status</th><th scope="col">Reviewed by</th>{access.isSuper && <th scope="col"></th>}
                     </tr>
                   </thead>
                   <tbody>

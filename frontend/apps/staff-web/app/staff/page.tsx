@@ -611,14 +611,14 @@ export default function StaffAccessPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Staff member</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Restriction</th>
-                  <th>Active</th>
-                  {showLogin && <th>Login</th>}
-                  {showLogin && <th>MFA</th>}
-                  <th></th>
+                  <th scope="col">Staff member</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Restriction</th>
+                  <th scope="col">Active</th>
+                  {showLogin && <th scope="col">Login</th>}
+                  {showLogin && <th scope="col">MFA</th>}
+                  <th scope="col"></th>
                 </tr>
               </thead>
               <tbody>
@@ -718,7 +718,7 @@ export default function StaffAccessPage() {
               <div className={styles.card}>
                 <div className={styles.tableWrap}>
                   <table className={styles.table} aria-label="Clinicians to confirm">
-                    <thead><tr><th>Staff</th><th>Role</th><th>Why</th><th></th></tr></thead>
+                    <thead><tr><th scope="col">Staff</th><th scope="col">Role</th><th scope="col">Why</th><th scope="col"></th></tr></thead>
                     <tbody>
                       {review.map((r) => (
                         <tr key={r.staffId}>
@@ -750,7 +750,7 @@ export default function StaffAccessPage() {
               <div className={styles.card}>
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
-                    <thead><tr><th>Staff</th><th>Reason</th><th>Activated</th><th>Expires</th></tr></thead>
+                    <thead><tr><th scope="col">Staff</th><th scope="col">Reason</th><th scope="col">Activated</th><th scope="col">Expires</th></tr></thead>
                     <tbody>
                       {breakGlass.map((g) => (
                         <tr key={g.grantId}>
@@ -871,9 +871,9 @@ export default function StaffAccessPage() {
               <table className={styles.matrixTable}>
                 <thead>
                   <tr>
-                    <th>Module</th>
-                    <th>All</th>
-                    {ACTIONS.map((a) => <th key={a.key}>{a.label}</th>)}
+                    <th scope="col">Module</th>
+                    <th scope="col">All</th>
+                    {ACTIONS.map((a) => <th scope="col" key={a.key}>{a.label}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -932,9 +932,8 @@ export default function StaffAccessPage() {
       )}
 
       {stepUpFor && (
-        <div className={styles.stepUpOverlay}>
-          <form className={styles.stepUpCard} onSubmit={confirmStepUp}>
-            <h2 className={styles.stepUpTitle}>Confirm it&apos;s you</h2>
+        <Dialog title="Confirm it's you" onClose={() => setStepUpFor(null)}>
+          <form onSubmit={confirmStepUp}>
             <p className={styles.stepUpText}>{stepUpKind === "reset" ? "Resetting an authenticator" : "Suspending a staff member"} needs a fresh code from your authenticator app.</p>
             {stepUpError && <div className={styles.formError} role="alert">{stepUpError}</div>}
             <div className={styles.field}>
@@ -958,7 +957,7 @@ export default function StaffAccessPage() {
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </main>
   );

@@ -6,6 +6,7 @@ import Link from "next/link";
 import styles from "./billing.module.css";
 import { getIdentity, getPermissions } from "../lib/session";
 import { can } from "../lib/permissions";
+import Dialog from "../components/ui/Dialog";
 import Icon, { type IconName } from "../components/ui/Icon";
 import { isKsa, paymentMethodLabel } from "@nabd/domain";
 import { apiFetch, goLogin } from "../lib/apiClient";
@@ -360,14 +361,6 @@ export default function BillingPage() {
   );
 }
 
-function useEscape(onClose: () => void) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-}
-
 async function problemDetail(res: Response, fallback: string): Promise<string> {
   const p: Problem = await res.json().catch(() => ({ title: "Error", detail: fallback }));
   return p.detail || p.title || fallback;
@@ -383,7 +376,6 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  useEscape(onClose);
   const blocked = summary.unbilled.length > 0;
   const canSubmit = !blocked && variance !== null && (!beyond || note.trim() !== "");
 
@@ -409,9 +401,8 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="close-title" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h2 id="close-title" className={styles.dialogTitle}>{summary.close?.status === "reopened" ? "Close the day again" : "Day close"}</h2>
+    <Dialog title={summary.close?.status === "reopened" ? "Close the day again" : "Day close"} onClose={onClose}>
+      <form onSubmit={submit}>
         <p className={styles.dialogSub}>{formatDate(summary.date)} · billing locks once the day is closed</p>
         <div className={styles.step}><span>1. Pending issues</span>
           <span className={blocked ? styles.amtBad : styles.amtOk}>{blocked ? `${summary.unbilled.length} blocking` : "None"}</span></div>
@@ -443,7 +434,7 @@ function CloseDialog({ summary, money, counted, setCounted, variance, beyond, au
           <button type="submit" className={styles.btnPrimary} disabled={!canSubmit || saving}>{saving ? "Closing…" : "Close the day"}</button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }
 
@@ -456,7 +447,6 @@ function ReopenDialog({ date, authedFetch, onClose, onDone }: {
   const [other, setOther] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  useEscape(onClose);
   const reason = choice === "other" ? other.trim() : choice;
 
   async function submit(e: React.FormEvent) {
@@ -479,9 +469,8 @@ function ReopenDialog({ date, authedFetch, onClose, onDone }: {
   }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="reopen-title" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h2 id="reopen-title" className={styles.dialogTitle}>Unlock a closed day</h2>
+    <Dialog title="Unlock a closed day" onClose={onClose}>
+      <form onSubmit={submit}>
         <p className={styles.dialogSub}>Unlocking reopens {formatDate(date)} so it can be corrected and closed again. It is recorded in the audit log with your name, the time and your reason.</p>
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
           <legend className={styles.countLabel}>Reason (required)</legend>
@@ -502,6 +491,6 @@ function ReopenDialog({ date, authedFetch, onClose, onDone }: {
           <button type="submit" className={styles.btnPrimary} disabled={!reason || saving}>{saving ? "Unlocking…" : "Unlock day"}</button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }

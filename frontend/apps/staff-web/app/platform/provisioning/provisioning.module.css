@@ -304,7 +304,6 @@
   color: var(--nb-text-primary);
   font-size: 14px;
   font-family: inherit;
-  outline: none;
   min-width: 120px;
 }
 

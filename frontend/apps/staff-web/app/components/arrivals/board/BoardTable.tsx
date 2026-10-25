@@ -14,7 +14,7 @@ export default function BoardTable({ rows, staff, grants, sendingId, h, onOpen }
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
-          <tr><th>Token</th><th>Patient</th><th className={styles.colVisit}>Visit</th><th className={styles.colDoctor}>Doctor</th><th>Wait</th><th>Status</th><th><span className={styles.srOnly}>Actions</span></th></tr>
+          <tr><th scope="col">Token</th><th scope="col">Patient</th><th scope="col" className={styles.colVisit}>Visit</th><th scope="col" className={styles.colDoctor}>Doctor</th><th scope="col">Wait</th><th scope="col">Status</th><th scope="col"><span className={styles.srOnly}>Actions</span></th></tr>
         </thead>
         <tbody>
           {rows.map((r) => (

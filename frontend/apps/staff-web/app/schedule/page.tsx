@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./schedule.module.css";
 import NewAppointmentDialog from "./NewAppointmentDialog";
+import Dialog from "../components/ui/Dialog";
 import { getPermissions } from "../lib/session";
 import { can } from "../lib/permissions";
 import { CancelAppointmentDialog, MoveAppointmentDialog } from "./AppointmentActions";
@@ -432,15 +433,9 @@ function WeekRow({ label, week, onPick }: { label: string; week: Week; onPick: (
 function InfoDialog({ title, sub, rows, action, extra, onClose }: {
   title: string; sub: string; rows: [string, string][]; action?: { label: string; href: string }; extra?: ReactNode; onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="info-title" onClick={(e) => e.stopPropagation()}>
-        <h2 id="info-title" className={styles.dialogTitle}>{title}</h2>
+    <Dialog title={title} onClose={onClose}>
+      <div>
         <p className={styles.dialogSub}>{sub}</p>
         {rows.map(([k, v]) => (
           <div key={k} className={styles.detailRow}><span className={styles.detailKey}>{k}</span><span>{v}</span></div>
@@ -451,6 +446,6 @@ function InfoDialog({ title, sub, rows, action, extra, onClose }: {
           <button type="button" className={styles.btnPrimary} onClick={onClose} autoFocus>Got it</button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

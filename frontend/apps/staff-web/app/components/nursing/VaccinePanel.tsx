@@ -148,7 +148,7 @@ export default function VaccinePanel({ authedFetch, reloadKey }: { authedFetch: 
         {rows !== null && rows.length === 0 && <EmptyState icon="syringe" title="No vaccines recorded today" hint="Vaccines you record appear here." />}
         {rows !== null && rows.length > 0 && (
           <table className={styles.table}>
-            <thead><tr><th>Time</th><th>Patient</th><th>Vaccine</th><th>Dose · route</th><th>Lot</th><th>Recorded by</th></tr></thead>
+            <thead><tr><th scope="col">Time</th><th scope="col">Patient</th><th scope="col">Vaccine</th><th scope="col">Dose · route</th><th scope="col">Lot</th><th scope="col">Recorded by</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>

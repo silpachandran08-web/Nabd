@@ -471,7 +471,7 @@ export default function ProvisioningPage() {
               <span className={styles.frd}>SSA-01 / SYS-14 · installation secrets are separate from tenant integrations — two different roles</span>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Secret</th><th>Owner</th><th>Note</th></tr></thead>
+                  <thead><tr><th scope="col">Secret</th><th scope="col">Owner</th><th scope="col">Note</th></tr></thead>
                   <tbody>
                     {SECRETS.map((s) => (
                       <tr key={s.label}><td>{s.label}</td><td>{s.owner}</td><td className={styles.muted}>{s.sub}</td></tr>

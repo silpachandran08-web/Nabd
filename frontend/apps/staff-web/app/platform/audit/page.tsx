@@ -314,12 +314,12 @@ export default function AuditLogPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>When</th>
-                    <th>Clinic</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Entity</th>
-                    <th>Changes</th>
+                    <th scope="col">When</th>
+                    <th scope="col">Clinic</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Entity</th>
+                    <th scope="col">Changes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -381,7 +381,7 @@ export default function AuditLogPage() {
             ) : (
               <table className={styles.diffTable}>
                 <thead>
-                  <tr><th>Field</th><th>Before</th><th>After</th></tr>
+                  <tr><th scope="col">Field</th><th scope="col">Before</th><th scope="col">After</th></tr>
                 </thead>
                 <tbody>
                   {changes.map((c) => (

@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "declaration-property-value-disallowed-list": [
+      { "/^outline(-style)?$/": ["none", "0"] },
+      { "message": "FEF-027: do not remove the focus outline; the global :focus-visible ring (--nb-focus-ring) must stay visible." }
+    ]
+  }
+}

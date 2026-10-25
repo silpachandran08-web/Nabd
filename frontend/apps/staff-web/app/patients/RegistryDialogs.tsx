@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import styles from "./patients.module.css";
 import StatusPill from "../components/ui/StatusPill";
+import Dialog from "../components/ui/Dialog";
 import { fingerprint, submitKeyed } from "../lib/idempotency";
 import type { Problem } from "@nabd/api-client/types";
 import { age } from "@nabd/domain";
@@ -20,14 +21,6 @@ function formatScore(score: number): string {
 // TODO(needs-legal-review): consent wording is a placeholder from S4 CGV-005; legal must approve before go-live.
 const GUARDIAN_CONSENT_TEXT = "Guardian has agreed to access on this patient's behalf";
 const CONSENT_CHANNELS = [["in_person", "In person"], ["phone", "Phone"], ["written", "Written"]] as const;
-
-function useEscape(onClose: () => void) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-}
 
 /** ACC-028: the server's field error for the phone (it names the clinic country), shown under the input. */
 export function phoneFieldError(p: Problem | null): string | null {
@@ -53,7 +46,6 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
   const [error, setError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  useEscape(onClose);
 
   const minor = !!form.dob && age(form.dob, clinicToday()) < 18;
 
@@ -110,10 +102,8 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
 
   const ready = form.name.trim() && form.phone.trim() && form.dob && form.gender && (!minor || (guardian && consent && channel));
   return (
-    <div className={styles.dialogOverlay} onClick={onClose}>
-      <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="register-title"
-        onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); void send(false); }}>
-        <h2 id="register-title" className={styles.dialogTitle}>Register patient</h2>
+    <Dialog title="Register patient" onClose={onClose}>
+      <form className={styles.dialogForm} onSubmit={(e) => { e.preventDefault(); void send(false); }}>
 
         {candidates ? (
           <>
@@ -199,6 +189,6 @@ export function RegisterDialog({ authedFetch, onClose, onRegistered, onOpenExist
           </>
         )}
       </form>
-    </div>
+    </Dialog>
   );
 }

@@ -326,9 +326,9 @@ function SetupWizard() {
           const status = checklist.find((c) => c.step === s.key)?.status ?? "pending";
           const className = status === "done" ? styles.stepDone : status === "skipped" ? styles.stepSkipped : styles.step;
           return (
-            <div key={s.key} className={className} onClick={() => setStepIndex(i)} role="button" tabIndex={0}>
+            <button key={s.key} type="button" className={className} onClick={() => setStepIndex(i)} aria-current={i === stepIndex ? "step" : undefined}>
               {s.title}
-            </div>
+            </button>
           );
         })}
       </div>

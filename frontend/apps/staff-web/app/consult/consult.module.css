@@ -222,7 +222,6 @@
   color: var(--nb-text-primary);
   font-size: 14px;
   font-family: inherit;
-  outline: none;
   resize: vertical;
 }
 
@@ -273,7 +272,6 @@
   color: var(--nb-text-primary);
   font-size: 14px;
   font-family: inherit;
-  outline: none;
 }
 
 .input:disabled {

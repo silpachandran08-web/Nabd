@@ -59,6 +59,10 @@
   --nb-space-48: 48px;
   --nb-space-64: 64px;
 
+  /* FEF-027: one focus ring for every control. #2ed3e0 on the darkest/lightest dark surfaces is >= 9:1 (WCAG 1.4.11 needs 3:1).
+     A light theme (none approved yet, §1.7) only has to redefine this token. */
+  --nb-focus-ring: #2ed3e0;
+
   --nb-dur-base: 180ms;
   --nb-ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
 }
@@ -158,4 +162,31 @@ button:active {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+:root[data-theme="light"] {
+  --nb-focus-ring: #0b6f7a; /* >= 3:1 on white and on light surfaces */
+}
+
+/* FEF-027: global focus-visible ring; page CSS must not remove it (stylelint a11y/no-outline-none). */
+:focus-visible {
+  outline: 2px solid var(--nb-focus-ring);
+  outline-offset: 2px;
+}
+
+.skipLink {
+  position: absolute;
+  inset-block-start: -100px;
+  inset-inline-start: var(--nb-space-8);
+  z-index: 1000;
+  padding: var(--nb-space-12) var(--nb-space-16);
+  background: var(--nb-surface-overlay);
+  color: var(--nb-text-primary);
+  border: 1px solid var(--nb-border-strong);
+  border-radius: var(--nb-radius-md);
+  min-block-size: 44px;
+}
+
+.skipLink:focus {
+  inset-block-start: var(--nb-space-8);
 }

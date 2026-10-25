@@ -158,7 +158,7 @@ export default function WhatsAppTemplates({ authedFetch }: { authedFetch: (path:
         <div className={styles.tableWrap}>
           <table className={styles.table}>
             <thead>
-              <tr><th>Name</th><th>Language</th><th>Message</th><th>Status</th><th>Quality</th><th></th></tr>
+              <tr><th scope="col">Name</th><th scope="col">Language</th><th scope="col">Message</th><th scope="col">Status</th><th scope="col">Quality</th><th scope="col"></th></tr>
             </thead>
             <tbody>
               {templates.map((t) => (
