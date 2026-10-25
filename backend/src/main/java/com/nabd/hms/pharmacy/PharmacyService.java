@@ -1,6 +1,7 @@
 package com.nabd.hms.pharmacy;
 
 import com.nabd.hms.iam.api.ActorDirectory;
+import com.nabd.hms.clinical.api.DrugMasterLookup;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.DomainEventType;
@@ -41,9 +42,11 @@ public class PharmacyService {
 
     private final ActorDirectory actors;
     private final EventPublisher events;
+    private final DrugMasterLookup drugs;
 
     PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService, ActorDirectory actors,
-                    EventPublisher events) {
+                    EventPublisher events, DrugMasterLookup drugs) {
+        this.drugs = drugs;
         this.events = events;
         this.actors = actors;
         this.repo = repo;
@@ -232,7 +235,26 @@ public class PharmacyService {
 
     private PharmacyItemResponse toResponse(PharmacyItemRow r) {
         return new PharmacyItemResponse(r.id().toString(), r.code(), r.name(), r.isRx(), r.hsnCode(), r.price(),
-                r.taxRatePercent(), r.stockQty(), r.active());
+                r.taxRatePercent(), r.stockQty(), r.active(), r.drugId());
+    }
+
+    /** CLN-019: owner maps an in-house item to a drug master id. is_rx is only SUGGESTED (scheduled product => prescription-only);
+     * the clinic's own flag and the price stay as they are. A product retired in the KB cannot be linked to a new item. */
+    @Transactional
+    public Map<String, Object> linkDrug(UUID tenantId, UUID callerStaffId, String ipAddress, UUID id, String drugId) {
+        requireHybridMode(tenantId);
+        PharmacyItemRow item = repo.findItem(tenantId, id).orElseThrow(this::notFound);
+        DrugMasterLookup.DrugRef drug = drugs.find(drugId).filter(DrugMasterLookup.DrugRef::active).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "DRUG_NOT_FOUND", "Drug not found", "No such drug in the drug master."));
+        repo.setDrug(tenantId, id, drug.id());
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "pharmacy.item_drug_linked",
+                "pharmacy_item", id, item.drugId() == null ? null : Map.of("drugId", item.drugId()), Map.of("drugId", drug.id()));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("itemId", id);
+        out.put("drugId", drug.id());
+        out.put("suggestedIsRx", drug.scheduled());
+        return out;
     }
 
     private ApiException notFound() {

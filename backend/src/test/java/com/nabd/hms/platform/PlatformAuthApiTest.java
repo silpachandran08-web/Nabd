@@ -182,7 +182,7 @@ class PlatformAuthApiTest extends ApiTestBase {
         String token = platformLoginAndGetAccessToken(operator);
 
         ResponseEntity<Map> resp = exchange("/v1/platform/auth/me", HttpMethod.GET, authed(token), Map.class);
-        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(20).contains("safety_content:edit", "support_access:request", "messaging_operations:override");
+        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(21).contains("kb_import:edit", "safety_content:edit", "support_access:request", "messaging_operations:override");
     }
 
     @Test

@@ -71,6 +71,17 @@ public class PharmacyController {
         return service.updateItem(tenantId(jwt), id, req);
     }
 
+    public record DrugLinkRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 80) String drugId) {
+    }
+
+    /** CLN-019: map the item to a drug master product (idempotent: same body, same result). */
+    @org.springframework.web.bind.annotation.PutMapping("/items/{id}/drug-link")
+    @PreAuthorize("hasAuthority('pharmacy:edit')")
+    public java.util.Map<String, Object> linkDrug(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                  @Valid @RequestBody DrugLinkRequest req, HttpServletRequest http) {
+        return service.linkDrug(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req.drugId());
+    }
+
     /** V2-004: the only way to change stock by hand. Relative (`delta`) or stock-take (`setTo`), reason required. */
     @PostMapping("/items/{id}/stock-adjustments")
     @PreAuthorize("hasAuthority('pharmacy:edit')")

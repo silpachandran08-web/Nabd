@@ -11,6 +11,7 @@ public record PharmacyItemResponse(
         BigDecimal price,
         BigDecimal taxRatePercent,
         int stockQty,
-        boolean active
+        boolean active,
+        String drugId
 ) {
 }

@@ -95,6 +95,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `comms.notification.cancelled.v1` | NotificationService.cancelBySubject (appointment cancelled / rescheduled), consent withdrawn before the send | requestId, reason |
 | `comms.inbound.received.v1` | WhatsAppInboundProcessor, an inbound patient message routed to a clinic by its reply context (COM-001); never the text | inboundId, senderNumberId?, kind, buttonPayload?, replyToWamid?, receivedAt |
 | `comms.message.status_changed.v1` | WhatsAppInboundProcessor, a delivery callback that moved a message forward (COM-001; subject = message), or WhatsAppMessageService.cancel / expire (COM-003: status cancelled or expired) | messageId, channel, status, errorCode?, at |
+| `clinical.drug_master.version_activated.v1` | DrugMasterImportService.activate (CLN-019): one event per tenant of the region after the drug master version switch. Consumers: core cache refresh (log-only handler, nothing cached yet), clinical-intelligence KB copy refresh and staff-web index refresh (**need external action**, those consumers are not in this repo) | region, drugMasterVersion, added, changed, retired |
 
 The following producers belong to other stories and should publish against this catalogue when they land:
 
