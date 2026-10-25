@@ -14,7 +14,7 @@ function load(): Promise<Entitlements | null> {
   const token = typeof localStorage === "undefined" ? null : localStorage.getItem("nabd_access_token");
   if (!token) return Promise.resolve(null);
   inflight = api.get<Entitlements>("/me/entitlements")
-    .then((e): Entitlements | null => e)
+    .then((e): Entitlements | null => (Array.isArray(e?.modules) && Array.isArray(e?.killedFeatures) ? e : null)) // a malformed body is treated as unknown
     .catch(() => null)
     .finally(() => { setTimeout(() => { inflight = null; }, 30_000); }); // shared by nav + banner, refreshed on the next page load
   return inflight;
