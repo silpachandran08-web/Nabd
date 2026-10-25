@@ -16,7 +16,7 @@ modules:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, favourite_rx_set_items, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]
     reads: []
   common:
-    owns: [audit_chain_heads, audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
+    owns: [audit_chain_heads, audit_chain_seals, audit_log, crypto_reencrypt_progress, outbox_events, phi_read_batches, phi_read_log, phi_read_volume_alerts]
     reads: []
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff

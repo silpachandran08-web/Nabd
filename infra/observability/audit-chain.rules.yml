@@ -1,0 +1,15 @@
+# OPS-067: a broken audit chain is a security incident, not a performance alert.
+groups:
+  - name: audit-chain
+    rules:
+      - alert: NabdAuditChainBroken
+        expr: increase(audit_chain_verify_failures_total[26h]) > 0
+        labels: {severity: page, team: security, incident: security}
+        annotations:
+          summary: "Nightly audit chain verify found a broken chain"
+          description: "verify_audit_chain returned a row id for at least one tenant (logged as 'SECURITY audit chain broken'). Treat as tampering until proven otherwise."
+      - alert: NabdAuditChainVerifyMissing
+        expr: time() - job_last_success_timestamp{job="audit-chain-verify"} > 93600
+        labels: {severity: page, team: security}
+        annotations:
+          summary: "Nightly audit chain verify has not completed in 26h"
