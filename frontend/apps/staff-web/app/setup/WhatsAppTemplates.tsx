@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import styles from "./setup.module.css";
-import type { Problem } from "@nabd/api-client/types";
+import { api, reasonText } from "../lib/api";
 
 type Template = {
   id: string; name: string; language: string; category: "UTILITY" | "MARKETING" | "AUTHENTICATION"; headerText: string; body: string;
@@ -43,7 +43,7 @@ const slotCount = (body: string) => (body.match(/\{\{\d+\}\}/g) ?? []).length;
 
 /** NB-190: the clinic's WhatsApp template library. Errors stay inline (unlike the page-level error
  * state) so a clinic fixing a rejected template keeps its text on screen. */
-export default function WhatsAppTemplates({ authedFetch }: { authedFetch: (path: string, init?: RequestInit) => Promise<Response | null> }) {
+export default function WhatsAppTemplates() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -51,9 +51,8 @@ export default function WhatsAppTemplates({ authedFetch }: { authedFetch: (path:
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    const res = await authedFetch("/setup/whatsapp-templates");
-    if (res?.ok) setTemplates(await res.json());
-  }, [authedFetch]);
+    try { setTemplates(await api.get<Template[]>("/setup/whatsapp-templates")); } catch { /* the list keeps what it had */ }
+  }, []);
 
   // Deferred to a microtask, same as the setup page's loadAll (react-hooks/set-state-in-effect).
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
@@ -75,16 +74,13 @@ export default function WhatsAppTemplates({ authedFetch }: { authedFetch: (path:
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const res = await authedFetch(editingId ? `/setup/whatsapp-templates/${editingId}` : "/setup/whatsapp-templates", {
-      method: editingId ? "PATCH" : "POST",
-      body: JSON.stringify(draft),
-    });
-    setSaving(false);
-    if (!res) return;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't submit the template." }));
-      setError(p.detail || p.title || null);
+    try {
+      await api.request(editingId ? "PATCH" : "POST", editingId ? `/setup/whatsapp-templates/${editingId}` : "/setup/whatsapp-templates", { body: draft });
+    } catch (err) {
+      setError(reasonText(err, "Couldn't submit the template."));
       return;
+    } finally {
+      setSaving(false);
     }
     cancel();
     load();

@@ -10,6 +10,7 @@
     // FEF-014: regenerate packages/api-client/src/generated from api/openapi/core.yaml (CI stage 5 runs --check).
     "codegen": { "cache": false },
     "check:permissions": {},
+    "check:raw-api": {},
     "test": { "env": ["NABD_REPO_INPUTS"] },
     // build waits for typecheck (doc 04 s9 order; both write .next/).
     "build": {

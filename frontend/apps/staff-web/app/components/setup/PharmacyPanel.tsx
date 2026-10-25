@@ -10,6 +10,7 @@ import Link from "next/link";
 import Dialog from "../ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
 import { can } from "../../lib/permissions";
+import { api, reasonText } from "../../lib/api";
 
 // Fed only by /pharmacy/* so a pharmacy-only user never touches /setup/*, and a Setup user without
 // pharmacy:view never sees this tab's 403 as a page-level error (PHA-002). It owns its own loading.
@@ -20,7 +21,6 @@ type DispensingQueueEntry = {
   prescriptionId: string; queueEntryId: string; token?: string | number | null; patientName: string; doctorName: string; signedAt: string;
   items: { stockQty?: number | null; drugName: string; dosage: string | null; frequency: string | null; duration: string | null; instructions: string | null }[];
 };
-type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 
 export const MODE_LABEL: Record<PharmacyMode, string> = { external: "External", hybrid: "Hybrid", in_house: "In-house" };
 export const MODE_DESC: Record<PharmacyMode, string> = {
@@ -38,11 +38,6 @@ const RULES: { label: string; hybrid: boolean; inHouse: boolean }[] = [
   { label: "Stock alerts (not yet available)", hybrid: false, inHouse: false },
 ];
 
-async function problemText(res: Response): Promise<string> {
-  const p = await res.json().catch(() => null);
-  return p?.detail || "Request failed";
-}
-
 function Mark({ on }: { on: boolean }) {
   return on
     ? <span className={ph.yes}><Icon name="check" size={14} label="Included" /></span>
@@ -53,8 +48,8 @@ function Mark({ on }: { on: boolean }) {
 // In-house is Phase 3 and not selectable (the server answers 400 mode-not-available).
 export const MODE_REASON_MIN = 3;
 export const MODE_REASON_MAX = 200;
-export function ModeChangeDialog({ from, to, authedFetch, onClose, onSaved }: {
-  from: PharmacyMode | null; to: PharmacyMode; authedFetch: AuthedFetch; onClose: () => void; onSaved: () => void;
+export function ModeChangeDialog({ from, to, onClose, onSaved }: {
+  from: PharmacyMode | null; to: PharmacyMode; onClose: () => void; onSaved: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -65,12 +60,10 @@ export function ModeChangeDialog({ from, to, authedFetch, onClose, onSaved }: {
     if (r.length < MODE_REASON_MIN || r.length > MODE_REASON_MAX) { setError(`A reason is required (${MODE_REASON_MIN}-${MODE_REASON_MAX} characters).`); return; }
     setBusy(true);
     try {
-      const res = await authedFetch("/pharmacy/settings", { method: "PATCH", body: JSON.stringify({ mode: to, reason: r }) });
-      if (!res) return;
-      if (!res.ok) { setError(await problemText(res)); return; }
+      await api.patch("/pharmacy/settings", { mode: to, reason: r });
       onSaved();
-    } catch {
-      setError("Couldn't reach the server. Nothing was changed; try again.");
+    } catch (err) {
+      setError(reasonText(err, "Request failed"));
     } finally {
       setBusy(false);
     }
@@ -123,7 +116,7 @@ export function HardRuleCard() {
   );
 }
 
-export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetch }) {
+export default function PharmacyPanel() {
   const canEdit = can("pharmacy:edit"); // the API gates every write behind pharmacy:edit; pharmacy:view is read-only
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -156,10 +149,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
     try {
       type R = { aborted: boolean; error: string | null; data: unknown };
       const get = async (path: string): Promise<R> => {
-        const res = await authedFetch(path);
-        if (!res) return { aborted: true, error: null, data: null };
-        if (!res.ok) return { aborted: false, error: await problemText(res), data: null };
-        return { aborted: false, error: null, data: await res.json() };
+        try { return { aborted: false, error: null, data: await api.get<unknown>(path) }; } catch (e) { return { aborted: false, error: reasonText(e, "Request failed"), data: null }; }
       };
       const [s, i, q] = await Promise.all([get("/pharmacy/settings"), get("/pharmacy/items"), get("/pharmacy/dispensing-queue")]);
       if (s.aborted || i.aborted || q.aborted) return;
@@ -168,12 +158,10 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
       if (i.error) { setLoadError(i.error); return; }
       setItems(i.data as PharmacyItem[]);
       if (q.error) setQueueError(q.error); else { setQueue(q.data as DispensingQueueEntry[]); setQueueError(null); }
-    } catch {
-      setLoadError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -182,12 +170,10 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
 
   const send = async (method: "POST" | "PATCH", path: string, body: unknown): Promise<boolean> => {
     try {
-      const res = await authedFetch(path, { method, body: JSON.stringify(body) });
-      if (!res) return false;
-      if (!res.ok) { setNotice({ text: await problemText(res), error: true }); return false; }
+      await api.request(method, path, { body });
       return true;
-    } catch {
-      setNotice({ text: "Couldn't reach the server. Check your connection and try again.", error: true });
+    } catch (e) {
+      setNotice({ text: reasonText(e, "Request failed"), error: true });
       return false;
     }
   };
@@ -223,16 +209,12 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
     if (reason.length < 3) { setAdjusting({ ...adjusting, error: "A reason is required (at least 3 characters)." }); reasonRef.current?.focus(); return; }
     setAdjustBusy(true);
     try {
-      const res = await authedFetch(`/pharmacy/items/${adjusting.item.id}/stock-adjustments`, {
-        method: "POST", body: JSON.stringify(delta ? { delta: qty, reason } : { setTo: qty, reason }),
-      });
-      if (!res) return;
-      if (!res.ok) { setAdjusting({ ...adjusting, error: await problemText(res) }); return; }
+      await api.post(`/pharmacy/items/${adjusting.item.id}/stock-adjustments`, delta ? { delta: qty, reason } : { setTo: qty, reason });
       setNotice({ text: `Stock of ${adjusting.item.name} updated.` });
       setAdjusting(null);
       await load(); // the server's count is authoritative: a concurrent sale or second pharmacist shows up here
-    } catch {
-      setAdjusting({ ...adjusting, error: "Couldn't reach the server. Nothing was changed; try again." });
+    } catch (e) {
+      setAdjusting({ ...adjusting, error: reasonText(e, "Request failed") });
     } finally {
       setAdjustBusy(false);
     }
@@ -445,7 +427,7 @@ export default function PharmacyPanel({ authedFetch }: { authedFetch: AuthedFetc
         </>
       )}
 
-      {switchTo && <ModeChangeDialog from={mode} to={switchTo} authedFetch={authedFetch} onClose={closeSwitch} onSaved={() => void modeSaved()} />}
+      {switchTo && <ModeChangeDialog from={mode} to={switchTo} onClose={closeSwitch} onSaved={() => void modeSaved()} />}
 
       {editing && (
         <Dialog title={`Edit ${editing.name}`} size="drawer" onClose={closeEdit}>

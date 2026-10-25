@@ -6,12 +6,25 @@ import { goLogin, needsRefresh, refreshSession } from "./apiClient.ts";
 export { ApiError, TimeoutError };
 export { intentKeys } from "@nabd/api-client";
 
+// FEF-018: the staff page registers its step-up dialog here; any call answering "step-up-required" then waits for it.
+let stepUpHandler: ((problem: Record<string, unknown>) => Promise<string | null>) | null = null;
+export const setStepUpHandler = (h: typeof stepUpHandler) => { stepUpHandler = h; };
+
 export const api = createClient({
   baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1",
   getToken: () => localStorage.getItem("nabd_access_token"),
   onAuthFailure: goLogin,
   refresh: refreshSession,
   shouldRefresh: needsRefresh,
+  stepUp: (problem) => (stepUpHandler ? stepUpHandler(problem) : Promise.resolve(null)),
+});
+
+/** Calls made before sign-in (owner portal, invite, MFA enrolment): no token, no refresh, a 401 is just the answer. */
+export const publicApi = createClient({
+  baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1",
+  getToken: () => null,
+  onAuthFailure: () => {},
+  timeoutMs: 20_000, // LIVE-01: a cold-starting host gets 20 s before the sign-in screens give up
 });
 
 // ACC-003: a second check-in of the same appointment names the token already issued.
@@ -19,6 +32,11 @@ function alreadyCheckedIn(p: { code?: unknown; tokenNumber?: unknown; checkedInA
   if (p?.code !== "ALREADY_CHECKED_IN" || p.tokenNumber == null) return null;
   const at = typeof p.checkedInAt === "string" ? new Date(p.checkedInAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "";
   return `Already checked in as T-${p.tokenNumber}${at ? ` at ${at}` : ""}.`;
+}
+
+/** What a form shows for a failed save: the server's own reason when it gave one (any status), else errorText. */
+export function reasonText(e: unknown, fallback: string): string {
+  return e instanceof ApiError && e.detail ? e.detail : errorText(e, fallback);
 }
 
 /** User-facing text for a failed call. A timeout means the server may still have acted: say so. */

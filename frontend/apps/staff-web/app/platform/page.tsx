@@ -5,11 +5,10 @@ import Link from "next/link";
 import styles from "./platform.module.css";
 import Icon from "../components/ui/Icon";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
-import { usePlatformFetch } from "./platformApi";
+import { platformApi, platformError } from "./platformApi";
 import { groupBySection, OperatorProfile, ROLE_LABELS, visibleSurfaces } from "./surfaces";
 
 export default function PlatformHomePage() {
-  const fetchAuthed = usePlatformFetch();
   const [profile, setProfile] = useState<OperatorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,20 +19,14 @@ export default function PlatformHomePage() {
     setError(null);
     (async () => {
       try {
-        const res = await fetchAuthed("/platform/auth/me");
-        if (!res) return; // session gone, already redirecting to login
-        if (!res.ok) {
-          setError("Couldn't load your profile. Try again.");
-          return;
-        }
-        setProfile(await res.json());
-      } catch {
-        setError("Couldn't reach the server. Check your connection and try again.");
+        setProfile(await platformApi.get<OperatorProfile>("/platform/auth/me"));
+      } catch (e) {
+        setError(platformError(e, "Couldn't load your profile. Try again."));
       } finally {
         setLoading(false);
       }
     })();
-  }, [fetchAuthed]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);

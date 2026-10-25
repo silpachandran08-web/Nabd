@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./wizard.module.css";
 import TimezoneSelect from "../TimezoneSelect";
@@ -8,11 +8,8 @@ import AccessGate from "../../components/ui/AccessGate";
 import { can } from "../../lib/permissions";
 import { MODE_DESC, ModeChangeDialog, type PharmacyMode } from "../../components/setup/PharmacyPanel";
 import pharmacyStyles from "../../components/setup/pharmacy.module.css";
-import { apiFetch, goLogin } from "../../lib/apiClient";
+import { api, reasonText } from "../../lib/api";
 import DpaPanel from "../../components/setup/DpaPanel";
-import type { Problem } from "@nabd/api-client/types";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 type ChecklistItem = { step: string; status: "pending" | "skipped" | "done" };
 type Profile = { name: string; region: string; timezone: string; taxIdType: string | null; taxId: string | null; whatsappNumber: string | null; specialties: string[] };
@@ -58,71 +55,41 @@ function SetupWizard() {
   const [savedMode, setSavedMode] = useState<PharmacyMode | null>(null);
   const [confirmMode, setConfirmMode] = useState(false);
 
-  const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) {
-      goLogin();
-      return null;
-    }
-    const res = await apiFetch(path, {
-      ...init,
-      headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-    if (res.status === 401) {
-      localStorage.removeItem("nabd_access_token");
-      goLogin();
-      return null;
-    }
-    return res;
-  }, [router]);
-
   useEffect(() => {
     async function init() {
-      const res = await authedFetch("/setup/checklist");
-      if (!res) return;
-      if (res.ok) {
-        const data: ChecklistItem[] = await res.json();
+      // A failed read leaves the wizard on its defaults (as before); each step's own save reports errors.
+      try {
+        const data = await api.get<ChecklistItem[]>("/setup/checklist");
         setChecklist(data);
         const firstPending = STEPS.findIndex((s) => data.find((c) => c.step === s.key)?.status === "pending");
         setStepIndex(firstPending === -1 ? STEPS.length - 1 : firstPending);
-      }
-      const profileRes = await authedFetch("/setup/profile");
-      if (profileRes?.ok) setProfile(await profileRes.json());
+      } catch { /* defaults */ }
+      try { setProfile(await api.get<Profile>("/setup/profile")); } catch { /* defaults */ }
       // Reading the mode needs pharmacy:view, changing it pharmacy:edit; the picker is for editors only.
       setCanPharmacy(can("pharmacy:edit"));
       if (can("pharmacy:view")) {
-        const phRes = await authedFetch("/pharmacy/settings");
-        if (phRes?.ok) { const m: PharmacyMode = (await phRes.json()).mode; setPharmacyMode(m); setSavedMode(m); }
+        try { const m = (await api.get<{ mode: PharmacyMode }>("/pharmacy/settings")).mode; setPharmacyMode(m); setSavedMode(m); } catch { /* picker stays empty */ }
       }
       setLoading(false);
     }
     // Deferred to a microtask so the effect body itself never calls setState
     // synchronously (react-hooks/set-state-in-effect) — init does, immediately.
     void Promise.resolve().then(init);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const post = async (path: string, body: unknown) => {
-    const res = await authedFetch(path, { method: "POST", body: JSON.stringify(body) });
-    if (!res) return false;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-      setError(p.detail || "Request failed");
+  // A failed save keeps every field as typed; the error shows and the same button retries.
+  const send = async (method: "POST" | "PATCH", path: string, body: unknown) => {
+    try {
+      await api.request(method, path, { body });
+      setError(null);
+      return true;
+    } catch (e) {
+      setError(reasonText(e, "Request failed"));
       return false;
     }
-    return true;
   };
-
-  const patch = async (path: string, body: unknown) => {
-    const res = await authedFetch(path, { method: "PATCH", body: JSON.stringify(body) });
-    if (!res) return false;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-      setError(p.detail || "Request failed");
-      return false;
-    }
-    return true;
-  };
+  const post = (path: string, body: unknown) => send("POST", path, body);
+  const patch = (path: string, body: unknown) => send("PATCH", path, body);
 
   const mark = async (status: "done" | "skipped") => {
     const step = STEPS[stepIndex].key;
@@ -304,7 +271,7 @@ function SetupWizard() {
               </>
             )}
             <h2 className={styles.cardTitle}>Data processing agreement</h2>
-            <DpaPanel authedFetch={authedFetch} />
+            <DpaPanel />
           </div>
         );
       default:
@@ -333,7 +300,7 @@ function SetupWizard() {
         })}
       </div>
 
-      {error && <div className={styles.card} style={{ color: "var(--nb-danger-500)" }}>{error}</div>}
+      {error && <div role="alert" className={styles.card} style={{ color: "var(--nb-danger-500)" }}>{error}</div>}
 
       {renderStep()}
 
@@ -355,7 +322,7 @@ function SetupWizard() {
         </div>
       </div>
       {confirmMode && pharmacyMode && (
-        <ModeChangeDialog from={savedMode} to={pharmacyMode} authedFetch={authedFetch} onClose={() => setConfirmMode(false)} onSaved={() => void pharmacySaved()} />
+        <ModeChangeDialog from={savedMode} to={pharmacyMode} onClose={() => setConfirmMode(false)} onSaved={() => void pharmacySaved()} />
       )}
     </main>
   );

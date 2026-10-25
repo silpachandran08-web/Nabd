@@ -9,7 +9,7 @@ import { ErrorState, Skeleton } from "../../components/ui/StateViews";
 import { decodeAccessToken, regionLabel, signOut as endClinicSession } from "../../lib/session";
 import { storeTokens } from "../../lib/apiClient";
 import { COOKIE_AUTH } from "../../lib/bffShim";
-import type { Problem } from "@nabd/api-client/types";
+import { publicApi, ApiError, reasonText } from "../../lib/api";
 
 // Matches GET /v1/owners/me/workspaces and POST /v1/owners/workspaces/select (OwnerController).
 type Clinic = { id: string; name: string; slug: string; region: string; status: string };
@@ -20,8 +20,6 @@ const STATUS_TONE: Record<string, PillTone> = {
   active: "ok", trialing: "info", provisioning: "sync", overdue: "warn", suspended: "danger", offboarding: "warn", offboarded: "neutral",
 };
 const statusLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, " ");
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 // "Last opened" is per device (there is no server-side history): remembered on a successful Enter.
 const LAST_CLINIC_KEY = "nabd_owner_last_clinic";
@@ -67,22 +65,16 @@ export default function OwnerWorkspacesPage() {
     }
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/owners/me/workspaces`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401) {
+      // The pending owner token is not a clinic session: it rides on the public client, per call.
+      const body = await publicApi.get<{ brands: Brand[] }>("/owners/me/workspaces", { headers: { Authorization: `Bearer ${token}` }, keepSession: true });
+      setBrands(body.brands);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
         sessionStorage.removeItem("nabd_owner_pending_token");
         router.replace("/owner/login");
         return;
       }
-      if (!res.ok) {
-        setError("Couldn't load your clinics. Try again.");
-        return;
-      }
-      const body: { brands: Brand[] } = await res.json();
-      setBrands(body.brands);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setError(e instanceof ApiError && e.status < 500 ? "Couldn't load your clinics. Try again." : reasonText(e, ""));
     } finally {
       setLoading(false);
     }
@@ -112,22 +104,7 @@ export default function OwnerWorkspacesPage() {
     try {
       // FEF-009: one cookie session per browser, so the old clinic's session ends before the new one replaces it.
       if (COOKIE_AUTH) await endClinicSession();
-      const res = await fetch(`${API_BASE}/owners/workspaces/select`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ clinicId }),
-      });
-      if (res.status === 401) {
-        sessionStorage.removeItem("nabd_owner_pending_token");
-        router.replace("/owner/login");
-        return;
-      }
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't enter that clinic." }));
-        setError(body.detail || "Couldn't enter that clinic.");
-        return;
-      }
-      const pair: TokenPair = await res.json();
+      const pair = await publicApi.post<TokenPair>("/owners/workspaces/select", { clinicId }, { headers: { Authorization: `Bearer ${token}` }, keepSession: true });
       // Switching from another clinic: end that clinic's session server-side first (best effort).
       if (!COOKIE_AUTH) await endClinicSession();
       storeTokens(pair);
@@ -136,8 +113,13 @@ export default function OwnerWorkspacesPage() {
       // permissions), this caller already knows the identity entering the clinic — the tenant
       // owner — so it goes straight to the owner's Overview instead of matching queue:view first.
       router.replace("/overview");
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        sessionStorage.removeItem("nabd_owner_pending_token");
+        router.replace("/owner/login");
+        return;
+      }
+      setError(reasonText(e, "Couldn't enter that clinic."));
     } finally {
       setSelectingId(null);
     }

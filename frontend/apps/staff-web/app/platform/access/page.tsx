@@ -6,7 +6,7 @@ import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews
 import StatusPill from "../../components/ui/StatusPill";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { GrantStatusPill } from "../../components/platform/statusPills";
-import { problemDetail, usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError } from "../platformApi";
 
 // Matches GET /v1/platform/support-access/grants (SupportAccessController).
 type Grant = {
@@ -36,7 +36,6 @@ function grantState(g: Grant): Grant["status"] {
 }
 
 export default function SupportAccessPage() {
-  const authedFetch = usePlatformFetch();
   const [grants, setGrants] = useState<Grant[]>([]);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,31 +56,19 @@ export default function SupportAccessPage() {
     setLoading(true);
     setError(null);
     try {
-      const grantsRes = await authedFetch("/platform/support-access/grants");
-      if (!grantsRes) return; // session gone, already redirecting to login
-      if (grantsRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!grantsRes.ok) {
-        setError("Couldn't load support access grants. Try again.");
-        return;
-      }
-      setGrants(await grantsRes.json());
+      setGrants(await platformApi.get<Grant[]>("/platform/support-access/grants"));
 
-      const tenantsRes = await authedFetch("/platform/tenants?limit=100");
-      if (tenantsRes?.ok) {
-        const body: { data: TenantOption[] } = await tenantsRes.json();
-        setTenants(body.data);
-      }
-      const ticketsRes = await authedFetch("/platform/support/tickets");
-      if (ticketsRes?.ok) setTickets(await ticketsRes.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      const tenantList = await platformApi.get<{ data: TenantOption[] }>("/platform/tenants?limit=100").catch(() => null);
+      if (tenantList) setTenants(tenantList.data);
+      const ticketList = await platformApi.get<typeof tickets>("/platform/support/tickets").catch(() => null);
+      if (ticketList) setTickets(ticketList);
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setError(platformError(e, "Couldn't load support access grants. Try again."));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -117,18 +104,11 @@ export default function SupportAccessPage() {
     }
     setSubmitting(true);
     try {
-      const res = await authedFetch("/platform/support-access/grants", {
-        method: "POST",
-        body: JSON.stringify({ tenantId, ticketId, scope, minutes: mins, reason }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setFormError(await problemDetail(res, "Couldn't request access. Try again."));
-        return;
-      }
-      const grant: Grant = await res.json();
+      const grant = await platformApi.post<Grant>("/platform/support-access/grants", { tenantId, ticketId, scope, minutes: mins, reason });
       setGrants((prev) => [grant, ...prev]);
       setReason("");
+    } catch (err) {
+      setFormError(platformError(err, "Couldn't request access. Try again."));
     } finally {
       setSubmitting(false);
     }
@@ -138,17 +118,12 @@ export default function SupportAccessPage() {
     setActingOn(id);
     setRevokeError(null);
     try {
-      const res = await authedFetch(`/platform/support-access/grants/${id}/revoke`, { method: "POST" });
-      if (!res) return;
-      if (!res.ok) {
-        setRevokeError(await problemDetail(res, "Couldn't revoke the grant. Try again."));
-        return;
-      }
+      await platformApi.post(`/platform/support-access/grants/${id}/revoke`);
       setGrants((prev) =>
         prev.map((g) => (g.id === id ? { ...g, active: false, status: "revoked", revokedAt: new Date().toISOString() } : g))
       );
-    } catch {
-      setRevokeError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      setRevokeError(platformError(e, "Couldn't revoke the grant. Try again."));
     } finally {
       setActingOn(null);
     }

@@ -8,7 +8,8 @@ import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews
 import RoleDenied, { ReadOnlyNote } from "../../components/platform/RoleDenied";
 import { DiscountStatusPill, TenantStatusPill } from "../../components/platform/statusPills";
 import { formatMoney } from "@nabd/domain";
-import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError, useOperatorAccess } from "../platformApi";
+import { ApiError } from "@nabd/api-client";
 
 // Matches GET/POST /v1/platform/billing/* (BillingController) and GET /v1/platform/tenants (FleetController)
 // and GET /v1/platform/plans (PlanController) for the tenant/plan pickers.
@@ -96,47 +97,36 @@ export default function BillingPage() {
   const [discSaving, setDiscSaving] = useState(false);
   const [discError, setDiscError] = useState<string | null>(null);
 
-  const authedFetch = usePlatformFetch();
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     setLoadError(null);
     setPlansUnavailable(false);
     try {
-      const subsRes = await authedFetch("/platform/billing/subscriptions?limit=100");
-      if (!subsRes) return;
-      if (subsRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!subsRes.ok) {
-        setLoadError("Couldn't load billing data. Try again.");
-        return;
-      }
-      setSubscriptions((await subsRes.json()).data);
+      setSubscriptions((await platformApi.get<{ data: Subscription[] }>("/platform/billing/subscriptions?limit=100")).data);
 
-      const discRes = await authedFetch("/platform/billing/discounts?limit=100");
-      if (discRes?.ok) setDiscounts((await discRes.json()).data);
+      const disc = await platformApi.get<{ data: Discount[] }>("/platform/billing/discounts?limit=100").catch(() => null);
+      if (disc) setDiscounts(disc.data);
 
-      const tenantsRes = await authedFetch("/platform/tenants?limit=100");
-      if (tenantsRes?.ok) setTenants((await tenantsRes.json()).data);
+      const tenantList = await platformApi.get<{ data: TenantOption[] }>("/platform/tenants?limit=100").catch(() => null);
+      if (tenantList) setTenants(tenantList.data);
 
-      const plansRes = await authedFetch("/platform/plans");
-      if (plansRes?.ok) {
-        setPlans((await plansRes.json()).filter((p: PlanOption) => p.active));
-      } else if (plansRes && plansRes.status !== 401) {
+      try {
+        setPlans((await platformApi.get<PlanOption[]>("/platform/plans")).filter((p) => p.active));
+      } catch (e) {
+        if (!(e instanceof ApiError) || e.status === 401) return;
         // Pricing & Packaging access is a separate authority (pricing_packaging:view) from billing —
         // a role with billing access but not that one would otherwise see a silently empty Plan
         // dropdown with no clue why, same confusion an empty-but-successful load already causes.
         setPlansUnavailable(true);
       }
-    } catch {
-      setLoadError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setLoadError(platformError(e, "Couldn't load billing data. Try again."));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -151,20 +141,14 @@ export default function BillingPage() {
     }
     setSubSaving(true);
     try {
-      const res = await authedFetch(`/platform/billing/subscriptions/${subTenantId}`, {
-        method: "POST",
-        body: JSON.stringify({ planId: subPlanId, mrrCents: Math.round(parseFloat(subMrr) * 100), renewalDate: subRenewal }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setSubError(await problemDetail(res, "Couldn't save subscription."));
-        return;
-      }
+      await platformApi.post(`/platform/billing/subscriptions/${subTenantId}`, { planId: subPlanId, mrrCents: Math.round(parseFloat(subMrr) * 100), renewalDate: subRenewal });
       setSubTenantId("");
       setSubPlanId("");
       setSubMrr("");
       setSubRenewal("");
       load();
+    } catch (e) {
+      setSubError(platformError(e, "Couldn't save subscription."));
     } finally {
       setSubSaving(false);
     }
@@ -188,17 +172,11 @@ export default function BillingPage() {
     setBusyId(tenantId);
     setMoveError(null);
     try {
-      const res = await authedFetch(`/platform/billing/subscriptions/${tenantId}/transitions`, {
-        method: "POST",
-        body: JSON.stringify({ toStatus, reason }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setMoveError(await problemDetail(res, "Couldn't update status."));
-        return;
-      }
+      await platformApi.post(`/platform/billing/subscriptions/${tenantId}/transitions`, { toStatus, reason });
       setPendingMove(null);
       load();
+    } catch (e) {
+      setMoveError(platformError(e, "Couldn't update status."));
     } finally {
       setBusyId(null);
     }
@@ -214,19 +192,13 @@ export default function BillingPage() {
     }
     setDiscSaving(true);
     try {
-      const res = await authedFetch("/platform/billing/discounts", {
-        method: "POST",
-        body: JSON.stringify({ tenantId: discTenantId, percent, reason: discReason }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setDiscError(await problemDetail(res, "Couldn't request discount."));
-        return;
-      }
+      await platformApi.post("/platform/billing/discounts", { tenantId: discTenantId, percent, reason: discReason });
       setDiscTenantId("");
       setDiscPercent("");
       setDiscReason("");
       load();
+    } catch (e) {
+      setDiscError(platformError(e, "Couldn't request discount."));
     } finally {
       setDiscSaving(false);
     }
@@ -236,13 +208,10 @@ export default function BillingPage() {
     setBusyId(id);
     setError(null);
     try {
-      const res = await authedFetch(`/platform/billing/discounts/${id}/${action}`, { method: "POST" });
-      if (!res) return;
-      if (!res.ok) {
-        setError(await problemDetail(res, "Couldn't review discount."));
-        return;
-      }
+      await platformApi.post(`/platform/billing/discounts/${id}/${action}`);
       load();
+    } catch (e) {
+      setError(platformError(e, "Couldn't review discount."));
     } finally {
       setBusyId(null);
     }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Dialog from "../ui/Dialog";
 import styles from "../../staff/staff.module.css";
+import { api, reasonText } from "../../lib/api";
 
 // DOC-N1: edit one staff member's professional registration number (printed on signed prescriptions).
 // PATCH /staff/{id} { professionalRegistrationNo } needs staff:edit; the caller only renders this for holders of it.
@@ -12,15 +13,13 @@ import styles from "../../staff/staff.module.css";
 const PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ./-]{0,39}$/;
 
 type Licence = { isClinician: boolean; licenceExpiresOn: string | null; licenceOverrideUntil: string | null };
-type Fetcher = (path: string, init?: RequestInit) => Promise<Response | null | undefined>;
 
-export default function RegistrationNoDialog({ staffId, staffName, current, onSave, onClose, authedFetch, onClinicianSaved }: {
+export default function RegistrationNoDialog({ staffId, staffName, current, onSave, onClose, onClinicianSaved }: {
   staffId: string;
   staffName: string;
   current: string | null;
   onSave: (value: string) => Promise<string | null>; // resolves to an error message, or null when saved
   onClose: () => void;
-  authedFetch: Fetcher;
   onClinicianSaved?: (isClinician: boolean) => void; // the row's Clinician pill follows the saved status
 }) {
   const [value, setValue] = useState(current ?? "");
@@ -34,10 +33,8 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
     let live = true;
     (async () => {
       try {
-        const res = await authedFetch(`/staff/${staffId}/clinical-licence`);
+        const l = await api.get<Licence>(`/staff/${staffId}/clinical-licence`);
         if (!live) return;
-        if (!res || !res.ok) { setLicence("error"); return; }
-        const l: Licence = await res.json();
         setLicence(l);
         setClinician(l.isClinician);
         setExpires(l.licenceExpiresOn ?? "");
@@ -46,7 +43,7 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
       }
     })();
     return () => { live = false; };
-  }, [authedFetch, staffId]);
+  }, [staffId]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,17 +71,11 @@ export default function RegistrationNoDialog({ staffId, staffName, current, onSa
 
   async function saveLicence(): Promise<string | null> {
     try {
-      const res = await authedFetch(`/staff/${staffId}/clinical-licence`, { method: "PUT",
-        body: JSON.stringify({ isClinician: clinician, licenceExpiresOn: expires === "" ? null : expires }) });
-      if (!res) return null;
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({ detail: "" }));
-        return body.detail || "Couldn't save the clinician status.";
-      }
+      await api.put(`/staff/${staffId}/clinical-licence`, { isClinician: clinician, licenceExpiresOn: expires === "" ? null : expires });
       onClinicianSaved?.(clinician);
       return null;
-    } catch {
-      return "Couldn't reach the server. The clinician status was not saved.";
+    } catch (e) {
+      return reasonText(e, "Couldn't save the clinician status.");
     }
   }
 

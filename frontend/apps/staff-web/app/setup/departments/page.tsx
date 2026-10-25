@@ -3,10 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./departments.module.css";
-import { apiFetch, goLogin } from "../../lib/apiClient";
-import type { Problem } from "@nabd/api-client/types";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+import { api, ApiError, reasonText } from "../../lib/api";
 
 type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 type TransferEdge = { fromDepartmentId: string; toDepartmentId: string };
@@ -53,65 +50,32 @@ export default function DepartmentsPage() {
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [flows, setFlows] = useState<Record<string, ResolvedFlow>>({});
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
-
   const loadFlow = useCallback(async (id: string) => {
     let flow: ResolvedFlow = null;
     try {
-      const res = await authedFetch(`/departments/${id}/flow`);
-      if (res?.ok) {
-        const body: FlowStep[] | { steps?: FlowStep[]; isDefault?: boolean } = await res.json();
-        const steps = Array.isArray(body) ? body : body.steps ?? [];
-        flow = { steps: steps.map((s) => s.stepType), isDefault: !Array.isArray(body) && body.isDefault === true };
-      }
+      const body = await api.get<FlowStep[] | { steps?: FlowStep[]; isDefault?: boolean }>(`/departments/${id}/flow`);
+      const steps = Array.isArray(body) ? body : body.steps ?? [];
+      flow = { steps: steps.map((s) => s.stepType), isDefault: !Array.isArray(body) && body.isDefault === true };
     } catch { /* shown as "—" */ }
     setFlows((prev) => ({ ...prev, [id]: flow }));
-  }, [authedFetch]);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [depRes, edgeRes] = await Promise.all([authedFetch("/departments"), authedFetch("/departments/transfers")]);
-      if (!depRes || !edgeRes) return;
-      if (depRes.status === 403 || edgeRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!depRes.ok || !edgeRes.ok) {
-        setError("Couldn't load departments. Try again.");
-        return;
-      }
-      const deps: Department[] = await depRes.json();
+      const [deps, edgeList] = await Promise.all([api.get<Department[]>("/departments"), api.get<TransferEdge[]>("/departments/transfers")]);
       setDepartments(deps);
       deps.forEach((d) => void loadFlow(d.id));
-      setEdges(await edgeRes.json());
+      setEdges(edgeList);
       setMatrixDirty(false);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      else setError(e instanceof ApiError && e.status < 500 ? "Couldn't load departments. Try again." : reasonText(e, ""));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, loadFlow]);
+  }, [loadFlow]);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -123,14 +87,10 @@ export default function DepartmentsPage() {
     setTogglingId(d.id);
     setToggleError(null);
     try {
-      const res = await authedFetch(`/departments/${d.id}`, { method: "PATCH", body: JSON.stringify({ name: d.name, active }) });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't update the department." }));
-        setToggleError(p.detail || "Couldn't update the department.");
-        return;
-      }
+      await api.patch(`/departments/${d.id}`, { name: d.name, active });
       await load();
+    } catch (e) {
+      setToggleError(reasonText(e, "Couldn't update the department."));
     } finally {
       setTogglingId(null);
     }
@@ -140,14 +100,10 @@ export default function DepartmentsPage() {
     setTogglingId(d.id);
     setToggleError(null);
     try {
-      const res = await authedFetch(`/departments/${d.id}`, { method: "DELETE" });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't delete the department." }));
-        setToggleError(p.detail || "Couldn't delete the department.");
-        return;
-      }
+      await api.delete(`/departments/${d.id}`);
       await load();
+    } catch (e) {
+      setToggleError(reasonText(e, "Couldn't delete the department."));
     } finally {
       setTogglingId(null);
       setConfirmDeleteId(null);
@@ -162,12 +118,13 @@ export default function DepartmentsPage() {
   async function openEdit(d: Department) {
     setBuilderError(null);
     setBuilder({ mode: "edit", sourceId: d.id, name: d.name, active: d.active, availableTemplates: [], workflowLoading: true, selectedTemplateCode: "", toggles: {} });
-    const res = await authedFetch(`/departments/${d.id}/workflow`);
-    if (!res?.ok) {
+    let workflow: DepartmentWorkflow;
+    try {
+      workflow = await api.get<DepartmentWorkflow>(`/departments/${d.id}/workflow`);
+    } catch {
       setBuilder((prev) => (prev ? { ...prev, workflowLoading: false } : prev));
       return;
     }
-    const workflow: DepartmentWorkflow = await res.json();
     setBuilder((prev) =>
       prev
         ? {
@@ -191,8 +148,8 @@ export default function DepartmentsPage() {
     setBuilder((prev) => (prev ? { ...prev, toggles: { ...prev.toggles, [key]: value } } : prev));
   }
 
-  async function submitBuilder(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitBuilder(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!builder) return;
     setBuilderError(null);
     const name = builder.name.trim();
@@ -207,26 +164,19 @@ export default function DepartmentsPage() {
     setBuilderSubmitting(true);
     try {
       const isEdit = builder.mode === "edit";
-      const res = await authedFetch(isEdit ? `/departments/${builder.sourceId}` : "/departments", {
-        method: isEdit ? "PATCH" : "POST",
-        body: JSON.stringify({ name, active: builder.active }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save the department." }));
-        setBuilderError(p.detail || "Couldn't save the department.");
+      let saved: Department;
+      try {
+        saved = await api.request<Department>(isEdit ? "PATCH" : "POST", isEdit ? `/departments/${builder.sourceId}` : "/departments", { body: { name, active: builder.active } });
+      } catch (err) {
+        setBuilderError(reasonText(err, "Couldn't save the department."));
         return;
       }
-      const saved: Department = await res.json();
 
       if (isEdit) {
-        const workflowRes = await authedFetch(`/departments/${saved.id}/workflow`, {
-          method: "POST",
-          body: JSON.stringify({ templateCode: builder.selectedTemplateCode, toggles: builder.toggles }),
-        });
-        if (!workflowRes?.ok) {
-          const p: Problem = await workflowRes?.json().catch(() => ({ title: "Error", detail: "Couldn't save the workflow." }));
-          setBuilderError(p?.detail || "Couldn't save the workflow.");
+        try {
+          await api.post(`/departments/${saved.id}/workflow`, { templateCode: builder.selectedTemplateCode, toggles: builder.toggles });
+        } catch (err) {
+          setBuilderError(reasonText(err, "Couldn't save the workflow."));
           return;
         }
       }
@@ -252,15 +202,10 @@ export default function DepartmentsPage() {
     setMatrixError(null);
     setSavingMatrix(true);
     try {
-      const res = await authedFetch("/departments/transfers", { method: "POST", body: JSON.stringify({ edges }) });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't save the transfer graph." }));
-        setMatrixError(p.detail || "Couldn't save the transfer graph.");
-        return;
-      }
-      setEdges(await res.json());
+      setEdges(await api.post<TransferEdge[]>("/departments/transfers", { edges }));
       setMatrixDirty(false);
+    } catch (e) {
+      setMatrixError(reasonText(e, "Couldn't save the transfer graph."));
     } finally {
       setSavingMatrix(false);
     }
@@ -359,7 +304,7 @@ export default function DepartmentsPage() {
                 </tbody>
               </table>
             </div>
-            {matrixError && <div className={styles.errorState}>{matrixError}</div>}
+            {matrixError && <div className={styles.errorState} role="alert">{matrixError} <button type="button" className={styles.btn} disabled={savingMatrix} onClick={() => void saveMatrix()}>Retry</button></div>}
             <button className={styles.btnPrimary} onClick={saveMatrix} disabled={savingMatrix || !matrixDirty}>
               {savingMatrix ? "Saving…" : "Save transfer graph"}
             </button>
@@ -430,7 +375,7 @@ export default function DepartmentsPage() {
               </div>
             )}
 
-            {builderError && <div className={styles.errorState}>{builderError}</div>}
+            {builderError && <div className={styles.errorState} role="alert">{builderError} <button type="button" className={styles.btn} disabled={builderSubmitting} onClick={() => void submitBuilder()}>Retry</button></div>}
             <div className={styles.modalActions}>
               <button type="button" className={styles.btn} onClick={() => setBuilder(null)}>Cancel</button>
               <button type="submit" className={styles.btnPrimary} disabled={builderSubmitting}>

@@ -6,7 +6,7 @@ import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews
 import RoleDenied, { ReadOnlyNote } from "../../components/platform/RoleDenied";
 import { PlanStatusPill } from "../../components/platform/statusPills";
 import { formatMoney } from "@nabd/domain";
-import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError, useOperatorAccess } from "../platformApi";
 
 // Matches GET/POST/PATCH /v1/platform/plans (PlanController).
 type Plan = {
@@ -33,29 +33,18 @@ export default function PlansPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const authedFetch = usePlatformFetch();
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await authedFetch("/platform/plans");
-      if (!res) return;
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load plans. Try again.");
-        return;
-      }
-      setPlans(await res.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setPlans(await platformApi.get<Plan[]>("/platform/plans"));
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setError(platformError(e, "Couldn't load plans. Try again."));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -92,16 +81,12 @@ export default function PlansPage() {
     setSaving(true);
     try {
       const body = { code: form.code, name: form.name, monthlyPriceCents, currency: form.currency, seatLimit, active: form.active };
-      const res = editingId
-        ? await authedFetch(`/platform/plans/${editingId}`, { method: "PATCH", body: JSON.stringify(body) })
-        : await authedFetch("/platform/plans", { method: "POST", body: JSON.stringify(body) });
-      if (!res) return;
-      if (!res.ok) {
-        setFormError(await problemDetail(res, "Couldn't save plan."));
-        return;
-      }
+      if (editingId) await platformApi.patch(`/platform/plans/${editingId}`, body);
+      else await platformApi.post("/platform/plans", body);
       cancelEdit();
       load();
+    } catch (e) {
+      setFormError(platformError(e, "Couldn't save plan."));
     } finally {
       setSaving(false);
     }

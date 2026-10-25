@@ -5,7 +5,7 @@ import styles from "./territories.module.css";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { formatMoney } from "@nabd/domain";
-import { usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError } from "../platformApi";
 
 // Matches GET /v1/platform/territories (TerritoryController). Region-level, not state-level — tenants
 // only carry a region (IN/AE/SA/QA), no state/city field, and there's no aggregator-demand data yet (NB-227).
@@ -25,7 +25,6 @@ type RegionSummary = {
 const REGION_NAME: Record<string, string> = { IN: "India", AE: "United Arab Emirates", SA: "Saudi Arabia", QA: "Qatar" };
 
 export default function TerritoriesPage() {
-  const fetchAuthed = usePlatformFetch();
   const [regions, setRegions] = useState<RegionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,23 +34,14 @@ export default function TerritoriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchAuthed("/platform/territories");
-      if (!res) return; // session gone, already redirecting to login
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load territories. Try again.");
-        return;
-      }
-      setRegions(await res.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setRegions(await platformApi.get<RegionSummary[]>("/platform/territories"));
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setError(platformError(e, "Couldn't load territories. Try again."));
     } finally {
       setLoading(false);
     }
-  }, [fetchAuthed]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);

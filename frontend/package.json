@@ -7,7 +7,8 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "check:permissions": "turbo run check:permissions"
+    "check:permissions": "turbo run check:permissions",
+    "check:raw-api": "turbo run check:raw-api"
   },
   "devDependencies": {
     "eslint": "^9",

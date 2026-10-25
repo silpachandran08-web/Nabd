@@ -3,9 +3,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import styles from "../../login/login.module.css";
-import { API_BASE } from "../surfaces";
 import { SESSION_EXPIRED_MESSAGE, storePlatformSession } from "../platformApi";
-import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
+import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError } from "../../lib/loginFetch";
+import { loginCall } from "../../lib/loginCall";
+import { ApiError, publicApi } from "../../lib/api";
 import MfaEnrolCard from "../../components/MfaEnrolCard";
 import type { Problem } from "@nabd/api-client/types";
 
@@ -28,7 +29,7 @@ export default function PlatformLoginPage() {
   const [slow, setSlow] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
 
-  // PLT-008: platformFetch sends a 401'd operator here with ?expired=1. Read after mount (no
+  // PLT-008: the operator client sends a 401'd operator here with ?expired=1. Read after mount (no
   // useSearchParams, which would need a Suspense boundary). This page never calls the authed fetch, so no loop.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -47,21 +48,13 @@ export default function PlatformLoginPage() {
     setTimedOut(false);
     setLoading(true);
     try {
-      const res = await loginFetch(`${API_BASE}/platform/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, pin }),
-      }, () => setSlow(true));
-      const body = await res.json();
-      if (res.ok) {
-        if ("challengeId" in body) setChallenge(body as MfaChallenge);
-        else if ("setupToken" in body) { setPin(""); setEnrolled(false); setSetupToken(body.setupToken); }
-        else handleTokens(body as TokenPair);
-        return;
-      }
-      applyProblem(res.status, body as Problem);
+      const body = await loginCall<TokenPair | MfaChallenge | { setupToken: string }>("/platform/auth/login", { email, pin }, () => setSlow(true));
+      if ("challengeId" in body) setChallenge(body);
+      else if ("setupToken" in body) { setPin(""); setEnrolled(false); setSetupToken(body.setupToken); }
+      else handleTokens(body);
     } catch (err) {
       if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
+      else if (err instanceof ApiError) applyProblem(err.status, err.problem as Problem);
       else setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setSlow(false);
@@ -75,19 +68,10 @@ export default function PlatformLoginPage() {
     setFormError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/platform/auth/mfa/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: challenge.challengeId, code }),
-      });
-      const body = await res.json();
-      if (res.ok) {
-        handleTokens(body as TokenPair);
-        return;
-      }
-      applyProblem(res.status, body as Problem);
-    } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      handleTokens(await publicApi.post<TokenPair>("/platform/auth/mfa/verify", { challengeId: challenge.challengeId, code }, { keepSession: true }));
+    } catch (err) {
+      if (err instanceof ApiError) applyProblem(err.status, err.problem as Problem);
+      else setFormError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -115,7 +99,7 @@ export default function PlatformLoginPage() {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <MfaEnrolCard enrollUrl={`${API_BASE}/platform/auth/mfa/enroll`} confirmUrl={`${API_BASE}/platform/auth/mfa/confirm`}
+          <MfaEnrolCard enrollPath="/platform/auth/mfa/enroll" confirmPath="/platform/auth/mfa/confirm"
             setupToken={setupToken} subtitle="Every Nabd operator account uses an authenticator app. Set it up to continue."
             onDone={() => { setSetupToken(null); setEnrolled(true); }} />
         </div>

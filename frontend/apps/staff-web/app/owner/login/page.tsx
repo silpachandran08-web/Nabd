@@ -4,9 +4,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "../../login/login.module.css";
-import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../../lib/loginFetch";
+import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError } from "../../lib/loginFetch";
+import { loginCall } from "../../lib/loginCall";
+import { ApiError, reasonText } from "../../lib/api";
 import MfaEnrolCard from "../../components/MfaEnrolCard";
-import type { Problem } from "@nabd/api-client/types";
 
 // Matches POST /v1/owners/auth/login (OwnerController) — a separate top-level identity from any
 // one clinic's staff login (NB-350): this PIN is the owner's own, not tied to a tenant slug, and
@@ -19,8 +20,6 @@ type MfaSetupRequired = { setupToken: string; expiresIn: number };
 type WorkspaceToken = { workspaceToken: string; expiresIn: number; remainingRecoveryCodes?: number | null };
 type Step = { kind: "pin" } | { kind: "challenge"; token: string } | { kind: "setup"; token: string } | { kind: "codes"; codes: string[]; workspaceToken: string };
 const OWNER_SETUP_TOKEN_KEY = "nabd_owner_setup_token"; // handed over by owner accept-invite (same key there)
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 export default function OwnerLoginPage() {
   const router = useRouter();
@@ -54,26 +53,18 @@ export default function OwnerLoginPage() {
     setFormError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/owners/auth/mfa/${useRecovery ? "recovery-verify" : "verify"}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(useRecovery ? { challengeToken: step.token, recoveryCode: code } : { challengeToken: step.token, code }),
-      });
-      const body = await res.json().catch(() => null);
-      if (res.status === 423) {
-        setBlocked((body as Problem | null)?.detail || "Too many failed attempts. Try again later.");
-        return;
-      }
-      if (!res.ok || !body) {
+      const r = await loginCall<WorkspaceToken>(`/owners/auth/mfa/${useRecovery ? "recovery-verify" : "verify"}`,
+        useRecovery ? { challengeToken: step.token, recoveryCode: code } : { challengeToken: step.token, code }, () => setSlow(true));
+      enterWorkspaces(r.workspaceToken);
+    } catch (err) {
+      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
+      else if (err instanceof ApiError && err.status === 423) setBlocked(err.detail || "Too many failed attempts. Try again later.");
+      else if (err instanceof ApiError) {
         setCode("");
-        setFormError(res.status === 401 ? (useRecovery ? "That recovery code isn't valid." : "That code didn't match. Try the current code.")
-          : (body as Problem | null)?.detail || "Couldn't verify the code.");
-        return;
-      }
-      enterWorkspaces((body as WorkspaceToken).workspaceToken);
-    } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+        setFormError(err.status === 401 ? (useRecovery ? "That recovery code isn't valid." : "That code didn't match. Try the current code.") : err.detail || "Couldn't verify the code.");
+      } else setFormError(reasonText(err, ""));
     } finally {
+      setSlow(false);
       setLoading(false);
     }
   }
@@ -84,34 +75,17 @@ export default function OwnerLoginPage() {
     setTimedOut(false);
     setLoading(true);
     try {
-      const res = await loginFetch(`${API_BASE}/owners/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, pin }),
-      }, () => setSlow(true));
-      if (res.status === 429) {
-        setFormError("Too many attempts. Wait a minute before trying again.");
-        return;
-      }
-      if (res.status === 423) {
-        const p: Problem | null = await res.json().catch(() => null);
-        setPin("");
-        setBlocked(p?.detail || "Too many failed attempts. Try again later.");
-        return;
-      }
-      const body = await res.json().catch(() => null);
-      if (!res.ok || !body) {
-        setPin("");
-        setFormError(res.status === 401 ? "Email or PIN is incorrect." : (body as Problem | null)?.detail || "Couldn't sign you in. Try again.");
-        return;
-      }
+      const body = await loginCall<PendingWorkspaceToken | MfaChallenge | MfaSetupRequired>("/owners/auth/login", { email, pin }, () => setSlow(true));
       setPin("");
-      if ("challengeId" in body) { setCode(""); setStep({ kind: "challenge", token: (body as MfaChallenge).challengeId }); return; }
-      if ("setupToken" in body) { setStep({ kind: "setup", token: (body as MfaSetupRequired).setupToken }); return; }
-      enterWorkspaces((body as PendingWorkspaceToken).pendingToken);
+      if ("challengeId" in body) { setCode(""); setStep({ kind: "challenge", token: body.challengeId }); return; }
+      if ("setupToken" in body) { setStep({ kind: "setup", token: body.setupToken }); return; }
+      enterWorkspaces(body.pendingToken);
     } catch (err) {
       if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
-      else setFormError("Couldn't reach the server. Check your connection and try again.");
+      else if (err instanceof ApiError && err.status === 429) setFormError("Too many attempts. Wait a minute before trying again.");
+      else if (err instanceof ApiError && err.status === 423) { setPin(""); setBlocked(err.detail || "Too many failed attempts. Try again later."); }
+      else if (err instanceof ApiError) { setPin(""); setFormError(err.status === 401 ? "Email or PIN is incorrect." : err.detail || "Couldn't sign you in. Try again."); }
+      else setFormError(reasonText(err, ""));
     } finally {
       setSlow(false);
       setLoading(false);
@@ -130,7 +104,7 @@ export default function OwnerLoginPage() {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <MfaEnrolCard enrollUrl={`${API_BASE}/owners/auth/mfa/enroll`} confirmUrl={`${API_BASE}/owners/auth/mfa/confirm`}
+          <MfaEnrolCard enrollPath="/owners/auth/mfa/enroll" confirmPath="/owners/auth/mfa/confirm"
             setupToken={step.token} subtitle="Owner accounts always use an authenticator app. Set it up once to continue."
             onDone={(b) => { const r = b as { recoveryCodes: string[]; workspaceToken: string }; setStep({ kind: "codes", codes: r.recoveryCodes, workspaceToken: r.workspaceToken }); }} />
           <button className={styles.linkBtn} type="button" onClick={startOver}>Start over</button>
