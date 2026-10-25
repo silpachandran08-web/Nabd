@@ -60,7 +60,7 @@ async function open(path, s, { perms = DOCTOR, viewport, wait = 400 } = {}) {
   const appts = Array.from({ length: 40 }, (_, i) => ({ id: `a${i + 1}`, patientId: `ap${i + 1}`, doctorId: DOC, startTime: NOW, endTime: NOW, status: 'booked', isFollowUp: false }));
   const { page, browser, log, headers } = await open('/my-day', { queue, appts }, { wait: 800 });
   const reqs = dataReqs(log);
-  check('AC1 My Day (30 queue + 40 appointments) makes <= 7 data requests (6 + ACC-015 GET /doctors/{id}/session)', reqs.length <= 7, `${reqs.length}: ${reqs.map((r) => r.path.slice(0, 90)).join(' | ')}`);
+  check('AC1 My Day (30 queue + 40 appointments) makes <= 8 data requests (6 + ACC-015 GET /doctors/{id}/session + PLT-059 /me/entitlements)', reqs.length <= 8, `${reqs.length}: ${reqs.map((r) => r.path.slice(0, 90)).join(' | ')}`);
   const batch = log.requests.filter((r) => /^\/patients\/batch/.test(r.path));
   check('AC1 exactly one batched patient call carrying all 70 distinct patients', batch.length === 1 && decodeURIComponent(batch[0].path).split('ids=')[1].split(',').length === 70, `calls=${batch.length}`);
   check('AC1 zero per-patient GET /patients/{id}', count(log, /^\/patients\/[^/?]+$/) === 0);
