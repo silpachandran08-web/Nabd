@@ -1,0 +1,33 @@
+# ACC-039: SLO and alert rules for the Patient Access Edge (metrics from :8081/actuator/prometheus).
+# Wiring this file into the cell's Prometheus is Needs external action (same as rate-limit.rules.yml).
+groups:
+  - name: nabd-patient-edge
+    rules:
+      - alert: EdgeAvailabilityReadSlow          # SLO: availability read p95 < 50 ms
+        expr: histogram_quantile(0.95, sum by (le) (rate(edge_availability_read_seconds_bucket[5m]))) > 0.05
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Edge availability read p95 above 50 ms for 10 minutes"
+          runbook: docs/runbooks/patient-access-edge.md
+      - alert: EdgeEventsDeadLettered
+        expr: sum(increase(edge_event_dlq_total[10m])) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "Edge moved an event to the dead-letter stream"
+          runbook: docs/runbooks/patient-access-edge.md
+      - alert: EdgeRateLimitFailOpen
+        expr: sum(increase(edge_rate_limit_fail_open_total[1m])) > 0
+        for: 0m
+        labels: { severity: page }
+        annotations:
+          summary: "Edge rate limits are failing open: Valkey unreachable"
+          runbook: docs/runbooks/patient-access-edge.md
+      - alert: EdgeProjectionMissRatioHigh
+        expr: sum(rate(edge_projection_total{result!="hit"}[10m])) / sum(rate(edge_projection_total[10m])) > 0.5
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "More than half of Edge availability reads miss the projection (Core is carrying the load)"
+          runbook: docs/runbooks/patient-access-edge.md
