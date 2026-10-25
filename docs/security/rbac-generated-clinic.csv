@@ -80,6 +80,7 @@ owner,GET /v1/patients/data-quality,patients:edit,allow
 owner,GET /v1/patients/guardian-reviews-due,patients:view,allow
 owner,GET /v1/patients/registry,patients:view,allow
 owner,GET /v1/patients/{id},patients:view,allow
+owner,GET /v1/patients/{patientId}/messages,patients:view,allow
 owner,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner,GET /v1/pharmacy/items,pharmacy:view,allow
 owner,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -356,6 +357,7 @@ owner_doctor,GET /v1/patients/data-quality,patients:edit,allow
 owner_doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
 owner_doctor,GET /v1/patients/registry,patients:view,allow
 owner_doctor,GET /v1/patients/{id},patients:view,allow
+owner_doctor,GET /v1/patients/{patientId}/messages,patients:view,allow
 owner_doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items,pharmacy:view,allow
 owner_doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -632,6 +634,7 @@ doctor,GET /v1/patients/data-quality,patients:edit,allow
 doctor,GET /v1/patients/guardian-reviews-due,patients:view,allow
 doctor,GET /v1/patients/registry,patients:view,allow
 doctor,GET /v1/patients/{id},patients:view,allow
+doctor,GET /v1/patients/{patientId}/messages,patients:view,allow
 doctor,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items,pharmacy:view,allow
 doctor,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -908,6 +911,7 @@ nurse,GET /v1/patients/data-quality,patients:edit,allow
 nurse,GET /v1/patients/guardian-reviews-due,patients:view,allow
 nurse,GET /v1/patients/registry,patients:view,allow
 nurse,GET /v1/patients/{id},patients:view,allow
+nurse,GET /v1/patients/{patientId}/messages,patients:view,allow
 nurse,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items,pharmacy:view,allow
 nurse,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -1184,6 +1188,7 @@ receptionist,GET /v1/patients/data-quality,patients:edit,allow
 receptionist,GET /v1/patients/guardian-reviews-due,patients:view,allow
 receptionist,GET /v1/patients/registry,patients:view,allow
 receptionist,GET /v1/patients/{id},patients:view,allow
+receptionist,GET /v1/patients/{patientId}/messages,patients:view,allow
 receptionist,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items,pharmacy:view,allow
 receptionist,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow
@@ -1460,6 +1465,7 @@ frontdesk_vitals,GET /v1/patients/data-quality,patients:edit,allow
 frontdesk_vitals,GET /v1/patients/guardian-reviews-due,patients:view,allow
 frontdesk_vitals,GET /v1/patients/registry,patients:view,allow
 frontdesk_vitals,GET /v1/patients/{id},patients:view,allow
+frontdesk_vitals,GET /v1/patients/{patientId}/messages,patients:view,allow
 frontdesk_vitals,GET /v1/pharmacy/dispensing-queue,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items,pharmacy:view,allow
 frontdesk_vitals,GET /v1/pharmacy/items/{id}/stock-movements,pharmacy:view,allow

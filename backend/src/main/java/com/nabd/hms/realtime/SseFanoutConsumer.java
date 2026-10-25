@@ -23,6 +23,7 @@ class SseFanoutConsumer implements EventConsumer {
     }
 
     private static final java.util.Map<String, Route> ROUTES = java.util.Map.of(
+            "comms.message.status_changed.v1", new Route(List.of(RealtimeTopic.MESSAGES), "messageId"), // COM-006
             "visit.queue_entry.created.v1", new Route(List.of(RealtimeTopic.QUEUE, RealtimeTopic.NURSING), "entryId"),
             "visit.queue_entry.changed.v1", new Route(List.of(RealtimeTopic.QUEUE, RealtimeTopic.NURSING), "entryId"),
             "visit.eta.updated.v1", new Route(List.of(RealtimeTopic.QUEUE), "entryId"),

@@ -1,0 +1,53 @@
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--nb-space-8);
+  padding-block: var(--nb-space-8);
+  border-block-end: 1px solid var(--nb-border-subtle);
+  font-size: 13px;
+}
+
+.main {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  color: var(--nb-text-tertiary);
+  font-size: 12px;
+}
+
+.reason {
+  color: var(--nb-danger-500);
+  font-size: 12px;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--nb-space-8);
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--nb-text-secondary);
+}
+
+.tick {
+  font-weight: 700;
+  letter-spacing: -2px;
+  color: var(--nb-text-tertiary);
+}
+
+.tickRead {
+  color: var(--nb-info-500);
+}
+
+.tickFailed {
+  color: var(--nb-danger-500);
+  letter-spacing: 0;
+}
+
+.more {
+  min-block-size: 44px;
+  margin-block-start: var(--nb-space-8);
+}

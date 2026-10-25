@@ -184,6 +184,7 @@ export type PackageSettingsWriteRequest = { priceFloorPercent: number; };
 export type PackageWriteRequest = { description?: string; eligibleDoctorIds?: Array<string>; graceDays?: number; items: Array<PackageItemInput>; name: string; packageType?: string; price: number; refundNote?: string; speciality?: string; taxInclusive?: boolean; validityDays?: number; validityStarts?: string; };
 export type Packages = { sessionsOwed?: number; soldToday?: number; };
 export type PackagesReportResponse = { expiredWithValue?: Array<ExpiredWithValue>; from?: string; redemption?: Redemption; salesByDay?: Array<SalesDay>; to?: string; };
+export type Page = { items?: Array<Item>; nextCursor?: string; };
 export type PageMeta = { limit?: number; nextCursor?: string; };
 export type PatientDetailResponse = { activePackages?: number; allergies?: Array<string>; chronicConditions?: Array<string>; dob?: string; gender?: string; guardianConsentGrantedAt?: string; guardianId?: string; guardianName?: string; guardianReviewKeptAt?: string; id?: string; isMinor?: boolean; lastVisit?: string; lastVisitAt?: string; mrn?: string; name?: string; outstandingBalance?: number; phone?: string; status?: string; };
 export type PatientPage = { data?: Array<PatientResponse>; page?: PageMeta; };
@@ -523,6 +524,7 @@ export type Operations = {
   PatientController_revokeGuardian: { method: "delete"; path: "/v1/patients/{id}/guardian"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
   PatientController_keepGuardian: { method: "post"; path: "/v1/patients/{id}/guardian/review"; permission: "patients:edit"; pathParams: { id: string; }; query: never; body: GuardianReviewDecisionRequest; response: PatientDetailResponse };
   PatientController_merge: { method: "post"; path: "/v1/patients/{id}/merge"; permission: "patients:delete"; pathParams: { id: string; }; query: never; body: MergeRequest; response: PatientDetailResponse };
+  PatientMessagesController_messages: { method: "get"; path: "/v1/patients/{patientId}/messages"; permission: "patients:view"; pathParams: { patientId: string; }; query: { cursor?: string; limit?: number; }; body: never; response: Page };
   PharmacyController_dispensingQueue: { method: "get"; path: "/v1/pharmacy/dispensing-queue"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: Array<DispensingQueueEntryResponse> };
   PharmacyController_items: { method: "get"; path: "/v1/pharmacy/items"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: Array<PharmacyItemResponse> };
   PharmacyController_addItem: { method: "post"; path: "/v1/pharmacy/items"; permission: "pharmacy:edit"; pathParams: never; query: never; body: PharmacyItemWriteRequest; response: PharmacyItemResponse };
