@@ -20,8 +20,6 @@ import VitalsCard from "../components/consult/VitalsCard";
 import type { Part } from "../components/consult/clinical";
 import type { Vitals } from "../components/consult/shared";
 import { age, DEFAULT_START_STATUS, initials, statusBeforeConsult, statusSequence, type PatientSummary } from "@nabd/domain";
-import { apiFetch, goLogin } from "../lib/apiClient";
-import { moveBody, moveErrorMessage } from "../lib/queueMove";
 import PatientMessages from "./PatientMessages";
 import { staleMessage } from "../lib/queueMove";
 import { ErrorSummary, FieldError, failText, useFormErrors } from "../lib/formErrors";
