@@ -346,3 +346,10 @@
 @media (max-width: 640px) { .stepList { grid-template-columns: minmax(0, 1fr); } }
 
 .retry { margin-top: var(--nb-space-12); }
+
+/* ACC-019: ETA accuracy tile sparkline */
+.etaSpark {
+  inline-size: 100%;
+  block-size: 40px;
+  margin-block: var(--nb-space-8);
+}

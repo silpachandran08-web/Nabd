@@ -25,5 +25,10 @@ class QueueEventRepository {
                         "SELECT tenant_id, id, encounter_id, doctor_id, queue_date, ?, ?, ?, ?, ?, ?, ? " +
                         "FROM queue_entries WHERE tenant_id = ? AND id = ?",
                 fromStatus, toStatus, kind, minutes, Timestamp.from(at), actorId, source, tenantId, entryId);
+        if ("in_consult".equals(toStatus) && "transition".equals(kind)) { // ACC-019: first call time of the visit closes its predictions
+            jdbc.update("UPDATE eta_prediction_log SET actual_called_at = ? WHERE tenant_id = ? AND actual_called_at IS NULL AND " +
+                            "(queue_entry_id = ? OR appointment_id = (SELECT appointment_id FROM queue_entries WHERE tenant_id = ? AND id = ?))",
+                    Timestamp.from(at), tenantId, entryId, tenantId, entryId);
+        }
     }
 }

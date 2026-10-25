@@ -104,6 +104,8 @@ export type EncounterListPage = { data?: Array<EncounterListItem>; page?: PageMe
 export type EncounterPage = { data?: Array<EncounterResponse>; page?: PageMeta; };
 export type EncounterResponse = { assessment?: string; diagnosis?: string; doctorId?: string; medications?: string; occurredAt?: string; queueEntryId?: string; };
 export type Entry = { patientId?: string; patientName?: string; priorNoShowCount?: number; };
+export type EtaAccuracyItem = { clinicDate?: string; doctorId?: string; lowConfidence?: boolean; maeMin?: number; n?: number; p80HitRate?: number; within10Pct?: number; };
+export type EtaAccuracyResponse = { items?: Array<EtaAccuracyItem>; };
 export type ExpiredWithValue = { expiredOn?: string; instanceId?: string; packageName?: string; patientName?: string; remainingValue?: number; };
 export type ExpiringSoonResponse = { alertTier?: number; expiresOn?: string; instanceId?: string; packageName?: string; patientName?: string; quantityConsumed?: number; quantityTotal?: number; reminderSentForTier?: boolean; valueLeft?: number; };
 export type ExportJobRequest = { exportType: string; };
@@ -586,6 +588,7 @@ export type Operations = {
   ReportsController_billingLeakage: { method: "get"; path: "/v1/reports/billing-leakage"; permission: "reports:view"; pathParams: never; query: { thresholdAmount?: number; }; body: never; response: BillingLeakageResponse };
   ReportsController_dailyMoney: { method: "get"; path: "/v1/reports/daily-money"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DailyMoneyResponse };
   ReportsController_doctorPunctuality: { method: "get"; path: "/v1/reports/doctor-punctuality"; permission: "reports:view"; pathParams: never; query: never; body: never; response: DoctorPunctualityResponse };
+  EtaAccuracyController_get: { method: "get"; path: "/v1/reports/eta-accuracy"; permission: "reports:view"; pathParams: never; query: { from?: string; to?: string; doctorId?: string; }; body: never; response: EtaAccuracyResponse };
   ReportsController_export: { method: "get"; path: "/v1/reports/export"; permission: "reports:export"; pathParams: never; query: { reportType: string; days?: number; from?: string; to?: string; }; body: never; response: string };
   ReportsController_money: { method: "get"; path: "/v1/reports/money"; permission: "reports:view"; pathParams: never; query: { from?: string; to?: string; }; body: never; response: MoneyResponse };
   ReportsController_noShowRisk: { method: "get"; path: "/v1/reports/no-show-risk"; permission: "reports:view"; pathParams: never; query: never; body: never; response: NoShowRiskResponse };
