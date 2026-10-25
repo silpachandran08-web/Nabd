@@ -66,6 +66,8 @@ class Ops010RollupsApiTest extends ApiTestBase {
         deliver(f, "billing.payment.recorded.v1", pay);
         deliver(f, "billing.invoice.paid.v1", Map.of("invoiceId", f.invoiceId().toString()));
         deliver(f, "visit.queue_entry.created.v1", Map.of("queueDate", f.today().toString()));
+        deliver(f, "visit.completed.v1", Map.of("queueDate", List.of(f.today().getYear(), f.today().getMonthValue(), f.today().getDayOfMonth()))); // Jackson timestamp form
+        deliver(f, "visit.completed.v1", Map.of("queueDate", "not-a-date")); // ignored, never retried forever
         Map<String, Object> row = today(f);
         assertThat((BigDecimal) row.get("collected")).isEqualByComparingTo("500");
         assertThat((BigDecimal) row.get("billed")).isEqualByComparingTo("500");

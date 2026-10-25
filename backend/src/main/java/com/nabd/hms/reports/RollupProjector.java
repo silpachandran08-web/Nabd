@@ -60,10 +60,10 @@ public class RollupProjector implements EventConsumer {
     public void handle(Event e) {
         ZoneId zone = clock.zone(e.tenantId());
         Optional<LocalDate> day = switch (e.type()) {
-            case "billing.payment.recorded.v1" -> repo.paymentRecordedAt(e.tenantId(), UUID.fromString(e.data().path("paymentId").asString()))
+            case "billing.payment.recorded.v1" -> paymentId(e.data()).flatMap(id -> repo.paymentRecordedAt(e.tenantId(), id))
                     .map(t -> t.atZone(zone).toLocalDate());
             case "billing.invoice.paid.v1" -> Optional.of(clock.today(zone));
-            default -> Optional.of(LocalDate.parse(e.data().path("queueDate").asString()));
+            default -> queueDate(e.data().path("queueDate"));
         };
         if (day.isEmpty()) {
             return;
@@ -73,6 +73,26 @@ public class RollupProjector implements EventConsumer {
             return;
         }
         recompute(e.tenantId(), day.get(), e.id());
+    }
+
+    private static Optional<UUID> paymentId(tools.jackson.databind.JsonNode data) {
+        try {
+            return Optional.of(UUID.fromString(data.path("paymentId").asString("")));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
+
+    /** The wire form of a LocalDate is "2026-01-31" or, with Jackson's timestamp default, [2026,1,31]; anything else is ignored. */
+    private static Optional<LocalDate> queueDate(tools.jackson.databind.JsonNode n) {
+        if (n.isArray() && n.size() == 3) {
+            return Optional.of(LocalDate.of(n.get(0).asInt(), n.get(1).asInt(), n.get(2).asInt()));
+        }
+        try {
+            return n.isString() ? Optional.of(LocalDate.parse(n.asString())) : Optional.empty();
+        } catch (java.time.format.DateTimeParseException ex) {
+            return Optional.empty();
+        }
     }
 
     /** Recomputes one clinic day from source, closed or not: the reopen path, the parity check and the historic backfill use it. */
