@@ -87,6 +87,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `consent.changed.v1` | PatientService.withdrawConsent, guardian consent grant / withdraw | patientId, consentType, status |
 | `organization.config.changed.v1` | SetupService.updatePolicy, updateProfile (key only, never the value) | configKey, status |
 | `organization.tenant.region_pinned.v1` | ProvisioningStepRunner.goLive (OPS-061; the region is immutable from here). Consumer: the Control Plane cell-routing record, **needs external action** (the control-plane service is not in this repo) | regionCode, cell |
+| `organization.privacy_notice.published.v1` | NoticeService.publish and the first seed when the clinic saves its consent contact (IDC-003). Re-acknowledgement is derived at read time from the patient's latest consent, so core needs no projection. Consumer patient-edge: **needs external action** (service not in this tree) | noticeVersion, languages |
 | `iam.role.changed.v1` | RoleService.create / update / resetToPreset | roleId, status |
 | `iam.staff.changed.v1` | StaffService.patch / suspend | staffId, status |
 | `iam.session.revoked.v1` | StaffService: role change, suspend, MFA reset (all sessions of the staff member) | staffId, scope, reasonCode, status |

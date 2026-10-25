@@ -185,6 +185,14 @@ app:
     circuit-open-seconds: 30
     providers:
       comms-gateway: { connect-timeout-ms: 1000, read-timeout-ms: 2000 } # COM-009: OTP budget 3 s
+  # IDC-016 ABDM bridge (DEC-33: off per clinic by default). Endpoints only; the bridge credentials live in the regional secret
+  # store (platform secrets abdm-client-id / abdm-client-secret). Blank base-url or lookup template = "not configured" (503).
+  abdm:
+    base-url: ${ABDM_BASE_URL:}
+    cm-id: ${ABDM_CM_ID:sbx}
+    hfr-lookup: ${ABDM_HFR_LOOKUP:}
+    hpr-lookup: ${ABDM_HPR_LOOKUP:}
+    jwks-uri: ${ABDM_JWKS_URI:}
   whatsapp:
     # Meta WhatsApp Cloud API. Blank access token = LoggingWhatsAppClient (logs, never sends) —
     # every local/test run, same as spring.mail.host above.

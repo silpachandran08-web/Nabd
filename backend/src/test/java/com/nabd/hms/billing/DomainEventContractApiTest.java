@@ -276,6 +276,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.ORGANIZATION_IMPORT_COMPLETED.type()); // ADM-012: produced by the import worker, Adm012ImportApiTest
         expected.remove(DomainEventType.DRUG_MASTER_VERSION_ACTIVATED.type()); // CLN-019: published on drug master activation (DrugMasterApiTest)
         expected.remove(DomainEventType.PLATFORM_ENTITLEMENTS_CHANGED.type()); // PLT-059: operator-plane producer, Plt059EntitlementsApiTest
+        expected.remove(DomainEventType.PRIVACY_NOTICE_PUBLISHED.type()); // IDC-003: Idc003PrivacyNoticeApiTest
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

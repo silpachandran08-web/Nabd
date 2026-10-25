@@ -974,6 +974,23 @@ schemas:
       safety_dictionary_version: operational
       signed_by: operational
       signed_by_registration_no: pii
+    notice_templates:
+      key: operational
+      market: operational
+      language: operational
+      version: operational
+      body_md: operational
+      mandatory_sections: operational
+      legal_reviewed: operational
+      published_at: operational
+    tenant_integrations_abdm:
+      tenant_id: operational
+      enabled: operational
+      hfr_id: operational
+      hip_id: operational
+      verified_at: operational
+      updated_by: operational
+      updated_at: operational
     privacy_notices:
       id: operational
       tenant_id: operational
@@ -1256,6 +1273,8 @@ schemas:
       is_clinician: operational
       licence_expires_on: pii
       licence_override_until: operational
+      hpr_id: pii
+      hpr_verified_at: operational
     staff_clinician_review:
       tenant_id: operational
       staff_id: operational
