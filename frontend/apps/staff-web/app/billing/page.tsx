@@ -15,13 +15,11 @@ import { getter, key } from "../lib/query";
 import { useHasMounted } from "../lib/useHasMounted";
 import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
 import type { Full } from "../lib/gen";
-import type { Close as GClose, DayCloseHistoryItem, DayCloseSummaryResponse, Method as GMethod, Outstanding as GOutstanding, TaxBand as GTaxBand, Unbilled as GUnbilled } from "@nabd/api-client/generated";
+import type { Close as GClose, DayCloseHistoryItem, DayCloseSummaryResponse, Method as GMethod, Totals as GTotals, Outstanding as GOutstanding, TaxBand as GTaxBand, Unbilled as GUnbilled } from "@nabd/api-client/generated";
 
-// TODO(spec): generated `Totals` is QuoteResponse.Totals (Java nested-record name clash with DayCloseSummaryResponse.Totals); remove once the backend names them apart.
-type GTotals = { billed: number; bills: number; collected: number; payments: number; tax: number };
 // GET /v1/billing/day-close (DayCloseController → DayCloseSummaryResponse), with the always-sent fields marked present.
 type Summary = Omit<Full<DayCloseSummaryResponse, "close" | "voidedCount" | "voidedTotal">, "totals" | "methods" | "outstanding" | "unbilled" | "taxBands" | "close"> & {
-  totals: GTotals; methods: Full<GMethod>[]; outstanding: Full<GOutstanding>; unbilled: Full<GUnbilled, "doctorName">[]; taxBands: Full<GTaxBand>[];
+  totals: Full<GTotals>; methods: Full<GMethod>[]; outstanding: Full<GOutstanding>; unbilled: Full<GUnbilled, "doctorName">[]; taxBands: Full<GTaxBand>[];
   close: Full<GClose, "note" | "reopenedByName" | "reopenedAt" | "reopenReason"> | null;
 };
 // FIN-005: GET /v1/billing/day-close/history — every close and reopen, newest first.
