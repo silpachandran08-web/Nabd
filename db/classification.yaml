@@ -938,6 +938,32 @@ schemas:
       subject: pii  # uncertain: an aggregate id, a patient id for patient-subject events (same as patient_id elsewhere)
       version: operational
       applied_at: operational
+    tenant_daily_metrics:
+      tenant_id: operational
+      day: operational
+      visits: operational
+      completed: operational
+      no_shows: operational
+      billed: financial
+      collected: financial
+      tax: financial
+      currency: operational
+      by_method: financial
+      packages_sold: operational
+      last_event_id: operational
+      updated_at: operational
+    doctor_daily_metrics:
+      tenant_id: operational
+      doctor_id: operational
+      day: operational
+      visits: operational
+      completed: operational
+      median_consult_s: operational
+      no_shows: operational
+      billed: financial
+      collected: financial
+      last_event_id: operational
+      updated_at: operational
     queue_entries:
       id: operational
       tenant_id: operational

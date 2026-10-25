@@ -391,4 +391,82 @@ class ReportsRepository {
     private BigDecimal nz(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
     }
+
+    // ── OPS-010 rollups. Writes only tenant_daily_metrics / doctor_daily_metrics (owned by reports); the sources are the
+    // same tables and definitions as the live queries above, so a rollup row equals the live figures for its day.
+
+    /** Recomputes one clinic day of one tenant from source and upserts it, idempotent. [start, end) is the day in the clinic zone. */
+    void recomputeTenantDay(UUID tenantId, LocalDate day, Instant start, Instant end, Instant now, String currency, String eventId) {
+        Timestamp s = Timestamp.from(start);
+        Timestamp e = Timestamp.from(end);
+        Date d = Date.valueOf(day);
+        jdbc.update("""
+                INSERT INTO tenant_daily_metrics (tenant_id, day, visits, completed, no_shows, billed, collected, tax, currency, by_method, packages_sold, last_event_id)
+                SELECT ?, ?,
+                  (SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ?),
+                  (SELECT count(*) FROM queue_entries WHERE tenant_id = ? AND queue_date = ? AND status = 'completed'),
+                  (SELECT count(*) FROM appointments a WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ? AND a.start_time < ?
+                     AND NOT EXISTS (SELECT 1 FROM queue_entries q WHERE q.appointment_id = a.id)),
+                  (SELECT COALESCE(SUM(total), 0) FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?),
+                  (SELECT COALESCE(SUM(amount), 0) FROM invoice_payments WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ?),
+                  (SELECT COALESCE(SUM(tax), 0) FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?),
+                  ?,
+                  (SELECT COALESCE(jsonb_object_agg(method, amt), '{}'::jsonb) FROM
+                     (SELECT method, SUM(amount) AS amt FROM invoice_payments WHERE tenant_id = ? AND recorded_at >= ? AND recorded_at < ? GROUP BY method) m),
+                  (SELECT count(*) FROM package_instances WHERE tenant_id = ? AND created_at >= ? AND created_at < ?),
+                  ?
+                ON CONFLICT (tenant_id, day) DO UPDATE SET visits = EXCLUDED.visits, completed = EXCLUDED.completed, no_shows = EXCLUDED.no_shows,
+                  billed = EXCLUDED.billed, collected = EXCLUDED.collected, tax = EXCLUDED.tax, currency = EXCLUDED.currency,
+                  by_method = EXCLUDED.by_method, packages_sold = EXCLUDED.packages_sold, last_event_id = EXCLUDED.last_event_id, updated_at = now()
+                """, tenantId, d, tenantId, d, tenantId, d, tenantId, s, e, Timestamp.from(now), tenantId, s, e, tenantId, s, e, tenantId, s, e,
+                currency, tenantId, s, e, tenantId, s, e, eventId);
+        jdbc.update("""
+                INSERT INTO doctor_daily_metrics (tenant_id, doctor_id, day, visits, completed, no_shows, billed, collected, last_event_id)
+                SELECT ?, x.doctor_id, ?, COALESCE(q.visits, 0), COALESCE(q.completed, 0), COALESCE(n.no_shows, 0), COALESCE(b.billed, 0), COALESCE(c.collected, 0), ?
+                FROM (SELECT doctor_id FROM queue_entries WHERE tenant_id = ? AND queue_date = ?
+                      UNION SELECT doctor_id FROM invoices WHERE tenant_id = ? AND created_at >= ? AND created_at < ?
+                      UNION SELECT i.doctor_id FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id
+                            WHERE p.tenant_id = ? AND i.tenant_id = ? AND p.recorded_at >= ? AND p.recorded_at < ?
+                      UNION SELECT doctor_id FROM appointments WHERE tenant_id = ? AND start_time >= ? AND start_time < ?) x
+                LEFT JOIN (SELECT doctor_id, count(*) AS visits, count(*) FILTER (WHERE status = 'completed') AS completed
+                           FROM queue_entries WHERE tenant_id = ? AND queue_date = ? GROUP BY doctor_id) q ON q.doctor_id = x.doctor_id
+                LEFT JOIN (SELECT a.doctor_id, count(*) AS no_shows FROM appointments a
+                           WHERE a.tenant_id = ? AND a.status <> 'cancelled' AND a.start_time >= ? AND a.start_time < ? AND a.start_time < ?
+                             AND NOT EXISTS (SELECT 1 FROM queue_entries q2 WHERE q2.appointment_id = a.id) GROUP BY a.doctor_id) n ON n.doctor_id = x.doctor_id
+                LEFT JOIN (SELECT doctor_id, SUM(total) AS billed FROM invoices WHERE tenant_id = ? AND status <> 'void' AND created_at >= ? AND created_at < ?
+                           GROUP BY doctor_id) b ON b.doctor_id = x.doctor_id
+                LEFT JOIN (SELECT i.doctor_id, SUM(p.amount) AS collected FROM invoice_payments p JOIN invoices i ON i.id = p.invoice_id
+                           WHERE p.tenant_id = ? AND i.tenant_id = ? AND p.recorded_at >= ? AND p.recorded_at < ? GROUP BY i.doctor_id) c ON c.doctor_id = x.doctor_id
+                ON CONFLICT (tenant_id, doctor_id, day) DO UPDATE SET visits = EXCLUDED.visits, completed = EXCLUDED.completed,
+                  no_shows = EXCLUDED.no_shows, billed = EXCLUDED.billed, collected = EXCLUDED.collected, last_event_id = EXCLUDED.last_event_id, updated_at = now()
+                """, tenantId, d, eventId, tenantId, d, tenantId, s, e, tenantId, tenantId, s, e, tenantId, s, e,
+                tenantId, d, tenantId, s, e, Timestamp.from(now), tenantId, s, e, tenantId, tenantId, s, e);
+    }
+
+    /** Recorded time of a payment, for the event-to-day mapping (null if the payment is gone). */
+    Optional<Instant> paymentRecordedAt(UUID tenantId, UUID paymentId) {
+        return jdbc.query("SELECT recorded_at FROM invoice_payments WHERE tenant_id = ? AND id = ?",
+                (rs, i) -> rs.getTimestamp(1).toInstant(), tenantId, paymentId).stream().findFirst();
+    }
+
+    /** Sums of the rollup rows for [from, to] (inclusive); a day without a row counts as zero. */
+    OverviewResponse.RangeTotals rollupTotals(UUID tenantId, LocalDate from, LocalDate to) {
+        var t = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(visits), 0) AS visits, COALESCE(SUM(completed), 0) AS completed, COALESCE(SUM(no_shows), 0) AS no_shows,
+                       COALESCE(SUM(billed), 0) AS billed, COALESCE(SUM(collected), 0) AS collected, COALESCE(SUM(packages_sold), 0) AS packages,
+                       max(updated_at) AS as_of
+                FROM tenant_daily_metrics WHERE tenant_id = ? AND day >= ? AND day <= ?
+                """, (rs, i) -> new Object[]{rs.getInt("visits"), rs.getInt("completed"), rs.getInt("no_shows"), rs.getBigDecimal("billed"),
+                        rs.getBigDecimal("collected"), rs.getInt("packages"), rs.getTimestamp("as_of")},
+                tenantId, Date.valueOf(from), Date.valueOf(to));
+        var methods = new java.util.TreeMap<String, BigDecimal>();
+        jdbc.query("""
+                SELECT m.key, SUM(m.value::numeric) AS amt FROM tenant_daily_metrics t, jsonb_each_text(t.by_method) m
+                WHERE t.tenant_id = ? AND t.day >= ? AND t.day <= ? GROUP BY m.key
+                """, rs -> {
+            methods.put(rs.getString("key"), rs.getBigDecimal("amt"));
+        }, tenantId, Date.valueOf(from), Date.valueOf(to));
+        return new OverviewResponse.RangeTotals(from, to, (Integer) t[0], (Integer) t[1], (Integer) t[2], (BigDecimal) t[3], (BigDecimal) t[4], methods,
+                (Integer) t[5], t[6] == null ? null : ((Timestamp) t[6]).toInstant());
+    }
 }

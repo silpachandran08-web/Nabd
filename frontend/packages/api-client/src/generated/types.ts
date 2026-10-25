@@ -168,7 +168,7 @@ export type OtpVerifyRequest = { code: string; mobilePhone: string; tenantSlug: 
 export type Outstanding = { amount?: number; bills?: number; patients?: number; };
 export type Override = { note?: string; reasonCode?: string; unitPrice?: number; };
 export type OverrideRequest = { until: string; };
-export type OverviewResponse = { activeStaff?: Array<ActiveStaff>; checkout?: Checkout; collections?: Collections; date?: string; dayClose?: DayClose; packages?: Packages; paymentSplit?: Array<PaymentSplit>; staff?: StaffSummary; visits?: Visits; };
+export type OverviewResponse = { activeStaff?: Array<ActiveStaff>; checkout?: Checkout; collections?: Collections; date?: string; dayClose?: DayClose; packages?: Packages; paymentSplit?: Array<PaymentSplit>; range?: RangeTotals; staff?: StaffSummary; visits?: Visits; };
 export type OwnerLoginRequest = { email: string; pin: string; };
 export type OwnerMfaConfirmRequest = { code: string; setupToken: string; };
 export type OwnerMfaConfirmResponse = { expiresIn?: number; recoveryCodes?: Array<string>; workspaceToken?: string; };
@@ -234,6 +234,7 @@ export type QueueEntryResponse = { ageYears?: number; appointmentId?: string; ap
 export type QueueReorderRequest = { priority: boolean; reason: string; };
 export type QueueStatusUpdateRequest = { expectedStatus?: string; status: string; };
 export type RaiseTicketRequest = { description: string; priority?: string; subject: string; };
+export type RangeTotals = { asOf?: string; billed?: number; byMethod?: Record<string, number>; collected?: number; completed?: number; from?: string; noShows?: number; packagesSold?: number; to?: string; visits?: number; };
 export type RecoveryVerifyRequest = { challengeToken: string; recoveryCode: string; };
 export type RecoveryVerifyResponse = { accessToken?: string; expiresIn?: number; refreshToken?: string; remainingCodes?: number; };
 export type RedactionPreview = { description?: string; redactionCount?: number; subject?: string; };
@@ -589,7 +590,7 @@ export type Operations = {
   ReportsController_export: { method: "get"; path: "/v1/reports/export"; permission: "reports:export"; pathParams: never; query: { reportType: string; days?: number; from?: string; to?: string; }; body: never; response: string };
   ReportsController_money: { method: "get"; path: "/v1/reports/money"; permission: "reports:view"; pathParams: never; query: { from?: string; to?: string; }; body: never; response: MoneyResponse };
   ReportsController_noShowRisk: { method: "get"; path: "/v1/reports/no-show-risk"; permission: "reports:view"; pathParams: never; query: never; body: never; response: NoShowRiskResponse };
-  ReportsController_overview: { method: "get"; path: "/v1/reports/overview"; permission: "reports:view"; pathParams: never; query: never; body: never; response: OverviewResponse };
+  ReportsController_overview: { method: "get"; path: "/v1/reports/overview"; permission: "reports:view"; pathParams: never; query: { from?: string; to?: string; }; body: never; response: OverviewResponse };
   ReportsController_packages: { method: "get"; path: "/v1/reports/packages"; permission: "reports:view"; pathParams: never; query: { days?: number; from?: string; to?: string; }; body: never; response: PackagesReportResponse };
   ReportsController_retention: { method: "get"; path: "/v1/reports/retention"; permission: "reports:view"; pathParams: never; query: never; body: never; response: RetentionResponse };
   ReportsController_sources: { method: "get"; path: "/v1/reports/sources"; permission: "reports:view"; pathParams: never; query: { days?: number; from?: string; to?: string; }; body: never; response: Array<SourceBreakdownResponse> };
