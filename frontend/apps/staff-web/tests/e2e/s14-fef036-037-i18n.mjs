@@ -14,9 +14,9 @@ async function visit(tag, { cookies = [], headers, viewport }, handlers, fn) {
     if (headers) await context.setExtraHTTPHeaders(headers);
     if (cookies.length) await context.addCookies(cookies.map(([name, value]) => ({ name, value, url: APP })));
     const bytes = { font: 0 };
-    page.on('response', async (r) => { if (/\.woff2?(\?|$)/.test(r.url())) bytes.font += (await r.body().catch(() => Buffer.alloc(0))).length; });
     await seedClinic(page, PERMS); await mockApi(page, log, handlers);
     await page.goto(APP + '/arrivals'); await sleep(2500);
+    bytes.font = await page.evaluate(() => performance.getEntriesByType('resource').filter((e) => /\/_next\/static\/media\/.*\.woff2/.test(e.name)).reduce((n, e) => n + (e.encodedBodySize || e.transferSize || 0), 0));
     await fn({ page, log, bytes });
     check(`${tag} zero console/page errors`, log.pageErrors.length === 0 && log.console.filter((x) => !/Failed to load resource/.test(x)).length === 0, JSON.stringify([...log.pageErrors, ...log.console]));
   } finally { dumpLog(tag, log); await browser.close(); }
@@ -38,7 +38,8 @@ await visit('hi', { cookies: [['nabd_locale', 'hi']], viewport: { width: 390, he
   check('hi: top bar status is in Hindi', /ऑनलाइन|लाइव/.test(text), text.slice(0, 120));
   check('hi: no literal English status left in the top bar', !/\b(Online|Live|Offline)\b/.test(await page.getByRole('status').first().innerText()));
   check('hi: extra font bytes <= 120 KB', bytes.font > 0 && bytes.font <= 120 * 1024, `${bytes.font} bytes`);
-  check('hi: font-display swap declared', (await page.evaluate(() => [...document.fonts].every((f) => f.display === 'swap'))));
+  const faces = await page.evaluate(() => [...document.styleSheets].flatMap((sh) => { try { return [...sh.cssRules]; } catch { return []; } }).filter((r) => r.constructor.name === 'CSSFontFaceRule').map((r) => [r.style.getPropertyValue('font-family'), r.style.getPropertyValue('font-display')]));
+  check('hi: every @font-face uses font-display swap', faces.length > 0 && faces.every(([, d]) => d === 'swap'), JSON.stringify(faces.filter(([, d]) => d !== 'swap')) + ` of ${faces.length}`);
   check('hi: no horizontal scroll at 390px', await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 });
 // English page loads no script font at all
