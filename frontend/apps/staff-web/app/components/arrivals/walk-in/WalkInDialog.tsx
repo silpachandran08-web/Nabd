@@ -14,6 +14,7 @@ import { CheckInIntakeFields, type CheckInResult } from "../CheckInDialog";
 import DuplicateReview from "../duplicate-review/DuplicateReview";
 import type { Grants, Staff } from "../types";
 import GuardianSearch from "./GuardianSearch";
+import HouseholdPicker, { looksLikePhone } from "./HouseholdPicker";
 import { initialWalkIn, walkInReducer } from "./walkInReducer";
 import { checkInBody, registerBody, walkInProblem } from "./walkInSchema";
 
@@ -104,6 +105,9 @@ export default function WalkInDialog({ staff, grants, region, onClose, onChecked
               <span>{s.selected.name} · {s.selected.phone}</span>
               <button type="button" className={styles.linkBtn} onClick={() => dispatch({ type: "clearSelected" })}>Change</button>
             </div>
+          )}
+          {!s.selected && looksLikePhone(s.query) && (
+            <HouseholdPicker phone={s.query} onPick={(m) => dispatch({ type: "select", patient: { id: m.patientId, name: m.displayName, phone: s.query.trim(), mrn: "" } })} />
           )}
           {!s.selected && s.results.length > 0 && (
             <div className={styles.searchResults}>

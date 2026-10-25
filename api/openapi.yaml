@@ -1671,7 +1671,105 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: Reversed }
-        "404": { description: "Merge doesn't exist, already reversed, or past the 30-day window", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { description: "Merge doesn't exist or was already reversed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "UNDO_WINDOW_PASSED: the merge is older than 30 days (ACC-030)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /patients/by-phone:
+    get:
+      tags: [Patients]
+      summary: Household lookup — patients with this phone plus patients whose guardian has it (ACC-029)
+      x-required-permission: patients:view
+      parameters:
+        - { name: phone, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Household
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [household]
+                properties:
+                  household:
+                    type: array
+                    items:
+                      type: object
+                      required: [patientId, displayName, age, sex, relation]
+                      properties:
+                        patientId: { type: string, format: uuid }
+                        displayName: { type: string }
+                        age: { type: integer }
+                        sex: { type: string }
+                        relation: { type: string, enum: [guardian, child, member] }
+                        lastVisitAt: { type: string, format: date-time, nullable: true }
+                        guardianId: { type: string, format: uuid, nullable: true }
+        "400": { description: "INVALID_PHONE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /patients/duplicate-suggestions:
+    get:
+      tags: [Patients]
+      summary: Likely duplicate pairs with the fields that matched (ACC-030)
+      x-required-permission: patients:delete
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Suggestions page (a page may be empty while nextCursor is set)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  nextCursor: { type: string, nullable: true }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [suggestionId, a, b, score, matchedFields]
+                      properties:
+                        suggestionId: { type: string }
+                        a: { $ref: "#/components/schemas/DuplicateBrief" }
+                        b: { $ref: "#/components/schemas/DuplicateBrief" }
+                        score: { type: number }
+                        matchedFields: { type: array, items: { type: string, enum: [phone, name, dob] } }
+
+  /patients/merges:
+    get:
+      tags: [Patients]
+      summary: Merges still inside the 30-day undo window (ACC-030)
+      x-required-permission: patients:delete
+      responses:
+        "200":
+          description: Recent merges, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [mergeId, mergedAt, undoUntil, duplicate, survivor]
+                      properties:
+                        mergeId: { type: string, format: uuid }
+                        mergedAt: { type: string, format: date-time }
+                        undoUntil: { type: string, format: date-time }
+                        duplicate: { $ref: "#/components/schemas/DuplicateBrief" }
+                        survivor: { $ref: "#/components/schemas/DuplicateBrief" }
+
+  /patients/duplicate-suggestions/{id}/dismiss:
+    post:
+      tags: [Patients]
+      summary: Dismiss a suggestion until a matched field changes (ACC-030)
+      x-required-permission: patients:delete
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Dismissed }
+        "404": { description: "No longer a suggestion", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /patients/{id}/guardian:
     delete:
@@ -3996,6 +4094,17 @@ components:
               page: { $ref: "#/components/schemas/PageMeta" }
 
   schemas:
+    DuplicateBrief:
+      type: object
+      required: [patientId, mrn, displayName, dob, sex, phone]
+      properties:
+        patientId: { type: string, format: uuid }
+        mrn: { type: string }
+        displayName: { type: string }
+        dob: { type: string, format: date }
+        sex: { type: string }
+        phone: { type: string }
+        lastVisitAt: { type: string, format: date-time, nullable: true }
     DoctorSession:
       type: object
       required: [state]

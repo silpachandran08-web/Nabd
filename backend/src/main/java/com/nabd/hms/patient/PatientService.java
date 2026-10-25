@@ -512,7 +512,9 @@ public class PatientService {
             throw notFound();
         }
 
-        repo.markMerged(tenantId, req.duplicatePatientId(), survivorId, callerStaffId);
+        UUID mergeId = repo.markMerged(tenantId, req.duplicatePatientId(), survivorId, callerStaffId);
+        audit(tenantId, callerStaffId, "patient.merge", survivorId, Map.of("duplicatePatientId", req.duplicatePatientId().toString()),
+                Map.of("survivorId", survivorId.toString(), "mergeId", mergeId.toString()));
         log.info("patient {} merged into {} by {} (tenant {})", req.duplicatePatientId(), survivorId, callerStaffId, tenantId);
         PatientRow row = repo.findById(tenantId, survivorId).orElseThrow(this::notFound);
         List<String> fieldGrants = staffService.getCallerInfo(tenantId, callerStaffId).fieldGrants();
@@ -525,10 +527,17 @@ public class PatientService {
     public void unmerge(UUID tenantId, UUID mergeId, UUID callerStaffId, String stepUpToken) {
         stepUpVerifier.require(stepUpToken, callerStaffId);
         tenantContext.set(tenantId);
-        if (!repo.unmerge(tenantId, mergeId, callerStaffId)) {
+        UUID[] reversed = repo.unmerge(tenantId, mergeId, callerStaffId);
+        if (reversed == null) {
+            if (repo.undoWindowPassed(tenantId, mergeId)) {
+                throw new ApiException(HttpStatus.CONFLICT, "undo-window-passed", "Undo window passed",
+                        "A merge can be undone for 30 days.", Map.of("code", "UNDO_WINDOW_PASSED"));
+            }
             throw new ApiException(HttpStatus.NOT_FOUND, "merge-not-reversible", "Merge not reversible",
                     "This merge doesn't exist, was already reversed, or is past its 30-day reversal window.");
         }
+        audit(tenantId, callerStaffId, "patient.merge_undo", reversed[1], Map.of("mergeId", mergeId.toString()),
+                Map.of("duplicatePatientId", reversed[0].toString(), "survivorId", reversed[1].toString()));
         log.info("merge {} reversed by {} (tenant {})", mergeId, callerStaffId, tenantId);
     }
 
@@ -545,7 +554,7 @@ public class PatientService {
     }
 
     /** NB-041 gate + NB-051 scope resolution in one caller lookup — every patient-facing method needs both. */
-    private UUID requireVerifiedAndResolveScope(UUID tenantId, UUID callerStaffId) {
+    UUID requireVerifiedAndResolveScope(UUID tenantId, UUID callerStaffId) {
         CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
         if (!caller.emailVerified() || !caller.mobileVerified()) {
             log.warn("patient-data access blocked: staff {} not fully verified (email={}, mobile={}, tenant {})",

@@ -9,6 +9,7 @@ import Dialog from "../components/ui/Dialog";
 import ConfirmDialog from "./ConfirmDialog";
 import GuardianReviews from "./GuardianReviews";
 import PhoneDataQuality from "./PhoneDataQuality";
+import DuplicateSuggestions from "./DuplicateSuggestions";
 import StatusPill from "../components/ui/StatusPill";
 import BillingStatePill from "../components/ui/BillingStatePill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
@@ -66,8 +67,8 @@ const TODAY_STATUS_LABEL: Record<string, string> = {
 const FILTERS: [string, string][] = [["all", "All"], ["recent", "Recently visited"], ["followup", "Follow-up due"],
   ["package", "Active package"], ["balance", "Outstanding balance"], ["duplicate", "Duplicate review"], ["archived", "Archived"]];
 // Financial and duplicate-review filters are absent (not disabled) for roles that don't hold the grant.
-type Perms = { clinicalView: boolean; clinicalEdit: boolean; dentalView: boolean; dentalEdit: boolean; billingView: boolean; checkIn: boolean; register: boolean; patientsEdit: boolean };
-const NO_PERMS: Perms = { clinicalView: false, clinicalEdit: false, dentalView: false, dentalEdit: false, billingView: false, checkIn: false, register: false, patientsEdit: false };
+type Perms = { clinicalView: boolean; clinicalEdit: boolean; dentalView: boolean; dentalEdit: boolean; billingView: boolean; checkIn: boolean; register: boolean; patientsEdit: boolean; merge: boolean };
+const NO_PERMS: Perms = { clinicalView: false, clinicalEdit: false, dentalView: false, dentalEdit: false, billingView: false, checkIn: false, register: false, patientsEdit: false, merge: false };
 
 /** "+91 ••••• 4412" — only the last four digits; used in the list and, until revealed, in the drawer. */
 function maskPhone(phone: string): string {
@@ -128,9 +129,10 @@ function PatientsList() {
   const [checkInFor, setCheckInFor] = useState<RegistryRow | null>(null);
   const [registering, setRegistering] = useState(false);
   const [fixingPhones, setFixingPhones] = useState(false); // ACC-028 data-quality list
+  const [reviewingDuplicates, setReviewingDuplicates] = useState(false); // ACC-030
   const [flash, setFlash] = useState<string | null>(null);
   const [perms, setPerms] = useState<Perms>(NO_PERMS);
-  const { checkIn: canCheckIn, register: canRegister, clinicalView, clinicalEdit, dentalView: canDental, dentalEdit, billingView, patientsEdit } = perms;
+  const { checkIn: canCheckIn, register: canRegister, clinicalView, clinicalEdit, dentalView: canDental, dentalEdit, billingView, patientsEdit, merge: canMerge } = perms;
   const loadSeq = useRef(0);
   const [moreState, setMoreState] = useState<"idle" | "loading" | "error">("idle");
   const moreRef = useRef<HTMLDivElement | null>(null);
@@ -224,7 +226,7 @@ function PatientsList() {
       setPerms({
         clinicalView: can("clinical:view"), clinicalEdit: can("clinical:edit"),
         dentalView: can("specialty_dental:view"), dentalEdit: can("specialty_dental:edit"),
-        billingView: can("billing:view"), checkIn: can("queue:create"), register: can("patients:create"), patientsEdit: can("patients:edit"),
+        billingView: can("billing:view"), checkIn: can("queue:create"), register: can("patients:create"), patientsEdit: can("patients:edit"), merge: can("patients:delete"),
       });
     });
   }, []);
@@ -690,6 +692,9 @@ function PatientsList() {
           {patientsEdit && !forbidden && (
             <button type="button" className={styles.secondaryBtn} style={{ minBlockSize: 44 }} onClick={() => setFixingPhones(true)}>Numbers to fix</button>
           )}
+          {canMerge && !forbidden && (
+            <button type="button" className={styles.secondaryBtn} style={{ minBlockSize: 44 }} onClick={() => setReviewingDuplicates(true)}>Possible duplicates</button>
+          )}
           {canRegister && !forbidden && (
             <button type="button" className={styles.primaryBtn} onClick={() => setRegistering(true)}>＋ Register patient</button>
           )}
@@ -793,6 +798,9 @@ function PatientsList() {
       {fixingPhones && (
         <PhoneDataQuality authedFetch={authedFetch} onClose={() => setFixingPhones(false)}
           onFixed={() => { setFlash("Mobile number corrected."); void load(q, filter); }} />
+      )}
+      {reviewingDuplicates && (
+        <DuplicateSuggestions authedFetch={authedFetch} onClose={() => setReviewingDuplicates(false)} onChanged={() => void load(q, filter)} />
       )}
       {registering && (
         <RegisterDialog authedFetch={authedFetch} onClose={() => setRegistering(false)}

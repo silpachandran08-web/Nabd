@@ -99,6 +99,7 @@ export type DpaStatusResponse = { accepted?: Accepted; blockers?: Array<string>;
 export type DrugKnowledgeBaseSource = { configured?: boolean; dataMonth?: string; source?: string; };
 export type DrugSuggestionResponse = { code?: string; inStock?: boolean; name?: string; prescriptionOnly?: boolean; source?: string; };
 export type DueConditionResponse = { condition?: string; id?: string; patientId?: string; patientName?: string; reviewDueDate?: string; };
+export type DuplicateSuggestionPage = { items?: Array<Item>; nextCursor?: string; };
 export type EncounterListItem = { amendmentCount?: number; documentsDraft?: number; documentsIssued?: number; noteSignedAt?: string; noteState?: string; occurredAt?: string; patientId?: string; patientMrn?: string; patientName?: string; queueDate?: string; queueEntryId?: string; rxItemCount?: number; rxStatus?: string; visitStatus?: string; };
 export type EncounterListPage = { data?: Array<EncounterListItem>; page?: PageMeta; };
 export type EncounterPage = { data?: Array<EncounterResponse>; page?: PageMeta; };
@@ -122,6 +123,7 @@ export type GrantResponse = { active?: boolean; declineNote?: string; expiresAt?
 export type GuardianConsent = { channel?: string; confirmed?: boolean; };
 export type GuardianReviewDecisionRequest = { decision: string; };
 export type GuardianReviewResponse = { dob?: string; guardianId?: string; guardianName?: string; mrn?: string; patientId?: string; patientName?: string; };
+export type HouseholdResponse = { household?: Array<Member>; };
 export type ImportJobRequest = { fileName: string; importType: string; };
 export type ImportJobResponse = { createdAt?: string; errorMessage?: string; fileName?: string; id?: string; importType?: string; resultUrl?: string; status?: string; };
 export type InstanceEventResponse = { actorName?: string; createdAt?: string; delta?: number; eventType?: string; note?: string; };
@@ -143,6 +145,7 @@ export type LifecycleEventResponse = { changedAt?: string; changedBy?: string; f
 export type LineItemRequest = { category?: string; chargeCode: string; chargeName?: string; override?: Override; prescriptionItemId?: string; quantity?: number; taxRatePercent?: number; unitPrice?: number; };
 export type LineItemResponse = { category?: string; chargeCode?: string; chargeName?: string; lineTotal?: number; listUnitPrice?: number; overrideReason?: string; quantity?: number; taxRatePercent?: number; tier?: string; unitPrice?: number; };
 export type LoginRequest = { email: string; pin: string; tenantSlug: string; };
+export type Member = { age?: number; displayName?: string; guardianId?: string; lastVisitAt?: string; patientId?: string; relation?: string; sex?: string; };
 export type MergeRequest = { duplicatePatientId: string; };
 export type Method = { amount?: number; method?: string; transactions?: number; };
 export type MfaConfirmRequest = { code: string; setupToken?: string; };
@@ -234,6 +237,7 @@ export type QueueEntryResponse = { ageYears?: number; appointmentId?: string; ap
 export type QueueReorderRequest = { priority: boolean; reason: string; };
 export type QueueStatusUpdateRequest = { expectedStatus?: string; status: string; };
 export type RaiseTicketRequest = { description: string; priority?: string; subject: string; };
+export type RecentMerges = { items?: Array<Item>; };
 export type RecoveryVerifyRequest = { challengeToken: string; recoveryCode: string; };
 export type RecoveryVerifyResponse = { accessToken?: string; expiresIn?: number; refreshToken?: string; remainingCodes?: number; };
 export type RedactionPreview = { description?: string; redactionCount?: number; subject?: string; };
@@ -513,8 +517,12 @@ export type Operations = {
   PatientController_list: { method: "get"; path: "/v1/patients"; permission: "patients:view"; pathParams: never; query: { q?: string; limit?: number; cursor?: string; }; body: never; response: PatientPage };
   PatientController_register: { method: "post"; path: "/v1/patients"; permission: "patients:create"; pathParams: never; query: never; body: PatientWriteRequest; response: Record<string, unknown> };
   PatientBatchController_batch: { method: "get"; path: "/v1/patients/batch"; permission: "patients:view"; pathParams: never; query: { ids: Array<string>; }; body: never; response: Array<PatientDetailResponse> };
+  PatientController_byPhone: { method: "get"; path: "/v1/patients/by-phone"; permission: "patients:view"; pathParams: never; query: { phone: string; }; body: never; response: HouseholdResponse };
   PatientController_dataQuality: { method: "get"; path: "/v1/patients/data-quality"; permission: "patients:edit"; pathParams: never; query: { issue: string; limit?: number; cursor?: string; }; body: never; response: DataQualityPage };
+  PatientController_duplicateSuggestions: { method: "get"; path: "/v1/patients/duplicate-suggestions"; permission: "patients:delete"; pathParams: never; query: { cursor?: string; }; body: never; response: DuplicateSuggestionPage };
+  PatientController_dismissSuggestion: { method: "post"; path: "/v1/patients/duplicate-suggestions/{id}/dismiss"; permission: "patients:delete"; pathParams: { id: string; }; query: never; body: never; response: void };
   PatientController_guardianReviewsDue: { method: "get"; path: "/v1/patients/guardian-reviews-due"; permission: "patients:view"; pathParams: never; query: never; body: never; response: Array<GuardianReviewResponse> };
+  PatientController_recentMerges: { method: "get"; path: "/v1/patients/merges"; permission: "patients:delete"; pathParams: never; query: never; body: never; response: RecentMerges };
   PatientController_undoMerge: { method: "post"; path: "/v1/patients/merges/{mergeId}/undo"; permission: "patients:delete"; pathParams: { mergeId: string; }; query: never; body: never; response: void };
   PatientController_registry: { method: "get"; path: "/v1/patients/registry"; permission: "patients:view"; pathParams: never; query: { q?: string; filter?: string; limit?: number; cursor?: string; }; body: never; response: PatientRegistryResponse };
   PatientController_get: { method: "get"; path: "/v1/patients/{id}"; permission: "patients:view"; pathParams: { id: string; }; query: never; body: never; response: PatientDetailResponse };

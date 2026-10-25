@@ -750,6 +750,14 @@ schemas:
       reason: phi
       actor_id: operational
       occurred_at: operational
+    patient_duplicate_dismissals:
+      id: operational
+      tenant_id: operational
+      patient_a: pii
+      patient_b: pii
+      fingerprint: pii
+      dismissed_by: operational
+      dismissed_at: operational
     patient_merges:
       id: operational
       tenant_id: operational

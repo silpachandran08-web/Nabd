@@ -36,9 +36,46 @@ import java.util.UUID;
 public class PatientController {
 
     private final PatientService service;
+    private final HouseholdService households;
+    private final DuplicateSuggestionService suggestions;
 
-    PatientController(PatientService service) {
+    PatientController(PatientService service, HouseholdService households, DuplicateSuggestionService suggestions) {
         this.service = service;
+        this.households = households;
+        this.suggestions = suggestions;
+    }
+
+    /** ACC-030: likely duplicate pairs with the fields that matched. Merging needs the same authority as POST /{id}/merge (patients:delete). */
+    @com.nabd.hms.shared.phiread.PhiRead(value = "patient_duplicate_list", key = "a.patientId,b.patientId")
+    @GetMapping("/duplicate-suggestions")
+    @PreAuthorize("hasAuthority('patients:delete')")
+    public com.nabd.hms.patient.dto.DuplicateSuggestionPage duplicateSuggestions(@AuthenticationPrincipal Jwt jwt,
+                                                                                   @RequestParam(required = false) String cursor) {
+        return suggestions.list(tenantId(jwt), staffId(jwt), cursor);
+    }
+
+    /** ACC-030: merges still inside the 30-day undo window. */
+    @com.nabd.hms.shared.phiread.PhiRead(value = "patient_merge_list", key = "duplicate.patientId,survivor.patientId")
+    @GetMapping("/merges")
+    @PreAuthorize("hasAuthority('patients:delete')")
+    public com.nabd.hms.patient.dto.RecentMerges recentMerges(@AuthenticationPrincipal Jwt jwt) {
+        return suggestions.recentMerges(tenantId(jwt), staffId(jwt));
+    }
+
+    @com.nabd.hms.shared.Idempotent
+    @PostMapping("/duplicate-suggestions/{id}/dismiss")
+    @PreAuthorize("hasAuthority('patients:delete')")
+    public ResponseEntity<Void> dismissSuggestion(@AuthenticationPrincipal Jwt jwt, @PathVariable String id) {
+        suggestions.dismiss(tenantId(jwt), staffId(jwt), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** ACC-029: everyone sharing the phone, or whose guardian has it, with relation, age and last visit. */
+    @com.nabd.hms.shared.phiread.PhiRead(value = "patient_household_list")
+    @GetMapping("/by-phone")
+    @PreAuthorize("hasAuthority('patients:view')")
+    public com.nabd.hms.patient.dto.HouseholdResponse byPhone(@AuthenticationPrincipal Jwt jwt, @RequestParam String phone) {
+        return households.byPhone(tenantId(jwt), staffId(jwt), phone);
     }
 
     /**
