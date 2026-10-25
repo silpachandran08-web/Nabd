@@ -270,12 +270,14 @@ class CheckoutRepository {
 
     List<LineItemRow> findLineItems(UUID tenantId, UUID invoiceId) {
         return jdbc.query(
-                "SELECT charge_code, charge_name, category, quantity, unit_price, tax_rate_percent, line_total, " +
-                        "list_unit_price, tier, override_reason_code FROM invoice_line_items WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order",
+                "SELECT id, charge_code, charge_name, category, quantity, unit_price, tax_rate_percent, line_total, " +
+                        "list_unit_price, tier, override_reason_code, tax_category, tax_inclusive, inter_state, sac_hsn, taxable_minor FROM invoice_line_items WHERE tenant_id = ? AND invoice_id = ? ORDER BY display_order",
                 (rs, i) -> new LineItemRow(rs.getString("charge_code"), rs.getString("charge_name"), rs.getString("category"),
                         rs.getInt("quantity"), rs.getBigDecimal("unit_price"), rs.getBigDecimal("tax_rate_percent"),
                         rs.getBigDecimal("line_total"), rs.getBigDecimal("list_unit_price"), rs.getString("tier"),
-                        rs.getString("override_reason_code")),
+                        rs.getString("override_reason_code"), rs.getObject("id", UUID.class), rs.getString("tax_category"),
+                        rs.getBoolean("tax_inclusive"), rs.getBoolean("inter_state"), rs.getString("sac_hsn"),
+                        (Long) rs.getObject("taxable_minor")),
                 tenantId, invoiceId);
     }
 

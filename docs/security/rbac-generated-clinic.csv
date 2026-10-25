@@ -22,6 +22,7 @@ owner,GET /v1/billing/day-close,billing:view,allow
 owner,GET /v1/billing/day-close/history,billing:view,allow
 owner,GET /v1/billing/invoices/{id},billing:view,allow
 owner,GET /v1/billing/otc-charges,billing:view,allow
+owner,GET /v1/billing/tax/guided-picker,setup:view,allow
 owner,GET /v1/clinical/conditions/due,clinical:view,allow
 owner,GET /v1/clinical/documents/{id},clinical:view,allow
 owner,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -164,6 +165,7 @@ owner,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,deny-401
 owner,PATCH /v1/queue/{id}/status,queue:edit,allow
 owner,PATCH /v1/roles/{id},staff:edit,allow
 owner,PATCH /v1/setup/charges/{id},setup:edit,allow
+owner,PATCH /v1/setup/charges/{id}/tax,setup:edit,allow
 owner,PATCH /v1/setup/consent-contact,setup:edit,allow
 owner,PATCH /v1/setup/licences/{id},setup:edit,allow
 owner,PATCH /v1/setup/policies/{key},setup:edit,allow
@@ -186,6 +188,7 @@ owner,POST /v1/billing/day-close/reopen,billing:approve,allow
 owner,POST /v1/billing/invoices/{id}/payments,billing:edit,allow
 owner,POST /v1/billing/invoices/{id}/void,billing:edit,allow
 owner,POST /v1/billing/otc-checkout,billing:create,allow
+owner,POST /v1/billing/quotes,billing:view,allow
 owner,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-403
 owner,POST /v1/clinical/note-templates,clinical:edit,deny-403
 owner,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-403
@@ -298,6 +301,7 @@ owner_doctor,GET /v1/billing/day-close,billing:view,allow
 owner_doctor,GET /v1/billing/day-close/history,billing:view,allow
 owner_doctor,GET /v1/billing/invoices/{id},billing:view,allow
 owner_doctor,GET /v1/billing/otc-charges,billing:view,allow
+owner_doctor,GET /v1/billing/tax/guided-picker,setup:view,allow
 owner_doctor,GET /v1/clinical/conditions/due,clinical:view,allow
 owner_doctor,GET /v1/clinical/documents/{id},clinical:view,allow
 owner_doctor,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -440,6 +444,7 @@ owner_doctor,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,den
 owner_doctor,PATCH /v1/queue/{id}/status,queue:edit,allow
 owner_doctor,PATCH /v1/roles/{id},staff:edit,allow
 owner_doctor,PATCH /v1/setup/charges/{id},setup:edit,allow
+owner_doctor,PATCH /v1/setup/charges/{id}/tax,setup:edit,allow
 owner_doctor,PATCH /v1/setup/consent-contact,setup:edit,allow
 owner_doctor,PATCH /v1/setup/licences/{id},setup:edit,allow
 owner_doctor,PATCH /v1/setup/policies/{key},setup:edit,allow
@@ -462,6 +467,7 @@ owner_doctor,POST /v1/billing/day-close/reopen,billing:approve,allow
 owner_doctor,POST /v1/billing/invoices/{id}/payments,billing:edit,allow
 owner_doctor,POST /v1/billing/invoices/{id}/void,billing:edit,allow
 owner_doctor,POST /v1/billing/otc-checkout,billing:create,allow
+owner_doctor,POST /v1/billing/quotes,billing:view,allow
 owner_doctor,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,allow
 owner_doctor,POST /v1/clinical/note-templates,clinical:edit,allow
 owner_doctor,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,allow
@@ -574,6 +580,7 @@ doctor,GET /v1/billing/day-close,billing:view,allow
 doctor,GET /v1/billing/day-close/history,billing:view,allow
 doctor,GET /v1/billing/invoices/{id},billing:view,allow
 doctor,GET /v1/billing/otc-charges,billing:view,allow
+doctor,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 doctor,GET /v1/clinical/conditions/due,clinical:view,allow
 doctor,GET /v1/clinical/documents/{id},clinical:view,allow
 doctor,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -716,6 +723,7 @@ doctor,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,deny-401
 doctor,PATCH /v1/queue/{id}/status,queue:edit,allow
 doctor,PATCH /v1/roles/{id},staff:edit,deny-403
 doctor,PATCH /v1/setup/charges/{id},setup:edit,deny-403
+doctor,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 doctor,PATCH /v1/setup/consent-contact,setup:edit,deny-403
 doctor,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 doctor,PATCH /v1/setup/policies/{key},setup:edit,deny-403
@@ -738,6 +746,7 @@ doctor,POST /v1/billing/day-close/reopen,billing:approve,deny-403
 doctor,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-403
 doctor,POST /v1/billing/invoices/{id}/void,billing:edit,deny-403
 doctor,POST /v1/billing/otc-checkout,billing:create,deny-403
+doctor,POST /v1/billing/quotes,billing:view,allow
 doctor,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,allow
 doctor,POST /v1/clinical/note-templates,clinical:edit,allow
 doctor,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,allow
@@ -850,6 +859,7 @@ nurse,GET /v1/billing/day-close,billing:view,deny-403
 nurse,GET /v1/billing/day-close/history,billing:view,deny-403
 nurse,GET /v1/billing/invoices/{id},billing:view,deny-403
 nurse,GET /v1/billing/otc-charges,billing:view,deny-403
+nurse,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 nurse,GET /v1/clinical/conditions/due,clinical:view,allow
 nurse,GET /v1/clinical/documents/{id},clinical:view,allow
 nurse,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -992,6 +1002,7 @@ nurse,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,deny-401
 nurse,PATCH /v1/queue/{id}/status,queue:edit,allow
 nurse,PATCH /v1/roles/{id},staff:edit,deny-403
 nurse,PATCH /v1/setup/charges/{id},setup:edit,deny-403
+nurse,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 nurse,PATCH /v1/setup/consent-contact,setup:edit,deny-403
 nurse,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 nurse,PATCH /v1/setup/policies/{key},setup:edit,deny-403
@@ -1014,6 +1025,7 @@ nurse,POST /v1/billing/day-close/reopen,billing:approve,deny-403
 nurse,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-403
 nurse,POST /v1/billing/invoices/{id}/void,billing:edit,deny-403
 nurse,POST /v1/billing/otc-checkout,billing:create,deny-403
+nurse,POST /v1/billing/quotes,billing:view,deny-403
 nurse,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,allow
 nurse,POST /v1/clinical/note-templates,clinical:edit,allow
 nurse,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,allow
@@ -1126,6 +1138,7 @@ receptionist,GET /v1/billing/day-close,billing:view,allow
 receptionist,GET /v1/billing/day-close/history,billing:view,allow
 receptionist,GET /v1/billing/invoices/{id},billing:view,allow
 receptionist,GET /v1/billing/otc-charges,billing:view,allow
+receptionist,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 receptionist,GET /v1/clinical/conditions/due,clinical:view,deny-403
 receptionist,GET /v1/clinical/documents/{id},clinical:view,deny-403
 receptionist,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-403
@@ -1268,6 +1281,7 @@ receptionist,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,den
 receptionist,PATCH /v1/queue/{id}/status,queue:edit,allow
 receptionist,PATCH /v1/roles/{id},staff:edit,deny-403
 receptionist,PATCH /v1/setup/charges/{id},setup:edit,deny-403
+receptionist,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 receptionist,PATCH /v1/setup/consent-contact,setup:edit,deny-403
 receptionist,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 receptionist,PATCH /v1/setup/policies/{key},setup:edit,deny-403
@@ -1290,6 +1304,7 @@ receptionist,POST /v1/billing/day-close/reopen,billing:approve,allow
 receptionist,POST /v1/billing/invoices/{id}/payments,billing:edit,allow
 receptionist,POST /v1/billing/invoices/{id}/void,billing:edit,allow
 receptionist,POST /v1/billing/otc-checkout,billing:create,allow
+receptionist,POST /v1/billing/quotes,billing:view,allow
 receptionist,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-403
 receptionist,POST /v1/clinical/note-templates,clinical:edit,deny-403
 receptionist,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-403
@@ -1402,6 +1417,7 @@ frontdesk_vitals,GET /v1/billing/day-close,billing:view,allow
 frontdesk_vitals,GET /v1/billing/day-close/history,billing:view,allow
 frontdesk_vitals,GET /v1/billing/invoices/{id},billing:view,allow
 frontdesk_vitals,GET /v1/billing/otc-charges,billing:view,allow
+frontdesk_vitals,GET /v1/billing/tax/guided-picker,setup:view,deny-403
 frontdesk_vitals,GET /v1/clinical/conditions/due,clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/documents/{id},clinical:view,allow
 frontdesk_vitals,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,allow
@@ -1544,6 +1560,7 @@ frontdesk_vitals,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit
 frontdesk_vitals,PATCH /v1/queue/{id}/status,queue:edit,allow
 frontdesk_vitals,PATCH /v1/roles/{id},staff:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/charges/{id},setup:edit,deny-403
+frontdesk_vitals,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/consent-contact,setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/licences/{id},setup:edit,deny-403
 frontdesk_vitals,PATCH /v1/setup/policies/{key},setup:edit,deny-403
@@ -1566,6 +1583,7 @@ frontdesk_vitals,POST /v1/billing/day-close/reopen,billing:approve,allow
 frontdesk_vitals,POST /v1/billing/invoices/{id}/payments,billing:edit,allow
 frontdesk_vitals,POST /v1/billing/invoices/{id}/void,billing:edit,allow
 frontdesk_vitals,POST /v1/billing/otc-checkout,billing:create,allow
+frontdesk_vitals,POST /v1/billing/quotes,billing:view,allow
 frontdesk_vitals,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/note-templates,clinical:edit,deny-403
 frontdesk_vitals,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-403

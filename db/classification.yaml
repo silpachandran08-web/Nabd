@@ -139,6 +139,9 @@ schemas:
       is_rx: operational
       hsn_code: financial
       stock_qty: operational
+      tax_category: financial
+      sac_hsn: financial
+      tax_inclusive: financial
     chronic_conditions:
       id: operational
       tenant_id: operational
@@ -435,6 +438,21 @@ schemas:
       overridden_by: operational
       prescription_item_id: operational
       is_rx: operational
+      discount_allocated_minor: financial
+      taxable_minor: financial
+      tax_category: financial
+      tax_rule_id: operational
+      tax_inclusive: financial
+      inter_state: financial
+      sac_hsn: financial
+    invoice_line_taxes:
+      id: operational
+      tenant_id: operational
+      line_id: operational
+      tax_type: financial
+      rate: financial
+      taxable_minor: financial
+      amount_minor: financial
     invoice_payments:
       id: operational
       tenant_id: operational
@@ -490,6 +508,8 @@ schemas:
       round_off_minor: financial
       total_minor: financial
       paid_minor: financial
+      document_type: operational
+      buyer_gstin: financial
     legal_entities:
       id: operational
       owner_id: operational
@@ -967,6 +987,16 @@ schemas:
       transfer_reason: operational
       transfer_reason_note: phi  # uncertain: free text, may carry clinical reason
       legacy_duplicate: operational
+    tax_rules:
+      id: operational
+      jurisdiction: operational
+      category: operational
+      tax_category: operational
+      rate: operational
+      components: operational
+      effective_from: operational
+      effective_to: operational
+      source_note: operational
     regions:
       code: operational
       name: operational

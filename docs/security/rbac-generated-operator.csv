@@ -22,6 +22,7 @@ super_admin,GET /v1/billing/day-close,billing:view,deny-401
 super_admin,GET /v1/billing/day-close/history,billing:view,deny-401
 super_admin,GET /v1/billing/invoices/{id},billing:view,deny-401
 super_admin,GET /v1/billing/otc-charges,billing:view,deny-401
+super_admin,GET /v1/billing/tax/guided-picker,setup:view,deny-401
 super_admin,GET /v1/clinical/conditions/due,clinical:view,deny-401
 super_admin,GET /v1/clinical/documents/{id},clinical:view,deny-401
 super_admin,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-401
@@ -164,6 +165,7 @@ super_admin,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,allo
 super_admin,PATCH /v1/queue/{id}/status,queue:edit,deny-401
 super_admin,PATCH /v1/roles/{id},staff:edit,deny-401
 super_admin,PATCH /v1/setup/charges/{id},setup:edit,deny-401
+super_admin,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-401
 super_admin,PATCH /v1/setup/consent-contact,setup:edit,deny-401
 super_admin,PATCH /v1/setup/licences/{id},setup:edit,deny-401
 super_admin,PATCH /v1/setup/policies/{key},setup:edit,deny-401
@@ -186,6 +188,7 @@ super_admin,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 super_admin,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-401
 super_admin,POST /v1/billing/invoices/{id}/void,billing:edit,deny-401
 super_admin,POST /v1/billing/otc-checkout,billing:create,deny-401
+super_admin,POST /v1/billing/quotes,billing:view,deny-401
 super_admin,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-401
 super_admin,POST /v1/clinical/note-templates,clinical:edit,deny-401
 super_admin,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-401
@@ -298,6 +301,7 @@ implementation,GET /v1/billing/day-close,billing:view,deny-401
 implementation,GET /v1/billing/day-close/history,billing:view,deny-401
 implementation,GET /v1/billing/invoices/{id},billing:view,deny-401
 implementation,GET /v1/billing/otc-charges,billing:view,deny-401
+implementation,GET /v1/billing/tax/guided-picker,setup:view,deny-401
 implementation,GET /v1/clinical/conditions/due,clinical:view,deny-401
 implementation,GET /v1/clinical/documents/{id},clinical:view,deny-401
 implementation,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-401
@@ -440,6 +444,7 @@ implementation,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,d
 implementation,PATCH /v1/queue/{id}/status,queue:edit,deny-401
 implementation,PATCH /v1/roles/{id},staff:edit,deny-401
 implementation,PATCH /v1/setup/charges/{id},setup:edit,deny-401
+implementation,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-401
 implementation,PATCH /v1/setup/consent-contact,setup:edit,deny-401
 implementation,PATCH /v1/setup/licences/{id},setup:edit,deny-401
 implementation,PATCH /v1/setup/policies/{key},setup:edit,deny-401
@@ -462,6 +467,7 @@ implementation,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 implementation,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-401
 implementation,POST /v1/billing/invoices/{id}/void,billing:edit,deny-401
 implementation,POST /v1/billing/otc-checkout,billing:create,deny-401
+implementation,POST /v1/billing/quotes,billing:view,deny-401
 implementation,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-401
 implementation,POST /v1/clinical/note-templates,clinical:edit,deny-401
 implementation,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-401
@@ -574,6 +580,7 @@ support_engineer,GET /v1/billing/day-close,billing:view,deny-401
 support_engineer,GET /v1/billing/day-close/history,billing:view,deny-401
 support_engineer,GET /v1/billing/invoices/{id},billing:view,deny-401
 support_engineer,GET /v1/billing/otc-charges,billing:view,deny-401
+support_engineer,GET /v1/billing/tax/guided-picker,setup:view,deny-401
 support_engineer,GET /v1/clinical/conditions/due,clinical:view,deny-401
 support_engineer,GET /v1/clinical/documents/{id},clinical:view,deny-401
 support_engineer,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-401
@@ -716,6 +723,7 @@ support_engineer,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit
 support_engineer,PATCH /v1/queue/{id}/status,queue:edit,deny-401
 support_engineer,PATCH /v1/roles/{id},staff:edit,deny-401
 support_engineer,PATCH /v1/setup/charges/{id},setup:edit,deny-401
+support_engineer,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-401
 support_engineer,PATCH /v1/setup/consent-contact,setup:edit,deny-401
 support_engineer,PATCH /v1/setup/licences/{id},setup:edit,deny-401
 support_engineer,PATCH /v1/setup/policies/{key},setup:edit,deny-401
@@ -738,6 +746,7 @@ support_engineer,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 support_engineer,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-401
 support_engineer,POST /v1/billing/invoices/{id}/void,billing:edit,deny-401
 support_engineer,POST /v1/billing/otc-checkout,billing:create,deny-401
+support_engineer,POST /v1/billing/quotes,billing:view,deny-401
 support_engineer,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-401
 support_engineer,POST /v1/clinical/note-templates,clinical:edit,deny-401
 support_engineer,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-401
@@ -850,6 +859,7 @@ billing,GET /v1/billing/day-close,billing:view,deny-401
 billing,GET /v1/billing/day-close/history,billing:view,deny-401
 billing,GET /v1/billing/invoices/{id},billing:view,deny-401
 billing,GET /v1/billing/otc-charges,billing:view,deny-401
+billing,GET /v1/billing/tax/guided-picker,setup:view,deny-401
 billing,GET /v1/clinical/conditions/due,clinical:view,deny-401
 billing,GET /v1/clinical/documents/{id},clinical:view,deny-401
 billing,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-401
@@ -992,6 +1002,7 @@ billing,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,deny-403
 billing,PATCH /v1/queue/{id}/status,queue:edit,deny-401
 billing,PATCH /v1/roles/{id},staff:edit,deny-401
 billing,PATCH /v1/setup/charges/{id},setup:edit,deny-401
+billing,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-401
 billing,PATCH /v1/setup/consent-contact,setup:edit,deny-401
 billing,PATCH /v1/setup/licences/{id},setup:edit,deny-401
 billing,PATCH /v1/setup/policies/{key},setup:edit,deny-401
@@ -1014,6 +1025,7 @@ billing,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 billing,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-401
 billing,POST /v1/billing/invoices/{id}/void,billing:edit,deny-401
 billing,POST /v1/billing/otc-checkout,billing:create,deny-401
+billing,POST /v1/billing/quotes,billing:view,deny-401
 billing,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-401
 billing,POST /v1/clinical/note-templates,clinical:edit,deny-401
 billing,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-401
@@ -1126,6 +1138,7 @@ sre,GET /v1/billing/day-close,billing:view,deny-401
 sre,GET /v1/billing/day-close/history,billing:view,deny-401
 sre,GET /v1/billing/invoices/{id},billing:view,deny-401
 sre,GET /v1/billing/otc-charges,billing:view,deny-401
+sre,GET /v1/billing/tax/guided-picker,setup:view,deny-401
 sre,GET /v1/clinical/conditions/due,clinical:view,deny-401
 sre,GET /v1/clinical/documents/{id},clinical:view,deny-401
 sre,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-401
@@ -1268,6 +1281,7 @@ sre,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,deny-403
 sre,PATCH /v1/queue/{id}/status,queue:edit,deny-401
 sre,PATCH /v1/roles/{id},staff:edit,deny-401
 sre,PATCH /v1/setup/charges/{id},setup:edit,deny-401
+sre,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-401
 sre,PATCH /v1/setup/consent-contact,setup:edit,deny-401
 sre,PATCH /v1/setup/licences/{id},setup:edit,deny-401
 sre,PATCH /v1/setup/policies/{key},setup:edit,deny-401
@@ -1290,6 +1304,7 @@ sre,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 sre,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-401
 sre,POST /v1/billing/invoices/{id}/void,billing:edit,deny-401
 sre,POST /v1/billing/otc-checkout,billing:create,deny-401
+sre,POST /v1/billing/quotes,billing:view,deny-401
 sre,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-401
 sre,POST /v1/clinical/note-templates,clinical:edit,deny-401
 sre,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-401
@@ -1402,6 +1417,7 @@ commercial,GET /v1/billing/day-close,billing:view,deny-401
 commercial,GET /v1/billing/day-close/history,billing:view,deny-401
 commercial,GET /v1/billing/invoices/{id},billing:view,deny-401
 commercial,GET /v1/billing/otc-charges,billing:view,deny-401
+commercial,GET /v1/billing/tax/guided-picker,setup:view,deny-401
 commercial,GET /v1/clinical/conditions/due,clinical:view,deny-401
 commercial,GET /v1/clinical/documents/{id},clinical:view,deny-401
 commercial,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-401
@@ -1544,6 +1560,7 @@ commercial,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,deny-
 commercial,PATCH /v1/queue/{id}/status,queue:edit,deny-401
 commercial,PATCH /v1/roles/{id},staff:edit,deny-401
 commercial,PATCH /v1/setup/charges/{id},setup:edit,deny-401
+commercial,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-401
 commercial,PATCH /v1/setup/consent-contact,setup:edit,deny-401
 commercial,PATCH /v1/setup/licences/{id},setup:edit,deny-401
 commercial,PATCH /v1/setup/policies/{key},setup:edit,deny-401
@@ -1566,6 +1583,7 @@ commercial,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 commercial,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-401
 commercial,POST /v1/billing/invoices/{id}/void,billing:edit,deny-401
 commercial,POST /v1/billing/otc-checkout,billing:create,deny-401
+commercial,POST /v1/billing/quotes,billing:view,deny-401
 commercial,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-401
 commercial,POST /v1/clinical/note-templates,clinical:edit,deny-401
 commercial,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-401
@@ -1678,6 +1696,7 @@ compliance_dpo,GET /v1/billing/day-close,billing:view,deny-401
 compliance_dpo,GET /v1/billing/day-close/history,billing:view,deny-401
 compliance_dpo,GET /v1/billing/invoices/{id},billing:view,deny-401
 compliance_dpo,GET /v1/billing/otc-charges,billing:view,deny-401
+compliance_dpo,GET /v1/billing/tax/guided-picker,setup:view,deny-401
 compliance_dpo,GET /v1/clinical/conditions/due,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/documents/{id},clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/drug-knowledge-base,clinical:edit|clinical:view,deny-401
@@ -1820,6 +1839,7 @@ compliance_dpo,PATCH /v1/platform/tenants/{tenantId}/region,tenant_detail:edit,d
 compliance_dpo,PATCH /v1/queue/{id}/status,queue:edit,deny-401
 compliance_dpo,PATCH /v1/roles/{id},staff:edit,deny-401
 compliance_dpo,PATCH /v1/setup/charges/{id},setup:edit,deny-401
+compliance_dpo,PATCH /v1/setup/charges/{id}/tax,setup:edit,deny-401
 compliance_dpo,PATCH /v1/setup/consent-contact,setup:edit,deny-401
 compliance_dpo,PATCH /v1/setup/licences/{id},setup:edit,deny-401
 compliance_dpo,PATCH /v1/setup/policies/{key},setup:edit,deny-401
@@ -1842,6 +1862,7 @@ compliance_dpo,POST /v1/billing/day-close/reopen,billing:approve,deny-401
 compliance_dpo,POST /v1/billing/invoices/{id}/payments,billing:edit,deny-401
 compliance_dpo,POST /v1/billing/invoices/{id}/void,billing:edit,deny-401
 compliance_dpo,POST /v1/billing/otc-checkout,billing:create,deny-401
+compliance_dpo,POST /v1/billing/quotes,billing:view,deny-401
 compliance_dpo,POST /v1/clinical/documents/{id}/issue,clinical:approve|clinical:edit,deny-401
 compliance_dpo,POST /v1/clinical/note-templates,clinical:edit,deny-401
 compliance_dpo,POST /v1/clinical/notes/{queueEntryId}/amendments,clinical:edit,deny-401

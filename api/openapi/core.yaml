@@ -1607,6 +1607,80 @@ paths:
       tags:
       - billing
       x-required-permission: billing:create
+  /v1/billing/quotes:
+    post:
+      operationId: CheckoutController_quote
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QuoteResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
+  /v1/billing/tax/guided-picker:
+    get:
+      operationId: TaxHeadController_picker
+      parameters:
+      - in: query
+        name: jurisdiction
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Picker"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: setup:view
   /v1/client-telemetry:
     post:
       operationId: ClientTelemetryController_ingest
@@ -9994,6 +10068,50 @@ paths:
       tags:
       - organization
       x-required-permission: setup:edit
+  /v1/setup/charges/{id}/tax:
+    patch:
+      operationId: TaxHeadController_setTax
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Request"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Response"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: setup:edit
   /v1/setup/checklist:
     get:
       operationId: SetupController_checklist
@@ -12540,6 +12658,15 @@ components:
       required:
       - severity
       - substance
+    Answer:
+      type: object
+      properties:
+        label:
+          type: string
+        nextQuestion:
+          type: string
+        outcome:
+          type: string
     AppointmentPage:
       type: object
       properties:
@@ -12983,6 +13110,8 @@ components:
     CheckoutRequest:
       type: object
       properties:
+        buyerGstin:
+          type: string
         discount:
           type: number
           exclusiveMinimum: false
@@ -13157,6 +13286,19 @@ components:
             $ref: "#/components/schemas/Item"
         licences:
           $ref: "#/components/schemas/Licences"
+    Component:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        ratePercent:
+          type: number
+        taxableMinor:
+          type: integer
+          format: int64
+        type:
+          type: string
     ConditionResponse:
       type: object
       properties:
@@ -14433,6 +14575,8 @@ components:
       properties:
         balanceDue:
           type: number
+        buyerGstin:
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -14444,6 +14588,8 @@ components:
           type: string
           format: uuid
         doctorName:
+          type: string
+        documentTitle:
           type: string
         id:
           type: string
@@ -14647,6 +14793,21 @@ components:
           type: string
         toStatus:
           type: string
+    Line:
+      type: object
+      properties:
+        chargeCode:
+          type: string
+        discountMinor:
+          type: integer
+          format: int64
+        taxableMinor:
+          type: integer
+          format: int64
+        taxes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tax"
     LineItemRequest:
       type: object
       properties:
@@ -14696,6 +14857,13 @@ components:
           format: int32
         taxRatePercent:
           type: number
+        taxableMinor:
+          type: integer
+          format: int64
+        taxes:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxPart"
         tier:
           type: string
         unitPrice:
@@ -15059,6 +15227,17 @@ components:
       - code
       - mobilePhone
       - tenantSlug
+    Outcome:
+      type: object
+      properties:
+        gstRate:
+          type: number
+        id:
+          type: string
+        note:
+          type: string
+        taxCategory:
+          type: string
     Outstanding:
       type: object
       properties:
@@ -15736,6 +15915,19 @@ components:
           format: int32
         reason:
           type: string
+    Picker:
+      type: object
+      properties:
+        jurisdiction:
+          type: string
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Outcome"
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
     PinChangeRequest:
       type: object
       properties:
@@ -16118,6 +16310,22 @@ components:
           type: string
         severity:
           type: string
+    Preview:
+      type: object
+      properties:
+        baseMinor:
+          type: integer
+          format: int64
+        taxMinor:
+          type: integer
+          format: int64
+        taxableMinor:
+          type: integer
+          format: int64
+        taxes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Component"
     Problem:
       type: object
       description: RFC 7807 problem+json (GlobalExceptionHandler)
@@ -16278,6 +16486,17 @@ components:
         stepOrder:
           type: integer
           format: int32
+    Question:
+      type: object
+      properties:
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Answer"
+        id:
+          type: string
+        text:
+          type: string
     QueueEntryResponse:
       type: object
       properties:
@@ -16382,6 +16601,35 @@ components:
           minLength: 1
       required:
       - status
+    QuoteRequest:
+      type: object
+      properties:
+        buyerGstin:
+          type: string
+        discounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiscountRequest"
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineItemRequest"
+          minItems: 1
+      required:
+      - lines
+    QuoteResponse:
+      type: object
+      properties:
+        currency:
+          type: string
+        documentType:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/Line"
+        totals:
+          $ref: "#/components/schemas/Totals"
     RaiseTicketRequest:
       type: object
       properties:
@@ -16641,6 +16889,17 @@ components:
       - kind
       - metric
       - route
+    Request:
+      type: object
+      properties:
+        gstRate:
+          type: number
+        sacHsn:
+          type: string
+        taxCategory:
+          type: string
+        taxInclusive:
+          type: boolean
     RequestGrantRequest:
       type: object
       properties:
@@ -16670,6 +16929,26 @@ components:
           format: date-time
       required:
       - newStartTime
+    Response:
+      type: object
+      properties:
+        allowedRates:
+          type: array
+          items:
+            type: number
+        gstRate:
+          type: number
+        id:
+          type: string
+          format: uuid
+        preview:
+          $ref: "#/components/schemas/Preview"
+        sacHsn:
+          type: string
+        taxCategory:
+          type: string
+        taxInclusive:
+          type: boolean
     RetentionResponse:
       type: object
       properties:
@@ -17386,6 +17665,16 @@ components:
         windowStartedAt:
           type: string
           format: date-time
+    Tax:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        rate:
+          type: number
+        type:
+          type: string
     TaxBand:
       type: object
       properties:
@@ -17395,6 +17684,16 @@ components:
           type: number
         taxable:
           type: number
+    TaxPart:
+      type: object
+      properties:
+        amountMinor:
+          type: integer
+          format: int64
+        ratePercent:
+          type: number
+        type:
+          type: string
     TemplateLintFinding:
       type: object
       properties:
@@ -17684,18 +17983,21 @@ components:
     Totals:
       type: object
       properties:
-        billed:
-          type: number
-        bills:
+        discountMinor:
           type: integer
-          format: int32
-        collected:
-          type: number
-        payments:
+          format: int64
+        roundOffMinor:
           type: integer
-          format: int32
-        tax:
-          type: number
+          format: int64
+        subtotalMinor:
+          type: integer
+          format: int64
+        taxMinor:
+          type: integer
+          format: int64
+        totalMinor:
+          type: integer
+          format: int64
     TransferEdge:
       type: object
       properties:

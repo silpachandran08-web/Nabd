@@ -1289,6 +1289,26 @@ paths:
         "200": { description: "Updated charge head", content: { application/json: { schema: { $ref: "#/components/schemas/ChargeHead" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /setup/charges/{id}/tax:
+    patch:
+      tags: [Setup]
+      summary: >
+        Set a charge head's tax class (FIN-009). Body `{ taxCategory: exempt|nil|taxable, sacHsn (4-8 digits), gstRate?, taxInclusive? }`.
+        A taxable head needs a `gstRate` from the rates in force (422 rate-not-allowed otherwise); an exempt or nil head takes none. 422 invalid-sac-hsn
+        for a malformed code. Writes audit `billing.charge_tax_set` and publishes the catalogue change. Response `{ id, taxCategory, sacHsn, gstRate,
+        taxInclusive, allowedRates, preview: { baseMinor, taxableMinor, taxMinor, taxes } }`. The existing PATCH /setup/charges/{id} keeps its full-write body
+        (that path cannot carry both bodies), so this is a sub-resource.
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: "The head's tax settings and a preview", content: { application/json: { schema: { type: object } } } }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "invalid-sac-hsn or rate-not-allowed" }
+
   /setup/policies:
     get:
       tags: [Setup]
@@ -3056,6 +3076,39 @@ paths:
         "403": { description: "Forbidden (including discount-not-permitted)" }
         "409": { description: Conflict }
         "422": { description: "unknown-charge, reason-required, invalid-reason, discount-exceeds-subtotal, rx-required, rx-not-signed, rx-patient-mismatch or rx-quantity-exhausted" }
+  /billing/quotes:
+    post:
+      tags: [Billing]
+      summary: >
+        Tax for a draft cart, nothing stored (FIN-008). Body `{ lines: [{ chargeCode, quantity, ... }], discounts?: [{ kind, value, reasonCode }], buyerGstin? }`.
+        Same path as checkout, so the quote is the bill: the invoice discount is allocated to the lines pro rata (largest remainder) before
+        tax, each tax component is rounded half-up to the minor unit, INR totals round to the rupee with a `roundOffMinor`, other currencies
+        keep their decimals. Response `{ currency, documentType: invoice|bill_of_supply, lines: [{ chargeCode, discountMinor, taxableMinor,
+        taxes: [{ type, rate, amountMinor }] }], totals: { subtotalMinor, discountMinor, taxMinor, roundOffMinor, totalMinor } }`.
+        Invoices carry `documentTitle` (Invoice | Bill of Supply), `buyerGstin`, and per line `taxableMinor` and `taxes` (stored, never recomputed).
+        Checkout accepts the optional `buyerGstin`. A clinic whose tax registration is on file but unregistered or without a GSTIN issues a
+        Bill of Supply (no tax). Not done: 422 TAX_RULE_MISSING (a head without a rule falls back to its own rate).
+      x-required-permission: billing:view
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: The quote, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "422": { description: "invalid-gstin, unknown-charge, reason-required, discount-exceeds-subtotal" }
+  /billing/tax/guided-picker:
+    get:
+      tags: [Billing]
+      summary: >
+        Questions and outcomes of the guided tax picker (FIN-009). `?jurisdiction=IN` returns `{ jurisdiction, questions: [{ id, text,
+        answers: [{ label, nextQuestion, outcome }] }], outcomes: [{ id, taxCategory, gstRate, note }] }`; a jurisdiction with no picker returns
+        empty lists. Rates and classes are a starting point: Needs external verification (CA, FIN-010).
+      x-required-permission: setup:view
+      parameters: [{ name: jurisdiction, in: query, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: The picker, content: { application/json: { schema: { type: object } } } }
+        "403": { description: Forbidden }
   /billing/day-close:
     get:
       tags: [Billing]
