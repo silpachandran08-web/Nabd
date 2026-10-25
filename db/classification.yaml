@@ -65,6 +65,13 @@ schemas:
       notes: pii
       created_at: operational
       updated_at: operational
+    audit_chain_seals:
+      tenant_id: operational
+      month: operational
+      last_id: operational
+      last_hash: operational
+      sealed_at: operational
+      signature: operational
     audit_chain_heads:
       tenant_id: operational
       last_id: operational

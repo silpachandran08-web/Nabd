@@ -1,0 +1,59 @@
+# OPS-047: nightly load regression against staging-in (QA 4.4 / doc06 7.5). Needs external action: a runner inside the cell
+# (label staging-in-load) that reaches the API and its actuator port, the OPS-046 seed loaded, secrets, and a stored baseline
+# per profile (first run: perf/run.sh <profile> --save-baseline on a green staging build). Never runs on PRs.
+# wa_burst (5,000 reminder sends, drain < 10 min) is not scheduled: its injection step is not built (perf/k6/wa_burst.js only watches the drain).
+# 19:00 UTC = 00:30 IST = 22:00 KSA: outside OPD hours of both cells. The soak runs weekly (Sunday) for 8 h at 30% of peak.
+name: nightly-load
+on:
+  schedule:
+    - cron: "0 19 * * 1-6"
+    - cron: "0 19 * * 0"
+  workflow_dispatch:
+jobs:
+  profiles:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 19 * * 1-6'
+    runs-on: [self-hosted, staging-in-load]
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 1   # one profile at a time: they share the cell
+      matrix:
+        profile: [rush, contention, webhook_storm, dayend]
+    env:
+      BASE_URL: ${{ secrets.STAGING_IN_URL }}
+      PERF_PIN: ${{ secrets.STAGING_IN_PERF_PIN }}
+      PEAK_RPS: ${{ vars.STAGING_IN_PEAK_RPS }}
+      WHATSAPP_APP_SECRET: ${{ secrets.STAGING_IN_WHATSAPP_APP_SECRET }}
+      PERF_TENANTS: ${{ matrix.profile == 'contention' && '1' || '50' }}
+      DURATION: 30m
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: perf/run.sh ${{ matrix.profile }}   # exit 1 = a gate failed or p95 > baseline + 10%
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: "load-${{ matrix.profile }}", path: perf/out }
+      - name: Open a performance defect
+        if: failure()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh issue create --label performance-defect --title "Nightly load regression: ${{ matrix.profile }} ($(date -u +%F))" \
+            --body "Profile ${{ matrix.profile }} failed its gate or exceeded baseline + 10% p95. Report: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} (artifact load-${{ matrix.profile }})."
+  soak:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 19 * * 0'
+    runs-on: [self-hosted, staging-in-load]
+    timeout-minutes: 560
+    env:
+      BASE_URL: ${{ secrets.STAGING_IN_URL }}
+      PERF_PIN: ${{ secrets.STAGING_IN_PERF_PIN }}
+      PEAK_RPS: ${{ vars.STAGING_IN_PEAK_RPS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: DURATION=8h METRICS_URL=${{ secrets.STAGING_IN_METRICS_URL }} perf/run.sh soak 2>&1 | tee perf/soak.log
+      - run: node perf/trend.mjs perf/soak.log
+      - if: failure()
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh issue create --label performance-defect --title "Weekly soak trend $(date -u +%F)" \
+            --body "Heap, pool or outbox lag trend failed. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
