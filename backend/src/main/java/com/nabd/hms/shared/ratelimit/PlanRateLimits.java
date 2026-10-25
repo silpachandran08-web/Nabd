@@ -54,7 +54,7 @@ class PlanRateLimits {
                             rs.getObject(2) == null ? props.tenantBurst() : rs.getInt(2)),
                     tenantId).stream().findFirst().orElse(new Limit(props.tenantPerMinute(), props.tenantBurst()));
         } catch (RuntimeException e) {
-            log.warn("plan rate limit read failed for tenant {}: {}", tenantId, e.getClass().getSimpleName());
+            log.warn("plan rate limit read failed for tenant {}: {}", tenantId, e.getClass().getSimpleName()); // log-phi-ok: exception class name
             limit = c != null ? c.limit() : new Limit(props.tenantPerMinute(), props.tenantBurst());
         }
         cache.put(tenantId, new Cached(limit, now));

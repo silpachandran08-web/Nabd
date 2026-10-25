@@ -41,7 +41,7 @@ class WhatsAppInboundProcessor {
             try {
                 stats = service.stats();
             } catch (RuntimeException e) {
-                log.warn("whatsapp inbound stats unavailable: {}", e.getClass().getSimpleName());
+                log.warn("whatsapp inbound stats unavailable: {}", e.getClass().getSimpleName()); // log-phi-ok: exception class name
             }
             statsAt = now;
         }
@@ -55,7 +55,7 @@ class WhatsAppInboundProcessor {
             try {
                 service.process(row);
             } catch (Exception e) {
-                log.warn("whatsapp inbound event {} failed on attempt {}: {}", row.id(), row.attempts(), e.getClass().getSimpleName());
+                log.warn("whatsapp inbound event {} failed on attempt {}: {}", row.id(), row.attempts(), e.getClass().getSimpleName()); // log-phi-ok: exception class name
                 try {
                     service.release(row, e.getClass().getSimpleName());
                 } catch (RuntimeException r) {

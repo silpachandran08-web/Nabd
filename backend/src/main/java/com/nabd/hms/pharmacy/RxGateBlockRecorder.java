@@ -50,6 +50,6 @@ class RxGateBlockRecorder {
         payload.put("reason", reason);
         payload.put("actorId", staffId);
         eventPublisher.publish(tenantId, EVENT, payload);
-        log.info("rx gate blocked {} for item {} by {} (tenant {})", reason, chargeCode, staffId, tenantId);
+        log.info("rx gate blocked item {} by {} (tenant {})", itemId, staffId, tenantId);
     }
 }

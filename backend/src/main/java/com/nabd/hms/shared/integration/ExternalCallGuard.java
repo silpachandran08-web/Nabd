@@ -32,6 +32,6 @@ public class ExternalCallGuard {
         if (failFast) {
             throw new NoTransactionAllowedException(message);
         }
-        log.error("reason={} provider={}: {}", REASON, provider, message, new NoTransactionAllowedException(message));
+        log.error("reason={} provider={}: {}", REASON, provider, message, new NoTransactionAllowedException(message)); // log-phi-ok: REASON is a fixed constant
     }
 }

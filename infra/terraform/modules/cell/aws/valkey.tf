@@ -52,7 +52,7 @@ resource "aws_elasticache_replication_group" "valkey" {
   replication_group_id        = "${var.name}-valkey"
   description                 = "Nabd ${var.name} cache (ids and keys only, no PHI values)"
   engine                      = "valkey"
-  engine_version              = "9.0"   # durability needs Valkey 9.0+; the engine's default parameter group applies
+  engine_version              = "9.0"  # durability needs Valkey 9.0+; the engine's default parameter group applies
   durability                  = "sync" # streams: an acknowledged XADD is in the Multi-AZ log (async may drop ~10 s)
   node_type                   = var.valkey_node_type
   port                        = 6379
@@ -67,7 +67,7 @@ resource "aws_elasticache_replication_group" "valkey" {
   auth_token                  = random_password.valkey_auth.result
   at_rest_encryption_enabled  = true
   kms_key_id                  = aws_kms_key.root["ops"].arn
-  snapshot_retention_limit    = 7 # daily snapshots on top of the log; the outbox redrive (events.md section 8) covers the rest
+  snapshot_retention_limit    = 7             # daily snapshots on top of the log; the outbox redrive (events.md section 8) covers the rest
   snapshot_window             = "20:00-21:00" # UTC, before the maintenance window
   auto_minor_version_upgrade  = true
   maintenance_window          = "sun:22:00-sun:23:00" # UTC, after the Postgres window

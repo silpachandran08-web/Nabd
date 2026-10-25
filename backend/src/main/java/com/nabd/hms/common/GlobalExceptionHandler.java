@@ -44,7 +44,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ProblemDetail handleIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
         String traceId = MDC.get(RequestCorrelationFilter.MDC_KEY);
-        log.error("[{}] unmapped integrity violation: {}", traceId, ex.getMostSpecificCause().getClass().getSimpleName(), ex);
+        log.error("[{}] unmapped integrity violation: {}", traceId, ex.getMostSpecificCause().getClass().getSimpleName(), ex); // log-phi-ok: exception class name
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         problem.setType(URI.create(TYPE_BASE + "internal-error"));
         problem.setTitle("Unexpected error");
@@ -108,7 +108,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         p.setDetail("Something went wrong. Quote the traceId to support.");
         String traceId = traceId();
         p.setProperty("traceId", traceId);
-        log.error("[{}] unhandled {}", traceId, ex.getClass().getName(), ex); // stack stays in the server log only
+        log.error("[{}] unhandled {}", traceId, ex.getClass().getName(), ex); // stack stays in the server log only // log-phi-ok: exception class name
         return ResponseEntity.internalServerError().contentType(MediaType.APPLICATION_PROBLEM_JSON).body(p);
     }
 

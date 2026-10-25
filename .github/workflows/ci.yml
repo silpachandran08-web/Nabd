@@ -18,6 +18,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    permissions: { contents: read, pull-requests: read }  # dorny/paths-filter lists the PR files through the API
     outputs:
       backend: ${{ steps.f.outputs.backend }}
       frontend: ${{ steps.f.outputs.frontend }}
@@ -302,7 +303,7 @@ jobs:
       - name: Container structure test (non-root, no shell, JVM flags, migrate entrypoint)
         run: infra/ci/check-image.sh "$IMAGE:${{ github.sha }}" "$IMAGE-migrate:${{ github.sha }}"
       - name: Trivy image scan (fail on new High/Critical)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: ${{ env.IMAGE }}:${{ github.sha }}
           severity: HIGH,CRITICAL
