@@ -33,7 +33,7 @@ function useEscape(onClose: () => void) {
 /** ACC-028: the server's field error for the phone names the clinic country; it reads "Mobile <message>." under the input. */
 export const phoneFieldText = (message: string) => `Mobile ${message}.`;
 
-const REGISTER_LABELS = { name: "Full name", phone: "Mobile", dob: "Date of birth", gender: "Sex", address: "Address", nationalId: "National ID", guardianId: "Guardian" };
+const REGISTER_LABELS = { name: "Full name", phone: "Mobile", gender: "Sex", address: "Address", nationalId: "National ID", guardianId: "Guardian" };
 
 /**
  * Register patient (POST /v1/patients). A minor needs a guardian (NB-080). If the server finds
@@ -93,7 +93,8 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
         keys.current.done("register");
       } else {
         if (e instanceof ApiError && e.status === 400 && e.errors.length) setCandidates(null);
-        fe.fail(e, "Couldn't register the patient.");
+        if (e instanceof ApiError && e.status >= 500) fe.set(e.detail || e.title || "Couldn't register the patient."); // front desk reads the server's reason here
+        else fe.fail(e, "Couldn't register the patient.");
       }
     } finally {
       setSaving(false);

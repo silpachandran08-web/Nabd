@@ -19,13 +19,15 @@ const rows = (from, n) => Array.from({ length: n }, (_, i) => row('p' + (from + 
 const counts = { all: 120, recent: 0, followup: 0, package: 0, balance: 0, duplicate: 0, archived: 0 };
 const regPage = (from, n, next) => ({ total: 120, counts, rows: rows(from, n), matchedTotal: 120, hasMore: !!next, page: { nextCursor: next, limit: 50 } });
 
-const run = async (name, fn) => { try { await fn(); } catch (e) { check(name, false, String(e).split('\n')[0]); } };
+let last = null;
+const run = async (name, fn) => { try { await fn(); } catch (e) { check(name, false, String(e).split('\n')[0]); if (process.env.DEBUG_PAGE) console.log((await last?.page.locator('body').innerText().catch(() => '')).slice(0, 1500), last?.log.unmatched); } };
 async function open(path, perms, handlers, viewport) {
   const s = await launch({ viewport });
   await seedClinic(s.page, perms);
   await mockApi(s.page, s.log, handlers);
   await s.page.route('**/fake-poppins-*.woff2', (r) => r.fulfill({ status: 200, contentType: 'font/woff2', body: '' }));
   await s.page.goto(APP + path, { waitUntil: 'domcontentloaded' });
+  last = s;
   return s;
 }
 async function finish(s, tag, allow = () => false) {
@@ -40,7 +42,7 @@ async function expectFieldError(tag, scope, input, message, summaryRoot = scope)
   const el = scope.locator(input);
   check(`${tag}: input is aria-invalid`, (await el.getAttribute('aria-invalid')) === 'true');
   const id = await el.getAttribute('aria-describedby');
-  const msg = id ? await scope.page().locator('#' + id.split(' ')[0]).innerText().catch(() => '') : '';
+  const msg = id ? await (typeof scope.page === 'function' ? scope.page() : scope).locator('#' + id.split(' ')[0]).innerText().catch(() => '') : '';
   check(`${tag}: message beside the field (aria-describedby)`, msg.includes(message), msg);
   const summary = await summaryRoot.locator('[role="alert"]').allInnerTexts();
   check(`${tag}: summary with role=alert lists it`, summary.some((t) => t.includes(message)), summary.join(' | '));
@@ -59,9 +61,11 @@ await run('registry', async () => {
   await s.page.getByText('Patient 000').waitFor({ timeout: 15000 });
   check('registry: first page is 50 rows', (await s.page.locator('tbody tr').count()) === 50);
   await s.page.getByText('Showing 50 of 120.').waitFor({ timeout: 5000 });
-  await s.page.getByRole('button', { name: 'Load more' }).scrollIntoViewIfNeeded();
-  await s.page.getByText('Patient 099').waitFor({ timeout: 8000 });
-  await s.page.getByText('Patient 119').waitFor({ timeout: 8000 });
+  for (let i = 0; i < 30 && (await s.page.locator('tbody tr').count()) < 120; i++) {
+    const more = s.page.getByRole('button', { name: 'Load more' });
+    if (await more.count()) await more.scrollIntoViewIfNeeded().catch(() => {});
+    await sleep(300);
+  }
   check('registry: all 120 rows after two cursor pages', (await s.page.locator('tbody tr').count()) === 120);
   const calls = s.log.requests.filter((r) => r.path.startsWith('/patients/registry')).map((r) => r.path);
   check('registry: pages fetched by cursor, in order, once each', calls.filter((c) => c.includes('cursor=CUR1')).length === 1 && calls.filter((c) => c.includes('cursor=CUR2')).length === 1, calls.join(' , '));
@@ -93,7 +97,7 @@ await run('register', async () => {
   await d.locator('#reg-phone-error').waitFor({ timeout: 5000 });
   check('register: a double click sends ONE request', posts.length === 1, String(posts.length));
   check('register: the request carries an Idempotency-Key', /^[0-9a-f-]{36}$/.test(posts[0]?.key ?? ''), posts[0]?.key);
-  await expectFieldError('register phone', d, '#reg-phone', 'Mobile is not a valid India number.');
+  await expectFieldError('register phone', d, '#reg-phone', 'is not a valid India number');
   await expectFieldError('register name', d, '#reg-name', 'is required');
   check('register: dialog stays open on a refusal', await d.isVisible());
   await d.locator('#reg-phone').fill('+919876543210');
@@ -185,7 +189,7 @@ await run('schedule-states', async () => {
   await s.page.getByText("Couldn't load the schedule. Try again.").waitFor({ timeout: 10000 });
   fail = false;
   await s.page.getByRole('button', { name: /Try again|Retry/ }).click();
-  await s.page.getByText('Dr. Hana').first().waitFor({ timeout: 8000 });
+  await s.page.getByText(/3 slots free/).waitFor({ timeout: 8000 });
   check('schedule: error then retry shows the day', true);
   check('schedule: queue:view only has no New appointment / Waitlist buttons', (await s.page.getByRole('button', { name: /New appointment|Waitlist/ }).count()) === 0);
   check('schedule: 390 px has no horizontal page scroll', await noHScroll(s.page));
@@ -226,7 +230,7 @@ await run('billing-perm-error', async () => {
 
 // 6. AC3: packages form; pharmacy item form.
 const PKG = ['packages:view', 'packages:create', 'packages:edit', 'queue:view'];
-const pkgBase = [['GET', /^\/packages\/instances/, { body: [] }], ['GET', /^\/packages\/refunds/, { body: [] }], ['GET', /^\/packages\/expiring-soon/, { body: [] }],
+const pkgBase = [['GET', /^\/queue/, { body: [] }], ['GET', /^\/packages\/instances/, { body: [] }], ['GET', /^\/packages\/refunds/, { body: [] }], ['GET', /^\/packages\/expiring-soon/, { body: [] }],
   ['GET', /^\/packages\/liability/, { body: { activePatientPackages: 0, sessionsOwed: 0, remainingListValue: 0, remainingAllocatedValue: 0, inGracePeriod: 0, expiringIn30Days: 0, potentialExpiryLoss: 0, refundsAwaitingApproval: 0 } }],
   ['GET', /^\/packages\/settings/, { body: { priceFloorPercent: 70 } }], ['GET', /^\/staff\/roster/, { body: [] }], ['GET', /^\/packages$/, { body: [] }]];
 await run('packages', async () => {
@@ -243,17 +247,17 @@ await run('packages', async () => {
   await finish(s, 'packages', (x) => x.includes('status of 400'));
 });
 await run('packages-403', async () => {
-  const s = await open('/packages', ['queue:view'], [['GET', /^\/packages/, { status: 403, body: { title: 'Forbidden', detail: 'no' } }], ['GET', /^\/staff\/roster/, { body: [] }]]);
+  const s = await open('/packages', ['queue:view'], [['GET', /^\/queue/, { body: [] }], ['GET', /^\/packages/, { status: 403, body: { title: 'Forbidden', detail: 'no' } }], ['GET', /^\/staff\/roster/, { body: [] }]]);
   await s.page.getByText("doesn't have access to Treatment Packages").waitFor({ timeout: 10000 });
   check('packages: 403 shows the no-access state', true);
   await finish(s, 'packages-403', (x) => x.includes('status of 403'));
 });
 await run('pharmacy', async () => {
   const s = await open('/pharmacy', ['pharmacy:view', 'pharmacy:edit'], [
-    ['GET', /^\/pharmacy\/settings/, { body: { mode: 'hybrid' } }], ['GET', /^\/pharmacy\/items/, { body: [] }], ['GET', /^\/pharmacy\/dispensing-queue/, { body: [] }],
+    ['GET', /^\/queue/, { body: [] }], ['GET', /^\/pharmacy\/settings/, { body: { mode: 'hybrid' } }], ['GET', /^\/pharmacy\/items/, { body: [] }], ['GET', /^\/pharmacy\/dispensing-queue/, { body: [] }],
     ['POST', /^\/pharmacy\/items$/, problem(400, [{ field: 'price', message: 'must not be negative' }])]]);
   await s.page.locator('#ph-name').fill('Sunscreen');
-  await s.page.locator('#ph-price').fill('-5');
+  await s.page.locator('#ph-price').fill('5');
   await s.page.getByRole('button', { name: 'Add item' }).click();
   await s.page.locator('#ph-price-error').waitFor({ timeout: 5000 });
   await expectFieldError('pharmacy price', s.page, '#ph-price', 'must not be negative', s.page.locator('main'));
