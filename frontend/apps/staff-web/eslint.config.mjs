@@ -2,6 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import boundaries from "eslint-plugin-boundaries";
+import jsxA11y from "eslint-plugin-jsx-a11y";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -15,6 +16,11 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "lint-fixtures/**", // FEF-012: must-fail samples, linted explicitly by tests/unit/s12-fef012-boundaries.test.mjs
   ]),
+  // FEF-027: jsx-a11y strict rule set (the plugin itself is already registered by eslint-config-next).
+  // Rules that still have pre-existing findings (a11y debt, FEF-027 report) stay warnings so they are listed but do not block; every other strict rule is an error.
+  { files: ["app/**/*.{ts,tsx}"], rules: { ...jsxA11y.flatConfigs.strict.rules,
+    ...Object.fromEntries(["label-has-associated-control", "no-autofocus", "click-events-have-key-events", "no-static-element-interactions",
+      "no-noninteractive-element-interactions", "no-noninteractive-element-to-interactive-role", "no-noninteractive-tabindex"].map((r) => [`jsx-a11y/${r}`, "warn"])) } },
   { rules: { "no-restricted-globals": ["error", { name: "atob", message: "Use decodeJwtPayload from app/lib/jwt.ts (UTF-8 safe)." }] } },
   { files: ["app/lib/jwt.ts"], rules: { "no-restricted-globals": "off" } },
   // FEF-011: dates and times in migrated files go through app/lib/clinicTime.ts (clinic timezone, one locale).

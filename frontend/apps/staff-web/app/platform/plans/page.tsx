@@ -155,12 +155,12 @@ export default function PlansPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>Monthly price</th>
-                  <th>Seat limit</th>
-                  <th>Status</th>
-                  {access.canBill && <th></th>}
+                  <th scope="col">Code</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Monthly price</th>
+                  <th scope="col">Seat limit</th>
+                  <th scope="col">Status</th>
+                  {access.canBill && <th scope="col"></th>}
                 </tr>
               </thead>
               <tbody>

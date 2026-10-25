@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./patients.module.css";
 import StatusPill from "../components/ui/StatusPill";
+import Dialog from "../components/ui/Dialog";
 import { api, ApiError, intentKeys } from "../lib/api";
 import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
 import type { PatientPage } from "@nabd/api-client/generated";
@@ -21,14 +22,6 @@ function formatScore(score: number): string {
 // TODO(needs-legal-review): consent wording is a placeholder from S4 CGV-005; legal must approve before go-live.
 const GUARDIAN_CONSENT_TEXT = "Guardian has agreed to access on this patient's behalf";
 const CONSENT_CHANNELS = [["in_person", "In person"], ["phone", "Phone"], ["written", "Written"]] as const;
-
-function useEscape(onClose: () => void) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-}
 
 /** ACC-028: the server's field error for the phone names the clinic country; it reads "Mobile <message>." under the input. */
 export const phoneFieldText = (message: string) => `Mobile ${message}.`;
@@ -53,7 +46,6 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
   const fe = useFormErrors("reg", REGISTER_LABELS);
   const [saving, setSaving] = useState(false);
   const keys = useRef(intentKeys()); // one Idempotency-Key per registration intent, reused when the same request is re-sent
-  useEscape(onClose);
 
   const minor = !!form.dob && age(form.dob, clinicToday()) < 18;
 
@@ -103,10 +95,8 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
 
   const ready = form.name.trim() && form.phone.trim() && form.dob && form.gender && (!minor || (guardian && consent && channel));
   return (
-    <div className={styles.dialogOverlay} onClick={onClose}>
-      <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="register-title"
-        onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); void send(false); }}>
-        <h2 id="register-title" className={styles.dialogTitle}>Register patient</h2>
+    <Dialog title="Register patient" onClose={onClose}>
+      <form className={styles.dialogForm} onSubmit={(e) => { e.preventDefault(); void send(false); }}>
 
         {candidates ? (
           <>
@@ -196,6 +186,6 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
           </>
         )}
       </form>
-    </div>
+    </Dialog>
   );
 }

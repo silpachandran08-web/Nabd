@@ -374,7 +374,7 @@ export default function PharmacyPanel() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Code</th><th>Name</th><th>Price</th><th>Tax %</th><th>Stock</th><th>Rx</th><th>HSN</th><th>Status</th>{canWrite && <th></th>}</tr>
+                  <tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Price</th><th scope="col">Tax %</th><th scope="col">Stock</th><th scope="col">Rx</th><th scope="col">HSN</th><th scope="col">Status</th>{canWrite && <th scope="col"></th>}</tr>
                 </thead>
                 <tbody>
                   {items.map((i) => (
@@ -418,7 +418,7 @@ export default function PharmacyPanel() {
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Drugs</th><th>Signed at</th></tr></thead>
+                <thead><tr><th scope="col">Token</th><th scope="col">Patient</th><th scope="col">Doctor</th><th scope="col">Drugs</th><th scope="col">Signed at</th></tr></thead>
                 <tbody>
                   {queue.map((q) => (
                     <tr key={q.prescriptionId}>

@@ -334,6 +334,12 @@ function PatientsList() {
       void qc.invalidateQueries({ queryKey: prefix("patient") }); // names on Arrivals follow a correction
     } catch { /* keep the last values */ }
   }
+  // FEF-027: the row link's href (/patients?open=<id>) also works when opened in a new tab.
+  const deepLinkId = searchParams.get("open");
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (deepLinkId) void openDrawer(deepLinkId);
+  }, [deepLinkId]);
 
   async function loadTodayVisit(patientId: string, seq: number) {
     if (!can("queue:view")) return;
@@ -653,15 +659,16 @@ function PatientsList() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th>Patient</th><th>Mobile</th><th>Age</th><th>Last visit</th><th>Next appointment</th><th>Flags</th><th /></tr>
+                <tr><th scope="col">Patient</th><th scope="col">Mobile</th><th scope="col">Age</th><th scope="col">Last visit</th><th scope="col">Next appointment</th><th scope="col">Flags</th><th scope="col"><span className="srOnly">Actions</span></th></tr>
               </thead>
               <tbody>
                 {registry.rows.map((p) => (
-                  <tr key={p.id} className={styles.row} onClick={() => openDrawer(p.id)}>
+                  <tr key={p.id} className={styles.row}>
                     <td>
                       <span className={styles.patientCell}>
                         <span className={p.archived ? styles.avatarMuted : styles.avatar} aria-hidden="true">{initials(p.name)}</span>
-                        <span><span className={styles.patientName}>{p.name}</span><span className={styles.mrn}>{p.mrn}</span></span>
+                        <span><a className={`${styles.patientName} ${styles.rowLink}`} href={`/patients?open=${encodeURIComponent(p.id)}`}
+                          onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey) { e.preventDefault(); void openDrawer(p.id); } }}>{p.name}</a><span className={styles.mrn}>{p.mrn}</span></span>
                       </span>
                     </td>
                     <td className={styles.nowrap}>{maskPhone(p.phone)}</td>

@@ -625,7 +625,7 @@ function NursingWorklist() {
               ) : (
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
-                    <thead><tr><th>Patient</th><th>Visit</th><th>Clinical flags</th><th>Last vitals</th><th>Status</th><th><span className={styles.srOnly}>Action</span></th></tr></thead>
+                    <thead><tr><th scope="col">Patient</th><th scope="col">Visit</th><th scope="col">Clinical flags</th><th scope="col">Last vitals</th><th scope="col">Status</th><th scope="col"><span className={styles.srOnly}>Action</span></th></tr></thead>
                     <tbody>
                       {visibleVitalsRows.map((r) => {
                         const flags = flagsFor(r);
@@ -705,7 +705,7 @@ function NursingWorklist() {
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Patient</th><th>Flagged</th><th>Reason</th><th>Acknowledged</th><th>State</th><th></th></tr></thead>
+                <thead><tr><th scope="col">Patient</th><th scope="col">Flagged</th><th scope="col">Reason</th><th scope="col">Acknowledged</th><th scope="col">State</th><th scope="col"></th></tr></thead>
                 <tbody>
                   {priorityRows.map((r) => {
                     const flaggedBy = staffName(r.priorityFlaggedBy);
@@ -747,7 +747,7 @@ function NursingWorklist() {
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Patient</th><th>Ordered item</th><th>Ordered by</th><th>Route &amp; site</th><th>State</th><th></th></tr></thead>
+                  <thead><tr><th scope="col">Patient</th><th scope="col">Ordered item</th><th scope="col">Ordered by</th><th scope="col">Route &amp; site</th><th scope="col">State</th><th scope="col"></th></tr></thead>
                   <tbody>
                     {administrationOrders.map((o) => (
                       <tr key={o.id}>
@@ -784,7 +784,7 @@ function NursingWorklist() {
             <div className={`${styles.card} ${styles.cardGap}`}>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Token</th><th>Patient</th><th>Doctor</th><th>Wait</th><th>Status</th><th></th></tr></thead>
+                  <thead><tr><th scope="col">Token</th><th scope="col">Patient</th><th scope="col">Doctor</th><th scope="col">Wait</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
                   <tbody>
                     {proceduresPendingRows.map((r) => (
                       <tr key={r.id} className={r.priority ? styles.rowUrgent : undefined}>
@@ -815,7 +815,7 @@ function NursingWorklist() {
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Patient</th><th>Procedure</th><th>Consent</th><th>Preparation</th><th>State</th><th></th></tr></thead>
+                  <thead><tr><th scope="col">Patient</th><th scope="col">Procedure</th><th scope="col">Consent</th><th scope="col">Preparation</th><th scope="col">State</th><th scope="col"></th></tr></thead>
                   <tbody>
                     {procedureOrders.map((p) => {
                       const consented = !!p.consentSignedName;
@@ -882,7 +882,7 @@ function NursingWorklist() {
             ) : (
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Patient</th><th>Activity</th><th>Time</th></tr></thead>
+                  <thead><tr><th scope="col">Patient</th><th scope="col">Activity</th><th scope="col">Time</th></tr></thead>
                   <tbody>
                     {activity.map((a, i) => (
                       <tr key={i}>

@@ -135,13 +135,13 @@ export default function SupportTicketsPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Ticket</th>
-                  <th>Clinic</th>
-                  <th>Raised by</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>SLA due</th>
-                  <th></th>
+                  <th scope="col">Ticket</th>
+                  <th scope="col">Clinic</th>
+                  <th scope="col">Raised by</th>
+                  <th scope="col">Priority</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">SLA due</th>
+                  <th scope="col"></th>
                 </tr>
               </thead>
               <tbody>

@@ -215,12 +215,12 @@ export default function SupportAccessPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Operator</th>
-                  <th>Reason</th>
-                  <th>Requested</th>
-                  <th>Open until</th>
-                  <th>Status</th>
-                  <th></th>
+                  <th scope="col">Operator</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Requested</th>
+                  <th scope="col">Open until</th>
+                  <th scope="col">Status</th>
+                  <th scope="col"></th>
                 </tr>
               </thead>
               <tbody>

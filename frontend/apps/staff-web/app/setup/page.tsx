@@ -473,7 +473,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Code</th><th>Name</th><th>Category</th><th>Base</th><th>Tax %</th><th>Status</th><th></th></tr>
+                  <tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Category</th><th scope="col">Base</th><th scope="col">Tax %</th><th scope="col">Status</th><th scope="col"></th></tr>
                 </thead>
                 <tbody>
                   {charges.map((c) => (
@@ -499,7 +499,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Policy</th><th>Value</th><th>Version</th><th></th></tr>
+                  <tr><th scope="col">Policy</th><th scope="col">Value</th><th scope="col">Version</th><th scope="col"></th></tr>
                 </thead>
                 <tbody>
                   {policies.map((p) => (
@@ -567,7 +567,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Date</th><th>Name</th><th>Recurring</th><th></th></tr>
+                  <tr><th scope="col">Date</th><th scope="col">Name</th><th scope="col">Recurring</th><th scope="col"></th></tr>
                 </thead>
                 <tbody>
                   {holidays.map((h) => (
@@ -612,7 +612,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Staff</th><th>Pattern</th><th>From</th><th>To</th></tr>
+                  <tr><th scope="col">Staff</th><th scope="col">Pattern</th><th scope="col">From</th><th scope="col">To</th></tr>
                 </thead>
                 <tbody>
                   {shifts.map((s) => (
@@ -655,7 +655,7 @@ function SetupPageInner() {
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
-                    <tr><th>Staff</th><th>Role</th><th>Days</th><th>Hours</th><th>Salary</th><th>Notes</th></tr>
+                    <tr><th scope="col">Staff</th><th scope="col">Role</th><th scope="col">Days</th><th scope="col">Hours</th><th scope="col">Salary</th><th scope="col">Notes</th></tr>
                   </thead>
                   <tbody>
                     {payroll.map((r) => (
@@ -683,7 +683,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Metric</th><th>Used</th><th>Limit</th></tr>
+                  <tr><th scope="col">Metric</th><th scope="col">Used</th><th scope="col">Limit</th></tr>
                 </thead>
                 <tbody>
                   <tr><td>Active patients</td><td>{subscription.activePatientsUsed}</td><td>{subscription.activePatientsLimit}</td></tr>
@@ -713,7 +713,7 @@ function SetupPageInner() {
             <h3 className={styles.cardTitle}>Recent import jobs</h3>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Type</th><th>File</th><th>Status</th><th>Created</th></tr></thead>
+                <thead><tr><th scope="col">Type</th><th scope="col">File</th><th scope="col">Status</th><th scope="col">Created</th></tr></thead>
                 <tbody>
                   {importJobs.map((j) => (
                     <tr key={j.id}><td>{j.importType}</td><td>{j.fileName}</td><td><span className={`${styles.pill} ${styles.pillPending}`}>{j.status}</span></td><td>{j.createdAt ? new Date(j.createdAt).toLocaleString() : "—"}</td></tr>
@@ -724,7 +724,7 @@ function SetupPageInner() {
             <h3 className={styles.cardTitle}>Recent export jobs</h3>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Type</th><th>Status</th><th>Created</th></tr></thead>
+                <thead><tr><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Created</th></tr></thead>
                 <tbody>
                   {exportJobs.map((j) => (
                     <tr key={j.id}><td>{j.exportType}</td><td><span className={`${styles.pill} ${styles.pillPending}`}>{j.status}</span></td><td>{j.createdAt ? new Date(j.createdAt).toLocaleString() : "—"}</td></tr>
@@ -767,7 +767,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Type</th><th>Holder</th><th>Number</th><th>Issuing body</th><th>Expiry</th><th>Status</th></tr>
+                  <tr><th scope="col">Type</th><th scope="col">Holder</th><th scope="col">Number</th><th scope="col">Issuing body</th><th scope="col">Expiry</th><th scope="col">Status</th></tr>
                 </thead>
                 <tbody>
                   {licences.map((l) => (

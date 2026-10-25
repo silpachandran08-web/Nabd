@@ -12,6 +12,7 @@ import { api, ApiError, intentKeys } from "../lib/api";
 import { getter, key } from "../lib/query";
 import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
 import { usePatientSearch, type PatientHit } from "../lib/usePatientSearch";
+import Dialog from "../components/ui/Dialog";
 
 type Patient = PatientHit;
 type Candidate = DuplicateCandidate;
@@ -81,11 +82,6 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
   const slot = slots && !slots.includes(pickedSlot) ? "" : pickedSlot;
   const { refetch: reloadSlots } = slotsQ;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
   async function book(e: React.FormEvent) {
     e.preventDefault();
@@ -137,10 +133,8 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
     : [];
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <form className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="new-appt-title"
-        onClick={(e) => e.stopPropagation()} onSubmit={registering ? registerPatient : book}>
-        <h2 id="new-appt-title" className={styles.dialogTitle}>New appointment</h2>
+    <Dialog title="New appointment" onClose={onClose}>
+      <form onSubmit={registering ? registerPatient : book}>
         <p className={styles.dialogSub}>Times are the clinic&apos;s local time.</p>
 
         <div className={styles.field}>
@@ -254,6 +248,6 @@ export default function NewAppointmentDialog({ doctors, timezone, initialDoctorI
           </button>
         </div>
       </form>
-    </div>
+    </Dialog>
   );
 }

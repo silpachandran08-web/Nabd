@@ -233,7 +233,7 @@ export default function DepartmentsPage() {
         <div style={{ overflowX: "auto" }}>
         <table className={styles.table}>
           <thead>
-            <tr><th>Name</th><th>Flow</th><th>Status</th><th></th></tr>
+            <tr><th scope="col">Name</th><th scope="col">Flow</th><th scope="col">Status</th><th scope="col"></th></tr>
           </thead>
           <tbody>
             {departments.map((d) => (
@@ -278,8 +278,8 @@ export default function DepartmentsPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>From \ To</th>
-                    {departments.map((to) => <th key={to.id}>{to.name}</th>)}
+                    <th scope="col">From \ To</th>
+                    {departments.map((to) => <th scope="col" key={to.id}>{to.name}</th>)}
                   </tr>
                 </thead>
                 <tbody>

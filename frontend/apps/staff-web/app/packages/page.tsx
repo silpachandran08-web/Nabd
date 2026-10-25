@@ -790,7 +790,7 @@ export default function PackagesPage() {
           {tab === "sessions" && (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Patient</th><th>Item</th><th>Package</th><th>Entitlement</th><th>Value</th><th></th></tr></thead>
+                <thead><tr><th scope="col">Patient</th><th scope="col">Item</th><th scope="col">Package</th><th scope="col">Entitlement</th><th scope="col">Value</th><th scope="col"></th></tr></thead>
                 <tbody>
                   {instances.flatMap((inst) => inst.items.map((item) => (
                     <tr key={item.id}>
@@ -821,7 +821,7 @@ export default function PackagesPage() {
             <div className={styles.tableWrap}>
               {reminderNotice && <div className={styles.muted} role="status">{reminderNotice}</div>}
               <table className={styles.table}>
-                <thead><tr><th>Patient</th><th>Package</th><th>Remaining</th><th>Expires</th><th>Value left</th><th>Contact</th><th></th></tr></thead>
+                <thead><tr><th scope="col">Patient</th><th scope="col">Package</th><th scope="col">Remaining</th><th scope="col">Expires</th><th scope="col">Value left</th><th scope="col">Contact</th><th scope="col"></th></tr></thead>
                 <tbody>
                   {expiring.map((e) => (
                     <tr key={e.instanceId}>
@@ -863,7 +863,7 @@ export default function PackagesPage() {
           {tab === "refunds" && (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Patient</th><th>Package</th><th>Reason</th><th>Refund</th><th>Owed</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th scope="col">Patient</th><th scope="col">Package</th><th scope="col">Reason</th><th scope="col">Refund</th><th scope="col">Owed</th><th scope="col">Status</th><th scope="col"></th></tr></thead>
                 <tbody>
                   {refunds.map((r) => (
                     <tr key={r.id}>
@@ -924,7 +924,7 @@ function InstanceTable({ instances, onOpen, showInvoice }: { instances: Instance
     <div className={styles_.tableWrap}>
       <table className={styles_.table}>
         <thead>
-          <tr><th>Patient</th><th>Package</th><th>Progress</th>{showInvoice && <th>Invoice</th>}<th>Expires</th><th>Status</th><th></th></tr>
+          <tr><th scope="col">Patient</th><th scope="col">Package</th><th scope="col">Progress</th>{showInvoice && <th scope="col">Invoice</th>}<th scope="col">Expires</th><th scope="col">Status</th><th scope="col"></th></tr>
         </thead>
         <tbody>
           {instances.map((inst) => {
@@ -982,7 +982,7 @@ function InstanceDetail({
       <h2 className={styles.cardTitle} style={{ marginTop: "16px" }}>Items</h2>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
-          <thead><tr><th>Item</th><th>Progress</th><th>Allocated</th><th></th></tr></thead>
+          <thead><tr><th scope="col">Item</th><th scope="col">Progress</th><th scope="col">Allocated</th><th scope="col"></th></tr></thead>
           <tbody>
             {instance.items.map((item) => (
               <tr key={item.id}>

@@ -1498,7 +1498,7 @@ export default function ConsultPage() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th>Patient</th><th className={styles.hideNarrow}>Visit type</th><th>Clinical flags</th><th className={styles.hideNarrow}>Wait · arrival</th><th>Status</th><th><span className={p.srOnly}>Action</span></th></tr>
+                <tr><th scope="col">Patient</th><th scope="col" className={styles.hideNarrow}>Visit type</th><th scope="col">Clinical flags</th><th scope="col" className={styles.hideNarrow}>Wait · arrival</th><th scope="col">Status</th><th scope="col"><span className={p.srOnly}>Action</span></th></tr>
               </thead>
               <tbody>
                 {visible.map((r) => {
