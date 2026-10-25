@@ -1,0 +1,26 @@
+# OPS-057: on every infra/config change, prove every PHI-bearing endpoint is in-country (infra/residency/sinks.yaml).
+name: residency
+on:
+  pull_request:
+    paths: ["infra/**", "backend/src/main/**", "scripts/ci/test_ops057.py", ".github/workflows/residency*.yml"]
+  push:
+    branches: [main, develop-initial]
+    paths: ["infra/**", "backend/src/main/**", ".github/workflows/residency*.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  egress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q pyyaml
+      - name: Egress resolution per cell (fails naming the endpoint)
+        run: python3 infra/residency/check_egress.py --cell in --report residency-report.json
+      - run: python3 infra/residency/check_egress.py --selftest && python3 scripts/ci/test_ops057.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: residency-report-in, path: residency-report.json }

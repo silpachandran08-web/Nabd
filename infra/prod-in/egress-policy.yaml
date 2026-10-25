@@ -1,0 +1,38 @@
+# OPS-057: default-deny egress for the prod-in cell. Nothing leaves a pod except DNS and the hosts below, which are exactly
+# the hosts inventoried in infra/residency/sinks.yaml (check_egress.py fails if the two lists differ). A connection to any other host is
+# dropped and the drop is logged as a policy verdict (Cilium/Hubble). Needs the Cilium CNI with the DNS proxy; applying it and the
+# blocked-egress probe (infra/residency/blocked-egress-probe.sh) are Needs external action in the staging/prod-in clusters.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny-egress, namespace: prod-in }
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: { name: allow-dns-and-sinks, namespace: prod-in }
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels: { "k8s:io.kubernetes.pod.namespace": kube-system, "k8s:k8s-app": kube-dns }
+      toPorts:
+        - ports: [{ port: "53", protocol: ANY }]
+          rules: { dns: [{ matchPattern: "*" }] }
+    - toFQDNs:
+        - matchName: api.nabd.health
+        - matchName: db.in.prod.cells.nabd.internal
+        - matchName: email-smtp.ap-south-1.amazonaws.com
+        - matchName: graph.facebook.com
+        - matchName: loki.obs.cell.internal
+        - matchName: pgbouncer.db.in.prod.cells.nabd.internal
+        - matchName: prometheus.obs.cell.internal
+        - matchName: rds.ap-south-1.amazonaws.com
+        - matchName: rds.ap-south-2.amazonaws.com
+        - matchName: s3.ap-south-1.amazonaws.com
+        - matchName: s3.ap-south-2.amazonaws.com
+        - matchName: tempo.obs.cell.internal
+        - matchName: valkey.in.prod.cells.nabd.internal
+      toPorts:
+        - ports: [{ port: "443", protocol: TCP }, { port: "5432", protocol: TCP }, { port: "6379", protocol: TCP }, { port: "587", protocol: TCP }, { port: "4317", protocol: TCP }, { port: "3100", protocol: TCP }, { port: "9090", protocol: TCP }]

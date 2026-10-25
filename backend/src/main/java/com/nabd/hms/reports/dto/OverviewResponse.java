@@ -16,8 +16,14 @@ public record OverviewResponse(
         List<PaymentSplit> paymentSplit,
         DayClose dayClose,
         List<ActiveStaff> activeStaff,
-        StaffSummary staff
+        StaffSummary staff,
+        RangeTotals range
 ) {
+    /** OPS-010: totals for ?from&to read from the daily rollups plus today's live delta; null when no range was asked. */
+    public record RangeTotals(LocalDate from, LocalDate to, int visits, int completed, int noShows, BigDecimal billed, BigDecimal collected,
+                              java.util.Map<String, BigDecimal> byMethod, int packagesSold, Instant asOf) {
+    }
+
     public record Visits(int total, int completed, int inFlow) {
     }
 

@@ -1,0 +1,103 @@
+# OPS-057: inventory of every place patient data (or something that could carry it) can flow to, kept as code.
+# infra/residency/check_egress.py resolves every endpoint configured in the repo against this file, per cell, and fails
+# when an endpoint is outside the country and is not an approved processor with a contract and no PHI in the payload.
+# A new exporter, SDK or provider is added HERE first; the policy infra/prod-in/egress-policy.yaml must list the same hosts.
+version: 1
+
+cells:
+  in:
+    country: IN
+    # the regions come from the one residency allow-list the Terraform module enforces (modules/cell/residency.tf)
+    residency_tf: infra/terraform/modules/cell/residency.tf
+    in_country_hosts:
+      - "*.cell.internal"            # in-cell private names (observability stack, OPS-026)
+      - "*.cells.nabd.internal"      # private DNS zone of the cell (modules/cell variable dns_zone)
+      - "*.{region}.amazonaws.com"   # AWS endpoints in an allowed region, expanded per residency.tf
+      - "*.nabd.health"              # our own edge: Mumbai ALB / WAF (OPS-056)
+
+# Hosts found in repo config that are not data sinks. Each needs a reason.
+not_sinks:
+  - { host: localhost, reason: local development and test defaults only }
+  - { host: 127.0.0.1, reason: loopback }
+  - { host: nabd-nu.vercel.app, reason: CORS origin default in application.yml, an inbound origin; prod overrides APP_CORS_ALLOWED_ORIGINS }
+  - { host: "www.w3.org", reason: XML/JSON schema namespace identifier, never contacted }
+  - { host: token.actions.githubusercontent.com, reason: "OIDC issuer string in the Kyverno image-verification policy (verify-images.yaml); image digests only, no patient data" }
+  - { host: github.com, reason: "signer identity string in verify-images.yaml; the admission controller, not an application pod, checks it" }
+  - { host: rekor.sigstore.dev, reason: "transparency log used by Kyverno to verify image signatures; carries image digests only" }
+  - { host: "json-schema.org", reason: schema identifier, never contacted }
+
+sinks:
+  - id: postgres
+    kind: database
+    phi: true
+    class: in_country
+    cells: { in: { hosts: ["pgbouncer.db.in.prod.cells.nabd.internal", "db.in.prod.cells.nabd.internal"] } }
+    configured_by: DB_URL (secret core-secrets/db-url), terraform postgres.tf + data_tier_pgbouncer.tf
+  - id: valkey
+    kind: cache-and-event-streams
+    phi: false   # events are PHI-free by contract (events.md section 3), but sessions and idempotency keys live there: kept in-cell
+    class: in_country
+    cells: { in: { hosts: ["valkey.in.prod.cells.nabd.internal"] } }
+    configured_by: VALKEY_URL (secret core-secrets/valkey-url), terraform valkey.tf
+  - id: object-storage
+    kind: object-storage
+    phi: true
+    class: in_country
+    cells: { in: { hosts: ["s3.ap-south-1.amazonaws.com", "s3.ap-south-2.amazonaws.com"] } }
+    configured_by: terraform storage.tf (buckets in ap-south-1, DR copy in ap-south-2)
+  - id: backups
+    kind: backup-copy
+    phi: true
+    class: in_country
+    cells: { in: { hosts: ["rds.ap-south-1.amazonaws.com", "rds.ap-south-2.amazonaws.com"] } }
+    configured_by: terraform postgres.tf (35-day PITR, backup replication to the DR region)
+  - id: logs
+    kind: log-exporter
+    phi: false   # PhiMasker + Collector denylist; treated as PHI-bearing for residency anyway
+    class: in_country
+    cells: { in: { hosts: ["loki.obs.cell.internal"] } }
+    configured_by: infra/observability/stack/otel-collector.yaml exporters.otlphttp/loki
+  - id: traces
+    kind: trace-exporter
+    phi: false
+    class: in_country
+    cells: { in: { hosts: ["tempo.obs.cell.internal"] } }
+    configured_by: infra/observability/stack/otel-collector.yaml exporters.otlp/tempo
+  - id: metrics
+    kind: metric-exporter
+    phi: false
+    class: in_country
+    cells: { in: { hosts: ["prometheus.obs.cell.internal"] } }
+    configured_by: infra/observability/stack/otel-collector.yaml exporters.prometheusremotewrite
+  - id: edge-cdn-origin
+    kind: cdn-origin
+    phi: true
+    class: in_country
+    cells: { in: { hosts: ["api.nabd.health"] } }
+    configured_by: ALB + WAF in Mumbai (edge_alb.tf); no CDN origin outside the cell
+  - id: email
+    kind: email-provider
+    phi: false   # transactional mail carries links and ids, no clinical content
+    class: in_country
+    cells: { in: { hosts: ["email-smtp.ap-south-1.amazonaws.com"] } }
+    configured_by: SMTP_HOST (deploy-set, empty in dev)
+  - id: whatsapp
+    kind: messaging-provider
+    phi: false   # utility templates and ids only, no PHI in bodies (OPS-057 risk note, COM-003 template lint)
+    class: approved_processor
+    cells: { in: { hosts: ["graph.facebook.com"] } }
+    processor: Meta Platforms (WhatsApp Cloud API)
+    processing_region: outside the cell (Meta decides)
+    contract: backend/src/main/resources/dpa/sub-processors.txt
+    phi_in_payload: false
+    configured_by: app.whatsapp.api-base-url (WHATSAPP_API_BASE_URL)
+  - id: sms
+    kind: sms-provider
+    phi: false
+    class: not_used
+    cells: { in: { hosts: [] } }
+  - id: llm-inference
+    kind: inference
+    phi: true
+    class: not_used   # later: an in-country endpoint must be added here as in_country before any call is made
+    cells: { in: { hosts: [] } }
