@@ -29,6 +29,9 @@ spec:
           env:
             - { name: SPRING_PROFILES_ACTIVE, value: prod }
             - { name: JWT_KEYS_FILE, value: /secrets/jwt/jwks.json }
+            - { name: JWT_OWNER_KEYS_FILE, value: /secrets/jwt/owner-jwks.json }   # PLT-009: one key set per token population, same secret mount
+            - { name: JWT_PLATFORM_KEYS_FILE, value: /secrets/jwt/platform-jwks.json }
+            - { name: JWT_INTERNAL_JWKS_FILE, value: /secrets/jwt/internal-public-jwks.json }   # public keys of the calling services only
             - { name: DB_USER, value: nabd_app }
             - { name: DB_URL, valueFrom: { secretKeyRef: { name: core-secrets, key: db-url } } }          # PgBouncer endpoint (OPS-055)
             - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: core-secrets, key: db-password } } }

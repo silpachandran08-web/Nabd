@@ -42,7 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** Independent QA for PLT-002 (signing keys, JWKS, iss/aud/kid validation, prod fail-fast, rotation overlap). */
 class SigningKeysS9QaTest extends ApiTestBase {
 
-    private static final String ISS = "https://api.nabd.health";
+    private static final String ISS = com.nabd.hms.shared.security.TokenPopulation.STAFF.issuer();
 
     @Autowired SigningKeyProvider qaKeys;
 
@@ -54,10 +54,17 @@ class SigningKeysS9QaTest extends ApiTestBase {
         return new JWKSet(new ArrayList<com.nimbusds.jose.jwk.JWK>(List.of(ks))).toString(false);
     }
 
+    /** PLT-009: prod also needs the owner/platform key sets and the internal public JWKS. */
+    private static ApplicationContextRunner withOtherPopulations(ApplicationContextRunner r) {
+        return r.withPropertyValues("app.jwt.owner.keys-json=" + jwks(key(), key()), "app.jwt.platform.keys-json=" + jwks(key(), key()),
+                "app.jwt.internal.jwks-json=" + new JWKSet(new ArrayList<com.nimbusds.jose.jwk.JWK>(List.of(key()))).toString(true));
+    }
+
     private static ApplicationContextRunner runner(String keysJson, String... profiles) {
         ApplicationContextRunner r = new ApplicationContextRunner().withUserConfiguration(JwtConfig.class);
         if (keysJson != null) r = r.withPropertyValues("app.jwt.keys-json=" + keysJson);
         if (profiles.length > 0) r = r.withInitializer(c -> c.getEnvironment().setActiveProfiles(profiles));
+        if (java.util.Arrays.asList(profiles).contains("prod")) r = withOtherPopulations(r);
         return r;
     }
 
@@ -222,9 +229,9 @@ class SigningKeysS9QaTest extends ApiTestBase {
         Path f = Files.createTempFile("qa-jwks", ".json");
         try {
             Files.writeString(f, jwks(a, b));
-            new ApplicationContextRunner().withUserConfiguration(JwtConfig.class).withPropertyValues("app.jwt.keys-file=" + f)
+            withOtherPopulations(new ApplicationContextRunner().withUserConfiguration(JwtConfig.class)).withPropertyValues("app.jwt.keys-file=" + f)
                     .withInitializer(c -> c.getEnvironment().setActiveProfiles("prod")).run(ctx -> assertThat(ctx).hasNotFailed());
-            new ApplicationContextRunner().withUserConfiguration(JwtConfig.class).withPropertyValues("app.jwt.keys-file=" + f + ".missing")
+            withOtherPopulations(new ApplicationContextRunner().withUserConfiguration(JwtConfig.class)).withPropertyValues("app.jwt.keys-file=" + f + ".missing")
                     .withInitializer(c -> c.getEnvironment().setActiveProfiles("prod")).run(ctx -> assertThat(ctx).hasFailed());
         } finally {
             Files.deleteIfExists(f);

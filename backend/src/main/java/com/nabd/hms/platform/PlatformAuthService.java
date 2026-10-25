@@ -23,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import com.nabd.hms.shared.security.Audience;
 import com.nabd.hms.shared.security.ChallengeTokenDecoder;
+import com.nabd.hms.shared.security.TokenPopulation;
 import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -54,7 +55,7 @@ import static com.nabd.hms.platform.PlatformAuthModels.SessionRow;
 public class PlatformAuthService {
 
     private static final Logger log = LoggerFactory.getLogger(PlatformAuthService.class);
-    private static final String ISSUER = "https://api.nabd.health"; // must match AuthService.ISSUER — same signing key/issuer
+    private static final String ISSUER = TokenPopulation.PLATFORM.issuer(); // PLT-009: own issuer and key set
 
     private final PlatformAuthRepository repo;
     private final PasswordEncoder pinEncoder;

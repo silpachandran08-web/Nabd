@@ -38,6 +38,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import com.nabd.hms.shared.security.Audience;
 import com.nabd.hms.shared.security.ChallengeTokenDecoder;
+import com.nabd.hms.shared.security.TokenPopulation;
 import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -64,7 +65,7 @@ import static com.nabd.hms.auth.AuthModels.Tenant;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
-    private static final String ISSUER = "https://api.nabd.health";
+    private static final String ISSUER = TokenPopulation.STAFF.issuer();
 
     private final AuthRepository repo;
     private final TenantContext tenantContext;
