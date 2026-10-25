@@ -11,7 +11,7 @@ import java.util.UUID;
 // (the tenant region's currency), one less thing an operator can set wrong.
 public record SubscriptionUpsertRequest(
         @NotNull UUID planId,
-        @NotNull @Min(0) Integer mrrCents,
+        @Min(0) Integer mrrCents, // ADM-034: omitted = priced from the plan's pricing basis (per_doctor: unit price x active clinicians)
         @NotNull @Future LocalDate renewalDate
 ) {
 }

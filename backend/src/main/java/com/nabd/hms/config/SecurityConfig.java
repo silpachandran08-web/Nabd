@@ -144,6 +144,7 @@ public class SecurityConfig {
                                 "/v1/platform/auth/mfa/verify",
                                 "/v1/platform/auth/refresh",
                                 "/.well-known/jwks.json",
+                                "/v1/plans/catalogue", // ADM-034: public plan comparison
                                 "/v1/webhooks/whatsapp", // HMAC-signed by Meta, verified in WhatsAppWebhookController
                                 "/internal/v1/notification-requests/*" // COM-004: internal service token, checked in NotificationClaimController
                         ).permitAll()

@@ -21,4 +21,7 @@ public interface ActorDirectory {
 
     /** Active staff flagged is_clinician (PLT-016), ordered by name. */
     List<Actor> listClinicians(UUID tenantId);
+
+    /** PLT-059: staff seats in use = invited + active (suspended do not count). */
+    int seatsInUse(UUID tenantId);
 }

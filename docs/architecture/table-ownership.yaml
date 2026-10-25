@@ -49,7 +49,7 @@ modules:
     owns: [pharmacy_settings, pharmacy_stock_movements]
     reads: []
   platform:
-    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.operators, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, tenant_lifecycle_events, tenants]
+    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, tenant_lifecycle_events, tenants]
     reads: []
   queue:
     owns: [appointments, doctor_delays, doctor_leave, doctor_session_pauses, doctor_sessions, doctor_working_hours, queue_entries, queue_entry_events, waitlist_entries]

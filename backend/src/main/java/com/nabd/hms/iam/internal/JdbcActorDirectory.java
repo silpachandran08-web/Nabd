@@ -50,4 +50,9 @@ class JdbcActorDirectory implements ActorDirectory {
     public List<Actor> listClinicians(UUID tenantId) {
         return jdbc.query(SELECT + "WHERE s.tenant_id = ? AND s.is_clinician AND s.status = 'active' ORDER BY s.name", MAPPER, tenantId);
     }
+
+    @Override
+    public int seatsInUse(UUID tenantId) {
+        return jdbc.queryForObject("SELECT count(*) FROM staff WHERE tenant_id = ? AND status IN ('invited','active')", Integer.class, tenantId);
+    }
 }
