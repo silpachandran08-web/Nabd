@@ -1,5 +1,6 @@
 "use client";
 
+import { moneyFormatter, type MoneyFormatter } from "@nabd/i18n";
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
@@ -83,7 +84,7 @@ export default function BillingPage() {
   if (error && !s) return <main className={styles.page}><div className={styles.error} role="alert">{error}</div></main>;
   if (!s) return <main className={styles.page}><p className={styles.state}>Loading…</p></main>;
 
-  const money = new Intl.NumberFormat(s.currency === "SAR" ? "en-SA" : "en-IN", { style: "currency", currency: s.currency, minimumFractionDigits: 2 });
+  const money = moneyFormatter(s.currency);
   const m = Object.fromEntries(s.methods.map((x) => [x.method, x])) as Record<"cash" | "card" | "upi" | "other", Summary["methods"][number]>;
   const closed = s.close?.status === "closed";
   const reopened = s.close?.status === "reopened";
@@ -302,7 +303,7 @@ export default function BillingPage() {
 
 /** The wireframe's three checks — pending issues, cash count, variance — then close. The server re-checks all of them. */
 function CloseDialog({ summary, money, counted, setCounted, variance, beyond, onClose, onDone }: {
-  summary: Summary; money: Intl.NumberFormat; counted: string; setCounted: (v: string) => void;
+  summary: Summary; money: MoneyFormatter; counted: string; setCounted: (v: string) => void;
   variance: number | null; beyond: boolean;
   onClose: () => void; onDone: (s: Summary) => void;
 }) {

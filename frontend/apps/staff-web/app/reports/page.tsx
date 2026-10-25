@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, moneyFormatter } from "@nabd/i18n";
 import { useCallback, useEffect, useState } from "react";
 import styles from "./reports.module.css";
 import Link from "next/link";
@@ -49,7 +50,7 @@ type DoctorPunctuality = {
   entries: { doctorId: string; doctorName: string; delayCount: number; avgDelayMinutes: number; sameDayRepeatDays: number }[];
 };
 
-const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (n: number) => formatNumber(n, { min: 2, max: 2 });
 const dash = (n: number | null | undefined) => (typeof n === "number" ? n : "—");
 const shortDate = (iso: string) => {
   const [y, mo, d] = iso.split("-").map(Number);
@@ -220,7 +221,7 @@ export default function ReportsPage() {
   const canExport = can("reports:export");
 
   const m = moneyReport;
-  const cur = m ? new Intl.NumberFormat(m.currency === "SAR" ? "en-SA" : "en-IN", { style: "currency", currency: m.currency, minimumFractionDigits: 2 }) : null;
+  const cur = m ? moneyFormatter(m.currency) : null;
   const tenderMax = m ? Math.max(0, ...m.tender.map((t) => Number(t.amount))) : 0;
   const serviceMax = m ? Math.max(0, ...m.topServices.map((t) => Number(t.revenue))) : 0;
 

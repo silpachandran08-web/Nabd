@@ -353,6 +353,9 @@ export type TransferRequest = { doctorId: string; reason?: string; reasonNote?: 
 export type TransferResponse = { closedLeg?: QueueEntryResponse; newLeg?: QueueEntryResponse; };
 export type TransferTargetResponse = { departmentId?: string; departmentName?: string; doctors?: Array<StaffRosterEntry>; };
 export type TransitionRequest = { reason: string; toStatus: string; };
+export type UiPreferences = { digitStyle?: string; uiLocale?: string; uiTheme?: string; };
+export type UiPreferencesRead = { clinicDefaultLocale?: string; digitStyle?: string; uiLocale?: string; uiTheme?: string; };
+export type UiPreferencesWrite = { digitStyle?: string; uiLocale?: string; uiTheme: string; };
 export type Unbilled = { doctorName?: string; endedAt?: string; patientName?: string; queueEntryId?: string; token?: number; };
 export type UnlockRequest = { pin: string; };
 export type UpdateRequest = { assessment?: string; favourite?: boolean; name?: string; objective?: string; plan?: string; subjective?: string; tags?: Array<string>; };
@@ -504,6 +507,8 @@ export type Operations = {
   ScheduleController_updateWorkingHours: { method: "put"; path: "/v1/doctors/{id}/working-hours/{hoursId}"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; hoursId: string; }; query: never; body: WorkingHoursWriteRequest; response: WorkingHoursResponse };
   ScheduleController_deleteWorkingHours: { method: "delete"; path: "/v1/doctors/{id}/working-hours/{hoursId}"; permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"; pathParams: { id: string; hoursId: string; }; query: never; body: never; response: void };
   EventsController_stream: { method: "get"; path: "/v1/events"; permission: "authenticated"; pathParams: never; query: { topics?: string; }; body: never; response: SseEmitter };
+  MePreferencesController_get: { method: "get"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: never; response: UiPreferencesRead };
+  MePreferencesController_put: { method: "put"; path: "/v1/me/preferences"; permission: "authenticated"; pathParams: never; query: never; body: UiPreferencesWrite; response: UiPreferences };
   NursingController_activityToday: { method: "get"; path: "/v1/nursing/activity/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<ActivityEntryResponse> };
   NursingController_orderAdministration: { method: "post"; path: "/v1/nursing/administration-orders"; permission: "nursing:create"; pathParams: never; query: never; body: AdministrationOrderRequest; response: AdministrationOrderResponse };
   NursingController_administrationOrdersToday: { method: "get"; path: "/v1/nursing/administration-orders/today"; permission: "nursing:view"; pathParams: never; query: never; body: never; response: Array<AdministrationOrderResponse> };

@@ -359,6 +359,9 @@ export const TransferRequestSchema = z.object({ doctorId: z.string(), reason: z.
 export const TransferResponseSchema = z.object({ closedLeg: QueueEntryResponseSchema.optional(), newLeg: QueueEntryResponseSchema.optional() });
 export const TransferTargetResponseSchema = z.object({ departmentId: z.string().optional(), departmentName: z.string().optional(), doctors: z.array(StaffRosterEntrySchema).optional() });
 export const TransitionRequestSchema = z.object({ reason: z.string().min(1), toStatus: z.string().min(1) });
+export const UiPreferencesSchema = z.object({ digitStyle: z.string().optional(), uiLocale: z.string().optional(), uiTheme: z.string().optional() });
+export const UiPreferencesReadSchema = z.object({ clinicDefaultLocale: z.string().optional(), digitStyle: z.string().optional(), uiLocale: z.string().optional(), uiTheme: z.string().optional() });
+export const UiPreferencesWriteSchema = z.object({ digitStyle: z.string().optional(), uiLocale: z.string().optional(), uiTheme: z.string() });
 export const UnlockRequestSchema = z.object({ pin: z.string().min(1) });
 export const UpdateRequestSchema = z.object({ assessment: z.string().optional(), favourite: z.boolean().optional(), name: z.string().optional(), objective: z.string().optional(), plan: z.string().optional(), subjective: z.string().optional(), tags: z.array(z.string()).optional() });
 export const VaccineRecordRequestSchema = z.object({ dose: z.string().min(0).max(100), expiryDate: z.string().optional(), lotNumber: z.string().min(0).max(100).optional(), notes: z.string().min(0).max(1000).optional(), patientId: z.string(), queueEntryId: z.string().optional(), route: z.string(), site: z.string().min(0).max(100).optional(), vaccineName: z.string().min(0).max(200) });
@@ -507,6 +510,8 @@ export const operationSchemas = {
   ScheduleController_updateWorkingHours: { body: WorkingHoursWriteRequestSchema, response: WorkingHoursResponseSchema },
   ScheduleController_deleteWorkingHours: {  },
   EventsController_stream: { response: SseEmitterSchema },
+  MePreferencesController_get: { response: UiPreferencesReadSchema },
+  MePreferencesController_put: { body: UiPreferencesWriteSchema, response: UiPreferencesSchema },
   NursingController_activityToday: { response: z.array(ActivityEntryResponseSchema) },
   NursingController_orderAdministration: { body: AdministrationOrderRequestSchema, response: AdministrationOrderResponseSchema },
   NursingController_administrationOrdersToday: { response: z.array(AdministrationOrderResponseSchema) },

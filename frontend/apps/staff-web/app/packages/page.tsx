@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@nabd/i18n";
 import { useCallback, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import styles from "./packages.module.css";
@@ -59,7 +60,7 @@ type SoldInvoice = Omit<Full<InvoiceResponse>, "lineItems"> & { lineItems: Full<
 const EMPTY_ITEM: ItemDraft = { itemType: "service_session", name: "", quantity: "1", unitListPrice: "0", taxRatePercent: "0" };
 
 function money(n: number): string {
-  return n.toFixed(2);
+  return formatNumber(n, { min: 2, max: 2 });
 }
 
 /** The words a person sees for a refused request: the server's reason, or the offline line. */

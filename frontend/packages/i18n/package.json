@@ -1,0 +1,19 @@
+{
+  "name": "@nabd/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./format": "./src/format/index.ts",
+    "./messages/*": "./messages/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON test/*.test.mjs"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.12.0",
+    "@formatjs/icu-messageformat-parser": "^2.11.0"
+  }
+}

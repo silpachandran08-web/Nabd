@@ -1299,6 +1299,13 @@ schemas:
       changed_by: operational
       reason: operational
       changed_at: operational
+    staff_preferences:
+      staff_id: operational
+      tenant_id: operational
+      ui_locale: operational
+      ui_theme: operational
+      digit_style: operational
+      updated_at: operational
     tenants:
       id: operational
       slug: operational
@@ -1311,6 +1318,7 @@ schemas:
       updated_at: operational
       brand_id: operational
       timezone: operational
+      default_locale: operational
       tax_id: financial
       tax_id_type: operational
       whatsapp_number: operational

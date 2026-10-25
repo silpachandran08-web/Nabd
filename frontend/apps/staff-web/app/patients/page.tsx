@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@nabd/i18n";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./patients.module.css";
@@ -904,7 +905,7 @@ function PatientsList() {
                     {billingView && drawerPatient.outstandingBalance !== undefined && (
                       <div className={styles.section}>
                         <div className={styles.sectionLabel}>Outstanding balance</div>
-                        <div className={styles.sectionValue}>{drawerPatient.outstandingBalance.toFixed(2)} <BillingStatePill state={drawerPatient.outstandingBalance > 0 ? "outstanding" : "settled"} /></div>
+                        <div className={styles.sectionValue}>{formatNumber(drawerPatient.outstandingBalance, { min: 2, max: 2 })} <BillingStatePill state={drawerPatient.outstandingBalance > 0 ? "outstanding" : "settled"} /></div>
                       </div>
                     )}
                     <div className={styles.section}>

@@ -112,12 +112,12 @@ describe("FEF-013 money formatter (QA-6)", () => {
       return typeof s === "string" && !s.includes("NaN");
     }), RUNS);
   });
-  test("formatMoney boundaries: null/undefined/NaN show a dash; 2 decimals; SAR trailing symbol", () => {
+  test("formatMoney boundaries: null/undefined/NaN show a dash; 2 decimals; SAR ISO code", () => {
     expect(formatMoney(null)).toBe("—");
     expect(formatMoney(undefined)).toBe("—");
     expect(formatMoney(NaN)).toBe("—");
-    expect(formatMoney(100000, "INR")).toBe("₹1,00,000");
+    expect(formatMoney(100000, "INR")).toBe("₹1,00,000.00"); // FEF-037: always the currency's minor digits
     expect(formatMoney(0.005, "INR")).toMatch(/^₹0\.01$|^₹0\.00$/);
-    expect(formatMoney(12.5, "SAR")).toBe("12.50 ﷼");
+    expect(formatMoney(12.5, "SAR")).toBe("SAR 12.50"); // FEF-037: ISO code; the riyal sign is a clinic setting (sarSymbol)
   });
 });

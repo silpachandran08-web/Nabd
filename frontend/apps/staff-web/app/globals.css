@@ -76,7 +76,7 @@ body {
   margin: 0;
   background: var(--nb-bg-root);
   color: var(--nb-text-primary);
-  font-family: var(--font-poppins), system-ui, sans-serif;
+  font-family: var(--font-poppins), var(--font-deva), var(--font-knda), var(--font-telu), var(--font-ar), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

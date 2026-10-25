@@ -57,6 +57,16 @@ function sessionCookies(pair: Pair, csrf: string | undefined): string[] {
   return [cookie(AT, pair.accessToken, pair.expiresIn ?? 900), cookie(RT, pair.refreshToken, rtAge), cookie(CSRF, csrf ?? randomToken(), rtAge, false)];
 }
 
+// FEF-036: first-paint cookies. Readable (no HttpOnly) and Lax so a link from outside still renders in the user's language.
+// Names match LOCALE_COOKIE / CLINIC_LOCALE_COOKIE in @nabd/i18n (not imported: this file is unit-tested without the workspace).
+const lax = (name: string, value: string | null | undefined) =>
+  `${name}=${value ?? ""}; Path=/; Max-Age=${value ? 365 * 24 * 3600 : 0}; Secure; SameSite=Lax`;
+export function preferenceCookies(j: Record<string, unknown>, withClinic: boolean): string[] {
+  const str = (v: unknown) => (typeof v === "string" && /^[a-z-]{2,10}$/.test(v) ? v : null);
+  return [lax("nabd_locale", str(j.uiLocale)), lax("nabd_theme", str(j.uiTheme)), lax("nabd_digits", j.digitStyle === "arab" ? "arab" : null),
+    ...(withClinic ? [lax("nabd_clinic_locale", str(j.clinicDefaultLocale))] : [])];
+}
+
 // ---- claims --------------------------------------------------------------------------------------
 const payload = (token: string | undefined) => (token ? decodeJwtPayload<Record<string, unknown>>(token) : null);
 export const claimsToken = (accessToken: string) => `${CLAIMS_HEAD}.${accessToken.split(".")[1] ?? ""}.`;
@@ -175,6 +185,7 @@ export async function proxy(req: Request, corePath: string, deps: Deps = default
     body = text;
     let j: Record<string, unknown> | null = null;
     try { j = JSON.parse(text); } catch { /* not JSON after all: pass through */ }
+    if (j && corePath.split("?")[0] === "/me/preferences") cookies.push(...preferenceCookies(j, req.method === "GET"));
     if (j && typeof j.accessToken === "string" && typeof j.refreshToken === "string") {
       const pair = j as unknown as Pair;
       cookies.length = 0;

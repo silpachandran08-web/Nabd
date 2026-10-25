@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@nabd/i18n";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./overview.module.css";
@@ -83,7 +84,7 @@ export default function OverviewPage() {
   const [canSwitchClinic, setCanSwitchClinic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
-  const [money, setMoney] = useState<Intl.NumberFormat | null>(null);
+  const [currency, setCurrency] = useState<string | null>(null);
   const [now, setNow] = useState(0);
 
   const load = useCallback(async () => {
@@ -111,8 +112,7 @@ export default function OverviewPage() {
       } catch { /* storage blocked: card simply stays visible */ }
       const region = getIdentity()?.tenantRegion;
       // shortcut: static region -> currency/locale pairs mirror the regions table; read GET /v1/regions once the client caches it
-      const fmt = ({ AE: ["en-AE", "AED"], SA: ["en-SA", "SAR"], QA: ["en-QA", "QAR"] } as Record<string, string[]>)[region ?? ""] ?? ["en-IN", "INR"];
-      setMoney(new Intl.NumberFormat(fmt[0], { style: "currency", currency: fmt[1], maximumFractionDigits: 0 }));
+      setCurrency(({ AE: "AED", SA: "SAR", QA: "QAR" } as Record<string, string>)[region ?? ""] ?? "INR");
       setNow(Date.now());
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) setForbidden(true);
@@ -132,7 +132,7 @@ export default function OverviewPage() {
   if (error) {
     return <main className={styles.page}><ErrorState message={error} onRetry={() => void load()} /></main>;
   }
-  if (!data || !money) {
+  if (!data || !currency) {
     return (
       <main className={styles.page} aria-busy="true">
         <div className={styles.skelKpis} aria-hidden="true">
@@ -201,13 +201,13 @@ export default function OverviewPage() {
         </div>
         <div className={styles.card}>
           <div className={styles.cardLabel}>Collections</div>
-          <div className={styles.kpiValue}>{money.format(Number(data.collections.collected))}</div>
+          <div className={styles.kpiValue}>{formatMoney(data.collections.collected, currency)}</div>
           <div className={styles.kpiSub}>{plural(data.collections.invoices, "invoice", "invoices")} · {data.collections.pendingInvoices} pending</div>
         </div>
         <div className={styles.card}>
           <div className={styles.cardLabel}>Checkout pending</div>
           <div className={styles.kpiValue}>{data.checkout.pending}</div>
-          <div className={styles.kpiSub}>{money.format(Number(data.checkout.outstanding))} outstanding</div>
+          <div className={styles.kpiSub}>{formatMoney(data.checkout.outstanding, currency)} outstanding</div>
         </div>
         <div className={styles.card}>
           <div className={styles.cardLabel}>Package sales</div>
@@ -234,7 +234,7 @@ export default function OverviewPage() {
                   <div key={p.method} className={styles.splitRow}>
                     <span className={styles.dot} style={{ background: METHOD_COLORS[p.method] ?? METHOD_COLORS.other }} />
                     <span>{METHOD_LABELS[p.method] ?? p.method}</span>
-                    <span className={styles.amount}>{money.format(Number(p.amount))}</span>
+                    <span className={styles.amount}>{formatMoney(p.amount, currency)}</span>
                     <span className={styles.pct}>{Math.round((Number(p.amount) / splitTotal) * 100)}%</span>
                   </div>
                 ))}

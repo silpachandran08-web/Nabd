@@ -551,6 +551,25 @@ paths:
           description: Account locked; the PIN was not checked. Body carries retryAfterSeconds.
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
+  /me/preferences:
+    get:
+      tags: [Auth]
+      summary: Current staff member's UI preferences (own row only; clinicDefaultLocale is the clinic-wide fallback)
+      x-required-permission: authenticated
+      responses:
+        "200": { description: Preferences, content: { application/json: { schema: { $ref: "#/components/schemas/UiPreferencesRead" } } } }
+        "401": { description: Unauthenticated, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    put:
+      tags: [Auth]
+      summary: Replace own UI preferences; the BFF mirrors uiLocale/uiTheme into the nabd_locale/nabd_theme cookies
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/UiPreferencesWrite" } } }
+      responses:
+        "200": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/UiPreferences" } } } }
+        "422": { description: UNSUPPORTED_LOCALE or unsupported theme / digit style, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /auth/pin/change:
     post:
       tags: [Auth]
@@ -4463,6 +4482,25 @@ components:
         sex: { type: string }
         phone: { type: string }
         lastVisitAt: { type: string, format: date-time, nullable: true }
+    UiPreferences:
+      type: object
+      properties:
+        uiLocale: { type: string, nullable: true, enum: [en, hi, kn, te, ta, ml, bn, ar] }
+        uiTheme: { type: string, enum: [system, dark, light] }
+        digitStyle: { type: string, nullable: true, enum: [latn, arab] }
+    UiPreferencesRead:
+      allOf:
+        - $ref: "#/components/schemas/UiPreferences"
+        - type: object
+          properties:
+            clinicDefaultLocale: { type: string, nullable: true, enum: [en, hi, kn, te, ta, ml, bn, ar] }
+    UiPreferencesWrite:
+      type: object
+      required: [uiTheme]
+      properties:
+        uiLocale: { type: string, nullable: true }
+        uiTheme: { type: string, enum: [system, dark, light] }
+        digitStyle: { type: string, nullable: true }
     DoctorSession:
       type: object
       required: [state]
