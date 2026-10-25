@@ -30,7 +30,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class Ops003S9QaTest extends ApiTestBase {
 
     private static final Set<String> STORY_EXEMPT = Set.of("public.tenant_lifecycle_events", "master.support_tickets",
-            "master.support_access_grants", "master.subscriptions", "master.discount_requests");
+            "master.support_access_grants", "master.subscriptions", "master.discount_requests",
+            "master.tenant_feature_overrides"); // PLT-059: sixth reviewed operator-plane table, see rls-exemptions.txt
 
     private JdbcTemplate su() {
         return new JdbcTemplate(superuserDataSource());
@@ -87,7 +88,7 @@ class Ops003S9QaTest extends ApiTestBase {
     }
 
     @Test
-    void exemptionFileIsExactlyTheFiveReviewedOperatorPlaneTablesAndEachIsReal() {
+    void exemptionFileIsExactlyTheReviewedOperatorPlaneTablesAndEachIsReal() {
         assertThat(RlsSelfCheck.exemptions()).containsExactlyInAnyOrderElementsOf(STORY_EXEMPT);
         JdbcTemplate su = su();
         for (String t : STORY_EXEMPT) {

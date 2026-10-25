@@ -2,7 +2,6 @@ package com.nabd.hms.patient;
 
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.PageRequest;
-import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.messaging.api.MessageHistory;
 import com.nabd.hms.staff.StaffService;
 import com.nabd.hms.staff.dto.CallerInfo;
@@ -24,13 +23,11 @@ public class PatientMessagesController {
 
     private final PatientRepository repo;
     private final StaffService staffService;
-    private final TenantContext tenantContext;
     private final MessageHistory history;
 
-    PatientMessagesController(PatientRepository repo, StaffService staffService, TenantContext tenantContext, MessageHistory history) {
+    PatientMessagesController(PatientRepository repo, StaffService staffService, MessageHistory history) {
         this.repo = repo;
         this.staffService = staffService;
-        this.tenantContext = tenantContext;
         this.history = history;
     }
 
@@ -48,7 +45,6 @@ public class PatientMessagesController {
             throw new ApiException(HttpStatus.FORBIDDEN, "verification-required", "Verification required",
                     "Both email and mobile verification must be complete before patient data is reachable.");
         }
-        tenantContext.set(tenantId);
         UUID scope = "own_patients_only".equals(caller.scope()) ? staffId : null;
         repo.findVisibleById(tenantId, patientId, scope)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested resource was not found."));

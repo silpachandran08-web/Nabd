@@ -33,9 +33,13 @@ public class AuditChainSealer {
     private final Counter failures;
     private final Counter runs;
     private final String sealKey;
+    private final java.time.Clock clock;
+    /** Audit seals are operator-plane, not clinic-dated: months are UTC by design. */
+    private static final java.time.ZoneId AUDIT_ZONE = java.time.ZoneId.of("UTC");
 
     AuditChainSealer(JdbcTemplate jdbc, TenantScope tenantScope, MeterRegistry meters,
-                     @Value("${app.audit.seal-key:}") String sealKey) {
+                     @Value("${app.audit.seal-key:}") String sealKey, java.time.Clock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
         this.tenantScope = tenantScope;
         this.failures = Counter.builder("audit.chain.verify.failures").description("tenants whose chain failed verification").register(meters);
@@ -52,7 +56,7 @@ public class AuditChainSealer {
     @Scheduled(cron = "${app.audit.seal-cron:0 0 3 1 * *}", zone = "${app.audit.verify-zone:Asia/Kolkata}")
     @SchedulerLock(name = "audit-chain-seal", lockAtMostFor = "PT2H")
     public void scheduledSeal() {
-        sealMonth(jdbc.queryForObject("SELECT (date_trunc('month', now() AT TIME ZONE 'UTC') - interval '1 month')::date", LocalDate.class));
+        sealMonth(LocalDate.now(clock.withZone(AUDIT_ZONE)).withDayOfMonth(1).minusMonths(1));
     }
 
     /** @return number of tenants whose chain is broken. */
@@ -81,8 +85,9 @@ public class AuditChainSealer {
             written += tenantScope.run(tenantId, () -> {
                 List<Object[]> head = jdbc.query("""
                         SELECT id, row_hash FROM audit_log WHERE tenant_id = ?
-                          AND created_at < ((?::date + interval '1 month') AT TIME ZONE 'UTC')
-                        ORDER BY id DESC LIMIT 1""", (rs, i) -> new Object[]{rs.getLong(1), rs.getString(2)}, tenantId, first);
+                          AND created_at < ?
+                        ORDER BY id DESC LIMIT 1""", (rs, i) -> new Object[]{rs.getLong(1), rs.getString(2)}, tenantId,
+                        java.sql.Timestamp.from(first.plusMonths(1).atStartOfDay(AUDIT_ZONE).toInstant()));
                 if (head.isEmpty()) {
                     return 0;
                 }
