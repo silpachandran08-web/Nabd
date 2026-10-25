@@ -22,7 +22,9 @@ class PublicEndpointsSecurityConfig {
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
-    SecurityFilterChain publicEndpointsChain(HttpSecurity http, RateLimitFilter rateLimit) throws Exception {
+    SecurityFilterChain publicEndpointsChain(HttpSecurity http, RateLimitFilter rateLimit,
+            org.springframework.security.oauth2.jwt.JwtDecoder staffDecoder,
+            org.springframework.core.convert.converter.Converter<org.springframework.security.oauth2.jwt.Jwt, org.springframework.security.authentication.AbstractAuthenticationToken> converter) throws Exception {
         http.securityMatcher("/v1/public/notices/**", "/abdm/v3/callbacks/**")
                 .addFilterAfter(rateLimit, AnonymousAuthenticationFilter.class)
                 .csrf(c -> c.disable()) // no cookies: the callbacks carry a gateway signature, the page is a GET
@@ -34,6 +36,11 @@ class PublicEndpointsSecurityConfig {
                                 .requestMatcher(org.springframework.security.web.util.matcher.AnyRequestMatcher.INSTANCE))
                         .contentSecurityPolicy(c -> c.policyDirectives("default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'")))
                 .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+        // same as every other mapping: a bearer that is present but not a staff access token is a 401 (the page ignores it otherwise);
+        // the ABDM callbacks carry the gateway's own bearer, which AbdmCallbackController verifies, so the staff decoder must not see it
+        SecurityConfig.resourceServer(http, staffDecoder, converter);
+        http.oauth2ResourceServer(o -> o.bearerTokenResolver(req -> req.getRequestURI().startsWith("/abdm/")
+                ? null : new org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver().resolve(req)));
         return http.build();
     }
 }

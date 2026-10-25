@@ -288,7 +288,8 @@ export type QueueEntryResponse = { ageYears?: number; appointmentId?: string; ap
 export type QueueReorderRequest = { priority: boolean; reason: string; };
 export type QueueStatusUpdateRequest = { expectedStatus?: string; status: string; };
 export type QuoteRequest = { buyerGstin?: string; discounts?: Array<DiscountRequest>; lines: Array<LineItemRequest>; };
-export type QuoteResponse = { currency?: string; documentType?: string; lines?: Array<Line>; totals?: Totals; };
+export type QuoteResponse = { currency?: string; documentType?: string; lines?: Array<Line>; totals?: QuoteTotals; };
+export type QuoteTotals = { discountMinor?: number; roundOffMinor?: number; subtotalMinor?: number; taxMinor?: number; totalMinor?: number; };
 export type RaiseTicketRequest = { description: string; priority?: string; subject: string; };
 export type RangeTotals = { asOf?: string; billed?: number; byMethod?: Record<string, number>; collected?: number; completed?: number; from?: string; noShows?: number; packagesSold?: number; to?: string; visits?: number; };
 export type RecentMerges = { items?: Array<Item>; };
@@ -378,7 +379,7 @@ export type TokenPairResponse = { accessToken?: string; expiresIn?: number; refr
 export type ToothHistoryEntryResponse = { action?: string; actorName?: string; actorRole?: string; after?: string; before?: string; occurredAt?: string; };
 export type ToothResponse = { id?: string; isSupernumerary?: boolean; note?: string; patientId?: string; status?: string; toothNumber?: number; updatedAt?: string; updatedBy?: string; };
 export type ToothWriteRequest = { note?: string; status?: string; };
-export type Totals = { discountMinor?: number; roundOffMinor?: number; subtotalMinor?: number; taxMinor?: number; totalMinor?: number; };
+export type Totals = { billed?: number; bills?: number; collected?: number; payments?: number; tax?: number; };
 export type TransferEdge = { fromDepartmentId: string; toDepartmentId: string; };
 export type TransferGraphRequest = { edges: Array<TransferEdge>; };
 export type TransferRequest = { doctorId: string; reason?: string; reasonNote?: string; toDepartmentId: string; };
@@ -415,7 +416,7 @@ export type Operations = {
   JwksController_jwks: { method: "get"; path: "/.well-known/jwks.json"; permission: "public"; pathParams: never; query: { population?: string; }; body: never; response: Record<string, Record<string, unknown>> };
   JwksController_jwksFor: { method: "get"; path: "/.well-known/jwks/{population}.json"; permission: "public"; pathParams: { population: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
   AbdmCallbackController_callback: { method: "post"; path: "/abdm/v3/callbacks/**"; permission: "public"; pathParams: never; query: never; body: never; response: void };
-  ConsentExportController_export: { method: "get"; path: "/internal/v1/consents:export"; permission: "authenticated"; pathParams: never; query: { tenantId: string; since?: string; cursor?: string; }; body: never; response: Page };
+  ConsentExportController_export: { method: "get"; path: "/internal/v1/consents:export"; permission: "public"; pathParams: never; query: { tenantId: string; since?: string; cursor?: string; }; body: never; response: Page };
   DrugMasterImportController_start: { method: "post"; path: "/internal/v1/drug-master/imports"; permission: "kb_import:edit"; pathParams: never; query: never; body: DrugMasterImportRequest; response: Record<string, Record<string, unknown>> };
   DrugMasterImportController_status: { method: "get"; path: "/internal/v1/drug-master/imports/{importId}"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
   DrugMasterImportController_activate: { method: "post"; path: "/internal/v1/drug-master/imports/{importId}/activate"; permission: "kb_import:edit"; pathParams: { importId: string; }; query: never; body: DrugMasterActivateRequest; response: Record<string, Record<string, unknown>> };
@@ -626,7 +627,7 @@ export type Operations = {
   PharmacyController_settings: { method: "get"; path: "/v1/pharmacy/settings"; permission: "pharmacy:view"; pathParams: never; query: never; body: never; response: PharmacySettingsResponse };
   PharmacyController_updateSettings: { method: "patch"; path: "/v1/pharmacy/settings"; permission: "pharmacy:edit"; pathParams: never; query: never; body: PharmacySettingsWriteRequest; response: PharmacySettingsResponse };
   PhiReadAlertController_phiReadAlerts: { method: "get"; path: "/v1/phi-read/alerts"; permission: "authenticated"; pathParams: never; query: never; body: never; response: AlertsResponse };
-  PlanCatalogueController_catalogue: { method: "get"; path: "/v1/plans/catalogue"; permission: "authenticated"; pathParams: never; query: { market?: string; }; body: never; response: Array<PlanCatalogueEntry> };
+  PlanCatalogueController_catalogue: { method: "get"; path: "/v1/plans/catalogue"; permission: "public"; pathParams: never; query: { market?: string; }; body: never; response: Array<PlanCatalogueEntry> };
   AuditSearchController_search: { method: "get"; path: "/v1/platform/audit-log"; permission: "audit_compliance:view"; pathParams: never; query: { tenantId?: string; action?: string; entityType?: string; createdAfter?: string; createdBefore?: string; actorId?: string; actorType?: string; actorRole?: string; actorName?: string; limit?: number; cursor?: string; includeValues?: boolean; reason?: string; }; body: never; response: AuditLogPage };
   AuditSearchController_export: { method: "get"; path: "/v1/platform/audit-log/export"; permission: "audit_compliance:view"; pathParams: never; query: { tenantId?: string; action?: string; entityType?: string; createdAfter?: string; createdBefore?: string; actorId?: string; actorType?: string; actorRole?: string; actorName?: string; includeValues?: boolean; reason?: string; }; body: never; response: string };
   PlatformAuthController_login: { method: "post"; path: "/v1/platform/auth/login"; permission: "public"; pathParams: never; query: never; body: OperatorLoginRequest; response: Record<string, unknown> };

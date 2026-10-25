@@ -53,6 +53,8 @@ class Adm034PlanCatalogueApiTest extends ApiTestBase {
             assertThat(((Map<?, ?>) e.get("limits")).get("branches")).isEqualTo(3);
         });
         // another market does not see it
+        // no market filter, anonymous: all active plans (was a 500, untyped null parameter)
+        assertThat(exchange("/v1/plans/catalogue", HttpMethod.GET, HttpEntity.EMPTY, List.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(exchange("/v1/plans/catalogue?market=ZZ-" + code, HttpMethod.GET, HttpEntity.EMPTY, List.class).getBody()).isEmpty();
     }
 

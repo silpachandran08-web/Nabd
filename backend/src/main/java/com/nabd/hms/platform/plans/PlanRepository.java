@@ -74,7 +74,7 @@ class PlanRepository {
 
     /** Active plans, or those of one market when given. */
     List<Plan> catalogue(String market) {
-        return jdbc.query("SELECT * FROM master.plans WHERE active AND (? IS NULL OR market = ?) ORDER BY monthly_price_cents",
+        return jdbc.query("SELECT * FROM master.plans WHERE active AND (?::text IS NULL OR market = ?) ORDER BY monthly_price_cents",
                 mapper(), market, market);
     }
 
