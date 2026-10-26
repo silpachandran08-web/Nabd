@@ -1496,6 +1496,26 @@ schemas:
       occurred_at: operational
       actor_id: operational
       source: operational
+      capped: operational
+    service_time_stats:
+      tenant_id: operational
+      doctor_id: operational
+      visit_type: operational
+      hour_bucket: operational
+      n: operational
+      mu_log: operational
+      sigma_log: operational
+      ewma_mu: operational
+      ewma_var: operational
+      median_s: operational
+      p80_s: operational
+      prior_source: operational
+      updated_at: operational
+    specialty_service_defaults:
+      specialty_code: operational
+      visit_type: operational
+      median_s: operational
+      p80_s: operational
     eta_prediction_log:
       id: operational
       tenant_id: operational

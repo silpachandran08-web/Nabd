@@ -13,8 +13,11 @@ class QueueEventRepository {
 
     private final JdbcTemplate jdbc;
 
-    QueueEventRepository(JdbcTemplate jdbc) {
+    private final ServiceTimeService serviceTimes;
+
+    QueueEventRepository(JdbcTemplate jdbc, ServiceTimeService serviceTimes) {
         this.jdbc = jdbc;
+        this.serviceTimes = serviceTimes;
     }
 
     /** Encounter, doctor and clinic date are read from the entry row itself (they never change on a transition). */
@@ -25,6 +28,9 @@ class QueueEventRepository {
                         "SELECT tenant_id, id, encounter_id, doctor_id, queue_date, ?, ?, ?, ?, ?, ?, ? " +
                         "FROM queue_entries WHERE tenant_id = ? AND id = ?",
                 fromStatus, toStatus, kind, minutes, Timestamp.from(at), actorId, source, tenantId, entryId);
+        if ("in_consult".equals(fromStatus) && "transition".equals(kind)) {
+            serviceTimes.onConsultEnd(entryId, at); // ACC-016: the consult just ended; learned in the same transaction
+        }
         if ("in_consult".equals(toStatus) && "transition".equals(kind)) { // ACC-019: first call time of the visit closes its predictions
             jdbc.update("UPDATE eta_prediction_log SET actual_called_at = ? WHERE tenant_id = ? AND actual_called_at IS NULL AND " +
                             "(queue_entry_id = ? OR appointment_id = (SELECT appointment_id FROM queue_entries WHERE tenant_id = ? AND id = ?))",
