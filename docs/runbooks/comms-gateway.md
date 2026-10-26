@@ -32,3 +32,8 @@ The webhook signature verification itself is built by the webhook story; until i
 
 ## Database roles
 `comms_migrator` runs Flyway (`services/comms-gateway/src/main/resources/db/migration`) in the migrate job only; `comms_app` serves, DML only, `statement_timeout 5s`, no connect to the Core database. CI proves it (`CommsGrantTest`). Passwords come from the secret store.
+
+## Scheduled sends and the inbox (COM-023, COM-030)
+- Scheduler: needs `comms.core.base-url` (claim check). One leader per region (ShedLock `comms-send-scheduler`), 15 s tick. A due send past `notAfter` becomes `expired`, a claim-check 410 or 404 becomes `cancelled`; both publish `comms.message.status_changed.v1`. If Core is down the sends stay `scheduled`, are retried, and expire once their window passes. Alert `CommsReminderWindowMissBurn` (expired share above 1%) means Core or Valkey was unavailable for a while or the tick stopped: check `comms_scheduled_total{outcome}` and the lock row `shedlock.name = 'comms-send-scheduler'`.
+- The Valkey due index is rebuilt from the database at start and every 20 ticks; losing Valkey costs nothing (the tick falls back to the partial index on `outbound_messages`).
+- Inbox: only active when `comms.field-key` (base64, 32 bytes, from the secret store) is set; `/internal/v1/inbox/**` additionally needs `comms.internal-token`. Message text and phone numbers are encrypted at rest; rotating the field key needs a re-encryption job (not built).
