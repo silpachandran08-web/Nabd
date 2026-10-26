@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import styles from "./ui.module.css";
 
 // Open dialogs, innermost last. Only the top one answers Escape and Tab, so a confirm opened from a
@@ -22,6 +23,7 @@ export default function Dialog({
   size?: "md" | "lg" | "drawer";
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const tc = useTranslations("common");
   const titleId = useId();
   // Callers pass inline arrows, so onClose changes identity on every parent render. Read it through a
   // ref so the effect below runs once per open: re-running it on each keystroke or autosave tick
@@ -84,7 +86,7 @@ export default function Dialog({
       >
         <div className={styles.dialogHead}>
           <h2 id={titleId} className={styles.dialogTitle}>{title}</h2>
-          <button type="button" className={styles.dialogClose} onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className={styles.dialogClose} onClick={onClose} aria-label={tc("close")}>×</button>
         </div>
         <div className={styles.dialogBody}>{children}</div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import styles from "../login/login.module.css";
 import { publicApi, ApiError, reasonText } from "../lib/api";
 
@@ -15,6 +16,7 @@ export default function MfaEnrolCard({ enrollPath, confirmPath, setupToken, subt
   subtitle: string;
   onDone: (body: unknown) => void;
 }) {
+  const t = useTranslations("login");
   const [secret, setSecret] = useState<{ secretBase32: string; otpauthUri: string } | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,9 +27,9 @@ export default function MfaEnrolCard({ enrollPath, confirmPath, setupToken, subt
     let live = true;
     publicApi.post<{ secretBase32: string; otpauthUri: string }>(enrollPath, { setupToken }, { keepSession: true })
       .then((body) => { if (live) setSecret(body); })
-      .catch((e) => { if (live) setError(e instanceof ApiError ? e.detail || "Couldn't start authenticator setup. Sign in again." : reasonText(e, "")); });
+      .catch((e) => { if (live) setError(e instanceof ApiError ? e.detail || t("enrol.fail") : reasonText(e, "")); });
     return () => { live = false; };
-  }, [enrollPath, setupToken, attempt]);
+  }, [enrollPath, setupToken, attempt, t]);
 
   async function confirm(e: FormEvent) {
     e.preventDefault();
@@ -38,9 +40,9 @@ export default function MfaEnrolCard({ enrollPath, confirmPath, setupToken, subt
     } catch (err) {
       if (!(err instanceof ApiError)) { setError(reasonText(err, "")); return; }
       setCode("");
-      setError(err.status === 423 ? "Too many failed attempts. Try again later."
-        : err.status === 401 ? "That code didn't match. Check your authenticator app and try again."
-        : err.detail || "Couldn't confirm the code.");
+      setError(err.status === 423 ? t("enrol.locked")
+        : err.status === 401 ? t("enrol.mismatch")
+        : err.detail || t("enrol.confirmFail"));
     } finally {
       setLoading(false);
     }
@@ -48,25 +50,25 @@ export default function MfaEnrolCard({ enrollPath, confirmPath, setupToken, subt
 
   return (
     <>
-      <h1 className={styles.title}>Set up two-factor authentication</h1>
+      <h1 className={styles.title}>{t("mfa.setupTitle")}</h1>
       <p className={styles.subtitle}>{subtitle}</p>
       {error && <div className={styles.formError} role="alert">{error}</div>}
-      {!secret && !error && <p className={styles.hint} role="status">Preparing your authenticator secret…</p>}
+      {!secret && !error && <p className={styles.hint} role="status">{t("enrol.preparing")}</p>}
       {!secret && error && (
-        <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => { setError(null); setAttempt((n) => n + 1); }}>Retry</button>
+        <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => { setError(null); setAttempt((n) => n + 1); }}>{t("signIn.retry")}</button>
       )}
       {secret && (
         <form onSubmit={confirm} noValidate>
-          <p className={styles.subtitle}>Add this secret to your authenticator app, then enter the 6-digit code it shows.</p>
+          <p className={styles.subtitle}>{t("mfa.setupSecret")}</p>
           <div className={styles.secretBox} data-testid="mfa-secret">{secret.secretBase32}</div>
-          <a className={styles.hint} href={secret.otpauthUri}>Open in authenticator app</a>
+          <a className={styles.hint} href={secret.otpauthUri}>{t("mfa.openApp")}</a>
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="setupCode">Authentication code</label>
+            <label className={styles.label} htmlFor="setupCode">{t("mfa.code")}</label>
             <input id="setupCode" className={styles.input} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoFocus
               autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} required />
           </div>
           <button className={styles.submit} type="submit" disabled={loading || code.length !== 6}>
-            {loading ? "Confirming…" : "Confirm & enable"}
+            {loading ? t("mfa.confirming") : t("mfa.confirm")}
           </button>
         </form>
       )}

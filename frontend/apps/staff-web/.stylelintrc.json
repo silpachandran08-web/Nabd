@@ -1,8 +1,54 @@
 {
+  "plugins": [
+    "stylelint-use-logical-spec"
+  ],
   "rules": {
+    "liberty/use-logical-spec": [
+      "always",
+      {
+        "except": [
+          "top",
+          "bottom",
+          "width",
+          "height",
+          "min-width",
+          "max-width",
+          "min-height",
+          "max-height",
+          "overflow-x",
+          "overflow-y",
+          "padding",
+          "margin",
+          "border-radius",
+          "border-width",
+          "border-style",
+          "border-color",
+          "inset",
+          "margin-top",
+          "margin-bottom",
+          "padding-top",
+          "padding-bottom",
+          "border-top",
+          "border-bottom",
+          "border-top-width",
+          "border-bottom-width",
+          "border-top-color",
+          "border-bottom-color",
+          "border-top-style",
+          "border-bottom-style"
+        ]
+      }
+    ],
     "declaration-property-value-disallowed-list": [
-      { "/^outline(-style)?$/": ["none", "0"] },
-      { "message": "FEF-027: do not remove the focus outline; the global :focus-visible ring (--nb-focus-ring) must stay visible." }
+      {
+        "/^outline(-style)?$/": [
+          "none",
+          "0"
+        ]
+      },
+      {
+        "message": "FEF-027: do not remove the focus outline; the global :focus-visible ring (--nb-focus-ring) must stay visible."
+      }
     ]
   }
 }

@@ -17,6 +17,7 @@ import { ApiError } from "../lib/api";
 import { getter, key, prefix } from "../lib/query";
 import { useHasMounted } from "../lib/useHasMounted";
 import type { Full } from "../lib/gen";
+import DeskShortcuts from "../components/arrivals/shortcuts/DeskShortcuts";
 import type { Booking as GBooking, Cell as GCell, Counts as GCounts, Day as GWeekDay, Doctor as GDoctor, ScheduleDayResponse, ScheduleWeekResponse, Session as GSession, SessionCount as GSessionCount } from "@nabd/api-client/generated";
 
 // GET /v1/schedule/day and /week (ScheduleBoardController): the generated types, with the fields the server always sends marked present.
@@ -144,6 +145,7 @@ export default function SchedulePage() {
 
   return (
     <main className={styles.page}>
+      <DeskShortcuts />
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Schedule &amp; Appointments</h1>

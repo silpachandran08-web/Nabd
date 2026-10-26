@@ -355,7 +355,7 @@
 }
 
 .matrixTable th:first-child {
-  text-align: left;
+  text-align: start;
 }
 
 .matrixTable td {
@@ -365,7 +365,7 @@
 }
 
 .matrixTable td:first-child {
-  text-align: left;
+  text-align: start;
   color: var(--nb-text-primary);
   white-space: nowrap;
 }

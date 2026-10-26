@@ -1,12 +1,13 @@
 "use client";
 
 import { memo } from "react";
-import { VISIT_LABEL } from "@nabd/domain";
+import { useTranslations } from "next-intl";
 import styles from "../arrivals.module.css";
 import StatusPill from "../../ui/StatusPill";
 import { useRenderProbe } from "../renderProbe";
 import type { Grants, Row } from "../types";
-import { bucketOf, VISIT_TYPE_LABEL } from "./boardLogic";
+import { bucketOf } from "./boardLogic";
+import { visitLabel } from "./visitLabel";
 import RowActions, { type RowHandlers } from "./RowActions";
 import StatusBadge from "./StatusBadge";
 import WaitCell from "./WaitCell";
@@ -24,22 +25,23 @@ const same = (p: Props, n: Props) =>
 
 function ArrivalRowImpl({ row: r, doctorName, grants, sendingId, h, onOpen }: Props) {
   useRenderProbe("arrivals-row");
+  const t = useTranslations("arrivals");
   const b = bucketOf(r.status);
   return (
-    <tr className={styles.row} tabIndex={0} aria-label={`Open details for ${r.patientName}, token ${r.tokenNumber}`}
+    <tr className={styles.row} tabIndex={0} aria-label={t("board.rowLabel", { name: r.patientName, token: r.tokenNumber })}
       onClick={() => onOpen(r.id)}
       onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen(r.id); } }}>
-      <td className={styles.token} data-label="Token">
+      <td className={styles.token} data-label={t("board.token")}>
         #{r.tokenNumber}
-        {r.priority && <span className={styles.priorityTag}><StatusPill tone="urgent" label="Priority" /></span>}
+        {r.priority && <span className={styles.priorityTag}><StatusPill tone="urgent" label={t("board.priority")} /></span>}
       </td>
-      <td data-label="Patient"><span className={styles.patientName}>{r.patientName}</span>
+      <td data-label={t("board.patient")}><span className={styles.patientName}>{r.patientName}</span>
         <span className={styles.mrn}>{[r.patientMrn, [r.ageYears, (r.gender ?? "").trim().charAt(0).toUpperCase()].filter((x) => x != null && x !== "").join(" ")].filter(Boolean).join(" · ")}</span>
         {r.presentingComplaint && <span className={styles.complaint} title={r.presentingComplaint}>{r.presentingComplaint}</span>}</td>
-      <td className={`${styles.muted} ${styles.colVisit}`} data-label="Visit">{(r.visitType && VISIT_TYPE_LABEL[r.visitType]) || (VISIT_LABEL[r.source] ?? r.source)}</td>
-      <td className={styles.colDoctor} data-label="Doctor">{doctorName}</td>
-      <td className={styles.muted} data-label="Wait">{b === "waiting" || b === "in_consult" ? <WaitCell createdAt={r.createdAt} /> : "—"}</td>
-      <td data-label="Status"><StatusBadge status={r.status} /></td>
+      <td className={`${styles.muted} ${styles.colVisit}`} data-label={t("board.visit")}>{visitLabel(t, r)}</td>
+      <td className={styles.colDoctor} data-label={t("board.doctor")}>{doctorName}</td>
+      <td className={styles.muted} data-label={t("board.wait")}>{b === "waiting" || b === "in_consult" ? <WaitCell createdAt={r.createdAt} /> : "—"}</td>
+      <td data-label={t("board.status")}><StatusBadge status={r.status} /></td>
       <td onClick={(e) => e.stopPropagation()}>
         <div className={styles.rowActions}><RowActions row={r} grants={grants} sendingId={sendingId} h={h} /></div>
       </td>

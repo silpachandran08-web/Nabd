@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import styles from "../arrivals.module.css";
 import Dialog from "../../ui/Dialog";
 import { api } from "../../../lib/api";
@@ -13,6 +14,7 @@ const PRIORITY_REASON_CODES = [
 ] as const;
 
 export default function PriorityDialog({ entryId, onClose, onSaved }: { entryId: string; onClose: () => void; onSaved: () => void }) {
+  const t = useTranslations("arrivals");
   const [code, setCode] = useState<string>(PRIORITY_REASON_CODES[0]);
   const [other, setOther] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -27,31 +29,31 @@ export default function PriorityDialog({ entryId, onClose, onSaved }: { entryId:
       await api.post(`/queue/${entryId}/reorder`, { priority: true, reason });
       onSaved();
     } catch (err) {
-      setError(failText(err, "Couldn't mark this patient as priority."));
+      setError(failText(err, t("priority.fail"), t("page.denied")));
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <Dialog title="Mark priority" onClose={onClose}>
+    <Dialog title={t("priority.title")} onClose={onClose}>
       <form onSubmit={submit}>
         <div className={styles.field}>
-          <label className={styles.label} htmlFor="priorityReason">Reason</label>
+          <label className={styles.label} htmlFor="priorityReason">{t("priority.reason")}</label>
           <select id="priorityReason" className={styles.select} value={code} onChange={(e) => setCode(e.target.value)}>
-            {PRIORITY_REASON_CODES.map((r) => <option key={r} value={r}>{r}</option>)}
+            {PRIORITY_REASON_CODES.map((r, i) => <option key={r} value={r}>{t(`priority.c${i}`)}</option>)}
           </select>
         </div>
         {code === "Other" && (
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="priorityOther">Specify</label>
+            <label className={styles.label} htmlFor="priorityOther">{t("priority.specify")}</label>
             <input id="priorityOther" className={styles.input} minLength={3} value={other} onChange={(e) => setOther(e.target.value)} />
           </div>
         )}
         {error && <div className={styles.formError} role="alert">{error}</div>}
         <div className={styles.modalActions}>
-          <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancel</button>
-          <button type="submit" className={styles.submitBtn} disabled={submitting || (code === "Other" && other.trim().length < 3)}>{submitting ? "Saving…" : "Mark priority"}</button>
+          <button type="button" className={styles.cancelBtn} onClick={onClose}>{t("dialog.cancel")}</button>
+          <button type="submit" className={styles.submitBtn} disabled={submitting || (code === "Other" && other.trim().length < 3)}>{submitting ? t("priority.saving") : t("priority.title")}</button>
         </div>
       </form>
     </Dialog>

@@ -49,6 +49,9 @@ const PATHS = {
 
 export type IconName = keyof typeof PATHS;
 
+// FEF-038 flip list: icons that point in a reading direction mirror under dir=rtl (globals.css [data-flip]).
+const FLIP_RTL: readonly IconName[] = ["chevron", "login"];
+
 export default function Icon({ name, size = 18, label, style }: { name: IconName; size?: number; label?: string; style?: CSSProperties }) {
   return (
     <svg
@@ -60,6 +63,7 @@ export default function Icon({ name, size = 18, label, style }: { name: IconName
       strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
+      data-flip={FLIP_RTL.includes(name) ? "" : undefined}
       aria-hidden={label ? undefined : true}
       role={label ? "img" : undefined}
       aria-label={label}

@@ -33,6 +33,7 @@ import type {
 } from "@nabd/api-client/generated";
 import { api, ApiError } from "../lib/api";
 import type { Full } from "../lib/gen";
+import DeskShortcuts from "../components/arrivals/shortcuts/DeskShortcuts";
 
 type PatientDetail = PatientSummary & Full<Pick<PatientDetailResponse, "isMinor" | "guardianId" | "guardianName" | "guardianConsentGrantedAt" | "lastVisit">,
   "guardianId" | "guardianName" | "guardianConsentGrantedAt" | "lastVisit">;
@@ -602,6 +603,7 @@ function PatientsList() {
 
   return (
     <main className={styles.page}>
+      <DeskShortcuts />
       <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Patient Registry</h1>

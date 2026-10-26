@@ -3,12 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import styles from "./login.module.css";
 import { decodeAccessToken, landingPathFor } from "../lib/session";
-import { NEW_PIN_PATTERN, lockedMessage, needsPinChange } from "../lib/pinPolicy";
+import { NEW_PIN_PATTERN, lockedMinutes, needsPinChange } from "../lib/pinPolicy";
 import { useHasMounted } from "../lib/useHasMounted";
 import { safeReturnTo, storeTokens, takeReturnTo, signOutReason } from "../lib/apiClient";
-import { LOGIN_SLOW_MESSAGE, LOGIN_TIMEOUT_MESSAGE, LoginTimeoutError, loginFetch } from "../lib/loginFetch";
+import { LoginTimeoutError, loginFetch } from "../lib/loginFetch";
 import type { Problem } from "@nabd/api-client/types";
 
 // Matches POST /v1/auth/login's oneOf response (api/openapi.yaml) and RFC 7807 Problem errors.
@@ -25,6 +26,7 @@ type View = "login" | "mfaVerify" | "mfaSetup" | "mfaSetupDone" | "forgotRequest
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("login");
   const [view, setView] = useState<View>("login");
   const [tenantSlug, setTenantSlug] = useState("");
   const [email, setEmail] = useState("");
@@ -65,7 +67,7 @@ export default function LoginPage() {
   async function submitPinChange(e: FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (!NEW_PIN_PATTERN.test(newPin)) { setFormError("Choose a PIN of 6 to 8 digits."); return; }
+    if (!NEW_PIN_PATTERN.test(newPin)) { setFormError(t("errors.pinRange")); return; }
     setLoading(true);
     try {
       const res = await loginFetch(`${API_BASE}/auth/pin/change`, {
@@ -80,11 +82,11 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken: localStorage.getItem("nabd_refresh_token") }),
       }, () => setSlow(true));
-      if (!r.ok) { setFormError("PIN changed. Sign in again with the new PIN."); setView("login"); setPin(""); return; }
+      if (!r.ok) { setFormError(t("errors.pinChangedSignIn")); setView("login"); setPin(""); return; }
       handleTokens((await r.json()) as TokenPair);
     } catch (err) {
-      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
-      else setFormError("Couldn't reach the server. Check your connection and try again.");
+      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(t("signIn.timeout")); }
+      else setFormError(t("errors.network"));
     } finally {
       setSlow(false);
       setLoading(false);
@@ -119,8 +121,8 @@ export default function LoginPage() {
       }
       applyProblem(res.status, body as LoginProblem);
     } catch (err) {
-      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(LOGIN_TIMEOUT_MESSAGE); }
-      else setFormError("Couldn't reach the server. Check your connection and try again.");
+      if (err instanceof LoginTimeoutError) { setTimedOut(true); setFormError(t("signIn.timeout")); }
+      else setFormError(t("errors.network"));
     } finally {
       setSlow(false);
       setLoading(false);
@@ -144,12 +146,12 @@ export default function LoginPage() {
       if (!res.ok) {
         // PLT-006: unknown clinic/mobile and per-number limits are a silent 202; only a malformed phone (400) or the IP limit (429) lands here.
         const p = await res.json().catch(() => null);
-        setFormError(p?.detail || "Couldn't send the code. Try again.");
+        setFormError(p?.detail || t("errors.otpSend"));
         return;
       }
       setView("otpVerify");
     } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      setFormError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -179,9 +181,9 @@ export default function LoginPage() {
         }
         return;
       }
-      setFormError((body as LoginProblem).detail || "That code is incorrect or has expired.");
+      setFormError((body as LoginProblem).detail || t("errors.codeWrong"));
     } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      setFormError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -207,7 +209,7 @@ export default function LoginPage() {
       }
       applyProblem(res.status, body as LoginProblem);
     } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      setFormError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -225,13 +227,13 @@ export default function LoginPage() {
       });
       const body = await res.json();
       if (!res.ok) {
-        setFormError((body as LoginProblem).detail || "Couldn't start MFA setup.");
+        setFormError((body as LoginProblem).detail || t("errors.mfaStart"));
         return;
       }
       setSecretBase32(body.secretBase32);
       setOtpauthUri(body.otpauthUri);
     } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      setFormError(t("errors.network"));
     }
   }
 
@@ -254,7 +256,7 @@ export default function LoginPage() {
       setRecoveryCodes(body.recoveryCodes);
       setView("mfaSetupDone");
     } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      setFormError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -273,7 +275,7 @@ export default function LoginPage() {
       // always proceeds the same way, known account or not — no enumeration
       setView("forgotConfirm");
     } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      setFormError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -290,13 +292,13 @@ export default function LoginPage() {
         body: JSON.stringify({ tenantSlug, mobilePhone, token: resetToken, newPin }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ title: "", detail: "That code is incorrect or has expired." }));
-        setFormError((body as LoginProblem).detail || "That code is incorrect or has expired.");
+        const body = await res.json().catch(() => ({ title: "", detail: "" }));
+        setFormError((body as LoginProblem).detail || t("errors.codeWrong"));
         return;
       }
       setView("forgotDone");
     } catch {
-      setFormError("Couldn't reach the server. Check your connection and try again.");
+      setFormError(t("errors.network"));
     } finally {
       setLoading(false);
     }
@@ -308,16 +310,17 @@ export default function LoginPage() {
       return;
     }
     if (status === 423) {
-      setFormError(lockedMessage(problem.retryAfterSeconds));
+      const min = lockedMinutes(problem.retryAfterSeconds);
+      setFormError(min ? t("errors.locked", { min }) : t("errors.lockedLater"));
       return;
     }
     if (status === 429) {
-      setFormError("Too many attempts. Try again shortly.");
+      setFormError(t("errors.tooMany"));
       return;
     }
     // 401 deliberately stays this generic — the backend gives the same shape for
     // unknown email and wrong PIN alike, so the UI must not narrow it further.
-    setFormError(problem.detail || "Invalid credentials.");
+    setFormError(problem.detail || t("errors.invalid"));
   }
 
   function backToLogin() {
@@ -333,16 +336,16 @@ export default function LoginPage() {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <h1 className={styles.title}>Choose a new PIN</h1>
-          <p className={styles.subtitle}>PINs are now 6 to 8 digits. Set yours to continue.</p>
+          <h1 className={styles.title}>{t("pinChange.title")}</h1>
+          <p className={styles.subtitle}>{t("pinChange.subtitle")}</p>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           <form onSubmit={submitPinChange} noValidate>
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="cNewPin">New PIN</label>
+              <label className={styles.label} htmlFor="cNewPin">{t("pinChange.newPin")}</label>
               <input id="cNewPin" type="password" inputMode="numeric" pattern="[0-9]{6,8}" maxLength={8} className={styles.input}
                 value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} autoFocus required />
             </div>
-            <button className={styles.submit} type="submit" disabled={loading}>{loading ? "Saving…" : "Save PIN"}</button>
+            <button className={styles.submit} type="submit" disabled={loading}>{loading ? t("pinChange.saving") : t("pinChange.save")}</button>
           </form>
         </div>
       </main>
@@ -353,16 +356,16 @@ export default function LoginPage() {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <h1 className={styles.title}>Set up two-factor authentication</h1>
-          <p className={styles.subtitle}>Your role requires this before you can sign in.</p>
+          <h1 className={styles.title}>{t("mfa.setupTitle")}</h1>
+          <p className={styles.subtitle}>{t("mfa.setupRole")}</p>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {view === "mfaSetup" && (
             <form onSubmit={submitMfaSetupConfirm} noValidate>
-              <p className={styles.subtitle}>Add this secret to your authenticator app, then enter the 6-digit code it shows.</p>
+              <p className={styles.subtitle}>{t("mfa.setupSecret")}</p>
               <div className={styles.secretBox}>{secretBase32}</div>
-              <a className={styles.hint} href={otpauthUri}>Open in authenticator app</a>
+              <a className={styles.hint} href={otpauthUri}>{t("mfa.openApp")}</a>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="setupCode">Authentication code</label>
+                <label className={styles.label} htmlFor="setupCode">{t("mfa.code")}</label>
                 <input
                   id="setupCode"
                   className={styles.input}
@@ -376,17 +379,17 @@ export default function LoginPage() {
                 />
               </div>
               <button className={styles.submit} type="submit" disabled={loading || code.length !== 6}>
-                {loading ? "Confirming…" : "Confirm & enable"}
+                {loading ? t("mfa.confirming") : t("mfa.confirm")}
               </button>
             </form>
           )}
           {view === "mfaSetupDone" && (
             <>
-              <p className={styles.subtitle}>Save these one-time recovery codes somewhere safe — each works once if you lose your authenticator.</p>
+              <p className={styles.subtitle}>{t("mfa.recoverySave")}</p>
               <div className={styles.recoveryCodes}>
                 {recoveryCodes.map((c) => <span key={c}>{c}</span>)}
               </div>
-              <button className={styles.submit} type="button" onClick={backToLogin}>Sign in now</button>
+              <button className={styles.submit} type="button" onClick={backToLogin}>{t("mfa.signInNow")}</button>
             </>
           )}
         </div>
@@ -398,12 +401,12 @@ export default function LoginPage() {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <h1 className={styles.title}>Enter your code</h1>
-          <p className={styles.subtitle}>{useRecovery ? "One of your saved recovery codes. Each works once." : "6-digit code from your authenticator app."}</p>
+          <h1 className={styles.title}>{t("mfa.verifyTitle")}</h1>
+          <p className={styles.subtitle}>{useRecovery ? t("mfa.verifyRecoveryHint") : t("mfa.verifyHint")}</p>
           <form onSubmit={submitMfa} noValidate>
             {formError && <div className={styles.formError} role="alert">{formError}</div>}
             <div className={styles.field}>
-              <label className={styles.label} htmlFor="code">{useRecovery ? "Recovery code" : "Authentication code"}</label>
+              <label className={styles.label} htmlFor="code">{useRecovery ? t("mfa.recoveryCode") : t("mfa.code")}</label>
               <input
                 id="code"
                 className={styles.input}
@@ -418,11 +421,11 @@ export default function LoginPage() {
               />
             </div>
             <button className={styles.submit} type="submit" disabled={loading || (useRecovery ? code.trim().length < 6 : code.length !== 6)}>
-              {loading ? "Verifying…" : "Verify"}
+              {loading ? t("mfa.verifying") : t("mfa.verify")}
             </button>
             <button type="button" className={styles.submit} style={{ background: "transparent", color: "inherit", border: "1px solid currentColor", marginBlockStart: 8 }}
               onClick={() => { setUseRecovery(!useRecovery); setCode(""); setFormError(null); }}>
-              {useRecovery ? "Use authenticator code" : "Use a recovery code"}
+              {useRecovery ? t("mfa.useAuthenticator") : t("mfa.useRecovery")}
             </button>
           </form>
         </div>
@@ -434,43 +437,43 @@ export default function LoginPage() {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <h1 className={styles.title}>Reset your PIN</h1>
+          <h1 className={styles.title}>{t("forgot.title")}</h1>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {view === "forgotRequest" && (
             <form onSubmit={submitForgotRequest} noValidate>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="fTenant">Clinic code</label>
+                <label className={styles.label} htmlFor="fTenant">{t("forgot.clinicCode")}</label>
                 <input id="fTenant" className={styles.input} value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} required />
               </div>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="fMobile">Mobile number</label>
+                <label className={styles.label} htmlFor="fMobile">{t("forgot.mobile")}</label>
                 <input id="fMobile" className={styles.input} value={mobilePhone} onChange={(e) => setMobilePhone(e.target.value)} required />
               </div>
-              <button className={styles.submit} type="submit" disabled={loading}>{loading ? "Sending…" : "Send reset code"}</button>
+              <button className={styles.submit} type="submit" disabled={loading}>{loading ? t("forgot.sending") : t("forgot.send")}</button>
             </form>
           )}
           {view === "forgotConfirm" && (
             <form onSubmit={submitForgotConfirm} noValidate>
-              <p className={styles.subtitle}>If that number is registered, a reset code was sent to it.</p>
+              <p className={styles.subtitle}>{t("forgot.sent")}</p>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="fToken">Reset code</label>
+                <label className={styles.label} htmlFor="fToken">{t("forgot.resetCode")}</label>
                 <input id="fToken" className={styles.input} value={resetToken} onChange={(e) => setResetToken(e.target.value)} required />
               </div>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="fNewPin">New PIN</label>
+                <label className={styles.label} htmlFor="fNewPin">{t("forgot.newPin")}</label>
                 <input id="fNewPin" type="password" inputMode="numeric" pattern="[0-9]{6,8}" maxLength={8} className={styles.input}
                   value={newPin} onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))} required />
               </div>
-              <button className={styles.submit} type="submit" disabled={loading}>{loading ? "Saving…" : "Set new PIN"}</button>
+              <button className={styles.submit} type="submit" disabled={loading}>{loading ? t("forgot.saving") : t("forgot.setPin")}</button>
             </form>
           )}
           {view === "forgotDone" && (
             <>
-              <p className={styles.success}>Your PIN has been reset.</p>
-              <button className={styles.submit} type="button" onClick={backToLogin}>Back to sign in</button>
+              <p className={styles.success}>{t("forgot.done")}</p>
+              <button className={styles.submit} type="button" onClick={backToLogin}>{t("forgot.back")}</button>
             </>
           )}
-          <button className={styles.linkBtn} type="button" onClick={backToLogin}>Back to sign in</button>
+          <button className={styles.linkBtn} type="button" onClick={backToLogin}>{t("forgot.back")}</button>
         </div>
       </main>
     );
@@ -480,33 +483,33 @@ export default function LoginPage() {
     return (
       <main className={styles.page}>
         <div className={styles.card}>
-          <h1 className={styles.title}>Sign in with WhatsApp OTP</h1>
+          <h1 className={styles.title}>{t("otp.title")}</h1>
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
           {view === "otpRequest" && (
             <form onSubmit={submitOtpRequest} noValidate>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="oTenant">Clinic code</label>
+                <label className={styles.label} htmlFor="oTenant">{t("otp.clinicCode")}</label>
                 <input id="oTenant" className={styles.input} value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} required />
               </div>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="oMobile">Mobile number</label>
+                <label className={styles.label} htmlFor="oMobile">{t("otp.mobile")}</label>
                 <input id="oMobile" className={styles.input} value={mobilePhone} onChange={(e) => setMobilePhone(e.target.value)} required />
               </div>
-              <button className={styles.submit} type="submit" disabled={loading}>{loading ? "Sending…" : "Send code"}</button>
+              <button className={styles.submit} type="submit" disabled={loading}>{loading ? t("otp.sending") : t("otp.send")}</button>
             </form>
           )}
           {view === "otpVerify" && (
             <form onSubmit={submitOtpVerify} noValidate>
-              <p className={styles.subtitle}>If that number is registered, a code was sent to it.</p>
+              <p className={styles.subtitle}>{t("otp.sent")}</p>
               <div className={styles.field}>
-                <label className={styles.label} htmlFor="oCode">Code</label>
+                <label className={styles.label} htmlFor="oCode">{t("otp.code")}</label>
                 <input id="oCode" className={styles.input} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoFocus
                   value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} required />
               </div>
-              <button className={styles.submit} type="submit" disabled={loading || code.length !== 6}>{loading ? "Verifying…" : "Verify"}</button>
+              <button className={styles.submit} type="submit" disabled={loading || code.length !== 6}>{loading ? t("otp.verifying") : t("otp.verify")}</button>
             </form>
           )}
-          <button className={styles.linkBtn} type="button" onClick={backToLogin}>Back to sign in</button>
+          <button className={styles.linkBtn} type="button" onClick={backToLogin}>{t("forgot.back")}</button>
         </div>
       </main>
     );
@@ -515,16 +518,16 @@ export default function LoginPage() {
   return (
     <main className={styles.page}>
       <div className={styles.card}>
-        <h1 className={styles.title}>Sign in to Nabd</h1>
-        <p className={styles.subtitle}>Enter your clinic, email and PIN.</p>
+        <h1 className={styles.title}>{t("signIn.title")}</h1>
+        <p className={styles.subtitle}>{t("signIn.subtitle")}</p>
         <form onSubmit={submitLogin} noValidate>
-          {(signedOut || accessChanged) && !formError && <div className={styles.formError} role="status">{accessChanged ? "Your access changed, please sign in again" : "Signed out. Your draft is saved. Sign in to continue."}</div>}
+          {(signedOut || accessChanged) && !formError && <div className={styles.formError} role="status">{accessChanged ? t("signIn.accessChanged") : t("signIn.signedOut")}</div>}
           {formError && <div className={styles.formError} role="alert">{formError}</div>}
-          {loading && slow && <p className={styles.hint} role="status">{LOGIN_SLOW_MESSAGE}</p>}
-          {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>Retry</button>}
+          {loading && slow && <p className={styles.hint} role="status">{t("signIn.slow")}</p>}
+          {timedOut && !loading && <button className={`${styles.linkBtn} ${styles.retryBtn}`} type="button" onClick={() => void submitLogin()}>{t("signIn.retry")}</button>}
 
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="tenantSlug">Clinic code</label>
+            <label className={styles.label} htmlFor="tenantSlug">{t("signIn.clinicCode")}</label>
             <input
               id="tenantSlug"
               className={`${styles.input} ${fieldErrors.tenantSlug ? styles.inputError : ""}`}
@@ -537,7 +540,7 @@ export default function LoginPage() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="email">Email</label>
+            <label className={styles.label} htmlFor="email">{t("signIn.email")}</label>
             <input
               id="email"
               type="email"
@@ -551,7 +554,7 @@ export default function LoginPage() {
           </div>
 
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="pin">PIN</label>
+            <label className={styles.label} htmlFor="pin">{t("signIn.pin")}</label>
             <input
               id="pin"
               type="password"
@@ -568,16 +571,16 @@ export default function LoginPage() {
           </div>
 
           <button className={styles.submit} type="submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? t("signIn.submitting") : t("signIn.submit")}
           </button>
         </form>
         <button className={styles.linkBtn} type="button" onClick={() => { setFormError(null); setView("forgotRequest"); }}>
-          Forgot PIN?
+          {t("signIn.forgot")}
         </button>
         <button className={styles.linkBtn} type="button" onClick={() => { setFormError(null); setView("otpRequest"); }}>
-          Sign in with WhatsApp OTP instead
+          {t("signIn.otpInstead")}
         </button>
-        <Link className={styles.linkBtn} href="/owner/login">Clinic owner? Sign in here</Link>
+        <Link className={styles.linkBtn} href="/owner/login">{t("signIn.ownerLink")}</Link>
       </div>
     </main>
   );

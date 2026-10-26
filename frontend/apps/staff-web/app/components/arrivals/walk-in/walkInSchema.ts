@@ -1,13 +1,14 @@
 // FEF-028: walk-in validation and request bodies, pure. Order of checks and messages are unchanged from the page.
 import type { WalkInState } from "./walkInReducer";
 
-/** First problem with the form, or null. `hasPatient`: an existing or already-registered patient is chosen. */
-export function walkInProblem(s: WalkInState, hasPatient: boolean, minor: boolean): string | null {
-  if (!s.doctorId) return "Pick a doctor.";
+/** First problem with the form as a catalogue key of arrivals.walkIn (the dialog translates it), or null. `hasPatient`: an existing or already-registered patient is chosen. */
+export type WalkInProblemKey = "pickDoctor" | "needNew" | "needGuardian" | "needConsent";
+export function walkInProblem(s: WalkInState, hasPatient: boolean, minor: boolean): WalkInProblemKey | null {
+  if (!s.doctorId) return "pickDoctor";
   if (hasPatient) return null;
-  if (!s.name || !s.phone || !s.dob) return "Fill in the new patient's name, phone and date of birth.";
-  if (minor && !s.guardian) return "A guardian is required for patients under 18. Search for the guardian's record below.";
-  if (minor && (!s.guardianConsent || !s.guardianChannel)) return "Confirm the guardian's consent and how it was given.";
+  if (!s.name || !s.phone || !s.dob) return "needNew";
+  if (minor && !s.guardian) return "needGuardian";
+  if (minor && (!s.guardianConsent || !s.guardianChannel)) return "needConsent";
   return null;
 }
 

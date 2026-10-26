@@ -76,7 +76,7 @@
 }
 
 .defaultTag {
-  margin-left: var(--nb-space-8);
+  margin-inline-start: var(--nb-space-8);
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -94,7 +94,7 @@
 }
 
 .table th {
-  text-align: left;
+  text-align: start;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -125,7 +125,7 @@
 
 .matrixWrap .table th:first-child,
 .matrixWrap .table td:first-child {
-  text-align: left;
+  text-align: start;
 }
 
 .matrixDiagonal {

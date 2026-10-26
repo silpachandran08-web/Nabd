@@ -6,6 +6,7 @@ import Link from "next/link";
 import styles from "./overview.module.css";
 import { getIdentity, getPermissions, isOwner } from "../lib/session";
 import { can } from "../lib/permissions";
+import Icon from "../components/ui/Icon";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { api, ApiError, reasonText } from "../lib/api";
@@ -317,28 +318,28 @@ export default function OverviewPage() {
                 {data.staff.invited > 0 && ` · ${data.staff.invited} invited`}
               </div>
             </div>
-            <span className={styles.chevron} aria-hidden="true">›</span>
+            <span className={styles.chevron}><Icon name="chevron" size={18} /></span>
           </Link>
           <Link className={styles.quickLink} href="/setup">
             <div>
               <div className={styles.quickTitle}>Clinic Setup</div>
               <div className={styles.quickSub}>Profile, charges, departments, holidays</div>
             </div>
-            <span className={styles.chevron} aria-hidden="true">›</span>
+            <span className={styles.chevron}><Icon name="chevron" size={18} /></span>
           </Link>
           <Link className={styles.quickLink} href="/setup?tab=subscription">
             <div>
               <div className={styles.quickTitle}>Plan &amp; Modules</div>
               <div className={styles.quickSub}>{subscription ? `${subscription.plan ? `${subscription.plan} plan` : "No plan assigned"} · ${subscription.status}` : "Your plan and usage"}</div>
             </div>
-            <span className={styles.chevron} aria-hidden="true">›</span>
+            <span className={styles.chevron}><Icon name="chevron" size={18} /></span>
           </Link>
           <Link className={styles.quickLink} href="/account">
             <div>
               <div className={styles.quickTitle}>Account &amp; Security</div>
               <div className={styles.quickSub}>Two-step sign-in, active sessions, emergency access</div>
             </div>
-            <span className={styles.chevron} aria-hidden="true">›</span>
+            <span className={styles.chevron}><Icon name="chevron" size={18} /></span>
           </Link>
           {canSwitchClinic && (
             <Link className={styles.quickLink} href="/owner/workspaces">
@@ -346,7 +347,7 @@ export default function OverviewPage() {
                 <div className={styles.quickTitle}>Switch clinic</div>
                 <div className={styles.quickSub}>Open another clinic or branch you own</div>
               </div>
-              <span className={styles.chevron} aria-hidden="true">›</span>
+              <span className={styles.chevron}><Icon name="chevron" size={18} /></span>
             </Link>
           )}
         </div>

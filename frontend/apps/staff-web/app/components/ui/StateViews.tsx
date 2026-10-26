@@ -24,14 +24,14 @@ export function EmptyState({ title, hint, icon = "inbox", action }: { title: str
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({ message, onRetry, retryLabel = "Retry" }: { message: string; onRetry?: () => void; retryLabel?: string }) {
   return (
     <div className={`${styles.state} ${styles.stateError}`} role="alert">
       <Icon name="alert" size={28} />
       <div className={styles.stateTitle}>{message}</div>
       {onRetry && (
         <button type="button" className={styles.stateBtn} onClick={onRetry}>
-          <Icon name="refresh" size={14} /> Retry
+          <Icon name="refresh" size={14} /> {retryLabel}
         </button>
       )}
     </div>

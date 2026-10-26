@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocale, useTranslations } from "next-intl";
 import type { AppointmentPage } from "@nabd/api-client/generated";
 import styles from "../arrivals.module.css";
 import Dialog from "../../ui/Dialog";
@@ -16,6 +18,8 @@ export default function CheckinPicker({ rows, staff, patientsView, onPick, onClo
   rows: Row[]; staff: Staff[]; patientsView: boolean; onPick: (a: AppointmentOption) => void; onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const t = useTranslations("arrivals");
+  const locale = useLocale();
   // Local date, not toISOString() (UTC): before 05:30 in India that would ask for yesterday.
   const today = new Date().toLocaleDateString("en-CA");
   // Re-read on every open (gcTime 0): an appointment checked in elsewhere must not be offered again.
@@ -30,33 +34,57 @@ export default function CheckinPicker({ rows, staff, patientsView, onPick, onClo
         const p = patientsView && a.patientId ? await qc.ensureQueryData(patientDetailQuery(a.patientId)).catch(() => null) : null;
         return {
           id: a.id ?? "", patientId: a.patientId ?? "", doctorId: a.doctorId ?? "",
-          doctorName: staff.find((s) => s.id === a.doctorId)?.name ?? "—", patientName: p?.name ?? "Unknown patient", startTime: a.startTime ?? "",
+          doctorName: staff.find((s) => s.id === a.doctorId)?.name ?? t("dialog.none"), patientName: p?.name ?? t("page.unknownPatient"), startTime: a.startTime ?? "",
         };
       }));
     },
   });
-  const list = q.isPending ? null : q.data ?? [];
-  const error = q.isError ? failText(q.error, "Couldn't load today's appointments.") : null;
+  // ACC-031: type to narrow, Enter takes the first match, the arrows walk the list.
+  const [filter, setFilter] = useState("");
+  const all = q.isPending ? null : q.data ?? [];
+  const needle = filter.trim().toLowerCase();
+  const list = all && (needle ? all.filter((a) => `${a.patientName} ${a.doctorName}`.toLowerCase().includes(needle)) : all);
+  const error = q.isError ? failText(q.error, t("checkinPicker.fail"), t("page.denied")) : null;
 
   return (
-    <Dialog title="Check in — today's appointments" onClose={onClose}>
+    <Dialog title={t("checkinPicker.title")} onClose={onClose}>
       {error && <div className={styles.formError} role="alert">{error}</div>}
       {list === null ? (
-        <Skeleton rows={3} label="Loading today's appointments" />
-      ) : list.length === 0 ? (
-        <EmptyState icon="calendar" title="No scheduled appointments are waiting to arrive" />
+        <Skeleton rows={3} label={t("checkinPicker.loading")} />
       ) : (
-        <div className={styles.searchResults}>
+        <>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="checkinFilter">{t("checkinPicker.filter")}</label>
+            <input id="checkinFilter" className={styles.input} autoComplete="off" value={filter} onChange={(e) => setFilter(e.target.value)}
+              onKeyDown={(e) => {
+                const rows = e.currentTarget.closest("[role=dialog]")?.querySelectorAll<HTMLButtonElement>("[data-results] button");
+                if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && list.length > 0) { e.preventDefault(); rows?.[0]?.click(); }
+                else if (e.key === "ArrowDown" && rows?.length) { e.preventDefault(); rows[0].focus(); }
+              }} />
+          </div>
+      {list.length === 0 ? (
+        <EmptyState icon="calendar" title={all && all.length > 0 ? t("checkinPicker.noMatch") : t("checkinPicker.empty")} />
+      ) : (
+        <div className={styles.searchResults} role="presentation" data-results onKeyDown={(e) => {
+          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+          const items = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
+          const i = items.indexOf(document.activeElement as HTMLButtonElement);
+          if (i < 0) return;
+          e.preventDefault();
+          if (e.key === "ArrowUp" && i === 0) document.getElementById("checkinFilter")?.focus(); else items[Math.min(items.length - 1, Math.max(0, i + (e.key === "ArrowDown" ? 1 : -1)))].focus();
+        }}>
           {list.map((a) => (
             <div key={a.id} className={styles.appointmentRow}>
-              <span>{a.patientName} · {a.doctorName} · {new Date(a.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-              <button type="button" className={styles.actionBtn} onClick={() => onPick(a)}>Check in</button>
+              <span>{a.patientName} · {a.doctorName} · {new Date(a.startTime).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}</span>
+              <button type="button" className={styles.actionBtn} onClick={() => onPick(a)}>{t("page.checkIn")}</button>
             </div>
           ))}
         </div>
       )}
+        </>
+      )}
       <div className={styles.modalActions}>
-        <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancel</button>
+        <button type="button" className={styles.cancelBtn} onClick={onClose}>{t("dialog.cancel")}</button>
       </div>
     </Dialog>
   );
