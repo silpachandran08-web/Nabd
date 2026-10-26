@@ -43,3 +43,13 @@ groups:
         annotations:
           summary: "The comms consumer moved an event to ev:<region>:dlq"
           runbook: docs/runbooks/comms-gateway.md
+      - alert: CommsReminderWindowMissBurn
+        # COM-023: a scheduled send that missed its window is 'expired', never sent late; more than 1% of settled scheduled sends over 1 h burns the 99% SLO
+        expr: |
+          sum(increase(comms_scheduled_total{outcome="expired"}[1h]))
+            / clamp_min(sum(increase(comms_scheduled_total{outcome=~"queued|expired|cancelled"}[1h])), 1) > 0.01
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 1% of scheduled reminders expired before they could be sent (window misses)"
+          runbook: docs/runbooks/comms-gateway.md

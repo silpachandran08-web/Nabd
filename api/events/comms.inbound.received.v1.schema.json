@@ -56,6 +56,12 @@
       "type": "integer",
       "minimum": 1,
       "description": "Outbox id of this event: monotonic per aggregate."
+    },
+    "threadId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Inbox thread the message was filed in (COM-030)."
     }
   },
   "examples": [
