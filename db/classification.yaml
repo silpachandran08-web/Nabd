@@ -240,6 +240,27 @@ schemas:
     crypto_reencrypt_progress:
       table_name: operational
       column_name: operational
+    cross_tenant_ref_quarantine:
+      table_name: operational
+      column_name: operational
+      row_id: operational
+      child_tenant_id: operational
+      parent_tenant_id: operational
+      found_at: operational
+    tenant_data_keys:
+      tenant_id: operational
+      kid: operational
+      wrapped_dek: operational
+      kms_key_ref: operational
+      status: operational
+      created_at: operational
+      rotated_at: operational
+      destroyed_at: operational
+    kms_region_keys:
+      region_code: operational
+      current_key_ref: operational
+      created_at: operational
+      last_rotated_at: operational
       last_id: operational
       rows_done: operational
       target_kid: operational

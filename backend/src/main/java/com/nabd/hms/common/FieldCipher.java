@@ -24,6 +24,9 @@ import java.util.TreeMap;
  * ciphertext copied to another row or tenant does not decrypt. Keys: app.crypto.keyring ("kid:base64,...",
  * kid 1-255) with one app.crypto.active-kid for writes. Reads also accept the pre-PLT-044 format
  * ([IV][ciphertext+tag], no AAD) under app.crypto.key until CryptoReencryptJob has rewritten every row.
+ * PLT-045: with per-tenant keys on (app.kms.provider) a tenant that has a DEK writes format v2 =
+ * [0x02][DEK version 1 byte][96-bit IV][ciphertext+tag], same AAD; the DEK comes from TenantKeyService (wrapped by the
+ * region KMS). Tenants without a DEK, and platform rows, stay on the global keyring (v1); v1 and legacy values keep opening.
  * Key material is never logged or put in exception messages.
  */
 @Component
@@ -31,6 +34,7 @@ public class FieldCipher {
 
     private static final Logger log = LoggerFactory.getLogger(FieldCipher.class);
     static final byte VERSION = 1;
+    static final byte VERSION_TENANT = 2;
     private static final int IV_LENGTH = 12;
     private static final int TAG_LENGTH_BITS = 128;
     private static final int HEADER = 2;
@@ -56,6 +60,12 @@ public class FieldCipher {
     private final int activeKid;
     private final SecretKeySpec legacyKey; // null = legacy reads off (every row re-encrypted, APP_CRYPTO_KEY removed)
     private final SecureRandom random = new SecureRandom();
+    private com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys; // PLT-045; null in unit tests that build the cipher by hand
+
+    @Autowired(required = false)
+    void tenantKeys(com.nabd.hms.common.tenantkey.TenantKeyService tenantKeys) {
+        this.tenantKeys = tenantKeys;
+    }
 
     @Autowired
     public FieldCipher(Environment env) {
@@ -122,7 +132,10 @@ public class FieldCipher {
     public Status status(byte[] blob, Aad aad) {
         try {
             decryptNew(blob, aad);
-            return (blob[1] & 0xff) == activeKid ? Status.CURRENT : Status.OLD_KID;
+            if (blob[0] == VERSION_TENANT) return tenantKeys.activeKey(aad.tenant()).filter(k -> k.version() == (blob[1] & 0xff)).isPresent() ? Status.CURRENT : Status.OLD_KID;
+            // a tenant with its own DEK is only CURRENT once its values are v2 under the active DEK
+            return tenantKeys != null && tenantKeys.activeKey(aad.tenant()).isPresent() ? Status.OLD_KID
+                    : (blob[1] & 0xff) == activeKid ? Status.CURRENT : Status.OLD_KID;
         } catch (DecryptException e) {
             return decryptLegacy(blob) != null ? Status.LEGACY : Status.FAILED;
         }
@@ -130,14 +143,15 @@ public class FieldCipher {
 
     public byte[] encrypt(byte[] plaintext, Aad aad) {
         try {
+            var tenantKey = tenantKeys == null ? java.util.Optional.<com.nabd.hms.common.tenantkey.TenantKeyService.ActiveKey>empty() : tenantKeys.activeKey(aad.tenant());
             byte[] out = new byte[HEADER + IV_LENGTH + plaintext.length + TAG_LENGTH_BITS / 8];
-            out[0] = VERSION;
-            out[1] = (byte) activeKid;
+            out[0] = tenantKey.isPresent() ? VERSION_TENANT : VERSION;
+            out[1] = (byte) (tenantKey.isPresent() ? tenantKey.get().version() : activeKid);
             byte[] iv = new byte[IV_LENGTH];
             random.nextBytes(iv);
             System.arraycopy(iv, 0, out, HEADER, IV_LENGTH);
             Cipher c = Cipher.getInstance("AES/GCM/NoPadding");
-            c.init(Cipher.ENCRYPT_MODE, keys.get(activeKid), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
+            c.init(Cipher.ENCRYPT_MODE, tenantKey.isPresent() ? tenantKey.get().key() : keys.get(activeKid), new GCMParameterSpec(TAG_LENGTH_BITS, iv));
             c.updateAAD(aad.bytes());
             c.doFinal(plaintext, 0, plaintext.length, out, HEADER + IV_LENGTH);
             return out;
@@ -158,8 +172,8 @@ public class FieldCipher {
     }
 
     byte[] decryptNew(byte[] blob, Aad aad) {
-        if (blob != null && blob.length >= HEADER + IV_LENGTH + 16 && blob[0] == VERSION) {
-            SecretKeySpec k = keys.get(blob[1] & 0xff);
+        if (blob != null && blob.length >= HEADER + IV_LENGTH + 16 && (blob[0] == VERSION || blob[0] == VERSION_TENANT && tenantKeys != null)) {
+            SecretKeySpec k = blob[0] == VERSION ? keys.get(blob[1] & 0xff) : tenantKeys.keyFor(aad.tenant(), blob[1] & 0xff).orElse(null);
             byte[] plain = k == null ? null : open(k, blob, HEADER, aad.bytes());
             if (plain != null) return plain;
         }
