@@ -3,3 +3,4 @@ export { formatNumber, localizeDigits, type NumberOpts } from "./number.ts";
 export { formatPhone } from "./phone.ts";
 export { minorDigits } from "./units.ts";
 export { getFormatContext, setFormatContext, intlTag, type DigitStyle, type FormatContext } from "./context.ts";
+export { amountInWords, integerInWords } from "./amountInWords.ts";

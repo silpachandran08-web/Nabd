@@ -10,6 +10,7 @@ import StatusPill from "../../components/ui/StatusPill";
 import { autoLink, rxErrorMessage, unlinkedRx } from "../../components/checkout/rxLink";
 import { getIdentity } from "../../lib/session";
 import { can } from "../../lib/permissions";
+import InvoiceActions from "../../components/checkout/InvoiceActions";
 import TenderRows from "../../components/checkout/TenderRows";
 import { filled, tenderError, tenderTotalMinor, toMinor, type Tender } from "../../components/checkout/tender";
 import { api, ApiError, errorText, intentKeys } from "../../lib/api";
@@ -514,6 +515,8 @@ export default function CheckoutPage() {
               <div className={styles.totalsRow}><span>Paid</span><span>{formatMoney(invoice.paid, invoice.currency)}</span></div>
               <div className={styles.totalsRow}><span>Balance due</span><span>{formatMoney(invoice.balanceDue, invoice.currency)}</span></div>
             </div>
+
+            {invoice.id && invoice.status !== "void" && can("billing:view") && invoice.payments.length > 0 && <InvoiceActions invoiceId={invoice.id} />}
 
             {context.queueStatus === "billing_pending" && canAdvance && (
               <>

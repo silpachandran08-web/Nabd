@@ -427,3 +427,10 @@
   font-size: 12px;
   text-align: start;
 }
+
+/* FEF-047: invoice/receipt print route toolbar. */
+.printBar { display: flex; gap: var(--nb-space-8); justify-content: space-between; margin-block-end: var(--nb-space-16); }
+.printBar .checkoutBtn { inline-size: auto; margin: 0; padding-inline: var(--nb-space-16); min-block-size: 44px; display: inline-flex; align-items: center; gap: var(--nb-space-8); }
+.printBar .backBtn { min-block-size: 44px; }
+.docActions { display: flex; flex-wrap: wrap; gap: var(--nb-space-8); margin-block-start: var(--nb-space-12); }
+.docActions button { min-block-size: 44px; padding-inline: var(--nb-space-16); border: 1px solid var(--nb-border-default); border-radius: var(--nb-radius-md); background: transparent; color: var(--nb-text-primary); font: inherit; font-size: 13px; cursor: pointer; }
