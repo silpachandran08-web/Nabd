@@ -67,6 +67,37 @@ schemas:
       published_by: operational
       published_at: operational
       updated_at: operational
+      channel: operational
+      visit_type: operational
+      decision_source: operational
+      decided_by: operational
+      decided_at: operational
+    booking_request_details:
+      appointment_id: operational
+      tenant_id: operational
+      review_reason: operational
+      triage_flags: phi  # uncertain: codes for red-flag symptoms the patient mentioned
+      patient_note: phi
+      sla_due_at: operational
+      escalated_at: operational
+      decline_reason_code: operational
+    booking_request_offers:
+      id: operational
+      tenant_id: operational
+      appointment_id: operational
+      slots: operational
+      status: operational
+      chosen_slot: operational
+      expires_at: operational
+      created_by: operational
+      created_at: operational
+    booking_routing_settings:
+      tenant_id: operational
+      acceptance_mode: operational
+      daily_auto_cap: operational
+      review_sla_minutes: operational
+      policy_version: operational
+      updated_at: operational
     attendance_records:
       id: operational
       tenant_id: operational

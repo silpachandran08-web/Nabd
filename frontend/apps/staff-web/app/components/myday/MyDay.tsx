@@ -10,6 +10,7 @@ import DoctorControls from "./DoctorControls";
 import { can } from "../../lib/permissions";
 import { clinicToday, formatClinicDate } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
+import RequestsCard from "../requests/RequestsCard";
 import { AppointmentsCard, ChronicDueCard, NeedsMeCard, NowNext, QueueList, SessionStrip } from "./MyDayParts";
 
 // DOC-002 "My Day" (wireframe NabdShell.html DOC-01 / "Doctor home"): session strip, In the room /
@@ -51,6 +52,7 @@ export default function MyDay() {
           <>
             <SessionStrip data={data} seen={seen} total={active.length} />
             {can("queue:edit") && <DoctorControls doctorId={data.selfId} inRoomId={inRoom?.id ?? null} onChanged={() => void reload()} />}
+            <RequestsCard />
             <div className={styles.grid}>
               <div className={styles.col}>
                 <NowNext inRoom={inRoom} next={next} now={now} />
