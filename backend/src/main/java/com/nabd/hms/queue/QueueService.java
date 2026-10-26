@@ -316,6 +316,13 @@ public class QueueService {
     public QueueEntryResponse reorder(UUID tenantId, UUID callerStaffId, UUID id, QueueReorderRequest req) {
         tenantContext.set(tenantId);
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        if (req.priority() && (req.reason() == null || req.reason().isBlank())) { // ACC-022: a priority flag needs its reason
+            throw new ApiException(HttpStatus.BAD_REQUEST, "reason-required", "Reason required",
+                    "State why this patient is moved up.", java.util.Map.of("code", "REASON_REQUIRED"));
+        }
+        if (req.reason() != null && !req.reason().isBlank() && req.reason().strip().length() < 3) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed", "reason: must be at least 3 characters");
+        }
         repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null, callerStaffId);
         recordEvent(tenantId, id, current.status(), current.status(), "priority", null, callerStaffId, current.doctorId());
         events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CHANGED, id, java.util.Map.of("entryId", id, "doctorId", current.doctorId(),
@@ -398,6 +405,12 @@ public class QueueService {
                     doctorId, today, occupancy, block.get().maxPatients());
             throw sessionFull();
         }
+    }
+
+    /** ACC-022: the entry as the API shows it (used by the reassign service in this package). */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    QueueEntryResponse view(UUID tenantId, UUID id) {
+        return toResponse(repo.findById(tenantId, id).orElseThrow(this::notFound));
     }
 
     private QueueEntryResponse toResponse(QueueEntryRow row) {

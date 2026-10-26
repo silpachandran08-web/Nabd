@@ -13,6 +13,7 @@ import DialogBoundary from "../components/arrivals/DialogBoundary";
 import BoardTable from "../components/arrivals/board/BoardTable";
 import SideColumn from "../components/arrivals/board/SideColumn";
 import TabBar from "../components/arrivals/board/TabBar";
+import DoctorBoard from "../components/arrivals/doctors/DoctorBoard";
 import { countsOf, filterByTab, isArrivalsTab, type ArrivalsTab } from "../components/arrivals/board/boardLogic";
 import { useArrivals } from "../components/arrivals/hooks/useArrivals";
 import type { RowHandlers } from "../components/arrivals/board/RowActions";
@@ -31,6 +32,7 @@ function ArrivalsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
+  const byDoctor = searchParams.get("view") === "doctors"; // ACC-022: one column per doctor
   const a = useArrivals();
   const { mounted, grants, rows, staff, forbidden, error, sendRow, clearDelay } = a;
   const [dlg, setDlg] = useState<Dlg | null>(null);
@@ -73,15 +75,17 @@ function ArrivalsPageInner() {
             {/* Clinic Operations' two views (DESIGN.md): this page is the Live Queue half. */}
             <nav className={styles.segmented} aria-label="Clinic operations view">
               <Link className={styles.segment} href="/schedule">Schedule</Link>
-              <span className={styles.segmentActive} aria-current="page">Live Queue</span>
+              {byDoctor
+                ? <><Link className={styles.segment} href="/arrivals">Live Queue</Link><span className={styles.segmentActive} aria-current="page">By doctor</span></>
+                : <><span className={styles.segmentActive} aria-current="page">Live Queue</span><Link className={styles.segment} href="/arrivals?view=doctors">By doctor</Link></>}
             </nav>
           </div>
         )}
       </div>
 
-      {!forbidden && <TabBar tab={tab} counts={counts} onSelect={selectTab} />}
+      {!forbidden && !byDoctor && <TabBar tab={tab} counts={counts} onSelect={selectTab} />}
 
-      {!forbidden && hasQuickActions && (
+      {!forbidden && !byDoctor && hasQuickActions && (
         <div className={styles.quickActions}>
           {/* A token is only ever created as part of check-in, so walk-in and "issue token" are one action. */}
           {grants.queueCreate && grants.patientsView && <button type="button" className={styles.primaryAction} onClick={() => setDlg({ k: "walkin" })}>Walk-in &amp; token</button>}
@@ -99,7 +103,7 @@ function ArrivalsPageInner() {
         </div>
       )}
 
-      {a.loading ? (
+      {byDoctor && !forbidden ? <DoctorBoard /> : a.loading ? (
         <div className={styles.card}><Skeleton rows={6} label="Loading today's arrivals" /></div>
       ) : forbidden ? (
         <div className={styles.card}><EmptyState icon="shield" title="No access to the arrivals board" hint="Your role doesn't include the live queue. Ask your clinic owner if you need it." /></div>
