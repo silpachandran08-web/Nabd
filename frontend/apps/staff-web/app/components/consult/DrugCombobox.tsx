@@ -3,15 +3,31 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import StatusPill from "../ui/StatusPill";
 import type { DrugSuggestion } from "./shared";
+import { api, ApiError } from "../../lib/api";
+import { decodeAccessToken } from "../../lib/session";
+import { loadDrugIndex, searchIndex, type IndexEntry, type IndexGet } from "../../lib/drugIndex";
 import s from "./RxPad.module.css";
 
 type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
 const DEBOUNCE_MS = 250;
 const MIN_CHARS = 2;
 
-/** Accessible type-ahead (ARIA 1.2 combobox with list autocomplete) over GET /clinical/drugs/search. Suggestions are the
- * tenant's own pharmacy list and past prescriptions, never a drug database. What the doctor types is always kept as
- * typed: picking a suggestion is optional, Tab/blur never replaces the text, and a failed search never blocks entry. */
+// CLN-020: one conditional GET of the per-doctor index (304 = the stored copy is current).
+const getIndex: IndexGet = async (ifNoneMatch) => {
+  try {
+    const blob = await api.get<Blob>("/clinical/drugs/client-index", { as: "blob", headers: ifNoneMatch ? { "If-None-Match": ifNoneMatch } : undefined });
+    return await blob.arrayBuffer();
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 304) return null;
+    throw e;
+  }
+};
+
+/** Accessible type-ahead (ARIA 1.2 combobox with list autocomplete). CLN-020: rows come from the per-doctor drug index on
+ * the device (no request per keystroke); a query the index has no row for falls back to GET /clinical/drugs/search (the
+ * regional drug master, the clinic's unlinked pharmacy items and past free-text prescriptions). What the doctor types is
+ * always kept as typed: picking a suggestion is optional, Tab/blur never replaces the text, and a failed search never
+ * blocks entry. */
 export default function DrugCombobox({
   id, label, value, placeholder, disabled, authedFetch, onType, onPick, hint,
 }: {
@@ -19,8 +35,8 @@ export default function DrugCombobox({
   authedFetch: AuthedFetch;
   /** Every keystroke (free text). */
   onType: (text: string) => void;
-  /** A suggestion was chosen: its name replaces the field text. */
-  onPick: (name: string) => void;
+  /** A suggestion was chosen: its name replaces the field text; the row (drugId, generic, brand ...) comes with it. */
+  onPick: (name: string, it: DrugSuggestion) => void;
 }) {
   const uid = useId();
   const listId = `${uid}-list`;
@@ -31,6 +47,15 @@ export default function DrugCombobox({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ctrl = useRef<AbortController | null>(null);
   const seq = useRef(0);
+  const index = useRef<IndexEntry[] | null>(null);
+
+  // First focus loads the device copy (and revalidates it once); until it is there every query uses the server.
+  function warmIndex() {
+    if (index.current || typeof localStorage === "undefined") return;
+    const claims = decodeAccessToken(localStorage.getItem("nabd_access_token") ?? "");
+    if (!claims?.tenantId || !claims.sub) return;
+    void loadDrugIndex(getIndex, claims.tenantId, claims.sub).then((e) => { index.current = e; });
+  }
 
   const cancel = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -48,6 +73,8 @@ export default function DrugCombobox({
       setOpen(false); setState("idle"); setItems([]); setActive(-1);
       return;
     }
+    const local = index.current ? searchIndex(index.current, q, 8) : [];
+    if (local.length > 0) { setOpen(true); setItems(local); setState("done"); setActive(-1); return; }
     setOpen(true); setState("loading"); setActive(-1);
     const mine = seq.current;
     timer.current = setTimeout(async () => {
@@ -70,7 +97,7 @@ export default function DrugCombobox({
 
   function pick(it: DrugSuggestion) {
     cancel();
-    onPick(it.name);
+    onPick(it.name, it);
     setOpen(false); setState("idle"); setItems([]); setActive(-1);
   }
 
@@ -100,7 +127,7 @@ export default function DrugCombobox({
   const status =
     state === "loading" ? "Searching…"
     : state === "error" ? "Suggestions are unavailable. You can still type the name."
-    : state === "done" && items.length === 0 ? "No match in your pharmacy list or past prescriptions. Your own text will be used."
+    : state === "done" && items.length === 0 ? "No match in the drug list, your pharmacy list or past prescriptions. Your own text will be used."
     : state === "done" ? `${items.length} suggestion${items.length === 1 ? "" : "s"}. Use the arrow keys, Enter to choose.`
     : "";
 
@@ -124,7 +151,7 @@ export default function DrugCombobox({
         onChange={(e) => { onType(e.target.value); search(e.target.value); }}
         onKeyDown={onKeyDown}
         onBlur={() => { setOpen(false); setActive(-1); }}
-        onFocus={() => { if (state === "done" || state === "loading") setOpen(true); }}
+        onFocus={() => { warmIndex(); if (state === "done" || state === "loading") setOpen(true); }}
       />
       {hint && <p className={s.hint}>{hint}</p>}
       <span className={s.srOnly} role="status" aria-live="polite">{expanded ? status : ""}</span>
@@ -134,7 +161,7 @@ export default function DrugCombobox({
         <ul id={listId} role="listbox" aria-label={`${label} suggestions`} className={s.listbox}>
           {items.map((it, n) => (
             <li
-              key={`${it.source}-${it.name}-${it.code ?? ""}`}
+              key={`${it.source}-${it.drugId ?? it.name}-${it.code ?? ""}`}
               id={`${uid}-opt-${n}`}
               role="option"
               aria-selected={n === active}
@@ -144,7 +171,8 @@ export default function DrugCombobox({
             >
               <span>{it.name}</span>
               <span className={s.optionMeta}>
-                {it.source === "pharmacy" ? <span>Pharmacy list</span> : <span>Prescribed before</span>}
+                {it.source === "master" ? <span>Drug list</span> : it.source === "pharmacy" ? <span>Pharmacy list</span> : <span>Prescribed before</span>}
+                {it.source === "master" && it.inStock === true && <StatusPill tone="ok" label="In stock" />}
                 {it.source === "pharmacy" && it.inStock === true && <StatusPill tone="ok" label="In stock" />}
                 {it.source === "pharmacy" && it.inStock === false && <StatusPill tone="warn" label="Out of stock" />}
                 {it.prescriptionOnly === true && <span>Rx only</span>}

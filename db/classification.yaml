@@ -423,6 +423,8 @@ schemas:
       route: operational
       quantity: operational
       quantity_unit: operational
+      drug_id: phi
+      generic_name_snapshot: phi
     favourite_rx_sets:
       id: operational
       tenant_id: operational
@@ -793,6 +795,8 @@ schemas:
       recorded_at: operational
       category: phi
       source: phi
+      allergen_ingredient_id: phi
+      allergen_class_id: phi
       updated_by: operational
       updated_at: operational
       deactivated_by: operational
@@ -956,6 +960,8 @@ schemas:
       route: phi
       quantity: phi
       quantity_unit: phi
+      drug_id: phi
+      generic_name_snapshot: phi
     prescription_signer_backfill:
       prescription_id: operational
       tenant_id: operational
@@ -1532,3 +1538,20 @@ schemas:
       paused_at: operational
       resumed_at: operational
       reason_code: operational
+    drug_usage:
+      tenant_id: operational
+      doctor_id: operational
+      drug_id: operational
+      uses: operational
+      last_used_at: operational
+    drug_usage_applied:
+      tenant_id: operational
+      prescription_id: operational
+      applied_at: operational
+    rx_coding_suggestions:
+      id: operational
+      tenant_id: operational
+      prescription_item_id: operational
+      suggested_drug_id: operational
+      confidence: operational
+      created_at: operational

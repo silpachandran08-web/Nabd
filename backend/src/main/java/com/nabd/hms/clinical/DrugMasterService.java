@@ -11,15 +11,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /** CLN-019: reads of the regional drug master for the caller's tenant region. Retired products stay resolvable by id
  * (existing prescriptions) and are never returned by search. */
 @Service
 public class DrugMasterService implements DrugMasterLookup {
-
-    private static final Pattern WORD = Pattern.compile("[\\p{L}\\p{N}]+");
 
     @Schema(name = "DrugIngredient")
     public record IngredientView(String id, String name, BigDecimal amount, String unit) {
@@ -66,15 +62,11 @@ public class DrugMasterService implements DrugMasterLookup {
 
     @Transactional
     List<SummaryView> search(String q, int limit) {
-        Matcher m = WORD.matcher(q == null ? "" : q);
-        StringBuilder ts = new StringBuilder();
-        while (m.find()) {
-            ts.append(ts.isEmpty() ? "" : " & ").append(m.group()).append(":*");
-        }
+        String ts = DrugDisplay.tsQuery(q);
         if (ts.isEmpty()) {
             return List.of();
         }
-        return repo.search(region(), ts.toString(), limit).stream()
+        return repo.search(region(), ts, limit).stream()
                 .map(s -> new SummaryView(s.id(), s.brand(), s.strength(), s.form(), s.generic(), s.schedule())).toList();
     }
 

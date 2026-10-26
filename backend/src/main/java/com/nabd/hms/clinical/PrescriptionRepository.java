@@ -82,6 +82,10 @@ class PrescriptionRepository {
         return findByQueueEntry(tenantId, queueEntryId).orElseThrow().id();
     }
 
+    /** CLN-021: the generic name of a coded line, taken from the drug master when the row is written (snapshot). */
+    private static final String GENERIC_OF = "(SELECT string_agg(g.name, ' + ' ORDER BY g.name) FROM drug_ingredients d " +
+            "JOIN ingredients g ON g.id = d.ingredient_id WHERE d.drug_id = ?)";
+
     /** Free-text pad: full replace on every save is simpler and just as correct as diffing line items. */
     void replaceItems(UUID tenantId, UUID prescriptionId, List<PrescriptionItemRow> items) {
         jdbc.update("DELETE FROM prescription_items WHERE tenant_id = ? AND prescription_id = ?", tenantId, prescriptionId);
@@ -89,12 +93,12 @@ class PrescriptionRepository {
         for (PrescriptionItemRow item : items) {
             jdbc.update("INSERT INTO prescription_items (tenant_id, prescription_id, drug_name, dosage, frequency, " +
                             "  duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, " +
-                            "  route, quantity, quantity_unit) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb,?,?,?,?,?)",
+                            "  route, quantity, quantity_unit, drug_id, generic_name_snapshot) " +
+                            "VALUES (?,?,?,?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?, " + GENERIC_OF + ")",
                     tenantId, prescriptionId, item.drugName(), item.dosage(), item.frequency(), item.duration(),
                     item.instructions(), item.allergyOverrideReason(), order++,
                     item.overridesJson() == null ? "[]" : item.overridesJson(),
-                    item.brandName(), item.sigPattern(), item.route(), item.quantity(), item.quantityUnit());
+                    item.brandName(), item.sigPattern(), item.route(), item.quantity(), item.quantityUnit(), item.drugId(), item.drugId());
         }
     }
 
@@ -110,26 +114,53 @@ class PrescriptionRepository {
                 allergySnapshotJson, safetyDictionaryVersion, signedBy, signedByRegistrationNo, tenantId, prescriptionId);
     }
 
-    /** DOC-033: type-ahead source. Pharmacy item master (active stocked items) first, then distinct names this tenant
-     * has prescribed before that the master does not already list. `like` is an already-escaped, lower-cased pattern.
-     * Names only: no patient, doctor or prescription identifiers leave this query. */
-    List<DrugSuggestionRow> searchDrugs(UUID tenantId, String likePattern, String prefixPattern, int limit) {
+    /** CLN-020 type-ahead. Three sources in one statement, in this order: (0) the regional drug master (prefix on every word
+     * or the brand, trigram for 3+ characters), boosted by this clinic's and this doctor's usage (drug_usage, a small table:
+     * no scan of prescription history); (1) pharmacy items not linked to a drug; (2) names this tenant prescribed before
+     * that are free text (prefix only, V53 index). `like` is the brand pattern, `legacyLike`/`prefix` are already-escaped
+     * lower-cased patterns. Names and drug ids only: no patient, doctor or prescription identifiers leave this query. */
+    List<DrugSuggestionRow> searchDrugs(UUID tenantId, UUID doctorId, String region, String tsQuery, String brandLike,
+                                        String legacyLike, String prefix, int limit) {
         return jdbc.query(
-                "SELECT name, source, code, in_stock, rx_only FROM (" +
-                        " SELECT c.name AS name, 'pharmacy' AS source, c.code AS code, (c.stock_qty > 0) AS in_stock, c.is_rx AS rx_only, " +
-                        "   0 AS src_rank FROM charge_catalogue c " +
-                        "  WHERE c.tenant_id = ? AND c.stock_qty IS NOT NULL AND c.active AND lower(c.name) LIKE ? ESCAPE '\\' " +
+                "SELECT name, source, code, in_stock, rx_only, drug_id, brand, strength, form, generic, schedule FROM (" +
+                        " SELECT * FROM (" +
+                        "  SELECT m.brand AS name, 'master' AS source, NULL::text AS code, " +
+                        "   EXISTS (SELECT 1 FROM charge_catalogue c WHERE c.tenant_id = ? AND c.drug_id = m.id AND c.active AND c.stock_qty > 0) AS in_stock, " +
+                        "   (cardinality(m.schedule) > 0) AS rx_only, m.id AS drug_id, m.brand AS brand, m.strength AS strength, m.form AS form, " +
+                        "   (SELECT array_agg(g.name ORDER BY g.name) FROM drug_ingredients d JOIN ingredients g ON g.id = d.ingredient_id WHERE d.drug_id = m.id) AS generic, " +
+                        "   m.schedule AS schedule, 0 AS src_rank, t.boost AS boost, t.pfx AS pfx " +
+                        "  FROM (SELECT m2.id, COALESCE(u.boost, 0) AS boost, (lower(m2.brand) LIKE ? ESCAPE '\\') AS pfx, " +
+                        "         ts_rank(m2.search_text, to_tsquery('simple', ?)) AS rnk " +
+                        "        FROM drug_master m2 " +
+                        "        LEFT JOIN (SELECT drug_id, sum(CASE WHEN doctor_id IS NULL THEN uses ELSE uses * 3 END) AS boost FROM drug_usage " +
+                        "                    WHERE tenant_id = ? AND (doctor_id IS NULL OR doctor_id = ?) GROUP BY drug_id) u ON u.drug_id = m2.id " +
+                        "        WHERE m2.region = ? AND m2.status = 'active' " +
+                        "          AND (m2.search_text @@ to_tsquery('simple', ?) OR lower(m2.brand) LIKE ? ESCAPE '\\') " +
+                        "        ORDER BY COALESCE(u.boost, 0) DESC, (lower(m2.brand) LIKE ? ESCAPE '\\') DESC, rnk DESC, m2.brand, m2.id LIMIT ?) t " +
+                        "  JOIN drug_master m ON m.id = t.id) master_rows " +
                         " UNION ALL " +
-                        " SELECT min(i.drug_name) AS name, 'history' AS source, NULL AS code, NULL::boolean AS in_stock, NULL::boolean AS rx_only, " +
-                        "   1 AS src_rank FROM prescription_items i " +
-                        "  WHERE i.tenant_id = ? AND lower(i.drug_name) LIKE ? ESCAPE '\\' " +
+                        " SELECT c.name, 'pharmacy', c.code, (c.stock_qty > 0), c.is_rx, NULL, NULL, NULL, NULL, NULL::text[], NULL::text[], 1, 0, false " +
+                        "  FROM charge_catalogue c " +
+                        "  WHERE c.tenant_id = ? AND c.stock_qty IS NOT NULL AND c.active AND c.drug_id IS NULL AND lower(c.name) LIKE ? ESCAPE '\\' " +
+                        " UNION ALL " +
+                        " SELECT min(i.drug_name), 'history', NULL, NULL::boolean, NULL::boolean, NULL, NULL, NULL, NULL, NULL::text[], NULL::text[], 2, 0, false " +
+                        "  FROM prescription_items i " +
+                        "  WHERE i.tenant_id = ? AND i.drug_id IS NULL AND lower(i.drug_name) LIKE ? ESCAPE '\\' " +
                         "    AND NOT EXISTS (SELECT 1 FROM charge_catalogue c2 WHERE c2.tenant_id = i.tenant_id " +
                         "      AND c2.stock_qty IS NOT NULL AND c2.active AND lower(c2.name) = lower(i.drug_name)) " +
                         "  GROUP BY lower(i.drug_name) " +
-                        ") s ORDER BY (CASE WHEN lower(name) LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END), src_rank, lower(name) LIMIT ?",
+                        ") s ORDER BY src_rank, boost DESC, pfx DESC, " +
+                        "  (CASE WHEN lower(name) LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END), lower(name) LIMIT ?",
                 (rs, i) -> new DrugSuggestionRow(rs.getString("name"), rs.getString("source"), rs.getString("code"),
-                        (Boolean) rs.getObject("in_stock"), (Boolean) rs.getObject("rx_only")),
-                tenantId, likePattern, tenantId, likePattern, prefixPattern, limit);
+                        (Boolean) rs.getObject("in_stock"), (Boolean) rs.getObject("rx_only"), rs.getString("drug_id"),
+                        rs.getString("brand"), rs.getString("strength"), rs.getString("form"), strings(rs.getArray("generic")),
+                        strings(rs.getArray("schedule"))),
+                tenantId, prefix, tsQuery, tenantId, doctorId, region, tsQuery, brandLike, prefix, limit,
+                tenantId, legacyLike, tenantId, prefix, prefix, limit);
+    }
+
+    private static List<String> strings(java.sql.Array a) throws java.sql.SQLException {
+        return a == null ? null : java.util.Arrays.asList((String[]) a.getArray());
     }
 
     // ── favourite Rx sets (NB-114) ───────────────────────────────────────
@@ -145,11 +176,11 @@ class PrescriptionRepository {
         int order = 0;
         for (PrescriptionItemRequest item : items) {
             jdbc.update("INSERT INTO favourite_rx_set_items (tenant_id, set_id, drug_name, dosage, frequency, " +
-                            "instructions, duration, display_order, brand_name, sig_pattern, route, quantity, quantity_unit) " +
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            "instructions, duration, display_order, brand_name, sig_pattern, route, quantity, quantity_unit, " +
+                            "drug_id, generic_name_snapshot) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, " + GENERIC_OF + ")",
                     tenantId, setId, item.drugName(), item.dosage(), item.frequency(), item.instructions(),
                     item.duration(), order++, blankToNull(item.brandName()), blankToNull(item.sigPattern()),
-                    blankToNull(item.route()), item.quantity(), blankToNull(item.quantityUnit()));
+                    blankToNull(item.route()), item.quantity(), blankToNull(item.quantityUnit()), item.drugId(), item.drugId());
         }
     }
 
@@ -203,7 +234,7 @@ class PrescriptionRepository {
                         rs.getString("dosage"), rs.getString("frequency"), rs.getString("duration"),
                         rs.getString("instructions"), rs.getInt("display_order"), rs.getString("brand_name"),
                         rs.getString("sig_pattern"), rs.getString("route"), rs.getBigDecimal("quantity"),
-                        rs.getString("quantity_unit")),
+                        rs.getString("quantity_unit"), rs.getString("drug_id"), rs.getString("generic_name_snapshot")),
                 tenantId, setId);
     }
 
@@ -246,6 +277,8 @@ class PrescriptionRepository {
                 rs.getString("sig_pattern"),
                 rs.getString("route"),
                 rs.getBigDecimal("quantity"),
-                rs.getString("quantity_unit"));
+                rs.getString("quantity_unit"),
+                rs.getString("drug_id"),
+                rs.getString("generic_name_snapshot"));
     }
 }

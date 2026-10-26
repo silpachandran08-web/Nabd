@@ -3,7 +3,6 @@ package com.nabd.hms.clinical;
 import com.nabd.hms.iam.api.ActorDirectory;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.clinical.dto.DoseCalculationResponse;
-import com.nabd.hms.clinical.dto.DrugSuggestionResponse;
 import com.nabd.hms.clinical.dto.PrescriptionAllergySnapshotResponse;
 import com.nabd.hms.clinical.dto.PrescriptionWarningResponse;
 import com.nabd.hms.clinical.dto.FavouriteRxSetItemResponse;
@@ -88,11 +87,14 @@ public class PrescriptionService {
     public static final String SIGNED_EVENT = "clinical.prescription.signed.v1";
 
     private final ActorDirectory actors;
+    private final DrugCoding coding;
 
     PrescriptionService(PrescriptionRepository repo, AllergyRepository allergyRepo, VitalsRepository vitalsRepo,
                          AuditService auditService, TenantContext tenantContext, ClinicClock clock, ObjectMapper objectMapper,
-                         SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors) {
+                         SafetyDictionaryService dictionaries, ClinicalAuthority clinicalAuthority, EventPublisher eventPublisher, ActorDirectory actors,
+                         DrugCoding coding) {
         this.actors = actors;
+        this.coding = coding;
         this.dictionaries = dictionaries;
         this.clinicalAuthority = clinicalAuthority;
         this.eventPublisher = eventPublisher;
@@ -184,7 +186,10 @@ public class PrescriptionService {
         List<StoredDecision> kept = new ArrayList<>();
         for (PrescriptionItemRequest item : items) {
             List<StoredDecision> decisions = new ArrayList<>();
-            for (Detected d : detectLine(item.drugName(), item.brandName(), allergies, profile, dict, today)) {
+            // CLN-021: a drug master id must exist (404 DRUG_NOT_FOUND); its ingredients and classes join the text checks.
+            String drugId = blankToNull(item.drugId());
+            DrugCoding.Codes codes = drugId == null ? null : coding.resolve(drugId).codes();
+            for (Detected d : detectLine(item.drugName(), item.brandName(), codes, allergies, profile, dict, today)) {
                 if (!d.requiresDecision()) {
                     continue;
                 }
@@ -219,7 +224,7 @@ public class PrescriptionService {
             rows.add(new PrescriptionItemRow(null, prescriptionId, item.drugName(), item.dosage(), item.frequency(),
                     item.duration(), item.instructions(), allergyLabel(decisions), 0, toJson(decisions),
                     blankToNull(item.brandName()), blankToNull(item.sigPattern()), blankToNull(item.route()),
-                    item.quantity(), blankToNull(item.quantityUnit())));
+                    item.quantity(), blankToNull(item.quantityUnit()), drugId, null));
         }
         // A decision that no longer applies (drug changed or removed, warning gone) is withdrawn on the record, not dropped silently.
         for (PrescriptionItemRow old : existing) {
@@ -248,6 +253,7 @@ public class PrescriptionService {
         if ("standard".equals(scope) && !callerCanApprove) {
             throw setForbidden("create a clinic standard");
         }
+        requireKnownDrugs(req.items());
         UUID setId = repo.insertSet(tenantId, "standard".equals(scope) ? null : doctorId, req.name().trim(), "shared".equals(scope));
         repo.insertSetItems(tenantId, setId, req.items());
         // DOC-R2: creation is audited like update and delete (same before/after shape).
@@ -301,6 +307,7 @@ public class PrescriptionService {
         }
         repo.updateSet(tenantId, setId, name, owner, shared);
         if (req.items() != null) {
+            requireKnownDrugs(req.items());
             repo.deleteSetItems(tenantId, setId);
             repo.insertSetItems(tenantId, setId, req.items());
         }
@@ -334,7 +341,7 @@ public class PrescriptionService {
         // drug AND brand exactly as for hand-typed lines, so a brand that carries an allergen is flagged on apply.
         List<PrescriptionItemRequest> items = repo.findSetItems(tenantId, setId).stream()
                 .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
-                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
+                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(), i.drugId()))
                 .toList();
         PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
         repo.markSetUsed(tenantId, setId);
@@ -357,7 +364,7 @@ public class PrescriptionService {
                         "This patient has no signed prescription from an earlier visit to repeat."));
         List<PrescriptionItemRequest> items = repo.findItems(tenantId, last.id()).stream()
                 .map(i -> new PrescriptionItemRequest(i.drugName(), i.dosage(), i.frequency(), i.duration(),
-                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit()))
+                        i.instructions(), null, i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(), i.drugId()))
                 .toList();
         PrescriptionResponse result = upsert(tenantId, queueEntryId, callerStaffId, callerCanApprove, ipAddress, items);
         ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
@@ -396,7 +403,9 @@ public class PrescriptionService {
         List<FavouriteRxSetItemResponse> items = repo.findSetItems(tenantId, s.id()).stream()
                 .map(i -> new FavouriteRxSetItemResponse(i.drugName(), i.dosage(), i.frequency(), i.duration(),
                         i.instructions(), i.brandName(), i.sigPattern(), i.route(), i.quantity(), i.quantityUnit(),
-                        checkable ? isStale(i, pharmacyMaster) : null))
+                        checkable ? isStale(i, pharmacyMaster) : null, i.drugId(), i.genericName(),
+                        i.drugId() != null ? null : coding.suggest(i.drugName())
+                                .map(x -> new FavouriteRxSetItemResponse.CodeSuggestion(x.drugId(), x.display())).orElse(null)))
                 .toList();
         String scope = s.doctorId() == null ? "standard" : s.doctorId().equals(callerStaffId) ? "mine" : "shared";
         int stale = (int) items.stream().filter(i -> Boolean.TRUE.equals(i.stale())).count();
@@ -524,7 +533,8 @@ public class PrescriptionService {
                     String allergyWarning = null;
                     String pregnancyWarning = null;
                     String controlledWarning = null;
-                    for (Detected d : detectLine(i.drugName(), i.brandName(), allergies, profile, dict, today)) {
+                    DrugCoding.Codes codes = coding.codes(i.drugId()).orElse(null);
+                    for (Detected d : detectLine(i.drugName(), i.brandName(), codes, allergies, profile, dict, today)) {
                         StoredDecision held = !d.requiresDecision() ? null : stored.stream()
                                 .filter(s -> s.kind().equals(d.kind()) && sameMatch(s.matched(), d.matched())
                                         && RxSafetyChecks.reasonLabel(d.kind(), s.reasonCode()) != null)
@@ -548,7 +558,7 @@ public class PrescriptionService {
                     return new PrescriptionItemResponse(i.id(), i.drugName(), i.dosage(), i.frequency(), i.duration(),
                             i.instructions(), i.allergyOverrideReason(), i.displayOrder(), allergyWarning,
                             pregnancyWarning, controlledWarning, warnings, i.brandName(), i.sigPattern(), i.route(),
-                            i.quantity(), i.quantityUnit());
+                            i.quantity(), i.quantityUnit(), i.drugId(), i.drugId() != null, i.genericName());
                 })
                 .toList();
         return new PrescriptionResponse(p.id(), p.queueEntryId(), p.patientId(), p.doctorId(), p.status(),
@@ -640,9 +650,18 @@ public class PrescriptionService {
 
     /** DOC-033: the safety checks run on the generic text AND the brand text. A brand can never hide a conflict the
      * generic would show, nor the other way round. A finding already raised by the generic is not duplicated. */
-    private List<Detected> detectLine(String drugName, String brandName, List<AllergyRow> allergies,
+    private List<Detected> detectLine(String drugName, String brandName, DrugCoding.Codes codes, List<AllergyRow> allergies,
                                       PrescriptionRepository.PatientProfile profile, SafetyDictionary dict, LocalDate today) {
         List<Detected> found = new ArrayList<>(detect(drugName, allergies, profile, dict, today));
+        // CLN-021: a coded allergy (ingredient or class id) matches a coded line by id, even when no dictionary text knows the brand.
+        if (codes != null) {
+            allergies.stream().filter(a -> (a.allergenIngredientId() != null && codes.ingredientIds().contains(a.allergenIngredientId()))
+                            || (a.allergenClassId() != null && codes.classIds().contains(a.allergenClassId())))
+                    .min(Comparator.comparingInt(a -> "severe".equals(a.severity()) ? 0 : "moderate".equals(a.severity()) ? 1 : 2))
+                    .filter(a -> found.stream().noneMatch(f -> RxSafetyChecks.KIND_ALLERGY.equals(f.kind()) && sameMatch(f.matched(), a.substance())))
+                    .ifPresent(a -> found.add(new Detected(RxSafetyChecks.KIND_ALLERGY, a.severity(),
+                            a.substance() + " (" + a.severity() + ")", a.substance(), "severe".equals(a.severity()))));
+        }
         if (brandName != null && !brandName.isBlank() && !brandName.trim().equalsIgnoreCase(drugName.trim())) {
             for (Detected d : detect(brandName, allergies, profile, dict, today)) {
                 boolean dup = found.stream().anyMatch(f -> f.kind().equals(d.kind()) && sameMatch(f.matched(), d.matched()));
@@ -658,22 +677,8 @@ public class PrescriptionService {
         return s == null || s.isBlank() ? null : s.trim();
     }
 
-    /** DOC-033: type-ahead over the tenant's own pharmacy item master and prescribing history. Not a formulary. */
-    @Transactional
-    public List<DrugSuggestionResponse> searchDrugs(UUID tenantId, String q, int limit) {
-        tenantContext.set(tenantId);
-        String term = q == null ? "" : q.trim().toLowerCase(java.util.Locale.ROOT);
-        if (term.length() < 2) {
-            return List.of();
-        }
-        if (term.length() > 60) {
-            term = term.substring(0, 60);
-        }
-        String escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-        int capped = Math.max(1, Math.min(limit, 20));
-        return repo.searchDrugs(tenantId, "%" + escaped + "%", escaped + "%", capped).stream()
-                .map(r -> new DrugSuggestionResponse(r.name().trim(), r.source(), r.code(), r.inStock(), r.prescriptionOnly()))
-                .toList();
+    private void requireKnownDrugs(List<PrescriptionItemRequest> items) {
+        items.stream().map(i -> blankToNull(i.drugId())).filter(Objects::nonNull).distinct().forEach(coding::resolve);
     }
 
     /** The most severe matching allergy wins (severe, then moderate, then mild). */

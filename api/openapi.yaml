@@ -2821,13 +2821,23 @@ paths:
   /clinical/drugs/search:
     get:
       tags: [Clinical]
-      summary: "DOC-033. Drug name type-ahead for the prescription pad, built only from this tenant's pharmacy item master (active stocked items) and names it has prescribed before. Returns [] for q shorter than 2 characters. Names only, no PII. Not a clinical formulary; free-text entry always remains possible."
+      summary: "DOC-033 / CLN-020. Drug type-ahead for the prescription pad: the regional drug master (prefix and trigram, ranked by this doctor's and clinic's usage, generic first where the region asks for it, in-stock dot), then the tenant's unlinked pharmacy items and free-text names it prescribed before. Returns [] for q shorter than 2 characters. Names and drug ids only, no PII. Free-text entry always remains possible. The body stays an array (not {items}) so existing clients keep working."
       x-required-permission: "clinical:view | clinical:edit"
       parameters:
         - { name: q, in: query, required: true, schema: { type: string } }
         - { name: limit, in: query, required: false, schema: { type: integer, default: 8, minimum: 1, maximum: 20 } }
       responses:
         "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DrugSuggestion" } } } } }
+  /clinical/drugs/client-index:
+    get:
+      tags: [Clinical]
+      summary: "CLN-020. Per-doctor client index for the typeahead: up to 3000 products (the doctor's favourites, then usage, then A-Z) as gzip-compressed JSON {v, master, rev (= the ETag value), items:[[drugId, display, generic, brand, strength, form, schedule[]]]}, ordered by rank. Drug ids and names only. ETag changes with the drug master version or the ranking; send If-None-Match to get 304. Compression is gzip (the JDK has no brotli)."
+      x-required-permission: clinical:view
+      parameters:
+        - { name: If-None-Match, in: header, required: false, schema: { type: string } }
+      responses:
+        "200": { description: "gzip JSON (X-Index-Encoding: gzip)", headers: { ETag: { schema: { type: string } } }, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        "304": { description: Not modified }
   /clinical/rx-sets:
     get:
       tags: [Clinical]
@@ -4850,6 +4860,8 @@ components:
         deactivatedAt: { type: [string, "null"], format: date-time }
         deactivatedByName: { type: [string, "null"] }
         unconfirmed: { type: boolean, description: "ADM-012: imported from a legacy list, a doctor still has to confirm it; a clinician correction clears it" }
+        allergenIngredientId: { type: [string, "null"], description: "CLN-021. Drug master ingredient id; coded drugs containing it raise the allergy warning by id." }
+        allergenClassId: { type: [string, "null"], description: "CLN-021. Drug master class id (e.g. penicillin); coded drugs with an ingredient of that class raise the warning." }
     AllergyWrite:
       type: object
       required: [substance, severity]
@@ -4859,6 +4871,8 @@ components:
         severity: { type: string, enum: [mild, moderate, severe] }
         reaction: { type: string, maxLength: 500 }
         source: { type: string, enum: [clinician, patient_reported, outside_record] }
+        allergenIngredientId: { type: string, maxLength: 80, description: "CLN-021, optional. Must exist in the drug master (404 DRUG_NOT_FOUND)." }
+        allergenClassId: { type: string, maxLength: 80, description: "CLN-021, optional. Must exist in the drug master (404 DRUG_NOT_FOUND)." }
     AllergyCorrection:
       type: object
       required: [reason]
@@ -4920,12 +4934,20 @@ components:
         route: { type: [string, "null"], maxLength: 40, description: "DOC-033. Route as entered (oral, topical, ...); not interpreted by the server." }
         quantity: { type: [number, "null"], exclusiveMinimum: 0, description: "DOC-033. Quantity to dispense, as entered by the doctor; never derived or converted by the server." }
         quantityUnit: { type: [string, "null"], maxLength: 40, description: "DOC-033. Unit of quantity as entered (tablets, ml, ...); never converted." }
+        drugId: { type: [string, "null"], maxLength: 80, description: "CLN-021. Drug master id; 404 DRUG_NOT_FOUND when unknown. The server stores it with the generic name snapshot and adds ingredient/class safety checks to the text checks." }
     DrugSuggestion:
       type: object
       description: "DOC-033. A type-ahead suggestion from the tenant's own data. Not a clinical formulary: no dose, strength or class."
       properties:
         name: { type: string }
-        source: { type: string, enum: [pharmacy, history], description: "pharmacy = the tenant's pharmacy item master; history = a name this tenant has prescribed before" }
+        source: { type: string, enum: [master, pharmacy, history], description: "master = the regional drug master (CLN-020); pharmacy = an unlinked item of the tenant's pharmacy item master; history = a free-text name this tenant has prescribed before" }
+        drugId: { type: [string, "null"], description: "Drug master id (master rows only)" }
+        display: { type: [string, "null"], description: "Row text, e.g. 'Amoxicillin 500 mg capsule (Mox)'; generic first where the region asks for it (master rows only). name is the legacy alias." }
+        generic: { type: [string, "null"], description: "Ingredient names joined with ' + '" }
+        brand: { type: [string, "null"] }
+        strength: { type: [string, "null"] }
+        form: { type: [string, "null"] }
+        schedule: { type: [array, "null"], items: { type: string } }
         code: { type: [string, "null"], description: "Pharmacy item code (pharmacy only)" }
         inStock: { type: [boolean, "null"] }
         prescriptionOnly: { type: [boolean, "null"] }
@@ -4961,6 +4983,9 @@ components:
               quantity: { type: [number, "null"] }
               quantityUnit: { type: [string, "null"] }
               stale: { type: [boolean, "null"] }
+              drugId: { type: [string, "null"], description: "CLN-021. Drug master id when the item is coded." }
+              genericName: { type: [string, "null"] }
+              codeSuggestion: { type: [object, "null"], description: "CLN-021. Best drug master match for an uncoded item ('code this'); never applied automatically.", properties: { drugId: { type: string }, display: { type: string } } }
     RxWarning:
       type: object
       properties:
@@ -5011,6 +5036,9 @@ components:
         route: { type: [string, "null"] }
         quantity: { type: [number, "null"] }
         quantityUnit: { type: [string, "null"] }
+        drugId: { type: [string, "null"], description: "CLN-021. Drug master id; null = uncoded free text." }
+        coded: { type: boolean }
+        genericName: { type: [string, "null"], description: "CLN-021. Generic name snapshot taken when the line was saved." }
     PharmacySettings:
       type: object
       properties:
@@ -5192,6 +5220,7 @@ components:
         prescriberId: { type: [string, "null"], format: uuid, description: "Who signed (the visit's doctor or a clinical:approve holder)" }
         prescriberName: { type: [string, "null"] }
         professionalRegistrationNo: { type: [string, "null"], description: "From the staff record; null when not set" }
+        genericFirst: { type: boolean, description: "CLN-021. The region prints the generic (salt) name first, the brand in brackets only if one was chosen." }
     StaffClinicalLicence:
       type: object
       required: [staffId, isClinician, hasRegistrationNo]

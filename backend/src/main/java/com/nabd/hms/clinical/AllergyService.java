@@ -49,9 +49,11 @@ public class AllergyService {
     private final com.nabd.hms.common.EventPublisher events;
 
     private final ActorDirectory actors;
+    private final DrugCoding coding;
 
     AllergyService(AllergyRepository repo, TenantContext tenantContext, AuditService auditService, ObjectMapper objectMapper,
-                   com.nabd.hms.common.EventPublisher events, ActorDirectory actors) {
+                   com.nabd.hms.common.EventPublisher events, ActorDirectory actors, DrugCoding coding) {
+        this.coding = coding;
         this.events = events;
         this.actors = actors;
         this.repo = repo;
@@ -93,7 +95,11 @@ public class AllergyService {
                     "'" + substance + "' is already on this patient's allergy register. Correct the existing entry instead.");
         }
         String source = req.source() == null ? "clinician" : req.source();
-        UUID id = repo.insert(tenantId, patientId, substance, req.category(), req.severity(), blankToNull(req.reaction()), source, callerStaffId);
+        String ingredientId = blankToNull(req.allergenIngredientId());
+        String classId = blankToNull(req.allergenClassId());
+        coding.requireAllergen(ingredientId, classId);
+        UUID id = repo.insert(tenantId, patientId, substance, req.category(), req.severity(), blankToNull(req.reaction()), source, callerStaffId,
+                ingredientId, classId);
         AllergyRow row = repo.findById(tenantId, id).orElseThrow();
         // A real allergy supersedes an earlier "no known allergies" statement; it is never left standing next to one.
         if (repo.deleteAssessment(tenantId, patientId) > 0) {
@@ -243,6 +249,8 @@ public class AllergyService {
         m.put("reaction", a.reaction());
         m.put("source", a.source());
         m.put("active", a.active());
+        m.put("allergenIngredientId", a.allergenIngredientId()); // CLN-021: history rows carry the codes
+        m.put("allergenClassId", a.allergenClassId());
         return m;
     }
 
@@ -272,7 +280,8 @@ public class AllergyService {
     private AllergyResponse toResponse(AllergyRow a, String recordedByName, String deactivatedByName) {
         return new AllergyResponse(a.id(), a.patientId(), a.substance(), a.severity(), a.reaction(), a.active(),
                 a.recordedBy(), a.recordedAt(), a.category(), a.source(), recordedByName, a.updatedAt(),
-                a.deactivationReason(), a.deactivatedAt(), deactivatedByName, a.unconfirmed());
+                a.deactivationReason(), a.deactivatedAt(), deactivatedByName, a.unconfirmed(),
+                a.allergenIngredientId(), a.allergenClassId());
     }
 
     private ApiException reasonRequired() {
