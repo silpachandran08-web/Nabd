@@ -110,6 +110,7 @@ public class CallOrderService {
         return entries.isEmpty() ? entries : annotate(tenantContext.current(), entries);
     }
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
     private List<QueueEntryResponse> annotate(UUID tenantId, List<QueueEntryResponse> entries) {
         ZoneId zone = clock.zone(tenantId);
         Instant now = clock.now();
