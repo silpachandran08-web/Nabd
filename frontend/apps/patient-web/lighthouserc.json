@@ -1,0 +1,28 @@
+{
+  "nabdBudgets": {
+    "lcpMs": 3000,
+    "totalJsGzipKB": 150,
+    "routes": ["/l/PREVIEW_LINK_ID_0000000000"]
+  },
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "formFactor": "mobile",
+        "screenEmulation": { "mobile": true, "width": 360, "height": 640, "deviceScaleFactor": 2.625, "disabled": false },
+        "emulatedUserAgent": "Mozilla/5.0 (Linux; Android 11; Moto G Power) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36",
+        "throttlingMethod": "simulate",
+        "throttling": { "rttMs": 150, "throughputKbps": 1638, "requestLatencyMs": 562, "downloadThroughputKbps": 1474, "uploadThroughputKbps": 675, "cpuSlowdownMultiplier": 4 },
+        "onlyCategories": ["performance"]
+      }
+    },
+    "assert": {
+      "assertions": {
+        "largest-contentful-paint": ["error", { "maxNumericValue": 3000, "aggregationMethod": "median" }],
+        "total-byte-weight": ["warn", { "maxNumericValue": 350000 }],
+        "resource-summary:script:size": ["error", { "maxNumericValue": 153600 }]
+      }
+    }
+  }
+}
