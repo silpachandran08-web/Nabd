@@ -17,4 +17,4 @@ groups:
         labels: { severity: ticket }
         annotations:
           summary: "Consumer group {{ $labels.group }} is more than 60 s behind on {{ $labels.stream }}"
-          runbook: docs/architecture/events.md
+          runbook: docs/runbooks/NabdConsumerLagging.md

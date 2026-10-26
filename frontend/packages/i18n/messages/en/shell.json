@@ -1,0 +1,22 @@
+{
+  "showSidebar": "Show sidebar",
+  "hideSidebar": "Hide sidebar",
+  "searchPatient": "Search patient by name or phone",
+  "startDayClose": "Start day close",
+  "captureVitals": "Capture vitals",
+  "registerWalkIn": "Register walk-in",
+  "lastSync": "Last sync {time}",
+  "noServerContact": "No server contact yet",
+  "offline": "Offline",
+  "offlineHint": "Changes can't be saved until you reconnect.",
+  "reconnecting": "Reconnecting",
+  "degradedHint": "The server isn't answering. Changes may not be saved.",
+  "liveReconnectingHint": "Live updates are paused. This screen refreshes once a minute until the connection is back.",
+  "slow": "Slow connection",
+  "slowHint": "The server is answering slowly. Wait for saves to finish.",
+  "live": "Live",
+  "liveHint": "Changes from other desks appear here within seconds.",
+  "online": "Online",
+  "language": "Language",
+  "languageSaveFailed": "Could not save your language. It will reset when you reload."
+}

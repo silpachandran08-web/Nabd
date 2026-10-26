@@ -27,6 +27,10 @@ class S11QaProdBootGuardsTest extends ApiTestBase {
     @Autowired
     Environment env;
 
+    private static String otherJwks() throws Exception {
+        return new JWKSet(new ArrayList<JWK>(List.of(SigningKeyProvider.gen(), SigningKeyProvider.gen()))).toString(false);
+    }
+
     private List<String> prodArgs() throws Exception {
         String jwks = new JWKSet(new ArrayList<JWK>(List.of(SigningKeyProvider.gen(), SigningKeyProvider.gen()))).toString(false);
         byte[] pepper = new byte[32];
@@ -38,6 +42,8 @@ class S11QaProdBootGuardsTest extends ApiTestBase {
                 "--spring.datasource.password=" + env.getProperty("spring.datasource.password"),
                 "--app.crypto.key=" + CRYPTO_KEY_B64, "--app.crypto.keyring=1:" + CRYPTO_KEY_B64, "--app.crypto.active-kid=1",
                 "--app.jwt.keys-json=" + jwks,
+                "--app.jwt.owner.keys-json=" + otherJwks(), "--app.jwt.platform.keys-json=" + otherJwks(), // PLT-009: one key set per population
+                "--app.jwt.internal.jwks-json=" + new JWKSet(new ArrayList<JWK>(List.of(SigningKeyProvider.gen()))).toString(true),
                 "--app.auth.otp.phone-hmac-key=" + Base64.getEncoder().encodeToString(pepper),
                 // src/test/resources/application.properties sets enforce-privileged=false for every boot on the test classpath
                 "--app.auth.mfa.enforce-privileged=true",

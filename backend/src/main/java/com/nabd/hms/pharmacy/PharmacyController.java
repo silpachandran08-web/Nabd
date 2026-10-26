@@ -57,6 +57,7 @@ public class PharmacyController {
     }
 
     @PostMapping("/items")
+    @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public ResponseEntity<PharmacyItemResponse> addItem(@AuthenticationPrincipal Jwt jwt,
                                                          @Valid @RequestBody PharmacyItemWriteRequest req, HttpServletRequest http) {
@@ -65,14 +66,27 @@ public class PharmacyController {
     }
 
     @PatchMapping("/items/{id}")
+    @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacyItemResponse updateItem(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                             @Valid @RequestBody PharmacyItemWriteRequest req) {
         return service.updateItem(tenantId(jwt), id, req);
     }
 
+    public record DrugLinkRequest(@jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 80) String drugId) {
+    }
+
+    /** CLN-019: map the item to a drug master product (idempotent: same body, same result). */
+    @org.springframework.web.bind.annotation.PutMapping("/items/{id}/drug-link")
+    @PreAuthorize("hasAuthority('pharmacy:edit')")
+    public java.util.Map<String, Object> linkDrug(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                  @Valid @RequestBody DrugLinkRequest req, HttpServletRequest http) {
+        return service.linkDrug(tenantId(jwt), staffId(jwt), RequestMeta.clientIp(http), id, req.drugId());
+    }
+
     /** V2-004: the only way to change stock by hand. Relative (`delta`) or stock-take (`setTo`), reason required. */
     @PostMapping("/items/{id}/stock-adjustments")
+    @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacyItemResponse adjustStock(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                              @Valid @RequestBody PharmacyStockAdjustmentRequest req, HttpServletRequest http) {
@@ -81,6 +95,7 @@ public class PharmacyController {
 
     /** V2-007: activate / deactivate an item. */
     @PatchMapping("/items/{id}/status")
+    @com.nabd.hms.organization.api.RequiresEntitlement("pharmacy_inhouse") // PLT-059
     @PreAuthorize("hasAuthority('pharmacy:edit')")
     public PharmacyItemResponse setStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
                                            @Valid @RequestBody PharmacyItemStatusRequest req, HttpServletRequest http) {

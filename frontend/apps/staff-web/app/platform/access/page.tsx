@@ -6,7 +6,7 @@ import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews
 import StatusPill from "../../components/ui/StatusPill";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { GrantStatusPill } from "../../components/platform/statusPills";
-import { problemDetail, usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError } from "../platformApi";
 
 // Matches GET /v1/platform/support-access/grants (SupportAccessController).
 type Grant = {
@@ -20,19 +20,22 @@ type Grant = {
   expiresAt: string;
   revokedAt: string | null;
   active: boolean;
+  // PLT-057: a grant is a request until the clinic owner approves it; the window starts at approval.
+  status: "requested" | "active" | "declined" | "expired" | "revoked";
+  windowEndsAt: string | null;
+  declineNote: string | null;
 };
 
 type TenantOption = { id: string; name: string; slug: string };
 // PLT-056: a grant names one of the clinic's support tickets (GET /v1/platform/support/tickets).
 type TicketOption = { id: string; tenantId: string; subject: string; status: string };
 
-function grantState(g: Grant): "active" | "expired" | "revoked" {
-  if (g.revokedAt) return "revoked";
-  return g.active ? "active" : "expired";
+function grantState(g: Grant): Grant["status"] {
+  if (g.status === "active" && !g.active) return "expired"; // window ran out before the sweep wrote it
+  return g.status;
 }
 
 export default function SupportAccessPage() {
-  const authedFetch = usePlatformFetch();
   const [grants, setGrants] = useState<Grant[]>([]);
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,31 +56,19 @@ export default function SupportAccessPage() {
     setLoading(true);
     setError(null);
     try {
-      const grantsRes = await authedFetch("/platform/support-access/grants");
-      if (!grantsRes) return; // session gone, already redirecting to login
-      if (grantsRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!grantsRes.ok) {
-        setError("Couldn't load support access grants. Try again.");
-        return;
-      }
-      setGrants(await grantsRes.json());
+      setGrants(await platformApi.get<Grant[]>("/platform/support-access/grants"));
 
-      const tenantsRes = await authedFetch("/platform/tenants?limit=100");
-      if (tenantsRes?.ok) {
-        const body: { data: TenantOption[] } = await tenantsRes.json();
-        setTenants(body.data);
-      }
-      const ticketsRes = await authedFetch("/platform/support/tickets");
-      if (ticketsRes?.ok) setTickets(await ticketsRes.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      const tenantList = await platformApi.get<{ data: TenantOption[] }>("/platform/tenants?limit=100").catch(() => null);
+      if (tenantList) setTenants(tenantList.data);
+      const ticketList = await platformApi.get<typeof tickets>("/platform/support/tickets").catch(() => null);
+      if (ticketList) setTickets(ticketList);
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setError(platformError(e, "Couldn't load support access grants. Try again."));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -113,18 +104,11 @@ export default function SupportAccessPage() {
     }
     setSubmitting(true);
     try {
-      const res = await authedFetch("/platform/support-access/grants", {
-        method: "POST",
-        body: JSON.stringify({ tenantId, ticketId, scope, minutes: mins, reason }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setFormError(await problemDetail(res, "Couldn't request access. Try again."));
-        return;
-      }
-      const grant: Grant = await res.json();
+      const grant = await platformApi.post<Grant>("/platform/support-access/grants", { tenantId, ticketId, scope, minutes: mins, reason });
       setGrants((prev) => [grant, ...prev]);
       setReason("");
+    } catch (err) {
+      setFormError(platformError(err, "Couldn't request access. Try again."));
     } finally {
       setSubmitting(false);
     }
@@ -134,17 +118,12 @@ export default function SupportAccessPage() {
     setActingOn(id);
     setRevokeError(null);
     try {
-      const res = await authedFetch(`/platform/support-access/grants/${id}/revoke`, { method: "POST" });
-      if (!res) return;
-      if (!res.ok) {
-        setRevokeError(await problemDetail(res, "Couldn't revoke the grant. Try again."));
-        return;
-      }
+      await platformApi.post(`/platform/support-access/grants/${id}/revoke`);
       setGrants((prev) =>
-        prev.map((g) => (g.id === id ? { ...g, active: false, revokedAt: new Date().toISOString() } : g))
+        prev.map((g) => (g.id === id ? { ...g, active: false, status: "revoked", revokedAt: new Date().toISOString() } : g))
       );
-    } catch {
-      setRevokeError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      setRevokeError(platformError(e, "Couldn't revoke the grant. Try again."));
     } finally {
       setActingOn(null);
     }
@@ -154,7 +133,7 @@ export default function SupportAccessPage() {
     <main className={styles.page}>
       <div className={styles.header}>
         <h1 className={styles.title}>Support Access</h1>
-        <p className={styles.subtitle}>Consented, time-boxed and audited — one clinic, one ticket, one scope, at most 60 minutes, no clinical fields.</p>
+        <p className={styles.subtitle}>Starts only after the clinic owner approves — one clinic, one ticket, one scope, at most 60 minutes from approval, no clinical fields.</p>
       </div>
 
       {!forbidden && (
@@ -206,7 +185,7 @@ export default function SupportAccessPage() {
               />
             </div>
             <button className={styles.submit} type="submit" disabled={submitting}>
-              {submitting ? "Requesting…" : "Request grant"}
+              {submitting ? "Requesting…" : "Request access"}
             </button>
             {formError && <div className={styles.formError} role="alert">{formError}</div>}
           </form>
@@ -236,12 +215,12 @@ export default function SupportAccessPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Operator</th>
-                  <th>Reason</th>
-                  <th>Granted</th>
-                  <th>Expires</th>
-                  <th>Status</th>
-                  <th></th>
+                  <th scope="col">Operator</th>
+                  <th scope="col">Reason</th>
+                  <th scope="col">Requested</th>
+                  <th scope="col">Open until</th>
+                  <th scope="col">Status</th>
+                  <th scope="col"></th>
                 </tr>
               </thead>
               <tbody>
@@ -252,16 +231,19 @@ export default function SupportAccessPage() {
                       <td>{g.operatorName} <span className={styles.muted}>({g.operatorRole})</span></td>
                       <td>{g.reason}</td>
                       <td>{new Date(g.grantedAt).toLocaleString()}</td>
-                      <td>{new Date(g.expiresAt).toLocaleString()}</td>
-                      <td><GrantStatusPill state={state} /></td>
+                      <td>{new Date(g.windowEndsAt ?? g.expiresAt).toLocaleString()}</td>
                       <td>
-                        {state === "active" && (
+                        <GrantStatusPill state={state} />
+                        {state === "declined" && g.declineNote && <div className={styles.muted}>{g.declineNote}</div>}
+                      </td>
+                      <td>
+                        {(state === "active" || state === "requested") && (
                           <button
                             className={styles.revokeBtn}
                             disabled={actingOn === g.id}
                             onClick={() => revoke(g.id)}
                           >
-                            {actingOn === g.id ? "…" : "Revoke"}
+                            {actingOn === g.id ? "…" : state === "requested" ? "Withdraw" : "Revoke"}
                           </button>
                         )}
                       </td>

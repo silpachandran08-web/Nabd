@@ -1,0 +1,68 @@
+# OPS-056: prod-in Core API (2 replicas, Mumbai, spread over zones). Image is promoted by digest (infra/prod-in/promote.py fills REPLACE_DIGEST; the Kyverno policy
+# verify-images.yaml refuses anything unsigned). Secret values come from the cell secret manager (OPS-058), synced into the
+# Secrets named below by the operator (Needs external action). Nothing here is applied from this sandbox.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: core, namespace: prod-in }
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: core }
+  template:
+    metadata:
+      labels: { app: core }
+    spec:
+      terminationGracePeriodSeconds: 45
+      nodeSelector: { topology.kubernetes.io/region: ap-south-1 }   # Mumbai only; the cluster itself has no other region
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector: { matchLabels: { app: core } }
+      containers:
+        - name: core
+          image: ghcr.io/REPLACE_ORG/nabd-core@sha256:REPLACE_DIGEST
+          ports: [{ name: http, containerPort: 8080 }, { name: management, containerPort: 8081 }]
+          env:
+            - { name: SPRING_PROFILES_ACTIVE, value: prod }
+            - { name: JWT_KEYS_FILE, value: /secrets/jwt/jwks.json }
+            - { name: JWT_OWNER_KEYS_FILE, value: /secrets/jwt/owner-jwks.json }   # PLT-009: one key set per token population, same secret mount
+            - { name: JWT_PLATFORM_KEYS_FILE, value: /secrets/jwt/platform-jwks.json }
+            - { name: JWT_INTERNAL_JWKS_FILE, value: /secrets/jwt/internal-public-jwks.json }   # public keys of the calling services only
+            - { name: DB_USER, value: nabd_app }
+            - { name: DB_URL, valueFrom: { secretKeyRef: { name: core-secrets, key: db-url } } }          # PgBouncer endpoint (OPS-055)
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: core-secrets, key: db-password } } }
+            - { name: APP_CRYPTO_KEYRING, valueFrom: { secretKeyRef: { name: core-secrets, key: app-crypto-keyring } } }
+            - { name: APP_CRYPTO_ACTIVE_KID, value: "1" }
+            - { name: VALKEY_URL, valueFrom: { secretKeyRef: { name: core-secrets, key: valkey-url } } }
+            - { name: APP_CORS_ALLOWED_ORIGINS, value: "https://REPLACE_APP_HOST" }   # the staff app host only; no Vercel/localhost origin in prod
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: management }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: management }
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: management }
+            periodSeconds: 5
+            failureThreshold: 36
+          volumeMounts:
+            - { name: jwt-keys, mountPath: /secrets/jwt, readOnly: true }
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "10"] }
+      volumes:
+        - name: jwt-keys
+          secret: { secretName: core-jwt-keys }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: core, namespace: prod-in }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: core } }

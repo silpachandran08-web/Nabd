@@ -17,6 +17,8 @@ import com.nabd.hms.common.AuditService;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.organization.api.OrganizationConfig;
+import com.nabd.hms.organization.api.SeriesAllocator;
+import com.nabd.hms.shared.money.Money;
 import com.nabd.hms.queue.QueueService;
 import com.nabd.hms.queue.dto.QueueStatusUpdateRequest;
 import org.slf4j.Logger;
@@ -70,11 +72,19 @@ public class CheckoutService {
     private final com.nabd.hms.pharmacy.RxGate rxGate;
 
     private final ActorDirectory actors;
+    private final com.nabd.hms.organization.api.RegionRules regions;
+    private final SeriesAllocator series;
+    private final com.nabd.hms.billing.tax.TaxService tax;
 
     CheckoutService(CheckoutRepository repo, TenantContext tenantContext, QueueService queueService,
                      OrganizationConfig departmentService, ClinicClock clock, DayCloseService dayClose,
                      AuditService auditService, com.nabd.hms.queue.VisitCommands visitCommands,
-                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors) {
+                     EventPublisher eventPublisher, BillingPricing pricing, com.nabd.hms.pharmacy.RxGate rxGate, ActorDirectory actors,
+                     com.nabd.hms.organization.api.RegionRules regions, SeriesAllocator series,
+                     com.nabd.hms.billing.tax.TaxService tax) {
+        this.tax = tax;
+        this.regions = regions;
+        this.series = series;
         this.actors = actors;
         this.rxGate = rxGate;
         this.visitCommands = visitCommands;
@@ -156,10 +166,11 @@ public class CheckoutService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge",
                         "Add at least one charge before checking out.");
             }
-            Totals t = computeTotals(lineItems, List.of(), BigDecimal.ZERO, req, canDiscount);
+            Totals t = computeTotals(null, lineItems, List.of(), BigDecimal.ZERO, req, canDiscount);
             invoiceId = repo.insertInvoice(tenantId, queueEntryId, ctx.patientId(), ctx.doctorId(),
-                    t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId);
-            repo.insertLineItems(tenantId, invoiceId, lineItems);
+                    t.subtotal(), t.discount(), t.tax(), t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
+            repo.insertLineItems(tenantId, invoiceId, t.items());
+            tax.persist(invoiceId, t.computation());
             repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
             auditPricing(tenantId, staffId, ip, invoiceId, lineItems, t.newDiscounts(), BigDecimal.ZERO);
             log.info("invoice {} created for queue entry {} by {} (tenant {}, total {})",
@@ -169,10 +180,11 @@ public class CheckoutService {
             InvoiceRow locked = repo.lockInvoice(tenantId, invoiceId).orElseThrow(this::notFound); // serialises with payments
             List<LineItemRow> existingItems = repo.findLineItems(tenantId, invoiceId);
             BigDecimal earlier = repo.sumDiscounts(tenantId, invoiceId);
-            Totals t = computeTotals(lineItems, existingItems, earlier, req, canDiscount);
+            Totals t = computeTotals(invoiceId, lineItems, existingItems, earlier, req, canDiscount);
             if (!lineItems.isEmpty()) {
-                repo.appendLineItems(tenantId, invoiceId, lineItems, repo.nextLineItemOrder(tenantId, invoiceId));
+                repo.appendLineItems(tenantId, invoiceId, t.items(), repo.nextLineItemOrder(tenantId, invoiceId));
             }
+            tax.persist(invoiceId, t.computation());
             if (locked.paid().compareTo(t.total()) > 0) {
                 throw new ApiException(HttpStatus.CONFLICT, "total-below-paid", "Total is below what was paid",
                         "This invoice already has " + locked.paid().toPlainString() + " paid, which is more than the new total.");
@@ -241,11 +253,12 @@ public class CheckoutService {
         }
         // PHL-001: a counter sale of an Rx line needs a signed in-system prescription; the invoice then carries that patient.
         UUID rxPatient = trusted ? null : rxGate.check(tenantId, patientId, rxLines(items), staffId, ip);
-        Totals t = computeTotals(items, List.of(), BigDecimal.ZERO, req, canDiscount);
+        Totals t = computeTotals(null, items, List.of(), BigDecimal.ZERO, req, canDiscount);
 
         UUID invoiceId = repo.insertInvoice(tenantId, null, patientId != null ? patientId : rxPatient, null, t.subtotal(), t.discount(), t.tax(),
-                t.roundOff(), t.total(), staffId);
-        repo.insertLineItems(tenantId, invoiceId, items);
+                t.roundOff(), t.total(), staffId, series.allocate(SeriesAllocator.Kind.INVOICE));
+        repo.insertLineItems(tenantId, invoiceId, t.items());
+        tax.persist(invoiceId, t.computation());
         repo.insertDiscounts(tenantId, invoiceId, t.newDiscounts(), staffId);
         if (!trusted) auditPricing(tenantId, staffId, ip, invoiceId, items, t.newDiscounts(), BigDecimal.ZERO);
         log.info("{} invoice {} created by {} (tenant {}, total {})", kind, invoiceId, staffId, tenantId, t.total());
@@ -259,33 +272,68 @@ public class CheckoutService {
     }
 
     private record Totals(BigDecimal subtotal, BigDecimal discount, BigDecimal tax, BigDecimal roundOff, BigDecimal total,
-                          List<BillingPricing.DiscountInput> newDiscounts) {
+                          List<BillingPricing.DiscountInput> newDiscounts, List<LineItemInput> items,
+                          com.nabd.hms.billing.tax.TaxService.Computation computation) {
     }
 
     /** NB-355: totals over new (not-yet-persisted) line items plus, when extending an
      * already-created invoice, whatever's already on it. FIN-003: the invoice discount is the ledger sum —
-     * {@code earlierDiscount} (rows from earlier checkpoints) plus this request's new rows, capped by the combined subtotal. */
-    private Totals computeTotals(List<LineItemInput> newItems, List<LineItemRow> existingItems, BigDecimal earlierDiscount,
-                                 CheckoutRequest req, boolean canDiscount) {
+     * {@code earlierDiscount} (rows from earlier checkpoints) plus this request's new rows, capped by the combined subtotal.
+     * FIN-008: the discount is allocated to the lines before tax, and the tax engine returns every figure in minor units;
+     * {@code items} are the new lines carrying the rate the engine resolved. */
+    private Totals computeTotals(UUID invoiceId, List<LineItemInput> newItems, List<LineItemRow> existingItems,
+                                 BigDecimal earlierDiscount, CheckoutRequest req, boolean canDiscount) {
+        UUID tenantId = tenantContext.current();
         BigDecimal subtotal = BigDecimal.ZERO;
-        BigDecimal tax = BigDecimal.ZERO;
-        for (LineItemInput li : newItems) {
-            BigDecimal lineAmount = li.unitPrice().multiply(BigDecimal.valueOf(li.quantity()));
-            subtotal = subtotal.add(lineAmount);
-            tax = tax.add(lineAmount.multiply(li.taxRatePercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-        }
-        for (LineItemRow li : existingItems) {
-            subtotal = subtotal.add(li.lineTotal());
-            tax = tax.add(li.lineTotal().multiply(li.taxRatePercent()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP));
-        }
+        for (LineItemInput li : newItems) subtotal = subtotal.add(li.unitPrice().multiply(BigDecimal.valueOf(li.quantity())));
+        for (LineItemRow li : existingItems) subtotal = subtotal.add(li.lineTotal());
 
         var newDiscounts = pricing.resolveDiscounts(req.discountOrZero(), req.discountsOrEmpty(), canDiscount, subtotal.subtract(earlierDiscount));
         BigDecimal discount = newDiscounts.stream().map(BillingPricing.DiscountInput::amount).reduce(earlierDiscount, BigDecimal::add);
 
-        BigDecimal rawTotal = subtotal.subtract(discount).add(tax);
-        BigDecimal total = rawTotal.setScale(0, RoundingMode.HALF_UP);
-        BigDecimal roundOff = total.subtract(rawTotal);
-        return new Totals(subtotal, discount, tax, roundOff, total, newDiscounts);
+        String currency = currencyFor(tenantId);
+        List<com.nabd.hms.billing.tax.TaxService.InLine> in = new java.util.ArrayList<>();
+        for (LineItemRow li : existingItems) {
+            in.add(new com.nabd.hms.billing.tax.TaxService.InLine(li.id().toString(), com.nabd.hms.billing.tax.TaxService.minor(li.lineTotal(), currency),
+                    null, li.taxRatePercent(), true, li.taxCategory(), li.taxInclusive(), li.interState(), li.sacHsn()));
+        }
+        int n = 0;
+        for (LineItemInput li : newItems) {
+            in.add(new com.nabd.hms.billing.tax.TaxService.InLine("new" + n++,
+                    com.nabd.hms.billing.tax.TaxService.minor(li.unitPrice().multiply(BigDecimal.valueOf(li.quantity())), currency),
+                    li.catalogueId(), li.taxRatePercent(), false, null, false, false, null));
+        }
+        var c = tax.compute(invoiceId, in, com.nabd.hms.billing.tax.TaxService.minor(discount, currency), req.buyerGstin());
+        List<LineItemInput> rated = new java.util.ArrayList<>();
+        for (int i = 0; i < newItems.size(); i++) rated.add(newItems.get(i).withTaxRate(c.meta().get(existingItems.size() + i).rate()));
+        var r = c.result();
+        return new Totals(money(r.subtotalMinor(), currency), discount, money(r.taxMinor(), currency), money(r.roundOffMinor(), currency),
+                money(r.totalMinor(), currency), newDiscounts, rated, c);
+    }
+
+    private static BigDecimal money(long minor, String currency) {
+        return new Money(minor, java.util.Currency.getInstance(currency)).amount();
+    }
+
+    /** FIN-008: tax for a draft cart, nothing stored. Same path as checkout, so the quote is the bill. */
+    @Transactional
+    public com.nabd.hms.billing.dto.QuoteResponse quote(UUID staffId, boolean canDiscount, CheckoutRequest req) {
+        UUID tenantId = tenantContext.current();
+        if (req.discountOrZero().signum() > 0 || !req.discountsOrEmpty().isEmpty()) BillingPricing.requireDiscountRight(canDiscount);
+        List<LineItemInput> items = pricing.resolveLines(tenantId, req.lineItems(), false, canDiscount, false, staffId);
+        if (items.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "line-items-required", "Add at least one charge", "Add at least one charge to get a quote.");
+        }
+        Totals t = computeTotals(null, items, List.of(), BigDecimal.ZERO, req, canDiscount);
+        var res = t.computation().result();
+        List<com.nabd.hms.billing.dto.QuoteResponse.Line> lines = new java.util.ArrayList<>();
+        for (int i = 0; i < items.size(); i++) {
+            var lr = res.lines().get(i);
+            lines.add(new com.nabd.hms.billing.dto.QuoteResponse.Line(items.get(i).chargeCode(), lr.discountMinor(), lr.taxableMinor(),
+                    lr.taxes().stream().map(x -> new com.nabd.hms.billing.dto.QuoteResponse.Tax(x.type(), x.ratePercent(), x.amountMinor())).toList()));
+        }
+        return new com.nabd.hms.billing.dto.QuoteResponse(t.computation().currency(), t.computation().documentType(), lines,
+                new com.nabd.hms.billing.dto.QuoteResponse.QuoteTotals(res.subtotalMinor(), res.discountMinor(), res.taxMinor(), res.roundOffMinor(), res.totalMinor()));
     }
 
     /** FIN-003: one audit row per price override / free-text line and per discount (before/after). */
@@ -352,7 +400,8 @@ public class CheckoutService {
                     java.util.Map.of("balance", balance));
         }
         String reference = req.reference() == null || req.reference().isBlank() ? null : req.reference().trim();
-        UUID paymentId = repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId, reference, idempotencyKey);
+        UUID paymentId = repo.insertPayment(tenantId, invoiceId, req.method(), req.amount(), staffId, reference, idempotencyKey,
+                series.allocate(SeriesAllocator.Kind.RECEIPT).formatted());
         BigDecimal newPaid = repo.sumPayments(tenantId, invoiceId);
         String newStatus = InvoiceStatus.derive(invoice.status(), invoice.total(), newPaid);
         repo.syncInvoicePaid(tenantId, invoiceId, newStatus);
@@ -365,11 +414,11 @@ public class CheckoutService {
         String currency = currencyFor(tenantId);
         eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.PAYMENT_RECORDED, paymentId, java.util.Map.of(
                 "invoiceId", invoiceId, "paymentId", paymentId, "method", req.method(),
-                "amountMinor", req.amount().movePointRight(2).longValueExact(), "currency", currency,
-                "balanceMinor", newBalance.movePointRight(2).longValueExact(), "status", newStatus));
+                "amountMinor", Money.of(req.amount(), currency).amountMinor(), "currency", currency,
+                "balanceMinor", Money.of(newBalance, currency).amountMinor(), "status", newStatus));
         if ("paid".equals(newStatus) && !"paid".equals(invoice.status())) {
             eventPublisher.publish(tenantId, com.nabd.hms.common.DomainEventType.INVOICE_PAID, invoiceId, java.util.Map.of(
-                    "invoiceId", invoiceId, "totalMinor", invoice.total().movePointRight(2).longValueExact(), "currency", currency,
+                    "invoiceId", invoiceId, "totalMinor", Money.of(invoice.total(), currency).amountMinor(), "currency", currency,
                     "status", "paid"));
         }
         log.info("payment recorded on invoice {} by {}: {} {} (tenant {})", invoiceId, staffId, req.amount(), req.method(), tenantId);
@@ -417,10 +466,17 @@ public class CheckoutService {
     }
 
     private InvoiceResponse toInvoiceResponse(UUID tenantId, InvoiceRow row) {
+        var stored = tax.storedTaxes(row.id());
         List<LineItemResponse> lineItems = repo.findLineItems(tenantId, row.id()).stream()
-                .map(li -> new LineItemResponse(li.chargeCode(), li.chargeName(), li.category(), li.quantity(),
-                        li.unitPrice(), li.taxRatePercent(), li.lineTotal(), li.listUnitPrice(), li.tier(), li.overrideReasonCode()))
+                .map(li -> {
+                    var parts = stored.getOrDefault(li.id(), List.of());
+                    return new LineItemResponse(li.chargeCode(), li.chargeName(), li.category(), li.quantity(),
+                        li.unitPrice(), li.taxRatePercent(), li.lineTotal(), li.listUnitPrice(), li.tier(), li.overrideReasonCode(),
+                        li.taxableMinor(),
+                        parts.stream().map(p -> new LineItemResponse.TaxPart(p.type(), p.ratePercent(), p.amountMinor())).toList());
+                })
                 .toList();
+        String[] docMeta = tax.documentMeta(row.id());
         List<PaymentResponse> payments = repo.findPayments(tenantId, row.id()).stream()
                 .map(p -> new PaymentResponse(p.id(), p.method(), p.amount(), p.recordedAt(), p.idempotencyKey()))
                 .toList();
@@ -431,7 +487,8 @@ public class CheckoutService {
         return new InvoiceResponse(row.id(), row.invoiceNumber(), row.queueEntryId(), row.patientId(), patientName,
                 row.doctorId(), doctorName, currencyFor(tenantId), row.subtotal(), row.discount(), row.tax(),
                 row.roundOff(), row.total(), row.paid(), row.total().subtract(row.paid()), row.status(),
-                lineItems, payments, row.createdAt());
+                lineItems, payments, row.createdAt(),
+                com.nabd.hms.billing.tax.TaxService.BILL_OF_SUPPLY.equals(docMeta[0]) ? "Bill of Supply" : "Invoice", docMeta[1]);
     }
 
     private ChargeResponse toChargeResponse(ChargeRow c) {
@@ -446,8 +503,7 @@ public class CheckoutService {
     }
 
     private String currencyFor(UUID tenantId) {
-        String region = repo.findTenantRegion(tenantId).orElse("IN");
-        return "KSA".equals(region) ? "SAR" : "INR";
+        return regions.region(repo.findTenantRegion(tenantId).orElse("IN")).currency();
     }
 
     private ApiException notFound() {

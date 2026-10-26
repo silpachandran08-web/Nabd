@@ -9,38 +9,29 @@
 // Token storage keys appear only in this file; login, logout and the nav go through the helpers below.
 // PLT-008: kept free of React/Next imports so the 401 handling is unit-tested (tests/unit/platformSession.test.mjs).
 
-// Same value as surfaces.ts API_BASE; read directly (as lib/session.ts does) so node can load this file in unit tests.
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+// FEF-018: the operator console's client is a second instance of the shared one (packages/api-client) with its own
+// token keys and its own refresh endpoint; it never reads or writes the clinic session. Same value as lib/api.ts.
+import { createClient, type ApiClient } from "@nabd/api-client";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const ACCESS_KEY = "nabd_platform_access_token";
 const REFRESH_KEY = "nabd_platform_refresh_token";
 
-let refreshing: Promise<boolean> | null = null;
+const refreshClient = createClient({ baseUrl: BASE_URL, getToken: () => null, onAuthFailure: () => {} });
 
-function refreshSession(): Promise<boolean> {
-  if (refreshing) return refreshing;
-  refreshing = (async () => {
-    const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (!refreshToken) return false;
-    try {
-      const res = await fetch(`${API_BASE}/platform/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
-      });
-      if (!res.ok) return false;
-      const pair: { accessToken?: string; refreshToken?: string } = await res.json();
-      if (!pair.accessToken) return false;
-      localStorage.setItem(ACCESS_KEY, pair.accessToken);
-      if (pair.refreshToken) localStorage.setItem(REFRESH_KEY, pair.refreshToken);
-      return true;
-    } catch {
-      return false;
-    } finally {
-      // Let the next 401 (minutes later) trigger a fresh refresh.
-      setTimeout(() => { refreshing = null; }, 0);
-    }
-  })();
-  return refreshing;
+/** POST /platform/auth/refresh once (the client shares one call between parallel 401s) and keep the rotated pair. */
+async function refreshSession(): Promise<boolean> {
+  const refreshToken = localStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return false;
+  try {
+    const pair = await refreshClient.post<{ accessToken?: string; refreshToken?: string }>("/platform/auth/refresh", { refreshToken }, { keepSession: true });
+    if (!pair.accessToken) return false;
+    localStorage.setItem(ACCESS_KEY, pair.accessToken);
+    if (pair.refreshToken) localStorage.setItem(REFRESH_KEY, pair.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Set when a 401 ended the session, so every redirect (including later calls that find no token)
@@ -49,7 +40,7 @@ let expired = false;
 
 export const SESSION_EXPIRED_MESSAGE = "Your session expired. Sign in again.";
 
-/** Where to send the operator when platformFetch returns null. */
+/** Where to send the operator once the session is gone. */
 export function platformLoginPath(): string {
   return expired ? "/platform/login?expired=1" : "/platform/login";
 }
@@ -73,33 +64,19 @@ export function storePlatformSession(pair: { accessToken: string; refreshToken: 
 /** Ends the server session (best effort) and clears the local one. The caller routes to login. */
 export async function platformLogout(): Promise<void> {
   const token = localStorage.getItem(ACCESS_KEY);
-  if (token) await send("/platform/auth/logout", { method: "POST" }, token).catch(() => {});
+  if (token) await platformApi.post("/platform/auth/logout", undefined, { keepSession: true }).catch(() => {});
   clearPlatformSession();
 }
 
-function send(path: string, init: RequestInit | undefined, token: string) {
-  const headers = new Headers(init?.headers);
-  headers.set("Authorization", `Bearer ${token}`);
-  if (typeof init?.body === "string" && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  return fetch(`${API_BASE}${path}`, { ...init, headers });
-}
-
-/** Authed fetch. Resolves to null when there is no session or a 401 survives one refresh (the session
- * is then cleared and marked expired); the caller routes to platformLoginPath(). Never called by the
- * login page, so an expired session cannot loop. */
-export async function platformFetch(path: string, init?: RequestInit): Promise<Response | null> {
-  const token = localStorage.getItem(ACCESS_KEY);
-  if (!token) return null;
-  let res = await send(path, init, token);
-  if (res.status === 401) {
-    if (await refreshSession()) {
-      res = await send(path, init, localStorage.getItem(ACCESS_KEY) ?? "");
-    }
-    if (res.status === 401) {
-      clearPlatformSession();
-      expired = true;
-      return null;
-    }
-  }
-  return res;
-}
+/** The operator console's API client. A 401 that survives one refresh clears the operator session, marks it expired and
+ * sends the operator to login (the call then throws ApiError 401). Never used by the login page, so no loop. */
+export const platformApi: ApiClient = createClient({
+  baseUrl: BASE_URL,
+  getToken: () => localStorage.getItem(ACCESS_KEY),
+  refresh: refreshSession,
+  onAuthFailure: () => {
+    expired = expired || hasPlatformSession(); // a visitor who never signed in gets the plain login, not "expired"
+    clearPlatformSession();
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/platform/login")) window.location.replace(platformLoginPath());
+  },
+});

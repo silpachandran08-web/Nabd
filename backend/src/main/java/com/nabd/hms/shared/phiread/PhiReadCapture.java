@@ -94,7 +94,7 @@ class PhiReadCapture implements ResponseBodyAdvice<Object> {
     /** The body's own {key} component, else that component of each element of the body (or of its first list component). */
     static Set<UUID> patientIds(Object body, String key) {
         Set<UUID> out = new LinkedHashSet<>();
-        UUID own = component(body, key);
+        UUID own = key.contains(",") ? null : component(body, key);
         if (own != null) {
             out.add(own);
             return out;
@@ -102,9 +102,11 @@ class PhiReadCapture implements ResponseBodyAdvice<Object> {
         Iterable<?> items = body instanceof Iterable<?> it ? it : firstList(body);
         if (items != null) {
             for (Object item : items) {
-                UUID id = component(item, key);
-                if (id != null) {
-                    out.add(id);
+                for (String k : key.split(",")) { // ACC-030: "a.patientId,b.patientId" = several patients per item
+                    UUID id = component(item, k);
+                    if (id != null) {
+                        out.add(id);
+                    }
                 }
             }
         }
@@ -113,6 +115,15 @@ class PhiReadCapture implements ResponseBodyAdvice<Object> {
 
     private static UUID component(Object o, String name) {
         if (o == null || !o.getClass().isRecord()) {
+            return null;
+        }
+        int dot = name.indexOf('.');
+        if (dot > 0) { // nested record component
+            for (RecordComponent c : o.getClass().getRecordComponents()) {
+                if (c.getName().equals(name.substring(0, dot))) {
+                    return component(read(c, o), name.substring(dot + 1));
+                }
+            }
             return null;
         }
         for (RecordComponent c : o.getClass().getRecordComponents()) {

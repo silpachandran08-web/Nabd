@@ -1,23 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Dialog from "../components/ui/Dialog";
 import styles from "./schedule.module.css";
 import { clinicTime } from "./NewAppointmentDialog";
 import { hijriLabel } from "../lib/hijri";
-import type { Problem } from "@nabd/api-client/types";
-
-type AuthedFetch = (path: string, init?: RequestInit) => Promise<Response | null>;
+import { api } from "../lib/api";
+import { getter, key } from "../lib/query";
+import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
+import type { AppointmentResponse } from "@nabd/api-client/generated";
 
 // Wireframe CANCEL_REASONS (NabdShell.html L5906). The chosen label is what gets sent.
 export const CANCEL_REASONS = [
   "Schedule conflict", "Illness", "Cost", "Transport", "Patient went elsewhere", "Clinic initiated", "Other",
 ];
-
-async function problemText(res: Response, fallback: string): Promise<string> {
-  const p: Problem | null = await res.json().catch(() => null);
-  return p?.detail || p?.title || fallback;
-}
 
 type Target = { appointmentId: string; patientName: string; doctorId: string; doctorName: string; time: string; dateLabel: string };
 
@@ -27,12 +24,12 @@ type Target = { appointmentId: string; patientName: string; doctorId: string; do
  * Body `reason` (CancelRequest, min 3 chars); any refusal is
  * shown verbatim so a mismatch is never silent.
  */
-export function CancelAppointmentDialog({ target, authedFetch, onClose, onDone }: {
-  target: Target; authedFetch: AuthedFetch; onClose: () => void; onDone: () => void;
+export function CancelAppointmentDialog({ target, onClose, onDone }: {
+  target: Target; onClose: () => void; onDone: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const fe = useFormErrors("cancel", { reason: "Cancellation reason" });
   // undefined = not cancelled yet; otherwise the server's recorded cancelReason (QA-06), null when absent.
   const [recorded, setRecorded] = useState<string | null | undefined>(undefined);
 
@@ -40,21 +37,12 @@ export function CancelAppointmentDialog({ target, authedFetch, onClose, onDone }
     e.preventDefault();
     if (!reason || saving) return;
     setSaving(true);
-    setError(null);
+    fe.clear();
     try {
-      const res = await authedFetch(`/appointments/${target.appointmentId}/cancel`, {
-        method: "POST",
-        body: JSON.stringify({ reason }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setError(await problemText(res, "Couldn't cancel the appointment."));
-        return;
-      }
-      const body: { cancelReason?: string | null } = await res.json().catch(() => ({}));
-      setRecorded(body.cancelReason ?? null);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      const body = await api.post<AppointmentResponse | undefined>(`/appointments/${target.appointmentId}/cancel`, { reason });
+      setRecorded(body?.cancelReason ?? null);
+    } catch (err) {
+      fe.fail(err, "Couldn't cancel the appointment.");
     } finally {
       setSaving(false);
     }
@@ -78,14 +66,15 @@ export function CancelAppointmentDialog({ target, authedFetch, onClose, onDone }
           <legend className={styles.label}>Cancellation reason (required)</legend>
           {CANCEL_REASONS.map((r) => (
             <label key={r} className={reason === r ? styles.reasonOn : styles.reason}>
-              <input type="radio" name="cancel-reason" value={r} checked={reason === r} onChange={() => setReason(r)} /> {r}
+              <input type="radio" name="cancel-reason" value={r} checked={reason === r} {...fe.attrs("reason")} onChange={() => { fe.clearField("reason"); setReason(r); }} /> {r}
             </label>
           ))}
         </fieldset>
+        <FieldError fe={fe} name="reason" className={styles.note} />
         <p className={styles.note}>
           {reason ? "The slot is released once the appointment is cancelled." : "Cancelling affects the patient — one reason is mandatory and is recorded."}
         </p>
-        {error && <div className={styles.error} role="alert">{error}</div>}
+        <ErrorSummary fe={fe} className={styles.error} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Keep appointment</button>
           <button type="submit" className={styles.btnDanger} disabled={!reason || saving}>
@@ -103,55 +92,32 @@ export function CancelAppointmentDialog({ target, authedFetch, onClose, onDone }
  * and patient notice have no API, so they are not offered. Body field `newStartTime` (RescheduleRequest) —
  * refusals are shown verbatim.
  */
-export function MoveAppointmentDialog({ target, timezone, initialDate, authedFetch, onClose, onDone }: {
-  target: Target; timezone: string; initialDate: string; authedFetch: AuthedFetch; onClose: () => void; onDone: () => void;
+export function MoveAppointmentDialog({ target, timezone, initialDate, onClose, onDone }: {
+  target: Target; timezone: string; initialDate: string; onClose: () => void; onDone: () => void;
 }) {
   const [date, setDate] = useState(initialDate);
-  const [slots, setSlots] = useState<string[] | null>(null);
-  const [slot, setSlot] = useState("");
-  const [loadError, setLoadError] = useState(false);
+  const [picked, setSlot] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.resolve().then(async () => {
-      if (!date) return;
-      setSlots(null);
-      setSlot("");
-      setLoadError(false);
-      try {
-        const res = await authedFetch(`/doctors/${target.doctorId}/availability?date=${date}`);
-        if (cancelled || !res) return;
-        if (!res.ok) { setLoadError(true); setSlots([]); return; }
-        const list: string[] = await res.json();
-        if (!cancelled) setSlots(list);
-      } catch {
-        if (!cancelled) { setLoadError(true); setSlots([]); }
-      }
-    });
-    return () => { cancelled = true; };
-  }, [date, target.doctorId, authedFetch]);
+  const fe = useFormErrors("move", { newStartTime: "New time" });
+  const slotsQ = useQuery({
+    queryKey: key("availability", { doctorId: target.doctorId, date }),
+    queryFn: getter<string[]>(`/doctors/${target.doctorId}/availability?date=${date}`),
+    enabled: !!date, staleTime: 0, gcTime: 0,
+  });
+  const loadError = slotsQ.isError;
+  const slots = slotsQ.data ?? (loadError ? [] : null);
+  const slot = slots?.includes(picked) ? picked : "";
 
   async function confirm(e: React.FormEvent) {
     e.preventDefault();
     if (!slot || saving) return;
     setSaving(true);
-    setError(null);
+    fe.clear();
     try {
-      const res = await authedFetch(`/appointments/${target.appointmentId}/reschedule`, {
-        method: "POST",
-        body: JSON.stringify({ newStartTime: slot }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setError(await problemText(res, "Couldn't move the appointment."));
-        return;
-      }
+      await api.post(`/appointments/${target.appointmentId}/reschedule`, { newStartTime: slot });
       onDone();
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
+    } catch (err) {
+      fe.fail(err, "Couldn't move the appointment.");
       setSaving(false);
     }
   }
@@ -167,14 +133,15 @@ export function MoveAppointmentDialog({ target, timezone, initialDate, authedFet
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="move-time">Available slots</label>
-          <select id="move-time" className={styles.input} value={slot} onChange={(e) => setSlot(e.target.value)} disabled={!slots || slots.length === 0}>
+          <select id="move-time" className={styles.input} value={slot} {...fe.attrs("newStartTime")} onChange={(e) => { fe.clearField("newStartTime"); setSlot(e.target.value); }} disabled={!slots || slots.length === 0}>
             <option value="">{slots === null ? "Loading free slots…" : slots.length === 0 ? "No free slots on this day" : "Choose a time"}</option>
             {(slots ?? []).map((s) => <option key={s} value={s}>{clinicTime(s, timezone)}</option>)}
           </select>
+          <FieldError fe={fe} name="newStartTime" className={styles.note} />
         </div>
         {loadError && <div className={styles.error} role="alert">Couldn&apos;t load free slots. Pick the date again to retry.</div>}
         <p className={styles.note}>On confirm the old slot is released and the appointment moves to the chosen time. Times are the clinic&apos;s local time.</p>
-        {error && <div className={styles.error} role="alert">{error}</div>}
+        <ErrorSummary fe={fe} className={styles.error} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Close</button>
           <button type="submit" className={styles.btnPrimary} disabled={!slot || saving}>

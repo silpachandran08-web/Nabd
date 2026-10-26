@@ -1,16 +1,10 @@
 package com.nabd.hms.platform.access.dto;
 
-import java.time.LocalDate;
-import java.util.UUID;
-
-/** No clinical fields — see SupportAccessModels.RedactedPatient for why. */
+/** PLT-057: initials, masked phone (+91******3210), birth year and MRN. Nothing else, and no clinical field, ever. */
 public record PatientViewResponse(
-        UUID id,
-        String mrn,
-        String name,
-        String phone,
-        LocalDate dob,
-        String gender,
-        String status
+        String initials,
+        String maskedPhone,
+        Integer birthYear,
+        String mrn
 ) {
 }

@@ -47,8 +47,11 @@ public class SetupController {
 
     private final SetupService service;
 
-    SetupController(SetupService service) {
+    private final com.nabd.hms.organization.dataimport.ImportPipeline importPipeline;
+
+    SetupController(SetupService service, com.nabd.hms.organization.dataimport.ImportPipeline importPipeline) {
         this.service = service;
+        this.importPipeline = importPipeline;
     }
 
     // ── Wizard / checklist ──
@@ -209,6 +212,12 @@ public class SetupController {
     @PreAuthorize("hasAuthority('setup:edit')")
     public ResponseEntity<ImportJobResponse> createImportJob(@AuthenticationPrincipal Jwt jwt,
                                                               @Valid @RequestBody ImportJobRequest req) {
+        if (req.uploadId() != null) { // ADM-012: staged pipeline
+            return ResponseEntity.status(HttpStatus.CREATED).body(importPipeline.create(staffId(jwt), req));
+        }
+        if (req.fileName() == null || req.fileName().isBlank()) {
+            throw new com.nabd.hms.common.ApiException(HttpStatus.BAD_REQUEST, "validation", "Validation failed", "fileName or uploadId is required");
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(service.addImportJob(tenantId(jwt), staffId(jwt), req));
     }
 

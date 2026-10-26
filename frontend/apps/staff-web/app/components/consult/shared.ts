@@ -44,6 +44,7 @@ export type Prescription = {
 export type Allergy = {
   id: string; substance: string; severity: string; reaction: string | null; active: boolean;
   category?: string | null; source?: string | null; recordedBy?: string; recordedByName?: string | null; recordedAt?: string; updatedAt?: string | null;
+  unconfirmed?: boolean; // ADM-012: imported from a legacy list, a doctor still has to confirm it
 };
 export type PregnancyStatus = { status: "not_documented" | "not_pregnant" | "pregnant" | "lactating" | "unknown"; expectedDeliveryDate: string | null; recordedByName: string | null; recordedAt: string | null };
 export type AllergyStatus = { state: "recorded" | "none_documented" | "not_assessed"; activeCount: number; documentedByName: string | null; documentedAt: string | null };

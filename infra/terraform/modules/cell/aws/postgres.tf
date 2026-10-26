@@ -13,6 +13,19 @@ resource "aws_db_parameter_group" "this" {
     name  = "rds.force_ssl"
     value = "1"
   }
+
+  # OPS-055: PgBouncer pools stay well below this; the rest is the direct reserve (relay, migrate job, admin).
+  parameter {
+    name         = "max_connections"
+    value        = tostring(var.db_max_connections)
+    apply_method = "pending-reboot"
+  }
+
+  # OPS-055: PgBouncer authenticates clients with SCRAM (auth_type scram-sha-256) through auth_query, which needs SCRAM verifiers.
+  parameter {
+    name  = "password_encryption"
+    value = "scram-sha-256"
+  }
 }
 
 resource "aws_db_instance" "this" {
@@ -21,6 +34,7 @@ resource "aws_db_instance" "this" {
   engine_version                = "16"
   instance_class                = var.db_instance_class
   allocated_storage             = var.db_allocated_storage_gb
+  max_allocated_storage         = var.db_max_allocated_storage_gb # OPS-055: storage autoscaling
   storage_type                  = "gp3"
   db_name                       = "nabd"
   username                      = "nabd_admin"

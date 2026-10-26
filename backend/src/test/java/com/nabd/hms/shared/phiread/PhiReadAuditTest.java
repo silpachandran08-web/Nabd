@@ -35,7 +35,8 @@ class PhiReadAuditTest extends ApiTestBase {
     /** /v1/clinical GETs that return no patient data (drug catalogue, the doctor's own Rx sets, note templates). */
     // CLN-004 safety-dictionary versions and CLN-005 signing-authority (canSign + reason code) carry no patient data
     static final Set<String> NO_PHI = Set.of("/v1/clinical/drugs/search", "/v1/clinical/rx-sets", "/v1/clinical/note-templates",
-            "/v1/clinical/safety-dictionary", "/v1/clinical/prescriptions/{queueEntryId}/signing-authority");
+            "/v1/clinical/safety-dictionary", "/v1/clinical/prescriptions/{queueEntryId}/signing-authority",
+            "/v1/clinical/drug-knowledge-base", "/v1/clinical/drugs", "/v1/clinical/drugs/{drugId}"); // licence attribution (source + data month), no patient data
 
     @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings;
     @Autowired PhiReadRecorder recorder;

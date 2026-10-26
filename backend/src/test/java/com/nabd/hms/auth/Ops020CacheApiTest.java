@@ -478,7 +478,7 @@ class Ops020CacheApiTest extends ApiTestBase {
         warm.forEach(s -> out.add("warm: " + (s.length() > 160 ? s.substring(0, 160) : s)));
         Files.write(Path.of("target", "ops020-statements.txt"), out);
         assertThat(warm).as("no session-liveness, tenant-zone or second tenant-bind statement on a warm check-in")
-                .noneMatch(s -> s.contains("FROM sessions") || s.contains("SELECT timezone, region FROM tenants"));
+                .noneMatch(s -> s.contains("FROM sessions") || s.contains("t.region_code FROM tenants t"));
         long binds = warm.stream().filter(s -> s.contains("set_config('app.tenant_id'")).count();
         assertThat(binds).as("one tenant bind per transaction (idempotency claim, check-in, idempotency complete)").isLessThanOrEqualTo(3);
         // PLT-019: RepositoryTransactionGuard (test-only, nabd.tenancy.strict-repositories) adds a verifyBinding() round trip per repository call; production sends none

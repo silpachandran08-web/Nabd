@@ -1,7 +1,7 @@
 "use client";
 
+import { formatNumber, moneyFormatter } from "@nabd/i18n";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import styles from "./reports.module.css";
 import Link from "next/link";
 import { getIdentity } from "../lib/session";
@@ -9,7 +9,7 @@ import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { paymentMethodLabel } from "@nabd/domain";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
-import { apiFetch, goLogin } from "../lib/apiClient";
+import { api, ApiError, reasonText } from "../lib/api";
 
 // E20 Owner Insights, scoped to live queries (see ReportsController) — NB-229/230/231/232/233/234/235/236/237.
 // OWN-024: revenue / untaggedCount are additive (S3 contract); every new field is optional so an older backend still renders.
@@ -50,8 +50,7 @@ type DoctorPunctuality = {
   entries: { doctorId: string; doctorName: string; delayCount: number; avgDelayMinutes: number; sameDayRepeatDays: number }[];
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (n: number) => formatNumber(n, { min: 2, max: 2 });
 const dash = (n: number | null | undefined) => (typeof n === "number" ? n : "—");
 const shortDate = (iso: string) => {
   const [y, mo, d] = iso.split("-").map(Number);
@@ -88,7 +87,6 @@ function periodRange(p: Period, custom: { from: string; to: string }): { from: s
 }
 
 export default function ReportsPage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,82 +120,58 @@ export default function ReportsPage() {
   const range = periodRange(period, custom);
   const qs = `from=${range.from}&to=${range.to}`;
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, { ...init, headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
-
   const load = useCallback(async () => {
     setError(null); // `loading` is only the first load — switching period keeps the page on screen
     try {
+      // Each report is read on its own: one failing card never blanks the others.
+      const read = <T,>(path: string) => api.get<T>(path).then((data) => ({ ok: true as const, status: 200, data }), (e: unknown) => ({ ok: false as const, status: e instanceof ApiError ? e.status : 0, data: null as T | null, error: e }));
       const [moneyRes, sourcesRes, staffRes, retentionRes, riskRes, liabilityRes, leakageRes, punctualityRes, dayCloseRes, pkRes] = await Promise.all([
-        authedFetch(`/reports/money?${qs}`), authedFetch(`/reports/sources?${qs}`),
-        authedFetch(`/reports/staff-performance?${qs}`), authedFetch("/reports/retention"),
-        authedFetch("/reports/no-show-risk"), authedFetch(`/packages/liability?${qs}`),
-        authedFetch("/reports/billing-leakage?thresholdAmount=0"), authedFetch("/reports/doctor-punctuality"),
-        authedFetch("/billing/day-close"),
-        can("packages:view") ? authedFetch(`/reports/packages?${qs}`) : Promise.resolve(null),
+        read<Money>(`/reports/money?${qs}`), read<unknown>(`/reports/sources?${qs}`),
+        read<StaffPerformanceReport>(`/reports/staff-performance?${qs}`), read<Retention>("/reports/retention"),
+        read<NoShowRisk>("/reports/no-show-risk"), read<Liability & Partial<PackagesReport>>(`/packages/liability?${qs}`),
+        read<BillingLeakage>("/reports/billing-leakage?thresholdAmount=0"), read<DoctorPunctuality>("/reports/doctor-punctuality"),
+        read<DayClose>("/billing/day-close"),
+        can("packages:view") ? read<PackagesReport>(`/reports/packages?${qs}`) : Promise.resolve(null),
       ]);
-      if (!moneyRes) return;
-      if (moneyRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
       if (!moneyRes.ok) {
-        const p = await moneyRes.json().catch(() => null);
-        setError(p?.detail || "Couldn't load reports. Try again.");
+        if (moneyRes.status === 403) setForbidden(true);
+        else setError(moneyRes.status >= 400 && moneyRes.status < 500 ? (moneyRes.error as ApiError).detail || "Couldn't load reports. Try again." : reasonText(moneyRes.error, ""));
         return;
       }
-      setMoneyReport(await moneyRes.json());
+      setMoneyReport(moneyRes.data);
       setClinicName(getIdentity()?.tenantName ?? "");
       setRegion(getIdentity()?.tenantRegion);
-      if (sourcesRes?.ok) {
+      if (sourcesRes.ok) {
         // Bare array; untaggedCount is repeated on every row (report-wide), so read the first. { rows, untaggedCount } also accepted.
-        const body = await sourcesRes.json();
+        const body = sourcesRes.data as any; // eslint-disable-line @typescript-eslint/no-explicit-any -- shape is either a bare array or { rows | items }
         setSources(Array.isArray(body) ? body : (body?.rows ?? body?.items ?? []));
         setUntagged(Number((Array.isArray(body) ? body[0] : body)?.untaggedCount) || 0);
       }
-      if (staffRes?.ok) setStaffPerf(await staffRes.json());
-      setTabErr({ sources: !!sourcesRes && !sourcesRes.ok, staff: !!staffRes && !staffRes.ok });
-      if (retentionRes?.ok) setRetention(await retentionRes.json());
-      if (riskRes?.ok) setNoShowRisk(await riskRes.json());
-      const liabilityBody = liabilityRes?.ok ? await liabilityRes.json() : null;
+      if (staffRes.ok) setStaffPerf(staffRes.data);
+      setTabErr({ sources: !sourcesRes.ok, staff: !staffRes.ok });
+      if (retentionRes.ok) setRetention(retentionRes.data);
+      if (riskRes.ok) setNoShowRisk(riskRes.data);
+      const liabilityBody = liabilityRes.ok ? liabilityRes.data : null;
       setLiability(liabilityBody);
       // OWN-026: the contract allows either a reports/packages endpoint or extra fields on liability; take whichever answers.
-      const pkBody: PackagesReport | null = pkRes?.ok ? await pkRes.json()
-        : liabilityBody && ("salesByDay" in liabilityBody || "redemption" in liabilityBody) ? liabilityBody : null;
+      const pkBody: PackagesReport | null = pkRes?.ok ? pkRes.data
+        : liabilityBody && ("salesByDay" in liabilityBody || "redemption" in liabilityBody) ? (liabilityBody as unknown as PackagesReport) : null;
       setPkReport(pkBody);
-      setPkErr(!pkBody && !!pkRes && pkRes.status !== 404);
-      if (leakageRes?.ok) setLeakage(await leakageRes.json());
-      if (punctualityRes?.ok) setPunctuality(await punctualityRes.json());
+      setPkErr(!pkBody && !!pkRes && !pkRes.ok && pkRes.status !== 404);
+      if (leakageRes.ok) setLeakage(leakageRes.data);
+      if (punctualityRes.ok) setPunctuality(punctualityRes.data);
       // Roles without billing access simply don't get the Day close card.
-      setDayClose(dayCloseRes?.ok ? await dayCloseRes.json() : null);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setDayClose(dayCloseRes.ok ? dayCloseRes.data : null);
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, qs]);
+  }, [qs]);
 
   const reloadLeakage = useCallback(
     async (threshold: string) => {
-      const res = await authedFetch(`/reports/billing-leakage?thresholdAmount=${encodeURIComponent(threshold || "0")}`);
-      if (res?.ok) setLeakage(await res.json());
+      try { setLeakage(await api.get<BillingLeakage>(`/reports/billing-leakage?thresholdAmount=${encodeURIComponent(threshold || "0")}`)); } catch { /* the card keeps its last figures */ }
     },
-    [authedFetch]
+    []
   );
 
   useEffect(() => {
@@ -206,12 +180,10 @@ export default function ReportsPage() {
 
   async function remind(instanceId: string) {
     try {
-      const res = await authedFetch(`/packages/instances/${instanceId}/send-reminder`, { method: "POST" });
-      if (!res) return;
-      const p = res.ok ? null : await res.json().catch(() => null);
-      setReminded((r) => ({ ...r, [instanceId]: res.ok ? "sent" : p?.detail || "Couldn't record the reminder. Try again." }));
-    } catch {
-      setReminded((r) => ({ ...r, [instanceId]: "Couldn't reach the server. The reminder wasn't recorded." }));
+      await api.post(`/packages/instances/${instanceId}/send-reminder`);
+      setReminded((r) => ({ ...r, [instanceId]: "sent" }));
+    } catch (e) {
+      setReminded((r) => ({ ...r, [instanceId]: reasonText(e, "Couldn't record the reminder. Try again.") }));
     }
   }
 
@@ -219,18 +191,13 @@ export default function ReportsPage() {
     setExportError(null);
     const token = localStorage.getItem("nabd_access_token");
     if (!token) return;
-    let res: Response;
+    let csv: string;
     try {
-      res = await apiFetch(`/reports/export?reportType=${reportType}&${qs}`);
-    } catch {
-      setExportError("Couldn't reach the server. The export wasn't downloaded.");
+      csv = await api.get<string>(`/reports/export?reportType=${reportType}&${qs}`, { as: "text" });
+    } catch (e) {
+      setExportError(e instanceof ApiError && e.status === 403 ? "Your role isn't allowed to export reports." : e instanceof ApiError ? "Couldn't export this report. Try again." : reasonText(e, ""));
       return;
     }
-    if (!res.ok) {
-      setExportError(res.status === 403 ? "Your role isn't allowed to export reports." : "Couldn't export this report. Try again.");
-      return;
-    }
-    const csv = await res.text();
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -254,7 +221,7 @@ export default function ReportsPage() {
   const canExport = can("reports:export");
 
   const m = moneyReport;
-  const cur = m ? new Intl.NumberFormat(m.currency === "SAR" ? "en-SA" : "en-IN", { style: "currency", currency: m.currency, minimumFractionDigits: 2 }) : null;
+  const cur = m ? moneyFormatter(m.currency) : null;
   const tenderMax = m ? Math.max(0, ...m.tender.map((t) => Number(t.amount))) : 0;
   const serviceMax = m ? Math.max(0, ...m.topServices.map((t) => Number(t.revenue))) : 0;
 
@@ -402,7 +369,7 @@ export default function ReportsPage() {
           <div className={styles.muted}>No visits recorded yet.</div>
         ) : (
           <div style={{ overflowX: "auto" }}><table className={styles.table}>
-            <thead><tr><th>Source</th><th>Visits</th><th>Revenue{m ? ` (${m.currency})` : ""}</th></tr></thead>
+            <thead><tr><th scope="col">Source</th><th scope="col">Visits</th><th scope="col">Revenue{m ? ` (${m.currency})` : ""}</th></tr></thead>
             <tbody>
               {sources.map((s) => (
                 <tr key={s.source}><td>{s.source.replace("_", " ")}</td><td>{s.visitCount}</td>
@@ -434,7 +401,7 @@ export default function ReportsPage() {
             <div className={styles.muted}>No payments recorded yet.</div>
           ) : (
             <div style={{ overflowX: "auto" }}><table className={styles.table}>
-              <thead><tr><th>Staff</th><th>Handled</th><th>Collected</th><th>Payments</th><th>Discounts</th><th>Overrides</th></tr></thead>
+              <thead><tr><th scope="col">Staff</th><th scope="col">Handled</th><th scope="col">Collected</th><th scope="col">Payments</th><th scope="col">Discounts</th><th scope="col">Overrides</th></tr></thead>
               <tbody>
                 {staffPerf.rows.map((s) => (
                   <tr key={s.staffId}><td>{s.staffName}</td><td>{dash(s.handledCount)}</td><td>{money(s.collected)}</td><td>{s.paymentCount}</td><td>{dash(s.discountCount)}</td><td>{dash(s.overrideCount)}</td></tr>
@@ -548,7 +515,7 @@ export default function ReportsPage() {
                 <div className={styles.muted}>No expired packages with value left.</div>
               ) : (
                 <div style={{ overflowX: "auto" }}><table className={styles.table}>
-                  <thead><tr><th>Patient</th><th>Package</th><th>Expired on</th><th>Value left</th>{canEdit && <th>Action</th>}</tr></thead>
+                  <thead><tr><th scope="col">Patient</th><th scope="col">Package</th><th scope="col">Expired on</th><th scope="col">Value left</th>{canEdit && <th scope="col">Action</th>}</tr></thead>
                   <tbody>
                     {expired.map((e) => (
                       <tr key={e.instanceId}>
@@ -603,7 +570,7 @@ export default function ReportsPage() {
             <div className={styles.muted}>No billing leakage found.</div>
           ) : (
             <table className={styles.table}>
-              <thead><tr><th>Patient</th><th>Charge</th><th>Amount</th><th>Completed</th></tr></thead>
+              <thead><tr><th scope="col">Patient</th><th scope="col">Charge</th><th scope="col">Amount</th><th scope="col">Completed</th></tr></thead>
               <tbody>
                 {leakage.entries.map((e) => (
                   <tr key={e.procedureOrderId}>
@@ -651,7 +618,7 @@ export default function ReportsPage() {
             <div className={styles.muted}>Nobody flagged today.</div>
           ) : (
             <table className={styles.table}>
-              <thead><tr><th>Patient</th><th>Prior no-shows</th></tr></thead>
+              <thead><tr><th scope="col">Patient</th><th scope="col">Prior no-shows</th></tr></thead>
               <tbody>
                 {noShowRisk.entries.map((e) => (
                   <tr key={e.patientId}><td>{e.patientName}</td><td>{e.priorNoShowCount}</td></tr>
@@ -676,7 +643,7 @@ export default function ReportsPage() {
                 <div className={styles.muted}>No delays in the last 90 days.</div>
               ) : (
                 <table className={styles.table}>
-                  <thead><tr><th>Doctor</th><th>Delay events</th><th>Avg minutes</th><th>Same-day repeat</th></tr></thead>
+                  <thead><tr><th scope="col">Doctor</th><th scope="col">Delay events</th><th scope="col">Avg minutes</th><th scope="col">Same-day repeat</th></tr></thead>
                   <tbody>
                     {punctuality.entries.map((e) => (
                       <tr key={e.doctorId}>

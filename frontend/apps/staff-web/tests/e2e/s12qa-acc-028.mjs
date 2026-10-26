@@ -31,7 +31,7 @@ const fill = async (page, phone) => {
 
 let s;
 try {
-  for (const [region, cc] of [['AE', 'AE'], ['KSA', 'SA']]) {
+  for (const [region, cc] of [['AE', 'AE'], ['SA', 'SA']]) {
     s = await patients(['patients:view', 'patients:create', 'patients:edit'], region, [['POST', /^\/patients$/, phone400(cc)]]);
     const d = await fill(s.page, 'abc');
     const err = d.locator('#reg-phone-error');

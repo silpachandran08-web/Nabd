@@ -336,7 +336,7 @@ export default function CheckoutPage() {
           <div className={styles.muted}>Pick a charge from the list to add it.</div>
         ) : (
           <table className={styles.table}>
-            <thead><tr><th>Charge</th><th>Qty</th><th>Unit price</th><th>Tax</th><th>Line total</th><th></th></tr></thead>
+            <thead><tr><th scope="col">Charge</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax</th><th scope="col">Line total</th><th scope="col"></th></tr></thead>
             <tbody>
               {items.map((i) => (
                 <tr key={i.chargeCode}>
@@ -468,7 +468,7 @@ export default function CheckoutPage() {
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>{invoice.invoiceNumber}</h2>
             <table className={styles.table}>
-              <thead><tr><th>Charge</th><th>Qty</th><th>Unit price</th><th>Tax %</th><th>Line total</th></tr></thead>
+              <thead><tr><th scope="col">Charge</th><th scope="col">Qty</th><th scope="col">Unit price</th><th scope="col">Tax %</th><th scope="col">Line total</th></tr></thead>
               <tbody>
                 {invoice.lineItems.map((li) => (
                   <tr key={li.chargeCode}>

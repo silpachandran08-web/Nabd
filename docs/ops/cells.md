@@ -33,3 +33,6 @@ No cloud keys are ever stored: CI uses OIDC, people use SSO. The DB master passw
 
 ## Not in this skeleton
 NAT / VPC endpoints and the container cluster (DEC-21), Redis-compatible store (DEC-19), public DNS, VPC flow logs and CloudTrail to the audit bucket (CERT-In log story), a cross-region DB read replica (DR placeholder output only), per-tenant DEKs.
+
+## Data tier (OPS-055)
+Postgres sizing, PgBouncer (transaction mode, 2 instances), the direct endpoint for the relay, the Comms/Edge databases and the pool alarms are described in `docs/runbooks/data-tier.md`. The cell module exports them as output `data_tier`.

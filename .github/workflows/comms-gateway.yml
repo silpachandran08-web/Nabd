@@ -1,0 +1,28 @@
+# COM-007: build + test of services/comms-gateway (DB grant test, consumer idempotency/DLQ, readiness) and the image build.
+name: comms-gateway
+on:
+  pull_request:
+    paths: ['services/comms-gateway/**', 'infra/observability/comms-gateway.*', 'docs/runbooks/comms-gateway.md', '.github/workflows/comms-gateway.yml']
+  push:
+    branches: [main]
+    paths: ['services/comms-gateway/**']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - run: mvn -B -f services/comms-gateway/pom.xml verify      # includes CommsGrantTest: the role has no SELECT on any Core table
+      - name: Rules and runbook links
+        run: python3 services/comms-gateway/ci/check_rules.py
+      - name: Image build (no push)
+        run: docker build -t comms-gateway:ci services/comms-gateway
+  contract:
+    # COM-007.2: contract tests against Core /internal/v1 need the ACC-038/PLT-009 contract; Needs external action until Core publishes it.
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "contract tests against Core /internal/v1 are added with COM-008/COM-011 (first calls to Core)"

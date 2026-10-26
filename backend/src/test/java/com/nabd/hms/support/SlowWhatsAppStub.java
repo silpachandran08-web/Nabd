@@ -30,6 +30,9 @@ public final class SlowWhatsAppStub {
     public final AtomicLong latencyMs = new AtomicLong(0);
     public final AtomicInteger requests = new AtomicInteger();
     public final AtomicInteger status = new AtomicInteger(200);
+    /** COM-003: templates the stub "holds", keyed metaName|language (registered on arrival of a 200-mode create). */
+    public final Map<String, String> templates = new ConcurrentHashMap<>();
+    public final AtomicInteger templateCreates = new AtomicInteger();
 
     private SlowWhatsAppStub(HttpServer server) {
         this.server = server;
@@ -42,6 +45,10 @@ public final class SlowWhatsAppStub {
             s.createContext("/", ex -> {
                 stub.requests.incrementAndGet();
                 byte[] in = ex.getRequestBody().readAllBytes();
+                if (ex.getRequestURI().getPath().endsWith("/message_templates")) {
+                    stub.templateCall(ex, in);
+                    return;
+                }
                 if (stub.status.get() == 200) { // counted on arrival: the provider has the send even if the caller times out
                     JsonNode body = stub.json.readTree(in.length == 0 ? "{}".getBytes() : in);
                     String marker = body.path("template").path("components").path(0).path("parameters").path(0).path("text").asString("");
@@ -81,12 +88,52 @@ public final class SlowWhatsAppStub {
         }
     }
 
+    private void templateCall(com.sun.net.httpserver.HttpExchange ex, byte[] in) throws IOException {
+        String out;
+        if ("POST".equals(ex.getRequestMethod())) {
+            JsonNode body = json.readTree(in);
+            String key = body.path("name").asString("") + "|" + body.path("language").asString("");
+            String id = "tpl-" + UUID.randomUUID();
+            if (status.get() == 200) { // like sends: counted on arrival, the provider has it even if the caller times out
+                templates.put(key, id);
+                templateCreates.incrementAndGet();
+            }
+            out = "{\"id\":\"" + id + "\",\"status\":\"PENDING\"}";
+        } else {
+            String name = ex.getRequestURI().getQuery().replaceAll(".*name=([^&]*).*", "$1");
+            StringBuilder data = new StringBuilder();
+            templates.forEach((k, id) -> {
+                if (k.startsWith(name + "|")) {
+                    data.append(data.length() > 0 ? "," : "").append("{\"id\":\"").append(id).append("\",\"status\":\"APPROVED\",\"language\":\"")
+                            .append(k.substring(k.indexOf('|') + 1)).append("\"}");
+                }
+            });
+            out = "{\"data\":[" + data + "]}";
+        }
+        try {
+            Thread.sleep(latencyMs.get());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        byte[] bytes = (status.get() == 200 ? out : "{\"error\":{\"message\":\"stub failure\"}}").getBytes(StandardCharsets.UTF_8);
+        try {
+            ex.getResponseHeaders().add("Content-Type", "application/json");
+            ex.sendResponseHeaders(status.get(), bytes.length);
+            ex.getResponseBody().write(bytes);
+        } catch (IOException clientGone) {
+            // the caller timed out first
+        }
+        ex.close();
+    }
+
     public String baseUrl() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
     public void reset(long latency) {
         sendsByMarker.clear();
+        templates.clear();
+        templateCreates.set(0);
         requests.set(0);
         status.set(200);
         latencyMs.set(latency);

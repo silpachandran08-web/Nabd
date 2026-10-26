@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nabd:event-schema:comms.message.status_changed.v1",
+  "title": "comms.message.status_changed.v1",
+  "description": "A WhatsApp message moved: an outbound message was delivered, read or failed (COM-001), or cancelled / expired before it was sent (COM-003). 'at' is the moment of the change.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenantId",
+    "messageId",
+    "channel",
+    "status",
+    "at",
+    "version"
+  ],
+  "properties": {
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "messageId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "channel": {
+      "const": "whatsapp",
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "delivered",
+        "read",
+        "failed",
+        "cancelled",
+        "expired"
+      ]
+    },
+    "errorCode": {
+      "type": "string",
+      "pattern": "^[0-9]{1,10}$"
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9T:.+Z-]{20,40}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Outbox id of this event: monotonic per aggregate."
+    }
+  },
+  "examples": [
+    {
+      "tenantId": "11111111-1111-4111-8111-111111111111",
+      "messageId": "33333333-3333-4333-8333-333333333333",
+      "channel": "whatsapp",
+      "status": "delivered",
+      "at": "2026-10-20T04:30:00Z",
+      "version": 1
+    }
+  ]
+}

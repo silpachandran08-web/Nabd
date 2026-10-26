@@ -380,7 +380,7 @@ public class ConsumerGroups {
         // shortcut: no MAXLEN on the DLQ (it should stay near empty; replay removes entries), add one if it ever grows
         v.opsForStream().add(StreamRecords.newRecord().in(dlqStream(stream.split(":")[1])).ofMap(f));
         dlqCounter(c.group()).increment();
-        log.error("event dead-lettered: consumer={} stream={} entry={} event={} attempts={} reason={}",
+        log.error("event dead-lettered: consumer={} stream={} entry={} event={} attempts={} reason={}", // log-phi-ok: reason is a fixed failure code
                 c.group(), stream, entryId, eventId, attempts, reason);
     }
 

@@ -1,17 +1,18 @@
 "use client";
 
+import { formatMoney } from "@nabd/i18n";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./overview.module.css";
 import { getIdentity, getPermissions, isOwner } from "../lib/session";
 import { can } from "../lib/permissions";
 import StatusPill from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
-import { apiFetch, goLogin } from "../lib/apiClient";
+import { api, ApiError, reasonText } from "../lib/api";
+import { DpaReacceptBanner } from "../components/setup/DpaPanel";
 import { initials } from "@nabd/domain";
+import EtaAccuracyTile from "./EtaAccuracyTile";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 
 // Matches GET /v1/reports/overview (ReportsController.overview → OverviewResponse).
 type Overview = {
@@ -75,7 +76,6 @@ function signedInLabel(signedInAt: string, now: number): string {
 }
 
 export default function OverviewPage() {
-  const router = useRouter();
   const [data, setData] = useState<Overview | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[] | null>(null);
@@ -84,26 +84,8 @@ export default function OverviewPage() {
   const [canSwitchClinic, setCanSwitchClinic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [forbidden, setForbidden] = useState(false);
-  const [money, setMoney] = useState<Intl.NumberFormat | null>(null);
+  const [currency, setCurrency] = useState<string | null>(null);
   const [now, setNow] = useState(0);
-
-  const authedFetch = useCallback(
-    async (path: string) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
 
   const load = useCallback(async () => {
     setError(null);
@@ -111,43 +93,32 @@ export default function OverviewPage() {
     try {
       // Licences and plan live under Setup; only asked for when this role can read them.
       const canSetup = getPermissions().includes("setup:view");
-      const [ovRes, subRes, clRes] = await Promise.all([
-        authedFetch("/reports/overview"),
-        canSetup ? authedFetch("/setup/subscription") : Promise.resolve(null),
-        canSetup ? authedFetch("/setup/checklist") : Promise.resolve(null),
+      const maybe = <T,>(path: string) => api.get<T>(path).catch(() => null);
+      const [subRes, clRes] = await Promise.all([
+        canSetup ? maybe<Subscription>("/setup/subscription") : null,
+        canSetup ? maybe<ChecklistItem[]>("/setup/checklist") : null,
+        api.get<Overview>("/reports/overview").then(setData),
       ]);
-      if (!ovRes) return;
-      if (ovRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!ovRes.ok) {
-        setError("Couldn't load today's overview. Try again.");
-        return;
-      }
-      setData(await ovRes.json());
       if (canSetup) {
         setHealth("loading");
-        authedFetch("/compliance/health")
-          .then(async (r) => setHealth(r?.ok ? await r.json() : r ? "error" : null))
-          .catch(() => setHealth("error"));
+        api.get<Health>("/compliance/health").then(setHealth).catch(() => setHealth("error"));
       }
-      if (subRes?.ok) setSubscription(await subRes.json());
-      if (clRes?.ok) setChecklist(await clRes.json());
+      if (subRes) setSubscription(subRes);
+      if (clRes) setChecklist(clRes);
       try {
         setSetupHidden(localStorage.getItem(hideKey(getIdentity()?.tenantName ?? "")) === "1");
         // The owner's workspace picker needs the pending owner token from the owner login.
         setCanSwitchClinic(isOwner() && !!sessionStorage.getItem("nabd_owner_pending_token"));
       } catch { /* storage blocked: card simply stays visible */ }
       const region = getIdentity()?.tenantRegion;
-      setMoney(new Intl.NumberFormat(region === "KSA" ? "en-SA" : "en-IN", {
-        style: "currency", currency: region === "KSA" ? "SAR" : "INR", maximumFractionDigits: 0,
-      }));
+      // shortcut: static region -> currency/locale pairs mirror the regions table; read GET /v1/regions once the client caches it
+      setCurrency(({ AE: "AED", SA: "SAR", QA: "QAR" } as Record<string, string>)[region ?? ""] ?? "INR");
       setNow(Date.now());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      else setError(e instanceof ApiError && e.status < 500 ? "Couldn't load today's overview. Try again." : reasonText(e, ""));
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body never calls setState synchronously
@@ -161,7 +132,7 @@ export default function OverviewPage() {
   if (error) {
     return <main className={styles.page}><ErrorState message={error} onRetry={() => void load()} /></main>;
   }
-  if (!data || !money) {
+  if (!data || !currency) {
     return (
       <main className={styles.page} aria-busy="true">
         <div className={styles.skelKpis} aria-hidden="true">
@@ -188,6 +159,7 @@ export default function OverviewPage() {
 
   return (
     <main className={styles.page}>
+      {can("setup:view") && <DpaReacceptBanner />}
       <h1 className={styles.title}>Today at a glance</h1>
       <p className={styles.subtitle}>
         {today.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
@@ -229,13 +201,13 @@ export default function OverviewPage() {
         </div>
         <div className={styles.card}>
           <div className={styles.cardLabel}>Collections</div>
-          <div className={styles.kpiValue}>{money.format(Number(data.collections.collected))}</div>
+          <div className={styles.kpiValue}>{formatMoney(data.collections.collected, currency)}</div>
           <div className={styles.kpiSub}>{plural(data.collections.invoices, "invoice", "invoices")} · {data.collections.pendingInvoices} pending</div>
         </div>
         <div className={styles.card}>
           <div className={styles.cardLabel}>Checkout pending</div>
           <div className={styles.kpiValue}>{data.checkout.pending}</div>
-          <div className={styles.kpiSub}>{money.format(Number(data.checkout.outstanding))} outstanding</div>
+          <div className={styles.kpiSub}>{formatMoney(data.checkout.outstanding, currency)} outstanding</div>
         </div>
         <div className={styles.card}>
           <div className={styles.cardLabel}>Package sales</div>
@@ -246,6 +218,7 @@ export default function OverviewPage() {
 
       <div className={styles.columns}>
         <div className={styles.column}>
+          {can("reports:view") && <EtaAccuracyTile />}
           <section className={styles.card} aria-label="Payment split">
             <div className={styles.cardLabel}>Payment split</div>
             {splitTotal === 0 ? (
@@ -261,7 +234,7 @@ export default function OverviewPage() {
                   <div key={p.method} className={styles.splitRow}>
                     <span className={styles.dot} style={{ background: METHOD_COLORS[p.method] ?? METHOD_COLORS.other }} />
                     <span>{METHOD_LABELS[p.method] ?? p.method}</span>
-                    <span className={styles.amount}>{money.format(Number(p.amount))}</span>
+                    <span className={styles.amount}>{formatMoney(p.amount, currency)}</span>
                     <span className={styles.pct}>{Math.round((Number(p.amount) / splitTotal) * 100)}%</span>
                   </div>
                 ))}

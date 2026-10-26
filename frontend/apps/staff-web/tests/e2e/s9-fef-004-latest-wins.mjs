@@ -81,7 +81,7 @@ await run('queue-board', {
   url: '/schedule', perms: ['queue:view'],
   handlers: [
     ['GET', /^\/schedule\/day/, { body: DAY }],
-    ['GET', /^\/queue(\?|$)/, seq([{ delay: 2000, body: [entry('p-old', 'q1')] }, { body: [entry('p-new', 'q2')] }], true)],
+    ['GET', /^\/queue(\?|$)/, seq([{ delay: 2000, body: [entry('p-old', 'q1')] }, { body: [entry('p-new', 'q2')] }])],
     ['GET', /./, { body: [] }],
   ],
   act: async (page) => { await page.getByRole('button', { name: 'Live Queue' }).click(); await sleep(300); await hideShow(page); },

@@ -7,7 +7,7 @@ import Dialog from "../../components/ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { JobStatusPill } from "../../components/platform/statusPills";
-import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError, useOperatorAccess } from "../platformApi";
 
 // Matches POST/GET /v1/platform/provisioning-jobs, POST .../{id}/advance, POST .../{id}/approve
 // (ProvisioningController) — NB-258/259/260/261. Six fixed steps, run one at a time via advance().
@@ -20,6 +20,11 @@ import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformA
 type Step = {
   stepName: string; stepOrder: number; status: string;
   startedAt: string | null; completedAt: string | null; errorDetail: string | null;
+};
+// GET /v1/regions (OPS-061): the picker and its consequences come from the regions table, not from this file.
+type RegionRow = {
+  code: string; name: string; currency: string; taxRegime: string; standardTaxRate: number | null;
+  regulator: string; defaultTimezone: string;
 };
 type Job = {
   id: string; tenantSlug: string; tenantName: string; region: string; status: string; path: string;
@@ -109,30 +114,26 @@ export default function ProvisioningPage() {
   const [ownerAccountInviteTokens, setOwnerAccountInviteTokens] = useState<Record<string, string>>({});
   const [lifecycleSel, setLifecycleSel] = useState(LIFECYCLE_STATES[1].key);
 
-  const authedFetch = usePlatformFetch();
+  const [regions, setRegions] = useState<RegionRow[]>([]);
+
+  useEffect(() => {
+    void platformApi.get<{ items?: RegionRow[] }>("/platform/regions").then((r) => setRegions(r.items ?? []))
+      .catch(() => { /* the form still works: the server validates the code */ });
+  }, []);
 
   const load = useCallback(async (showSkeleton = false) => {
     if (showSkeleton) setLoading(true);
     setError(null);
     try {
-      const res = await authedFetch("/platform/provisioning-jobs");
-      if (!res) return;
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load provisioning jobs. Try again.");
-        return;
-      }
-      const data: Job[] = await res.json();
+      const data = await platformApi.get<Job[]>("/platform/provisioning-jobs");
       setJobs(data.sort((a, b) => (a.id < b.id ? 1 : -1)));
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setError(platformError(e, "Couldn't load provisioning jobs. Try again."));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(() => load());
@@ -143,42 +144,26 @@ export default function ProvisioningPage() {
     setFormError(null);
     setSaving(true);
     try {
-      const res = await authedFetch("/platform/provisioning-jobs", { method: "POST", body: JSON.stringify(form) });
-      if (!res) return;
-      if (!res.ok) {
-        setFormError(await problemDetail(res, "Couldn't create the job."));
-        return;
-      }
+      await platformApi.post("/platform/provisioning-jobs", form);
       setForm(emptyForm);
       setShowNewTenant(false);
       load();
+    } catch (e) {
+      setFormError(platformError(e, "Couldn't create the job."));
     } finally {
       setSaving(false);
     }
-  }
-
-  // authedFetch returns null when the session's expired (it redirects to /platform/login itself);
-  // any other failure gets a Problem body we can show — either way, this used to fail *silently*,
-  // leaving the button just reset with nothing to explain it. That silence was the actual bug.
-  async function describeFailure(res: Response | null, fallback: string): Promise<string | null> {
-    if (!res) return null; // already redirecting to login, nothing to show
-    if (res.ok) return null;
-    return problemDetail(res, fallback);
   }
 
   async function approve(jobId: string) {
     setBusyJobId(jobId);
     setJobActionError((prev) => ({ ...prev, [jobId]: "" }));
     try {
-      const res = await authedFetch(`/platform/provisioning-jobs/${jobId}/approve`, { method: "POST" });
-      const err = await describeFailure(res, "Couldn't approve the job. Try again.");
-      if (err) {
-        setJobActionError((prev) => ({ ...prev, [jobId]: err }));
-        return;
-      }
+      await platformApi.post(`/platform/provisioning-jobs/${jobId}/approve`);
       await load();
-    } catch {
-      setJobActionError((prev) => ({ ...prev, [jobId]: "Couldn't reach the server. Check your connection and try again." }));
+    } catch (e) {
+      // A failure must always say why (it once failed silently, leaving the button just reset).
+      setJobActionError((prev) => ({ ...prev, [jobId]: platformError(e, "Couldn't approve the job. Try again.") }));
     } finally {
       setBusyJobId(null);
     }
@@ -192,14 +177,7 @@ export default function ProvisioningPage() {
     try {
       const stepCount = Object.keys(STEP_LABELS).length;
       for (let i = 0; i < stepCount; i++) {
-        const res = await authedFetch(`/platform/provisioning-jobs/${jobId}/advance`, { method: "POST" });
-        const err = await describeFailure(res, "Couldn't advance the job. Try again.");
-        if (err) {
-          setJobActionError((prev) => ({ ...prev, [jobId]: err }));
-          break;
-        }
-        if (!res) break; // redirecting to login
-        const updated: Job = await res.json();
+        const updated = await platformApi.post<Job>(`/platform/provisioning-jobs/${jobId}/advance`);
         setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
         if (updated.ownerInviteToken) {
           // captured separately: the very next advance() call in this loop overwrites the job's
@@ -213,8 +191,8 @@ export default function ProvisioningPage() {
         }
         if (!["queued", "running"].includes(updated.status)) break;
       }
-    } catch {
-      setJobActionError((prev) => ({ ...prev, [jobId]: "Couldn't reach the server. Check your connection and try again." }));
+    } catch (e) {
+      setJobActionError((prev) => ({ ...prev, [jobId]: platformError(e, "Couldn't advance the job. Try again.") }));
     } finally {
       setBusyJobId(null);
     }
@@ -290,9 +268,15 @@ export default function ProvisioningPage() {
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="region">Country &amp; data region</label>
                       <select id="region" className={styles.select} value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })}>
-                        <option value="IN">India</option>
-                        <option value="KSA">Saudi Arabia</option>
+                        {regions.length === 0 && <option value={form.region}>{form.region}</option>}
+                        {regions.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
                       </select>
+                      {regions.filter((r) => r.code === form.region).map((r) => (
+                        <p key={r.code} className={styles.formNote} data-testid="region-consequences">
+                          {r.currency}, {r.taxRegime === "NONE" ? "no VAT" : r.standardTaxRate == null ? r.taxRegime : `${r.taxRegime} ${r.standardTaxRate}%`},
+                          {" "}{r.defaultTimezone}, regulator {r.regulator}. Irreversible after go-live: the region cannot be changed later.
+                        </p>
+                      ))}
                     </div>
                     <div className={styles.field}>
                       <label className={styles.label} htmlFor="ownerName">Owner name</label>
@@ -453,7 +437,7 @@ export default function ProvisioningPage() {
               <span className={styles.frd}>SSA-01 / SYS-14 · installation secrets are separate from tenant integrations — two different roles</span>
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
-                  <thead><tr><th>Secret</th><th>Owner</th><th>Note</th></tr></thead>
+                  <thead><tr><th scope="col">Secret</th><th scope="col">Owner</th><th scope="col">Note</th></tr></thead>
                   <tbody>
                     {SECRETS.map((s) => (
                       <tr key={s.label}><td>{s.label}</td><td>{s.owner}</td><td className={styles.muted}>{s.sub}</td></tr>

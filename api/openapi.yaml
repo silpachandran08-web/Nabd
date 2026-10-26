@@ -20,6 +20,7 @@ tags:
   - name: Auth
   - name: Owners
   - name: Staff
+  - name: Realtime
   - name: Roles
   - name: Tenants
   - name: Setup
@@ -33,6 +34,7 @@ tags:
   - name: Reports
   - name: Platform
   - name: Packages
+  - name: Ops
 
 paths:
   # ---------------------------------------------------------------- JWKS (PLT-002)
@@ -67,6 +69,26 @@ paths:
                         e: { type: string }
                         use: { type: string, enum: [sig] }
                         alg: { type: string, enum: [RS256] }
+  /.well-known/jwks/{population}.json:
+    servers:
+      - url: /
+    parameters: [{ name: population, in: path, required: true, schema: { type: string, enum: [staff, owner, platform] } }]
+    get:
+      tags: [Auth]
+      summary: "PLT-009. Public verification keys of one token population (staff, owner or platform): exactly 2 (active + next/previous kid), no private material. Each population has its own issuer (https://api.nabd.health/<population>) and keys; rotating one never touches another. The legacy /.well-known/jwks.json (and ?population=) serves the same sets, staff by default. The internal (service) population is not published: 404."
+      security: []
+      x-required-permission: public
+      responses:
+        "200":
+          description: JWKS, Cache-Control public max-age=300
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [keys]
+                properties:
+                  keys: { type: array, minItems: 2, maxItems: 2, items: { type: object, required: [kid, kty, n, e, use, alg] } }
+        "404": { description: "Unknown or unpublished population" }
   # ---------------------------------------------------------------- Auth
   /auth/login:
     post:
@@ -528,6 +550,25 @@ paths:
         "423":
           description: Account locked; the PIN was not checked. Body carries retryAfterSeconds.
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
+
+  /me/preferences:
+    get:
+      tags: [Auth]
+      summary: Current staff member's UI preferences (own row only; clinicDefaultLocale is the clinic-wide fallback)
+      x-required-permission: authenticated
+      responses:
+        "200": { description: Preferences, content: { application/json: { schema: { $ref: "#/components/schemas/UiPreferencesRead" } } } }
+        "401": { description: Unauthenticated, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+    put:
+      tags: [Auth]
+      summary: Replace own UI preferences; the BFF mirrors uiLocale/uiTheme into the nabd_locale/nabd_theme cookies
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/UiPreferencesWrite" } } }
+      responses:
+        "200": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/UiPreferences" } } } }
+        "422": { description: UNSUPPORTED_LOCALE or unsupported theme / digit style, content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /auth/pin/change:
     post:
@@ -1094,6 +1135,52 @@ paths:
         "201": { description: "Branch", content: { application/json: { schema: { $ref: "#/components/schemas/Branch" } } } }
 
   # --------------------------------------------------------------- Setup
+  /setup/dpa:
+    get:
+      tags: [Setup]
+      summary: ADM-002 current DPA text for the clinic's market, acceptance status and data gate
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Status", content: { application/json: { schema: { $ref: "#/components/schemas/DpaStatus" } } } }
+
+  /setup/dpa/otp:
+    post:
+      tags: [Setup]
+      summary: ADM-002 send a one-time code to the owner's registered mobile (WhatsApp) to sign the DPA
+      x-required-permission: setup:edit
+      responses:
+        "200": { description: "Challenge", content: { application/json: { schema: { $ref: "#/components/schemas/DpaOtpChallenge" } } } }
+        "400": { description: "NO_MOBILE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "NOT_OWNER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "OTP_RATE_LIMITED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/dpa/accept:
+    post:
+      tags: [Setup]
+      summary: ADM-002 accept the DPA with the one-time code; opens the data gate when the clinic also has a plan
+      description: >
+        Owner only (the clinic's built-in Owner role) with setup:edit. Idempotency-Key required; a replay of an accepted
+        version returns the same acceptance. At most 5 wrong codes per challenge. eSignRef is reserved: a value is refused.
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DpaAcceptRequest" } } }
+      responses:
+        "201": { description: "Accepted", content: { application/json: { schema: { $ref: "#/components/schemas/DpaAcceptResponse" } } } }
+        "400": { description: "OTP_INVALID or ESIGN_NOT_SUPPORTED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "NOT_OWNER", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "VERSION_SUPERSEDED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /setup/dpa/acceptances/{id}/pdf:
+    get:
+      tags: [Setup]
+      summary: ADM-002 the signed DPA as a PDF
+      x-required-permission: setup:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: "PDF", content: { application/pdf: { schema: { type: string, format: binary } } } }
+        "404": { description: "Not found", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /setup/checklist:
     get:
       tags: [Setup]
@@ -1127,6 +1214,72 @@ paths:
       responses:
         "204": { description: "Step completed" }
         "400": { $ref: "#/components/responses/BadRequest" }
+
+  /regions:
+    get:
+      tags: [Setup]
+      summary: OPS-061. Supported regions and their rules (non-PHI reference data from the regions table); any authenticated staff (operators use /platform/regions).
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Active regions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string, enum: [IN, AE, SA, QA] }
+                        name: { type: string }
+                        currency: { type: string, description: "ISO 4217" }
+                        minorUnits: { type: integer }
+                        taxRegime: { type: string, description: "GST, VAT or NONE" }
+                        standardTaxRate: { type: [number, "null"], description: "Headline rate in percent; null where there is no single rate (India GST)" }
+                        regulator: { type: string }
+                        defaultTimezone: { type: string }
+                        phoneRules:
+                          type: object
+                          properties:
+                            countryCode: { type: string }
+                            nsnLength: { type: array, items: { type: integer } }
+                        cell: { type: string }
+
+  /platform/regions:
+    get:
+      tags: [Platform]
+      summary: OPS-061. Supported regions and their rules (non-PHI reference data from the regions table); any authenticated staff or operator.
+      x-required-permission: authenticated
+      responses:
+        "200":
+          description: Active regions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code: { type: string, enum: [IN, AE, SA, QA] }
+                        name: { type: string }
+                        currency: { type: string, description: "ISO 4217" }
+                        minorUnits: { type: integer }
+                        taxRegime: { type: string, description: "GST, VAT or NONE" }
+                        standardTaxRate: { type: [number, "null"], description: "Headline rate in percent; null where there is no single rate (India GST)" }
+                        regulator: { type: string }
+                        defaultTimezone: { type: string }
+                        phoneRules:
+                          type: object
+                          properties:
+                            countryCode: { type: string }
+                            nsnLength: { type: array, items: { type: integer } }
+                        cell: { type: string }
 
   /setup/profile:
     get:
@@ -1175,6 +1328,26 @@ paths:
         "200": { description: "Updated charge head", content: { application/json: { schema: { $ref: "#/components/schemas/ChargeHead" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /setup/charges/{id}/tax:
+    patch:
+      tags: [Setup]
+      summary: >
+        Set a charge head's tax class (FIN-009). Body `{ taxCategory: exempt|nil|taxable, sacHsn (4-8 digits), gstRate?, taxInclusive? }`.
+        A taxable head needs a `gstRate` from the rates in force (422 rate-not-allowed otherwise); an exempt or nil head takes none. 422 invalid-sac-hsn
+        for a malformed code. Writes audit `billing.charge_tax_set` and publishes the catalogue change. Response `{ id, taxCategory, sacHsn, gstRate,
+        taxInclusive, allowedRates, preview: { baseMinor, taxableMinor, taxMinor, taxes } }`. The existing PATCH /setup/charges/{id} keeps its full-write body
+        (that path cannot carry both bodies), so this is a sub-resource.
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: "The head's tax settings and a preview", content: { application/json: { schema: { type: object } } } }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "invalid-sac-hsn or rate-not-allowed" }
+
   /setup/policies:
     get:
       tags: [Setup]
@@ -1195,6 +1368,90 @@ paths:
       responses:
         "200": { description: "Updated policy", content: { application/json: { schema: { $ref: "#/components/schemas/Policy" } } } }
         "422": { description: "Value out of range (session.idle_lock_minutes must be a whole number 2-30)" }
+
+  /settings/privacy/privacy-notice:
+    get:
+      tags: [Setup]
+      summary: Privacy notice versions per language (IDC-003); the current version carries its text and locked clauses
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Versions, newest first per language", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticeVersions" } } } }
+    put:
+      tags: [Setup]
+      summary: Publish a new notice version. The locked clauses of the template must stay verbatim and in order (422 mandatory-clause-locked); a stale baseVersion is 409 version-conflict
+      x-required-permission: setup:edit
+      x-step-up: true
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticePublishRequest" } } }
+      responses:
+        "200": { description: "Published", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticePublished" } } } }
+        "409": { description: "version-conflict (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "mandatory-clause-locked | unknown-template (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /patients/{patientId}/privacy-notice:
+    get:
+      tags: [Patients]
+      summary: Does this patient need to re-acknowledge a newer privacy notice (IDC-003)
+      x-required-permission: patients:view
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: "Status", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticeStatus" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /patients/{patientId}/privacy-notice/acknowledge:
+    post:
+      tags: [Patients]
+      summary: One-tap desk acknowledgement of the current notice (a new consent row; nothing is rewritten)
+      x-required-permission: patients:edit
+      parameters: [{ name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: "Status after acknowledging", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticeStatus" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /settings/integrations/abdm:
+    get:
+      tags: [Setup]
+      summary: ABDM switch and HFR status (IDC-016); off by default
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Settings", content: { application/json: { schema: { $ref: "#/components/schemas/AbdmSettings" } } } }
+    put:
+      tags: [Setup]
+      summary: Enable ABDM (verifies the HFR id first) or switch it off
+      x-required-permission: setup:edit
+      x-step-up: true
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AbdmSettingsRequest" } } }
+      responses:
+        "200": { description: "Settings", content: { application/json: { schema: { $ref: "#/components/schemas/AbdmSettings" } } } }
+        "422": { description: "hfr-not-found | invalid-hfr-id (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "503": { description: "abdm-unavailable | abdm-not-configured (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /staff/{id}/hpr:
+    put:
+      tags: [Staff]
+      summary: Verify a doctor's HPR id against the Health Professional Registry and store it (needs ABDM enabled; 409 abdm-disabled otherwise)
+      x-required-permission: staff:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/StaffHprRequest" } } }
+      responses:
+        "200": { description: "Stored", content: { application/json: { schema: { $ref: "#/components/schemas/StaffHpr" } } } }
+        "409": { description: "abdm-disabled (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "hpr-not-found (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /public/notices/{tenantSlug}/{version}:
+    get:
+      tags: [Setup]
+      summary: Public privacy notice page for one clinic, version and language (IDC-003); HTML, no PHI, ETag and public cache headers
+      security: []
+      x-required-permission: public
+      parameters:
+        - { name: tenantSlug, in: path, required: true, schema: { type: string } }
+        - { name: version, in: path, required: true, schema: { type: string } }
+        - { name: lang, in: query, required: false, schema: { type: string, default: en } }
+      responses:
+        "200": { description: "The notice page", content: { text/html: { schema: { type: string } } } }
+        "304": { description: "Not modified" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /setup/consent-contact:
     get:
@@ -1289,7 +1546,84 @@ paths:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/ImportJobRequest" } } }
       responses:
-        "201": { description: "Created import job", content: { application/json: { schema: { $ref: "#/components/schemas/ImportJob" } } } }
+        "201": { description: "Created import job. With uploadId (ADM-012) the job starts in status validating; 403 DPA_REQUIRED while the clinic is demo_only, 415 UNSUPPORTED_FILE.", content: { application/json: { schema: { $ref: "#/components/schemas/ImportJob" } } } }
+
+  /setup/import-uploads:
+    post:
+      tags: [Setup]
+      summary: Upload the patient file (xlsx or csv) for an import job (ADM-012)
+      description: The raw file is the request body (application/octet-stream), at most 25 MB. 403 DPA_REQUIRED while the clinic is demo_only, 415 UNSUPPORTED_FILE, 413 FILE_TOO_LARGE.
+      x-required-permission: setup:edit
+      parameters:
+        - { name: fileName, in: query, required: true, schema: { type: string } }
+        - { name: format, in: query, required: true, schema: { type: string, enum: [xlsx, csv] } }
+      requestBody:
+        required: true
+        content: { application/octet-stream: { schema: { type: string, format: binary } } }
+      responses:
+        "201": { description: "Stored", content: { application/json: { schema: { $ref: "#/components/schemas/ImportUploadResponse" } } } }
+
+  /setup/import-jobs/{id}:
+    get:
+      tags: [Setup]
+      summary: One import job with its diff, mapping and progress (ADM-012)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "Import job", content: { application/json: { schema: { $ref: "#/components/schemas/ImportJob" } } } }
+
+  /setup/import-jobs/{id}/mapping:
+    put:
+      tags: [Setup]
+      summary: Save the column mapping and re-run the dry run (ADM-012)
+      description: Only while the job is at the review step (status dry_run), else 409 DIFF_STALE. 422 REQUIRED_FIELD_UNMAPPED unless name, mobile, dob and sex are mapped. Nothing is written to patients.
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ImportMappingRequest" } } }
+      responses:
+        "200": { description: "Dry-run diff and a sample", content: { application/json: { schema: { $ref: "#/components/schemas/ImportMappingResponse" } } } }
+
+  /setup/import-jobs/{id}/commit:
+    post:
+      tags: [Setup]
+      summary: Commit the dry-run result (ADM-012)
+      description: Runs in the background in chunks of 500, each chunk one transaction, resumable. Possible duplicates without a decision are skipped. 409 DIFF_STALE unless the job is at the review step or a decision names a row that is not a duplicate.
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/ImportCommitRequest" } } }
+      responses:
+        "202": { description: "Accepted", content: { application/json: { schema: { $ref: "#/components/schemas/ImportCommitResponse" } } } }
+
+  /setup/import-jobs/{id}/duplicates:
+    get:
+      tags: [Setup]
+      summary: Possible duplicates of the dry run, keyed by file row (ADM-012)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: afterRow, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { description: "Page of possible duplicates", content: { application/json: { schema: { $ref: "#/components/schemas/ImportDuplicatePage" } } } }
+
+  /setup/import-jobs/{id}/errors.csv:
+    get:
+      tags: [Setup]
+      summary: Download the error report of the dry run (row, code, reason) (ADM-012)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: "CSV", content: { text/csv: { schema: { type: string } } } }
 
   /setup/export-jobs:
     get:
@@ -1386,12 +1720,16 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Free-text match on name (any script), phone, MRN or token
+          description: >
+            OPS-009 index-assisted search: phone prefix (national number, e.g. 98123 for +91 98123 45678), MRN (exact, or
+            prefix from 3 characters) or name (any script; Arabic diacritics and alef/yaa/taa-marbuta variants fold).
+            Ranked phone, MRN, name; top-N, no cursor. limit is 1..50 when q is given.
           schema: { type: string }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
         "200": { $ref: "#/components/responses/PatientPage" }
+        "400": { description: "With q: code QUERY_TOO_SHORT (under 3 characters and not an exact MRN) or INVALID_LIMIT (limit outside 1..50)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
     post:
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       tags: [Patients]
@@ -1482,6 +1820,17 @@ paths:
           description: Invalid filter (`invalid-filter`), limit outside 1..200 (`validation`, code `INVALID_LIMIT`) or malformed cursor (`invalid-cursor`)
           content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } }
 
+  /patients/batch:
+    get:
+      tags: [Patients]
+      summary: Patient 360 for up to 100 ids in one call (FEF-016); unknown or out-of-scope ids are absent
+      x-required-permission: patients:view
+      parameters:
+        - { name: ids, in: query, required: true, schema: { type: array, maxItems: 100, items: { type: string, format: uuid } }, style: form, explode: false }
+      responses:
+        "200": { description: "PatientDetail list", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/PatientDetail" } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
   /patients/{id}:
     get:
       tags: [Patients]
@@ -1506,6 +1855,40 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PatientPatch" } } }
       responses:
         "200": { description: "Patient", content: { application/json: { schema: { $ref: "#/components/schemas/Patient" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /patients/{patientId}/messages:
+    get:
+      tags: [Patients]
+      summary: Message history with delivery status, newest first (COM-006). Template name, plain-language purpose, status, time, failure reason; never the rendered body or the phone number. PHI read logged.
+      x-required-permission: patients:view
+      parameters:
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 50, default: 50 } }
+      responses:
+        "200":
+          description: One page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        channel: { type: string, enum: [whatsapp] }
+                        purpose: { type: string }
+                        templateName: { type: string }
+                        status: { type: string, enum: [scheduled, queued, sending, sent, delivered, read, failed, blocked, cancelled, expired] }
+                        statusAt: { type: string, format: date-time }
+                        failureReason: { type: string, nullable: true, description: "Plain words, e.g. Not on WhatsApp, Opted out, Template paused by Meta; only for failed or blocked" }
+                        fallbackOf: { type: string, format: uuid, nullable: true, description: "Reserved for the SMS fallback (COM-027)" }
+                  nextCursor: { type: string, nullable: true }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
 
@@ -1542,7 +1925,105 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "204": { description: Reversed }
-        "404": { description: "Merge doesn't exist, already reversed, or past the 30-day window", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { description: "Merge doesn't exist or was already reversed", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "UNDO_WINDOW_PASSED: the merge is older than 30 days (ACC-030)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /patients/by-phone:
+    get:
+      tags: [Patients]
+      summary: Household lookup — patients with this phone plus patients whose guardian has it (ACC-029)
+      x-required-permission: patients:view
+      parameters:
+        - { name: phone, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Household
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [household]
+                properties:
+                  household:
+                    type: array
+                    items:
+                      type: object
+                      required: [patientId, displayName, age, sex, relation]
+                      properties:
+                        patientId: { type: string, format: uuid }
+                        displayName: { type: string }
+                        age: { type: integer }
+                        sex: { type: string }
+                        relation: { type: string, enum: [guardian, child, member] }
+                        lastVisitAt: { type: string, format: date-time, nullable: true }
+                        guardianId: { type: string, format: uuid, nullable: true }
+        "400": { description: "INVALID_PHONE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /patients/duplicate-suggestions:
+    get:
+      tags: [Patients]
+      summary: Likely duplicate pairs with the fields that matched (ACC-030)
+      x-required-permission: patients:delete
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Suggestions page (a page may be empty while nextCursor is set)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  nextCursor: { type: string, nullable: true }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [suggestionId, a, b, score, matchedFields]
+                      properties:
+                        suggestionId: { type: string }
+                        a: { $ref: "#/components/schemas/DuplicateBrief" }
+                        b: { $ref: "#/components/schemas/DuplicateBrief" }
+                        score: { type: number }
+                        matchedFields: { type: array, items: { type: string, enum: [phone, name, dob] } }
+
+  /patients/merges:
+    get:
+      tags: [Patients]
+      summary: Merges still inside the 30-day undo window (ACC-030)
+      x-required-permission: patients:delete
+      responses:
+        "200":
+          description: Recent merges, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [mergeId, mergedAt, undoUntil, duplicate, survivor]
+                      properties:
+                        mergeId: { type: string, format: uuid }
+                        mergedAt: { type: string, format: date-time }
+                        undoUntil: { type: string, format: date-time }
+                        duplicate: { $ref: "#/components/schemas/DuplicateBrief" }
+                        survivor: { $ref: "#/components/schemas/DuplicateBrief" }
+
+  /patients/duplicate-suggestions/{id}/dismiss:
+    post:
+      tags: [Patients]
+      summary: Dismiss a suggestion until a matched field changes (ACC-030)
+      x-required-permission: patients:delete
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Dismissed }
+        "404": { description: "No longer a suggestion", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /patients/{id}/guardian:
     delete:
@@ -1641,6 +2122,33 @@ paths:
         "204": { description: Deleted }
         "403": { description: "Caller is neither doctor {id} nor holds setup:edit" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /doctors/{id}/session:
+    get:
+      tags: [Queue]
+      summary: "The doctor's session state today (ACC-015): in, paused or out"
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "State; sessionId and since are null when no session was started today", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorSession" } } } }
+
+  /doctors/{id}/session/{action}:
+    post:
+      tags: [Queue]
+      summary: "Start, pause, resume or end the doctor's session (ACC-015)"
+      x-required-permission: "hasAuthority('queue:edit') and (authentication.name == #id.toString() or hasAuthority('setup:edit'))"
+      description: "Own doctor with queue:edit, or a caller who also holds setup:edit (queue:manage does not exist). Audited; publishes scheduling.doctor_status.changed.v1. The first in_consult of the day starts a session implicitly."
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+        - { $ref: "#/components/parameters/PathId" }
+        - { name: action, in: path, required: true, schema: { type: string, enum: [start, pause, resume, end] } }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { reasonCode: { type: string, pattern: "^[a-z][a-z0-9_]{0,39}$" } } } } }
+      responses:
+        "200": { description: "New state", content: { application/json: { schema: { $ref: "#/components/schemas/DoctorSession" } } } }
+        "403": { description: "Not the own doctor and no setup:edit" }
+        "409": { description: "Problem `invalid-session-state` (code INVALID_SESSION_STATE)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /doctors/{id}/leave:
     get:
@@ -1883,6 +2391,34 @@ paths:
         "404": { description: "Problem `patient-not-found`, `doctor-not-found` (unknown or other-tenant id) or `not-found` (appointment mismatch, cancelled/completed)" }
         "409": { description: "Problem `session-full` (walk-in only): the doctor's session covering now has reached maxPatients. Occupancy = scheduled + arrived + completed appointments starting in the block + walk-in/transfer entries created in it (except no_show). Serialized per doctor-day with booking. Also `already-checked-in` (code ALREADY_CHECKED_IN, ACC-003): the appointment is already arrived (a second desk or a retry); extra members tokenNumber, queueEntryId, checkedInAt name the first check-in; no second token is issued. Also `appointment-not-today` (scheduled only): the appointment's date in the clinic timezone is not today's clinic date (ACC-001); nothing is created.", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /events:
+    get:
+      tags: [Realtime]
+      summary: "Server-sent events for staff screens (ACC-021): snapshot on connect, then {type, id, v, topic, fields} deltas, heartbeat every 25 s"
+      description: |
+        `event: snapshot` (data `{type, id, v, topics}`; load the boards through the normal reads, `id` is the cursor deltas continue from),
+        `event: delta` (data `{type, id, v, topic, fields}`; apply when `v` is newer; the SSE `id` is the resume cursor),
+        `event: heartbeat` every 25 s. Reconnect with `Last-Event-ID` within 5 minutes to replay missed deltas without a new snapshot.
+        The stream ends when the access token expires, when the user's role/status changes or a session is revoked; reconnect with the current token.
+        Deltas carry ids, statuses and versions only, never names.
+        Per topic: queue, doctor-status, exceptions need queue:view; messages (COM-006, delivery ticks) needs patients:view; nursing needs nursing:view; requests needs scheduling:review (403 TOPIC_FORBIDDEN otherwise).
+      x-required-permission: authenticated
+      parameters:
+        - name: topics
+          in: query
+          required: false
+          description: "Comma list of queue, nursing, doctor-status, requests, exceptions, messages. Omitted = every topic the caller may see."
+          schema: { type: string }
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200": { description: "text/event-stream", content: { text/event-stream: { schema: { type: string } } } }
+        "400": { description: "Unknown topic (type INVALID_TOPIC)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "A requested topic needs a permission the caller lacks (type TOPIC_FORBIDDEN)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "Too many open streams for this user or pod (type TOO_MANY_STREAMS)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /queue:
     get:
       tags: [Queue]
@@ -1952,6 +2488,21 @@ paths:
                   newLeg: { $ref: "#/components/schemas/QueueEntry" }
         "400": { description: "transfer-reason-required / transfer-not-allowed / illegal-transition", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /queue/{id}/extend:
+    post:
+      tags: [Queue]
+      summary: "Extend the current consult by 5, 10 or 15 minutes (ACC-015); an event the ETA reads"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [minutes], properties: { minutes: { type: integer, enum: [5, 10, 15] } } } } }
+      responses:
+        "200": { description: "Recorded", content: { application/json: { schema: { type: object, properties: { queueEntryId: { type: string, format: uuid }, extendedBy: { type: integer } } } } } }
+        "400": { description: "minutes is not 5, 10 or 15", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "Problem `not-in-consult` (code NOT_IN_CONSULT)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   /queue/{id}/reorder:
     post:
@@ -2412,6 +2963,183 @@ paths:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/SafetyDictionaryActive" } } } }
         "503": { description: "No active dictionary for the region (safety-dictionary-unavailable, problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /notification-requests/{id}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (comms-gateway service token)" }]
+    parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Messaging]
+      summary: "COM-004. Claim check: render params and recipient of a pending notification request, for the Comms Gateway (header X-Internal-Token; the tenant comes from the request row). 410 code SUBJECT_GONE when the request was cancelled (appointment cancelled or moved), blocked for missing consent, or its params were purged."
+      x-required-permission: public
+      parameters: [{ name: X-Internal-Token, in: header, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: "OK: { requestId, tenantId, purpose, templateKey, language, params[], recipient{phoneE164, patientId?}, consentClass, notBefore?, notAfter? }", content: { application/json: { schema: { type: object } } } }
+        "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410": { description: "SUBJECT_GONE (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/availability:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Queue]
+      summary: "ACC-038. Authoritative availability for the Edge projection: per doctor, one session per working-hours block per day, mode slots (free slot starts) or tokens (places left of a capped session). specialtyCode is accepted but not applied (Core has no specialty data yet). Service token aud=internal (iss https://api.nabd.health/internal) naming the tenant in its tenants claim, behind a client certificate; another tenant is 403."
+      x-required-permission: authenticated
+      parameters:
+        - { name: doctorId, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: specialtyCode, in: query, required: false, schema: { type: string } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date }, description: "At most 14 days after from" }
+      responses:
+        "200": { description: "{ doctors: [{ doctorId, sessions: [{ id, date, mode, slots?, tokensLeft? }] }], v }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "No client certificate, or not an aud=internal service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "This service identity may not act for that tenant (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/households/{phoneHash}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: phoneHash, in: path, required: true, description: "SHA-256, lower-case hex, of the verified phone's E.164 digits without +", schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+    get:
+      tags: [Patients]
+      summary: "ACC-038. Household of a WhatsApp-verified phone: the patients registered on it plus their dependants. Returns only patientRef (opaque, per tenant), firstName, age band (0-4, 5-11, 12-17, 18-39, 40-59, 60+), relation (self, guardian, dependent) and isGuardian; never a date of birth or full name. Audited as 'patient via edge'."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ members: [{ patientRef, firstName, age, relation, isGuardian }] }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tenants/{tid}/appointments:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Queue]
+      summary: "ACC-038. Book an appointment for a patient reference. Idempotency-Key (UUID) is required (400 IDEMPOTENCY_KEY_REQUIRED); a replay returns the identical status and body. Same slot rules as staff booking; the last slot raced by two patients gives one 201 and one 409 SLOT_TAKEN. Audited as 'patient via edge' with the patientRef."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [patientRef, doctorId, startTime], properties: { patientRef: { type: string }, doctorId: { type: string, format: uuid }, startTime: { type: string, format: date-time } } } } }
+      responses:
+        "201": { description: "{ appointmentId, status }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed, or unknown patientRef (NOT_OWNER) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "SLOT_TAKEN (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/appointments/{id}/{action}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [confirm, reschedule, cancel] } }
+    post:
+      tags: [Queue]
+      summary: "ACC-038. Confirm, reschedule or cancel the patient's own appointment on their behalf. reasonCode (lower-case code, 3-40 characters) is required to cancel, newStartTime to reschedule (the response then carries the new appointment id). Idempotency-Key required. Core has no separate 'confirmed' state: confirm validates ownership and status, records the confirmation in the audit trail and answers status scheduled."
+      x-required-permission: authenticated
+      parameters: [{ name: Idempotency-Key, in: header, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [patientRef], properties: { patientRef: { type: string }, newStartTime: { type: string, format: date-time }, reasonCode: { type: string, pattern: "^[a-z0-9_]{3,40}$" } } } } }
+      responses:
+        "200": { description: "{ appointmentId, status }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed, or the appointment is not this patient's (NOT_OWNER) (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "SLOT_TAKEN or APPOINTMENT_ARRIVED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "INSIDE_CANCELLATION_WINDOW: the clinic's cancellation_window_hours policy applies (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /consents:export:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (comms-gateway service token)" }]
+    get:
+      tags: [Messaging]
+      summary: "COM-008. Paged latest channel consent (messaging, marketing) per patient and purpose, for the Comms Gateway's nightly reconciliation (header X-Internal-Token). version is the outbox id of the latest consent.changed.v1 event (0 if none)."
+      x-required-permission: public
+      parameters:
+        - { name: X-Internal-Token, in: header, required: true, schema: { type: string } }
+        - { name: tenantId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: since, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { description: "OK: { items: [{ patientId, purpose, granted, version, at }], nextCursor? }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Missing or wrong service token (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/drug-knowledge-base:
+    get:
+      tags: [Clinical]
+      summary: "CLN-018. Attribution of the licensed drug knowledge base behind the drug data ('Drug data - <source> <dataMonth>' under the Rx pad). configured=false until a licence is signed and a feed is loaded (then nothing is shown). Attribution only: no KB content is returned (licence: no bulk KB content through public APIs; the drug typeahead is capped at 20)."
+      x-required-permission: "clinical:view | clinical:edit"
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DrugKnowledgeBaseSource" } } } }
+
+  /clinical/drugs/{drugId}:
+    get:
+      tags: [Clinical]
+      summary: "CLN-019. Drug master detail from the regional drug master (generic ingredients with strengths, classes, schedule flags, pregnancy category, source KB and data month). A product retired in the KB is still returned (status retired) so existing prescriptions resolve. Reference data, no PHI."
+      x-required-permission: "clinical:view | pharmacy:view"
+      parameters: [{ name: drugId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/DrugDetail" } } } }
+        "404": { description: "DRUG_NOT_FOUND (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /clinical/drugs:
+    get:
+      tags: [Clinical]
+      summary: "CLN-019. Typeahead over the active products of the caller's region (prefix match on brand, ingredient, strength, form). Retired products are never returned. limit 1-100 (default 20)."
+      x-required-permission: "clinical:view | pharmacy:view"
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DrugSummary" } } } } }
+  /pharmacy/items/{id}/drug-link:
+    put:
+      tags: [Pharmacy]
+      summary: "CLN-019. Map a pharmacy item to a drug master product. Pricing and stock are untouched; suggestedIsRx is true when the product carries a schedule flag (a suggestion only, the clinic's isRx stays as set). Hybrid mode only. 404 DRUG_NOT_FOUND for an unknown or retired product. Audited (pharmacy.item_drug_linked)."
+      x-required-permission: pharmacy:edit
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [drugId], properties: { drugId: { type: string, maxLength: 80 } } } } }
+      responses:
+        "200": { description: Linked, content: { application/json: { schema: { type: object, properties: { itemId: { type: string, format: uuid }, drugId: { type: string }, suggestedIsRx: { type: boolean } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /drug-master/imports:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-019. Start a KB drug master import. feedUri is file:<name> inside the cell's configured feed directory (the licensed feed delivery is external). Dry run by default: parse, validate and diff only, never activatable. The same feed content returns the existing import. 202 {importId, status}; poll GET /drug-master/imports/{importId}. Audited."
+      x-required-permission: kb_import:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [feedUri, kind], properties: { feedUri: { type: string }, kind: { type: string, enum: [full, delta] }, dryRun: { type: boolean, default: true } } } } }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { type: object, properties: { importId: { type: string, format: uuid }, status: { type: string } } } } } }
+        "422": { description: "FEED_INVALID or FEED_UNSUPPORTED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "503": { description: "FEED_IMPORT_DISABLED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /drug-master/imports/{importId}:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    parameters: [{ name: importId, in: path, required: true, schema: { type: string, format: uuid } }]
+    get:
+      tags: [Clinical]
+      summary: "CLN-019. Import status (running, validated, active, failed, superseded) with the dry-run diff {added, changed, retired, safetyRelevant, samples} once validated, or the error of a failed import."
+      x-required-permission: kb_import:edit
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /drug-master/imports/{importId}/activate:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
+    parameters: [{ name: importId, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Clinical]
+      summary: "CLN-019. Activate a validated, non-dry-run import in one transaction (the version switch). csoAckRef is required when the diff changes schedule, pregnancy category or ingredients of existing products (409 CSO_ACK_REQUIRED); 409 IMPORT_INVALID when the import is not validated, was a dry run, or the active version moved since validation. Re-activating the active import returns its version. Publishes clinical.drug_master.version_activated.v1 per tenant of the region. Audited."
+      x-required-permission: kb_import:edit
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { csoAckRef: { type: string, maxLength: 200 } } } } }
+      responses:
+        "200": { description: Active, content: { application/json: { schema: { type: object, properties: { version: { type: integer } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "IMPORT_INVALID or CSO_ACK_REQUIRED (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
   /safety-dictionaries/{region}/versions:
     servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (platform operator token)" }]
     parameters: [{ name: region, in: path, required: true, schema: { type: string, enum: [IN, SA, AE, QA] } }]
@@ -2836,6 +3564,39 @@ paths:
         "403": { description: "Forbidden (including discount-not-permitted)" }
         "409": { description: Conflict }
         "422": { description: "unknown-charge, reason-required, invalid-reason, discount-exceeds-subtotal, rx-required, rx-not-signed, rx-patient-mismatch or rx-quantity-exhausted" }
+  /billing/quotes:
+    post:
+      tags: [Billing]
+      summary: >
+        Tax for a draft cart, nothing stored (FIN-008). Body `{ lines: [{ chargeCode, quantity, ... }], discounts?: [{ kind, value, reasonCode }], buyerGstin? }`.
+        Same path as checkout, so the quote is the bill: the invoice discount is allocated to the lines pro rata (largest remainder) before
+        tax, each tax component is rounded half-up to the minor unit, INR totals round to the rupee with a `roundOffMinor`, other currencies
+        keep their decimals. Response `{ currency, documentType: invoice|bill_of_supply, lines: [{ chargeCode, discountMinor, taxableMinor,
+        taxes: [{ type, rate, amountMinor }] }], totals: { subtotalMinor, discountMinor, taxMinor, roundOffMinor, totalMinor } }`.
+        Invoices carry `documentTitle` (Invoice | Bill of Supply), `buyerGstin`, and per line `taxableMinor` and `taxes` (stored, never recomputed).
+        Checkout accepts the optional `buyerGstin`. A clinic whose tax registration is on file but unregistered or without a GSTIN issues a
+        Bill of Supply (no tax). Not done: 422 TAX_RULE_MISSING (a head without a rule falls back to its own rate).
+      x-required-permission: billing:view
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        "200": { description: The quote, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "422": { description: "invalid-gstin, unknown-charge, reason-required, discount-exceeds-subtotal" }
+  /billing/tax/guided-picker:
+    get:
+      tags: [Billing]
+      summary: >
+        Questions and outcomes of the guided tax picker (FIN-009). `?jurisdiction=IN` returns `{ jurisdiction, questions: [{ id, text,
+        answers: [{ label, nextQuestion, outcome }] }], outcomes: [{ id, taxCategory, gstRate, note }] }`; a jurisdiction with no picker returns
+        empty lists. Rates and classes are a starting point: Needs external verification (CA, FIN-010).
+      x-required-permission: setup:view
+      parameters: [{ name: jurisdiction, in: query, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: The picker, content: { application/json: { schema: { type: object } } } }
+        "403": { description: Forbidden }
   /billing/day-close:
     get:
       tags: [Billing]
@@ -3097,6 +3858,39 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/MoneyReport" } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /reports/eta-accuracy:
+    get:
+      tags: [Reports]
+      summary: "ACC-019 - ETA accuracy per clinic day and doctor (rolled up hourly for the previous clinic day, so yesterday is in place by 06:00 local). from/to are clinic days, inclusive; default is the 14 days ending yesterday; 400 invalid-range when from is after to or the range exceeds 93 days. maeMin is the mean absolute error of the p50 time in minutes, p80HitRate the share of visits called at or before the promised p80 time, within10Pct the share within +/-10 min. lowConfidence is true when the clinic had fewer than 30 visits that day (no drift alert fires for it). Aggregates only, no patient data."
+      x-required-permission: reports:view
+      parameters:
+        - { name: from, in: query, required: false, schema: { type: string, format: date } }
+        - { name: to, in: query, required: false, schema: { type: string, format: date } }
+        - { name: doctorId, in: query, required: false, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [clinicDate, doctorId, n, maeMin, p80HitRate]
+                      properties:
+                        clinicDate: { type: string, format: date }
+                        doctorId: { type: string, format: uuid }
+                        n: { type: integer }
+                        maeMin: { type: number }
+                        p80HitRate: { type: number }
+                        within10Pct: { type: number }
+                        lowConfidence: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Caller lacks reports:view }
   /reports/sources:
     get:
       tags: [Reports]
@@ -3282,14 +4076,46 @@ paths:
                   byStatus: { type: object, additionalProperties: { type: integer } }
                   regions: { type: array, items: { type: string } }
         "403": { description: "Forbidden: no clinics_fleet:view (sre)" }
-  # ------------------------------------------------- Platform console: support access (PLT-056)
+  /platform/tenants/{tenantId}/region:
+    patch:
+      tags: [Platform]
+      summary: >
+        OPS-061. A clinic's region is chosen at provisioning and is immutable (database trigger V1991). Asking for the same
+        region is a no-op 200; any other region answers 409 REGION_IMMUTABLE. Unknown tenant 404.
+      x-required-permission: tenant_detail:edit
+      parameters:
+        - { name: tenantId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [regionCode]
+              properties:
+                regionCode: { type: string, enum: [IN, AE, SA, QA] }
+      responses:
+        "200":
+          description: Region unchanged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenantId: { type: string, format: uuid }
+                  regionCode: { type: string, enum: [IN, AE, SA, QA] }
+        "404": { description: "Tenant not found", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "REGION_IMMUTABLE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  # ------------------------------------------------- Platform console: support access (PLT-056, PLT-057)
   /platform/support-access/grants:
     post:
       tags: [Platform]
       summary: >
         Request a support grant for one tenant, one support ticket of that tenant and one scope, for 1-60 minutes
         (default 60). Errors 400 with code TICKET_REQUIRED, SCOPE_INVALID, DURATION_OUT_OF_RANGE, TICKET_INVALID
-        (ticket missing or of another tenant). A config_only grant never opens patient records (403 scope-not-permitted).
+        (ticket missing or of another tenant); 409 REQUEST_ALREADY_OPEN (same operator and ticket). A config_only grant never opens patient records (403 scope-not-permitted).
+        PLT-057: this only creates a request (status requested, 24 h deadline, no window). The clinic owner is notified in the app
+        and on WhatsApp; the window starts when the owner approves (POST /support-access/requests/{id}/decision).
       x-required-permission: support_access:request
       requestBody:
         required: true
@@ -3306,12 +4132,136 @@ paths:
                 minutes: { type: integer, minimum: 1, maximum: 60, default: 60 }
       responses:
         "201":
-          description: The grant (id, tenantId, ticketId, scope, operatorId, operatorName, operatorRole, reason, grantedAt, expiresAt, revokedAt, active)
+          description: The grant (id, tenantId, ticketId, scope, operatorId, operatorName, operatorRole, reason, grantedAt, expiresAt, revokedAt, active, status requested|active|declined|expired|revoked, minutes, windowStartedAt, windowEndsAt, declineNote). active is true only inside an owner-approved window.
           content:
             application/json:
               schema: { type: object }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden: no support_access:request (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /platform/support-access/grants/{id}/patients/{patientId}:
+    get:
+      tags: [Platform]
+      summary: >
+        PLT-057: redacted patient view. Only for the grant's own operator, scope redacted_patient_view, and only while the
+        owner-approved window is open (otherwise 403 GRANT_NOT_ACTIVE). Returns initials, masked phone (+91******3210),
+        birth year and MRN. No clinical field, no name, no full phone, no date of birth. Audited as patient.support_view.
+      x-required-permission: support_access:view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Redacted patient
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  initials: { type: string, example: AR }
+                  maskedPhone: { type: string, example: "+91******3210" }
+                  birthYear: { type: integer, example: 1990 }
+                  mrn: { type: string }
+        "403": { description: "GRANT_NOT_ACTIVE, not-your-grant or scope-not-permitted (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  # ------------------------------------------------- Clinic owner: support access requests (PLT-057)
+  /support-access/requests:
+    get:
+      tags: [Compliance]
+      summary: The clinic's support access requests, newest first. A request or window whose time ran out reads expired.
+      x-required-permission: compliance:view
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [requested, active, declined, expired, revoked] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200":
+          description: Requests of this clinic only
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        operatorName: { type: string }
+                        reason: { type: string }
+                        scope: { type: string, enum: [config_only, redacted_patient_view] }
+                        minutes: { type: integer }
+                        status: { type: string, enum: [requested, active, declined, expired, revoked] }
+                        requestedAt: { type: string, format: date-time }
+                        expiresAt: { type: string, format: date-time }
+                        windowStartedAt: { type: string, format: date-time, nullable: true }
+                        windowEndsAt: { type: string, format: date-time, nullable: true }
+                        declineNote: { type: string, nullable: true }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: "Forbidden: no compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /support-access/requests/{id}/decision:
+    post:
+      tags: [Compliance]
+      summary: >
+        The owner approves or declines. Approval starts the window now (at most the requested minutes, 60 at the most) and
+        writes "support_access.session_started" to the clinic's audit log; decline writes support_access.declined.
+        Needs an Idempotency-Key. 409 ALREADY_DECIDED, 410 EXPIRED (not answered within 24 h), 404 for another clinic's request.
+      x-required-permission: compliance:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [active, declined] }
+                  windowEndsAt: { type: string, format: date-time, nullable: true }
+        "403": { description: "Forbidden: no compliance:approve (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: ALREADY_DECIDED (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "410": { description: EXPIRED (problem+json), content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /support/tickets/redaction-preview:
+    post:
+      tags: [Support]
+      x-required-permission: authenticated
+      summary: >
+        PLT-057: what the ticket form shows before submitting. Returns the subject and description as they would be stored
+        (phone numbers, emails, national IDs, MRNs and this clinic's patient names replaced by [redacted]) and how many
+        replacements were made. Stores nothing. POST /support/tickets stores the redacted text only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subject, description]
+              properties:
+                subject: { type: string, maxLength: 200 }
+                description: { type: string, maxLength: 4000 }
+                priority: { type: string, enum: [low, normal, high, urgent] }
+      responses:
+        "200":
+          description: Redacted preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redactionCount: { type: integer }
+                  subject: { type: string }
+                  description: { type: string }
   # ------------------------------------------------- Platform console: audit (PLT-028)
   /platform/audit-log:
     get:
@@ -3328,7 +4278,7 @@ paths:
         toStatus, reason; also written by billing dunning transitions), platform_billing.subscription_created,
         platform_billing.subscription_updated, platform_billing.discount_requested, platform_billing.discount_auto_approved,
         platform_billing.discount_approved, platform_billing.discount_rejected, platform_ticket.status_changed (status
-        only), support_access.grant, support_access.revoke, patient.support_view, audit_log.export.
+        only), support_access.requested, support_access.session_started, support_access.declined, support_access.request_expired, support_access.session_ended, support_access.revoke, patient.support_view, audit_log.export.
       summary: Cross-tenant audit log search for platform operators (search_audit_log, V16/V85). Oldest first (ascending id), cursor = last id. All filters optional and additive (AND). createdAfter/createdBefore are inclusive ISO-8601 instants; createdAfter later than createdBefore is 400 invalid-date-range.
       x-required-permission: audit_compliance:view
       x-plt-056: >
@@ -3407,6 +4357,163 @@ paths:
               schema: { type: string }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { description: "Forbidden: no audit_compliance:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /organization/invoice-series:
+    get:
+      tags: [Organization]
+      summary: FIN-006 - list the facility's invoice, credit-note and receipt series (one row per kind and financial year)
+      x-required-permission: setup:view
+      responses:
+        "200":
+          description: Series rows
+          content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceSeriesList" } } }
+        "403": { description: "Forbidden: no setup:view (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /organization/invoice-series/{kind}:
+    put:
+      tags: [Organization]
+      summary: FIN-006 - set the prefix pattern of a series before its first use (pattern carries {FY}, e.g. SKN/{FY}/)
+      x-required-permission: setup:edit
+      parameters:
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [invoice, credit_note, receipt] } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prefixPattern]
+              properties:
+                prefixPattern: { type: string, maxLength: 40, example: "SKN/{FY}/" }
+                taxRegistrationId: { type: string, format: uuid }
+                fyStartMonth: { type: integer, minimum: 1, maximum: 12, description: "April in India, January elsewhere when omitted" }
+      responses:
+        "200":
+          description: The series
+          content: { application/json: { schema: { $ref: "#/components/schemas/InvoiceSeries" } } }
+        "403": { description: "Forbidden: no setup:edit (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "SERIES_IN_USE: numbers were already issued (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "NUMBER_TOO_LONG: over 16 characters for an Indian GSTIN; INVALID_PREFIX_PATTERN; INVALID_TAX_REGISTRATION (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /me/entitlements:
+    get:
+      tags: [Setup]
+      summary: PLT-059. What this clinic may use (modules, killed features, seat limit) so staff-web hides navigation it does not have
+      x-required-permission: isAuthenticated()
+      responses:
+        "200":
+          description: Entitlements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  modules: { type: array, items: { type: object, properties: { code: { type: string }, enabled: { type: boolean } } } }
+                  killedFeatures: { type: array, items: { type: string } }
+                  seatLimit: { type: [integer, "null"] }
+        "403": { description: "Not a clinic session" }
+  /plans/catalogue:
+    get:
+      tags: [Platform]
+      summary: ADM-034. Public plan comparison for a market (no auth, Cache-Control public 5 min)
+      security: []
+      x-required-permission: public
+      parameters:
+        - { name: market, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Active plans offered in the market (current version)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    code: { type: string }
+                    name: { type: string }
+                    priceMinor: { type: integer }
+                    currency: { type: string, enum: [INR, SAR, AED, QAR] }
+                    pricingBasis: { type: string, enum: [per_clinic, per_doctor] }
+                    modules: { type: array, items: { type: string } }
+                    limits: { type: object, properties: { seats: { type: integer }, branches: { type: [integer, "null"] }, visitsPerMonth: { type: [integer, "null"] } } }
+  /platform/tenants/{tenantId}/features:
+    get:
+      tags: [Platform]
+      summary: PLT-059. A clinic's feature overrides
+      x-required-permission: tenant_detail:view
+      parameters:
+        - { name: tenantId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Overrides }
+  /platform/tenants/{tenantId}/features/{code}:
+    put:
+      tags: [Platform]
+      summary: >
+        PLT-059. Set a per-clinic override (on, off, kill) with a reason and optional expiry; audited, effective within 60 s.
+        kill answers 503 FEATURE_DISABLED on the clinic's writes, off answers 403 MODULE_NOT_IN_PLAN. Unknown code 404 UNKNOWN_FEATURE.
+      x-required-permission: tenant_detail:edit
+      parameters:
+        - { name: tenantId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state, reason]
+              properties:
+                state: { type: string, enum: [on, off, kill] }
+                reason: { type: string, maxLength: 500 }
+                expiresAt: { type: [string, "null"], format: date-time }
+      responses:
+        "200": { description: Override saved }
+        "404": { description: UNKNOWN_FEATURE or unknown clinic }
+  /platform/kill-switches/{code}:
+    put:
+      tags: [Platform]
+      summary: PLT-059. Global kill switch, evaluated before any clinic override; no clinic can use the feature within 60 s
+      x-required-permission: tenant_detail:edit
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [active, reason]
+              properties:
+                active: { type: boolean }
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200": { description: Switch saved }
+        "404": { description: UNKNOWN_FEATURE }
+  /client-telemetry:
+    post:
+      tags: [Ops]
+      summary: Ingest scrubbed web vitals and client errors (OPS-028)
+      x-required-permission: isAuthenticated()
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, metric, route]
+              properties:
+                kind: { type: string, enum: [vital, error] }
+                metric: { type: string, maxLength: 64 }
+                value: { type: number }
+                route: { type: string, maxLength: 200, description: "Path only; query string and fragment are cut" }
+                message: { type: string, maxLength: 500, description: Accepted, never stored or logged }
+                stackHash: { type: string, maxLength: 64 }
+      responses:
+        "202": { description: Accepted }
+        "400": { description: Invalid report }
+        "413": { description: "TOO_LARGE: body over 4096 bytes" }
+        "429": { description: RATE_LIMITED }
 
 components:
   securitySchemes:
@@ -3558,6 +4665,61 @@ components:
               page: { $ref: "#/components/schemas/PageMeta" }
 
   schemas:
+    DuplicateBrief:
+      type: object
+      required: [patientId, mrn, displayName, dob, sex, phone]
+      properties:
+        patientId: { type: string, format: uuid }
+        mrn: { type: string }
+        displayName: { type: string }
+        dob: { type: string, format: date }
+        sex: { type: string }
+        phone: { type: string }
+        lastVisitAt: { type: string, format: date-time, nullable: true }
+    UiPreferences:
+      type: object
+      properties:
+        uiLocale: { type: string, nullable: true, enum: [en, hi, kn, te, ta, ml, bn, ar] }
+        uiTheme: { type: string, enum: [system, dark, light] }
+        digitStyle: { type: string, nullable: true, enum: [latn, arab] }
+    UiPreferencesRead:
+      allOf:
+        - $ref: "#/components/schemas/UiPreferences"
+        - type: object
+          properties:
+            clinicDefaultLocale: { type: string, nullable: true, enum: [en, hi, kn, te, ta, ml, bn, ar] }
+    UiPreferencesWrite:
+      type: object
+      required: [uiTheme]
+      properties:
+        uiLocale: { type: string, nullable: true }
+        uiTheme: { type: string, enum: [system, dark, light] }
+        digitStyle: { type: string, nullable: true }
+    DoctorSession:
+      type: object
+      required: [state]
+      properties:
+        sessionId: { type: [string, "null"], format: uuid }
+        state: { type: string, enum: [in, paused, out] }
+        since: { type: [string, "null"], format: date-time }
+    InvoiceSeries:
+      type: object
+      required: [id, kind, prefix, fiscalYear, nextNumber, prefixPattern, fyStartMonth, pad]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [invoice, credit_note, receipt] }
+        prefix: { type: string, example: "SKN/25-26/" }
+        fiscalYear: { type: string, example: "25-26" }
+        nextNumber: { type: integer, format: int64 }
+        taxRegistrationId: { type: string, format: uuid, nullable: true }
+        prefixPattern: { type: string, nullable: true }
+        fyStartMonth: { type: integer }
+        pad: { type: integer }
+    InvoiceSeriesList:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/InvoiceSeries" } }
     ClinicalDocumentCreate:
       type: object
       required: [type]
@@ -3687,6 +4849,7 @@ components:
         deactivatedReason: { type: [string, "null"], description: "Why the entry was removed; null while active" }
         deactivatedAt: { type: [string, "null"], format: date-time }
         deactivatedByName: { type: [string, "null"] }
+        unconfirmed: { type: boolean, description: "ADM-012: imported from a legacy list, a doctor still has to confirm it; a clinician correction clears it" }
     AllergyWrite:
       type: object
       required: [substance, severity]
@@ -3960,6 +5123,31 @@ components:
         ruleSource: { type: string }
         weightRecordedAt: { type: [string, "null"], format: date-time, description: When the weight used was recorded. Null when unknown (weight saved before the date was tracked); never estimated from the visit row time. Clients should treat null as stale. }
         weightStale: { type: boolean, description: "True when the weight is older than the policy window (30 days under 2 years of age, 90 days otherwise; CSO to confirm) or its date is unknown." }
+    DrugDetail:
+      type: object
+      properties:
+        id: { type: string }
+        brand: { type: string }
+        generic: { type: array, items: { type: string } }
+        strength: { type: [string, "null"] }
+        form: { type: [string, "null"] }
+        route: { type: [string, "null"] }
+        schedule: { type: array, items: { type: string } }
+        pregnancyCategory: { type: [string, "null"] }
+        lactationNote: { type: [string, "null"] }
+        status: { type: string, enum: [active, retired] }
+        ingredients: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string }, amount: { type: [number, "null"] }, unit: { type: [string, "null"] } } } }
+        classes: { type: array, items: { type: object, properties: { id: { type: string }, name: { type: string } } } }
+        source: { type: object, properties: { kb: { type: [string, "null"] }, month: { type: [string, "null"] } } }
+    DrugSummary:
+      type: object
+      properties:
+        id: { type: string }
+        brand: { type: string }
+        strength: { type: [string, "null"] }
+        form: { type: [string, "null"] }
+        generic: { type: array, items: { type: string } }
+        schedule: { type: array, items: { type: string } }
     PharmacyItem:
       type: object
       properties:
@@ -3972,6 +5160,7 @@ components:
         taxRatePercent: { type: number }
         stockQty: { type: integer, minimum: 0 }
         active: { type: boolean }
+        drugId: { type: [string, "null"], description: "CLN-019: linked drug master product" }
     PharmacyStockAdjustment:
       type: object
       required: [reason]
@@ -4046,6 +5235,13 @@ components:
         safetyDictionaryVersion:
           type: [string, "null"]
           description: "CLN-004. Safety dictionary version active when the prescription was signed (e.g. 'IN v1'); null for a draft or a prescription signed before V1211."
+    DrugKnowledgeBaseSource:
+      type: object
+      required: [configured]
+      properties:
+        configured: { type: boolean }
+        source: { type: [string, "null"], description: "Licensed KB name as agreed in the licence attribution clause" }
+        dataMonth: { type: [string, "null"], pattern: '^\d{4}-(0[1-9]|1[0-2])$', example: "2026-10" }
     SafetyDictionaryActive:
       type: object
       properties:
@@ -4415,6 +5611,9 @@ components:
           properties:
             confirmed: { type: boolean, description: "Must be true" }
             channel: { type: string, enum: [in_person, phone, written] }
+        synthetic:
+          type: [boolean, "null"]
+          description: "ADM-002. true marks a demo patient. While the clinic's data gate is demo_only only synthetic patients can be created; a real one returns 403 DPA_REQUIRED and writes nothing."
 
     PatientPatch:
       type: object
@@ -4443,6 +5642,7 @@ components:
         dob: { type: string, format: date }
         gender: { type: string, enum: [male, female, other] }
         status: { type: string, enum: [active, merged] }
+        matchedOn: { type: string, enum: [phone, mrn, name], description: "Search results only (OPS-009): which index branch found the patient" }
 
     PatientDetail:
       allOf:
@@ -4647,6 +5847,50 @@ components:
         skippedAt: { type: [string, "null"], format: date-time }
         doneAt: { type: [string, "null"], format: date-time }
 
+    DpaStatus:
+      type: object
+      required: [version, marketCode, html, dataGate, blockers]
+      properties:
+        version: { type: string }
+        marketCode: { type: string, description: "IN, KSA, AE or QA: IN says data fiduciary / data processor, the others controller / processor" }
+        html: { type: string, description: "The DPA text, server-escaped HTML" }
+        accepted:
+          type: [object, "null"]
+          properties:
+            version: { type: string }
+            at: { type: string, format: date-time }
+            by: { type: [string, "null"] }
+            method: { type: string }
+            acceptanceId: { type: string, format: uuid }
+        dataGate: { type: string, enum: [demo_only, live] }
+        blockers: { type: array, items: { type: string, enum: [DPA_REQUIRED, PLAN_REQUIRED] } }
+        reacceptDueBy: { type: [string, "null"], format: date-time, description: "Set when a newer DPA than the accepted one exists: show a non-blocking banner; the gate is never reset" }
+
+    DpaOtpChallenge:
+      type: object
+      required: [otpChallengeId, expiresAt]
+      properties:
+        otpChallengeId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+
+    DpaAcceptRequest:
+      type: object
+      required: [version, otpChallengeId, otp]
+      properties:
+        version: { type: string, minLength: 1 }
+        otpChallengeId: { type: string, format: uuid }
+        otp: { type: string, pattern: "^\\d{6}$" }
+        eSignRef: { type: [string, "null"], description: "Reserved for Aadhaar eSign / Nafath / UAE Pass; not built, a value is refused" }
+
+    DpaAcceptResponse:
+      type: object
+      required: [acceptanceId, dataGate, pdfUrl, blockers]
+      properties:
+        acceptanceId: { type: string, format: uuid }
+        dataGate: { type: string, enum: [demo_only, live] }
+        pdfUrl: { type: string }
+        blockers: { type: array, items: { type: string, enum: [PLAN_REQUIRED] } }
+
     SetupProgressUpdate:
       type: object
       required: [status]
@@ -4726,6 +5970,66 @@ components:
       properties:
         value: { type: string }
 
+    PrivacyNoticeVersions:
+      type: object
+      required: [versions]
+      properties:
+        versions:
+          type: array
+          items:
+            type: object
+            required: [version, language, effectiveFrom, mandatoryHash, templateKey, legalReviewed, current]
+            properties:
+              version: { type: string }
+              language: { type: string }
+              effectiveFrom: { type: string, format: date-time }
+              mandatoryHash: { type: string }
+              templateKey: { type: string }
+              legalReviewed: { type: boolean, description: "false until the DPO has approved the template wording" }
+              current: { type: boolean }
+              bodyMd: { type: [string, "null"], description: "Only on the current version" }
+              lockedClauses: { type: [array, "null"], items: { type: string } }
+    PrivacyNoticePublishRequest:
+      type: object
+      required: [language, bodyMd, basedOnTemplate]
+      properties:
+        language: { type: string }
+        bodyMd: { type: string, maxLength: 50000 }
+        basedOnTemplate: { type: string }
+        baseVersion: { type: string, description: "The version being edited; a different current version is 409" }
+    PrivacyNoticePublished:
+      type: object
+      required: [version]
+      properties: { version: { type: string } }
+    PrivacyNoticeStatus:
+      type: object
+      required: [needsReAcknowledgement]
+      properties:
+        needsReAcknowledgement: { type: boolean }
+        acceptedVersion: { type: [string, "null"] }
+        currentVersion: { type: [string, "null"] }
+        language: { type: [string, "null"] }
+    AbdmSettings:
+      type: object
+      required: [enabled, hfrVerified]
+      properties:
+        enabled: { type: boolean }
+        hfrVerified: { type: boolean }
+        hfrId: { type: [string, "null"] }
+    AbdmSettingsRequest:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        hfrId: { type: string, maxLength: 40 }
+    StaffHprRequest:
+      type: object
+      required: [hprId]
+      properties: { hprId: { type: string, pattern: "^[A-Za-z0-9@._-]{3,60}$" } }
+    StaffHpr:
+      type: object
+      required: [staffId, hprId, hprVerified]
+      properties: { staffId: { type: string, format: uuid }, hprId: { type: string }, hprVerified: { type: boolean } }
     ConsentContact:
       type: object
       properties:
@@ -4797,7 +6101,11 @@ components:
         whatsappMessagesUsed: { type: integer }
         whatsappMessagesLimit: { type: integer }
         branchesUsed: { type: integer }
-        branchesLimit: { type: integer }
+        branchesLimit: { type: integer, description: "The plan's branch limit when the plan has one (PLT-059)" }
+        modules: { type: array, items: { type: object, properties: { code: { type: string }, enabled: { type: boolean } } }, description: "PLT-059: effective state of every module" }
+        killedFeatures: { type: array, items: { type: string }, description: "PLT-059: features switched off by a kill switch; staff-web shows a banner" }
+        seatsUsed: { type: integer, description: "PLT-059: invited + active staff; suspended do not count" }
+        seatsLimit: { type: [integer, "null"], description: "PLT-059: null = unlimited" }
 
     ImportJob:
       type: object
@@ -4805,17 +6113,85 @@ components:
         id: { type: string, format: uuid }
         importType: { type: string, enum: [patients, appointments, invoices, charges] }
         fileName: { type: string }
-        status: { type: string, enum: [pending, validating, importing, done, failed] }
+        status: { type: string, enum: [pending, validating, dry_run, awaiting_commit, importing, done, failed] }
         resultUrl: { type: [string, "null"] }
         errorMessage: { type: [string, "null"] }
         createdAt: { type: [string, "null"], format: date-time }
+        rowsTotal: { type: [integer, "null"] }
+        rowsDone: { type: [integer, "null"] }
+        diff: { type: [object, "null"], additionalProperties: true, description: "ready, duplicates, errors, total (needsMapping when a required column is unmapped); after the commit created, merged, skipped, errors" }
+        mapping: { type: [object, "null"], additionalProperties: true, description: "headers, columns [{source, target}], dateFormat" }
 
     ImportJobRequest:
       type: object
-      required: [importType, fileName]
+      required: [importType]
+      description: fileName for the legacy stub job; uploadId (with optional sourceFormat) starts the staged patient import.
       properties:
         importType: { type: string, enum: [patients, appointments, invoices, charges] }
         fileName: { type: string }
+        uploadId: { type: string, format: uuid }
+        sourceFormat: { type: string, enum: [xlsx, csv] }
+
+    ImportUploadResponse:
+      type: object
+      properties:
+        uploadId: { type: string, format: uuid }
+        fileName: { type: string }
+        sourceFormat: { type: string, enum: [xlsx, csv] }
+        sizeBytes: { type: integer }
+
+    ImportColumn:
+      type: object
+      required: [source, target]
+      properties:
+        source: { type: string, description: "Header text in the file" }
+        target: { type: string, enum: [name, mobile, dob, sex, oldRecordNo, allergies] }
+
+    ImportMappingRequest:
+      type: object
+      required: [columns]
+      properties:
+        columns: { type: array, items: { $ref: "#/components/schemas/ImportColumn" } }
+        dateFormat: { type: string, enum: [dd/MM/yyyy, MM/dd/yyyy, dd-MM-yyyy, dd.MM.yyyy, yyyy-MM-dd], default: dd/MM/yyyy }
+
+    ImportMappingResponse:
+      type: object
+      properties:
+        diff: { type: object, additionalProperties: true }
+        sample: { type: array, items: { type: object, additionalProperties: { type: string } } }
+
+    ImportDecision:
+      type: object
+      required: [row, action]
+      properties:
+        row: { type: integer, description: "Row number as in the spreadsheet (header = 1)" }
+        action: { type: string, enum: [skip, merge, create] }
+
+    ImportCommitRequest:
+      type: object
+      properties:
+        duplicateDecisions: { type: array, items: { $ref: "#/components/schemas/ImportDecision" } }
+
+    ImportCommitResponse:
+      type: object
+      properties:
+        status: { type: string, enum: [importing] }
+
+    ImportDuplicateRow:
+      type: object
+      properties:
+        row: { type: integer }
+        reason: { type: string, enum: [DUP_FILE, DUP_REGISTRY] }
+        name: { type: string }
+        mobileEnding: { type: string, description: "Last 4 digits" }
+        dob: { type: string, format: date }
+        decision: { type: [string, "null"], enum: [skip, merge, create, null] }
+
+    ImportDuplicatePage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ImportDuplicateRow" } }
+        nextAfterRow: { type: [integer, "null"] }
 
     ExportJob:
       type: object

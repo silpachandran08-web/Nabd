@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { adminOrdersQuery, prefix, queueQuery } from "./lib/query";
+import { adminOrdersQuery, doctorQueueQuery, prefix, queueQuery } from "./lib/query";
 import styles from "./clinicNav.module.css";
 import Icon, { type IconName } from "./components/ui/Icon";
 import { initials } from "@nabd/domain";
-import { decodeAccessToken, getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
+import { selfStaffId } from "./lib/doctorQueries";
+import { usePermissions } from "./lib/usePermissions";
+import { navAllowed, useEntitlements } from "./lib/entitlements";
+import { getIdentity, getPermissions, hasNursingGrant, getSessionExpiresAt, isOwner, ownerPendingTokenValid, regionLabel, signOut, SHELL_SKIP_PREFIXES, type Identity } from "./lib/session";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 // Same "waiting" bucket as the Arrivals page's own tab counts (arrivals/page.tsx bucketOf).
@@ -70,6 +73,7 @@ const OWNER_ITEMS: OwnerItem[] = [
     active: (p, tab) => p.startsWith("/setup") && tab !== "licences" && tab !== "subscription" },
   { label: "Compliance & Audit", short: "Audit", icon: "shield", href: "/setup?tab=licences", permission: "setup:view",
     active: (p, tab) => p === "/setup" && tab === "licences" },
+  { label: "Support access", short: "Support", icon: "shield", href: "/compliance", permission: "compliance:view", active: (p) => p.startsWith("/compliance") },
   { label: "Plan & Modules", short: "Plan", icon: "list", href: "/setup?tab=subscription", permission: "setup:view",
     active: (p, tab) => p === "/setup" && tab === "subscription" },
 ];
@@ -133,7 +137,9 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
+  const tokenGrants = usePermissions().permissions; // FEF-019: changes when a token refresh brings a new role, so the nav follows without re-login
   const [permissions, setPermissions] = useState<string[] | null>(null);
+  const ent = useEntitlements(pathname); // PLT-059: hide modules the plan does not include
   const [owner, setOwner] = useState(false);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [showMenu, setShowMenu] = useState(false);
@@ -144,7 +150,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const [showClinic, setShowClinic] = useState(false);
   const [plan, setPlan] = useState<{ plan: string | null; status: string; branchesUsed: number; branchesLimit: number } | null>(null);
   const [canReturnToWorkspaces, setCanReturnToWorkspaces] = useState(false);
-  const [myDayBadge, setMyDayBadge] = useState<Record<string, number>>({});
 
   // Escape closes the mobile More menu and hands focus back to its button.
   useEffect(() => {
@@ -173,7 +178,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     setPermissions(skip ? [] : getPermissions());
     setIdentity(skip ? null : getIdentity());
     setOwner(skip ? false : isOwner());
-  }, [pathname, skip]);
+  }, [pathname, skip, tokenGrants]);
 
   // The Receptionist sidebar's count badges: today's waiting arrivals and visits sent to checkout, off
   // today's queue. FEF-015: the same query (key and request) Arrivals reads, so the two share one GET /queue.
@@ -184,9 +189,13 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   // queue entries (queue:view) and today's administration orders not yet given (nursing:view).
   const priorityRows = useQuery({ ...queueQuery(true), enabled: nurseNav && perms.includes("queue:view") }).data;
   const adminRows = useQuery({ ...adminOrdersQuery(), enabled: nurseNav && perms.includes("nursing:view") }).data;
+  // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view). The JWT subject
+  // is the staff id (AuthService.mintTokenPair). FEF-016: the same query My Day and the consult queue read.
+  const me = skip ? "" : selfStaffId();
+  const myDayRows = useQuery({ ...doctorQueueQuery(me), enabled: !!me && isDoctorNav(perms) && perms.includes("queue:view") }).data;
   const count = <T,>(rows: T[] | undefined, keep: (r: T) => boolean) => (Array.isArray(rows) ? rows.filter(keep).length : undefined);
   const badges: Record<string, number | undefined> = {
-    ...myDayBadge,
+    [MY_DAY_HREF]: count(myDayRows, (r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status ?? "")),
     "/arrivals": count(queueRows, (r) => WAITING_STATUSES.includes(r.status ?? "")),
     "/billing": count(queueRows, (r) => r.status === "checkout_pending"),
     "nursing:priority": count(priorityRows, () => true),
@@ -198,27 +207,6 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
     void qc.refetchQueries({ queryKey: prefix("queue"), type: "active" });
     void qc.refetchQueries({ queryKey: adminOrdersQuery().queryKey, type: "active" });
   }, [pathname, qc]);
-
-  // My Day badge: this doctor's waiting patients today (GET /queue?doctorId=<own staff id>, queue:view).
-  // The JWT subject is the staff id (AuthService.mintTokenPair); no queue:view = no badge.
-  useEffect(() => {
-    const perms = getPermissions();
-    if (skip || !isDoctorNav(perms) || !perms.includes("queue:view")) return;
-    const token = localStorage.getItem("nabd_access_token");
-    const me = token ? decodeAccessToken(token)?.sub : undefined;
-    if (!token || !me) return;
-    const ctrl = new AbortController();
-    let cancelled = false;
-    void fetch(`${API_BASE}/queue?doctorId=${encodeURIComponent(me)}`, { headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal })
-      .then(async (res) => {
-        if (cancelled || !res.ok) return;
-        const rows: { status: string; doctorId?: string }[] = await res.json();
-        if (cancelled || !Array.isArray(rows)) return;
-        setMyDayBadge({ [MY_DAY_HREF]: rows.filter((r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status)).length });
-      })
-      .catch(() => {});
-    return () => { cancelled = true; ctrl.abort(); };
-  }, [pathname, skip]);
 
   // Owner's plan chip (wireframe showPlanChip): GET /setup/subscription (setup:view).
   useEffect(() => {
@@ -252,7 +240,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
   const currentTab = searchParams.get("tab");
 
   type Entry = { key: string; href: string; label: string; short: string; icon: IconName; active: boolean; badge?: number };
-  const entries: Entry[] = [
+  const allEntries: Entry[] = [
     ...ownerItems.map((item) => ({
       key: item.label, href: item.href, label: item.label, short: item.short, icon: item.icon,
       active: !!pathname && item.active(pathname, currentTab),
@@ -273,6 +261,7 @@ export default function ClinicNav({ collapsed }: { collapsed: boolean }) {
       badge: badges[item.href],
     })),
   ];
+  const entries = allEntries.filter((e) => navAllowed(e.href, ent));
   // Mobile bottom nav: max 5 destinations (DESIGN.md §4) — 4 items + "More" when there are more.
   const primaryEntries = entries.length > 5 ? entries.slice(0, 4) : entries;
   const overflowEntries = entries.length > 5 ? entries.slice(4) : [];

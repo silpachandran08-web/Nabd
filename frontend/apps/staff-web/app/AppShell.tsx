@@ -3,8 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import ClinicNav from "./ClinicNav";
+import EntitlementsBanner from "./EntitlementsBanner";
 import { useClinicTimeZoneBoot } from "./lib/useClinicTimeZone";
 import TopBar from "./TopBar";
+import RouteChrome from "./RouteChrome";
 import "./lib/bffShim"; // FEF-009: cookie-mode fetch routing, before any screen calls Core
 
 const COLLAPSE_KEY = "nabd_sidebar_collapsed";
@@ -39,6 +41,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="appShell">
+      <RouteChrome />
       {/* ClinicNav reads useSearchParams (nursing's deep-linked sidebar items), which requires
           a Suspense boundary or every other page's static prerender breaks. */}
       <Suspense fallback={null}>
@@ -46,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </Suspense>
       <div className="appShellContent">
         <TopBar collapsed={collapsed} onToggleCollapse={toggleCollapsed} />
-        <div className="appShellBody">{children}</div>
+        <div className="appShellBody" id="app-body"><EntitlementsBanner />{children}</div>
       </div>
     </div>
   );

@@ -33,7 +33,7 @@ final class SkipLoggingLockProvider implements LockProvider {
             Long prev = lastLogged.get(config.getName());
             if (prev == null || now - prev >= LOG_EVERY_MS) {
                 lastLogged.put(config.getName(), now);
-                log.info("job {} skipped: locked by another replica", config.getName());
+                log.info("job {} skipped: locked by another replica", config.getName()); // log-phi-ok: scheduled job name
             }
         }
         return lock;

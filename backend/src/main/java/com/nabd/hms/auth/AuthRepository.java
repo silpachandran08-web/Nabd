@@ -49,7 +49,7 @@ class AuthRepository {
 
     Optional<Tenant> findTenantBySlug(String slug) {
         return jdbc.query(
-                "SELECT id, slug, status, name, region FROM tenants WHERE slug = ?::citext",
+                "SELECT id, slug, status, name, region_code AS region FROM tenants WHERE slug = ?::citext",
                 tenantMapper(), slug
         ).stream().findFirst();
     }
@@ -59,7 +59,7 @@ class AuthRepository {
      * all mint a fresh token from just a staff/session row, no slug in hand). */
     Optional<Tenant> findTenantById(UUID id) {
         return jdbc.query(
-                "SELECT id, slug, status, name, region FROM tenants WHERE id = ?",
+                "SELECT id, slug, status, name, region_code AS region FROM tenants WHERE id = ?",
                 tenantMapper(), id
         ).stream().findFirst();
     }

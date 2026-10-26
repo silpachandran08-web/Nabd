@@ -56,6 +56,15 @@ class RelayConfigTest {
     }
 
     @Test
+    void relayRefusesToLockThroughPgBouncer() {
+        var pooled = runner.withPropertyValues("app.relay.enabled=true", "spring.datasource.url=jdbc:postgresql://pool.cell.internal:6432/nabd")
+                .withBean(LettuceConnectionFactory.class, LettuceConnectionFactory::new);
+        pooled.run(ctx -> assertThat(ctx).hasFailed().getFailure().rootCause().hasMessageContaining("RELAY_DB_URL"));
+        pooled.withPropertyValues("app.relay.direct-url=jdbc:postgresql://127.0.0.1:1/none")
+                .run(ctx -> assertThat(ctx).hasNotFailed().hasSingleBean(OutboxRelay.class));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void workerProfileEnablesTheRelay() throws Exception {
         Map<String, Object> doc;

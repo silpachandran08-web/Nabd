@@ -2,12 +2,15 @@ package com.nabd.hms.messaging;
 
 import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ApiException;
+import com.nabd.hms.common.DomainEventType;
 import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -25,14 +28,16 @@ public class WhatsAppMessageService {
     private final EventPublisher publisher;
     private final TenantContext tenantContext;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     WhatsAppMessageService(WhatsAppMessageRepository repo, WhatsAppTemplateRepository templates, EventPublisher publisher,
-                           TenantContext tenantContext, ObjectMapper objectMapper) {
+                           TenantContext tenantContext, ObjectMapper objectMapper, Clock clock) {
         this.repo = repo;
         this.templates = templates;
         this.publisher = publisher;
         this.tenantContext = tenantContext;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     /** @param patientId set for any patient-facing send — consent is checked at send time, not here,
@@ -58,5 +63,32 @@ public class WhatsAppMessageService {
         } catch (Exception e) {
             throw new IllegalArgumentException("WhatsApp template params are not serializable", e);
         }
+    }
+
+    /** COM-003: a send that is no longer wanted. True when it was stopped; false when it had already started
+     * sending (or is past it): a message that may be at the provider is never silently relabelled. */
+    @Transactional
+    public boolean cancel(UUID messageId) {
+        return stop(messageId, "cancelled");
+    }
+
+    /** COM-003: a send that missed its window (COM-023 decides the window; this is the state change). */
+    @Transactional
+    public boolean expire(UUID messageId) {
+        return stop(messageId, "expired");
+    }
+
+    @Transactional
+    boolean stop(UUID messageId, String status) {
+        if (!repo.markTerminal(messageId, status)) {
+            return false;
+        }
+        Map<String, Object> data = new LinkedHashMap<>(); // same event as the delivery callbacks (COM-001): one schema, status delivered|read|failed|cancelled|expired
+        data.put("messageId", messageId.toString());
+        data.put("channel", "whatsapp");
+        data.put("status", status);
+        data.put("at", clock.instant().toString());
+        publisher.publish(tenantContext.current(), DomainEventType.MESSAGE_STATUS_CHANGED, messageId, data);
+        return true;
     }
 }

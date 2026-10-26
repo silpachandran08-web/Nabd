@@ -98,7 +98,7 @@ class S11QaFin004RefundOnceTest extends ApiTestBase {
     }
 
     private static long cnSeq(Object cn) {
-        return Long.parseLong(String.valueOf(cn).substring(3));
+        return Long.parseLong(String.valueOf(cn).substring(String.valueOf(cn).lastIndexOf('-') + 1)); // CN-26-27-000001
     }
 
     // AC1

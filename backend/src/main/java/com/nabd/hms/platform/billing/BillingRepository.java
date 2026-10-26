@@ -29,16 +29,17 @@ class BillingRepository {
     // (there's no one tenant to scope to — subscriptions span every tenant) — staff_counts_by_tenant()
     // is the SECURITY DEFINER escape hatch for that, same precedent as search_audit_log() (V16).
     private static final String SUBSCRIPTION_SELECT =
-            "SELECT s.id, s.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug, t.region, t.status AS tenant_status, " +
+            "SELECT s.id, s.tenant_id, t.name AS tenant_name, t.slug AS tenant_slug, t.region_code AS region, t.status AS tenant_status, " +
                     "       s.plan_id, p.code AS plan_code, p.name AS plan_name, s.mrr_cents, s.currency, s.renewal_date, " +
-                    "       p.seat_limit, COALESCE(sc.staff_count, 0) AS seats_used, s.created_at " +
+                    "       COALESCE(pv.seat_limit, p.seat_limit) AS seat_limit, COALESCE(sc.staff_count, 0) AS seats_used, s.created_at " +
                     "FROM master.subscriptions s " +
                     "JOIN tenants t ON t.id = s.tenant_id " +
                     "JOIN master.plans p ON p.id = s.plan_id " +
+                    "LEFT JOIN master.plan_versions pv ON pv.plan_id = s.plan_id AND pv.version = s.plan_version " +
                     "LEFT JOIN staff_counts_by_tenant() sc ON sc.tenant_id = t.id ";
 
     Optional<String> findTenantRegion(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region"), tenantId)
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region_code"), tenantId)
                 .stream().findFirst();
     }
 
@@ -62,12 +63,18 @@ class BillingRepository {
 
     UUID upsert(UUID tenantId, UUID planId, int mrrCents, String currency, LocalDate renewalDate) {
         return jdbc.queryForObject(
-                "INSERT INTO master.subscriptions (tenant_id, plan_id, mrr_cents, currency, renewal_date) " +
-                        "VALUES (?,?,?,?,?) " +
-                        "ON CONFLICT (tenant_id) DO UPDATE SET plan_id = EXCLUDED.plan_id, mrr_cents = EXCLUDED.mrr_cents, " +
+                "INSERT INTO master.subscriptions (tenant_id, plan_id, mrr_cents, currency, renewal_date, plan_version) " +
+                        "VALUES (?,?,?,?,?,(SELECT version FROM master.plans WHERE id = ?)) " + // ADM-034: sold/moved onto the current version
+                        "ON CONFLICT (tenant_id) DO UPDATE SET plan_id = EXCLUDED.plan_id, mrr_cents = EXCLUDED.mrr_cents, plan_version = EXCLUDED.plan_version, " +
                         "  currency = EXCLUDED.currency, renewal_date = EXCLUDED.renewal_date " +
                         "RETURNING id",
-                UUID.class, tenantId, planId, mrrCents, currency, renewalDate);
+                UUID.class, tenantId, planId, mrrCents, currency, renewalDate, planId);
+    }
+
+    /** {pricingBasis, monthly_price_cents} of the plan's current version. */
+    Object[] pricing(UUID planId) {
+        return jdbc.queryForObject("SELECT pricing_basis, monthly_price_cents FROM master.plans WHERE id = ?",
+                (rs, i) -> new Object[] {rs.getString(1), rs.getInt(2)}, planId);
     }
 
     void updateMrr(UUID tenantId, int newMrrCents) {

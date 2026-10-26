@@ -1,7 +1,7 @@
 "use client";
 
 import { decodeJwtPayload } from "../lib/jwt";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Dialog from "../components/ui/Dialog";
 import Icon from "../components/ui/Icon";
@@ -11,9 +11,9 @@ import { Skeleton, EmptyState, ErrorState } from "../components/ui/StateViews";
 import PermissionMatrix from "../components/staff/PermissionMatrix";
 import RegistrationNoDialog from "../components/staff/RegistrationNoDialog";
 import styles from "./staff.module.css";
-import { apiFetch, goLogin } from "../lib/apiClient";
+import { goLogin } from "../lib/apiClient";
+import { api, ApiError, reasonText, setStepUpHandler } from "../lib/api";
 import { isOwner } from "../lib/session";
-import type { Problem } from "@nabd/api-client/types";
 
 // Matches GET /v1/staff (StaffController) and GET /v1/roles (RoleController).
 type Staff = {
@@ -43,6 +43,7 @@ const REVIEW_REASON: Record<string, string> = {
   registration_without_doctor_role: "Has a registration number but no doctor role",
   doctor_role_without_registration: "Doctor role but no registration number",
 };
+type BreakGlassGrant = { grantId: string; staffName: string; reasonCode: string; activatedAt: string; expiresAt: string };
 type Department = { id: string; name: string; isDefault: boolean; active: boolean };
 // GlobalExceptionHandler serializes RFC 7807 ProblemDetail — the machine-readable
 // error code lives in `type` (a "…/errors/<slug>" URI), not `title` (human text).
@@ -95,8 +96,6 @@ function grantsFromGrid(grid: Grid): ModuleGrant[] {
   return MODULES.filter((m) => ACTIONS.some((a) => grid[m.key][a.key])).map((m) => ({ module: m.key, ...grid[m.key] }));
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
 const SCOPE_LABELS: Record<string, string> = {
   own_patients_only: "Own patients only",
   all_clinic_patients: "All clinic patients",
@@ -143,7 +142,7 @@ export default function StaffAccessPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesFailed, setRolesFailed] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [breakGlass, setBreakGlass] = useState<{ grantId: string; staffName: string; reasonCode: string; activatedAt: string; expiresAt: string }[]>([]);
+  const [breakGlass, setBreakGlass] = useState<BreakGlassGrant[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -183,26 +182,30 @@ export default function StaffAccessPage() {
   const [roleNotice, setRoleNotice] = useState<string | null>(null);
   const [owner, setOwner] = useState(false);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  // FEF-018 step-up: the client asks this when a call answers "step-up-required"; the dialog resolves with a step-up
+  // token (the client then replays the original request once) or null (Cancel).
+  const stepUpWait = useRef<((token: string | null) => void) | null>(null);
+  const stepUpTarget = useRef<string | null>(null);
+  const stepUpCancelled = useRef(false);
+  const stepUpShown = useRef(false);
+  const askStepUp = useRef<() => Promise<string | null>>(() => Promise.resolve(null));
+  useEffect(() => {
+    askStepUp.current = () => new Promise<string | null>((resolve) => {
+      stepUpWait.current = resolve;
+      stepUpShown.current = true;
+      setStepUpFor(stepUpTarget.current);
+      setStepUpCode("");
+      setStepUpError(null);
+    });
+    setStepUpHandler(() => askStepUp.current());
+    return () => setStepUpHandler(null);
+  }, []);
+  function cancelStepUp() {
+    stepUpCancelled.current = true;
+    stepUpWait.current?.(null);
+    stepUpWait.current = null;
+    setStepUpFor(null);
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -217,39 +220,31 @@ export default function StaffAccessPage() {
       setPermissions(decodePermissions(token));
       setOwner(isOwner());
 
-      const staffRes = await authedFetch("/staff?limit=50");
-      if (!staffRes) return;
-      if (staffRes.status === 403) {
-        setForbidden(true);
+      let staffBody: StaffPage;
+      try {
+        staffBody = await api.get<StaffPage>("/staff?limit=50");
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 403) setForbidden(true);
+        else setError(e instanceof ApiError && e.status < 500 ? "Couldn't load staff. Try again." : reasonText(e, ""));
         return;
       }
-      if (!staffRes.ok) {
-        setError("Couldn't load staff. Try again.");
-        return;
-      }
-      const staffBody: StaffPage = await staffRes.json();
       setStaff(staffBody.data);
       setNextCursor(staffBody.page.nextCursor);
 
-      const rolesRes = await authedFetch("/roles");
-      if (rolesRes?.ok) setRoles(await rolesRes.json());
-      setRolesFailed(!!rolesRes && !rolesRes.ok);
-
-      const reviewRes = await authedFetch("/staff/clinician-review");
-      if (reviewRes?.ok) setReview(await reviewRes.json());
-      setReviewFailed(!!reviewRes && !reviewRes.ok);
-
-      const departmentsRes = await authedFetch("/departments");
-      if (departmentsRes?.ok) setDepartments(await departmentsRes.json());
-
-      const bgRes = await authedFetch("/auth/break-glass/active");
-      if (bgRes?.ok) setBreakGlass((await bgRes.json()).items ?? []);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      // The side reads fail on their own (a flag or an empty list), never the whole page.
+      const side = async <T,>(path: string, set: (v: T) => void, failed?: (f: boolean) => void) => {
+        try { set(await api.get<T>(path)); failed?.(false); } catch { failed?.(true); }
+      };
+      await Promise.all([
+        side<Role[]>("/roles", setRoles, setRolesFailed),
+        side<ClinicianReview[]>("/staff/clinician-review", setReview, setReviewFailed),
+        side<Department[]>("/departments", setDepartments),
+        side<{ items?: BreakGlassGrant[] }>("/auth/break-glass/active", (b) => setBreakGlass(b.items ?? [])),
+      ]);
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, router]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(load);
@@ -259,11 +254,11 @@ export default function StaffAccessPage() {
     if (!nextCursor) return;
     setLoadingMore(true);
     try {
-      const res = await authedFetch(`/staff?limit=50&cursor=${encodeURIComponent(nextCursor)}`);
-      if (!res?.ok) return;
-      const body: StaffPage = await res.json();
+      const body = await api.get<StaffPage>(`/staff?limit=50&cursor=${encodeURIComponent(nextCursor)}`);
       setStaff((prev) => [...prev, ...body.data]);
       setNextCursor(body.page.nextCursor);
+    } catch {
+      /* the Load more button stays; pressing it again retries */
     } finally {
       setLoadingMore(false);
     }
@@ -348,20 +343,12 @@ export default function StaffAccessPage() {
     setBuilderSubmitting(true);
     try {
       const isEdit = builder.mode === "edit";
-      const res = await authedFetch(isEdit ? `/roles/${builder.sourceId}` : "/roles", {
-        method: isEdit ? "PATCH" : "POST",
-        // PLT-005: false is never sent; the server forces MFA on approve/refund roles and 422s an explicit false
-        body: JSON.stringify({ name, grants, ...(builder.mfaRequired ? { mfaRequired: true } : {}) }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't save the role." }));
-        setBuilderError(body.detail || "Couldn't save the role.");
-        return;
-      }
-      const saved: Role = await res.json();
+      // PLT-005: false is never sent; the server forces MFA on approve/refund roles and 422s an explicit false
+      const saved = await api.request<Role>(isEdit ? "PATCH" : "POST", isEdit ? `/roles/${builder.sourceId}` : "/roles", { body: { name, grants, ...(builder.mfaRequired ? { mfaRequired: true } : {}) } });
       setRoles((prev) => (isEdit ? prev.map((r) => (r.id === saved.id ? saved : r)) : [...prev, saved]));
       setBuilder(null);
+    } catch (e) {
+      setBuilderError(reasonText(e, "Couldn't save the role."));
     } finally {
       setBuilderSubmitting(false);
     }
@@ -376,20 +363,10 @@ export default function StaffAccessPage() {
     }
     setInviting(true);
     try {
-      const res = await authedFetch("/staff", {
-        method: "POST",
-        body: JSON.stringify({
-          email: inviteEmail, name: inviteName, mobilePhone: invitePhone, roleId: inviteRoleId, scope: inviteScope,
-          departmentId: inviteDepartmentId || null,
-        }),
+      const body = await api.post<{ staff: Staff; inviteToken: string }>("/staff", {
+        email: inviteEmail, name: inviteName, mobilePhone: invitePhone, roleId: inviteRoleId, scope: inviteScope,
+        departmentId: inviteDepartmentId || null,
       });
-      if (!res) return;
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "Error", detail: "Couldn't send invite." }));
-        setInviteFormError(body.detail || "Couldn't send invite.");
-        return;
-      }
-      const body: { staff: Staff; inviteToken: string } = await res.json();
       // GET /v1/staff orders by created_at ascending, so the newest row belongs at the end; while
       // more pages remain, Load more will return it, and inserting it now would render it twice.
       if (!nextCursor) setStaff((prev) => [...prev, body.staff]);
@@ -401,41 +378,47 @@ export default function StaffAccessPage() {
       setInviteScope("all_clinic_patients");
       setInviteDepartmentId("");
       setInviteOpen(false);
+    } catch (e) {
+      setInviteFormError(reasonText(e, "Couldn't send invite."));
     } finally {
       setInviting(false);
     }
   }
 
-  async function suspend(id: string) {
+  // Suspend and authenticator reset both need a step-up: the client middleware asks the dialog below, then replays
+  // the call once with the token. A wrong code keeps the dialog open; Cancel ends the action quietly.
+  async function stepUpAction(kind: "suspend" | "reset", id: string, preset?: string) {
+    const reset = kind === "reset";
     setError(null);
+    setResetNotice(null);
+    setStepUpKind(kind);
+    stepUpTarget.current = id;
+    stepUpCancelled.current = false;
+    stepUpShown.current = !!preset;
     setSuspending(id);
     try {
-      const res = await authedFetch(`/staff/${id}/suspend`, { method: "POST" });
-      if (!res) return;
-      if (res.status === 204) {
-        setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, status: "suspended" } : s)));
-        return;
-      }
-      const body: Problem = await res.json().catch(() => ({ title: "", detail: "Couldn't suspend staff member." }));
-      if (res.status === 403 && body.type?.endsWith("/step-up-required")) {
-        setStepUpFor(id);
-        setStepUpCode("");
-        setStepUpError(null);
-        return;
-      }
-      setError(body.detail || "Couldn't suspend staff member.");
+      if (reset) {
+        // Resetting an authenticator always needs a fresh code: ask first, no failed round trip (PLT-004).
+        const token = preset ?? (await askStepUp.current());
+        if (!token) return;
+        await api.post(`/staff/${id}/mfa/reset`, { reasonCode: "lost_device" }, { headers: { "X-Step-Up-Token": token } });
+      } else await api.post(`/staff/${id}/suspend`, undefined, preset ? { headers: { "X-Step-Up-Token": preset } } : undefined);
+      if (reset) setResetNotice("Authenticator reset. They are signed out and must set up a new one at next sign-in.");
+      else setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, status: "suspended" } : s)));
+      setStepUpFor(null);
+    } catch (e) {
+      if (stepUpCancelled.current) return;
+      const text = reasonText(e, reset ? "Couldn't reset the authenticator." : "Couldn't suspend staff member.");
+      if (stepUpShown.current) setStepUpError(text);
+      else setError(text);
     } finally {
+      stepUpWait.current = null;
+      setStepUpBusy(false);
       setSuspending(null);
     }
   }
-
-  function startReset(id: string) {
-    setStepUpKind("reset");
-    setStepUpFor(id);
-    setStepUpCode("");
-    setStepUpError(null);
-    setResetNotice(null);
-  }
+  const suspend = (id: string) => stepUpAction("suspend", id);
+  const startReset = (id: string) => stepUpAction("reset", id);
 
   async function confirmStepUp(e: React.FormEvent) {
     e.preventDefault();
@@ -443,45 +426,14 @@ export default function StaffAccessPage() {
     setStepUpBusy(true);
     setStepUpError(null);
     try {
-      // Deliberately not authedFetch: a wrong step-up code also comes back as 401
-      // ("mfa-failed"), which authedFetch would misread as an expired session and
-      // log the caller out mid-suspend instead of just letting them retry the code.
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return;
-      }
-      const mfaRes = await fetch(`${API_BASE}/auth/mfa/verify`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ challengeId: "", code: stepUpCode }),
-      });
-      if (!mfaRes.ok) {
-        const body: Problem = await mfaRes.json().catch(() => ({ title: "", detail: "Verification failed." }));
-        setStepUpError(body.detail || "Verification failed.");
-        return;
-      }
-      const { stepUpToken }: { stepUpToken: string } = await mfaRes.json();
-      const reset = stepUpKind === "reset";
-      const suspendRes = await authedFetch(reset ? `/staff/${stepUpFor}/mfa/reset` : `/staff/${stepUpFor}/suspend`, {
-        method: "POST",
-        headers: { "X-Step-Up-Token": stepUpToken },
-        ...(reset ? { body: JSON.stringify({ reasonCode: "lost_device" }) } : {}),
-      });
-      if (!suspendRes) return;
-      if (suspendRes.status === 204) {
-        if (reset) {
-          setResetNotice("Authenticator reset. They are signed out and must set up a new one at next sign-in.");
-        } else {
-          setStaff((prev) => prev.map((s) => (s.id === stepUpFor ? { ...s, status: "suspended" } : s)));
-        }
-        setStepUpFor(null);
-        return;
-      }
-      const fallback = reset ? "Couldn't reset the authenticator." : "Couldn't suspend staff member.";
-      const body: Problem = await suspendRes.json().catch(() => ({ title: "", detail: fallback }));
-      setStepUpError(body.detail || fallback);
-    } finally {
+      // keepSession: a wrong code also answers 401 ("mfa-failed"); that must not sign the caller out mid-action.
+      const { stepUpToken } = await api.post<{ stepUpToken: string }>("/auth/mfa/verify", { challengeId: "", code: stepUpCode }, { keepSession: true });
+      if (stepUpWait.current) {
+        stepUpWait.current(stepUpToken); // the original request is replayed by the client; stepUpAction finishes the flow
+        stepUpWait.current = null;
+      } else await stepUpAction(stepUpKind, stepUpFor, stepUpToken); // the action already failed and the dialog stayed open: retry with the new token
+    } catch (err) {
+      setStepUpError(reasonText(err, "Verification failed."));
       setStepUpBusy(false);
     }
   }
@@ -489,17 +441,11 @@ export default function StaffAccessPage() {
   async function saveRegistrationNo(target: Staff, value: string): Promise<string | null> {
     try {
       // "" clears it (null/absent would leave it unchanged).
-      const res = await authedFetch(`/staff/${target.id}`, { method: "PATCH", body: JSON.stringify({ professionalRegistrationNo: value }) });
-      if (!res) return null;
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
-        return body.detail || "Couldn't save the registration number.";
-      }
-      const saved: Staff = await res.json();
+      const saved = await api.patch<Staff>(`/staff/${target.id}`, { professionalRegistrationNo: value });
       setStaff((prev) => prev.map((x) => (x.id === saved.id ? { ...x, professionalRegistrationNo: saved.professionalRegistrationNo ?? null, clinician: saved.clinician } : x)));
       return null; // the dialog closes itself once the clinician status (CLN-005) is saved too
-    } catch {
-      return "Couldn't reach the server. The registration number was not saved.";
+    } catch (e) {
+      return reasonText(e, "Couldn't save the registration number.");
     }
   }
 
@@ -513,17 +459,10 @@ export default function StaffAccessPage() {
     setBusyId(staffId);
     setRoleNotice(null);
     try {
-      const res = await authedFetch(`/staff/${staffId}`, { method: "PATCH", body: JSON.stringify({ clinician: value }) });
-      if (!res) return;
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
-        setRoleNotice(body.detail || "Couldn't change the clinician flag.");
-        return;
-      }
-      const saved: Staff = await res.json();
+      const saved = await api.patch<Staff>(`/staff/${staffId}`, { clinician: value });
       clinicianSaved(saved.id, !!saved.clinician);
-    } catch {
-      setRoleNotice("Couldn't reach the server. The clinician flag was not changed.");
+    } catch (e) {
+      setRoleNotice(reasonText(e, "Couldn't change the clinician flag."));
     } finally {
       setBusyId(null);
     }
@@ -534,20 +473,11 @@ export default function StaffAccessPage() {
     setBusyId(role.id);
     setRoleNotice(null);
     try {
-      const res = await authedFetch(`/roles/${role.id}/reset-to-preset`, {
-        method: "POST", body: "{}", headers: { "Idempotency-Key": crypto.randomUUID() },
-      });
-      if (!res) return;
-      if (!res.ok) {
-        const body: Problem = await res.json().catch(() => ({ title: "", detail: "" }));
-        setRoleNotice(body.detail || "Couldn't reset the role.");
-        return;
-      }
-      const saved: Role = await res.json();
+      const saved = await api.post<Role>(`/roles/${role.id}/reset-to-preset`, {});
       setRoles((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
       setRoleNotice(`${saved.name} is back to its preset.`);
-    } catch {
-      setRoleNotice("Couldn't reach the server. The role was not reset.");
+    } catch (e) {
+      setRoleNotice(reasonText(e, "Couldn't reset the role."));
     } finally {
       setBusyId(null);
     }
@@ -611,14 +541,14 @@ export default function StaffAccessPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Staff member</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Restriction</th>
-                  <th>Active</th>
-                  {showLogin && <th>Login</th>}
-                  {showLogin && <th>MFA</th>}
-                  <th></th>
+                  <th scope="col">Staff member</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Restriction</th>
+                  <th scope="col">Active</th>
+                  {showLogin && <th scope="col">Login</th>}
+                  {showLogin && <th scope="col">MFA</th>}
+                  <th scope="col"></th>
                 </tr>
               </thead>
               <tbody>
@@ -648,7 +578,7 @@ export default function StaffAccessPage() {
                         <button className={styles.actionBtn} onClick={() => startReset(s.id)}>Reset authenticator</button>
                       )}
                       {canSuspend && s.status === "active" && (
-                        <button className={styles.actionBtn} disabled={suspending === s.id} onClick={() => { setStepUpKind("suspend"); suspend(s.id); }}>
+                        <button className={styles.actionBtn} disabled={suspending === s.id} onClick={() => suspend(s.id)}>
                           {suspending === s.id ? "…" : "Suspend"}
                         </button>
                       )}
@@ -718,7 +648,7 @@ export default function StaffAccessPage() {
               <div className={styles.card}>
                 <div className={styles.tableWrap}>
                   <table className={styles.table} aria-label="Clinicians to confirm">
-                    <thead><tr><th>Staff</th><th>Role</th><th>Why</th><th></th></tr></thead>
+                    <thead><tr><th scope="col">Staff</th><th scope="col">Role</th><th scope="col">Why</th><th scope="col"></th></tr></thead>
                     <tbody>
                       {review.map((r) => (
                         <tr key={r.staffId}>
@@ -750,7 +680,7 @@ export default function StaffAccessPage() {
               <div className={styles.card}>
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
-                    <thead><tr><th>Staff</th><th>Reason</th><th>Activated</th><th>Expires</th></tr></thead>
+                    <thead><tr><th scope="col">Staff</th><th scope="col">Reason</th><th scope="col">Activated</th><th scope="col">Expires</th></tr></thead>
                     <tbody>
                       {breakGlass.map((g) => (
                         <tr key={g.grantId}>
@@ -771,7 +701,7 @@ export default function StaffAccessPage() {
 
       {regEdit && canEditRoles && (
         <RegistrationNoDialog staffId={regEdit.id} staffName={regEdit.name} current={regEdit.professionalRegistrationNo ?? null}
-          onSave={(v) => saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)} authedFetch={authedFetch}
+          onSave={(v) => saveRegistrationNo(regEdit, v)} onClose={() => setRegEdit(null)}
           onClinicianSaved={(on) => clinicianSaved(regEdit.id, on)} />
       )}
 
@@ -871,9 +801,9 @@ export default function StaffAccessPage() {
               <table className={styles.matrixTable}>
                 <thead>
                   <tr>
-                    <th>Module</th>
-                    <th>All</th>
-                    {ACTIONS.map((a) => <th key={a.key}>{a.label}</th>)}
+                    <th scope="col">Module</th>
+                    <th scope="col">All</th>
+                    {ACTIONS.map((a) => <th scope="col" key={a.key}>{a.label}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -932,9 +862,8 @@ export default function StaffAccessPage() {
       )}
 
       {stepUpFor && (
-        <div className={styles.stepUpOverlay}>
-          <form className={styles.stepUpCard} onSubmit={confirmStepUp}>
-            <h2 className={styles.stepUpTitle}>Confirm it&apos;s you</h2>
+        <Dialog title="Confirm it's you" onClose={() => setStepUpFor(null)}>
+          <form onSubmit={confirmStepUp}>
             <p className={styles.stepUpText}>{stepUpKind === "reset" ? "Resetting an authenticator" : "Suspending a staff member"} needs a fresh code from your authenticator app.</p>
             {stepUpError && <div className={styles.formError} role="alert">{stepUpError}</div>}
             <div className={styles.field}>
@@ -952,13 +881,13 @@ export default function StaffAccessPage() {
               />
             </div>
             <div className={styles.stepUpActions}>
-              <button type="button" className={styles.cancelBtn} onClick={() => setStepUpFor(null)}>Cancel</button>
+              <button type="button" className={styles.cancelBtn} onClick={cancelStepUp}>Cancel</button>
               <button type="submit" className={styles.submit} disabled={stepUpBusy || stepUpCode.length !== 6}>
                 {stepUpBusy ? "Verifying…" : stepUpKind === "reset" ? "Confirm & reset" : "Confirm & suspend"}
               </button>
             </div>
           </form>
-        </div>
+        </Dialog>
       )}
     </main>
   );

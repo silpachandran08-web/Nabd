@@ -19,6 +19,8 @@ public record TicketResponse(
         Instant slaDueAt,
         boolean slaBreached,
         Instant resolvedAt,
-        Instant createdAt
+        Instant createdAt,
+        boolean bodyRedacted,
+        int redactionCount
 ) {
 }

@@ -116,6 +116,11 @@ class StaffRepository {
                 registrationNo, tenantId, id);
     }
 
+    /** PLT-059: seats in use = staff who are invited or active. */
+    int countSeats(UUID tenantId) {
+        return jdbc.queryForObject("SELECT count(*) FROM staff WHERE tenant_id = ? AND status IN ('invited','active')", Integer.class, tenantId);
+    }
+
     void suspend(UUID tenantId, UUID id) {
         jdbc.update("UPDATE staff SET status = 'suspended' WHERE tenant_id = ? AND id = ?", tenantId, id);
     }

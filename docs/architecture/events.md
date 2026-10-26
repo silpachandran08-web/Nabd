@@ -37,7 +37,7 @@ Its schema is `api/events/cloudevent.schema.json`.
 | `time` | the commit transaction's `created_at`, UTC RFC 3339 |
 | `subject` | the aggregate id (uuid) |
 | `tenantid` | the tenant uuid |
-| `region` | `in` or `ksa`, from `tenants.region` (extension attribute) |
+| `region` | the tenant's cell code: `in`, `ae`, `sa` or `qa`, from `tenants.region_code` (extension attribute, OPS-061) |
 | `traceparent` | W3C trace context of the HTTP request that published the event (see section 4). Absent for jobs |
 | `dataschema` | `urn:nabd:event-schema:<type>`, which is the `$id` of `api/events/<type>.schema.json` |
 | `datacontenttype` | `application/json` |
@@ -67,7 +67,7 @@ Stream names for the relay are `ev:<region>:<domain>`, where `<domain>` is the f
 
 The relay passes it on as the CloudEvents `traceparent` extension, so one trace spans HTTP -> outbox -> consumer.
 
-## 5. Catalogue (19 types, `DomainEventType`)
+## 5. Catalogue (21 types, `DomainEventType`)
 
 | type | producer (business action) | data besides tenantId, version |
 |---|---|---|
@@ -76,25 +76,33 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `scheduling.appointment.rescheduled.v1` | AppointmentService.reschedule (subject = new appointment) | + previousAppointmentId, previousStartTime |
 | `scheduling.appointment.arrived.v1` | QueueService.checkIn with an appointment | appointmentId, doctorId, queueEntryId, status |
 | `visit.queue_entry.created.v1` | QueueService.checkIn, transfer (new leg) | entryId, doctorId, queueDate, status |
-| `visit.queue_entry.changed.v1` | every status move (CAS), priority reorder | entryId, doctorId, queueDate, status, fromStatus?, priority? |
+| `visit.queue_entry.changed.v1` | every status move (CAS), priority reorder, consult extend (ACC-015, stands in for `visit.consult.extended.v1`) | entryId, doctorId, queueDate, status, fromStatus?, priority?, extendedMinutes? |
 | `visit.completed.v1` | the checkout move to completed (subject = encounter) | encounterId, entryId, doctorId, queueDate, status |
 | `scheduling.doctor_delay.changed.v1` | ScheduleService.announceDelay / clearDelay | doctorId, delayId, delayMinutes, status |
-| `scheduling.doctor_status.changed.v1` | **no producer yet**: there is no doctor-status (available, break, away) action in the product | doctorId, status |
+| `scheduling.doctor_status.changed.v1` | DoctorSessionService start / pause / resume / end, implicit start at the first in_consult (ACC-015). Status in, paused, out. Replaces the story's `scheduling.doctor_session.changed.v1` | doctorId, status |
 | `clinical.rx.signed.v1` | PrescriptionService.sign | prescriptionId, queueEntryId, signedBy, status |
 | `clinical.allergy.changed.v1` | AllergyService add / correct / deactivate / no-known-allergies (subject = patient) | patientId, allergyId?, change, status |
 | `billing.invoice.paid.v1` | CheckoutService.recordPayment, when the invoice becomes paid | invoiceId, totalMinor, currency, status |
 | `billing.payment.recorded.v1` | CheckoutService.recordPayment (converted from the FIN-001 event; same keys) | invoiceId, paymentId, method, amountMinor, currency, balanceMinor, status |
 | `consent.changed.v1` | PatientService.withdrawConsent, guardian consent grant / withdraw | patientId, consentType, status |
 | `organization.config.changed.v1` | SetupService.updatePolicy, updateProfile (key only, never the value) | configKey, status |
+| `organization.tenant.region_pinned.v1` | ProvisioningStepRunner.goLive (OPS-061; the region is immutable from here). Consumer: the Control Plane cell-routing record, **needs external action** (the control-plane service is not in this repo) | regionCode, cell |
+| `organization.privacy_notice.published.v1` | NoticeService.publish and the first seed when the clinic saves its consent contact (IDC-003). Re-acknowledgement is derived at read time from the patient's latest consent, so core needs no projection. Consumer patient-edge: **needs external action** (service not in this tree) | noticeVersion, languages |
 | `iam.role.changed.v1` | RoleService.create / update / resetToPreset | roleId, status |
 | `iam.staff.changed.v1` | StaffService.patch / suspend | staffId, status |
 | `iam.session.revoked.v1` | StaffService: role change, suspend, MFA reset (all sessions of the staff member) | staffId, scope, reasonCode, status |
 | `billing.catalogue.changed.v1` | SetupService.addCharge / updateCharge | chargeHeadId, status |
+| `comms.notification.requested.v1` | NotificationService.request (COM-004), not when the patient has no consent | requestId, purpose, priority, channelPolicy, notBefore?, notAfter? |
+| `comms.notification.cancelled.v1` | NotificationService.cancelBySubject (appointment cancelled / rescheduled), consent withdrawn before the send | requestId, reason |
+| `comms.inbound.received.v1` | WhatsAppInboundProcessor, an inbound patient message routed to a clinic by its reply context (COM-001); never the text | inboundId, senderNumberId?, kind, buttonPayload?, replyToWamid?, receivedAt |
+| `organization.import.completed.v1` | ImportWorker, when a patient import job (ADM-012) finishes its last chunk. Consumers (control-plane provisioning, core reporting): **needs external action** / not built yet | jobId, importType, created, merged, skipped, errors |
+| `comms.message.status_changed.v1` | WhatsAppInboundProcessor, a delivery callback that moved a message forward (COM-001; subject = message), or WhatsAppMessageService.cancel / expire (COM-003: status cancelled or expired) | messageId, channel, status, errorCode?, at |
+| `clinical.drug_master.version_activated.v1` | DrugMasterImportService.activate (CLN-019): one event per tenant of the region after the drug master version switch. Consumers: core cache refresh (log-only handler, nothing cached yet), clinical-intelligence KB copy refresh and staff-web index refresh (**need external action**, those consumers are not in this repo) | region, drugMasterVersion, added, changed, retired |
+| `platform.entitlements.changed.v1` | FeatureSwitchController.set (per-clinic override / kill), BillingService.upsert (plan or plan-version move). Not sent for a global kill switch or a plan publish: those change no clinic's pinned plan, replicas converge on the 60 s snapshot TTL (PLT-059) | changedCodes[] |
 
 The following producers belong to other stories and should publish against this catalogue when they land:
 
 - iam.session.revoked from logout, refresh-reuse and operator logout (PLT-007).
-- doctor_status once a doctor-status action exists.
 
 Deprecated, still published until their consumers move over (expand and contract):
 
@@ -121,7 +129,7 @@ The app refuses to boot a consumer with no idempotency strategy, a duplicate gro
 
 ### 7.1 Stream entries
 
-- The consumer reads streams `ev:<region>:<domain>` for every region in `app.events.consumer.regions` (default `in,ksa`)
+- The consumer reads streams `ev:<region>:<domain>` for every region in `app.events.consumer.regions` (default `in,ae,sa,qa`)
   and every domain of its types. Entries of other types are acknowledged without calling the handler.
 - **Contract with OPS-016:** each stream entry has one field, `ce`, holding the structured envelope of section 2 as JSON.
   An entry without a valid envelope (specversion 1.0, id, type, tenantid, integral `data.version`) is dead-lettered at
@@ -182,8 +190,9 @@ Redis 6.2) and `consumer_lag_seconds{group,stream}` (age of the oldest undeliver
 | group | strategy | gated | handles | status |
 |---|---|---|---|---|
 | projector | DB_LEDGER | yes | `clinical.allergy.changed.v1` -> `RegistryProjector.project(patient)` | built (OPS-017); the V221 trigger poller stays until OPS-016 runs everywhere |
-| cache-invalidator | VALKEY_SET | no | `organization.config.changed.v1` -> `TenantConfigEvictions`: evicts the tenant's zone/region locally and PUBLISHes the tenant id on `nabd:cfg:changed`, which every instance subscribes to | built (OPS-020, FIX-C). A group delivers each entry to ONE replica, so the pub/sub broadcast is the fan-out to all instances. Without Valkey the outbox dispatcher calls the same bean |
-| eta-engine, sse-fanout, comms, edge-projector | | | | their own stories |
+| cache-invalidator | VALKEY_SET | no | `organization.config.changed.v1` -> `TenantConfigEvictions`: evicts the tenant's zone/region locally and PUBLISHes the tenant id on `nabd:cfg:changed`, which every instance subscribes to; `billing.catalogue.changed.v1` (OPS-021) -> INCR of the domain version in Valkey, then PUBLISH `<tenant>/CATALOGUE` on the same channel | built (OPS-020, FIX-C). A group delivers each entry to ONE replica, so the pub/sub broadcast is the fan-out to all instances. Without Valkey the outbox dispatcher calls the same bean |
+| sse-fanout | VALKEY_SET | no | `visit.queue_entry.*`, `visit.eta.updated.v1` (no producer yet), `scheduling.doctor_status/doctor_delay.changed.v1`, `scheduling.appointment.booked/cancelled/rescheduled.v1`, and `comms.message.status_changed.v1` (topic `messages`, COM-006), and `iam.session.revoked/staff.changed/role.changed.v1` (close streams) -> `RealtimeHub.publish` | built (ACC-021), see valkey.md "Realtime (SSE)" |
+| eta-engine, comms, edge-projector | | | | their own stories |
 
 ## 8. Relay to Valkey Streams (OPS-016)
 
@@ -215,7 +224,7 @@ succeeded. On any Valkey error the whole batch goes back to pending at once, `re
 relay backs off `error-backoff-ms` (1 s). Delivery is at-least-once: a batch whose XADDs partly succeeded is sent
 again, so consumers dedupe on the CloudEvents `id` (and the `version` gate, section 1).
 
-**Stream entries.** Stream `ev:<region>:<domain>` (`ev:in:visit`, `ev:ksa:billing`, ...). Each entry has one field,
+**Stream entries.** Stream `ev:<region>:<domain>` (`ev:in:visit`, `ev:sa:billing`, ...). Each entry has one field,
 `ce`, holding the structured CloudEvents envelope exactly as `outbox_cloudevents` renders it (section 2).
 
 **Retention.** `MAXLEN ~ 1,000,000` per stream (`app.relay.stream-maxlen`), approximate trimming (Valkey trims whole

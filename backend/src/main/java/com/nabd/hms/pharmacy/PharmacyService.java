@@ -1,8 +1,11 @@
 package com.nabd.hms.pharmacy;
 
 import com.nabd.hms.iam.api.ActorDirectory;
+import com.nabd.hms.clinical.api.DrugMasterLookup;
 import com.nabd.hms.common.ApiException;
 import com.nabd.hms.common.AuditService;
+import com.nabd.hms.common.DomainEventType;
+import com.nabd.hms.common.EventPublisher;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.pharmacy.dto.DispensingQueueEntryResponse;
 import com.nabd.hms.pharmacy.dto.PharmacyItemResponse;
@@ -38,8 +41,13 @@ public class PharmacyService {
     private final AuditService auditService;
 
     private final ActorDirectory actors;
+    private final EventPublisher events;
+    private final DrugMasterLookup drugs;
 
-    PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService, ActorDirectory actors) {
+    PharmacyService(PharmacyRepository repo, TenantContext tenantContext, AuditService auditService, ActorDirectory actors,
+                    EventPublisher events, DrugMasterLookup drugs) {
+        this.drugs = drugs;
+        this.events = events;
         this.actors = actors;
         this.repo = repo;
         this.tenantContext = tenantContext;
@@ -93,6 +101,7 @@ public class PharmacyService {
         requireHybridMode(tenantId);
         String code = "PHM-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         UUID id = repo.insertItem(tenantId, code, req);
+        catalogueChanged(tenantId, id, "added");
         int opening = req.stockQtyOrZero();
         if (opening > 0) {
             // Opening stock is a stock change like any other: it gets a movement row and an audit event.
@@ -110,7 +119,13 @@ public class PharmacyService {
         if (repo.updateItem(tenantId, id, req) == 0) {
             throw notFound();
         }
+        catalogueChanged(tenantId, id, "updated");
         return toResponse(repo.findItem(tenantId, id).orElseThrow(this::notFound));
+    }
+
+    /** OPS-021: pharmacy items are catalogue rows; a price or active change must reach the cached price catalogue too. */
+    private void catalogueChanged(UUID tenantId, UUID id, String status) {
+        events.publish(tenantId, DomainEventType.CATALOGUE_CHANGED, id, Map.of("chargeHeadId", id, "status", status));
     }
 
     /** V2-004: relative (delta) or stock-take (setTo) change, reason mandatory. The item row is locked, the new
@@ -153,6 +168,7 @@ public class PharmacyService {
         boolean active = Boolean.TRUE.equals(req.active());
         if (item.active() != active) {
             repo.setActive(tenantId, id, active);
+            catalogueChanged(tenantId, id, "updated");
             Map<String, Object> before = new LinkedHashMap<>();
             before.put("active", item.active());
             Map<String, Object> after = new LinkedHashMap<>();
@@ -219,7 +235,26 @@ public class PharmacyService {
 
     private PharmacyItemResponse toResponse(PharmacyItemRow r) {
         return new PharmacyItemResponse(r.id().toString(), r.code(), r.name(), r.isRx(), r.hsnCode(), r.price(),
-                r.taxRatePercent(), r.stockQty(), r.active());
+                r.taxRatePercent(), r.stockQty(), r.active(), r.drugId());
+    }
+
+    /** CLN-019: owner maps an in-house item to a drug master id. is_rx is only SUGGESTED (scheduled product => prescription-only);
+     * the clinic's own flag and the price stay as they are. A product retired in the KB cannot be linked to a new item. */
+    @Transactional
+    public Map<String, Object> linkDrug(UUID tenantId, UUID callerStaffId, String ipAddress, UUID id, String drugId) {
+        requireHybridMode(tenantId);
+        PharmacyItemRow item = repo.findItem(tenantId, id).orElseThrow(this::notFound);
+        DrugMasterLookup.DrugRef drug = drugs.find(drugId).filter(DrugMasterLookup.DrugRef::active).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "DRUG_NOT_FOUND", "Drug not found", "No such drug in the drug master."));
+        repo.setDrug(tenantId, id, drug.id());
+        ActorDirectory.Actor actor = actors.findActor(tenantId, callerStaffId).orElseThrow(this::notFound);
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), ipAddress, "pharmacy.item_drug_linked",
+                "pharmacy_item", id, item.drugId() == null ? null : Map.of("drugId", item.drugId()), Map.of("drugId", drug.id()));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("itemId", id);
+        out.put("drugId", drug.id());
+        out.put("suggestedIsRx", drug.scheduled());
+        return out;
     }
 
     private ApiException notFound() {

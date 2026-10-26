@@ -45,14 +45,14 @@ class PharmacyRepository {
 
     List<PharmacyItemRow> listItems(UUID tenantId) {
         return jdbc.query(
-                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active " +
+                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active, drug_id " +
                         "FROM charge_catalogue WHERE tenant_id = ? AND stock_qty IS NOT NULL ORDER BY name",
                 itemMapper(), tenantId);
     }
 
     Optional<PharmacyItemRow> findItem(UUID tenantId, UUID id) {
         return jdbc.query(
-                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active " +
+                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active, drug_id " +
                         "FROM charge_catalogue WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL",
                 itemMapper(), tenantId, id).stream().findFirst();
     }
@@ -61,7 +61,7 @@ class PharmacyRepository {
      * on the same item run one after the other and each sees the other's result. */
     Optional<PharmacyItemRow> lockItem(UUID tenantId, UUID id) {
         return jdbc.query(
-                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active " +
+                "SELECT id, code, name, is_rx, hsn_code, base_amount, tax_rate_percent, stock_qty, active, drug_id " +
                         "FROM charge_catalogue WHERE tenant_id = ? AND id = ? AND stock_qty IS NOT NULL FOR UPDATE",
                 itemMapper(), tenantId, id).stream().findFirst();
     }
@@ -72,8 +72,18 @@ class PharmacyRepository {
     }
 
     void setActive(UUID tenantId, UUID id, boolean active) {
-        jdbc.update("UPDATE charge_catalogue SET active = ?, updated_at = now() WHERE tenant_id = ? AND id = ?",
-                active, tenantId, id);
+        patchItem(tenantId, id, active, null);
+    }
+
+    /** CLN-019: map an item to a drug master product; pricing and stock are untouched. */
+    void setDrug(UUID tenantId, UUID id, String drugId) {
+        patchItem(tenantId, id, null, drugId);
+    }
+
+    /** One statement for the two single-column item flags (a null argument leaves its column as it is). */
+    private void patchItem(UUID tenantId, UUID id, Boolean active, String drugId) {
+        jdbc.update("UPDATE charge_catalogue SET active = COALESCE(?, active), drug_id = COALESCE(?, drug_id), updated_at = now() " +
+                "WHERE tenant_id = ? AND id = ?", active, drugId, tenantId, id);
     }
 
     /** Append-only (trigger-enforced in V51): one row per stock change. */
@@ -152,6 +162,6 @@ class PharmacyRepository {
     private RowMapper<PharmacyItemRow> itemMapper() {
         return (rs, i) -> new PharmacyItemRow(UUID.fromString(rs.getString("id")), rs.getString("code"),
                 rs.getString("name"), rs.getBoolean("is_rx"), rs.getString("hsn_code"), rs.getBigDecimal("base_amount"),
-                rs.getBigDecimal("tax_rate_percent"), rs.getInt("stock_qty"), rs.getBoolean("active"));
+                rs.getBigDecimal("tax_rate_percent"), rs.getInt("stock_qty"), rs.getBoolean("active"), rs.getString("drug_id"));
     }
 }

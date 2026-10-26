@@ -133,8 +133,9 @@ class S11QaPlt016PresetEscalationTest extends ApiTestBase {
         assertThat(permissions(owner)).contains("clinical:view").doesNotContain("clinical:create", "clinical:edit", "clinical:approve");
         assertThat(permissions(docTok)).contains("clinical:edit").doesNotContain("clinical:approve");
 
-        String patient = (String) exchange("/v1/patients", HttpMethod.POST, authedJsonBody(owner, Map.of(
-                "name", "Qaowner Pia", "phone", phone(), "dob", "1990-01-01", "gender", "female")), Map.class).getBody().get("id");
+        ResponseEntity<Map> reg = exchange("/v1/patients", HttpMethod.POST, authedJsonBody(owner, Map.of(
+                "name", "Qaowner Pia", "phone", phone(), "dob", "1990-01-01", "gender", "female", "synthetic", true)), Map.class); // ADM-002: demo_only gate
+        String patient = (String) reg.getBody().get("id");
         ResponseEntity<Map> checkIn = exchange("/v1/queue/check-in", HttpMethod.POST, authedJsonBody(owner, Map.of(
                 "patientId", patient, "doctorId", doc.id().toString())), Map.class);
         assertThat(checkIn.getStatusCode().is2xxSuccessful()).as(String.valueOf(checkIn.getBody())).isTrue();

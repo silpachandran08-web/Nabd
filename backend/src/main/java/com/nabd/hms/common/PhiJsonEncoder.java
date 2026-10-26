@@ -29,6 +29,9 @@ public class PhiJsonEncoder extends EncoderBase<ILoggingEvent> {
         m.put("logger", e.getLoggerName());
         m.put("thread", e.getThreadName());
         m.put("traceId", e.getMDCPropertyMap().get(RequestCorrelationFilter.MDC_KEY));
+        m.put("tenantId", uuidOrNull(claimOrMdc(e, "tenantId")));
+        m.put("staffId", uuidOrNull(claimOrMdc(e, "staffId")));
+        m.put("reasonCode", e.getMDCPropertyMap().get("reasonCode"));
         m.put("message", PhiMasker.mask(e.getFormattedMessage()));
         if (e.getThrowableProxy() != null) {
             m.put("stack_trace", PhiMasker.mask(ThrowableProxyUtil.asString(e.getThrowableProxy())));
@@ -37,6 +40,27 @@ public class PhiJsonEncoder extends EncoderBase<ILoggingEvent> {
             return (JSON.writeValueAsString(m) + "\n").getBytes(StandardCharsets.UTF_8);
         } catch (Exception ex) {
             return ("{\"message\":\"log encoding failed\"}\n").getBytes(StandardCharsets.UTF_8);
+        }
+    }
+
+    /** MDC wins; otherwise the authenticated JWT of the logging thread (tenantId claim, subject = staff id). */
+    private static String claimOrMdc(ILoggingEvent e, String key) {
+        String v = e.getMDCPropertyMap().get(key);
+        if (v != null) {
+            return v;
+        }
+        if (org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication()
+                instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwt) {
+            return key.equals("staffId") ? jwt.getToken().getSubject() : jwt.getToken().getClaimAsString(key);
+        }
+        return null;
+    }
+
+    private static String uuidOrNull(String v) {
+        try {
+            return v == null ? null : java.util.UUID.fromString(v).toString();
+        } catch (IllegalArgumentException ex) {
+            return null; // never print a non-uuid identity value
         }
     }
 

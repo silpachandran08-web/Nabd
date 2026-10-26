@@ -1,6 +1,18 @@
-# JWT signing key rotation (PLT-002)
+# JWT signing key rotation (PLT-002, PLT-009)
 
 The API signs access tokens with RS256. Keys live in a JWKS JSON secret holding exactly 2 RSA private keys (2048 bits or more, each with a unique `kid`). Key 0 signs new tokens. Key 1 is the next or previous key: it is published at `GET /.well-known/jwks.json` and accepted for verification. The JWKS endpoint returns only the public parts.
+
+## Populations (PLT-009)
+Four token populations, each with its own issuer and keys, so a token of one can never verify for another:
+
+| Population | Issuer | Keys (secret) | Public keys |
+|---|---|---|---|
+| staff | `https://api.nabd.health/staff` | `JWT_KEYS_FILE` / `JWT_KEYS_JSON` (2 private keys) | `/.well-known/jwks/staff.json` (also `/.well-known/jwks.json`) |
+| owner | `https://api.nabd.health/owner` | `JWT_OWNER_KEYS_FILE` / `JWT_OWNER_KEYS_JSON` | `/.well-known/jwks/owner.json` |
+| platform (operators) | `https://api.nabd.health/platform` | `JWT_PLATFORM_KEYS_FILE` / `JWT_PLATFORM_KEYS_JSON` | `/.well-known/jwks/platform.json` |
+| internal (services) | `https://api.nabd.health/internal` | `JWT_INTERNAL_JWKS_FILE` / `JWT_INTERNAL_JWKS_JSON`: PUBLIC keys of the calling services (1 to 4), Core never mints these | not published |
+
+Each prefix has its own filter chain: `/v1/platform/**` accepts only platform access tokens, `/internal/v1/**` only internal service tokens (plus platform tokens for the few operator-driven endpoints that live there), `/v1/owners/**` none (owner endpoints read their own challenge token), `/v1/**` only staff access tokens. Under `prod` the app refuses to boot unless all four are configured. Rotate each population on its own using the steps below; the other three are not touched. The internal keys are rotated by the owner of the calling service: add the new public key to the JWKS, roll Core, then let the service switch.
 
 ## Configuration (every replica must see the same secret)
 - `JWT_KEYS_FILE` (`app.jwt.keys-file`): path of the mounted secret file. Preferred.
@@ -20,4 +32,4 @@ Access tokens live 15 minutes. Overlap rules below keep that valid.
 Rollback: restore the previous secret version and restart; tokens signed by NEW are rejected only if NEW was dropped, so keep it as key 1.
 
 ## Infra wiring (Needs external action)
-The per-cell secret and its mount are created by IaC (`infra/security`, not in this repo) in the chosen secret manager (KMS-protected). The app side is ready: it only reads `JWT_KEYS_FILE` or `JWT_KEYS_JSON`.
+The per-cell secret and its mount are created by IaC (`infra/security`, not in this repo) in the chosen secret manager (KMS-protected). The app side is ready: it only reads the variables in the table above. The existing secret must gain the three new files (`owner-jwks.json`, `platform-jwks.json`, `internal-public-jwks.json`) before the next deploy; the manifests under `infra/prod-in` and `infra/staging-in` already point at them.

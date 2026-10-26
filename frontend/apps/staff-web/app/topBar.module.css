@@ -49,7 +49,6 @@
   flex: 1;
   min-width: 0;
   border: none;
-  outline: none;
   background: transparent;
   color: var(--nb-text-primary);
   font-family: inherit;
@@ -141,7 +140,7 @@
   }
 }
 
-@media (max-width: 430px) {
+@media (max-width: 543px) {
   .iconBtn, .kbd, .spacer { display: none; }
   .bar { padding: 0 var(--nb-space-12); gap: var(--nb-space-8); }
   .primaryAction { padding: 0 var(--nb-space-12); white-space: nowrap; }

@@ -1,0 +1,38 @@
+# OPS-028: nightly scan of the staging-in log stream for synthetic PHI markers and unmasked PHI. A hit opens an S2 privacy defect.
+# Needs external action: repository variable STAGING_LOG_EXPORT_URL (a URL returning the last 24h of staging-in JSON logs) and
+# secret STAGING_LOG_EXPORT_TOKEN. Until both exist the job FAILS on purpose (a scan that did not run must not look green).
+name: log-phi-nightly
+on:
+  schedule: [{ cron: "43 2 * * *" }]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: fetch staging-in logs
+        env:
+          URL: ${{ vars.STAGING_LOG_EXPORT_URL }}
+          TOKEN: ${{ secrets.STAGING_LOG_EXPORT_TOKEN }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$TOKEN" ]; then echo "STAGING_LOG_EXPORT_URL / STAGING_LOG_EXPORT_TOKEN not set: scan cannot run"; exit 1; fi
+          curl -fsS -H "Authorization: Bearer $TOKEN" "$URL" -o staging.log
+      - name: scan
+        id: scan
+        run: python3 scripts/ci/log_phi_scan.py --report log-phi-report.json staging.log
+      - name: open S2 privacy defect
+        if: failure() && steps.scan.outcome == 'failure'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "S2 privacy: PHI marker or unmasked PHI in staging-in logs ($(date -u +%F))" \
+            --label "S2,privacy" --body "The nightly log scan found hits (loggers and rules only, values are cut): $(python3 -c "import json;print(json.dumps(json.load(open('log-phi-report.json'))['hits'][:20]))")
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: log-phi-report, path: log-phi-report.json, if-no-files-found: ignore }

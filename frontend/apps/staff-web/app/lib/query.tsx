@@ -39,6 +39,13 @@ export const queueQuery = (priority = false) => queryOptions({
   queryFn: getter<QueueEntryResponse[]>(priority ? "/queue?priority=true" : "/queue"),
 });
 
+/** GET /queue?doctorId=<me>: My Day, the consult queue and the doctor sidebar badge share one request (FEF-016). */
+export const doctorQueueQuery = (doctorId: string) => queryOptions({
+  ...live,
+  queryKey: key("queue", { doctorId }),
+  queryFn: getter<QueueEntryResponse[]>(`/queue?doctorId=${encodeURIComponent(doctorId)}`),
+});
+
 /** GET /nursing/administration-orders/today: the Nursing page and the nurse sidebar badge share it. */
 export const adminOrdersQuery = () => queryOptions({
   ...live,

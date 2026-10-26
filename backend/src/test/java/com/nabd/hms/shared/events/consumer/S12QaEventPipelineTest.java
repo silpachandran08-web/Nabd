@@ -675,6 +675,8 @@ class S12QaEventPipelineTest extends ApiTestBase {
 
     @Test
     void ops017_ac4_versionGateIgnoresLowerAndEqualVersionsPerSubjectIncludingRealEventsOutOfOrder() throws Exception {
+        // check-ins now publish queue events that other consumers apply too: hold the relay so only the events fed by hand are delivered
+        relayBean.stop();
         U u = user();
         String p = patient(u.token);
         String other = patient(u.token);
@@ -749,7 +751,7 @@ class S12QaEventPipelineTest extends ApiTestBase {
     @Test
     void ops017_nfr_aConsumerWithoutIdempotencyStrategyIsRefused() {
         assertThatThrownBy(() -> ConsumerGroups.validate(List.of(new Probe("qa7-none", null)))).hasMessageContaining("idempotency");
-        ConsumerGroups d = replica("x", new ConsumerProperties(true, "", List.of("in", "ksa"), 50, 60_000, 8, 1000, 30_000, 86_400));
+        ConsumerGroups d = replica("x", new ConsumerProperties(true, "", List.of("in", "sa"), 50, 60_000, 8, 1000, 30_000, 86_400));
         assertThat(d.backoff(1).toMillis()).isEqualTo(1000);
         assertThat(d.backoff(7).toMillis()).isEqualTo(30_000);
     }

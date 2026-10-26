@@ -26,7 +26,7 @@ class PatientRepository {
      * NB-053: consent is checked here, in the query, not filtered after the fact in the service or
      * the UI — a withdrawn data_processing consent removes the patient from every read path.
      */
-    private static final String CONSENT_GATE =
+    static final String CONSENT_GATE =
             "AND NOT EXISTS (SELECT 1 FROM consents c WHERE c.patient_id = patients.id " +
                     "AND c.consent_type = 'data_processing' AND c.withdrawn_at IS NOT NULL) ";
 
@@ -41,7 +41,7 @@ class PatientRepository {
     // data type of parameter" — found by actually running this query, not by inspection.
     // IDC-001: queue_entries.doctor_id counts too (same rule as clinical ReadScope.gate), so a walk-in without an
     // appointment is not hidden from the doctor who saw her. VALUES(...) keeps the two binds every caller passes.
-    private static final String SCOPE_GATE =
+    static final String SCOPE_GATE =
             "AND (?::uuid IS NULL OR EXISTS (SELECT 1 FROM (VALUES (?::uuid)) sd(id) WHERE " +
                     "EXISTS (SELECT 1 FROM appointments a WHERE a.tenant_id = patients.tenant_id AND a.doctor_id = sd.id AND a.patient_id = patients.id) " +
                     "OR EXISTS (SELECT 1 FROM queue_entries sq WHERE sq.tenant_id = patients.tenant_id AND sq.doctor_id = sd.id AND sq.patient_id = patients.id))) ";
@@ -157,7 +157,7 @@ class PatientRepository {
     }
 
     String region(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst().orElse("IN");
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst().orElse("IN");
     }
 
     boolean existsActive(UUID tenantId, UUID id) {
@@ -308,15 +308,47 @@ class PatientRepository {
                 all.toArray());
     }
 
-    /** Free-text search: phone/MRN prefix, name by substring OR trigram fuzzy match (typo-tolerant). */
-    List<PatientRow> search(UUID tenantId, String q, UUID scopedToDoctorId, int limit) {
-        return jdbc.query("SELECT " + COLUMNS + "FROM patients " +
-                        "WHERE tenant_id = ? AND status = 'active' " +
-                        "AND (phone ILIKE ? || '%' OR mrn ILIKE ? || '%' " +
-                        "     OR name ILIKE '%' || ? || '%' OR similarity(name, ?) > 0.25) " +
-                        CONSENT_GATE + SCOPE_GATE +
-                        "ORDER BY similarity(name, ?) DESC, created_at DESC LIMIT ?",
-                patientMapper(), tenantId, q, q, q, q, scopedToDoctorId, scopedToDoctorId, q, limit);
+    /** One OPS-009 search hit: the row, which branch found it (1 phone, 2 mrn, 3 name) and the name similarity. */
+    record SearchHit(PatientRow row, int branch, double sim) {
+    }
+
+    /**
+     * OPS-009: UNION ALL of up to three index-driven branches, each LIMIT k (phone_last10 / mrn prefix ranges on
+     * text_pattern_ops, name_search trigram), ranked after the filter. Prefix ranges use ~>=~ / ~<~ so they stay
+     * indexable under a generic prepared plan. Null key = branch absent. The same consent and row-scope gates apply.
+     */
+    List<SearchHit> search(UUID tenantId, String phoneKey, String mrnKey, boolean mrnPrefix, String name, UUID scopedToDoctorId, int k) {
+        SearchSql built = searchSql(tenantId, phoneKey, mrnKey, mrnPrefix, name, scopedToDoctorId, k);
+        if (built == null) return List.of();
+        return jdbc.query(built.sql(), (rs, i) -> new SearchHit(patientMapper().mapRow(rs, i), rs.getInt("branch"), rs.getDouble("sim")), built.args().toArray());
+    }
+
+    record SearchSql(String sql, List<Object> args) {
+    }
+
+    /** The statement search() runs (null when no branch applies); the plan test EXPLAINs exactly this text. */
+    SearchSql searchSql(UUID tenantId, String phoneKey, String mrnKey, boolean mrnPrefix, String name, UUID scopedToDoctorId, int k) {
+        List<String> parts = new java.util.ArrayList<>();
+        List<Object> args = new java.util.ArrayList<>();
+        String head = "(SELECT " + COLUMNS.trim() + ", ";
+        String tail = " FROM patients WHERE tenant_id = ? AND status = 'active' AND ";
+        String gates = " " + CONSENT_GATE + SCOPE_GATE + "LIMIT ?)";
+        if (phoneKey != null) {
+            parts.add(head + "1 AS branch, 0::float8 AS sim" + tail + "phone_last10 ~>=~ ? AND phone_last10 ~<~ ?" + gates);
+            args.addAll(java.util.Arrays.asList(tenantId, phoneKey, phoneKey + "~", scopedToDoctorId, scopedToDoctorId, k));
+        }
+        if (mrnKey != null) {
+            parts.add(head + "2 AS branch, 0::float8 AS sim" + tail + (mrnPrefix ? "mrn ~>=~ ? AND mrn ~<~ ?" : "mrn = ?") + gates);
+            args.add(tenantId);
+            args.add(mrnKey);
+            if (mrnPrefix) args.add(mrnKey + "~");
+            args.addAll(java.util.Arrays.asList(scopedToDoctorId, scopedToDoctorId, k));
+        }
+        if (name != null) {
+            parts.add(head + "3 AS branch, similarity(name_search, ?) AS sim" + tail + "name_search LIKE ?" + gates);
+            args.addAll(java.util.Arrays.asList(name, tenantId, "%" + name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%", scopedToDoctorId, scopedToDoctorId, k));
+        }
+        return parts.isEmpty() ? null : new SearchSql(String.join(" UNION ALL ", parts), args);
     }
 
     List<PatientRow> listPage(UUID tenantId, UUID scopedToDoctorId, int limit, Instant afterCreatedAt, UUID afterId) {
@@ -363,10 +395,10 @@ class PatientRepository {
     }
 
     void insert(UUID id, UUID tenantId, String name, String phone, LocalDate dob, String gender,
-                UUID guardianId, String address, byte[] nationalIdEnc) {
-        jdbc.update("INSERT INTO patients (id, tenant_id, name, phone, dob, gender, guardian_id, address, national_id_enc) " +
-                        "VALUES (?,?,?,?,?,?,?,?,?)",
-                id, tenantId, name, phone, Date.valueOf(dob), gender, guardianId, address, nationalIdEnc);
+                UUID guardianId, String address, byte[] nationalIdEnc, boolean synthetic) {
+        jdbc.update("INSERT INTO patients (id, tenant_id, name, phone, dob, gender, guardian_id, address, national_id_enc, is_synthetic) " +
+                        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, name, phone, Date.valueOf(dob), gender, guardianId, address, nationalIdEnc, synthetic);
     }
 
     /**
@@ -397,19 +429,25 @@ class PatientRepository {
         return mergeId;
     }
 
-    /** Reverses a merge if it's within the 30-day window and hasn't already been reversed. Returns false otherwise. */
-    boolean unmerge(UUID tenantId, UUID mergeId, UUID reversedBy) {
-        int rows = jdbc.update(
+    /** Reverses a merge if it's within the 30-day window and hasn't already been reversed. Returns {duplicateId, survivorId}, or null otherwise. */
+    UUID[] unmerge(UUID tenantId, UUID mergeId, UUID reversedBy) {
+        List<UUID[]> done = jdbc.query(
                 "UPDATE patient_merges SET reversed_at = now(), reversed_by = ? " +
-                        "WHERE tenant_id = ? AND id = ? AND reversed_at IS NULL AND merged_at > now() - interval '30 days'",
-                reversedBy, tenantId, mergeId);
-        if (rows == 0) {
-            return false;
+                        "WHERE tenant_id = ? AND id = ? AND reversed_at IS NULL AND merged_at > now() - interval '30 days' " +
+                        "RETURNING duplicate_patient_id, survivor_patient_id",
+                (rs, i) -> new UUID[]{rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)}, reversedBy, tenantId, mergeId);
+        if (done.isEmpty()) {
+            return null;
         }
-        jdbc.update("UPDATE patients p SET status = 'active', merged_into_id = NULL " +
-                        "FROM patient_merges m WHERE m.id = ? AND p.id = m.duplicate_patient_id AND p.tenant_id = ?",
-                mergeId, tenantId);
-        return true;
+        jdbc.update("UPDATE patients SET status = 'active', merged_into_id = NULL WHERE id = ? AND tenant_id = ?",
+                done.get(0)[0], tenantId);
+        return done.get(0);
+    }
+
+    /** ACC-030: a merge that exists, was not reversed, and is older than the 30-day window. */
+    boolean undoWindowPassed(UUID tenantId, UUID mergeId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM patient_merges WHERE tenant_id = ? AND id = ? " +
+                "AND reversed_at IS NULL AND merged_at <= now() - interval '30 days')", Boolean.class, tenantId, mergeId));
     }
 
     void withdrawConsent(UUID tenantId, UUID patientId, String consentType) {

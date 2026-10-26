@@ -2,8 +2,8 @@ package com.nabd.hms.messaging;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.nabd.hms.common.FieldCipher;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +19,8 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Meta's webhook endpoint — public (Meta can't send our JWT), so the HMAC signature is the only
  * thing standing between the internet and message status. No app secret configured = reject all. */
@@ -27,20 +28,21 @@ import java.util.Set;
 @RequestMapping("/v1/webhooks/whatsapp")
 class WhatsAppWebhookController {
 
-    private static final Logger log = LoggerFactory.getLogger(WhatsAppWebhookController.class);
-    private static final Set<String> TRACKED = Set.of("delivered", "read", "failed");
+    private static final int MAX_BODY_BYTES = 1_048_576;
 
     private final WhatsAppProperties props;
-    private final WhatsAppMessageRepository repo;
-    private final WhatsAppTemplateRepository templates;
+    private final WhatsAppInboundRepository inbound;
+    private final FieldCipher cipher;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meters;
 
-    WhatsAppWebhookController(WhatsAppProperties props, WhatsAppMessageRepository repo,
-                              WhatsAppTemplateRepository templates, ObjectMapper objectMapper) {
+    WhatsAppWebhookController(WhatsAppProperties props, WhatsAppInboundRepository inbound, FieldCipher cipher,
+                              ObjectMapper objectMapper, MeterRegistry meters) {
         this.props = props;
-        this.repo = repo;
-        this.templates = templates;
+        this.inbound = inbound;
+        this.cipher = cipher;
         this.objectMapper = objectMapper;
+        this.meters = meters;
     }
 
     /** Subscription handshake: Meta sends hub.verify_token, expects hub.challenge echoed back. */
@@ -54,41 +56,32 @@ class WhatsAppWebhookController {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
     }
 
+    /** COM-001 persist-then-ack: verify the HMAC, store one encrypted row per change item, answer 200. Processing is
+     * asynchronous (WhatsAppInboundProcessor); a repeated delivery stores nothing new. The body is never logged. */
     @PostMapping
     ResponseEntity<Void> receive(@RequestBody byte[] body,
                                  @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature) throws Exception {
+        if (body.length > MAX_BODY_BYTES) {
+            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).build();
+        }
         if (!notBlank(props.appSecret()) || signature == null
                 || !constantTimeEquals("sha256=" + hmacSha256Hex(props.appSecret(), body), signature)) {
+            meters.counter("whatsapp.webhook.rejected", "reason", "bad_signature").increment();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        for (JsonNode entry : objectMapper.readTree(body).path("entry")) {
-            for (JsonNode change : entry.path("changes")) {
-                JsonNode value = change.path("value");
-                switch (change.path("field").asString()) {
-                    case "message_template_status_update" -> templates.applyUpdate(
-                            value.path("message_template_id").asString(),
-                            WhatsAppTemplateService.statusOf(value.path("event").asString()),
-                            value.path("reason").isNull() || "NONE".equals(value.path("reason").asString())
-                                    ? null : value.path("reason").asString(null),
-                            null);
-                    case "message_template_quality_update" -> templates.applyUpdate(
-                            value.path("message_template_id").asString(), null, null,
-                            value.path("new_quality_score").asString("UNKNOWN"));
-                    default -> { }
-                }
-                for (JsonNode s : change.path("value").path("statuses")) {
-                    String status = s.path("status").asString();
-                    if (TRACKED.contains(status)) {
-                        JsonNode err = s.path("errors").path(0);
-                        repo.applyStatus(s.path("id").asString(), status,
-                                err.isMissingNode() ? null : err.path("code").asString() + ": " + err.path("title").asString());
-                    }
-                }
-                // ponytail: inbound patient messages are acknowledged but not stored — see V46 header.
-                if (change.path("value").has("messages")) {
-                    log.info("WhatsApp inbound message received and dropped (no inbox yet, NB-197)");
-                }
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(body);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build(); // signed but not JSON: not Meta, a retry cannot fix it
+        }
+        List<WhatsAppInboundKeys.Item> items = WhatsAppInboundKeys.split(root, objectMapper);
+        if (!items.isEmpty()) {
+            List<byte[]> bodies = new ArrayList<>(items.size());
+            for (WhatsAppInboundKeys.Item i : items) {
+                bodies.add(cipher.encrypt(i.body().toString().getBytes(StandardCharsets.UTF_8), WhatsAppInboundService.aad(i.key())));
             }
+            inbound.store(items, bodies);
         }
         return ResponseEntity.ok().build(); // anything but 2xx makes Meta retry the whole batch
     }

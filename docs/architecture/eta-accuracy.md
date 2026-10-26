@@ -1,0 +1,9 @@
+# ETA accuracy (ACC-019)
+
+**Live.** The ETA engine (ACC-017) calls `queue.EtaPredictionLog.record(queueEntryId, appointmentId, doctorId, p50, p80)` whenever it shows a patient a time (check-in, leave-home). `QueueEventRepository` stamps `actual_called_at` when the visit first reaches `in_consult`. `EtaAccuracyJob` (hourly, ShedLock) rolls the previous clinic day (tenant zone) into `eta_accuracy_daily` using each visit's last prediction: `n`, `mae_s` (|actual - p50|), `p80_hit_rate`, `within10_pct`. `GET /v1/reports/eta-accuracy` (reports:view) reads it; the owner overview tile shows yesterday's within-10-min share and the 14-day trend. A clinic day under 30 visits is `lowConfidence`.
+
+**Metrics.** `nabd_eta_mae_seconds`, `nabd_eta_p80_coverage` (calls in the last 3 h, 1 when fewer than 5) and `nabd_eta_visits_today`, label `tenant` = 12 hex chars of a salted hash; top 50 tenants by visits plus `other`. Rule: `infra/observability/eta-accuracy.rules.yml` (coverage < 0.70 and visits_today >= 30 for 5 m, severity warning, team patient-access = ticket, not a page).
+
+**Offline.** `queue.sim.EtaSimulator` replays a pseudonymous CSV (`entry,doctor,day,checkin,called`; schema-checked) through an `EtaPredictor`; `BaselinePredictor` stands in until the ACC-017 library is shared. `EtaDatasetExporter` produces the CSV from `queue_entry_events` with salted-hash ids. Gate: `Acc019EtaSimulatorTest` (also nightly, `.github/workflows/eta-accuracy.yml`) fails if P80 coverage drops more than 3 points against `backend/src/test/resources/eta/reference-baseline.json`; refresh it deliberately with `-Deta.writeBaseline=true` after an accepted engine change.
+
+**Needs external action.** Loading the rules file into the cell's Prometheus, and the staging drift-injection firing test (alert reaches the Patient Access on-call within 15 min).

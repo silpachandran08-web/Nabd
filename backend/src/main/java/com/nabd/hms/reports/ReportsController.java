@@ -41,8 +41,8 @@ public class ReportsController {
 
     @GetMapping("/overview")
     @PreAuthorize("hasAuthority('reports:view')")
-    public OverviewResponse overview(@AuthenticationPrincipal Jwt jwt) {
-        return service.overview(tenantId(jwt));
+    public OverviewResponse overview(@AuthenticationPrincipal Jwt jwt, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from, @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.overview(tenantId(jwt), from, to);
     }
 
     @GetMapping("/daily-money")

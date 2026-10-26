@@ -27,6 +27,10 @@ class ConditionRepository {
                 mapper(), tenantId, patientId);
     }
 
+    boolean patientExists(UUID tenantId, UUID patientId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND id = ?)", Boolean.class, tenantId, patientId));
+    }
+
     UUID insert(UUID tenantId, UUID patientId, String condition, LocalDate reviewDueDate, UUID recordedBy) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO chronic_conditions (id, tenant_id, patient_id, condition, review_due_date, recorded_by) " +

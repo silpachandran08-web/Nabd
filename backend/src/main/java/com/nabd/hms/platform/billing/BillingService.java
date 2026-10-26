@@ -37,8 +37,19 @@ public class BillingService {
     private final BillingRepository repo;
     private final TenantLifecycleService lifecycleService;
     private final PlatformAudit audit;
+    private final com.nabd.hms.organization.api.RegionRules regions;
+    private final com.nabd.hms.iam.api.ActorDirectory actors;
+    private final com.nabd.hms.common.TenantScope tenantScope;
+    private final com.nabd.hms.platform.entitlements.EntitlementEvents entitlementEvents;
 
-    BillingService(BillingRepository repo, TenantLifecycleService lifecycleService, PlatformAudit audit) {
+    BillingService(BillingRepository repo, TenantLifecycleService lifecycleService, PlatformAudit audit,
+                   com.nabd.hms.organization.api.RegionRules regions, com.nabd.hms.iam.api.ActorDirectory actors,
+                   com.nabd.hms.common.TenantScope tenantScope,
+                   com.nabd.hms.platform.entitlements.EntitlementEvents entitlementEvents) {
+        this.actors = actors;
+        this.tenantScope = tenantScope;
+        this.entitlementEvents = entitlementEvents;
+        this.regions = regions;
         this.repo = repo;
         this.lifecycleService = lifecycleService;
         this.audit = audit;
@@ -64,9 +75,15 @@ public class BillingService {
         if (!repo.planExists(req.planId())) {
             throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Not found", "The requested plan was not found.");
         }
-        String currency = "KSA".equals(region) ? "SAR" : "INR";
+        String currency = regions.region(region).currency();
         SubscriptionResponse before = repo.findByTenant(tenantId).map(this::toResponse).orElse(null);
-        repo.upsert(tenantId, req.planId(), req.mrrCents(), currency, req.renewalDate());
+        // ADM-034: omitted mrr = priced from the plan: per_clinic flat, per_doctor unit price x the clinic's active clinicians
+        Object[] pricing = req.mrrCents() == null ? repo.pricing(req.planId()) : null;
+        int mrr = req.mrrCents() != null ? req.mrrCents()
+                : com.nabd.hms.platform.plans.PlanPricing.mrrCents((String) pricing[0], (Integer) pricing[1],
+                        "per_doctor".equals(pricing[0]) ? tenantScope.run(tenantId, () -> actors.listClinicians(tenantId).size()) : 0);
+        repo.upsert(tenantId, req.planId(), mrr, currency, req.renewalDate());
+        entitlementEvents.changed(tenantId, java.util.List.of("plan")); // PLT-059: a plan (version) move changes what the clinic may use
         SubscriptionResponse after = getForTenant(tenantId);
         audit.record(tenantId, operatorId, ip, before == null ? "platform_billing.subscription_created"
                 : "platform_billing.subscription_updated", "subscription", after.id(),

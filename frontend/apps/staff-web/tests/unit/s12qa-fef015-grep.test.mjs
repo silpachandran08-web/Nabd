@@ -5,11 +5,13 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { arrivalsSource } from "./arrivalsSource.mjs";
 
 const FE = fileURLToPath(new URL("../../../../", import.meta.url));
 const APP = join(FE, "apps/staff-web");
-const PAGES = ["app/arrivals/page.tsx", "app/nursing/page.tsx"];
-const src = Object.fromEntries(PAGES.map((p) => [p, readFileSync(join(APP, p), "utf8")]));
+const PAGES = ["app/nursing/page.tsx"];
+// FEF-028: Arrivals is page.tsx + components/arrivals/**, read as one source.
+const src = { "app/arrivals (page + components/arrivals)": arrivalsSource(), ...Object.fromEntries(PAGES.map((p) => [p, readFileSync(join(APP, p), "utf8")])) };
 
 /** Body of every `useEffect(` call (brace-matched from the arrow function's `{`). */
 function effectBodies(s) {

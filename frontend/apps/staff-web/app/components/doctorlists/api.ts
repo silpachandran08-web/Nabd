@@ -1,16 +1,16 @@
-import { apiFetch, goLogin } from "../../lib/apiClient";
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+// FEF-016: doctor lists read through the shared api client (token, refresh, timeout from packages/api-client).
+import type { PageMeta as GPageMeta } from "@nabd/api-client/generated";
+import { api, ApiError } from "../../lib/api";
 
-export type PageMeta = { nextCursor: string | null; limit: number };
+export type PageMeta = Omit<GPageMeta, "nextCursor" | "limit"> & { nextCursor: string | null; limit: number };
 
-/** GET with the session token. Throws "auth" after redirecting on 401, "http" on any other failure. */
-export async function getJson<T>(path: string): Promise<T> {
-  const token = localStorage.getItem("nabd_access_token");
-  if (!token) { goLogin(); throw new Error("auth"); }
-  const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
-  if (res.status === 401) { localStorage.removeItem("nabd_access_token"); goLogin(); throw new Error("auth"); }
-  if (!res.ok) throw new Error("http");
-  return (await res.json()) as T;
+/** GET through the api client. Throws "auth" on 401 (the client has already sent the user to sign-in), "http" on any other failure. */
+export async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+  try {
+    return await api.get<T>(path, { signal });
+  } catch (e) {
+    throw new Error(e instanceof ApiError && e.status === 401 ? "auth" : "http");
+  }
 }
 
 export function isoDate(d: Date): string {

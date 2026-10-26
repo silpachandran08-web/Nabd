@@ -15,6 +15,8 @@ public final class PhiMasker {
     private static final Pattern LOCAL_PHONE = Pattern.compile("(?<![\\w.-])0?[5-9]\\d{8,9}(?![\\w.-])");
     private static final Pattern CODE6 = Pattern.compile("(?<![\\w.-])\\d{6}(?![\\w.-])");
 
+    private static final Pattern OTP_NEAR_WORD = Pattern.compile("(?i)\\b(otp|code|pin)\\b([^\\w\\n]{0,4}(?:is|=|:)?\\s*)\\d{4,8}\\b");
+
     private PhiMasker() {
     }
 
@@ -26,6 +28,7 @@ public final class PhiMasker {
         s = replace(INTL_PHONE, s, 3, 4);
         s = NATIONAL_ID.matcher(s).replaceAll("************");
         s = replace(LOCAL_PHONE, s, 0, 4);
+        s = OTP_NEAR_WORD.matcher(s).replaceAll("$1$2******");
         return CODE6.matcher(s).replaceAll("******");
     }
 

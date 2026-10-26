@@ -29,7 +29,7 @@ def phi_fields(data, deny):
 def sample_envelope(t, data):
     return {"specversion": "1.0", "id": "123456789", "source": "core/" + t.split(".")[0], "type": t,
             "time": "2026-10-20T04:30:00.123456Z", "subject": "44444444-4444-4444-8444-444444444444",
-            "tenantid": data.get("tenantId", "11111111-1111-4111-8111-111111111111"), "region": "ksa",
+            "tenantid": data.get("tenantId", "11111111-1111-4111-8111-111111111111"), "region": "sa",
             "traceparent": "00-" + "a" * 32 + "-" + "b" * 16 + "-01", "dataschema": "urn:nabd:event-schema:" + t,
             "datacontenttype": "application/json", "data": data}
 

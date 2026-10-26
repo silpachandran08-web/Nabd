@@ -7,6 +7,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /** Meta WhatsApp Cloud API — POST {base}/{phone-number-id}/messages. OPS-012: built on ResilientHttpClient
  * (provider "meta-whatsapp"), so every call is timeout-bounded, circuit-broken and refused inside a DB transaction. */
@@ -17,6 +18,12 @@ class MetaWhatsAppClient implements WhatsAppClient {
     private final String businessAccountId;
 
     static final String PROVIDER = "meta-whatsapp";
+
+    // COM-003: separate bulkheads, so a send flood cannot starve OTP logins or template admin.
+    // shortcut: fixed sizes; make them app.whatsapp.* properties when a clinic's Meta throughput tier needs tuning.
+    private final CallLimiter sends = new CallLimiter("sends", 10, 80);
+    private final CallLimiter otps = new CallLimiter("otp", 5, 20);
+    private final CallLimiter admin = new CallLimiter("template-admin", 2, 5);
 
     MetaWhatsAppClient(WhatsAppProperties props, ResilientHttpClient integration) {
         this.http = integration.builder(PROVIDER)
@@ -31,33 +38,49 @@ class MetaWhatsAppClient implements WhatsAppClient {
     public String sendTemplate(String toPhone, String templateName, String language, List<String> bodyParams) {
         List<Map<String, Object>> components = bodyParams.isEmpty() ? List.of()
                 : List.of(Map.of("type", "body", "parameters", textParams(bodyParams)));
-        return send(toPhone, templateName, language, components);
+        return sends.run(() -> send(toPhone, templateName, language, components));
     }
 
     @Override
     public String sendOtp(String toPhone, String templateName, String language, String code) {
-        return send(toPhone, templateName, language, List.of(
+        return otps.run(() -> send(toPhone, templateName, language, List.of(
                 Map.of("type", "body", "parameters", textParams(List.of(code))),
-                Map.of("type", "button", "sub_type", "url", "index", "0", "parameters", textParams(List.of(code)))));
+                Map.of("type", "button", "sub_type", "url", "index", "0", "parameters", textParams(List.of(code))))));
     }
 
     @Override
     public Submission createTemplate(String metaName, String language, String category, String headerText,
                                      String body, List<String> bodyExamples) {
-        JsonNode resp = http.post().uri("/{waba}/message_templates", businessAccountId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("name", metaName, "language", language, "category", category,
-                        "components", templateComponents(headerText, body, bodyExamples)))
-                .retrieve().body(JsonNode.class);
-        return new Submission(resp.path("id").asString(), resp.path("status").asString("PENDING").toLowerCase());
+        return admin.run(() -> {
+            JsonNode resp = http.post().uri("/{waba}/message_templates", businessAccountId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("name", metaName, "language", language, "category", category,
+                            "components", templateComponents(headerText, body, bodyExamples)))
+                    .retrieve().body(JsonNode.class);
+            return new Submission(resp.path("id").asString(), resp.path("status").asString("PENDING").toLowerCase());
+        });
+    }
+
+    @Override
+    public Optional<Submission> findTemplate(String metaName, String language) {
+        return admin.run(() -> {
+            JsonNode resp = http.get().uri("/{waba}/message_templates?name={n}&fields=id,status,language", businessAccountId, metaName)
+                    .retrieve().body(JsonNode.class);
+            for (JsonNode t : resp.path("data")) {
+                if (language.equals(t.path("language").asString())) {
+                    return Optional.of(new Submission(t.path("id").asString(), t.path("status").asString("PENDING").toLowerCase()));
+                }
+            }
+            return Optional.empty();
+        });
     }
 
     @Override
     public void editTemplate(String metaTemplateId, String headerText, String body, List<String> bodyExamples) {
-        http.post().uri("/{id}", metaTemplateId)
+        admin.run(() -> http.post().uri("/{id}", metaTemplateId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("components", templateComponents(headerText, body, bodyExamples)))
-                .retrieve().toBodilessEntity();
+                .retrieve().toBodilessEntity());
     }
 
     private static List<Map<String, Object>> templateComponents(String headerText, String body, List<String> bodyExamples) {

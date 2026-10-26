@@ -1,35 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ErrorState, Skeleton } from "../components/ui/StateViews";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./schedule.module.css";
 import NewAppointmentDialog from "./NewAppointmentDialog";
-import { getPermissions } from "../lib/session";
+import Dialog from "../components/ui/Dialog";
 import { can } from "../lib/permissions";
 import { CancelAppointmentDialog, MoveAppointmentDialog } from "./AppointmentActions";
 import LiveQueueBoard from "./LiveQueueBoard";
 import WaitlistPanel from "./WaitlistPanel";
 import Icon from "../components/ui/Icon";
 import { hijriLabel } from "../lib/hijri";
-import { apiFetch, goLogin } from "../lib/apiClient";
+import { ApiError } from "../lib/api";
+import { getter, key, prefix } from "../lib/query";
+import { useHasMounted } from "../lib/useHasMounted";
+import type { Full } from "../lib/gen";
+import type { Booking as GBooking, Cell as GCell, Counts as GCounts, Day as GWeekDay, Doctor as GDoctor, ScheduleDayResponse, ScheduleWeekResponse, Session as GSession, SessionCount as GSessionCount } from "@nabd/api-client/generated";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
-
-// Matches GET /v1/schedule/day and /week (ScheduleBoardController → ScheduleDayResponse / ScheduleWeekResponse).
-type Booking = {
-  appointmentId: string | null; queueEntryId: string | null; patientId: string; patientName: string;
-  visitType: "appointment" | "follow_up" | "walk_in" | "transfer"; time: string; token: number | null; status: string;
-};
-type Cell = { doctorId: string; kind: string; slotStart: string | null; bookings: Booking[] };
-type Session = { label: string; start: string; end: string; stepMinutes: number; rows: { time: string; cells: Cell[] }[] };
-type Doctor = { id: string; name: string; department: string | null; onLeave: boolean; leaveReason: string | null; worksToday: boolean };
-type Day = {
-  date: string; today: boolean; timezone: string; holiday: string | null; doctors: Doctor[]; sessions: Session[];
-  counts: { appointments: number; walkIns: number; freeSlots: number };
-};
-type Week = { start: string; today: string; days: { date: string; holiday: string | null; sessions: { label: string; booked: number; free: number }[] }[] };
+// GET /v1/schedule/day and /week (ScheduleBoardController): the generated types, with the fields the server always sends marked present.
+type Booking = Full<GBooking, "appointmentId" | "queueEntryId" | "token"> & { visitType: "appointment" | "follow_up" | "walk_in" | "transfer" };
+type Cell = Omit<Full<GCell, "slotStart">, "bookings"> & { bookings: Booking[] };
+type Session = Omit<Full<GSession>, "rows"> & { rows: { time: string; cells: Cell[] }[] };
+type Doctor = Full<GDoctor, "department" | "leaveReason">;
+type Day = Omit<Full<ScheduleDayResponse, "holiday">, "doctors" | "sessions" | "counts"> & { doctors: Doctor[]; sessions: Session[]; counts: Full<GCounts> };
+type Week = Omit<Full<ScheduleWeekResponse>, "days"> & { days: (Omit<Full<GWeekDay, "holiday">, "sessions"> & { sessions: Full<GSessionCount>[] })[] };
 
 const DOCTOR_COLORS = ["var(--nb-accent-500)", "var(--nb-info-500)", "var(--nb-sync-500)", "var(--nb-warn-500)", "var(--nb-ok-500)", "var(--nb-urgent-500)"];
 const VISIT_LABELS: Record<Booking["visitType"], string> = {
@@ -83,79 +79,42 @@ type Dialog =
   | { kind: "move"; booking: Booking; doctor: Doctor };
 
 export default function SchedulePage() {
-  const router = useRouter();
+  const qc = useQueryClient();
+  const mounted = useHasMounted(); // permissions live in the browser: role-dependent controls wait for hydration
   const [date, setDate] = useState<string | null>(null); // null = the clinic's today (server decides)
   const [mode, setMode] = useState<"day" | "week" | "queue">("day");
-  const [day, setDay] = useState<Day | null>(null);
-  const [week, setWeek] = useState<Week | null>(null);
   const [doctorFilter, setDoctorFilter] = useState("all");
   const [visitFilter, setVisitFilter] = useState<"all" | Booking["visitType"]>("all");
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [forbidden, setForbidden] = useState(false);
-  const [canBook, setCanBook] = useState(false);
-  const [canEdit, setCanEdit] = useState(false); // queue:edit — cancel / move / waitlist
-  const [canQueue, setCanQueue] = useState(false); // queue:view — live queue board
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const closeDialog = useCallback(() => setDialog(null), []);
   const closeWaitlist = useCallback(() => setWaitlistOpen(false), []);
+  // Booking needs queue:create (POST /appointments) and patient search needs patients:view.
+  const canBook = mounted && can("queue:create") && can("patients:view");
+  const canEdit = mounted && can("queue:edit"); // cancel / move / waitlist
+  const canQueue = mounted && can("queue:view"); // live queue board
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const perms = getPermissions();
-      // Booking needs queue:create (POST /appointments) and patient search needs patients:view.
-      setCanBook(perms.includes("queue:create") && perms.includes("patients:view"));
-      setCanEdit(can("queue:edit"));
-      setCanQueue(can("queue:view"));
-      const dayRes = await authedFetch(`/schedule/day${date ? `?date=${date}` : ""}`);
-      if (!dayRes) return;
-      if (dayRes.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!dayRes.ok) {
-        setError("Couldn't load the schedule. Try again.");
-        return;
-      }
-      const d: Day = await dayRes.json();
-      setDay(d);
-      if (mode === "week") {
-        const weekRes = await authedFetch(`/schedule/week?start=${mondayOf(d.date)}`);
-        if (weekRes?.ok) setWeek(await weekRes.json());
-        else if (weekRes) setError("Couldn't load the week overview. Try again.");
-      }
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
-    }
-  }, [authedFetch, date, mode]);
-
-  useEffect(() => {
-    // Deferred to a microtask so the effect body never calls setState synchronously
-    // (react-hooks/set-state-in-effect) — same as the other clinic pages.
-    void Promise.resolve().then(load);
-  }, [load]);
+  // Keep the last day on screen while the next one loads (the old state-based page did the same).
+  const dayQ = useQuery({
+    queryKey: key("schedule", { view: "day", date: date ?? "today" }),
+    queryFn: getter<Day>(`/schedule/day${date ? `?date=${date}` : ""}`),
+    placeholderData: keepPreviousData,
+  });
+  const day = dayQ.data ?? null;
+  const weekStart = day ? mondayOf(day.date) : "";
+  const weekQ = useQuery({
+    queryKey: key("schedule", { view: "week", start: weekStart }),
+    queryFn: getter<Week>(`/schedule/week?start=${weekStart}`),
+    enabled: mode === "week" && !!day,
+    placeholderData: keepPreviousData,
+  });
+  const week = weekQ.data ?? null;
+  const forbidden = dayQ.error instanceof ApiError && dayQ.error.status === 403;
+  const error = forbidden ? null
+    : dayQ.error ? (dayQ.error instanceof ApiError ? "Couldn't load the schedule. Try again." : "Couldn't reach the server. Check your connection and try again.")
+    : weekQ.error ? "Couldn't load the week overview. Try again." : null;
+  // Reload the day and the week (retry, and after a booking, move, cancel or waitlist change).
+  const load = useCallback(() => qc.invalidateQueries({ queryKey: prefix("schedule") }), [qc]);
 
   if (forbidden) {
     return <main className={styles.page}><p className={styles.state}>You don&apos;t have access to the schedule.</p></main>;
@@ -251,7 +210,7 @@ export default function SchedulePage() {
       {!day && !error && <Skeleton rows={6} label="Loading schedule" />}
 
       {day && mode === "queue" && (
-        <LiveQueueBoard doctors={day.doctors} names={queueNames} authedFetch={authedFetch} />
+        <LiveQueueBoard doctors={day.doctors} names={queueNames} />
       )}
 
       {day && mode === "day" && (
@@ -320,7 +279,7 @@ export default function SchedulePage() {
 
       {dialog?.kind === "new" && day && (
         <NewAppointmentDialog doctors={day.doctors} timezone={day.timezone} initialDoctorId={dialog.doctorId}
-          initialDate={dialog.date} initialSlot={dialog.slot} authedFetch={authedFetch}
+          initialDate={dialog.date} initialSlot={dialog.slot}
           onClose={closeDialog} onBooked={() => { setDialog(null); void load(); }} />
       )}
       {dialog?.kind === "booking" && day && (
@@ -347,11 +306,11 @@ export default function SchedulePage() {
         };
         const done = () => { setDialog(null); void load(); };
         return dialog.kind === "cancel"
-          ? <CancelAppointmentDialog target={target} authedFetch={authedFetch} onClose={closeDialog} onDone={done} />
-          : <MoveAppointmentDialog target={target} timezone={day.timezone} initialDate={day.date} authedFetch={authedFetch} onClose={closeDialog} onDone={done} />;
+          ? <CancelAppointmentDialog target={target} onClose={closeDialog} onDone={done} />
+          : <MoveAppointmentDialog target={target} timezone={day.timezone} initialDate={day.date} onClose={closeDialog} onDone={done} />;
       })()}
       {waitlistOpen && day && (
-        <WaitlistPanel doctors={day.doctors} timezone={day.timezone} canJoin={canBook} authedFetch={authedFetch}
+        <WaitlistPanel doctors={day.doctors} timezone={day.timezone} canJoin={canBook}
           onClose={closeWaitlist} onBooked={() => void load()} />
       )}
       {dialog?.kind === "slot" && day && (
@@ -432,15 +391,9 @@ function WeekRow({ label, week, onPick }: { label: string; week: Week; onPick: (
 function InfoDialog({ title, sub, rows, action, extra, onClose }: {
   title: string; sub: string; rows: [string, string][]; action?: { label: string; href: string }; extra?: ReactNode; onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="info-title" onClick={(e) => e.stopPropagation()}>
-        <h2 id="info-title" className={styles.dialogTitle}>{title}</h2>
+    <Dialog title={title} onClose={onClose}>
+      <div>
         <p className={styles.dialogSub}>{sub}</p>
         {rows.map(([k, v]) => (
           <div key={k} className={styles.detailRow}><span className={styles.detailKey}>{k}</span><span>{v}</span></div>
@@ -451,6 +404,6 @@ function InfoDialog({ title, sub, rows, action, extra, onClose }: {
           <button type="button" className={styles.btnPrimary} onClick={onClose} autoFocus>Got it</button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -33,6 +33,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import com.nabd.hms.shared.security.Audience;
+import com.nabd.hms.shared.security.TokenPopulation;
 import com.nabd.hms.shared.security.TokenType;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
@@ -66,7 +67,7 @@ import static com.nabd.hms.owner.OwnerModels.Owner;
 public class OwnerService {
 
     private static final Logger log = LoggerFactory.getLogger(OwnerService.class);
-    private static final String ISSUER = "https://api.nabd.health"; // must match AuthService.ISSUER — same signing key/issuer
+    private static final String ISSUER = TokenPopulation.OWNER.issuer(); // PLT-009: own issuer and key set
     private static final String PENDING_WORKSPACE_PURPOSE = "owner_pending_workspace";
     private static final String OWNER_MFA_PENDING = "owner_mfa_pending";
     private static final String OWNER_MFA_SETUP = "owner_mfa_setup";
@@ -209,7 +210,7 @@ public class OwnerService {
 
     private Owner ownerFrom(String token, TokenType type, String purpose) {
         try {
-            Jwt jwt = challengeDecoder.decode(token, type);
+            Jwt jwt = challengeDecoder.decode(token, type, TokenPopulation.OWNER);
             if (purpose.equals(jwt.getClaimAsString("purpose"))) {
                 Owner owner = repo.findById(UUID.fromString(jwt.getSubject())).orElse(null);
                 if (owner != null && "active".equals(owner.status())) {

@@ -8,6 +8,13 @@ public record SubscriptionSummaryResponse(
         long whatsappMessagesUsed,
         long whatsappMessagesLimit,
         long branchesUsed,
-        long branchesLimit
+        long branchesLimit,
+        // PLT-059: plan entitlements and seat usage (additive)
+        java.util.List<ModuleState> modules,
+        java.util.List<String> killedFeatures,
+        long seatsUsed,
+        Long seatsLimit
 ) {
+    public record ModuleState(String code, boolean enabled) {
+    }
 }

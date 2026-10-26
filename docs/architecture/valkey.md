@@ -120,3 +120,35 @@ story in one class. Plain unit tests can build the production factory directly:
   mode on the logs and Prometheus scrape captured by `Ops020CacheApiTest` (CI stage 3).
 - Tests turn the zone cache off (`app.cache.tenant-config-ttl-seconds=0` in `src/test/resources/application.properties`)
   because fixtures edit `tenants.timezone` with plain SQL; `Ops020CacheApiTest` turns it back on.
+
+## Realtime (SSE, ACC-021)
+
+`GET /v1/events?topics=queue,nursing,doctor-status,requests,exceptions,messages` (`com.nabd.hms.realtime`). Topic permissions:
+queue/doctor-status/exceptions need `queue:view`, messages `patients:view`, nursing `nursing:view`, requests `scheduling:review` (no role grant
+produces that authority yet, so the `requests` topic is 403 for everyone until one does).
+
+| Key / channel | Content | TTL |
+|---|---|---|
+| `rt:{<tenantId>}:<utc day>` (stream) | resume log, one entry per delta, fields `topic`, `d`; the entry id is the SSE event id | trimmed to 30 min (`MINID`), key expires 35 min after the last write |
+| `t:<tenantId>:rt` (pub/sub) | `{i: entry id, t: topic, d: delta}` or `{ctl: close, staff}` | none |
+
+A pod subscribes to a tenant's channel only while it has a connection of that tenant. The `sse-fanout` consumer group
+appends and publishes; a delta is `{type, id, v, topic, fields}` with ids/statuses/versions only. Resume window 5 min
+(`app.realtime.resume-window-seconds`), same UTC day; heartbeat 25 s (`app.realtime.heartbeat-ms`); 5 streams per user
+(`app.realtime.max-streams-per-user`) and 2,000 per pod (`app.realtime.max-connections`) else 429 `TOO_MANY_STREAMS`.
+Metrics: `realtime_sse_connections` (gauge), `realtime_delivery_latency_seconds` (stream append to socket write).
+Without Valkey the endpoint answers (snapshot, heartbeats) but nothing is pushed.
+
+## Versioned tenant configuration cache (OPS-021)
+
+`shared.cache.ConfigCache`: L1 per instance (`app.cache.config-ttl-seconds`, default 300; soft refresh at half; 0 turns the cache off,
+as in tests) and L2 in Valkey (`app.cache.config-l2-ttl-seconds`, default 3600), both with +/-10% jitter.
+
+| Domain | Key | Version key | Invalidation |
+|---|---|---|---|
+| `CATALOGUE` (charge code -> price row used by checkout; never stock) | `nabd:cfg:t:<tenant>:catalogue:<code>:v<ver>` | `nabd:cfg:t:<tenant>:catalogue:ver` | `billing.catalogue.changed.v1` (setup charges and pharmacy items) -> group `cache-invalidator` -> `INCR` version (after commit) -> PUBLISH `<tenant>/CATALOGUE` on `nabd:cfg:changed` -> every instance drops L1 |
+
+- A value written under an old version is unreachable once the version moves (AC "stale L2"); an L1 fill that raced an eviction is dropped (epoch check).
+- Stampede: one load per key per instance (single-flight future); across instances a `SET NX PX 5000` lock key (`...:v<ver>:lock`), the others poll L2 for up to 2 s, then load themselves.
+- Keys come only from `CacheKeyPolicy` (tenant id always present, PHI refused). `Ops021ConfigCacheApiTest` forbids `nabd:cfg` literals outside `shared.cache`, `@Cacheable`, and any domain built from forbidden data classes.
+- Valkey down: the DB answers, nothing is cached. Not built (OPS-021 subtasks): departments, workflows, templates, roles, entitlements loaders, opening-time warm-up.

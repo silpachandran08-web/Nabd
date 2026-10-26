@@ -67,6 +67,17 @@ public class QueueController {
         return service.transfer(tenantId(jwt), staffId(jwt), id, req);
     }
 
+    @com.nabd.hms.shared.Idempotent
+    @PostMapping("/{id}/extend")
+    @PreAuthorize("hasAuthority('queue:edit')")
+    public com.nabd.hms.queue.dto.ConsultExtendResponse extend(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                         @Valid @RequestBody com.nabd.hms.queue.dto.ConsultExtendRequest req) {
+        if (!java.util.Set.of(5, 10, 15).contains(req.minutes())) {
+            throw new com.nabd.hms.common.ApiException(HttpStatus.BAD_REQUEST, "invalid-extension", "Invalid extension", "Minutes must be 5, 10 or 15.");
+        }
+        return service.extend(tenantId(jwt), staffId(jwt), id, req.minutes());
+    }
+
     @PostMapping("/{id}/reorder")
     @PreAuthorize("hasAuthority('queue:edit')")
     public QueueEntryResponse reorder(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,

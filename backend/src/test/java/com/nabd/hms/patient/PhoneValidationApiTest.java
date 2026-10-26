@@ -35,7 +35,7 @@ class PhoneValidationApiTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         if (!"IN".equals(region)) {
             new org.springframework.jdbc.core.JdbcTemplate(superuserDataSource()).execute(
-                    "SET session_replication_role = replica; UPDATE tenants SET region = '" + region + "' WHERE id = '" + t.id() + "'");
+                    "SET session_replication_role = replica; UPDATE tenants SET region_code = '" + region + "' WHERE id = '" + t.id() + "'");
         }
         return t;
     }
@@ -75,7 +75,7 @@ class PhoneValidationApiTest extends ApiTestBase {
                 "AE", new String[]{"050 123 4567", "+971501234567"},
                 "QA", new String[]{"3312 3456", "+97433123456"},
                 "IN", new String[]{"098450 22110", "+919845022110"},
-                "KSA", new String[]{"0501234567", "+966501234567"});
+                "SA", new String[]{"0501234567", "+966501234567"});
         matrix.forEach((region, c) -> {
             SeededTenant t = tenant(region);
             ResponseEntity<Map> r = register(owner(t), c[0]);
@@ -116,18 +116,18 @@ class PhoneValidationApiTest extends ApiTestBase {
 
     @Test
     void renormaliseJobRewritesValidAndFlagsInvalid_dataQualityListsThemPagedAndGated() {
-        SeededTenant t = tenant("KSA");
+        SeededTenant t = tenant("SA");
         String tok = owner(t);
         UUID legacyValid = insertRaw(t, "Legacy Valid", "0512345678");
         UUID bad1 = insertRaw(t, "Bad One", "abc");
         UUID bad2 = insertRaw(t, "Bad Two", "12345");
-        SeededTenant other = tenant("KSA");
+        SeededTenant other = tenant("SA");
         UUID otherBad = insertRaw(other, "Other Bad", "zzz");
 
         PhoneRenormaliseJob job = new PhoneRenormaliseJob(jdbc, new TransactionTemplate(txManager), tenantScope, audit);
-        assertThat(job.run(t.id(), "KSA")).containsExactly(1, 2);
-        assertThat(job.run(t.id(), "KSA")).as("re-runnable, nothing left to do").containsExactly(0, 0);
-        job.run(other.id(), "KSA");
+        assertThat(job.run(t.id(), "SA")).containsExactly(1, 2);
+        assertThat(job.run(t.id(), "SA")).as("re-runnable, nothing left to do").containsExactly(0, 0);
+        job.run(other.id(), "SA");
         Map<String, Object> legacy = inTenantTx(t.id(), () -> jdbc.queryForMap("SELECT phone, phone_invalid FROM patients WHERE id = ?", legacyValid));
         assertThat(legacy).containsEntry("phone", "+966512345678").containsEntry("phone_invalid", false);
         String kept = inTenantTx(t.id(), () -> jdbc.queryForObject("SELECT phone FROM patients WHERE id = ?", String.class, bad1));

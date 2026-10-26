@@ -49,12 +49,20 @@ export type ClientOptions = {
   /** True when the token is ageing and should be refreshed before the call. */
   shouldRefresh?: (token: string | null) => boolean;
   language?: () => string | undefined;
+  /** Step-up middleware (FEF-018): a 403 "step-up-required" calls this; a returned token replays the same request ONCE
+   * with X-Step-Up-Token (same Idempotency-Key). null = the user cancelled, the 403 is thrown as an ApiError. */
+  stepUp?: (problem: Record<string, unknown>) => Promise<string | null>;
   timeoutMs?: number;
   retryDelayMs?: number;
   fetch?: typeof fetch;
 };
 
-export type RequestOptions = { body?: unknown; signal?: AbortSignal; idempotencyKey?: string };
+/** `as: "blob" | "text"` returns the body as a Blob / string (file downloads, CSV); errors are still parsed as Problem+JSON. */
+export type RequestOptions = {
+  body?: unknown; /** Sent as-is (a File, a Blob): set Content-Type in `headers`. */ rawBody?: BodyInit; signal?: AbortSignal; idempotencyKey?: string; as?: "blob" | "text"; headers?: Record<string, string>;
+  /** A 401 is the answer (e.g. a wrong MFA code), not an expired session: no refresh, no sign-out. */
+  keepSession?: boolean;
+};
 
 const MUTATING = new Set(["POST", "PUT", "PATCH"]);
 const RETRY_STATUS = new Set([502, 503, 504]);
@@ -76,10 +84,11 @@ export function createClient(o: ClientOptions) {
     if (token) headers.Authorization = `Bearer ${token}`;
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
     if (key) headers["Idempotency-Key"] = key;
+    if (opts.headers) Object.assign(headers, opts.headers);
     const lang = o.language ? o.language() : typeof navigator !== "undefined" ? navigator.language : undefined;
     if (lang) headers["Accept-Language"] = lang;
     try {
-      return await doFetch(url, { method, headers, body: opts.body === undefined ? undefined : JSON.stringify(opts.body), signal: ctl.signal });
+      return await doFetch(url, { method, headers, body: opts.rawBody ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)), signal: ctl.signal });
     } catch (e) {
       if (timedOut) throw new TimeoutError(timeoutMs);
       throw e;
@@ -101,7 +110,7 @@ export function createClient(o: ClientOptions) {
     for (let n = 0; ; n++) {
       try {
         res = await attempt(method, url, token, opts, key);
-        if (res.status === 401 && o.refresh && token) {
+        if (res.status === 401 && o.refresh && token && !opts.keepSession) {
           if (await refreshOnce(token)) { token = o.getToken(); res = await attempt(method, url, token, opts, key); }
         }
         if (!(mutating && RETRY_STATUS.has(res.status) && n < MAX_RETRIES)) break;
@@ -113,9 +122,18 @@ export function createClient(o: ClientOptions) {
       const base = o.retryDelayMs ?? 300;
       await new Promise((r) => setTimeout(r, base * 2 ** n * (0.5 + Math.random())));
     }
-    if (res.status === 401) o.onAuthFailure();
-    if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => null)) ?? {});
+    if (res.status === 401 && !opts.keepSession) o.onAuthFailure();
+    if (!res.ok) {
+      const problem: Record<string, unknown> = (await res.json().catch(() => null)) ?? {};
+      if (res.status === 403 && o.stepUp && !opts.headers?.["X-Step-Up-Token"] && String(problem.type ?? "").endsWith("/step-up-required")) {
+        const t = await o.stepUp(problem);
+        if (t) return request<T>(method, path, { ...opts, idempotencyKey: key, headers: { ...opts.headers, "X-Step-Up-Token": t } });
+      }
+      throw new ApiError(res.status, problem);
+    }
     if (res.status === 204) return undefined as T;
+    if (opts.as === "blob") return (await res.blob()) as T;
+    if (opts.as === "text") return (await res.text()) as T;
     return (await res.json()) as T;
   }
 

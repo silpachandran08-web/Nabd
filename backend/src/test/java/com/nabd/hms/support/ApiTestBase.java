@@ -46,6 +46,7 @@ import java.util.UUID;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureTestRestTemplate // PLT-032: Boot 4 no longer registers TestRestTemplate without it
+@org.junit.jupiter.api.extension.ExtendWith(LogPhiCaptureExtension.class) // OPS-028
 public abstract class ApiTestBase {
 
     protected static final String APP_ROLE = "nabd_app";
@@ -56,6 +57,7 @@ public abstract class ApiTestBase {
     protected static final String REPORTS_ROLE_PW = "nabd_reports";
     protected static final String STAFF_PIN = "1234";
     /** RFC 6238 test-vector-style fixed secret — deterministic so tests can compute the current code. */
+    protected static final String INTERNAL_COMMS_TOKEN = java.util.UUID.randomUUID().toString();
     protected static final byte[] TOTP_SECRET = "12345678901234567890".getBytes(StandardCharsets.US_ASCII);
     protected static final String CRYPTO_KEY_B64 = Base64.getEncoder().encodeToString(new byte[32]);
 
@@ -125,8 +127,10 @@ public abstract class ApiTestBase {
         registry.add("spring.datasource.password", () -> APP_ROLE_PW);
         registry.add("spring.flyway.enabled", () -> "false"); // migrated as nabd_migrator above
         registry.add("app.crypto.key", () -> CRYPTO_KEY_B64);
+        registry.add("app.internal.comms-token", () -> INTERNAL_COMMS_TOKEN); // COM-004 claim-check service token
         // tests call OutboxDispatcher.poll() themselves; the background poll would race them for the same rows
         registry.add("app.outbox.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE));
+        registry.add("app.whatsapp.inbound.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // COM-001: tests call WhatsAppInboundProcessor.poll() themselves
         registry.add("app.registry.poll-interval-ms", () -> String.valueOf(Integer.MAX_VALUE)); // OPS-007: tests call drain() themselves
         registry.add("app.registry.reconcile-cron", () -> "-"); // never fires; tests call runAll()
         // default 20/min is realistic for one browser, not for a suite of HTTP calls from one loopback IP
@@ -225,7 +229,9 @@ public abstract class ApiTestBase {
     protected SeededTenant seedTenant() {
         UUID id = UUID.randomUUID();
         String slug = "t" + id.toString().replace("-", "").substring(0, 12);
-        jdbc.update("INSERT INTO tenants (id, slug, name, region, status) VALUES (?,?,?,?,?)",
+        // ADM-002: seeded clinics are 'live' (INSERT is not guarded) so the many tests that register patients keep working;
+        // DataGateApiTest flips a tenant back to demo_only to cover the gate. UTC as before OPS-061: the region default would move every suite's clinic day.
+        jdbc.update("INSERT INTO tenants (id, slug, name, region_code, status, timezone, data_gate) VALUES (?,?,?,?,?,'UTC','live')",
                 id, slug, "Test Clinic " + slug, "IN", "active");
         // Every tenant gets a default department the moment it exists — same backfill guarantee
         // V37's migration gives every already-provisioned tenant, and ProvisioningStepRunner gives

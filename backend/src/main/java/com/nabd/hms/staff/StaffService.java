@@ -54,11 +54,13 @@ public class StaffService {
 
     private final Clock clock;
     private final com.nabd.hms.common.ClinicClock clinicClock;
+    private final com.nabd.hms.organization.api.Entitlements entitlements;
 
     StaffService(StaffRepository staffRepo, RoleRepository roleRepo, TenantContext tenantContext,
                  PasswordEncoder pinEncoder, StepUpVerifier stepUpVerifier, AuditService auditService,
                  GrantAuthority grantAuthority, EventPublisher eventPublisher, Clock clock,
-                 com.nabd.hms.common.ClinicClock clinicClock) {
+                 com.nabd.hms.common.ClinicClock clinicClock, com.nabd.hms.organization.api.Entitlements entitlements) {
+        this.entitlements = entitlements;
         this.clock = clock;
         this.clinicClock = clinicClock;
         this.staffRepo = staffRepo;
@@ -103,6 +105,11 @@ public class StaffService {
             StaffRow caller = staffRepo.findById(tenantId, invitedBy).orElseThrow(this::notFound);
             grantAuthority.requireAssignable(tenantId, caller, roleRepo.findById(tenantId, req.roleId()).orElseThrow(this::notFound),
                     req.scopeOrDefault(), null);
+            // PLT-059: invited + active staff fill seats, suspended do not. Pending invites count, so accepting one (activation) never exceeds the limit.
+            if (staffRepo.countSeats(tenantId) >= entitlements.seatLimit()) {
+                throw new ApiException(HttpStatus.CONFLICT, "seat-limit-reached", "SEAT_LIMIT_REACHED",
+                        "Your plan's staff seats are all in use. Suspend someone or upgrade your plan.", Map.of("upgradeUrl", "/owner/plan"));
+            }
         }
 
         String mobile = com.nabd.hms.common.PhoneNumbers.require(req.mobilePhone(), java.util.Objects.requireNonNullElse(clinicClock.region(tenantId), "IN"), "mobilePhone"); // ACC-028

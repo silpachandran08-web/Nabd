@@ -38,7 +38,7 @@ class S12QaFin005DayCloseTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         if (!"IN".equals(region)) {
             new JdbcTemplate(superuserDataSource()).execute(
-                    "SET session_replication_role = replica; UPDATE tenants SET region = '" + region + "' WHERE id = '" + t.id() + "'");
+                    "SET session_replication_role = replica; UPDATE tenants SET region_code = '" + region + "' WHERE id = '" + t.id() + "'");
         }
         UUID role = seedFullAccessRole(t.id());
         SeededStaff s = seedStaff(t, role, "q1f5" + UUID.randomUUID() + "@a.com", phone(), false);
@@ -262,7 +262,7 @@ class S12QaFin005DayCloseTest extends ApiTestBase {
         Owner qa = owner("QA");
         assertThat(summary(qa.token(), null)).containsEntry("currency", "QAR");
         assertThat(num(summary(qa.token(), null).get("cashTolerance"))).isEqualTo(20.0);
-        Owner sa = owner("KSA");
+        Owner sa = owner("SA");
         assertThat(num(summary(sa.token(), null).get("cashTolerance"))).isEqualTo(20.0);
         Owner in = owner();
         assertThat(num(summary(in.token(), null).get("cashTolerance"))).as("INR default unchanged, AE policy is tenant-scoped").isEqualTo(200.0);

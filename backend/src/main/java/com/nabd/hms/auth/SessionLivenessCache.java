@@ -168,7 +168,7 @@ class SessionLivenessCache implements SessionRevocation.RevokedSessions {
                     + "WHERE revoked_at > now() - interval '65 seconds'", UUID.class));
             recentReadAt = at;
         } catch (RuntimeException e) {
-            log.debug("recent session revocations not read: {}", e.getClass().getSimpleName()); // stays stale: no "1" trusted
+            log.debug("recent session revocations not read: {}", e.getClass().getSimpleName()); // stays stale: no "1" trusted // log-phi-ok: exception class name
         }
     }
 
@@ -191,7 +191,7 @@ class SessionLivenessCache implements SessionRevocation.RevokedSessions {
 
     private void failed(RuntimeException e) {
         skipUntil = System.nanoTime() + SKIP_NANOS_AFTER_FAILURE;
-        log.debug("valkey session cache call failed: {}", e.getClass().getSimpleName());
+        log.debug("valkey session cache call failed: {}", e.getClass().getSimpleName()); // log-phi-ok: exception class name
         fallback();
     }
 

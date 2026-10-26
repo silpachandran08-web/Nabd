@@ -53,6 +53,15 @@ public class CheckoutController {
         return service.checkout(tenantId(jwt), queueEntryId, staffId(jwt), canDiscount(jwt), RequestMeta.clientIp(http), req);
     }
 
+    /** FIN-008: tax for a draft cart, nothing stored (read-only, so no Idempotency-Key). */
+    @PostMapping("/quotes")
+    @PreAuthorize("hasAuthority('billing:view')")
+    public com.nabd.hms.billing.dto.QuoteResponse quote(@AuthenticationPrincipal Jwt jwt,
+                                                         @Valid @RequestBody com.nabd.hms.billing.dto.QuoteRequest req) {
+        return service.quote(staffId(jwt), canDiscount(jwt),
+                new CheckoutRequest(req.lines(), null, req.discounts(), req.buyerGstin()));
+    }
+
     @GetMapping("/otc-charges")
     @PreAuthorize("hasAuthority('billing:view')")
     public OtcChargesResponse otcCharges(@AuthenticationPrincipal Jwt jwt) {

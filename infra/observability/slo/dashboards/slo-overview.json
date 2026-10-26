@@ -1,0 +1,150 @@
+{
+ "editable": false,
+ "panels": [
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 24,
+    "x": 0,
+    "y": 0
+   },
+   "id": 1,
+   "targets": [
+    {
+     "expr": "slo:objective:ratio",
+     "format": "table",
+     "instant": true,
+     "refId": "A"
+    },
+    {
+     "expr": "1 - slo:sli_error:ratio_rate28d",
+     "format": "table",
+     "instant": true,
+     "refId": "B"
+    },
+    {
+     "expr": "slo:error_budget_remaining:ratio",
+     "format": "table",
+     "instant": true,
+     "refId": "C"
+    },
+    {
+     "expr": "slo:release_frozen",
+     "format": "table",
+     "instant": true,
+     "refId": "D"
+    }
+   ],
+   "title": "SLOs (28 d): target, actual, budget remaining, release frozen",
+   "transformations": [
+    {
+     "id": "merge"
+    }
+   ],
+   "type": "table"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 0
+   },
+   "id": 2,
+   "targets": [
+    {
+     "expr": "slo:error_budget_remaining:ratio",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Budget remaining",
+   "type": "bargauge"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 8
+   },
+   "id": 3,
+   "targets": [
+    {
+     "expr": "1 - slo:sli_error:ratio_rate1h{slo=\"staff-api-availability\"} or slo:objective:ratio{slo=\"staff-api-availability\"} or slo:contract_objective:ratio",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Actual vs target vs contract (availability)",
+   "type": "timeseries"
+  },
+  {
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    }
+   },
+   "gridPos": {
+    "h": 6,
+    "w": 24,
+    "x": 0,
+    "y": 24
+   },
+   "id": 4,
+   "targets": [
+    {
+     "expr": "slo:release_frozen",
+     "legendFormat": "{{slo}}",
+     "refId": "A"
+    }
+   ],
+   "title": "Release frozen (budget burnt > 50 %)",
+   "type": "stat"
+  }
+ ],
+ "refresh": "1m",
+ "schemaVersion": 39,
+ "tags": [
+  "nabd",
+  "ops-027"
+ ],
+ "time": {
+  "from": "now-28d",
+  "to": "now"
+ },
+ "title": "Nabd SLOs and error budgets (per cell)",
+ "uid": "nabd-slo",
+ "version": 1
+}

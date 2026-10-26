@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./fleet.module.css";
-import { usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError, useOperatorAccess } from "../platformApi";
+import Link from "next/link";
 import { ErrorState, Skeleton, EmptyState } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
 import { TenantStatusPill } from "../../components/platform/statusPills";
@@ -34,11 +35,10 @@ type OperatorProfile = { permissions: string[] };
 // Matches GET /v1/platform/support-access/grants (SupportAccessController) — active count only.
 type SupportGrant = { active: boolean };
 
-const REGION_NAMES: Record<string, string> = { IN: "India", KSA: "Saudi Arabia" };
+const REGION_NAMES: Record<string, string> = { IN: "India", AE: "United Arab Emirates", SA: "Saudi Arabia", QA: "Qatar" };
 
 export default function FleetPage() {
   const router = useRouter();
-  const fetchAuthed = usePlatformFetch();
   const [rows, setRows] = useState<TenantSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +47,7 @@ export default function FleetPage() {
   const [forbidden, setForbidden] = useState(false);
   const [summary, setSummary] = useState<FleetSummary | null>(null);
   const [canRequestSupportAccess, setCanRequestSupportAccess] = useState(false);
+  const canSwitchFeatures = useOperatorAccess().isSuper; // PLT-059: tenant_detail:edit (super_admin)
   const [activeSupportSessions, setActiveSupportSessions] = useState<number | null>(null);
 
   const fetchPage = useCallback(async (cursor: string | null, append: boolean) => {
@@ -56,27 +57,17 @@ export default function FleetPage() {
     try {
       const params = new URLSearchParams({ limit: "50" });
       if (cursor) params.set("cursor", cursor);
-      const res = await fetchAuthed(`/platform/tenants?${params}`);
-      if (!res) return; // session gone, already redirecting to login
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load the fleet. Try again.");
-        return;
-      }
-
-      const body: FleetPage = await res.json();
+      const body = await platformApi.get<FleetPage>(`/platform/tenants?${params}`);
       setRows((prev) => (append ? [...prev, ...body.data] : body.data));
       setNextCursor(body.page.nextCursor);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setError(platformError(e, "Couldn't load the fleet. Try again."));
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [fetchAuthed]);
+  }, []);
 
   useEffect(() => {
     void Promise.resolve().then(() => fetchPage(null, false));
@@ -88,23 +79,19 @@ export default function FleetPage() {
   // still gets a working page, just with that one tile/column showing "not available" instead of 403ing.
   useEffect(() => {
     void (async () => {
-      const summaryRes = await fetchAuthed("/platform/tenants/summary").catch(() => null);
-      if (summaryRes?.ok) setSummary(await summaryRes.json());
+      const sum = await platformApi.get<FleetSummary>("/platform/tenants/summary").catch(() => null);
+      if (sum) setSummary(sum);
 
-      const meRes = await fetchAuthed("/platform/auth/me").catch(() => null);
-      if (!meRes?.ok) return;
-      const me: OperatorProfile = await meRes.json();
+      const me = await platformApi.get<OperatorProfile>("/platform/auth/me").catch(() => null);
+      if (!me) return;
       const allowed = me.permissions.includes("support_access:view");
       setCanRequestSupportAccess(allowed);
       if (!allowed) return;
 
-      const grantsRes = await fetchAuthed("/platform/support-access/grants").catch(() => null);
-      if (grantsRes?.ok) {
-        const grants: SupportGrant[] = await grantsRes.json();
-        setActiveSupportSessions(grants.filter((g) => g.active).length);
-      }
+      const grants = await platformApi.get<SupportGrant[]>("/platform/support-access/grants").catch(() => null);
+      if (grants) setActiveSupportSessions(grants.filter((g) => g.active).length);
     })();
-  }, [fetchAuthed]);
+  }, []);
 
   function requestSupportAccessFor(tenantId: string) {
     sessionStorage.setItem("nabd_fleet_support_access_tenant_id", tenantId);
@@ -164,13 +151,14 @@ export default function FleetPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Clinic</th>
-                    <th>Region</th>
-                    <th>Status</th>
-                    <th>Brand</th>
-                    <th>Owner</th>
-                    <th>Privileged MFA</th>
-                    {canRequestSupportAccess && <th></th>}
+                    <th scope="col">Clinic</th>
+                    <th scope="col">Region</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Brand</th>
+                    <th scope="col">Owner</th>
+                    <th scope="col">Privileged MFA</th>
+                    {canRequestSupportAccess && <th scope="col"></th>}
+                    {canSwitchFeatures && <th scope="col"></th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -199,6 +187,7 @@ export default function FleetPage() {
                           <button className={styles.actionBtn} onClick={() => requestSupportAccessFor(t.id)}>Support access</button>
                         </td>
                       )}
+                      {canSwitchFeatures && <td><Link className={styles.actionBtn} href={`/platform/fleet/${t.id}/features`}>Features</Link></td>}
                     </tr>
                   ))}
                 </tbody>

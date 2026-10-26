@@ -23,9 +23,9 @@ class PhoneNumbersTest {
     @Test
     void saudiFormats() {
         for (String typed : new String[]{"+966512345678", "0512345678", "512345678", "00966512345678", "+966 51 234 5678"}) {
-            assertThat(PhoneNumbers.digits(typed, "KSA")).as(typed).isEqualTo("966512345678");
+            assertThat(PhoneNumbers.digits(typed, "SA")).as(typed).isEqualTo("966512345678");
         }
-        assertThat(PhoneNumbers.e164OrNull("0501234567", "KSA")).isEqualTo("+966501234567");
+        assertThat(PhoneNumbers.e164OrNull("0501234567", "SA")).isEqualTo("+966501234567");
     }
 
     @Test
@@ -45,7 +45,7 @@ class PhoneNumbersTest {
     @Test
     void anExplicitCountryCodeIsNeverRewritten() {
         assertThat(PhoneNumbers.digits("+966512345678", "IN")).isEqualTo("966512345678");
-        assertThat(PhoneNumbers.digits("+919812345678", "KSA")).isEqualTo("919812345678");
+        assertThat(PhoneNumbers.digits("+919812345678", "SA")).isEqualTo("919812345678");
         assertThat(PhoneNumbers.e164OrNull("+97433123456", "AE")).isEqualTo("+97433123456");
         assertThat(PhoneNumbers.e164OrNull("00971501234567", "QA")).isEqualTo("+971501234567");
     }
@@ -57,7 +57,7 @@ class PhoneNumbersTest {
             assertThat(PhoneNumbers.e164OrNull(bad, region)).as(bad).isNull();
         }
         assertThat(PhoneNumbers.e164OrNull(null, "IN")).isNull();
-        assertThat(PhoneNumbers.e164OrNull("9812345678", "KSA")).as("Indian local digits are not a Saudi number").isNull();
+        assertThat(PhoneNumbers.e164OrNull("9812345678", "SA")).as("Indian local digits are not a Saudi number").isNull();
     }
 
     @Test

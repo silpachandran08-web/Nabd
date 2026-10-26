@@ -7,6 +7,9 @@ import StatusPill from "../ui/StatusPill";
 import { EmptyState } from "../ui/StateViews";
 import { age, minutesSince, queueStatusLabel as statusLabel } from "@nabd/domain";
 import { clinicToday, formatClinicDate, formatClinicTime } from "../../lib/clinicTime";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchVisit } from "../../lib/doctorQueries";
+import { can } from "../../lib/permissions";
 import type { AppointmentPage, DayRow, DueCondition, MyDayData, Part } from "./useMyDay";
 
 const hhmm = (iso: string) => formatClinicTime(iso);
@@ -66,6 +69,9 @@ export function SessionStrip({ data, seen, total }: { data: MyDayData; seen: num
 }
 
 export function NowNext({ inRoom, next, now }: { inRoom: DayRow | null; next: DayRow | null; now: number | null }) {
+  const qc = useQueryClient();
+  // FEF-016: pointing at (hover / focus) the next patient reads their visit ahead, so Start consultation opens from cache.
+  const warm = (r: DayRow) => () => prefetchVisit(qc, r.id, r.patientId, can("clinical:view"));
   return (
     <section className={styles.card} aria-label="In the room and up next">
       <div className={styles.nowNext}>
@@ -91,7 +97,7 @@ export function NowNext({ inRoom, next, now }: { inRoom: DayRow | null; next: Da
                 {now !== null && minutesSince(next.createdAt, now) !== null && <span className={styles.stat}><Icon name="clock" size={14} /> waiting {minutesSince(next.createdAt, now)} min</span>}
                 <Fact r={next} />
               </div>
-              <Link href={consultHref(next.id)} className={styles.primary}><Icon name="stethoscope" size={16} /> Start consultation</Link>
+              <Link href={consultHref(next.id)} className={styles.primary} onMouseEnter={warm(next)} onFocus={warm(next)}><Icon name="stethoscope" size={16} /> Start consultation</Link>
             </>
           ) : <div className={styles.quiet}>No one is waiting.</div>}
         </div>
@@ -101,6 +107,8 @@ export function NowNext({ inRoom, next, now }: { inRoom: DayRow | null; next: Da
 }
 
 export function QueueList({ rows, now }: { rows: DayRow[]; now: number | null }) {
+  const qc = useQueryClient();
+  const warm = (r: DayRow) => () => prefetchVisit(qc, r.id, r.patientId, can("clinical:view"));
   return (
     <section className={styles.card} aria-label="My queue">
       <h2 className={styles.cardTitle}>My queue <span className={styles.count}>{rows.length}</span></h2>
@@ -110,7 +118,7 @@ export function QueueList({ rows, now }: { rows: DayRow[]; now: number | null })
             const wait = now !== null ? minutesSince(r.createdAt, now) : null;
             return (
               <li key={r.id}>
-                <Link href={consultHref(r.id)} className={styles.qrow}>
+                <Link href={consultHref(r.id)} className={styles.qrow} onMouseEnter={warm(r)} onFocus={warm(r)}>
                   <span className={styles.token}>T-{r.tokenNumber}</span>
                   <span className={styles.qmain}>
                     <span className={styles.qname}>{nameOf(r)}</span>

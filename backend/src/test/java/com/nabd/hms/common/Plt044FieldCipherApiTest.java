@@ -249,6 +249,9 @@ class Plt044FieldCipherApiTest extends ApiTestBase {
                 "--spring.datasource.username=" + env.getProperty("spring.datasource.username"),
                 "--spring.datasource.password=" + env.getProperty("spring.datasource.password"),
                 "--app.crypto.key=" + CRYPTO_KEY_B64, "--app.jwt.keys-json=" + jwks,
+                "--app.jwt.owner.keys-json=" + new JWKSet(new ArrayList<JWK>(List.of(SigningKeyProvider.gen(), SigningKeyProvider.gen()))).toString(false),
+                "--app.jwt.platform.keys-json=" + new JWKSet(new ArrayList<JWK>(List.of(SigningKeyProvider.gen(), SigningKeyProvider.gen()))).toString(false), // PLT-009: one key set per population
+                "--app.jwt.internal.jwks-json=" + new JWKSet(new ArrayList<JWK>(List.of(SigningKeyProvider.gen()))).toString(true),
                 "--app.outbox.poll-interval-ms=" + Integer.MAX_VALUE))
                 .hasStackTraceContaining("Refusing to boot under the prod profile without a keyring");
     }

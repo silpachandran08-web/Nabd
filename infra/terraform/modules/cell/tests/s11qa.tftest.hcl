@@ -31,13 +31,14 @@ mock_provider "aws" {
 }
 
 variables {
-  environment = "prod"
-  dns_zone    = "qa.cells.nabd.internal"
-  cell        = "in"
-  country     = "IN"
-  region      = "ap-south-1"
-  dr_region   = "ap-south-2"
-  azs         = ["ap-south-1a", "ap-south-1b"]
+  pgbouncer_ami_id = "ami-0123456789abcdef0"
+  environment      = "prod"
+  dns_zone         = "qa.cells.nabd.internal"
+  cell             = "in"
+  country          = "IN"
+  region           = "ap-south-1"
+  dr_region        = "ap-south-2"
+  azs              = ["ap-south-1a", "ap-south-1b"]
 }
 
 run "qa_prod_in_has_35_day_pitr_and_hyderabad_dr_placeholders" {

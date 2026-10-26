@@ -1,20 +1,25 @@
 "use client";
 
+import { seatMeter } from "../lib/entitlements";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./setup.module.css";
 import WhatsAppTemplates from "./WhatsAppTemplates";
 import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
+import PrivacyNoticePanel from "../components/setup/PrivacyNoticePanel";
+import AbdmCard from "../components/setup/AbdmCard";
 import Icon from "../components/ui/Icon";
 import AccessGate from "../components/ui/AccessGate";
+import PatientImport from "../components/setup/PatientImport";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity, regionLabel } from "../lib/session";
-import { apiFetch, goLogin } from "../lib/apiClient";
-import type { Problem } from "@nabd/api-client/types";
+import { api, ApiError, reasonText } from "../lib/api";
+import { intentKeys } from "@nabd/api-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
+// FEF-018: one idempotency key per save intent, so a retry after a dropped answer cannot double-apply.
+const intents = intentKeys();
 
 
 type ChecklistItem = { step: string; status: "pending" | "skipped" | "done"; skippedAt: string | null; doneAt: string | null };
@@ -25,7 +30,7 @@ type ConsentContact = { name: string; email: string; phone: string | null };
 type Holiday = { id: string; holidayDate: string; name: string; recurring: boolean };
 type Shift = { id: string; staffId: string; staffName: string | null; patternJson: string; effectiveFrom: string; effectiveTo: string | null };
 type PayrollRow = { staffId: string; staffName: string; role: string; days: number; hours: number; salary: number; notes: string };
-type Subscription = { plan: string | null; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number };
+type Subscription = { plan: string | null; status: string; activePatientsUsed: number; activePatientsLimit: number; whatsappMessagesUsed: number; whatsappMessagesLimit: number; branchesUsed: number; branchesLimit: number; modules?: { code: string; enabled: boolean }[]; killedFeatures?: string[]; seatsUsed?: number; seatsLimit?: number | null };
 type ImportJob = { id: string; importType: string; fileName: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type ExportJob = { id: string; exportType: string; status: string; resultUrl: string | null; errorMessage: string | null; createdAt: string | null };
 type Licence = { id: string; licenceType: string; holderId: string | null; holderName: string | null; number: string; issuingBody: string | null; expiryDate: string; region: string; status: string };
@@ -38,6 +43,8 @@ const TABS = [
   { key: "charges", label: "Charges" },
   { key: "policies", label: "Policies" },
   { key: "consent", label: "Consent" },
+  { key: "privacy", label: "Privacy notice" },
+  { key: "integrations", label: "Integrations" },
   { key: "whatsapp", label: "WhatsApp" },
   { key: "holidays", label: "Holidays" },
   { key: "shifts", label: "Shifts" },
@@ -112,37 +119,18 @@ function SetupPageInner() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
-  const authedFetch = useCallback(async (path: string, init?: RequestInit) => {
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) {
-      goLogin();
-      return null;
-    }
-    const res = await apiFetch(path, {
-      ...init,
-      headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    });
-    if (res.status === 401) {
-      localStorage.removeItem("nabd_access_token");
-      goLogin();
-      return null;
-    }
-    return res;
-  }, [router]);
-
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const fetchJson = async <T,>(path: string): Promise<T | null> => {
-        const res = await authedFetch(path);
-        if (!res) return null;
-        if (!res.ok) {
-          const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-          setError(p.detail || `Failed to load ${path}`);
+        try {
+          return await api.get<T>(path);
+        } catch (e) {
+          if (!(e instanceof ApiError)) throw e;
+          setError(reasonText(e, `Failed to load ${path}`));
           return null;
         }
-        return res.json();
       };
       const wanted = new Set(TAB_DATA[tab] ?? []);
       const [cl, pr, ch, po, co, ho, sh, su, ij, ej, li, st] = await Promise.all([
@@ -171,12 +159,12 @@ function SetupPageInner() {
       if (ej) setExportJobs(ej);
       if (li) setLicences(li);
       if (st) setStaff(st);
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      setError(reasonText(e, ""));
     } finally {
       setLoading(false);
     }
-  }, [authedFetch, tab]);
+  }, [tab]);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body itself never calls setState
@@ -189,27 +177,22 @@ function SetupPageInner() {
     });
   }, [loadAll]);
 
-  const post = async (path: string, body: unknown) => {
-    const res = await authedFetch(path, { method: "POST", body: JSON.stringify(body) });
-    if (!res) return false;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-      setError(p.detail || "Request failed");
+  // A failed save keeps the form as it is: the tab stays, and a banner offers Retry (same body, same Idempotency-Key).
+  const [saveFail, setSaveFail] = useState<{ message: string; retry: () => void } | null>(null);
+  const mutate = async (method: "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<boolean> => {
+    const name = `${method} ${path}`;
+    try {
+      await api.request(method, path, { body, idempotencyKey: intents.get(name, body) });
+      intents.done(name);
+      setSaveFail(null);
+      return true;
+    } catch (e) {
+      setSaveFail({ message: reasonText(e, "Request failed"), retry: () => { void mutate(method, path, body).then((ok) => { if (ok) void loadAll(); }); } });
       return false;
     }
-    return true;
   };
-
-  const patch = async (path: string, body: unknown) => {
-    const res = await authedFetch(path, { method: "PATCH", body: JSON.stringify(body) });
-    if (!res) return false;
-    if (!res.ok) {
-      const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-      setError(p.detail || "Request failed");
-      return false;
-    }
-    return true;
-  };
+  const post = (path: string, body: unknown) => mutate("POST", path, body);
+  const patch = (path: string, body: unknown) => mutate("PATCH", path, body);
 
   const markStep = async (step: string, status: "skipped" | "done") => {
     if (await post(`/setup/checklist/${step}/${status === "skipped" ? "skip" : "complete"}`, { status })) {
@@ -219,8 +202,8 @@ function SetupPageInner() {
 
   // A failed save stays inline (unlike the shared patch(), which swaps the whole tab for an
   // error view) so the owner's edits are not lost.
-  const saveProfile = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const saveProfile = async (e?: React.FormEvent<HTMLFormElement>) => {
+    e?.preventDefault();
     if (!profile || profileSaving) return;
     setNotice(null);
     setProfileError(null);
@@ -234,17 +217,11 @@ function SetupPageInner() {
     };
     setProfileSaving(true);
     try {
-      const res = await authedFetch("/setup/profile", { method: "PATCH", body: JSON.stringify(body) });
-      if (!res) return;
-      if (!res.ok) {
-        const p: Problem | null = await res.json().catch(() => null);
-        setProfileError(res.status === 403 ? "Your role can't change the clinic profile." : p?.detail || "Couldn't save the profile. Try again.");
-        return;
-      }
-      setProfile(await res.json());
+      setProfile(await api.patch<Profile>("/setup/profile", body, { idempotencyKey: intents.get("profile", body) }));
+      intents.done("profile");
       setNotice("Profile saved.");
-    } catch {
-      setProfileError("Couldn't reach the server. Your changes are still here; try again.");
+    } catch (e) {
+      setProfileError(e instanceof ApiError && e.status === 403 ? "Your role can't change the clinic profile." : e instanceof ApiError && e.status < 500 ? e.detail || "Couldn't save the profile. Try again." : `${reasonText(e, "")} Your changes are still here.`);
     } finally {
       setProfileSaving(false);
     }
@@ -295,8 +272,7 @@ function SetupPageInner() {
   };
 
   const deleteHoliday = async (id: string) => {
-    const res = await authedFetch(`/setup/holidays/${id}`, { method: "DELETE" });
-    if (res?.ok) loadAll();
+    if (await mutate("DELETE", `/setup/holidays/${id}`)) loadAll();
   };
 
   const [newShift, setNewShift] = useState<Partial<Shift>>({ patternJson: "{}" });
@@ -313,19 +289,13 @@ function SetupPageInner() {
     setPayrollLoading(true);
     setPayrollError(null);
     try {
-      const res = await authedFetch(`/setup/payroll-export?month=${encodeURIComponent(month)}`);
-      if (!res) return;
-      if (res.ok) setPayroll(await res.json());
-      else {
-        const p: Problem = await res.json().catch(() => ({ title: "Error", detail: "Request failed" }));
-        setPayrollError(p.detail || "Couldn't load the payroll export.");
-      }
-    } catch {
-      setPayrollError("Couldn't reach the server. Check your connection and try again.");
+      setPayroll(await api.get<PayrollRow[]>(`/setup/payroll-export?month=${encodeURIComponent(month)}`));
+    } catch (e) {
+      setPayrollError(e instanceof ApiError && e.status < 500 ? e.detail || "Couldn't load the payroll export." : reasonText(e, ""));
     } finally {
       setPayrollLoading(false);
     }
-  }, [authedFetch]);
+  }, []);
 
   useEffect(() => {
     if (tab !== "payroll") return;
@@ -344,16 +314,12 @@ function SetupPageInner() {
     URL.revokeObjectURL(url);
   };
 
-  const createImport = async (importType: string) => {
-    if (await post("/setup/import-jobs", { importType, fileName: `${importType}-import.csv` })) loadAll();
-  };
-
   const createExport = async (exportType: string) => {
     if (await post("/setup/export-jobs", { exportType })) loadAll();
   };
 
-  // The API only accepts IN or KSA; default to the clinic's own region (fixed at provisioning).
-  const licenceRegion = getIdentity()?.tenantRegion === "KSA" ? "KSA" : "IN";
+  // The API accepts IN, AE, SA or QA; default to the clinic's own region (fixed at provisioning).
+  const licenceRegion = ["IN", "AE", "SA", "QA"].find((c) => c === getIdentity()?.tenantRegion) ?? "IN";
   const [newLicence, setNewLicence] = useState<Partial<Licence>>({ region: licenceRegion, licenceType: "clinician" });
   const addLicence = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,7 +331,9 @@ function SetupPageInner() {
   };
 
   const renderContent = () => {
-    if (tab === "pharmacy") return canPharmacy ? <PharmacyPanel authedFetch={authedFetch} /> : null;
+    if (tab === "privacy") return <PrivacyNoticePanel />;
+    if (tab === "integrations") return <AbdmCard />;
+    if (tab === "pharmacy") return canPharmacy ? <PharmacyPanel /> : null;
     if (loading && (TAB_DATA[tab]?.length ?? 0) > 0) return <div className={styles.card}><Skeleton rows={5} label="Loading" /></div>;
     if (error) return <div className={styles.card}><ErrorState message={error} onRetry={loadAll} /></div>;
 
@@ -402,7 +370,12 @@ function SetupPageInner() {
             {profile && (
               <form onSubmit={saveProfile}>
                 {notice && <div className={styles.notice} role="status"><Icon name="check" size={14} /> {notice}</div>}
-                {profileError && <div className={styles.errorState} role="alert">{profileError}</div>}
+                {profileError && (
+                  <div className={styles.errorState} role="alert">
+                    {profileError}{" "}
+                    <button type="button" className={styles.wizardBtn} disabled={profileSaving} onClick={() => void saveProfile()}>Try again</button>
+                  </div>
+                )}
                 {!canEditProfile && <p className={styles.regionNote}>View only: your role can&apos;t change the clinic profile.</p>}
                 <fieldset className={styles.plainFieldset} disabled={!canEditProfile || profileSaving}>
                 <div className={styles.field}>
@@ -507,7 +480,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Code</th><th>Name</th><th>Category</th><th>Base</th><th>Tax %</th><th>Status</th><th></th></tr>
+                  <tr><th scope="col">Code</th><th scope="col">Name</th><th scope="col">Category</th><th scope="col">Base</th><th scope="col">Tax %</th><th scope="col">Status</th><th scope="col"></th></tr>
                 </thead>
                 <tbody>
                   {charges.map((c) => (
@@ -533,7 +506,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Policy</th><th>Value</th><th>Version</th><th></th></tr>
+                  <tr><th scope="col">Policy</th><th scope="col">Value</th><th scope="col">Version</th><th scope="col"></th></tr>
                 </thead>
                 <tbody>
                   {policies.map((p) => (
@@ -601,7 +574,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Date</th><th>Name</th><th>Recurring</th><th></th></tr>
+                  <tr><th scope="col">Date</th><th scope="col">Name</th><th scope="col">Recurring</th><th scope="col"></th></tr>
                 </thead>
                 <tbody>
                   {holidays.map((h) => (
@@ -646,7 +619,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Staff</th><th>Pattern</th><th>From</th><th>To</th></tr>
+                  <tr><th scope="col">Staff</th><th scope="col">Pattern</th><th scope="col">From</th><th scope="col">To</th></tr>
                 </thead>
                 <tbody>
                   {shifts.map((s) => (
@@ -689,7 +662,7 @@ function SetupPageInner() {
               <div className={styles.tableWrap}>
                 <table className={styles.table}>
                   <thead>
-                    <tr><th>Staff</th><th>Role</th><th>Days</th><th>Hours</th><th>Salary</th><th>Notes</th></tr>
+                    <tr><th scope="col">Staff</th><th scope="col">Role</th><th scope="col">Days</th><th scope="col">Hours</th><th scope="col">Salary</th><th scope="col">Notes</th></tr>
                   </thead>
                   <tbody>
                     {payroll.map((r) => (
@@ -717,7 +690,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Metric</th><th>Used</th><th>Limit</th></tr>
+                  <tr><th scope="col">Metric</th><th scope="col">Used</th><th scope="col">Limit</th></tr>
                 </thead>
                 <tbody>
                   <tr><td>Active patients</td><td>{subscription.activePatientsUsed}</td><td>{subscription.activePatientsLimit}</td></tr>
@@ -726,17 +699,32 @@ function SetupPageInner() {
                 </tbody>
               </table>
             </div>
+            {subscription.seatsUsed !== undefined && (
+              <p data-testid="seat-meter"><strong>Staff seats:</strong> {seatMeter(subscription.seatsUsed, subscription.seatsLimit ?? null).label}</p>
+            )}
+            {subscription.modules && (
+              <>
+                <h3 className={styles.cardTitle}>Modules</h3>
+                <ul data-testid="module-list">
+                  {subscription.modules.map((m) => (
+                    <li key={m.code}>{m.code.replace(/_/g, " ")}: {subscription.killedFeatures?.includes(m.code) ? "switched off by Nabd" : m.enabled ? "included" : "not in your plan"}</li>
+                  ))}
+                </ul>
+              </>
+            )}
           </div>
         );
       case "data":
         return (
           <div className={styles.card}>
             <h2 className={styles.cardTitle}>Self-serve data import & export</h2>
-            <div className={styles.row}>
+            {can("setup:edit") && (
               <div className={styles.field}>
                 <label className={styles.label}>Import patients</label>
-                <button className={styles.btnPrimary} onClick={() => createImport("patients")}>Start import job</button>
+                <PatientImport />
               </div>
+            )}
+            <div className={styles.row}>
               <div className={styles.field}>
                 <label className={styles.label}>Export full tenant</label>
                 <button className={styles.btnPrimary} onClick={() => createExport("full_tenant")}>Start export job</button>
@@ -745,7 +733,7 @@ function SetupPageInner() {
             <h3 className={styles.cardTitle}>Recent import jobs</h3>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Type</th><th>File</th><th>Status</th><th>Created</th></tr></thead>
+                <thead><tr><th scope="col">Type</th><th scope="col">File</th><th scope="col">Status</th><th scope="col">Created</th></tr></thead>
                 <tbody>
                   {importJobs.map((j) => (
                     <tr key={j.id}><td>{j.importType}</td><td>{j.fileName}</td><td><span className={`${styles.pill} ${styles.pillPending}`}>{j.status}</span></td><td>{j.createdAt ? new Date(j.createdAt).toLocaleString() : "—"}</td></tr>
@@ -756,7 +744,7 @@ function SetupPageInner() {
             <h3 className={styles.cardTitle}>Recent export jobs</h3>
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Type</th><th>Status</th><th>Created</th></tr></thead>
+                <thead><tr><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Created</th></tr></thead>
                 <tbody>
                   {exportJobs.map((j) => (
                     <tr key={j.id}><td>{j.exportType}</td><td><span className={`${styles.pill} ${styles.pillPending}`}>{j.status}</span></td><td>{j.createdAt ? new Date(j.createdAt).toLocaleString() : "—"}</td></tr>
@@ -799,7 +787,7 @@ function SetupPageInner() {
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
-                  <tr><th>Type</th><th>Holder</th><th>Number</th><th>Issuing body</th><th>Expiry</th><th>Status</th></tr>
+                  <tr><th scope="col">Type</th><th scope="col">Holder</th><th scope="col">Number</th><th scope="col">Issuing body</th><th scope="col">Expiry</th><th scope="col">Status</th></tr>
                 </thead>
                 <tbody>
                   {licences.map((l) => (
@@ -818,7 +806,7 @@ function SetupPageInner() {
           </div>
         );
       case "whatsapp":
-        return <WhatsAppTemplates authedFetch={authedFetch} />;
+        return <WhatsAppTemplates />;
       default:
         return null;
     }
@@ -842,6 +830,12 @@ function SetupPageInner() {
         ))}
       </div>
 
+      {saveFail && (
+        <div className={styles.errorState} role="alert">
+          {saveFail.message}{" "}
+          <button type="button" className={styles.wizardBtn} onClick={saveFail.retry}>Retry</button>
+        </div>
+      )}
       {renderContent()}
     </main>
   );

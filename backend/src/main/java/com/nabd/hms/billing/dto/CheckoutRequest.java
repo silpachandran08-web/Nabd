@@ -17,10 +17,11 @@ import java.util.List;
 public record CheckoutRequest(
         @NotNull @Valid List<LineItemRequest> lineItems,
         @DecimalMin(value = "0") BigDecimal discount,
-        @Valid List<DiscountRequest> discounts
+        @Valid List<DiscountRequest> discounts,
+        String buyerGstin
 ) {
     public CheckoutRequest(List<LineItemRequest> lineItems, BigDecimal discount) {
-        this(lineItems, discount, null);
+        this(lineItems, discount, null, null);
     }
 
     public record DiscountRequest(@NotNull String kind, @NotNull @DecimalMin(value = "0.01") BigDecimal value,

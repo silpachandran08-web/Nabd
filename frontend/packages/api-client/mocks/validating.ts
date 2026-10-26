@@ -49,6 +49,7 @@ export async function createValidatingHandlers(baseUrl = "*") {
 
   const route = (verb: Verb) => (path: string, resolver: () => Response) =>
     http[verb](path, async ({ request }) => {
+      if (path.includes("*")) return resolver(); // wildcard servlet mappings (e.g. /abdm/v3/callbacks/**) are not OpenAPI templates: openapi-backend's router throws on them
       const url = new URL(request.url);
       const text = await request.clone().text();
       let body: unknown = undefined;

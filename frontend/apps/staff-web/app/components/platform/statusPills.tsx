@@ -55,7 +55,9 @@ export const JobStatusPill = ({ status }: { status: string }) => pill(JOB, statu
 export const TicketStatusPill = ({ status }: { status: string }) => pill(TICKET_STATUS, status);
 export const PriorityPill = ({ priority }: { priority: string }) => pill(PRIORITY, priority);
 
-export function GrantStatusPill({ state }: { state: "active" | "expired" | "revoked" }) {
+export function GrantStatusPill({ state }: { state: "requested" | "active" | "declined" | "expired" | "revoked" }) {
+  if (state === "requested") return <StatusPill tone="warn" icon="clock" label="Waiting for owner" />;
+  if (state === "declined") return <StatusPill tone="danger" icon="x" label="Declined" />;
   if (state === "active") return <StatusPill tone="ok" label="Active" />;
   if (state === "revoked") return <StatusPill tone="danger" icon="x" label="Revoked" />;
   return <StatusPill tone="neutral" icon="clock" label="Expired" />;

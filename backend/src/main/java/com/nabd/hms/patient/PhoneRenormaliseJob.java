@@ -47,7 +47,7 @@ public class PhoneRenormaliseJob implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        for (Map<String, Object> t : jdbc.queryForList("SELECT id, region FROM tenants")) {
+        for (Map<String, Object> t : jdbc.queryForList("SELECT id, region_code AS region FROM tenants")) {
             run((UUID) t.get("id"), (String) t.get("region"));
         }
     }

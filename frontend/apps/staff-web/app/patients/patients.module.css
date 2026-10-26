@@ -42,7 +42,6 @@
   color: var(--nb-text-primary);
   font-size: 14px;
   font-family: inherit;
-  outline: none;
 }
 
 .card {
@@ -86,7 +85,13 @@
 
 .row {
   cursor: pointer;
+  position: relative;
 }
+
+/* FEF-027: the patient name is the row's link; its ::after stretches over the row so a click anywhere opens it. */
+.rowLink { text-decoration: none; }
+.rowLink::after { content: ""; position: absolute; inset: 0; }
+.row .checkInBtn { position: relative; z-index: 1; }
 
 .row:hover td {
   background: var(--nb-surface-2);
@@ -412,7 +417,6 @@
   color: var(--nb-text-primary);
   font-family: inherit;
   font-size: 14px;
-  outline: none;
 }
 .filterBar {
   display: flex;
@@ -517,7 +521,8 @@
   flex-direction: column;
   gap: 6px;
 }
-.dialog .input { max-width: none; }
+.dialogForm { display: flex; flex-direction: column; gap: var(--nb-space-8); }
+.dialog .input, .dialogForm .input { max-width: none; }
 .dialogTitle { font-size: 18px; font-weight: 600; margin: 0; }
 .dialogSub { font-size: 13px; color: var(--nb-text-secondary); margin: 0 0 var(--nb-space-8); }
 .fieldLabel { font-size: 12px; font-weight: 600; color: var(--nb-text-secondary); margin-top: var(--nb-space-8); }

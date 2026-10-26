@@ -23,6 +23,10 @@ class RelayConfig {
             throw new IllegalStateException("app.relay.enabled needs app.valkey.url (VALKEY_URL): the relay publishes to Valkey Streams");
         }
         String url = blank(props.directUrl()) ? env.getRequiredProperty("spring.datasource.url") : props.directUrl();
+        // OPS-055: PgBouncer (transaction mode) listens on 6432. A session advisory lock or LISTEN taken through it is silently lost.
+        if (url.contains(":6432")) {
+            throw new IllegalStateException("the relay leader lock and LISTEN need a direct Postgres connection, not PgBouncer (:6432): set RELAY_DB_URL");
+        }
         String user = blank(props.directUsername()) ? env.getRequiredProperty("spring.datasource.username") : props.directUsername();
         String password = blank(props.directPassword()) ? env.getProperty("spring.datasource.password") : props.directPassword();
         return new OutboxRelay(jdbc, new StringRedisTemplate(factory), props, OutboxRelay.direct(url, user, password), meters);

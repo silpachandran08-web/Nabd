@@ -17,7 +17,10 @@
       "cell": "in",
       "service": "nabd-core",
       "data_class": "phi"
-     }
+     },
+     "multi_az": true,
+     "allocated_storage": 500,
+     "max_allocated_storage": 2048
     }
    }
   },

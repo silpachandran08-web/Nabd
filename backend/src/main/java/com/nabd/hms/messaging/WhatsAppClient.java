@@ -1,6 +1,7 @@
 package com.nabd.hms.messaging;
 
 import java.util.List;
+import java.util.Optional;
 
 /** Sends one approved template message; returns Meta's message id (wamid). Throws on rejection. */
 public interface WhatsAppClient {
@@ -20,4 +21,7 @@ public interface WhatsAppClient {
 
     /** Replaces a template's text (the fix path for a rejected one); Meta puts it back into review. */
     void editTemplate(String metaTemplateId, String headerText, String body, List<String> bodyExamples);
+
+    /** COM-003 reconciler: the template Meta holds under this name and language, if any. */
+    Optional<Submission> findTemplate(String metaName, String language);
 }

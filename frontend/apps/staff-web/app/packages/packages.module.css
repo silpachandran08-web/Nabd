@@ -148,7 +148,8 @@
 .input:focus,
 .select:focus,
 .textarea:focus {
-  outline: none;
+  outline: 2px solid var(--nb-focus-ring);
+  outline-offset: 2px;
   border-color: var(--nb-accent-500);
   box-shadow: 0 0 0 3px var(--nb-accent-tint);
 }

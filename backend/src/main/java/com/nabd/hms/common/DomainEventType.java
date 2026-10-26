@@ -21,10 +21,19 @@ public enum DomainEventType {
     PAYMENT_RECORDED("billing.payment.recorded.v1", "core/billing"),
     CONSENT_CHANGED("consent.changed.v1", "core/patient"),
     ORGANIZATION_CONFIG_CHANGED("organization.config.changed.v1", "core/organization"),
+    TENANT_REGION_PINNED("organization.tenant.region_pinned.v1", "core/organization"),
     ROLE_CHANGED("iam.role.changed.v1", "core/iam"),
     STAFF_CHANGED("iam.staff.changed.v1", "core/iam"),
     SESSION_REVOKED("iam.session.revoked.v1", "core/iam"),
-    CATALOGUE_CHANGED("billing.catalogue.changed.v1", "core/billing");
+    CATALOGUE_CHANGED("billing.catalogue.changed.v1", "core/billing"),
+    NOTIFICATION_REQUESTED("comms.notification.requested.v1", "core/messaging"),
+    NOTIFICATION_CANCELLED("comms.notification.cancelled.v1", "core/messaging"),
+    INBOUND_RECEIVED("comms.inbound.received.v1", "core/messaging"),
+    MESSAGE_STATUS_CHANGED("comms.message.status_changed.v1", "core/messaging"),
+    ORGANIZATION_IMPORT_COMPLETED("organization.import.completed.v1", "core/organization"),
+    DRUG_MASTER_VERSION_ACTIVATED("clinical.drug_master.version_activated.v1", "core/clinical"),
+    PLATFORM_ENTITLEMENTS_CHANGED("platform.entitlements.changed.v1", "core/platform"),
+    PRIVACY_NOTICE_PUBLISHED("organization.privacy_notice.published.v1", "core/organization");
 
     private final String type;
     private final String source;

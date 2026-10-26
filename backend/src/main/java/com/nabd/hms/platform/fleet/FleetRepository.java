@@ -22,7 +22,7 @@ class FleetRepository {
     }
 
     private static final String BASE_SELECT =
-            "SELECT t.id, t.slug, t.name, t.region, t.status, t.created_at, " +
+            "SELECT t.id, t.slug, t.name, t.region_code AS region, t.status, t.created_at, " +
                     "       b.name AS brand_name, o.name AS owner_name, o.email AS owner_email, m.privileged, m.enrolled " +
                     "FROM tenants t LEFT JOIN brands b ON t.brand_id = b.id LEFT JOIN owners o ON b.owner_id = o.id " +
                     // PLT-005: counts only, through a definer function (staff/roles are tenant-RLS; this is the operator plane)
@@ -38,7 +38,7 @@ class FleetRepository {
 
     /** Status+region only — the Fleet KPI grid's counts, cheaper than paging through every column. */
     List<String[]> listStatusesAndRegions() {
-        return jdbc.query("SELECT status, region FROM tenants", (rs, i) -> new String[]{rs.getString("status"), rs.getString("region")});
+        return jdbc.query("SELECT status, region_code AS region FROM tenants", (rs, i) -> new String[]{rs.getString("status"), rs.getString("region")});
     }
 
     private RowMapper<TenantSummary> mapper() {

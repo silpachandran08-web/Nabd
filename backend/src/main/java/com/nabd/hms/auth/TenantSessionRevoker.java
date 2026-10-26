@@ -38,7 +38,7 @@ class TenantSessionRevoker implements SessionRevocation.TenantRevoker {
                 events.publish(tenantId, DomainEventType.SESSION_REVOKED, staffId,
                         Map.of("staffId", staffId, "scope", "all_sessions", "reasonCode", reason, "status", "revoked"));
             }
-            log.warn("tenant {}: {} sessions revoked ({})", tenantId, staffIds.size(), reason);
+            log.warn("tenant {}: {} sessions revoked ({})", tenantId, staffIds.size(), reason); // log-phi-ok: revocation reason is a fixed lifecycle code
             return staffIds.size();
         });
     }

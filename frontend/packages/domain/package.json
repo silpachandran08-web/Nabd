@@ -3,14 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run --coverage"
   },
   "dependencies": {
-    "@nabd/api-client": "workspace:*"
+    "@nabd/api-client": "workspace:*",
+    "@nabd/i18n": "workspace:*"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "4.1.11",

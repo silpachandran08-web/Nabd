@@ -1,0 +1,20 @@
+# ACC-039: the Patient Access Edge builds, tests and ships on its own. Triggered only by its own paths, so a Core change never
+# rebuilds it and an Edge change never touches Core. Deploying the image to the India cell is Needs external action.
+name: patient-access-edge
+on:
+  pull_request:
+    paths: ['services/patient-access-edge/**', 'scripts/log-phi-scan.py', '.github/workflows/patient-access-edge.yml']
+  push:
+    branches: [main]
+    paths: ['services/patient-access-edge/**']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21", cache: maven }
+      - run: python3 scripts/log-phi-scan.py services/patient-access-edge/src/main/java
+      - name: Unit, Testcontainers (Postgres 16) and threat-model tests
+        run: mvn -B -f services/patient-access-edge/pom.xml verify

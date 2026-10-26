@@ -89,11 +89,14 @@ class DayCloseRepository {
                 tenantId, Date.valueOf(day));
     }
 
-    /** Same per-line rounding as CheckoutService.computeTotals, so the tax column adds up to the bills' tax. */
+    /** FIN-008: the tax column is the stored line taxes (the same figures as the bills); lines from before the tax engine fall back to the old per-line rounding. */
     List<DayCloseSummaryResponse.TaxBand> taxBands(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return jdbc.query("""
-                SELECT li.tax_rate_percent AS rate, SUM(li.line_total) AS taxable,
-                       SUM(ROUND(li.line_total * li.tax_rate_percent / 100, 2)) AS tax
+                SELECT li.tax_rate_percent AS rate,
+                       SUM(COALESCE(li.taxable_minor / power(10::numeric, currency_exponent(i.currency)), li.line_total)) AS taxable,
+                       SUM(CASE WHEN li.taxable_minor IS NULL THEN ROUND(li.line_total * li.tax_rate_percent / 100, 2)
+                                ELSE (SELECT COALESCE(SUM(t.amount_minor), 0) FROM invoice_line_taxes t
+                                       WHERE t.tenant_id = li.tenant_id AND t.line_id = li.id) / power(10::numeric, currency_exponent(i.currency)) END) AS tax
                 FROM invoice_line_items li JOIN invoices i ON i.id = li.invoice_id
                 WHERE i.tenant_id = ? AND i.created_at >= ? AND i.created_at < ?
                 GROUP BY li.tax_rate_percent ORDER BY li.tax_rate_percent
@@ -207,7 +210,7 @@ class DayCloseRepository {
     }
 
     Optional<String> region(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString(1), tenantId).stream().findFirst();
     }
 
     private static Timestamp ts(Instant i) {

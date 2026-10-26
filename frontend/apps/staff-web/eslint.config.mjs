@@ -2,6 +2,17 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import boundaries from "eslint-plugin-boundaries";
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import i18next from "eslint-plugin-i18next";
+
+// FEF-037: money and number formatting exists once, in @nabd/i18n (formatMoney / formatNumber / moneyFormatter).
+const MONEY_MESSAGE = "Use formatMoney / formatNumber / moneyFormatter from @nabd/i18n (ISO-4217 minor units, one grouping).";
+const MONEY_RULES = [
+  { selector: ":matches(NewExpression, CallExpression)[callee.object.name='Intl'][callee.property.name='NumberFormat']", message: MONEY_MESSAGE },
+  { selector: "CallExpression[callee.property.name='toLocaleString'][arguments.1.properties.0.key.name=/FractionDigits$/]", message: MONEY_MESSAGE },
+  { selector: "CallExpression[callee.property.name='toFixed'][callee.object.name=/^(amount|price|total|subtotal|fee|charge|balance|paid|due|tax|discount|money|cost|revenue|payment|outstanding)/i]", message: "Do not hand-round money with toFixed. " + MONEY_MESSAGE },
+  { selector: "CallExpression[callee.property.name='toFixed'][callee.object.type='MemberExpression'][callee.object.property.name=/^(amount|price|total|subtotal|fee|charge|balance|paid|due|tax|discount|money|cost|revenue|payment|outstanding)/i]", message: "Do not hand-round money with toFixed. " + MONEY_MESSAGE },
+];
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -15,11 +26,20 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "lint-fixtures/**", // FEF-012: must-fail samples, linted explicitly by tests/unit/s12-fef012-boundaries.test.mjs
   ]),
+  // FEF-027: jsx-a11y strict rule set (the plugin itself is already registered by eslint-config-next).
+  // Rules that still have pre-existing findings (a11y debt, FEF-027 report) stay warnings so they are listed but do not block; every other strict rule is an error.
+  { files: ["app/**/*.{ts,tsx}"], rules: { ...jsxA11y.flatConfigs.strict.rules,
+    ...Object.fromEntries(["label-has-associated-control", "no-autofocus", "click-events-have-key-events", "no-static-element-interactions",
+      "no-noninteractive-element-interactions", "no-noninteractive-element-to-interactive-role", "no-noninteractive-tabindex"].map((r) => [`jsx-a11y/${r}`, "warn"])) } },
   { rules: { "no-restricted-globals": ["error", { name: "atob", message: "Use decodeJwtPayload from app/lib/jwt.ts (UTF-8 safe)." }] } },
   { files: ["app/lib/jwt.ts"], rules: { "no-restricted-globals": "off" } },
+  { files: ["app/**/*.{ts,tsx}", "lint-fixtures/**/*.{ts,tsx}"], rules: { "no-restricted-syntax": ["error", ...MONEY_RULES] } },
+  // FEF-036: migrated folders/files may not carry a literal UI string in JSX; text comes from next-intl catalogues (packages/i18n/messages).
+  { files: ["app/TopBar.tsx", "app/LanguagePicker.tsx", "lint-fixtures/i18n/**/*.tsx"], plugins: { i18next },
+    rules: { "i18next/no-literal-string": ["error", { mode: "jsx-text-only", words: { exclude: ["[^a-zA-Z]+", "[A-Z_-]+", "^[⌘⌥⌃⇧]\\w*$"] } }] } },
   // FEF-011: dates and times in migrated files go through app/lib/clinicTime.ts (clinic timezone, one locale).
   { files: ["app/components/myday/**", "app/components/myschedule/**", "app/components/consult/FollowUpPanel.tsx", "app/components/consult/DocumentSheet.tsx"],
-    rules: { "no-restricted-syntax": ["error",
+    rules: { "no-restricted-syntax": ["error", ...MONEY_RULES,
       { selector: "CallExpression[callee.property.name=/^toLocale(Date|Time)String$/]", message: "Use formatClinicDate/formatClinicTime from app/lib/clinicTime.ts (clinic timezone)." },
       { selector: ":matches(NewExpression, CallExpression)[callee.object.name='Intl'][callee.property.name='DateTimeFormat']", message: "Use app/lib/clinicTime.ts; it is the only place that builds Intl.DateTimeFormat." },
     ] } },

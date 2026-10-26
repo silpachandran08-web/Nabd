@@ -1,0 +1,3 @@
+{
+  "patientsWaiting": "{n, plural, =0 {No patients waiting} one {# patient waiting} other {# patients waiting}}"
+}

@@ -5,7 +5,9 @@ import tools.jackson.databind.ObjectMapper;
 import com.nabd.hms.common.ClinicClock;
 import com.nabd.hms.common.OutboxEvent;
 import com.nabd.hms.common.OutboxEventHandler;
-import com.nabd.hms.messaging.WhatsAppMessageService;
+import com.nabd.hms.shared.notify.NotificationPort;
+import com.nabd.hms.shared.notify.NotificationPurpose;
+import com.nabd.hms.shared.notify.NotificationRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -58,13 +60,13 @@ final class BreakGlassOwnerNotifier {
     @Component
     static class WhatsApp implements OutboxEventHandler {
         private final BreakGlassRepository repo;
-        private final WhatsAppMessageService whatsApp;
+        private final NotificationPort notifications;
         private final ClinicClock clock;
         private final ObjectMapper mapper;
 
-        WhatsApp(BreakGlassRepository repo, WhatsAppMessageService whatsApp, ClinicClock clock, ObjectMapper mapper) {
+        WhatsApp(BreakGlassRepository repo, NotificationPort notifications, ClinicClock clock, ObjectMapper mapper) {
             this.repo = repo;
-            this.whatsApp = whatsApp;
+            this.notifications = notifications;
             this.clock = clock;
             this.mapper = mapper;
         }
@@ -81,8 +83,11 @@ final class BreakGlassOwnerNotifier {
             String time = when(clock, e, p);
             for (BreakGlassRepository.Owner o : repo.owners(e.tenantId())) {
                 if (o.phone() != null && !o.phone().isBlank()) {
-                    // throws if the tenant has no approved emergency_access_used template: the outbox retries, then dead-letters visibly
-                    whatsApp.queueTemplate(null, o.phone(), BreakGlassPolicy.WHATSAPP_TEMPLATE, "en", List.of(name, time));
+                    // COM-004: one request per owner and grant (the dedupe key makes the outbox retry harmless). Throws if the tenant
+                    // has no approved emergency_access_used template: the outbox retries, then dead-letters visibly
+                    notifications.request(new NotificationRequest(NotificationPurpose.EMERGENCY_ACCESS_USED,
+                            "break_glass_grant", UUID.fromString(p.path("grantId").asString()), null, o.phone(), "en", List.of(name, time),
+                            null, null, null, "break-glass:" + p.path("grantId").asString() + ":" + o.id()));
                 }
             }
         }

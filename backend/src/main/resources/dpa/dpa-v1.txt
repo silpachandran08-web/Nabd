@@ -1,0 +1,13 @@
+# Data Processing Agreement
+DRAFT TEXT: pending legal review. Not valid as a contract until counsel has approved it for this market.
+Between {{CLINIC}} (the {{CONTROLLER}}) and Nabd (the {{PROCESSOR}}).
+## In plain words
+- {{CLINIC}} decides why and how patient data is used. Nabd only processes it to run the service, on {{CLINIC}}'s instructions.
+- Nabd keeps patient data confidential and secured, and tells {{CLINIC}} about incidents that affect it.
+- Nabd uses only the sub-processors listed below and tells {{CLINIC}} before adding another.
+- When the service ends, Nabd returns or deletes the data as {{CLINIC}} instructs, unless the law requires it to be kept.
+- Until this agreement is accepted and a plan is chosen, {{CLINIC}} can use the demo clinic only: no real patient records.
+## Sub-processors
+{{SUBPROCESSORS}}
+## Applicable law
+{{LAW}}

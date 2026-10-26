@@ -1,6 +1,7 @@
 package com.nabd.hms.platform.provisioning;
 
 import tools.jackson.databind.ObjectMapper;
+import com.nabd.hms.common.CatalogueTemplates;
 import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.common.TenantContext;
 import com.nabd.hms.common.WabaProvisioningGateway;
@@ -41,17 +42,24 @@ class ProvisioningStepRunner {
     private final ProvisioningRepository repo;
     private final TenantContext tenantContext;
     private final WabaProvisioningGateway wabaGateway;
+    private final CatalogueTemplates catalogueTemplates;
     private final ObjectMapper objectMapper;
     private final TenantLifecycleService lifecycleService;
     private final StaffService staffService;
     private final String frontendBaseUrl;
     private final OwnerService ownerService;
+    private final com.nabd.hms.common.EventPublisher events;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
     ProvisioningStepRunner(ProvisioningRepository repo, TenantContext tenantContext,
                             WabaProvisioningGateway wabaGateway, ObjectMapper objectMapper,
                             TenantLifecycleService lifecycleService, StaffService staffService,
                             @Value("${app.frontend-base-url}") String frontendBaseUrl,
-                            OwnerService ownerService) {
+                            OwnerService ownerService, com.nabd.hms.common.EventPublisher events,
+                            com.nabd.hms.organization.api.RegionRules regions, CatalogueTemplates catalogueTemplates) {
+        this.catalogueTemplates = catalogueTemplates;
+        this.events = events;
+        this.regions = regions;
         this.repo = repo;
         this.tenantContext = tenantContext;
         this.wabaGateway = wabaGateway;
@@ -93,6 +101,7 @@ class ProvisioningStepRunner {
             }
             case "provision_whatsapp" -> {
                 wabaGateway.provisionNumber(job.tenantSlug());
+                catalogueTemplates.instantiateDefaults(job.createdTenantId(), job.region()); // COM-012: queued; submitted in the background
                 yield StepResult.NONE;
             }
             case "verify_invite_owner" -> inviteOwner(job);
@@ -111,8 +120,13 @@ class ProvisioningStepRunner {
             case "seed_masters" -> undoSeedMasters(job);
             case "create_tenant" -> undoCreateTenant(job);
             case "verify_invite_owner" -> undoInviteOwner(job);
-            case "migrate_schema", "provision_whatsapp" -> {
-                // nothing persisted by run() for these steps — see the comments there
+            case "migrate_schema" -> {
+                // nothing persisted by run() for this step — see the comment there
+            }
+            case "provision_whatsapp" -> {
+                if (job.createdTenantId() != null) {
+                    catalogueTemplates.removeInstantiated(job.createdTenantId()); // COM-012: queued catalogue rows reference the tenant
+                }
             }
             case "go_live" -> {
                 // go_live is structurally the last step — nothing can fail after it to trigger an
@@ -259,6 +273,9 @@ class ProvisioningStepRunner {
             throw new IllegalStateException("go_live ran before create_tenant recorded a tenant id");
         }
         lifecycleService.transition(tenantId, "trialing", job.requestedBy(), "provisioning completed", null);
+        // OPS-061: the region is now immutable; the control plane records the tenant's cell routing from this
+        events.publish(tenantId, com.nabd.hms.common.DomainEventType.TENANT_REGION_PINNED, tenantId,
+                java.util.Map.of("regionCode", job.region(), "cell", regions.region(job.region()).cell()));
     }
 
     private String writeGrantsJson(List<ModuleGrant> grants) {

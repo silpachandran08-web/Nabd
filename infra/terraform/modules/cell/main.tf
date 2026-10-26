@@ -31,4 +31,9 @@ module "aws" {
   dns_zone                = var.dns_zone
   pitr_lag_alarm_seconds  = var.pitr_lag_alarm_seconds
   valkey_node_type        = var.valkey_node_type
+
+  # OPS-055
+  pgbouncer_ami_id            = var.pgbouncer_ami_id
+  db_max_allocated_storage_gb = var.db_max_allocated_storage_gb
+  pgbouncer_app_pool_size     = var.pgbouncer_app_pool_size
 }

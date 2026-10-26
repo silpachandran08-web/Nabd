@@ -29,6 +29,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,6 +54,8 @@ abstract class RbacMatrixTestBase extends ApiTestBase {
     /** Detail written only by SecurityConfig.forbidden: a 403 from the permission layer, not a business-rule 403. */
     static final String SECURITY_403 = "You do not have permission to do this.";
     private static final Pattern AUTHORITY_CALL = Pattern.compile("has(?:Any)?Authority\\(([^)]*)\\)");
+    private static final Pattern SELF_AND = Pattern.compile(
+            "hasAuthority\\('([^']+)'\\) and \\(authentication\\.name == #id\\.toString\\(\\) or hasAuthority\\('([^']+)'\\)\\)");
     private static final Pattern QUOTED = Pattern.compile("'([^']+)'");
     static final String ALLOW = "allow", DENY_403 = "deny-403", DENY_401 = "deny-401";
 
@@ -156,6 +159,9 @@ abstract class RbacMatrixTestBase extends ApiTestBase {
      * "or authentication.name == #id" self clause (ScheduleController) never matches a random id, so it adds nothing.
      */
     static Set<String> requiredAuthorities(String expression) {
+        // "A and (authentication.name == #id.toString() or B)" (DoctorSessionController): a random id never matches the self clause, so A and B are both needed; one "A&B" entry = all of.
+        Matcher self = SELF_AND.matcher(expression);
+        if (self.matches()) return Set.of(self.group(1) + "&" + self.group(2));
         if (expression.contains(" and ") || expression.contains("&&") || expression.contains("!")) {
             throw new IllegalStateException("OPS-042 cannot model this @PreAuthorize yet: " + expression);
         }
@@ -173,7 +179,7 @@ abstract class RbacMatrixTestBase extends ApiTestBase {
         rolePermissions.forEach((role, perms) -> {
             for (Op op : ops) {
                 String expected = !op.plane().equals(rolePlane) ? DENY_401
-                        : op.anyOf().stream().anyMatch(perms::contains) ? ALLOW : DENY_403;
+                        : op.anyOf().stream().anyMatch(a -> Arrays.stream(a.split("&")).allMatch(perms::contains)) ? ALLOW : DENY_403;
                 out.add(new Case(role, op, expected));
             }
         });

@@ -1,16 +1,14 @@
 "use client";
 
-import { decodeJwtPayload } from "../lib/jwt";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Dialog from "../components/ui/Dialog";
 import Icon, { type IconName } from "../components/ui/Icon";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { can } from "../lib/permissions";
 import { getIdentity } from "../lib/session";
-import { isPatientNotFound, useClinicalContext } from "../components/consult/clinical";
+import { useClinicalContext } from "../components/consult/clinical";
 import AllergyRegister from "../components/consult/AllergyRegister";
 import ConflictDialog from "../components/consult/ConflictDialog";
 import ConsultTimer from "../components/consult/ConsultTimer";
@@ -26,6 +24,7 @@ import PackageSessionCard from "../components/consult/PackageSessionCard";
 import PreConsultDialog from "../components/consult/PreConsultDialog";
 import RxWarnings, { OverrideDialog, WARNING_TITLE } from "../components/consult/RxWarnings";
 import { useSafetyDictionarySource } from "../components/consult/safetyDictionary";
+import { useDrugKbAttribution } from "../components/consult/drugKnowledgeBase";
 import RxPad from "../components/consult/RxPad";
 import FavouriteRxSetsPanel from "../components/consult/FavouriteRxSetsPanel";
 import SafetyStrip from "../components/consult/SafetyStrip";
@@ -38,23 +37,26 @@ import {
 import VitalsCard from "../components/consult/VitalsCard";
 import {
   age, DONE_STATUSES, initials, minutesSince, rxItemLine, WAITING_STATUSES,
-  type PatientDetail, type Prescription, type PrescriptionItem, type Problem, type QueueEntry, type Row, type RxWarning,
+  type AuthedFetch, type PatientDetail, type Prescription, type PrescriptionItem, type Problem, type QueueEntry, type Row, type RxWarning,
 } from "../components/consult/shared";
 import p from "../components/consult/consultParts.module.css";
 import styles from "./consult.module.css";
-import { apiFetch, goLogin } from "../lib/apiClient";
+import { useQueryClient } from "@tanstack/react-query";
+import { STALE } from "@nabd/api-client/queries";
+import type { NoteAmendmentResponse, NoteResponse, StaffRosterEntry, TransferTargetResponse } from "@nabd/api-client/generated";
+import { api, ApiError } from "../lib/api";
+import { doctorQueueQuery, key, queueQuery } from "../lib/query";
+import { responseFetch } from "../lib/responseFetch";
+import { type Need, dropVisitReads, FRESH_MS, loadPatients, prefetchVisit, selfStaffId, visitIsWarm, visitReadKey, visitRead } from "../lib/doctorQueries";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
-type TransferTarget = { departmentId: string; departmentName: string; doctors: { id: string; name: string }[] };
-type Note = {
-  id: string; queueEntryId: string; patientId: string; doctorId: string;
-  subjective: string | null; objective: string | null; assessment: string | null; plan: string | null;
-  diagnosis: string | null; status: string; signedAt: string | null; updatedAt: string;
-};
+type TransferTarget = Need<Omit<TransferTargetResponse, "doctors">, "departmentId" | "departmentName"> & { doctors: Need<StaffRosterEntry, "id" | "name">[] };
+type Note = Need<Omit<NoteResponse, "subjective" | "objective" | "assessment" | "plan" | "diagnosis" | "signedAt">, "id" | "queueEntryId" | "patientId" | "doctorId" | "status" | "updatedAt">
+  & Record<"subjective" | "objective" | "assessment" | "plan" | "diagnosis" | "signedAt", string | null>;
 type NoteDraft = NoteFields;
-type NoteAmendment = { id: string; amendedBy: string; reason: string; diagnosis: string | null; createdAt: string };
+type NoteAmendment = Need<Omit<NoteAmendmentResponse, "diagnosis">, "id" | "amendedBy" | "reason" | "createdAt"> & { diagnosis: string | null };
 type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 type Step = "reason" | "examine" | "assess" | "plan" | "close";
 
@@ -78,7 +80,6 @@ function normalizeRxItem(i: PrescriptionItem): PrescriptionItem {
   };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/v1";
 const AUTOSAVE_MS = 10_000;
 const LOCAL_DRAFT_MS = 800;
 const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
@@ -98,10 +99,6 @@ function StatusBadge({ status }: { status: string }) {
   return <StatusPill tone={t.tone} icon={t.icon} label={queueStatusLabel(status)} />;
 }
 
-function decodeJwt(token: string): Record<string, unknown> {
-  return decodeJwtPayload(token) ?? {};
-}
-
 function toFields(n: Note): NoteFields {
   return { subjective: n.subjective ?? "", objective: n.objective ?? "", assessment: n.assessment ?? "", plan: n.plan ?? "", diagnosis: n.diagnosis ?? "" };
 }
@@ -111,7 +108,7 @@ const isStep = (v: string | null): v is Step => STEPS.some((s) => s.id === v);
 type StatusFilter = "all" | "waiting" | "in_consult" | "done";
 
 export default function ConsultPage() {
-  const router = useRouter();
+  const qc = useQueryClient();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +188,8 @@ export default function ConsultPage() {
   const needsServerCheckRef = useRef(false); // compare with the server copy before the next PATCH
   const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openSeqRef = useRef(0);
+  const openAbortRef = useRef<AbortController | null>(null);
+  const openIdRef = useRef<string | null>(null);
   const deepLinkRef = useRef<{ entry: string; step: Step | null } | null>(null);
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -198,89 +197,57 @@ export default function ConsultPage() {
     conflictRef.current = conflict;
   }, [dirty, note, conflict]);
 
-  const authedFetch = useCallback(
-    async (path: string, init?: RequestInit) => {
-      const token = localStorage.getItem("nabd_access_token");
-      if (!token) {
-        goLogin();
-        return null;
-      }
-      const res = await apiFetch(path, {
-        ...init,
-        headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (res.status === 401) {
-        localStorage.removeItem("nabd_access_token");
-        goLogin();
-        return null;
-      }
-      return res;
-    },
-    [router]
-  );
+  // FEF-016: every consult call goes through the shared api client (token, refresh, timeout, retry, Idempotency-Key).
+  const authedFetch = useCallback<AuthedFetch>(async (path, init) => {
+    const res = await responseFetch(path, init);
+    if (init?.method && init.method !== "GET" && path.startsWith("/clinical/")) dropVisitReads(qc); // a queue move leaves the note and Rx untouched
+    return res;
+  }, [qc]);
 
   const { ctx, reload: reloadCtx } = useClinicalContext(authedFetch, unavailable ? null : activeEntry?.patientId ?? null, activeEntry?.id ?? null);
   const rxSource = useSafetyDictionarySource(authedFetch);
+  const drugKb = useDrugKbAttribution(authedFetch);
 
   const load = useCallback(async (which: "mine" | "all" = "mine") => {
     setLoading(true);
     setError(null);
     setForbidden(false);
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) {
-      goLogin();
-      return;
-    }
-    const self = String(decodeJwt(token).sub ?? "");
+    const self = selfStaffId();
+    if (!self) return; // signed out: the shell sends the user to sign-in
     setSelfId(self);
     // LIVE-09: no queue:view, no request; same "no access" state the 403 used to produce.
     if (!can("queue:view")) { setForbidden(true); setLoading(false); return; }
     try {
-      const res = await authedFetch(which === "mine" ? `/queue?doctorId=${self}` : "/queue");
-      if (!res) return;
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load today's queue. Try again.");
-        return;
-      }
-      const entries: QueueEntry[] = await res.json();
-      // One patient request per distinct patient (not per row): the detail carries the allergy,
-      // chronic-condition and package flags shown in the list. There is no batch endpoint yet.
-      const byPatient = new Map<string, Promise<PatientDetail | null>>();
-      for (const e of entries) {
-        if (can("patients:view") && !byPatient.has(e.patientId)) {
-          byPatient.set(e.patientId, authedFetch(`/patients/${e.patientId}`).then(async (r) => (r?.ok ? ((await r.json()) as PatientDetail) : null)).catch(() => null));
-        }
-      }
-      const withNames = await Promise.all(entries.map(async (e): Promise<Row> => {
-        const patient = (await byPatient.get(e.patientId)) ?? null;
+      const entries = await qc.fetchQuery(which === "mine" ? { ...doctorQueueQuery(self), staleTime: 2000 } : queueQuery()) as QueueEntry[];
+      // One batched read for every distinct patient (the detail carries the allergy, chronic-condition and package
+      // flags shown in the list); patients already in the cache (prefetched, or read by My Day) are not asked for again.
+      const details = can("patients:view") ? await loadPatients(qc, entries.map((e) => e.patientId)) : new Map<string, PatientDetail>();
+      setRows(entries.map((e): Row => {
+        const patient = details.get(e.patientId) ?? null;
         return { ...e, patientName: patient?.name ?? "Unknown patient", patient };
       }));
-      setRows(withNames);
       // One flow lookup per department, so "Start consultation" is offered exactly where the server
       // will accept the move. An unreadable flow falls back to the default pipeline (vitals first).
       const depts = [...new Set(entries.map((e) => e.departmentId))];
       const flows = await Promise.all(depts.map(async (d) => {
         try {
-          const r = await authedFetch(`/departments/${d}/flow`);
-          if (!r?.ok) return [d, DEFAULT_START_STATUS] as const;
-          const steps: { stepType: string }[] = await r.json();
+          const steps = await qc.fetchQuery({ queryKey: key("dept-flow", { departmentId: d }), staleTime: STALE.departments, queryFn: ({ signal }) => api.get<{ stepType: string }[]>(`/departments/${d}/flow`, { signal }) });
           return [d, statusBeforeConsult(statusSequence(steps.map((x) => x.stepType)))] as const;
         } catch {
           return [d, DEFAULT_START_STATUS] as const;
         }
       }));
       setStartStatus(Object.fromEntries(flows));
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) return;
+      if (e instanceof ApiError && e.status === 403) setForbidden(true);
+      else if (e instanceof ApiError) setError("Couldn't load today's queue. Try again.");
+      else setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
       setNow(Date.now());
     }
-  }, [authedFetch, router]);
+  }, [qc]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -428,6 +395,17 @@ export default function ConsultPage() {
     return r.doctorId === selfId && from !== null && r.status === from && can("queue:edit");
   };
 
+  // FEF-016: point at (hover / focus / arrow key) a visit the doctor can start or resume and its context is read ahead.
+  function warm(r: Row) {
+    if (r.doctorId === selfId) prefetchVisit(qc, r.id, r.patientId, can("clinical:view"));
+  }
+  function rowArrows(e: React.KeyboardEvent<HTMLTableRowElement>) {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const sib = (e.key === "ArrowDown" ? e.currentTarget.nextElementSibling : e.currentTarget.previousElementSibling) as HTMLElement | null;
+    const btn = sib?.querySelector("button");
+    if (btn) { e.preventDefault(); btn.focus(); }
+  }
+
   function openRow(row: Row) {
     setPreviewError(null);
     if (row.status === "in_consult" && row.doctorId === selfId) void openConsult(row);
@@ -469,6 +447,13 @@ export default function ConsultPage() {
   async function openConsult(row: Row, wantStep?: Step) {
     const seq = ++openSeqRef.current;
     const stale = () => seq !== openSeqRef.current;
+    // AC: opening another visit cancels the previous visit's reads, so a slow answer can never land on this one.
+    openAbortRef.current?.abort();
+    for (const w of ["note", "rx", "sign-authority"] as const) if (openIdRef.current) void qc.cancelQueries({ queryKey: visitReadKey(w, openIdRef.current), exact: true });
+    const ctl = new AbortController();
+    openAbortRef.current = ctl;
+    openIdRef.current = row.id;
+    const signal = ctl.signal;
     setActiveEntry(row);
     setActivePatient(row.patient);
     setStep(wantStep ?? "reason");
@@ -503,35 +488,41 @@ export default function ConsultPage() {
     needsServerCheckRef.current = false;
 
     try {
-      const pRes = can("patients:view") ? await authedFetch(`/patients/${row.patientId}`) : null;
-      if (stale()) return;
-      if (pRes?.ok) setActivePatient(await pRes.json());
+      // A prefetched visit (hover / focus on the queue) is served from the cache; otherwise this reads it.
+      const warm = visitIsWarm(qc, row.id);
+      if (can("patients:view")) {
+        const got = await loadPatients(qc, [row.patientId], signal);
+        if (stale()) return;
+        const fresh = got.get(row.patientId);
+        if (fresh) setActivePatient(fresh);
+      }
 
-      const nRes = await authedFetch(`/clinical/notes/${row.id}`);
+      const n = await visitRead<Note>(qc, "note", row.id, FRESH_MS);
       if (stale()) return;
+      if (n.status === 401) return;
       let server: Note | null = null;
-      if (nRes?.status === 200) {
-        server = await nRes.json();
-        baseUpdatedRef.current = server!.updatedAt;
-        setNote(toFields(server!));
-        setNoteStatus(server!.status as "draft" | "signed");
-        setSignedAt(server!.signedAt);
-        if (server!.status === "signed") {
-          const aRes = await authedFetch(`/clinical/notes/${row.id}/amendments`);
+      if (n.status === 200) {
+        server = n.body!;
+        baseUpdatedRef.current = server.updatedAt;
+        setNote(toFields(server));
+        setNoteStatus(server.status as "draft" | "signed");
+        setSignedAt(server.signedAt);
+        // A cached copy may be up to FRESH_MS old: the first autosave compares with the server before it writes (unchanged conflict check).
+        if (warm) needsServerCheckRef.current = true;
+        if (server.status === "signed") {
+          const aRes = await authedFetch(`/clinical/notes/${row.id}/amendments`, { signal });
           if (stale()) return;
           if (aRes?.ok) setAmendments(await aRes.json());
         }
-      } else if (nRes && await isPatientNotFound(nRes)) {
-        if (stale()) return;
+      } else if (n.status === 404 && typeof n.problem?.type === "string" && n.problem.type.endsWith("/patient-not-found")) {
         // No patient details, no further reads, no retry: the answer will not change on its own.
         setActivePatient(null);
         setUnavailable(true);
         return;
-      } else if (nRes && nRes.status !== 404) {
+      } else if (n.status !== 404) {
         noteLoadRef.current = "error";
         setNoteLoad("error");
       }
-      if (!nRes) return;
       if (noteLoadRef.current === "loading") { noteLoadRef.current = "ok"; setNoteLoad("ok"); }
 
       // A local draft means the last save never reached the server (offline, crash, reload).
@@ -559,20 +550,20 @@ export default function ConsultPage() {
         }
       }
 
-      const rRes = await authedFetch(`/clinical/prescriptions/${row.id}`);
+      const rRes = await visitRead<Prescription>(qc, "rx", row.id, FRESH_MS);
       if (stale()) return;
-      if (rRes?.status === 200) {
-        const rx: Prescription = await rRes.json();
+      if (rRes.status === 200) {
+        const rx = rRes.body!;
         setRxItems(rx.items.length > 0 ? rx.items.map(normalizeRxItem) : [{ ...BLANK_RX_ITEM }]);
         setRxStatus(rx.status as "draft" | "signed");
       } else {
         setRxItems([{ ...BLANK_RX_ITEM }]);
       }
-      const aRes = await authedFetch(`/clinical/prescriptions/${row.id}/signing-authority`);
+      const aRes = await visitRead<SignAuthority>(qc, "sign-authority", row.id, FRESH_MS);
       if (stale()) return;
-      setSignAuthority(aRes?.status === 200 ? ((await aRes.json()) as SignAuthority) : "error");
+      setSignAuthority(aRes.status === 200 ? aRes.body! : "error");
     } catch {
-      if (!stale()) {
+      if (!stale() && !signal.aborted) {
         if (noteLoadRef.current === "loading") { noteLoadRef.current = "error"; setNoteLoad("error"); }
         setShellError("Couldn't reach the server. Check your connection, then reopen the visit.");
       }
@@ -1205,6 +1196,7 @@ export default function ConsultPage() {
                     </div>
                   ))}
                   {rxStatus !== "signed" && <button type="button" className={styles.backBtn} onClick={addRxItem}>+ Add drug</button>}
+                  {drugKb && <p data-testid="drug-kb-attribution" style={{ fontSize: "12px", color: "var(--nb-text-tertiary)", margin: "var(--nb-space-8) 0 0" }}>{drugKb}</p>}
 
                   {!(pat && age(pat.dob) >= 18) && <div className={styles.previousMeds}>
                     <DoseCalculator key={activeEntry.patientId} authedFetch={authedFetch} patientId={activeEntry.patientId} queueEntryId={activeEntry.id} canRecordWeight={can("clinical:edit")} onWeightRecorded={reloadCtx} />
@@ -1506,7 +1498,7 @@ export default function ConsultPage() {
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
-                <tr><th>Patient</th><th className={styles.hideNarrow}>Visit type</th><th>Clinical flags</th><th className={styles.hideNarrow}>Wait · arrival</th><th>Status</th><th><span className={p.srOnly}>Action</span></th></tr>
+                <tr><th scope="col">Patient</th><th scope="col" className={styles.hideNarrow}>Visit type</th><th scope="col">Clinical flags</th><th scope="col" className={styles.hideNarrow}>Wait · arrival</th><th scope="col">Status</th><th scope="col"><span className={p.srOnly}>Action</span></th></tr>
               </thead>
               <tbody>
                 {visible.map((r) => {
@@ -1515,7 +1507,7 @@ export default function ConsultPage() {
                   const mine = r.doctorId === selfId;
                   const pt = r.patient;
                   return (
-                    <tr key={r.id}>
+                    <tr key={r.id} onMouseEnter={() => warm(r)} onFocus={() => warm(r)} onKeyDown={rowArrows}>
                       <td className={styles.token}>
                         #{r.tokenNumber} {r.patientName}
                         <span className={styles.subline}>{[pt ? `${age(pt.dob)} y` : null, r.presentingComplaint?.trim() || null].filter(Boolean).join(" · ") || "No reason recorded"}</span>

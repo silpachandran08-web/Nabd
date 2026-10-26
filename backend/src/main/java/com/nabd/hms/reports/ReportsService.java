@@ -44,6 +44,7 @@ import static com.nabd.hms.reports.ReportsModels.StaffCollectionRow;
 @Service
 public class ReportsService {
 
+    private static final int MAX_RANGE_DAYS = 365;
     private static final int NO_SHOW_RISK_THRESHOLD = 2;
     private static final int NO_SHOW_LOOKBACK_DAYS = 90;
     private static final String NO_SHOW_RULE =
@@ -61,8 +62,11 @@ public class ReportsService {
     private final ClinicClock clock;
 
     private final ActorDirectory actors;
+    private final com.nabd.hms.organization.api.RegionRules regions;
 
-    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext, ClinicClock clock, ActorDirectory actors) {
+    ReportsService(ReportsRepository repo, StaffService staffService, AuditService auditService, TenantContext tenantContext, ClinicClock clock, ActorDirectory actors,
+                    com.nabd.hms.organization.api.RegionRules regions) {
+        this.regions = regions;
         this.actors = actors;
         this.clock = clock;
         this.repo = repo;
@@ -72,14 +76,15 @@ public class ReportsService {
     }
 
     /** Owner home — one call for the whole "Today at a glance" page, all on the clinic's own day. */
-    @Transactional
-    public OverviewResponse overview(UUID tenantId) {
+    @Transactional(readOnly = true)
+    public OverviewResponse overview(UUID tenantId, LocalDate from, LocalDate to) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
         LocalDate today = clock.today(zone);
         Instant dayStart = today.atStartOfDay(zone).toInstant();
         Instant dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant();
         int checkoutPending = repo.checkoutPendingOn(tenantId, today);
+        OverviewResponse.RangeTotals range = from == null && to == null ? null : rangeTotals(tenantId, zone, today, from, to);
         return new OverviewResponse(
                 today,
                 repo.visitsOn(tenantId, today),
@@ -90,10 +95,32 @@ public class ReportsService {
                 repo.paymentSplitOn(tenantId, dayStart, dayEnd),
                 new OverviewResponse.DayClose(repo.unbilledConsultationsOn(tenantId, today), checkoutPending, repo.dayClosed(tenantId, today)),
                 repo.activeStaffSince(tenantId, dayStart, today),
-                repo.staffSummary(tenantId));
+                repo.staffSummary(tenantId), range);
     }
 
-    @Transactional
+    /** OPS-010: closed past days come from the rollups, today (when in range) from a live delta bounded to today. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    private OverviewResponse.RangeTotals rangeTotals(UUID tenantId, ZoneId zone, LocalDate today, LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.plusDays(MAX_RANGE_DAYS).isBefore(to)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "range-too-large", "Range too large", "Pick at most " + (MAX_RANGE_DAYS + 1) + " days.");
+        }
+        Range r = range(tenantId, 0, from, to);
+        LocalDate lastClosed = r.to().isBefore(today) ? r.to() : today.minusDays(1);
+        OverviewResponse.RangeTotals t = repo.rollupTotals(tenantId, r.from(), lastClosed);
+        if (r.to().isBefore(today)) {
+            return new OverviewResponse.RangeTotals(r.from(), r.to(), t.visits(), t.completed(), t.noShows(), t.billed(), t.collected(), t.byMethod(), t.packagesSold(), t.asOf());
+        }
+        Instant start = today.atStartOfDay(zone).toInstant();
+        Instant end = today.plusDays(1).atStartOfDay(zone).toInstant();
+        var v = repo.visitsOn(tenantId, today);
+        var byMethod = new java.util.TreeMap<>(t.byMethod());
+        repo.paymentSplitOn(tenantId, start, end).forEach(p -> byMethod.merge(p.method(), p.amount(), BigDecimal::add));
+        return new OverviewResponse.RangeTotals(r.from(), r.to(), t.visits() + v.total(), t.completed() + v.completed(),
+                t.noShows() + repo.bookingsAndNoShows(tenantId, start, end, clock.now())[1], t.billed().add(repo.billedOn(tenantId, start, end)),
+                t.collected().add(repo.collectedOn(tenantId, start, end)), byMethod, t.packagesSold() + repo.packagesSoldOn(tenantId, start, end), clock.now());
+    }
+
+    @Transactional(readOnly = true)
     public DailyMoneyResponse dailyMoney(UUID tenantId) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
@@ -108,6 +135,7 @@ public class ReportsService {
     public record Range(LocalDate from, LocalDate to) {
     }
 
+    @Transactional(readOnly = true)
     public Range range(UUID tenantId, Integer days, LocalDate from, LocalDate to) {
         LocalDate today = clock.today(tenantId);
         if (from == null && to == null) {
@@ -123,7 +151,7 @@ public class ReportsService {
     }
 
     /** Reports → Today's money for a period of clinic days (inclusive). */
-    @Transactional
+    @Transactional(readOnly = true)
     public MoneyResponse money(UUID tenantId, Range r) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
@@ -131,9 +159,9 @@ public class ReportsService {
         Instant start = r.from().atStartOfDay(zone).toInstant();
         Instant end = r.to().plusDays(1).atStartOfDay(zone).toInstant();
         boolean includesToday = !today.isBefore(r.from()) && !today.isAfter(r.to());
-        boolean ksa = "KSA".equals(repo.region(tenantId).orElse("IN"));
+        var region = regions.region(repo.region(tenantId).orElse("IN"));
         int[] bookings = repo.bookingsAndNoShows(tenantId, start, end, clock.now());
-        return new MoneyResponse(r.from(), r.to(), includesToday, ksa ? "SAR" : "INR", ksa ? "VAT" : "GST",
+        return new MoneyResponse(r.from(), r.to(), includesToday, region.currency(), region.taxRegime(),
                 repo.collectedOn(tenantId, start, end), repo.invoiceCountOn(tenantId, start, end),
                 repo.taxBilledBetween(tenantId, start, end), bookings[1], bookings[0],
                 includesToday ? repo.waitingNow(tenantId, today) : null,
@@ -141,7 +169,7 @@ public class ReportsService {
     }
 
     /** OWN-026 Reports → Packages for a period of clinic days (inclusive). No revenue recognition split. */
-    @Transactional
+    @Transactional(readOnly = true)
     public PackagesReportResponse packages(UUID tenantId, Range r) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId);
@@ -152,7 +180,7 @@ public class ReportsService {
                 repo.expiredPackagesWithValue(tenantId, r.from(), r.to(), clock.today(zone)));
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<SourceBreakdownResponse> sourceBreakdown(UUID tenantId, Range r) {
         tenantContext.set(tenantId);
         long untagged = repo.untaggedVisits(tenantId, r.from(), r.to());
@@ -161,7 +189,7 @@ public class ReportsService {
     }
 
     /** NB-231: same row-scoping convention as NB-051 — "own_patients_only" staff see only their own row. */
-    @Transactional
+    @Transactional(readOnly = true)
     public List<StaffPerformanceResponse> staffPerformance(UUID tenantId, UUID callerStaffId, Range r) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
@@ -175,7 +203,7 @@ public class ReportsService {
     }
 
     /** NB-231: the access rule stated on the surface, same convention as NB-235's echoed rule text. */
-    @Transactional
+    @Transactional(readOnly = true)
     public StaffPerformanceReport staffPerformanceReport(UUID tenantId, UUID callerStaffId, Range r) {
         tenantContext.set(tenantId);
         CallerInfo caller = staffService.getCallerInfo(tenantId, callerStaffId);
@@ -185,7 +213,7 @@ public class ReportsService {
         return new StaffPerformanceReport(scopeNote, staffPerformance(tenantId, callerStaffId, r));
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public RetentionResponse retention(UUID tenantId) {
         tenantContext.set(tenantId);
         int totalPatients = repo.totalActivePatients(tenantId);
@@ -197,7 +225,7 @@ public class ReportsService {
         return new RetentionResponse(totalPatients, repeatPatients, round1(repeatRate), round1(avgVisits));
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public NoShowRiskResponse noShowRisk(UUID tenantId) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
@@ -210,7 +238,7 @@ public class ReportsService {
 
     /** NB-233: threshold is a request param, not a persisted setting — no clinic-settings store for
      * report thresholds exists, and a per-request value is genuinely "configurable" without one. */
-    @Transactional
+    @Transactional(readOnly = true)
     public BillingLeakageResponse billingLeakage(UUID tenantId, BigDecimal thresholdAmount) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days
@@ -227,7 +255,7 @@ public class ReportsService {
 
     /** NB-236: Owner-only, gated the same as every other endpoint in this Owner-scoped controller —
      * accessNote states that in the response per the ticket's "printed on the surface" bar. */
-    @Transactional
+    @Transactional(readOnly = true)
     public DoctorPunctualityResponse doctorPunctuality(UUID tenantId) {
         tenantContext.set(tenantId);
         ZoneId zone = clock.zone(tenantId); // report days are the clinic's days

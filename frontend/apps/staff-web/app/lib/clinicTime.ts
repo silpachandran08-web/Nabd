@@ -5,7 +5,7 @@
 
 export const CLINIC_LOCALE = "en-GB";
 
-/** Used only when tenants.timezone is null or unusable. Backend regions are IN and KSA; AE/SA/QA are the Gulf codes. */
+/** Used only when tenants.timezone is null or unusable. Backend regions (regions table): IN, AE, SA, QA. KSA is a legacy alias for tokens issued before OPS-061. */
 export const REGION_DEFAULT_TZ: Record<string, string> = {
   IN: "Asia/Kolkata", AE: "Asia/Dubai", SA: "Asia/Riyadh", KSA: "Asia/Riyadh", QA: "Asia/Qatar",
 };

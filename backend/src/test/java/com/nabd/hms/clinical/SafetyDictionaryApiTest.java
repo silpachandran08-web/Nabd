@@ -98,7 +98,7 @@ class SafetyDictionaryApiTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         try (java.sql.Connection c = superuserConnection(); java.sql.Statement st = c.createStatement()) {
             st.execute("SET session_replication_role = replica");
-            st.execute("UPDATE tenants SET region = 'KSA' WHERE id = '" + t.id() + "'");
+            st.execute("UPDATE tenants SET region_code = 'SA' WHERE id = '" + t.id() + "'");
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException(e);
         }

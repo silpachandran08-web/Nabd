@@ -1,5 +1,6 @@
 package com.nabd.hms.platform.territory;
 
+import com.nabd.hms.organization.api.RegionRules;
 import com.nabd.hms.platform.territory.dto.PlanMixResponse;
 import com.nabd.hms.platform.territory.dto.RegionSummaryResponse;
 import org.springframework.stereotype.Service;
@@ -14,14 +15,13 @@ import static com.nabd.hms.platform.territory.TerritoryRepository.RegionMrr;
 @Service
 public class TerritoryService {
 
-    // Fixed by tenants.region's check constraint — hardcoded so a region with zero clinics still
-    // shows as a coverage gap instead of silently disappearing from a GROUP BY.
-    private static final List<String> REGIONS = List.of("IN", "KSA");
 
     private final TerritoryRepository repo;
+    private final RegionRules regions;
 
-    TerritoryService(TerritoryRepository repo) {
+    TerritoryService(TerritoryRepository repo, RegionRules regions) {
         this.repo = repo;
+        this.regions = regions;
     }
 
     public List<RegionSummaryResponse> list() {
@@ -30,7 +30,8 @@ public class TerritoryService {
         Map<String, RegionMrr> mrr = repo.mrrByRegion();
         Map<String, List<PlanMixEntry>> planMix = repo.planMixByRegion();
 
-        return REGIONS.stream().map(region -> {
+        // every region in the table, so one with zero clinics still shows as a coverage gap
+        return regions.all().stream().map(RegionRules.Region::code).map(region -> {
             ClinicCounts c = clinics.getOrDefault(region, new ClinicCounts(0, 0, 0, List.of()));
             RegionMrr m = mrr.get(region);
             List<PlanMixResponse> mix = planMix.getOrDefault(region, List.of()).stream()
@@ -42,6 +43,6 @@ public class TerritoryService {
     }
 
     private String defaultCurrency(String region) {
-        return "KSA".equals(region) ? "SAR" : "INR";
+        return regions.region(region).currency();
     }
 }

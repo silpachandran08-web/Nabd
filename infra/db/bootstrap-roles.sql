@@ -9,6 +9,8 @@
 --   nabd_definer   NOLOGIN, BYPASSRLS: owns SECURITY DEFINER functions (see V210); migrator is a member.
 --   nabd_platform  NOLOGIN: the only role allowed to run search_audit_log (PLT-056, V1410). nabd_app is a
 --                  NOINHERIT member, so it holds no EXECUTE itself and must SET ROLE explicitly (operator console only).
+--   nabd_control   NOLOGIN, NOBYPASSRLS (PLT-009): the Control Plane's role on the master schema (V2130). The per-cell login user is
+--                  made a member by IaC. nabd_app still holds its master grants until the platform package moves onto it.
 -- Table/sequence/function grants are applied by V210 (and default privileges), not here, so they follow the schema.
 DO $$
 BEGIN
@@ -26,6 +28,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nabd_platform') THEN
     CREATE ROLE nabd_platform NOLOGIN NOSUPERUSER NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nabd_control') THEN
+    CREATE ROLE nabd_control NOLOGIN NOSUPERUSER NOBYPASSRLS;
   END IF;
 END $$;
 

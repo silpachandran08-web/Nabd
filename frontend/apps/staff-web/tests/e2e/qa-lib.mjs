@@ -43,6 +43,8 @@ export async function mockApi(page, log, handlers) {
     const url = new URL(req.url());
     log.apiHost = url.host;
     const path = url.pathname.replace(/^\/v1/, '') + url.search;
+    // OPS-028 TelemetryReporter beacon (web vitals): answered 202 and kept out of the request log, so request-count checks stay about the flow.
+    if (req.method() === 'POST' && path === '/client-telemetry') return route.fulfill({ headers: CORS, status: 202, body: '' });
     log.requests.push({ method: req.method(), path, body: req.postData(), auth: req.headers()['authorization'] ?? null });
     for (const [method, re, h] of handlers) {
       if (method !== '*' && method !== req.method()) continue;
@@ -55,6 +57,8 @@ export async function mockApi(page, log, handlers) {
       if (h.delay) await new Promise((r) => setTimeout(r, h.delay));
       return route.fulfill({ headers: CORS, status: h.status ?? 200, contentType: h.status >= 400 ? 'application/problem+json' : 'application/json', body: h.body === undefined ? '' : JSON.stringify(h.body) });
     }
+    // PLT-059 shell banner/nav read the plan; default to "nothing switched off" unless a script mocks it.
+    if (req.method() === 'GET' && path === '/me/entitlements') return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: JSON.stringify({ modules: ['billing', 'packages', 'pharmacy_inhouse', 'pharmacy_external', 'lab'].map((code) => ({ code, enabled: true })), killedFeatures: [], seatLimit: null }) });
     // FEF-005 idle lock reads the clinic idle policy on every page; default to "no policy row" unless a script mocks it.
     if (req.method() === 'GET' && /^\/setup\/policies/.test(path)) return route.fulfill({ headers: CORS, status: 200, contentType: 'application/json', body: '[]' });
     // FEF-011 shell boot loads the clinic zone (/setup/profile, or the bare /schedule/day on 403); default to the token's IN clinic.

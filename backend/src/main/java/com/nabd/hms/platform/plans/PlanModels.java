@@ -9,6 +9,8 @@ final class PlanModels {
     }
 
     record Plan(UUID id, String code, String name, int monthlyPriceCents, String currency,
-                int seatLimit, boolean active, Instant createdAt) {
+                int seatLimit, boolean active, Instant createdAt,
+                int version, String market, String pricingBasis, Integer branchLimit, Integer visitsPerMonth,
+                String onTrialExpiry) {
     }
 }

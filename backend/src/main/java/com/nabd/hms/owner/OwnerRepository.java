@@ -139,7 +139,7 @@ class OwnerRepository {
 
         jdbc.query(
                 "SELECT b.id AS brand_id, b.name AS brand_name, b.status AS brand_status, " +
-                        "       t.id AS clinic_id, t.name AS clinic_name, t.slug AS clinic_slug, t.region, t.status AS clinic_status " +
+                        "       t.id AS clinic_id, t.name AS clinic_name, t.slug AS clinic_slug, t.region_code AS region, t.status AS clinic_status " +
                         "FROM brands b LEFT JOIN tenants t ON t.brand_id = b.id " +
                         "WHERE b.owner_id = ? ORDER BY b.name, t.name",
                 rs -> {

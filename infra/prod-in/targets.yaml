@@ -1,0 +1,32 @@
+# OPS-056: registers pod IPs in the Mumbai ALB target groups (AWS Load Balancer Controller). ARNs = output `edge.target_groups` of the cell module.
+apiVersion: eks.amazonaws.com/v1
+kind: TargetGroupBinding
+metadata: { name: core, namespace: prod-in }
+spec:
+  serviceRef: { name: core, port: 8080 }
+  targetGroupARN: REPLACE_CORE_TG_ARN
+  targetType: ip
+---
+apiVersion: eks.amazonaws.com/v1
+kind: TargetGroupBinding
+metadata: { name: bff, namespace: prod-in }
+spec:
+  serviceRef: { name: bff, port: 3000 }
+  targetGroupARN: REPLACE_BFF_TG_ARN
+  targetType: ip
+---
+apiVersion: v1
+kind: Service
+metadata: { name: core, namespace: prod-in }
+spec:
+  type: ClusterIP
+  selector: { app: core }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: bff, namespace: prod-in }
+spec:
+  type: ClusterIP
+  selector: { app: bff }
+  ports: [{ name: http, port: 3000, targetPort: http }]

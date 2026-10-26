@@ -149,6 +149,9 @@ public class ScheduleService {
     @Transactional
     public DoctorLeaveResponse addLeave(UUID tenantId, UUID callerStaffId, UUID doctorId, DoctorLeaveWriteRequest req) {
         tenantContext.set(tenantId);
+        if (!repo.doctorInTenant(tenantId, doctorId)) { // OPS-043: a foreign doctor id must not be stored
+            throw new ApiException(HttpStatus.NOT_FOUND, "not-found", "Doctor not found", "No such doctor.");
+        }
         UUID id = repo.insertLeave(tenantId, doctorId, req.dateFrom(), req.dateTo(), req.reason());
         List<String> affected = repo.findAffectedPackagePatientNames(tenantId, doctorId);
         log.info("leave {} added for doctor {} by {} ({} to {}); {} package patient(s) potentially affected",

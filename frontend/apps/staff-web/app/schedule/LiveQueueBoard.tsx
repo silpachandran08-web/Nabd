@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import StatusPill, { type PillTone } from "../components/ui/StatusPill";
 import { EmptyState, ErrorState, Skeleton } from "../components/ui/StateViews";
 import { usePolling } from "../lib/usePolling";
-import { useLatestLoad } from "../lib/useLatestLoad";
+import { useLiveRefresh } from "../lib/live";
+import { ApiError } from "../lib/api";
+import { queueQuery, useReload } from "../lib/query";
 import type { QueueEntry } from "@nabd/domain";
 import styles from "./schedule.module.css";
 
@@ -34,38 +36,19 @@ function statusOf(status: string): { label: string; tone: PillTone } {
  * by doctorId. Patient names come from the schedule day's bookings (matched on queueEntryId);
  * an entry the schedule doesn't know is shown by token only — Arrivals has the full patient list.
  */
-export default function LiveQueueBoard({ doctors, names, authedFetch }: {
+export default function LiveQueueBoard({ doctors, names }: {
   doctors: BoardDoctor[];
   names: Record<string, string>;
-  authedFetch: (path: string, init?: RequestInit) => Promise<Response | null>;
 }) {
-  const [entries, setEntries] = useState<QueueEntry[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const newSignal = useLatestLoad();
-  const load = useCallback(async () => {
-    const signal = newSignal();
-    try {
-      const res = await authedFetch("/queue", { signal });
-      if (!res || signal.aborted) return;
-      if (!res.ok) {
-        setError(res.status === 403 ? "You don't have access to the live queue." : "Couldn't load the live queue.");
-        return;
-      }
-      const rows = await res.json();
-      if (signal.aborted) return;
-      setEntries(rows);
-      setError(null);
-    } catch {
-      if (signal.aborted) return;
-      setError("Couldn't reach the server. Check your connection and try again.");
-    }
-  }, [authedFetch, newSignal]);
-
-  useEffect(() => {
-    void Promise.resolve().then(load);
-  }, [load]);
+  // The same GET /queue (and key) as Arrivals and the sidebar badge; a reload cancels a slower one in flight (FEF-004).
+  const q = useQuery(queueQuery());
+  const entries = (Array.isArray(q.data) ? q.data : null) as QueueEntry[] | null;
+  const error = !q.error ? null
+    : q.error instanceof ApiError ? (q.error.status === 403 ? "You don't have access to the live queue." : "Couldn't load the live queue.")
+    : "Couldn't reach the server. Check your connection and try again.";
+  const load = useReload("queue");
   usePolling(load, POLL_MS);
+  useLiveRefresh(["queue"], load);
 
   if (error && !entries) return <ErrorState message={error} onRetry={() => void load()} />;
   if (!entries) return <Skeleton rows={5} label="Loading live queue" />;

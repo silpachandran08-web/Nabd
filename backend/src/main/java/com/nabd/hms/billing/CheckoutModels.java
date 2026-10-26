@@ -31,7 +31,8 @@ final class CheckoutModels {
 
     record LineItemRow(String chargeCode, String chargeName, String category, int quantity,
                         BigDecimal unitPrice, BigDecimal taxRatePercent, BigDecimal lineTotal,
-                        BigDecimal listUnitPrice, String tier, String overrideReasonCode) {
+                        BigDecimal listUnitPrice, String tier, String overrideReasonCode,
+                        UUID id, String taxCategory, boolean taxInclusive, boolean interState, String sacHsn, Long taxableMinor) {
     }
 
     record PaymentRow(UUID id, String method, BigDecimal amount, Instant recordedAt, String idempotencyKey) {
@@ -42,6 +43,11 @@ final class CheckoutModels {
                           BigDecimal unitPrice, BigDecimal taxRatePercent, UUID catalogueId, BigDecimal listUnitPrice,
                           String tier, String overrideReasonCode, String overrideNote, UUID overriddenBy,
                           boolean isRx, UUID prescriptionItemId) {
+        /** FIN-008: the tax engine decides the rate (head class, effective-dated rule); the line then stores that rate. */
+        LineItemInput withTaxRate(BigDecimal rate) {
+            return new LineItemInput(chargeCode, chargeName, category, quantity, unitPrice, rate, catalogueId, listUnitPrice, tier,
+                    overrideReasonCode, overrideNote, overriddenBy, isRx, prescriptionItemId);
+        }
     }
 
     /** NB-179: what a signed-but-not-yet-billed prescription still needs dispensed. */

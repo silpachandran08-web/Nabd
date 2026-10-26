@@ -153,7 +153,7 @@ await optimistic('390px', { width: 390, height: 800 });
   await page.waitForLoadState('networkidle').catch(() => {});
   await sleep(1500);
   const n = log.requests.length;
-  check('AC6 nursing with 40 entries: <= 8 requests', n <= 8, `${n}: ${log.requests.map((r) => r.path).join(', ')}`);
+  check('AC6 nursing with 40 entries: <= 9 requests (8 + PLT-059 /me/entitlements)', n <= 9, `${n}: ${log.requests.map((r) => r.path).join(', ')}`);
   check('AC6 no per-row /patients or /clinical/vitals requests', count(log, /^\/(patients|clinical\/vitals)\//) === 0);
   check('AC6 administration orders fetched once (page + badge share it)', count(log, /^\/nursing\/administration-orders\/today/) === 1);
   check('AC6 all 25 due rows rendered', (await page.getByText(/^Patient \d+$/).count()) >= 25, `${await page.getByText(/^Patient \d+$/).count()}`);

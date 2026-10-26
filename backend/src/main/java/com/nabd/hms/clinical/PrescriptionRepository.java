@@ -44,9 +44,9 @@ class PrescriptionRepository {
                 tenantId, patientId).stream().findFirst();
     }
 
-    /** NB-111: India Schedule H/H1 vs KSA SFDA controlled-substance rules apply by tenant region. */
+    /** NB-111: Controlled-substance rules apply by tenant region_code (OPS-061). */
     Optional<String> findTenantRegion(UUID tenantId) {
-        return jdbc.query("SELECT region FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region"), tenantId)
+        return jdbc.query("SELECT region_code FROM tenants WHERE id = ?", (rs, i) -> rs.getString("region_code"), tenantId)
                 .stream().findFirst();
     }
 

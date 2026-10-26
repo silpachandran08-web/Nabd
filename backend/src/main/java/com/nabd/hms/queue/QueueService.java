@@ -79,11 +79,16 @@ public class QueueService {
     private final com.nabd.hms.common.EventPublisher events;
 
     private final ActorDirectory actors;
+    private final QueueEventRepository eventRepo;
+    private final DoctorSessionService sessions;
 
     QueueService(QueueRepository repo, AppointmentRepository appointmentRepo, AppointmentService appointmentService,
                  ScheduleRepository scheduleRepo, OrganizationConfig departmentService, TenantContext tenantContext, ClinicClock clock,
                  com.nabd.hms.common.AuditService auditService,
-                 com.nabd.hms.common.EventPublisher events, ActorDirectory actors) {
+                 com.nabd.hms.common.EventPublisher events, ActorDirectory actors,
+                 QueueEventRepository eventRepo, DoctorSessionService sessions) {
+        this.eventRepo = eventRepo;
+        this.sessions = sessions;
         this.actors = actors;
         this.events = events;
         this.auditService = auditService;
@@ -105,7 +110,8 @@ public class QueueService {
             throw new ApiException(HttpStatus.NOT_FOUND, "patient-not-found", "Patient not found",
                     "That patient doesn't exist in this clinic.");
         }
-        if (!repo.staffExists(tenantId, req.doctorId())) {
+        var doctorDepartment = repo.findCheckInDepartment(tenantId, req.doctorId()); // also the doctor-exists check
+        if (doctorDepartment.isEmpty()) {
             throw new ApiException(HttpStatus.NOT_FOUND, "doctor-not-found", "Doctor not found",
                     "That doctor doesn't exist in this clinic.");
         }
@@ -137,7 +143,7 @@ public class QueueService {
             throw alreadyCheckedIn(tenantId, req.appointmentId());
         }
 
-        UUID departmentId = repo.findCheckInDepartment(tenantId, req.doctorId());
+        UUID departmentId = doctorDepartment.get(0);
         int token = repo.nextTokenNumber(tenantId, req.doctorId(), today);
         String source = req.source() == null ? "walk_in" : req.source();
         // encounterId null -> a fresh visit, defaulted to this row's own id by the DB trigger (V43).
@@ -152,7 +158,7 @@ public class QueueService {
             }
             throw e;
         }
-        entryCreated(tenantId, id, req.doctorId(), today, "checked_in");
+        entryCreated(tenantId, id, req.doctorId(), today, "checked_in", callerStaffId);
         if (req.appointmentId() != null) {
             events.publish(tenantId, DomainEventType.APPOINTMENT_ARRIVED, req.appointmentId(), java.util.Map.of(
                     "appointmentId", req.appointmentId(), "doctorId", req.doctorId(), "queueEntryId", id, "status", "arrived"));
@@ -209,6 +215,10 @@ public class QueueService {
             throw stale(repo.findById(tenantId, current.id()).map(QueueEntryRow::status).orElseThrow(this::notFound));
         }
         log.info("queue entry {} moved {} -> {} by {}", current.id(), current.status(), nextStatus, callerStaffId);
+        recordEvent(tenantId, current.id(), current.status(), nextStatus, "transition", null, callerStaffId, current.doctorId());
+        if ("in_consult".equals(nextStatus)) {
+            sessions.startIfNone(tenantId, current.doctorId(), clock.now()); // ACC-015: the doctor forgot to tap Start
+        }
         String role = actors.findActor(tenantId, callerStaffId).orElseThrow().role();
         var payload = new java.util.LinkedHashMap<String, Object>();
         payload.put("tenantId", tenantId);
@@ -235,7 +245,8 @@ public class QueueService {
     }
 
     /** OPS-015: data is exactly { tenantId, entryId, doctorId, queueDate, status, version } (the publisher adds tenantId/version). */
-    private void entryCreated(UUID tenantId, UUID entryId, UUID doctorId, LocalDate queueDate, String status) {
+    private void entryCreated(UUID tenantId, UUID entryId, UUID doctorId, LocalDate queueDate, String status, UUID callerStaffId) {
+        recordEvent(tenantId, entryId, null, status, "transition", null, callerStaffId, doctorId);
         events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CREATED, entryId,
                 java.util.Map.of("entryId", entryId, "doctorId", doctorId, "queueDate", queueDate, "status", status));
     }
@@ -289,7 +300,7 @@ public class QueueService {
                 current.id(), current.encounterId(), today, token, "internal_transfer", "waiting", null, null, req.reason(), blankToNull(req.reasonNote()), clock.now());
         log.info("queue entry {} opened by transfer from {} (doctor {}, department {})",
                 newId, id, req.doctorId(), req.toDepartmentId());
-        entryCreated(tenantId, newId, req.doctorId(), today, "waiting");
+        entryCreated(tenantId, newId, req.doctorId(), today, "waiting", callerStaffId);
 
         var actor = actors.findActor(tenantId, callerStaffId).orElseThrow();
         auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
@@ -306,10 +317,36 @@ public class QueueService {
         tenantContext.set(tenantId);
         QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
         repo.updatePriority(tenantId, id, req.priority(), req.priority() ? req.reason() : null, callerStaffId);
+        recordEvent(tenantId, id, current.status(), current.status(), "priority", null, callerStaffId, current.doctorId());
         events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CHANGED, id, java.util.Map.of("entryId", id, "doctorId", current.doctorId(),
                 "queueDate", current.queueDate(), "status", current.status(), "priority", req.priority()));
         log.info("queue entry {} priority set to {} by {}", id, req.priority(), callerStaffId);
         return toResponse(repo.findById(tenantId, id).orElseThrow());
+    }
+
+    /** ACC-015: "Extend by N min" on a running consult; an event the ETA engine reads, and a queue change so desks refresh. */
+    @Transactional
+    public com.nabd.hms.queue.dto.ConsultExtendResponse extend(UUID tenantId, UUID callerStaffId, UUID id, int minutes) {
+        // tenant already bound by TenantTransactionBinder (PLT-019)
+        QueueEntryRow current = repo.findById(tenantId, id).orElseThrow(this::notFound);
+        if (!"in_consult".equals(current.status())) {
+            throw new ApiException(HttpStatus.CONFLICT, "not-in-consult", "Not in consult",
+                    "Only a visit that is in consult can be extended.", java.util.Map.of("code", "NOT_IN_CONSULT", "currentStatus", current.status()));
+        }
+        recordEvent(tenantId, id, "in_consult", "in_consult", "extend", minutes, callerStaffId, current.doctorId());
+        events.publish(tenantId, DomainEventType.QUEUE_ENTRY_CHANGED, id, java.util.Map.of("entryId", id, "doctorId", current.doctorId(),
+                "queueDate", current.queueDate(), "status", "in_consult", "extendedMinutes", minutes));
+        var actor = actors.findActor(tenantId, callerStaffId).orElseThrow();
+        auditService.record(tenantId, "staff", callerStaffId, actor.name(), actor.role(), null,
+                "queue.extend", "queue_entry", id, null, java.util.Map.of("minutes", minutes));
+        return new com.nabd.hms.queue.dto.ConsultExtendResponse(id, minutes);
+    }
+
+    /** ACC-015: one queue_entry_events row, in the caller's transaction. The doctor moving their own patient is source 'doctor'. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY) // marker: always called inside the caller's tx
+    private void recordEvent(UUID tenantId, UUID entryId, String from, String to, String kind, Integer minutes, UUID callerStaffId, UUID doctorId) {
+        eventRepo.record(tenantId, entryId, from, to, kind, minutes, clock.now(), callerStaffId,
+                callerStaffId.equals(doctorId) ? "doctor" : "desk");
     }
 
     /** NB-143: the "alerts the doctor" half of the AC — a doctor (or anyone with queue:edit)

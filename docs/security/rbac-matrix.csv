@@ -93,12 +93,13 @@ operator,super_admin,billing_revenue,view|edit|approve
 operator,super_admin,support_tickets,view
 operator,super_admin,pricing_packaging,view
 operator,super_admin,territories,view
-operator,super_admin,messaging_operations,view
+operator,super_admin,messaging_operations,view|override
 operator,super_admin,platform_health,view
 operator,super_admin,aggregator_demand,view
 operator,super_admin,support_access,view|request
 operator,super_admin,audit_compliance,view
 operator,super_admin,safety_content,edit
+operator,super_admin,kb_import,edit
 operator,implementation,command_centre,view
 operator,implementation,clinics_fleet,view
 operator,implementation,tenant_detail,view
@@ -114,6 +115,7 @@ operator,implementation,aggregator_demand,
 operator,implementation,support_access,view|request
 operator,implementation,audit_compliance,
 operator,implementation,safety_content,
+operator,implementation,kb_import,
 operator,support_engineer,command_centre,view
 operator,support_engineer,clinics_fleet,view
 operator,support_engineer,tenant_detail,view
@@ -129,6 +131,7 @@ operator,support_engineer,aggregator_demand,
 operator,support_engineer,support_access,view|request
 operator,support_engineer,audit_compliance,
 operator,support_engineer,safety_content,
+operator,support_engineer,kb_import,
 operator,billing,command_centre,view
 operator,billing,clinics_fleet,view
 operator,billing,tenant_detail,
@@ -144,6 +147,7 @@ operator,billing,aggregator_demand,
 operator,billing,support_access,
 operator,billing,audit_compliance,
 operator,billing,safety_content,
+operator,billing,kb_import,
 operator,sre,command_centre,view
 operator,sre,clinics_fleet,
 operator,sre,tenant_detail,
@@ -159,6 +163,7 @@ operator,sre,aggregator_demand,
 operator,sre,support_access,
 operator,sre,audit_compliance,
 operator,sre,safety_content,
+operator,sre,kb_import,
 operator,commercial,command_centre,view
 operator,commercial,clinics_fleet,view
 operator,commercial,tenant_detail,
@@ -174,6 +179,7 @@ operator,commercial,aggregator_demand,view
 operator,commercial,support_access,
 operator,commercial,audit_compliance,
 operator,commercial,safety_content,
+operator,commercial,kb_import,
 operator,compliance_dpo,command_centre,view
 operator,compliance_dpo,clinics_fleet,view
 operator,compliance_dpo,tenant_detail,view
@@ -187,5 +193,6 @@ operator,compliance_dpo,messaging_operations,
 operator,compliance_dpo,platform_health,
 operator,compliance_dpo,aggregator_demand,
 operator,compliance_dpo,support_access,
-operator,compliance_dpo,audit_compliance,view
+operator,compliance_dpo,audit_compliance,view|values
 operator,compliance_dpo,safety_content,
+operator,compliance_dpo,kb_import,

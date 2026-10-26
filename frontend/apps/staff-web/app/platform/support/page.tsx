@@ -6,7 +6,7 @@ import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews
 import RoleDenied from "../../components/platform/RoleDenied";
 import StatusPill from "../../components/ui/StatusPill";
 import { PriorityPill, TicketStatusPill } from "../../components/platform/statusPills";
-import { problemDetail, usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError } from "../platformApi";
 
 // Matches GET /v1/platform/support/tickets (TicketAdminController) — a bare array, no cursor
 // pagination like fleet's list; ticket volume doesn't need it yet.
@@ -37,8 +37,22 @@ const NEXT_ACTION: Record<string, { toStatus: string; label: string }> = {
   resolved: { toStatus: "closed", label: "Close" },
 };
 
+// PLT-057: how owners answered the access requests (GET /platform/support-access/grants). Support never sees clinical fields.
+type AccessStats = { total: number; approved: number; declined: number; expired: number; waiting: number };
+
+function statsOf(grants: { status: string; windowStartedAt: string | null }[]): AccessStats {
+  const n = (f: (g: { status: string; windowStartedAt: string | null }) => boolean) => grants.filter(f).length;
+  return {
+    total: grants.length,
+    approved: n((g) => g.windowStartedAt !== null), // a window opened, whatever became of it since
+    declined: n((g) => g.status === "declined"),
+    expired: n((g) => g.status === "expired" && g.windowStartedAt === null), // never answered
+    waiting: n((g) => g.status === "requested"),
+  };
+}
+
 export default function SupportTicketsPage() {
-  const fetchAuthed = usePlatformFetch();
+  const [stats, setStats] = useState<AccessStats | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,23 +64,25 @@ export default function SupportTicketsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchAuthed("/platform/support/tickets");
-      if (!res) return; // session gone, already redirecting to login
-      if (res.status === 403) {
-        setForbidden(true);
-        return;
-      }
-      if (!res.ok) {
-        setError("Couldn't load tickets. Try again.");
-        return;
-      }
-      setTickets(await res.json());
-    } catch {
-      setError("Couldn't reach the server. Check your connection and try again.");
+      setTickets(await platformApi.get<Ticket[]>("/platform/support/tickets"));
+    } catch (e) {
+      if (isForbidden(e)) setForbidden(true);
+      else setError(platformError(e, "Couldn't load tickets. Try again."));
     } finally {
       setLoading(false);
     }
-  }, [fetchAuthed]);
+  }, []);
+
+  useEffect(() => {
+    // Absent, not an error, when the role cannot read grants (support_access:view).
+    void Promise.resolve().then(async () => {
+      try {
+        setStats(statsOf(await platformApi.get<{ status: string; windowStartedAt: string | null }[]>("/platform/support-access/grants")));
+      } catch {
+        /* the tickets list is the page; the stats strip just stays hidden */
+      }
+    });
+  }, []);
 
   useEffect(() => {
     // Deferred to a microtask so the effect body itself never calls setState
@@ -78,19 +94,10 @@ export default function SupportTicketsPage() {
     setActingOn(id);
     setActionError(null);
     try {
-      const res = await fetchAuthed(`/platform/support/tickets/${id}/transitions`, {
-        method: "POST",
-        body: JSON.stringify({ toStatus }),
-      });
-      if (!res) return;
-      if (!res.ok) {
-        setActionError(await problemDetail(res, "Couldn't update the ticket. Try again."));
-        return;
-      }
-      const updated: Ticket = await res.json();
+      const updated = await platformApi.post<Ticket>(`/platform/support/tickets/${id}/transitions`, { toStatus });
       setTickets((prev) => prev.map((t) => (t.id === id ? updated : t)));
-    } catch {
-      setActionError("Couldn't reach the server. Check your connection and try again.");
+    } catch (e) {
+      setActionError(platformError(e, "Couldn't update the ticket. Try again."));
     } finally {
       setActingOn(null);
     }
@@ -105,6 +112,12 @@ export default function SupportTicketsPage() {
         </div>
         {!loading && !error && !forbidden && <span className={styles.count}>{tickets.length} total</span>}
       </div>
+
+      {stats && (
+        <p className={styles.subtitle} data-testid="access-stats">
+          Clinical fields shown: 0 · Access requests: {stats.total} · Approved by owner: {stats.approved} · Declined: {stats.declined} · Expired unanswered: {stats.expired} · Waiting: {stats.waiting}
+        </p>
+      )}
 
       {actionError && <div className={styles.actionError} role="alert">{actionError}</div>}
 
@@ -122,13 +135,13 @@ export default function SupportTicketsPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Ticket</th>
-                  <th>Clinic</th>
-                  <th>Raised by</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>SLA due</th>
-                  <th></th>
+                  <th scope="col">Ticket</th>
+                  <th scope="col">Clinic</th>
+                  <th scope="col">Raised by</th>
+                  <th scope="col">Priority</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">SLA due</th>
+                  <th scope="col"></th>
                 </tr>
               </thead>
               <tbody>

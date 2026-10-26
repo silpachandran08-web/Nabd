@@ -177,12 +177,12 @@ class PlatformAuthApiTest extends ApiTestBase {
     }
 
     @Test
-    void superAdminMeSeesAllFourteenSurfacesPlusTheFiveWriteAuthorities() { // PLT-056 added support_access:request, CLN-004 safety_content:edit
+    void superAdminMeSeesAllFourteenSurfacesPlusTheFiveWriteAuthorities() { // PLT-056 added support_access:request, CLN-004 safety_content:edit, COM-014 messaging_operations:override, COM-014 messaging_operations:override
         SeededOperator operator = seedOperator("super1@nabd.health", "super_admin", false);
         String token = platformLoginAndGetAccessToken(operator);
 
         ResponseEntity<Map> resp = exchange("/v1/platform/auth/me", HttpMethod.GET, authed(token), Map.class);
-        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(19).contains("safety_content:edit", "support_access:request");
+        assertThat((List<String>) resp.getBody().get("permissions")).hasSize(21).contains("kb_import:edit", "safety_content:edit", "support_access:request", "messaging_operations:override");
     }
 
     @Test

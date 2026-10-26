@@ -20,7 +20,7 @@
 .stateBtn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 var(--nb-space-16); border-radius: var(--nb-radius-md); border: 1px solid var(--nb-border-default); background: var(--nb-surface-2); color: var(--nb-text-primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 
 .scrim { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: var(--nb-space-16); background: var(--nb-scrim); }
-.dialog { width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); outline: none; }
+.dialog { width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; border-radius: var(--nb-radius-lg); background: var(--nb-surface-overlay); border: 1px solid var(--nb-border-default); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); }
 .dialog_md { max-width: 480px; }
 .dialog_lg { max-width: 720px; }
 .dialog_drawer { max-width: 480px; height: calc(100vh - 32px); margin-inline-start: auto; }

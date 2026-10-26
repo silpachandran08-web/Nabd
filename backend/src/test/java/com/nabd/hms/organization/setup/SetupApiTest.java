@@ -283,7 +283,7 @@ class SetupApiTest extends ApiTestBase {
         int n = 0;
         for (int days : new int[]{400, 10, -5}) {
             exchange("/v1/setup/licences", HttpMethod.POST, authedJsonBody(token, Map.of("licenceType", "facility",
-                    "number", "L-" + n++, "expiryDate", LocalDate.now().plusDays(days).toString(), "region", "KSA")), Map.class);
+                    "number", "L-" + n++, "expiryDate", LocalDate.now().plusDays(days).toString(), "region", "SA")), Map.class);
         }
         ResponseEntity<Map> resp = exchange("/v1/compliance/health", HttpMethod.GET, authed(token), Map.class);
         Map lic = (Map) resp.getBody().get("licences");
@@ -310,14 +310,14 @@ class SetupApiTest extends ApiTestBase {
 
         LocalDate expiry = LocalDate.now().plusYears(1);
         ResponseEntity<Map> postResp = exchange("/v1/setup/licences", HttpMethod.POST,
-                authedJsonBody(token, Map.of("licenceType", "facility", "number", "MOH-FL-123", "issuingBody", "MOH", "expiryDate", expiry.toString(), "region", "KSA")),
+                authedJsonBody(token, Map.of("licenceType", "facility", "number", "MOH-FL-123", "issuingBody", "MOH", "expiryDate", expiry.toString(), "region", "SA")),
                 Map.class);
         assertThat(postResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         String id = (String) postResp.getBody().get("id");
         assertThat(postResp.getBody().get("status")).isEqualTo("valid");
 
         ResponseEntity<Map> patchResp = exchange("/v1/setup/licences/" + id, HttpMethod.PATCH,
-                authedJsonBody(token, Map.of("licenceType", "facility", "number", "MOH-FL-124", "expiryDate", expiry.toString(), "region", "KSA")),
+                authedJsonBody(token, Map.of("licenceType", "facility", "number", "MOH-FL-124", "expiryDate", expiry.toString(), "region", "SA")),
                 Map.class);
         assertThat(patchResp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(patchResp.getBody().get("number")).isEqualTo("MOH-FL-124");

@@ -15,7 +15,7 @@ const css = readFileSync(join(ROOT, 'app/globals.css'), 'utf8');
 const tok = (n) => css.match(new RegExp(`--nb-${n}:\\s*(#[0-9a-fA-F]{6})`))?.[1];
 const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-check('T0 only the dark theme exists (no light/data-theme overrides)', !/prefers-color-scheme|data-theme/.test(css));
+check('T0 only the dark theme exists (no light/data-theme overrides)', !/prefers-color-scheme|data-theme[^{]*\{[^}]*--nb-(text|bg|surface|border)/.test(css)); // FEF-027's light focus-ring override is not a theme
 const surfaces = ['bg-root', 'bg-canvas', 'bg-nav', 'surface-1', 'surface-2', 'surface-3', 'surface-overlay'];
 for (const s of surfaces) {
   const r = ratio(tok('text-tertiary'), tok(s));
@@ -25,7 +25,7 @@ const rd = ratio(tok('text-disabled'), tok('surface-1'));
 check(`T2 disabled ${tok('text-disabled')} on surface-1 >= 3`, rd >= 3, rd.toFixed(2));
 
 // ---- 2. no font-size < 12px in the reception-screen styles (print blocks excluded)
-const SCOPE = ['app/clinicNav.module.css', 'app/topBar.module.css', 'app/schedule/schedule.module.css', 'app/patients/patients.module.css', 'app/arrivals/arrivals.module.css',
+const SCOPE = ['app/clinicNav.module.css', 'app/topBar.module.css', 'app/schedule/schedule.module.css', 'app/patients/patients.module.css', 'app/components/arrivals/arrivals.module.css',
   'app/billing/billing.module.css', 'app/checkout/checkout.module.css', 'app/components/ui/ui.module.css', 'app/components/arrivals/checkin.module.css'];
 const stripPrint = (s) => { let out = '', i = 0; for (;;) { const j = s.indexOf('@media print', i); if (j < 0) return out + s.slice(i); out += s.slice(i, j); let d = 0, k = s.indexOf('{', j); for (; k < s.length; k++) { if (s[k] === '{') d++; else if (s[k] === '}' && --d === 0) break; } i = k + 1; } };
 const small = [];
@@ -116,7 +116,7 @@ await visit('X-arrivals-500', '/arrivals', { over: [['GET', /^\/queue(\?|$)/, { 
 // 403 / permission-absent: no queue:view -> no-access state, no action controls
 await visit('P-arrivals-no-perm', '/arrivals', { perms: ['patients:view'], fn: async (page) => {
   const body = await page.locator('body').innerText();
-  check('P-arrivals no-access state', /No access to the arrivals board/.test(body));
+  check('P-arrivals no-access state', /No access to the arrivals board|You do not have access to arrivals/.test(body));
   check('P-arrivals Check in / Walk-in controls absent', (await page.getByRole('button', { name: /Check in|Walk-in/ }).count()) === 0);
   const v = await axe(page); check('P-arrivals no-access axe 0 violations', v.length === 0, v.slice(0, 4).join(' || '));
 } });

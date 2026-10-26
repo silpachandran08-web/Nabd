@@ -8,7 +8,7 @@ import { can } from "../../lib/permissions";
 import { useHasMounted } from "../../lib/useHasMounted";
 import { age, type Allergy, type AllergyStatus, type PatientDetail, type Prescription, type PrescriptionAllergySnapshot } from "./shared";
 import r from "./rxPrint.module.css";
-import { apiFetch, goLogin } from "../../lib/apiClient";
+import { responseFetch } from "../../lib/responseFetch";
 
 // DOC-N1: printable SIGNED prescription. Data comes from GET /clinical/prescriptions/{queueEntryId},
 // GET /clinical/prescriptions/{queueEntryId}/print-header (clinic + prescriber of record + registration number),
@@ -62,19 +62,10 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
   const allowed = mounted && can("clinical:view");
 
   const get = useCallback(async (path: string): Promise<Response> => {
-    const token = localStorage.getItem("nabd_access_token");
-    if (!token) {
-      goLogin();
-      throw new LoadError("signed out");
-    }
-    const res = await apiFetch(path, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.status === 401) {
-      localStorage.removeItem("nabd_access_token");
-      goLogin();
-      throw new LoadError("signed out");
-    }
+    const res = await responseFetch(path);
+    if (!res) throw new LoadError("signed out"); // 401: the api client has sent the user to sign-in
     return res;
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     if (!allowed) return;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # OPS-046: one command per profile against any environment, synthetic credentials only.
-#   BASE_URL=https://<env> PERF_PIN=<synthetic pin> PEAK_RPS=<pilot peak req/s> perf/run.sh registry|checkin [--seed] [--save-baseline]
+#   BASE_URL=https://<env> PERF_PIN=<synthetic pin> PEAK_RPS=<pilot peak req/s> perf/run.sh registry|checkin|rush|contention|webhook_storm|dayend|soak [--seed] [--save-baseline]
 # The run drives 2 x PEAK_RPS for DURATION (default 30m). Optional:
 #   PERF_DB_URL       psql URL (any DML role): --seed loads perf/data/seed.sql, waits for the registry read model to drain,
 #                     and samples pg_stat_activity (API connection usage, the Hikari pool's view of the DB) every 5 s

@@ -1,0 +1,13 @@
+# OPS-027: non-burn-rate alerts. Burn-rate pages are generated into slo.rules.yml. Read-model/consumer lag > 60 s for 5 min is
+# NabdConsumerLagging in ../event-consumers.rules.yml (ticket severity, runbook docs/runbooks/NabdConsumerLagging.md).
+groups:
+  - name: nabd-waba-quality
+    rules:
+      # Proposed Comms gauge waba_quality_rating{phone_number_id}: 3 green, 2 yellow, 1 red, from Meta's quality webhook (old NB-264). Emitter is not built yet.
+      - alert: NabdWabaQualityDropped
+        expr: waba_quality_rating < 3
+        for: 0m
+        labels: { severity: warning }
+        annotations:
+          summary: "WhatsApp sender {{ $labels.phone_number_id }} quality dropped (rating {{ $value }}; 2 = yellow, 1 = red)"
+          runbook: docs/runbooks/NabdWabaQualityDropped.md

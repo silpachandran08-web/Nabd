@@ -6,7 +6,7 @@ import Dialog from "../../components/ui/Dialog";
 import Icon from "../../components/ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../../components/ui/StateViews";
 import RoleDenied from "../../components/platform/RoleDenied";
-import { problemDetail, useOperatorAccess, usePlatformFetch } from "../platformApi";
+import { isForbidden, platformApi, platformError, useOperatorAccess } from "../platformApi";
 import { actionLabel } from "./actionLabel";
 
 // Matches GET /v1/platform/audit-log (AuditSearchController) — cross-tenant by default. Filters
@@ -110,9 +110,8 @@ function exportCsv(rows: AuditEntry[]) {
 }
 
 export default function AuditLogPage() {
-  const fetchAuthed = usePlatformFetch();
   // PLT-056: before/after come back only for compliance_dpo, on request, with a reason (audited server-side).
-  const isDpo = useOperatorAccess().profile?.role === "compliance_dpo";
+  const isDpo = useOperatorAccess().canSeeValues;
   const [valuesReason, setValuesReason] = useState("");
   const [valuesOn, setValuesOn] = useState(false);
   const [rows, setRows] = useState<AuditEntry[]>([]);
@@ -159,38 +158,26 @@ export default function AuditLogPage() {
         const params = new URLSearchParams(searched.current);
         if (cursor) params.set("cursor", cursor);
 
-        const res = await fetchAuthed(`/platform/audit-log?${params}`);
-        if (!res) return; // session gone, already redirecting to login
-        if (res.status === 403) {
-          setForbidden(true);
-          return;
-        }
-        if (!res.ok) {
-          fail(await problemDetail(res, append ? "Couldn't load more entries. Try again." : "Couldn't load the audit log. Try again."));
-          return;
-        }
+        const body = await platformApi.get<AuditPage>(`/platform/audit-log?${params}`);
         setValuesOn(searched.current.get("includeValues") === "true");
-        const body: AuditPage = await res.json();
         const data = Array.isArray(body?.data) ? body.data : [];
         setRows((prev) => (append ? [...prev, ...data] : data));
         setNextCursor(body?.page?.nextCursor ?? null);
-      } catch {
-        fail("Couldn't reach the server. Check your connection and try again.");
+      } catch (e) {
+        if (isForbidden(e)) setForbidden(true);
+        else fail(platformError(e, append ? "Couldn't load more entries. Try again." : "Couldn't load the audit log. Try again."));
       } finally {
         setLoading(false);
         setLoadingMore(false);
       }
     },
-    [fetchAuthed, tenantId, action, entityType, fromDate, toDate]
+    [tenantId, action, entityType, fromDate, toDate]
   );
 
   useEffect(() => {
     void Promise.resolve().then(async () => {
-      const tenantsRes = await fetchAuthed("/platform/tenants?limit=100");
-      if (tenantsRes?.ok) {
-        const body: { data: TenantOption[] } = await tenantsRes.json();
-        setTenants(body.data);
-      }
+      const tenantList = await platformApi.get<{ data: TenantOption[] }>("/platform/tenants?limit=100").catch(() => null);
+      if (tenantList) setTenants(tenantList.data);
       fetchPage(null, false);
     });
     // Initial load only; later loads go through the Search button so typing a filter never refetches.
@@ -314,12 +301,12 @@ export default function AuditLogPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>When</th>
-                    <th>Clinic</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Entity</th>
-                    <th>Changes</th>
+                    <th scope="col">When</th>
+                    <th scope="col">Clinic</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Entity</th>
+                    <th scope="col">Changes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -381,7 +368,7 @@ export default function AuditLogPage() {
             ) : (
               <table className={styles.diffTable}>
                 <thead>
-                  <tr><th>Field</th><th>Before</th><th>After</th></tr>
+                  <tr><th scope="col">Field</th><th scope="col">Before</th><th scope="col">After</th></tr>
                 </thead>
                 <tbody>
                   {changes.map((c) => (

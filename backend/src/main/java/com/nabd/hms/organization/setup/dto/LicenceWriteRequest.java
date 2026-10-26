@@ -14,6 +14,6 @@ public record LicenceWriteRequest(
         @NotBlank String number,
         String issuingBody,
         @NotNull LocalDate expiryDate,
-        @NotBlank @Pattern(regexp = "IN|KSA") String region
+        @NotBlank @Pattern(regexp = "IN|AE|SA|QA") String region
 ) {
 }

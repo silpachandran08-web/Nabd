@@ -73,6 +73,11 @@ management:
     web:
       exposure:
         include: health,prometheus
+  # OPS-027: the 500 ms / 2 s buckets the latency SLOs read (http_server_requests_seconds_bucket{le="0.5"}).
+  metrics:
+    distribution:
+      slo:
+        http.server.requests: 100ms,500ms,2s
   endpoint:
     health:
       probes:
@@ -102,9 +107,7 @@ logging:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [reqId=%X{requestId:-none}] %logger{35} - %mask%n"
   level:
     root: INFO
-    # ponytail: no PHI-redaction scanner on top of this yet (NB-158) — logging code is
-    # hand-disciplined to pass IDs, not patient name/phone/DOB/national-ID: read PatientService
-    # before adding a new log line there.
+    # OPS-028: JSON logs masked by PhiMasker; scripts/log-phi-scan.py (source) and scripts/ci/log_phi_scan.py (log streams) check them.
     com.nabd.hms: INFO
 
 app:
@@ -133,6 +136,13 @@ app:
     # Documented env var names (APP_JWT_KEYS_* still win via relaxed binding).
     keys-file: ${JWT_KEYS_FILE:}
     keys-json: ${JWT_KEYS_JSON:}
+    # PLT-009: one key set per token population (the prod profile refuses to boot without each)
+    owner: { keys-file: "${JWT_OWNER_KEYS_FILE:}", keys-json: "${JWT_OWNER_KEYS_JSON:}" }
+    platform: { keys-file: "${JWT_PLATFORM_KEYS_FILE:}", keys-json: "${JWT_PLATFORM_KEYS_JSON:}" }
+    internal: { jwks-file: "${JWT_INTERNAL_JWKS_FILE:}", jwks-json: "${JWT_INTERNAL_JWKS_JSON:}" }  # PUBLIC keys of the calling services
+  internal:  # ACC-038: /internal/v1 chain. A client certificate is always required under the prod profile.
+    require-client-cert: ${INTERNAL_REQUIRE_CLIENT_CERT:false}
+    client-cert-header: ${INTERNAL_CLIENT_CERT_HEADER:}   # set when the ingress terminates mTLS and forwards the verified cert's SHA-256 thumbprint
   outbox:
     poll-interval-ms: 2000
     batch-size: 20
@@ -173,7 +183,16 @@ app:
     read-timeout-ms: 5000
     circuit-failure-threshold: 5
     circuit-open-seconds: 30
-    providers: {}
+    providers:
+      comms-gateway: { connect-timeout-ms: 1000, read-timeout-ms: 2000 } # COM-009: OTP budget 3 s
+  # IDC-016 ABDM bridge (DEC-33: off per clinic by default). Endpoints only; the bridge credentials live in the regional secret
+  # store (platform secrets abdm-client-id / abdm-client-secret). Blank base-url or lookup template = "not configured" (503).
+  abdm:
+    base-url: ${ABDM_BASE_URL:}
+    cm-id: ${ABDM_CM_ID:sbx}
+    hfr-lookup: ${ABDM_HFR_LOOKUP:}
+    hpr-lookup: ${ABDM_HPR_LOOKUP:}
+    jwks-uri: ${ABDM_JWKS_URI:}
   whatsapp:
     # Meta WhatsApp Cloud API. Blank access token = LoggingWhatsAppClient (logs, never sends) —
     # every local/test run, same as spring.mail.host above.
@@ -186,6 +205,11 @@ app:
     otp-template: ${WHATSAPP_OTP_TEMPLATE:nabd_login_otp}
     otp-language: ${WHATSAPP_OTP_LANGUAGE:en}
     log-otp: ${WHATSAPP_LOG_OTP:false}         # OtpLoggingGuard refuses to boot in prod when true; the sender no longer logs codes
+  comms:
+    gateway: # COM-009: blank base-url = no gateway, OTPs use the in-process sender
+      base-url: ${COMMS_GATEWAY_URL:}
+      service-token: ${COMMS_GATEWAY_TOKEN:}
+      otp-cutover: ${COMMS_OTP_CUTOVER:false} # true = no in-process fallback; 503 with a retry hint when the gateway is down
   crypto:
     # base64, 32 bytes (AES-256) each, no code defaults (FieldCipher refuses to boot without a key).
     # PLT-044: legacy key: reads pre-PLT-044 values and, outside prod with no keyring, doubles as kid 1.
