@@ -23,6 +23,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/
 type PrintHeader = {
   prescriptionId: string; signedAt: string | null; clinicName: string; clinicRegion: string; clinicPhone: string | null;
   prescriberId: string | null; prescriberName: string | null; professionalRegistrationNo: string | null;
+  genericFirst?: boolean; // CLN-021: print the generic (salt) first, the brand in brackets only if one was chosen
 };
 type RxFull = Prescription & { patientId: string };
 type AllergyView =
@@ -214,8 +215,12 @@ export default function RxPrint({ queueEntryId }: { queueEntryId: string }) {
               <li key={m.id ?? i} className={r.med}>
                 <span className={r.medNo}>{i + 1}.</span>
                 <div>
-                  <div className={r.medName}>{m.drugName}</div>
-                  {m.brandName && <div className={r.medInstructions}><span className={r.muted}>Brand </span>{m.brandName}</div>}
+                  {header.genericFirst
+                    ? <div className={r.medName} data-testid="med-line">{m.brandName ? `${m.drugName} (${m.brandName})` : m.drugName}</div>
+                    : <>
+                        <div className={r.medName}>{m.drugName}</div>
+                        {m.brandName && <div className={r.medInstructions}><span className={r.muted}>Brand </span>{m.brandName}</div>}
+                      </>}
                   <div className={r.medFields}>
                     {m.route && <span className={r.medField}><span className={r.muted}>Route</span>{m.route}</span>}
                     {m.dosage && <span className={r.medField}><span className={r.muted}>Dose</span>{m.dosage}</span>}

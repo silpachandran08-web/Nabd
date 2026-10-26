@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import DrugCombobox from "./DrugCombobox";
+import StatusPill from "../ui/StatusPill";
 import { formatQty, formatSig, parseSig, ROUTES, SIG_STEPS, suggestQuantity, type SigSlots } from "@nabd/domain";
 import type { PrescriptionItem } from "./shared";
 import s from "./RxPad.module.css";
@@ -76,16 +77,26 @@ export default function RxPad({
           <DrugCombobox
             id={`rx-drug-${index}`} label="Generic name" placeholder="Type the generic name" disabled={locked}
             authedFetch={authedFetch} value={item.drugName}
-            hint="Suggestions come from your pharmacy list and past prescriptions. Any text you type is kept as is."
-            onType={(t) => onChange({ drugName: t })} onPick={(n) => onChange({ drugName: n })}
+            hint="Suggestions come from the drug list, your pharmacy list and past prescriptions. Any text you type is kept as is."
+            onType={(t) => onChange({ drugName: t, drugId: null, genericName: null })}
+            onPick={(n, it) => onChange(it.drugId
+              ? { drugName: [it.generic ?? it.brand, it.strength, it.form].filter(Boolean).join(" "), brandName: it.brand ?? "", drugId: it.drugId, genericName: it.generic ?? null }
+              : { drugName: n, drugId: null, genericName: null })}
           />
+          {item.drugName.trim() !== "" && !item.drugId && (
+            <p className={s.hint} data-testid="uncoded-badge"><StatusPill tone="neutral" label="Uncoded" /> Not linked to the drug list; safety checks use the name only.</p>
+          )}
         </div>
         <div className={`${s.cell} ${s.c6}`}>
           <DrugCombobox
             id={id("brand")} label="Brand (optional)" placeholder="Type or pick a brand" disabled={locked}
             authedFetch={authedFetch} value={item.brandName ?? ""}
             hint="Safety checks run on the generic name and the brand."
-            onType={(t) => onChange({ brandName: t })} onPick={(n) => onChange({ brandName: n })}
+            onType={(t) => onChange({ brandName: t })}
+            onPick={(n, it) => onChange(it.drugId
+              ? { brandName: it.brand ?? n, drugId: it.drugId, genericName: it.generic ?? null,
+                  ...(item.drugName.trim() === "" ? { drugName: [it.generic ?? it.brand, it.strength, it.form].filter(Boolean).join(" ") } : {}) }
+              : { brandName: n })}
           />
         </div>
 

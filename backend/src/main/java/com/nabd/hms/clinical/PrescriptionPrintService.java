@@ -15,8 +15,10 @@ public class PrescriptionPrintService {
 
     private final PrescriptionPrintRepository repo;
     private final TenantContext tenantContext;
+    private final DrugCoding coding;
 
-    PrescriptionPrintService(PrescriptionPrintRepository repo, TenantContext tenantContext) {
+    PrescriptionPrintService(PrescriptionPrintRepository repo, TenantContext tenantContext, DrugCoding coding) {
+        this.coding = coding;
         this.repo = repo;
         this.tenantContext = tenantContext;
     }
@@ -35,6 +37,6 @@ public class PrescriptionPrintService {
         PrescriptionPrintRepository.Person who = prescriberId == null ? null : repo.findPerson(tenantId, prescriberId).orElse(null);
         String reg = h.signerRegistrationNo() == null || h.signerRegistrationNo().isBlank() ? null : h.signerRegistrationNo();
         return new PrescriptionPrintHeaderResponse(h.prescriptionId(), h.signedAt(), h.clinicName(), h.clinicRegion(),
-                h.clinicPhone(), prescriberId, who == null ? null : who.name(), reg);
+                h.clinicPhone(), prescriberId, who == null ? null : who.name(), reg, coding.genericFirst());
     }
 }

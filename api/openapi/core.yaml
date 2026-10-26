@@ -2839,9 +2839,47 @@ paths:
       tags:
       - clinical
       x-required-permission: clinical:view | pharmacy:view
+  /v1/clinical/drugs/client-index:
+    get:
+      operationId: DrugTypeaheadController_clientIndex
+      parameters:
+      - in: header
+        name: If-None-Match
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - clinical
+      x-required-permission: clinical:view
   /v1/clinical/drugs/search:
     get:
-      operationId: PrescriptionController_searchDrugs
+      operationId: DrugTypeaheadController_search
       parameters:
       - in: query
         name: q
@@ -15194,6 +15232,10 @@ components:
       properties:
         active:
           type: boolean
+        allergenClassId:
+          type: string
+        allergenIngredientId:
+          type: string
         category:
           type: string
         deactivatedAt:
@@ -15249,6 +15291,14 @@ components:
     AllergyWriteRequest:
       type: object
       properties:
+        allergenClassId:
+          type: string
+          maxLength: 80
+          minLength: 0
+        allergenIngredientId:
+          type: string
+          maxLength: 80
+          minLength: 0
         category:
           type: string
           pattern: drug|food|environmental|other
@@ -17014,7 +17064,17 @@ components:
     DrugSuggestionResponse:
       type: object
       properties:
+        brand:
+          type: string
         code:
+          type: string
+        display:
+          type: string
+        drugId:
+          type: string
+        form:
+          type: string
+        generic:
           type: string
         inStock:
           type: boolean
@@ -17022,7 +17082,13 @@ components:
           type: string
         prescriptionOnly:
           type: boolean
+        schedule:
+          type: array
+          items:
+            type: string
         source:
+          type: string
+        strength:
           type: string
     DrugSummary:
       type: object
@@ -17267,13 +17333,19 @@ components:
       properties:
         brandName:
           type: string
+        codeSuggestion:
+          $ref: "#/components/schemas/RxCodeSuggestion"
         dosage:
+          type: string
+        drugId:
           type: string
         drugName:
           type: string
         duration:
           type: string
         frequency:
+          type: string
+        genericName:
           type: string
         instructions:
           type: string
@@ -19680,6 +19752,10 @@ components:
           minLength: 0
         dosage:
           type: string
+        drugId:
+          type: string
+          maxLength: 80
+          minLength: 0
         drugName:
           type: string
           maxLength: 200
@@ -19721,6 +19797,8 @@ components:
           type: string
         brandName:
           type: string
+        coded:
+          type: boolean
         controlledSubstanceWarning:
           type: string
         displayOrder:
@@ -19728,11 +19806,15 @@ components:
           format: int32
         dosage:
           type: string
+        drugId:
+          type: string
         drugName:
           type: string
         duration:
           type: string
         frequency:
+          type: string
+        genericName:
           type: string
         id:
           type: string
@@ -19762,6 +19844,8 @@ components:
           type: string
         clinicRegion:
           type: string
+        genericFirst:
+          type: boolean
         prescriberId:
           type: string
           format: uuid
@@ -20903,6 +20987,13 @@ components:
           items:
             $ref: "#/components/schemas/Cell"
         time:
+          type: string
+    RxCodeSuggestion:
+      type: object
+      properties:
+        display:
+          type: string
+        drugId:
           type: string
     RxDecisionView:
       type: object

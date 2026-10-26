@@ -1,5 +1,6 @@
 // FEF-005: screen-lock state that survives reload and is shared between tabs.
 import { clearDrafts } from "../components/consult/draftStore.ts";
+import { clearDrugIndex } from "./drugIndex.ts";
 
 export const LOCK_KEY = "nabd_locked_at";
 export const LOCK_CHANNEL = "nabd-lock";
@@ -57,4 +58,5 @@ export function onLockMessage(cb: (locked: boolean) => void): () => void {
 export async function clearLocalSessionData(): Promise<void> {
   try { sessionStorage.removeItem(LOCK_KEY); localStorage.removeItem(LOCK_KEY); } catch { /* ignore */ }
   await clearDrafts();
+  await clearDrugIndex(); // CLN-020: the per-doctor drug index is deleted with the session (T-029)
 }

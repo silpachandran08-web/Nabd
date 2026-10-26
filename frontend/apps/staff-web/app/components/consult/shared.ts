@@ -26,8 +26,14 @@ export type PrescriptionItem = {
   warnings?: RxWarning[]; overrides?: RxDecisionInput[];
   // DOC-033 structured pad fields (null on lines saved before they existed)
   brandName?: string | null; sigPattern?: string | null; route?: string | null; quantity?: number | null; quantityUnit?: string | null;
+  // CLN-021: drug master code (null/absent = uncoded free text) and the generic name snapshot taken when it was saved
+  drugId?: string | null; coded?: boolean; genericName?: string | null;
 };
-export type DrugSuggestion = { name: string; source: "pharmacy" | "history"; code: string | null; inStock: boolean | null; prescriptionOnly: boolean | null };
+export type DrugSuggestion = {
+  name: string; source: "master" | "pharmacy" | "history"; code: string | null; inStock: boolean | null; prescriptionOnly: boolean | null;
+  // CLN-020: master rows (server) and client-index rows carry the product parts
+  drugId?: string | null; display?: string | null; generic?: string | null; brand?: string | null; strength?: string | null; form?: string | null;
+};
 // DOC-R3: allergy statement captured at signing. Null on drafts and on prescriptions signed before it was captured.
 export type PrescriptionAllergySnapshot = {
   state: "recorded" | "none_documented" | "not_assessed";

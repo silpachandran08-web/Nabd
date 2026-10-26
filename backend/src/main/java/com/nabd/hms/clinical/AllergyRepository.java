@@ -63,11 +63,12 @@ class AllergyRepository {
     }
 
     UUID insert(UUID tenantId, UUID patientId, String substance, String category, String severity, String reaction,
-                String source, UUID recordedBy) {
+                String source, UUID recordedBy, String allergenIngredientId, String allergenClassId) {
         UUID id = UUID.randomUUID();
         jdbc.update("INSERT INTO patient_allergies (id, tenant_id, patient_id, substance, category, severity, reaction, " +
-                        "source, recorded_by) VALUES (?,?,?,?,?,?,?,?,?)",
-                id, tenantId, patientId, substance, category, severity, reaction, source, recordedBy);
+                        "source, recorded_by, allergen_ingredient_id, allergen_class_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                id, tenantId, patientId, substance, category, severity, reaction, source, recordedBy,
+                allergenIngredientId, allergenClassId);
         return id;
     }
 
@@ -145,6 +146,7 @@ class AllergyRepository {
                 rs.getTimestamp("updated_at") == null ? null : rs.getTimestamp("updated_at").toInstant(),
                 rs.getString("deactivated_by") == null ? null : UUID.fromString(rs.getString("deactivated_by")),
                 rs.getTimestamp("deactivated_at") == null ? null : rs.getTimestamp("deactivated_at").toInstant(),
-                rs.getString("deactivation_reason"), rs.getBoolean("unconfirmed"));
+                rs.getString("deactivation_reason"), rs.getBoolean("unconfirmed"),
+                rs.getString("allergen_ingredient_id"), rs.getString("allergen_class_id"));
     }
 }

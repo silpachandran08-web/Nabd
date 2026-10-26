@@ -17,11 +17,13 @@ final class PrescriptionModels {
     record PrescriptionItemRow(UUID id, UUID prescriptionId, String drugName, String dosage, String frequency,
                                 String duration, String instructions, String allergyOverrideReason, int displayOrder,
                                 String overridesJson, String brandName, String sigPattern, String route,
-                                java.math.BigDecimal quantity, String quantityUnit) {
+                                java.math.BigDecimal quantity, String quantityUnit, String drugId, String genericName) {
     }
 
     /** DOC-033: tenant-scoped drug name suggestion (see DrugSuggestionResponse). */
-    record DrugSuggestionRow(String name, String source, String code, Boolean inStock, Boolean prescriptionOnly) {
+    record DrugSuggestionRow(String name, String source, String code, Boolean inStock, Boolean prescriptionOnly,
+                              String drugId, String brand, String strength, String form, java.util.List<String> generic,
+                              java.util.List<String> schedule) {
     }
 
     /** NB-114: a saved prescription set — doctorId null means a clinic default, visible to every doctor. */
@@ -31,6 +33,6 @@ final class PrescriptionModels {
 
     record FavouriteSetItemRow(UUID id, String drugName, String dosage, String frequency, String duration,
                                 String instructions, int displayOrder, String brandName, String sigPattern, String route,
-                                java.math.BigDecimal quantity, String quantityUnit) {
+                                java.math.BigDecimal quantity, String quantityUnit, String drugId, String genericName) {
     }
 }
