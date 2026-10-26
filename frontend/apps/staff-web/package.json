@@ -22,6 +22,7 @@
     "@nabd/api-client": "workspace:*",
     "@nabd/domain": "workspace:*",
     "@nabd/i18n": "workspace:*",
+    "@nabd/ui": "workspace:*",
     "@tanstack/react-query": "5.104.1",
     "next": "16.4.2",
     "next-intl": "^4.14.9",

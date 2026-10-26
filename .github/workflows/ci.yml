@@ -82,6 +82,8 @@ jobs:
         run: python3 scripts/ci/events.py check && python3 scripts/ci/test_events.py
       - name: No cache value in logs or metrics (OPS-020 static scan) and the scan's own tests
         run: python3 scripts/ci/cache_values.py check && python3 scripts/ci/test_cache_values.py
+      - name: Pilot UAT pack complete (OPS-049) and its tools
+        run: python3 scripts/ci/uat_pack.py check && python3 scripts/ci/test_ops049_uat.py
 
   stage2-unit:
     needs: changes

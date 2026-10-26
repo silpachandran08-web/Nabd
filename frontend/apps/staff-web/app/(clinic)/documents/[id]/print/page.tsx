@@ -8,6 +8,8 @@ import Icon from "../../../../components/ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../../../../components/ui/StateViews";
 import DocumentSheet from "../../../../components/consult/DocumentSheet";
 import { DOC_LABEL, type ClinicalDocument } from "../../../../components/consult/documents";
+import { PrintSheet } from "@nabd/ui";
+import { usePrintPaper } from "../../../../lib/usePrintPaper";
 import styles from "./print.module.css";
 import { apiFetch, goLogin } from "../../../../lib/apiClient";
 
@@ -29,6 +31,7 @@ function PrintView() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [load, setLoad] = useState<Load>({ state: "loading" });
+  const paper = usePrintPaper("document"); // FEF-046
 
   const fetchDoc = useCallback(async () => {
     setLoad({ state: "loading" });
@@ -67,9 +70,9 @@ function PrintView() {
               <button type="button" className={styles.btnPrimary} onClick={() => window.print()}><Icon name="list" size={14} /> Print</button>
             </div>
           </div>
-          <div className={styles.printArea}>
+          <PrintSheet paper={paper} label={DOC_LABEL[load.doc.type]} bare>
             <DocumentSheet type={load.doc.type} body={load.doc.body} header={load.doc.header} issuedAt={load.doc.issuedAt} />
-          </div>
+          </PrintSheet>
           <p className={`${styles.note} ${styles.noPrint}`}>Sharing by WhatsApp or a secure link is not available yet.</p>
         </>
       )}

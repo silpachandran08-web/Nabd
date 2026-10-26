@@ -3,6 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "peerDependencies": { "react": "19.2.8" },
+  "devDependencies": { "@types/react": "^19" },
   "exports": { ".": "./src/index.ts" },
   "scripts": {
     "lint": "eslint .",

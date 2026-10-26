@@ -220,42 +220,8 @@
   }
 }
 
+/* FEF-046: printing (paper size, shell hiding, black on white) comes from the print kit (PrintSheet). */
 @media print {
-  @page {
-    size: A4;
-    margin: 14mm;
-  }
-
-  /* Hide the app shell (sidebar, top bar, bottom nav) only on the page that holds a printable sheet. */
-  :global(.appShell):has(.sheet) > :not(:global(.appShellContent)) {
-    display: none !important;
-  }
-  :global(.appShell):has(.sheet) :global(.appShellContent) > :not(:global(.appShellBody)) {
-    display: none !important;
-  }
-  :global(.appShell):has(.sheet) :global(.appShellContent) {
-    padding-block-end: 0 !important;
-  }
-
-  /* The app is dark; the paper must not inherit it when "background graphics" is on. */
-  :global(html):has(.sheet),
-  :global(body):has(.sheet) {
-    background: Canvas !important;
-    color: CanvasText !important;
-  }
-
-  .page {
-    padding: 0;
-    max-inline-size: none;
-    gap: 0;
-  }
-  .toolbar,
-  .notice,
-  .screenOnly {
-    display: none !important;
-  }
-  .sheet {
-    padding: 0;
-    border-radius: 0;
-  }
+  .sheet { gap: var(--nb-space-8); font-size: 12px; }
+  .letterhead { padding-block-end: var(--nb-space-8); }
 }

@@ -39,14 +39,8 @@
   .actions > button { flex: 1 1 100%; }
 }
 
-/* Print only the token slip. */
-@media print {
-  :global(body) * { visibility: hidden; }
-  .printArea, .printArea * { visibility: visible; }
-  .printArea { position: absolute; inset-block-start: 0; inset-inline: 0; padding: 16px; color: #000; }
-  .printArea * { color: #000 !important; background: none !important; }
-  .noPrint { display: none !important; }
-}
+/* FEF-046: the print kit hides everything outside the sheet; this hides the on-screen hint inside it. */
+@media print { .noPrint { display: none !important; } }
 
 /* ACC-031: announced to screen readers when the token is issued; see globals.css .srOnly */
 .srOnly { position: absolute; inset-inline-start: 0; inline-size: 1px; block-size: 1px; margin: -1px; padding: 0; clip-path: inset(50%); white-space: nowrap; }

@@ -8,6 +8,8 @@ import { getIdentity } from "../../lib/session";
 import { api, errorText, intentKeys } from "../../lib/api";
 import type { StaffOption, WaitEstimate } from "@nabd/api-client/types";
 import type { QueueEntry } from "@nabd/domain";
+import { PrintSheet } from "@nabd/ui";
+import { usePrintPaper } from "../../lib/usePrintPaper";
 import styles from "./checkin.module.css";
 import { dateLocale } from "./dateLocale";
 import { readDeskDefault, writeDeskDefault } from "./walk-in/deskDefaults";
@@ -48,10 +50,12 @@ export function CheckInResultDialog({ result, onClose }: { result: CheckInResult
     return () => { cancelled = true; };
   }, [result]);
 
+  const paper = usePrintPaper("token_slip"); // FEF-046
   const loading = position === undefined || waitMin === undefined;
   return (
     <Dialog title={sl("title")} onClose={onClose}>
-      <div className={`${styles.result} ${styles.printArea}`}>
+      <PrintSheet paper={paper} label="Token slip">
+      <div className={styles.result}>
         <span className={styles.srOnly} role="status">{sl("announce", { token: result.tokenNumber, name: result.patientName })}</span>
         <div className={styles.tokenLabel}>{sl("token")}</div>
         <div className={styles.tokenNumber}>#{result.tokenNumber}</div>
@@ -64,6 +68,7 @@ export function CheckInResultDialog({ result, onClose }: { result: CheckInResult
         </dl>
         <p className={`${styles.note} ${styles.noPrint}`}>{!loading && (position == null || waitMin == null) ? sl("unavailable") : "\u00a0"}</p>
       </div>
+      </PrintSheet>
       <div className={`${styles.actions} ${styles.noPrint}`}>
         <button type="button" className={styles.secondaryBtn} onClick={() => window.print()}>{sl("print")}</button>
         <button type="button" className={styles.primaryBtn} onClick={onClose}>{sl("done")}</button>
