@@ -66,8 +66,10 @@ async function open(perms, extra, handlers, path, viewport) {
   await s.browser.close();
 }
 {
-  const s = await open(RECEPTION, {}, base(ALL), '/requests');
-  check('entitled + permitted planned screen shows the honest placeholder', (await s.page.getByText(/Requests is not available yet/).count()) === 1);
+  const s = await open(RECEPTION, {}, base(ALL), '/messages');
+  check('entitled + permitted planned screen shows the honest placeholder', (await s.page.getByText(/WhatsApp inbox is not available yet/).count()) === 1);
+  await s.page.goto(`${APP}/requests`, { waitUntil: 'networkidle' }); // ACC-010 built it: the real inbox, not the placeholder
+  check('entitled + permitted built screen (requests) shows the real inbox', (await s.page.getByRole('heading', { name: 'Booking requests' }).count()) === 1 && (await s.page.getByText(/not available yet/).count()) === 0);
   await s.browser.close();
 }
 
