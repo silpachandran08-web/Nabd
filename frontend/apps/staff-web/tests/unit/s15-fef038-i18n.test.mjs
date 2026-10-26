@@ -15,7 +15,7 @@ const flat = (o, p = "") => Object.entries(o).flatMap(([k, v]) => (v && typeof v
 const cat = (loc, ns) => Object.fromEntries(flat(JSON.parse(readFileSync(`${msgDir}${loc}/${ns}.json`, "utf8"))));
 const vars = (s) => [...new Set([...s.matchAll(/\{(\w+)/g)].map((m) => m[1]))].sort().join(",");
 const walk = (d) => readdirSync(d).flatMap((f) => { const p = `${d}/${f}`; return statSync(p).isDirectory() ? walk(p) : [p]; });
-const MIGRATED = [...walk(`${app}app/login`), ...walk(`${app}app/accept-invite`), ...walk(`${app}app/arrivals`), ...walk(`${app}app/components/arrivals`), `${app}app/components/MfaEnrolCard.tsx`, `${app}app/components/ui/Dialog.tsx`]
+const MIGRATED = [...walk(`${app}app/(auth)/login`), ...walk(`${app}app/(auth)/accept-invite`), ...walk(`${app}app/(clinic)/arrivals`), ...walk(`${app}app/components/arrivals`), `${app}app/components/MfaEnrolCard.tsx`, `${app}app/components/ui/Dialog.tsx`]
   .filter((f) => /\.tsx?$/.test(f));
 
 test("hi has exactly the keys and ICU placeholders of en, and no empty text", () => {
@@ -93,7 +93,7 @@ test("stylelint with the logical-properties rule passes on every CSS file of the
 test("directional icons mirror under rtl: flip list on Icon, one global rule, overview chevrons use the icon", () => {
   assert.match(readFileSync(`${app}app/components/ui/Icon.tsx`, "utf8"), /FLIP_RTL: readonly IconName\[\] = \["chevron", "login"\]/);
   assert.match(readFileSync(`${app}app/globals.css`, "utf8"), /\[dir="rtl"\] svg\[data-flip\] \{ transform: scaleX\(-1\); \}/);
-  const ov = readFileSync(`${app}app/overview/page.tsx`, "utf8");
+  const ov = readFileSync(`${app}app/(clinic)/overview/page.tsx`, "utf8");
   assert.ok(!ov.includes("›"), "a text chevron is left in overview");
   assert.equal((ov.match(/<Icon name="chevron" size=\{18\} \/>/g) ?? []).length, 5);
 });

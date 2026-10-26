@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import styles from "./myDay.module.css";
 import Icon from "../ui/Icon";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
@@ -10,13 +10,12 @@ import DoctorControls from "./DoctorControls";
 import { can } from "../../lib/permissions";
 import { clinicToday, formatClinicDate } from "../../lib/clinicTime";
 import { useClinicTimeZone } from "../../lib/useClinicTimeZone";
-import RequestsCard from "../requests/RequestsCard";
 import { AppointmentsCard, ChronicDueCard, NeedsMeCard, NowNext, QueueList, SessionStrip } from "./MyDayParts";
 
 // DOC-002 "My Day" (wireframe NabdShell.html DOC-01 / "Doctor home"): session strip, In the room /
 // Up next, My queue, Needs me and optional widgets. Only real endpoints feed it; anything with no
 // API yet is named as such in "Needs me" rather than shown as a number.
-export default function MyDay() {
+export default function MyDay({ requestsSlot }: { requestsSlot?: ReactNode }) {
   const { data, loading, error, reload } = useMyDay();
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
@@ -52,7 +51,7 @@ export default function MyDay() {
           <>
             <SessionStrip data={data} seen={seen} total={active.length} />
             {can("queue:edit") && <DoctorControls doctorId={data.selfId} inRoomId={inRoom?.id ?? null} onChanged={() => void reload()} />}
-            <RequestsCard />
+            {requestsSlot}
             <div className={styles.grid}>
               <div className={styles.col}>
                 <NowNext inRoom={inRoom} next={next} now={now} />

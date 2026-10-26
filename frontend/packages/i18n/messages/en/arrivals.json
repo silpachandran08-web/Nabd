@@ -56,7 +56,14 @@
     "priority": "Priority",
     "rowLabel": "Open details for {name}, token {token}",
     "waitShort": "{n}m",
-    "waitLong": "{n} min"
+    "waitLong": "{n} min",
+    "why": {
+      "priority": "priority",
+      "booked_on_time": "booked",
+      "interleave": "walk-in turn",
+      "reserved_slot": "reserved walk-in slot"
+    },
+    "nextWhy": "Next {position} · {reason}{range, select, none {} other { · {range}}}"
   },
   "visit": {
     "appointment": "Appointment",
@@ -320,5 +327,34 @@
       "back": "Go back / close",
       "help": "Show this list"
     }
+  },
+  "doctorBoard": {
+    "hint": "Drag a waiting patient to another doctor, or focus a card and press M, then the column number. P marks priority.",
+    "colLabel": "{name}, column {number}",
+    "state": {
+      "in": "In",
+      "paused": "Paused",
+      "out": "Out"
+    },
+    "nowServing": "Now T-{token}",
+    "late": "Running {minutes} min late",
+    "noPatients": "No patients",
+    "cardLabel": "{token}, {name}, {stage}{priority, select, true {, priority} other {}}",
+    "priority": "Priority",
+    "allergy": "Allergy",
+    "dialogTitle": "Move patient",
+    "confirm": "Move {token} ({name}) from {from} to {to}? The patient gets {to}’s next token.",
+    "reason": "Reason",
+    "cancel": "Cancel",
+    "move": "Move",
+    "moving": "Moving...",
+    "moved": "Moved. New token T-{token}, was T-{previous}.",
+    "moveFail": "Couldn't move this patient.",
+    "movingNote": "Moving {token}. Press a column number, or Escape.",
+    "pickOther": "Pick another doctor's column number.",
+    "loading": "Loading the doctor board",
+    "loadFail": "Couldn't load the doctor board.",
+    "emptyTitle": "No doctors on the board",
+    "emptyHint": "Doctors with working hours or patients today appear here."
   }
 }

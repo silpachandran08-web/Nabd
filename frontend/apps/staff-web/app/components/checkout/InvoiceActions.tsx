@@ -21,8 +21,8 @@ export default function InvoiceActions({ invoiceId, reprint = false }: { invoice
   useEffect(() => {
     // Enter on the success state prints the receipt; any focused control keeps its own Enter.
     const onKey = (e: KeyboardEvent) => { if (e.key === "Enter" && (e.target === document.body || e.target === null)) receiptLink.current?.click(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, []);
 
   const send = async () => {

@@ -14,11 +14,6 @@ import WaitCell from "./WaitCell";
 
 type Props = { row: Row; doctorName: string; grants: Grants; sendingId?: string; h: RowHandlers; onOpen: (id: string) => void };
 
-// ACC-012: why a patient sits where they do in the call order
-const WHY_HERE: Record<string, string> = {
-  priority: "priority", booked_on_time: "booked", interleave: "walk-in turn", reserved_slot: "reserved walk-in slot",
-};
-
 const shallow = (a: object, b: object) => {
   const ka = Object.keys(a) as (keyof typeof a)[];
   return ka.length === Object.keys(b).length && ka.every((k) => Object.is(a[k], b[k as keyof typeof b]));
@@ -39,7 +34,7 @@ function ArrivalRowImpl({ row: r, doctorName, grants, sendingId, h, onOpen }: Pr
       <td className={styles.token} data-label={t("board.token")}>
         #{r.tokenNumber}
         {r.priority && <span className={styles.priorityTag}><StatusPill tone="urgent" label={t("board.priority")} /></span>}
-        {r.position != null && <span className={styles.muted} data-testid="why-here"> Next {r.position} · {WHY_HERE[r.orderReason ?? ""] ?? r.orderReason ?? ""}{r.expectedRange ? ` · ${r.expectedRange}` : ""}</span>}
+        {r.position != null && <span className={styles.muted} data-testid="why-here">{" "}{t("board.nextWhy", { position: r.position, reason: t.has(`board.why.${r.orderReason}`) ? t(`board.why.${r.orderReason}`) : (r.orderReason ?? ""), range: r.expectedRange || "none" })}</span>}
       </td>
       <td data-label={t("board.patient")}><span className={styles.patientName}>{r.patientName}</span>
         <span className={styles.mrn}>{[r.patientMrn, [r.ageYears, (r.gender ?? "").trim().charAt(0).toUpperCase()].filter((x) => x != null && x !== "").join(" ")].filter(Boolean).join(" · ")}</span>

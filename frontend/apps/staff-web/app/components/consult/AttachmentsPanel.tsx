@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Dialog from "../ui/Dialog";
 import { EmptyState, ErrorState, Skeleton } from "../ui/StateViews";
-import type { AuthedFetch } from "./shared";
+import { api, reasonText } from "../../lib/api";
 import { blobPath, defaultKind, isTerminal, KINDS, statusLabel, validateUpload, type Kind, type ScanStatus } from "../../lib/attachments";
 import s from "./consultParts.module.css";
 
@@ -11,10 +11,8 @@ type Item = { attachmentId: string; fileId: string; kind: Kind; note: string | n
 type Phase = { text: string; blocked?: boolean } | null;
 
 const kindLabel = (k: string) => KINDS.find((x) => x.id === k)?.label ?? k;
-const problem = async (res: Response | null, fallback: string) => (res ? ((await res.json().catch(() => null))?.detail ?? fallback) : fallback);
-
 /** PLT-030: the visit's attachments, an upload control (PLT-029) and a viewer. Restricted controls are absent, not disabled. */
-export default function AttachmentsPanel({ authedFetch, visitId, canView, canAttach }: { authedFetch: AuthedFetch; visitId: string; canView: boolean; canAttach: boolean }) {
+export default function AttachmentsPanel({ visitId, canView, canAttach }: { visitId: string; canView: boolean; canAttach: boolean }) {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>(null);
@@ -24,11 +22,9 @@ export default function AttachmentsPanel({ authedFetch, visitId, canView, canAtt
 
   const load = useCallback(async () => {
     setError(null);
-    const res = await authedFetch(`/clinical/visits/${visitId}/attachments`);
-    if (!res) return;
-    if (!res.ok) { setError(await problem(res, "Attachments could not be loaded.")); return; }
-    setItems(((await res.json()) as { items: Item[] }).items);
-  }, [authedFetch, visitId]);
+    try { setItems((await api.get<{ items: Item[] }>(`/clinical/visits/${visitId}/attachments`)).items); }
+    catch (e) { setError(reasonText(e, "Attachments could not be loaded.")); }
+  }, [visitId]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- load-on-mount fetch, same as DoctorOrders
   useEffect(() => { if (canView) void load(); }, [canView, load]);
 
@@ -36,39 +32,35 @@ export default function AttachmentsPanel({ authedFetch, visitId, canView, canAtt
     const bad = validateUpload(file);
     if (bad) { setPhase({ text: bad, blocked: true }); return; }
     setPhase({ text: "Uploading" });
-    const json = { "Content-Type": "application/json" };
-    const slotRes = await authedFetch("/files/uploads", { method: "POST", headers: json, body: JSON.stringify({ purpose: "outside_report", contentType: file.type, sizeBytes: file.size }) });
-    if (!slotRes?.ok) { setPhase({ text: await problem(slotRes, "Upload could not start."), blocked: true }); return; }
-    const slot = (await slotRes.json()) as { uploadId: string; putUrl: string };
-    const put = await authedFetch(blobPath(slot.putUrl), { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: file });
-    if (!put?.ok) { setPhase({ text: "Upload failed. Try again.", blocked: true }); return; }
-    const done = await authedFetch(`/files/uploads/${slot.uploadId}/complete`, { method: "POST", headers: json, body: "{}" });
-    if (!done?.ok) { setPhase({ text: await problem(done, "Upload could not be completed."), blocked: true }); return; }
-    const { fileId } = (await done.json()) as { fileId: string };
+    let fileId: string;
+    try {
+      const slot = await api.post<{ uploadId: string; putUrl: string }>("/files/uploads", { purpose: "outside_report", contentType: file.type, sizeBytes: file.size });
+      try { await api.put(blobPath(slot.putUrl), undefined, { rawBody: file, headers: { "Content-Type": "application/octet-stream" } }); }
+      catch { setPhase({ text: "Upload failed. Try again.", blocked: true }); return; }
+      ({ fileId } = await api.post<{ fileId: string }>(`/files/uploads/${slot.uploadId}/complete`, {}));
+    } catch (e) { setPhase({ text: reasonText(e, "Upload could not be completed."), blocked: true }); return; }
     setPhase({ text: statusLabel("pending_scan") });
     for (let i = 0; i < 60; i++) {
-      const st = await authedFetch(`/files/${fileId}`);
-      const status = st?.ok ? (((await st.json()) as { status: ScanStatus }).status) : "pending_scan";
+      const status = await api.get<{ status: ScanStatus }>(`/files/${fileId}`).then((r) => r.status, () => "pending_scan" as ScanStatus);
       if (isTerminal(status)) {
         if (status !== "available") { setPhase({ text: statusLabel(status), blocked: true }); return; }
         break;
       }
       await new Promise((r) => setTimeout(r, 1000));
     }
-    const att = await authedFetch(`/clinical/visits/${visitId}/attachments`, { method: "POST", headers: json, body: JSON.stringify({ fileId, kind: defaultKind(file.type), note: note.trim() || undefined }) });
-    if (!att?.ok) { setPhase({ text: await problem(att, "The file could not be attached."), blocked: true }); return; }
+    try { await api.post(`/clinical/visits/${visitId}/attachments`, { fileId, kind: defaultKind(file.type), note: note.trim() || undefined }); }
+    catch (e) { setPhase({ text: reasonText(e, "The file could not be attached."), blocked: true }); return; }
     setPhase(null);
     setNote("");
     await load();
   }
 
   async function open(a: Item) {
-    const u = await authedFetch(`/files/${a.fileId}/download-url`, { method: "POST" });
-    if (!u?.ok) { setError(await problem(u, "The file could not be opened.")); return; }
-    const { url } = (await u.json()) as { url: string };
-    const blob = await authedFetch(blobPath(url));
-    if (!blob?.ok) { setError("The file could not be opened."); return; }
-    setViewer({ url: URL.createObjectURL(await blob.blob()), type: a.contentType, title: kindLabel(a.kind) });
+    try {
+      const { url } = await api.post<{ url: string }>(`/files/${a.fileId}/download-url`);
+      const blob = await api.get<Blob>(blobPath(url), { as: "blob" });
+      setViewer({ url: URL.createObjectURL(blob), type: a.contentType, title: kindLabel(a.kind) });
+    } catch (e) { setError(reasonText(e, "The file could not be opened.")); }
   }
   const closeViewer = () => { if (viewer) URL.revokeObjectURL(viewer.url); setViewer(null); };
 
@@ -102,9 +94,9 @@ export default function AttachmentsPanel({ authedFetch, visitId, canView, canAtt
       {viewer && (
         <Dialog title={viewer.title} onClose={closeViewer} size="lg">
           {viewer.type === "application/pdf"
-            ? <iframe src={viewer.url} title={viewer.title} style={{ inlineSize: "100%", blockSize: "70vh", border: 0 }} />
+            ? <iframe src={viewer.url} title={viewer.title} className={s.viewerFrame} />
             // eslint-disable-next-line @next/next/no-img-element
-            : <img src={viewer.url} alt={viewer.title} style={{ maxInlineSize: "100%" }} />}
+            : <img src={viewer.url} alt={viewer.title} className={s.viewerImg} />}
         </Dialog>
       )}
     </section>

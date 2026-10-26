@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { CallNextResponse } from "@nabd/api-client/generated";
 import styles from "./myDay.module.css";
 import StatusPill from "../ui/StatusPill";
 import { apiFetch } from "../../lib/apiClient";
@@ -49,7 +50,7 @@ export default function DoctorControls({ doctorId, inRoomId, onChanged }: { doct
 
   // ACC-012: one button applies the clinic's call order; the answer says who and why.
   const callNext = () => post(`/queue/doctors/${doctorId}/call-next`, {}, (j) => {
-    const r = j as unknown as { entry?: { tokenNumber?: number }; reason?: string };
+    const r = j as unknown as CallNextResponse;
     setCalled(`Called token #${r.entry?.tokenNumber ?? "?"}: ${CALL_REASON[r.reason ?? ""] ?? "next in order"}`);
     onChanged();
   }, "Couldn't call the next patient. Try again.");

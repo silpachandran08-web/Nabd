@@ -9,8 +9,8 @@ import { useNavBadges, WAITING_STATUSES } from "./useNavBadges";
 export default function ShellHotkeys() {
   const router = useRouter();
   const pathname = usePathname();
-  const { skip, input, role } = useShellNav();
-  const { me, mine } = useNavBadges(skip ? null : role, input.perms, pathname);
+  const { input, role } = useShellNav();
+  const { me, mine } = useNavBadges(role, input.perms, pathname);
   const next = mine?.find((r) => (!r.doctorId || r.doctorId === me) && WAITING_STATUSES.includes(r.status ?? ""));
   const state = useRef({ role, perms: input.perms, pathname, nextId: next?.id });
   useEffect(() => { state.current = { role, perms: input.perms, pathname, nextId: next?.id }; });

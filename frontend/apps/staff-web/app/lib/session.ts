@@ -144,5 +144,3 @@ export async function signOut(): Promise<void> {
   await clearLocalSessionData(); // FEF-005: lock flag + drafts database
 }
 
-// Routes with their own identity/nav or no session yet: the nav hooks do not poll there (the shell is also kept off them by the route groups).
-export const SHELL_SKIP_PREFIXES = ["/login", "/platform", "/accept-invite", "/owner"];

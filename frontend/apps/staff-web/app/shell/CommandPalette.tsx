@@ -10,11 +10,11 @@ import { useShellNav } from "./useShellNav";
 
 export default function CommandPalette() {
   const router = useRouter();
-  const { skip, input } = useShellNav();
+  const { input } = useShellNav();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
-  const hasSession = !skip && input.perms.length > 0;
+  const hasSession = input.perms.length > 0;
 
   useEffect(() => {
     if (!hasSession) return;

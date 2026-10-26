@@ -3,14 +3,13 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { usePermissions } from "../lib/usePermissions";
 import { useEntitlements } from "../lib/entitlements";
-import { decodeAccessToken, SHELL_SKIP_PREFIXES } from "../lib/session";
+import { decodeAccessToken } from "../lib/session";
 import { navFor } from "./navRegistry";
 import { useRoleOverride } from "./roleContext";
 
 /** The resolved nav for the signed-in staff member: role context, switchable contexts, permitted items. */
 export function useShellNav() {
   const pathname = usePathname();
-  const skip = SHELL_SKIP_PREFIXES.some((p) => pathname?.startsWith(p));
   const { permissions } = usePermissions();
   const ent = useEntitlements();
   const override = useRoleOverride();
@@ -18,13 +17,13 @@ export function useShellNav() {
   useEffect(() => {
     let c = { owner: false, specialty: null as string | null, tenantId: null as string | null };
     try {
-      const t = skip ? null : localStorage.getItem("nabd_access_token");
+      const t = localStorage.getItem("nabd_access_token");
       const d = t ? decodeAccessToken(t) : null;
       c = { owner: d?.owner === true, specialty: d?.specialty ?? null, tenantId: d?.tenantId ?? null };
     } catch { /* no storage: treated as signed out */ }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setClaims(c);
-  }, [pathname, skip, permissions]);
+  }, [pathname, permissions]);
   const input = { perms: permissions, owner: claims.owner, ent, override, specialty: claims.specialty };
-  return { skip, input, owner: claims.owner, tenantId: claims.tenantId, ...navFor(input) };
+  return { input, owner: claims.owner, tenantId: claims.tenantId, ...navFor(input) };
 }

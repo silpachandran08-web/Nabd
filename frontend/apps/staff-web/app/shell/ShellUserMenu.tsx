@@ -11,7 +11,7 @@ import { useShellNav } from "./useShellNav";
 
 export default function ShellUserMenu() {
   const router = useRouter();
-  const { skip, input, role, roles, owner } = useShellNav();
+  const { input, role, roles, owner } = useShellNav();
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (!open) return;
@@ -19,7 +19,7 @@ export default function ShellUserMenu() {
     document.addEventListener("keydown", k);
     return () => document.removeEventListener("keydown", k);
   }, [open]);
-  if (skip || input.perms.length === 0) return null;
+  if (input.perms.length === 0) return null;
   const who = getIdentity();
 
   function pick(r: RoleContext) {
