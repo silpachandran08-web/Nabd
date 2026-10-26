@@ -109,6 +109,12 @@ export const DiscountPageSchema = z.object({ data: z.array(DiscountResponseSchem
 export const DiscountRequestCreateSchema = z.object({ percent: z.number().gte(0.01).lte(100), reason: z.string().min(1), tenantId: z.string() });
 export const DispensingQueueItemSchema = z.object({ dosage: z.string().optional(), drugName: z.string().optional(), duration: z.string().optional(), frequency: z.string().optional(), instructions: z.string().optional(), stockQty: z.number().int().optional() });
 export const DispensingQueueEntryResponseSchema = z.object({ doctorName: z.string().optional(), items: z.array(DispensingQueueItemSchema).optional(), patientId: z.string().optional(), patientName: z.string().optional(), prescriptionId: z.string().optional(), queueEntryId: z.string().optional(), signedAt: z.string().optional(), token: z.number().int().optional() });
+export const DisplayScopeSchema = z.object({ departmentId: z.string().optional(), doctorIds: z.array(z.string()).optional() });
+export const DisplayDeviceSchema = z.object({ id: z.string().optional(), label: z.string().optional(), lastSeenAt: z.string().optional(), pairedAt: z.string().optional(), scope: DisplayScopeSchema.optional() });
+export const DisplayPairRequestSchema = z.object({ clinic: z.string().min(0).max(80), code: z.string().min(1) });
+export const DisplayPairResponseSchema = z.object({ deviceToken: z.string().optional(), scope: DisplayScopeSchema.optional() });
+export const DisplayPairingCodeSchema = z.object({ clinic: z.string().optional(), code: z.string().optional(), expiresAt: z.string().optional() });
+export const DisplayPairingCodeRequestSchema = z.object({ label: z.string().min(0).max(60), scope: DisplayScopeSchema.optional() });
 export const DoctorSchema = z.object({ department: z.string().optional(), id: z.string().optional(), leaveReason: z.string().optional(), name: z.string().optional(), onLeave: z.boolean().optional(), worksToday: z.boolean().optional() });
 export const DoctorDelayResponseSchema = z.object({ active: z.boolean().optional(), announcedAt: z.string().optional(), announcedBy: z.string().optional(), clearedAt: z.string().optional(), clearedBy: z.string().optional(), clinicDate: z.string().optional(), delayMinutes: z.number().int().optional(), doctorId: z.string().optional(), id: z.string().optional(), reason: z.string().optional() });
 export const DoctorLeaveResponseSchema = z.object({ affectedPackagePatients: z.array(z.string()).optional(), dateFrom: z.string().optional(), dateTo: z.string().optional(), id: z.string().optional(), reason: z.string().optional() });
@@ -252,6 +258,8 @@ export const RedemptionSchema = z.object({ sessionsRedeemed: z.number().int().op
 export const SalesDaySchema = z.object({ amount: z.number().optional(), count: z.number().int().optional(), date: z.string().optional() });
 export const PackagesReportResponseSchema = z.object({ expiredWithValue: z.array(ExpiredWithValueSchema).optional(), from: z.string().optional(), redemption: RedemptionSchema.optional(), salesByDay: z.array(SalesDaySchema).optional(), to: z.string().optional() });
 export const PageSchema = z.object({ items: z.array(ItemSchema).optional(), nextCursor: z.string().optional() });
+export const PatientBatchSummarySchema = z.object({ allergyFlag: z.boolean().optional(), displayName: z.string().optional(), gender: z.string().optional(), id: z.string().optional(), isMinor: z.boolean().optional(), mrn: z.string().optional() });
+export const PatientBatchPageSchema = z.object({ items: z.array(PatientBatchSummarySchema).optional() });
 export const PatientDetailResponseSchema = z.object({ activePackages: z.number().int().optional(), allergies: z.array(z.string()).optional(), chronicConditions: z.array(z.string()).optional(), dob: z.string().optional(), gender: z.string().optional(), guardianConsentGrantedAt: z.string().optional(), guardianId: z.string().optional(), guardianName: z.string().optional(), guardianReviewKeptAt: z.string().optional(), id: z.string().optional(), isMinor: z.boolean().optional(), lastVisit: z.string().optional(), lastVisitAt: z.string().optional(), mrn: z.string().optional(), name: z.string().optional(), outstandingBalance: z.number().optional(), phone: z.string().optional(), status: z.string().optional() });
 export const PatientResponseSchema = z.object({ dob: z.string().optional(), gender: z.string().optional(), id: z.string().optional(), isMinor: z.boolean().optional(), matchedOn: z.string().optional(), mrn: z.string().optional(), name: z.string().optional(), phone: z.string().optional(), status: z.string().optional() });
 export const PatientPageSchema = z.object({ data: z.array(PatientResponseSchema).optional(), page: PageMetaSchema.optional() });
@@ -307,8 +315,16 @@ export const ProcedureOrderResponseSchema = z.object({ baseAmount: z.number().op
 export const ProcedureStatusRequestSchema = z.object({ status: z.string().optional() });
 export const ProvisioningStepResponseSchema = z.object({ completedAt: z.string().optional(), errorDetail: z.string().optional(), startedAt: z.string().optional(), status: z.string().optional(), stepName: z.string().optional(), stepOrder: z.number().int().optional() });
 export const ProvisioningJobResponseSchema = z.object({ approvedAt: z.string().optional(), createdTenantId: z.string().optional(), id: z.string().optional(), ownerAccountInviteToken: z.string().optional(), ownerInviteToken: z.string().optional(), path: z.string().optional(), region: z.string().optional(), status: z.string().optional(), steps: z.array(ProvisioningStepResponseSchema).optional(), tenantName: z.string().optional(), tenantSlug: z.string().optional() });
+export const QueueBoardEntrySchema = z.object({ allergyFlag: z.boolean().optional(), displayName: z.string().optional(), flags: z.array(z.string()).optional(), id: z.string().optional(), mrn: z.string().optional(), p50At: z.string().optional(), p80At: z.string().optional(), patientId: z.string().optional(), position: z.number().int().optional(), previousToken: z.number().int().optional(), priority: z.boolean().optional(), stage: z.string().optional(), token: z.number().int().optional(), vitalsRecorded: z.boolean().optional() });
+export const QueueBoardDoctorSchema = z.object({ delayMinutes: z.number().int().optional(), doctorId: z.string().optional(), entries: z.array(QueueBoardEntrySchema).optional(), name: z.string().optional(), nowServing: z.number().int().optional(), state: z.string().optional() });
+export const QueueBoardSchema = z.object({ date: z.string().optional(), doctors: z.array(QueueBoardDoctorSchema).optional(), v: z.number().int().optional() });
 export const QueueEntryResponseSchema = z.object({ ageYears: z.number().int().optional(), appointmentId: z.string().optional(), appointmentStatus: z.string().optional(), createdAt: z.string().optional(), currentStage: z.string().optional(), departmentId: z.string().optional(), doctorId: z.string().optional(), doctorName: z.string().optional(), encounterClass: z.string().optional(), encounterId: z.string().optional(), gender: z.string().optional(), id: z.string().optional(), parentQueueEntryId: z.string().optional(), patientId: z.string().optional(), paymentMode: z.string().optional(), presentingComplaint: z.string().optional(), priority: z.boolean().optional(), priorityAcknowledgedAt: z.string().optional(), priorityAcknowledgedBy: z.string().optional(), priorityFlaggedAt: z.string().optional(), priorityFlaggedBy: z.string().optional(), priorityReason: z.string().optional(), queueDate: z.string().optional(), source: z.string().optional(), status: z.string().optional(), tokenNumber: z.number().int().optional(), transferReason: z.string().optional(), transferReasonNote: z.string().optional(), visitType: z.string().optional(), waitMinutes: z.number().int().optional(), workflowDefinitionId: z.string().optional() });
-export const QueueReorderRequestSchema = z.object({ priority: z.boolean(), reason: z.string().min(3).max(2147483647) });
+export const QueueFacilitySettingsRequestSchema = z.object({ etaDisplayMode: z.string().min(1) });
+export const QueueReassignRequestSchema = z.object({ expectedStatus: z.string().min(1), reasonCode: z.string().min(1), toDoctorId: z.string() });
+export const QueueReassignResponseSchema = z.object({ entry: QueueEntryResponseSchema.optional(), previousToken: z.number().int().optional() });
+export const QueueReorderRequestSchema = z.object({ priority: z.boolean(), reason: z.string().optional() });
+export const QueueSettingsRequestSchema = z.object({ etaDisplayMode: z.string().nullable().optional(), workingHoursId: z.string().nullable().optional() });
+export const QueueSettingsResponseSchema = z.object({ effectiveSource: z.string().optional(), etaDisplayMode: z.string().optional() });
 export const QueueStatusUpdateRequestSchema = z.object({ expectedStatus: z.string().optional(), status: z.string().min(1) });
 export const QuoteRequestSchema = z.object({ buyerGstin: z.string().optional(), discounts: z.array(DiscountRequestSchema).optional(), lines: z.array(LineItemRequestSchema) });
 export const QuoteTotalsSchema = z.object({ discountMinor: z.number().int().optional(), roundOffMinor: z.number().int().optional(), subtotalMinor: z.number().int().optional(), taxMinor: z.number().int().optional(), totalMinor: z.number().int().optional() });
@@ -348,6 +364,8 @@ export const ScheduleWeekResponseSchema = z.object({ days: z.array(DaySchema).op
 export const SellPackageRequestSchema = z.object({ packageId: z.string(), patientId: z.string(), paymentMethod: z.string().min(1) });
 export const SessionActionRequestSchema = z.object({ reasonCode: z.string().optional() });
 export const SessionResponseSchema = z.object({ current: z.boolean().optional(), device: z.string().optional(), id: z.string().optional(), ip: z.string().optional(), lastSeenAt: z.string().optional() });
+export const SessionSettingSchema = z.object({ dayOfWeek: z.number().int().optional(), endTime: z.string().optional(), etaDisplayMode: z.string().optional(), startTime: z.string().optional(), workingHoursId: z.string().optional() });
+export const SettingsSchema = z.object({ effectiveMode: z.string().optional(), effectiveSource: z.string().optional(), etaDisplayMode: z.string().optional(), facilityDefault: z.string().optional(), sessions: z.array(SessionSettingSchema).optional() });
 export const SetupChecklistItemResponseSchema = z.object({ doneAt: z.string().optional(), skippedAt: z.string().optional(), status: z.string().optional(), step: z.string().optional() });
 export const SourceBreakdownResponseSchema = z.object({ revenue: z.number().optional(), source: z.string().optional(), untaggedCount: z.number().int().optional(), visitCount: z.number().int().optional() });
 export const SseEmitterSchema = z.object({ timeout: z.number().int().optional() });
@@ -536,12 +554,19 @@ export const operationSchemas = {
   DepartmentController_transferTargets: { response: z.array(TransferTargetResponseSchema) },
   DepartmentController_getWorkflow: { response: DepartmentWorkflowResponseSchema },
   DepartmentController_replaceWorkflow: { body: DepartmentWorkflowRequestSchema, response: DepartmentWorkflowResponseSchema },
+  DisplayController_devices: { response: z.array(DisplayDeviceSchema) },
+  DisplayController_createCode: { body: DisplayPairingCodeRequestSchema, response: DisplayPairingCodeSchema },
+  DisplayController_unpair: {  },
+  DisplayController_pair: { body: DisplayPairRequestSchema, response: DisplayPairResponseSchema },
+  DisplayController_stream: { response: SseEmitterSchema },
   ScheduleController_availability: { response: z.array(z.string()) },
   ScheduleController_delayHistory: { response: z.array(DoctorDelayResponseSchema) },
   ScheduleController_announceDelay: { body: DelayAnnounceRequestSchema, response: DoctorDelayResponseSchema },
   ScheduleController_clearDelay: {  },
   ScheduleController_listLeave: { response: z.array(DoctorLeaveResponseSchema) },
   ScheduleController_addLeave: { body: DoctorLeaveWriteRequestSchema, response: DoctorLeaveResponseSchema },
+  QueueSettingsController_get: { response: SettingsSchema },
+  QueueSettingsController_put: { body: QueueSettingsRequestSchema, response: QueueSettingsResponseSchema },
   DoctorSessionController_today: { response: DoctorSessionResponseSchema },
   DoctorSessionController_act: { body: SessionActionRequestSchema, response: DoctorSessionResponseSchema },
   ScheduleController_listWorkingHours: { response: z.array(WorkingHoursResponseSchema) },
@@ -597,7 +622,7 @@ export const operationSchemas = {
   PackageController_update: { body: PackageWriteRequestSchema, response: PackageResponseSchema },
   PackageController_activate: { response: PackageResponseSchema },
   PackageController_deactivate: { response: PackageResponseSchema },
-  PatientController_list: { response: PatientPageSchema },
+  PatientBatchController_summaries: { response: z.unknown() },
   PatientController_register: { body: PatientWriteRequestSchema, response: z.record(z.string(), z.unknown()) },
   PatientBatchController_batch: { response: z.array(PatientDetailResponseSchema) },
   PatientController_byPhone: { response: HouseholdResponseSchema },
@@ -676,10 +701,13 @@ export const operationSchemas = {
   TerritoryController_list: { response: z.array(RegionSummaryResponseSchema) },
   PublicNoticeController_page: { response: z.string() },
   QueueController_list: { response: z.array(QueueEntryResponseSchema) },
+  QueueSettingsController_putFacility: { body: QueueFacilitySettingsRequestSchema, response: QueueSettingsResponseSchema },
+  QueueBoardController_board: { response: QueueBoardSchema },
   QueueController_checkIn: { body: CheckInRequestSchema, response: QueueEntryResponseSchema },
   QueueController_waitEstimate: { response: WaitEstimateResponseSchema },
   QueueController_extend: { body: ConsultExtendRequestSchema, response: ConsultExtendResponseSchema },
   QueueController_acknowledgePriority: { response: QueueEntryResponseSchema },
+  QueueBoardController_reassign: { body: QueueReassignRequestSchema, response: QueueReassignResponseSchema },
   QueueController_reorder: { body: QueueReorderRequestSchema, response: QueueEntryResponseSchema },
   QueueController_updateStatus: { body: QueueStatusUpdateRequestSchema, response: QueueEntryResponseSchema },
   QueueController_transfer: { body: TransferRequestSchema, response: TransferResponseSchema },

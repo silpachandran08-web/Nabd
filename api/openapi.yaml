@@ -26,6 +26,7 @@ tags:
   - name: Setup
   - name: Patients
   - name: Queue
+  - name: Display
   - name: Audit
   - name: Clinical
   - name: Pharmacy
@@ -1725,10 +1726,16 @@ paths:
             prefix from 3 characters) or name (any script; Arabic diacritics and alef/yaa/taa-marbuta variants fold).
             Ranked phone, MRN, name; top-N, no cursor. limit is 1..50 when q is given.
           schema: { type: string }
+        - name: ids
+          in: query
+          description: "ACC-022 batch read: up to 100 patient ids (comma separated) answered as PatientBatchPage instead of a page; 400 TOO_MANY_IDS above 100. Audited as patient_summary_list."
+          schema: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+          style: form
+          explode: false
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Cursor"
       responses:
-        "200": { $ref: "#/components/responses/PatientPage" }
+        "200": { description: "PatientPage, or PatientBatchPage when ids is given", content: { application/json: { schema: { oneOf: [ { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/Patient" } }, page: { $ref: "#/components/schemas/PageMeta" } } }, { $ref: "#/components/schemas/PatientBatchPage" } ] } } } }
         "400": { description: "With q: code QUERY_TOO_SHORT (under 3 characters and not an exact MRN) or INVALID_LIMIT (limit outside 1..50)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
     post:
       parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
@@ -2516,11 +2523,123 @@ paths:
           application/json:
             schema:
               type: object
-              required: [priority, reason]
-              properties: { priority: { type: boolean }, reason: { type: string, minLength: 3 } }
+              required: [priority]
+              properties: { priority: { type: boolean }, reason: { type: string, minLength: 3, description: "Required (400 REASON_REQUIRED) when priority is true" } }
       responses:
         "200": { description: "Updated", content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /doctors/{id}/queue-settings:
+    get:
+      tags: [Queue]
+      summary: "How patients see their wait for this doctor (ACC-018): own setting, per-session overrides, clinic default and the effective mode"
+      x-required-permission: queue:view
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "200": { description: "Settings", content: { application/json: { schema: { $ref: "#/components/schemas/QueueSettings" } } } }
+    put:
+      tags: [Queue]
+      summary: "Set the doctor's patient-facing ETA mode, or one working-hours block's override (null = inherit)"
+      description: "Allowed for setup:edit or the doctor themself. Audited as queue.eta_display_mode_set. Unknown mode is 422."
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name == #id.toString()"
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/QueueSettingsRequest" } } }
+      responses:
+        "200": { description: "The effective mode after the change", content: { application/json: { schema: { $ref: "#/components/schemas/QueueSettingsResponse" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "etaDisplayMode is not one of exact, range, position, delay_only, hidden", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /queue-settings/facility:
+    put:
+      tags: [Queue]
+      summary: "Clinic-wide default for how patients see their wait (ACC-018); doctors and sessions inherit it"
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/QueueFacilitySettingsRequest" } } }
+      responses:
+        "200": { description: "The new default", content: { application/json: { schema: { $ref: "#/components/schemas/QueueSettingsResponse" } } } }
+        "422": { description: "Not one of exact, range, position, delay_only, hidden", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /queue/board:
+    get:
+      tags: [Queue]
+      summary: "Today's OPD queue for every doctor in one call (ACC-022); inpatient/ER entries are excluded"
+      x-required-permission: queue:view
+      responses:
+        "200": { description: "Board", content: { application/json: { schema: { $ref: "#/components/schemas/QueueBoard" } } } }
+
+  /queue/{id}/reassign:
+    post:
+      tags: [Queue]
+      summary: "Move a waiting patient to another doctor of the same department (ACC-022); new token, old one kept as previousToken"
+      x-required-permission: queue:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/QueueReassignRequest" } } }
+      responses:
+        "200": { description: "Moved", content: { application/json: { schema: { $ref: "#/components/schemas/QueueReassignResponse" } } } }
+        "400": { description: "validation-failed (same doctor) or different-department (code DIFFERENT_DEPARTMENT)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "stale-status (code STALE_STATUS, the visit is no longer at expectedStatus) or session-full (code SESSION_FULL)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /display-devices/pairing-codes:
+    post:
+      tags: [Display]
+      summary: "Make a 6-digit code (10 minutes, single use) to pair a lobby screen (ACC-023)"
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DisplayCodeRequest" } } }
+      responses:
+        "201": { description: "Code", content: { application/json: { schema: { $ref: "#/components/schemas/DisplayCodeResponse" } } } }
+
+  /display-devices:
+    get:
+      tags: [Display]
+      summary: "Paired lobby screens with last-seen time"
+      x-required-permission: setup:view
+      responses:
+        "200": { description: "Devices", content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/DisplayDevice" } } } } }
+
+  /display-devices/{id}:
+    delete:
+      tags: [Display]
+      summary: "Unpair a lobby screen; its stream closes within 10 seconds"
+      x-required-permission: setup:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      responses:
+        "204": { description: "Unpaired" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /display/pair:
+    post:
+      tags: [Display]
+      summary: "Exchange a pairing code for a device token (public; 5 wrong codes lock the clinic for 15 minutes)"
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/DisplayPairRequest" } } }
+      responses:
+        "200": { description: "Device token (shown once)", content: { application/json: { schema: { $ref: "#/components/schemas/DisplayPairResponse" } } } }
+        "400": { description: "INVALID_CODE (wrong, expired or used)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "429": { description: "LOCKED", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+
+  /display/stream:
+    get:
+      tags: [Display]
+      summary: "Server-sent events for a paired lobby screen: `projection` (tokens and delays only, no patient data, resent every 15 s) and `revoked`"
+      description: "Header `Authorization: Display <deviceToken>`; the token is never accepted in the URL."
+      security: []
+      x-required-permission: public
+      responses:
+        "200": { description: "text/event-stream", content: { text/event-stream: { schema: { type: string } } } }
+        "401": { description: "DEVICE_REVOKED or INVALID_DEVICE", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
   # -------------------------------------------------------------- Audit
   /audit-events:
@@ -5802,6 +5921,92 @@ components:
         presentingComplaint: { type: [string, "null"] }
         paymentMode: { type: [string, "null"], enum: [cash, card, upi, other] }
 
+    QueueSettingsSession:
+      type: object
+      properties: { workingHoursId: { type: string, format: uuid }, dayOfWeek: { type: integer }, startTime: { type: string }, endTime: { type: string }, etaDisplayMode: { type: string, nullable: true } }
+    QueueSettings:
+      type: object
+      properties:
+        etaDisplayMode: { type: string, nullable: true, description: "The doctor's own setting; null = inherit" }
+        facilityDefault: { type: string, description: "Clinic default (PUT /queue-settings/facility), range when unset" }
+        effectiveMode: { type: string, enum: [exact, range, position, delay_only, hidden] }
+        effectiveSource: { type: string, enum: [session, doctor, facility, default] }
+        sessions: { type: array, items: { $ref: "#/components/schemas/QueueSettingsSession" } }
+    QueueSettingsRequest:
+      type: object
+      properties:
+        etaDisplayMode: { type: string, nullable: true, enum: [exact, range, position, delay_only, hidden] }
+        workingHoursId: { type: string, format: uuid, nullable: true, description: "Set this block's override instead of the doctor's" }
+    QueueFacilitySettingsRequest:
+      type: object
+      required: [etaDisplayMode]
+      properties: { etaDisplayMode: { type: string, enum: [exact, range, position, delay_only, hidden] } }
+    QueueSettingsResponse:
+      type: object
+      properties: { etaDisplayMode: { type: string }, effectiveSource: { type: string } }
+    QueueBoardEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        patientId: { type: string, format: uuid }
+        token: { type: integer }
+        previousToken: { type: integer, nullable: true }
+        displayName: { type: string, description: "First name and last initial" }
+        mrn: { type: string }
+        stage: { type: string }
+        position: { type: integer }
+        p50At: { type: string, format: date-time, nullable: true, description: "Empty until the ETA engine (ACC-017) records predictions" }
+        p80At: { type: string, format: date-time, nullable: true }
+        priority: { type: boolean }
+        flags: { type: array, items: { type: string } }
+        allergyFlag: { type: boolean }
+        vitalsRecorded: { type: boolean }
+    QueueBoardDoctor:
+      type: object
+      properties:
+        doctorId: { type: string, format: uuid }
+        name: { type: string }
+        state: { type: string }
+        delayMinutes: { type: integer, nullable: true }
+        nowServing: { type: integer, nullable: true }
+        entries: { type: array, items: { $ref: "#/components/schemas/QueueBoardEntry" } }
+    QueueBoard:
+      type: object
+      properties: { v: { type: integer, format: int64 }, date: { type: string, format: date }, doctors: { type: array, items: { $ref: "#/components/schemas/QueueBoardDoctor" } } }
+    QueueReassignRequest:
+      type: object
+      required: [toDoctorId, expectedStatus, reasonCode]
+      properties: { toDoctorId: { type: string, format: uuid }, expectedStatus: { type: string }, reasonCode: { type: string, pattern: "^[a-z][a-z0-9_]{1,39}$" } }
+    QueueReassignResponse:
+      type: object
+      properties: { entry: { $ref: "#/components/schemas/QueueEntry" }, previousToken: { type: integer } }
+    PatientBatchSummary:
+      type: object
+      properties: { id: { type: string, format: uuid }, mrn: { type: string }, displayName: { type: string }, gender: { type: string }, allergyFlag: { type: boolean }, isMinor: { type: boolean } }
+    PatientBatchPage:
+      type: object
+      properties: { items: { type: array, items: { $ref: "#/components/schemas/PatientBatchSummary" } } }
+    DisplayScope:
+      type: object
+      nullable: true
+      properties: { doctorIds: { type: array, items: { type: string, format: uuid } }, departmentId: { type: string, format: uuid, nullable: true } }
+    DisplayCodeRequest:
+      type: object
+      required: [label]
+      properties: { scope: { $ref: "#/components/schemas/DisplayScope" }, label: { type: string, maxLength: 60 } }
+    DisplayCodeResponse:
+      type: object
+      properties: { code: { type: string }, expiresAt: { type: string, format: date-time }, clinic: { type: string, description: "Clinic name to type on the TV" } }
+    DisplayPairRequest:
+      type: object
+      required: [clinic, code]
+      properties: { clinic: { type: string, maxLength: 80 }, code: { type: string, pattern: "^\\d{6}$" } }
+    DisplayPairResponse:
+      type: object
+      properties: { deviceToken: { type: string }, scope: { $ref: "#/components/schemas/DisplayScope" } }
+    DisplayDevice:
+      type: object
+      properties: { id: { type: string, format: uuid }, label: { type: string }, scope: { $ref: "#/components/schemas/DisplayScope" }, pairedAt: { type: string, format: date-time }, lastSeenAt: { type: string, format: date-time, nullable: true } }
     QueueEntry:
       type: object
       properties:

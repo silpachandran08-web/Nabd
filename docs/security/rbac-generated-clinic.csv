@@ -4,6 +4,7 @@ role,operation,required_any_of,expected
 owner,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 owner,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 owner,DELETE /v1/departments/{id},departments:delete,allow
+owner,DELETE /v1/display-devices/{id},setup:edit,allow
 owner,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner,DELETE /v1/patients/{id}/guardian,patients:edit,allow
 owner,DELETE /v1/roles/delegations/{id},staff:edit,allow
@@ -58,9 +59,11 @@ owner,GET /v1/departments/transfers,departments:view,allow
 owner,GET /v1/departments/{id}/flow,queue:view,allow
 owner,GET /v1/departments/{id}/transfer-targets,queue:view,allow
 owner,GET /v1/departments/{id}/workflow,departments:view,allow
+owner,GET /v1/display-devices,setup:view,allow
 owner,GET /v1/doctors/{id}/availability,queue:view,allow
 owner,GET /v1/doctors/{id}/delay,queue:view,allow
 owner,GET /v1/doctors/{id}/leave,queue:view,allow
+owner,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner,GET /v1/doctors/{id}/session,queue:view,allow
 owner,GET /v1/doctors/{id}/working-hours,queue:view,allow
 owner,GET /v1/nursing/activity/today,nursing:view,allow
@@ -78,6 +81,7 @@ owner,GET /v1/packages/liability,packages:view,allow
 owner,GET /v1/packages/refunds,packages:view,allow
 owner,GET /v1/packages/settings,packages:view,allow
 owner,GET /v1/packages/{id},packages:view,allow
+owner,GET /v1/patients,patients:view,allow
 owner,GET /v1/patients,patients:view,allow
 owner,GET /v1/patients/batch,patients:view,allow
 owner,GET /v1/patients/by-phone,patients:view,allow
@@ -110,6 +114,7 @@ owner,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 owner,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner,GET /v1/platform/territories,territories:view,deny-401
 owner,GET /v1/queue,queue:view,allow
+owner,GET /v1/queue/board,queue:view,allow
 owner,GET /v1/queue/wait-estimate,queue:view,allow
 owner,GET /v1/reports/billing-leakage,reports:view,allow
 owner,GET /v1/reports/daily-money,reports:view,allow
@@ -221,6 +226,7 @@ owner,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-403
 owner,POST /v1/departments,departments:create,allow
 owner,POST /v1/departments/transfers,departments:edit,allow
 owner,POST /v1/departments/{id}/workflow,departments:edit,allow
+owner,POST /v1/display-devices/pairing-codes,setup:edit,allow
 owner,POST /v1/doctors/{id}/delay,queue:edit,allow
 owner,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 owner,POST /v1/doctors/{id}/leave,queue:edit,allow
@@ -270,6 +276,7 @@ owner,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operatio
 owner,POST /v1/queue/check-in,queue:create,allow
 owner,POST /v1/queue/{id}/extend,queue:edit,allow
 owner,POST /v1/queue/{id}/priority/acknowledge,queue:edit,allow
+owner,POST /v1/queue/{id}/reassign,queue:edit,allow
 owner,POST /v1/queue/{id}/reorder,queue:edit,allow
 owner,POST /v1/queue/{id}/transfer,queue:edit,allow
 owner,POST /v1/roles,staff:create,allow
@@ -299,11 +306,13 @@ owner,POST /v1/waitlist,queue:create,allow
 owner,POST /v1/waitlist/{id}/accept,queue:edit,allow
 owner,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
 owner,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
+owner,PUT /v1/doctors/{id}/queue-settings,setup:edit,allow
 owner,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
 owner,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
 owner,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 owner,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
+owner,PUT /v1/queue-settings/facility,setup:edit,allow
 owner,PUT /v1/settings/integrations/abdm,setup:edit,allow
 owner,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
 owner,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,allow
@@ -312,6 +321,7 @@ owner,PUT /v1/staff/{id}/hpr,staff:edit,allow
 owner_doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 owner_doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
 owner_doctor,DELETE /v1/departments/{id},departments:delete,allow
+owner_doctor,DELETE /v1/display-devices/{id},setup:edit,allow
 owner_doctor,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner_doctor,DELETE /v1/patients/{id}/guardian,patients:edit,allow
 owner_doctor,DELETE /v1/roles/delegations/{id},staff:edit,allow
@@ -366,9 +376,11 @@ owner_doctor,GET /v1/departments/transfers,departments:view,allow
 owner_doctor,GET /v1/departments/{id}/flow,queue:view,allow
 owner_doctor,GET /v1/departments/{id}/transfer-targets,queue:view,allow
 owner_doctor,GET /v1/departments/{id}/workflow,departments:view,allow
+owner_doctor,GET /v1/display-devices,setup:view,allow
 owner_doctor,GET /v1/doctors/{id}/availability,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/delay,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/leave,queue:view,allow
+owner_doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/session,queue:view,allow
 owner_doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
 owner_doctor,GET /v1/nursing/activity/today,nursing:view,allow
@@ -386,6 +398,7 @@ owner_doctor,GET /v1/packages/liability,packages:view,allow
 owner_doctor,GET /v1/packages/refunds,packages:view,allow
 owner_doctor,GET /v1/packages/settings,packages:view,allow
 owner_doctor,GET /v1/packages/{id},packages:view,allow
+owner_doctor,GET /v1/patients,patients:view,allow
 owner_doctor,GET /v1/patients,patients:view,allow
 owner_doctor,GET /v1/patients/batch,patients:view,allow
 owner_doctor,GET /v1/patients/by-phone,patients:view,allow
@@ -418,6 +431,7 @@ owner_doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,den
 owner_doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner_doctor,GET /v1/platform/territories,territories:view,deny-401
 owner_doctor,GET /v1/queue,queue:view,allow
+owner_doctor,GET /v1/queue/board,queue:view,allow
 owner_doctor,GET /v1/queue/wait-estimate,queue:view,allow
 owner_doctor,GET /v1/reports/billing-leakage,reports:view,allow
 owner_doctor,GET /v1/reports/daily-money,reports:view,allow
@@ -529,6 +543,7 @@ owner_doctor,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,all
 owner_doctor,POST /v1/departments,departments:create,allow
 owner_doctor,POST /v1/departments/transfers,departments:edit,allow
 owner_doctor,POST /v1/departments/{id}/workflow,departments:edit,allow
+owner_doctor,POST /v1/display-devices/pairing-codes,setup:edit,allow
 owner_doctor,POST /v1/doctors/{id}/delay,queue:edit,allow
 owner_doctor,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 owner_doctor,POST /v1/doctors/{id}/leave,queue:edit,allow
@@ -578,6 +593,7 @@ owner_doctor,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_o
 owner_doctor,POST /v1/queue/check-in,queue:create,allow
 owner_doctor,POST /v1/queue/{id}/extend,queue:edit,allow
 owner_doctor,POST /v1/queue/{id}/priority/acknowledge,queue:edit,allow
+owner_doctor,POST /v1/queue/{id}/reassign,queue:edit,allow
 owner_doctor,POST /v1/queue/{id}/reorder,queue:edit,allow
 owner_doctor,POST /v1/queue/{id}/transfer,queue:edit,allow
 owner_doctor,POST /v1/roles,staff:create,allow
@@ -607,11 +623,13 @@ owner_doctor,POST /v1/waitlist,queue:create,allow
 owner_doctor,POST /v1/waitlist/{id}/accept,queue:edit,allow
 owner_doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 owner_doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
+owner_doctor,PUT /v1/doctors/{id}/queue-settings,setup:edit,allow
 owner_doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,allow
 owner_doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,allow
 owner_doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,allow
 owner_doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 owner_doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
+owner_doctor,PUT /v1/queue-settings/facility,setup:edit,allow
 owner_doctor,PUT /v1/settings/integrations/abdm,setup:edit,allow
 owner_doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,allow
 owner_doctor,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,allow
@@ -620,6 +638,7 @@ owner_doctor,PUT /v1/staff/{id}/hpr,staff:edit,allow
 doctor,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 doctor,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
 doctor,DELETE /v1/departments/{id},departments:delete,deny-403
+doctor,DELETE /v1/display-devices/{id},setup:edit,deny-403
 doctor,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 doctor,DELETE /v1/patients/{id}/guardian,patients:edit,allow
 doctor,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
@@ -674,9 +693,11 @@ doctor,GET /v1/departments/transfers,departments:view,allow
 doctor,GET /v1/departments/{id}/flow,queue:view,allow
 doctor,GET /v1/departments/{id}/transfer-targets,queue:view,allow
 doctor,GET /v1/departments/{id}/workflow,departments:view,allow
+doctor,GET /v1/display-devices,setup:view,deny-403
 doctor,GET /v1/doctors/{id}/availability,queue:view,allow
 doctor,GET /v1/doctors/{id}/delay,queue:view,allow
 doctor,GET /v1/doctors/{id}/leave,queue:view,allow
+doctor,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 doctor,GET /v1/doctors/{id}/session,queue:view,allow
 doctor,GET /v1/doctors/{id}/working-hours,queue:view,allow
 doctor,GET /v1/nursing/activity/today,nursing:view,allow
@@ -694,6 +715,7 @@ doctor,GET /v1/packages/liability,packages:view,allow
 doctor,GET /v1/packages/refunds,packages:view,allow
 doctor,GET /v1/packages/settings,packages:view,allow
 doctor,GET /v1/packages/{id},packages:view,allow
+doctor,GET /v1/patients,patients:view,allow
 doctor,GET /v1/patients,patients:view,allow
 doctor,GET /v1/patients/batch,patients:view,allow
 doctor,GET /v1/patients/by-phone,patients:view,allow
@@ -726,6 +748,7 @@ doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 doctor,GET /v1/platform/territories,territories:view,deny-401
 doctor,GET /v1/queue,queue:view,allow
+doctor,GET /v1/queue/board,queue:view,allow
 doctor,GET /v1/queue/wait-estimate,queue:view,allow
 doctor,GET /v1/reports/billing-leakage,reports:view,allow
 doctor,GET /v1/reports/daily-money,reports:view,allow
@@ -837,6 +860,7 @@ doctor,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
 doctor,POST /v1/departments,departments:create,deny-403
 doctor,POST /v1/departments/transfers,departments:edit,deny-403
 doctor,POST /v1/departments/{id}/workflow,departments:edit,deny-403
+doctor,POST /v1/display-devices/pairing-codes,setup:edit,deny-403
 doctor,POST /v1/doctors/{id}/delay,queue:edit,allow
 doctor,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 doctor,POST /v1/doctors/{id}/leave,queue:edit,allow
@@ -886,6 +910,7 @@ doctor,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operati
 doctor,POST /v1/queue/check-in,queue:create,deny-403
 doctor,POST /v1/queue/{id}/extend,queue:edit,allow
 doctor,POST /v1/queue/{id}/priority/acknowledge,queue:edit,allow
+doctor,POST /v1/queue/{id}/reassign,queue:edit,allow
 doctor,POST /v1/queue/{id}/reorder,queue:edit,allow
 doctor,POST /v1/queue/{id}/transfer,queue:edit,allow
 doctor,POST /v1/roles,staff:create,deny-403
@@ -915,11 +940,13 @@ doctor,POST /v1/waitlist,queue:create,deny-403
 doctor,POST /v1/waitlist/{id}/accept,queue:edit,allow
 doctor,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 doctor,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
+doctor,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 doctor,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 doctor,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 doctor,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 doctor,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 doctor,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
+doctor,PUT /v1/queue-settings/facility,setup:edit,deny-403
 doctor,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 doctor,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 doctor,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
@@ -928,6 +955,7 @@ doctor,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
 nurse,DELETE /v1/clinical/note-templates/{id},clinical:edit,allow
 nurse,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,allow
 nurse,DELETE /v1/departments/{id},departments:delete,deny-403
+nurse,DELETE /v1/display-devices/{id},setup:edit,deny-403
 nurse,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 nurse,DELETE /v1/patients/{id}/guardian,patients:edit,allow
 nurse,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
@@ -982,9 +1010,11 @@ nurse,GET /v1/departments/transfers,departments:view,allow
 nurse,GET /v1/departments/{id}/flow,queue:view,allow
 nurse,GET /v1/departments/{id}/transfer-targets,queue:view,allow
 nurse,GET /v1/departments/{id}/workflow,departments:view,allow
+nurse,GET /v1/display-devices,setup:view,deny-403
 nurse,GET /v1/doctors/{id}/availability,queue:view,allow
 nurse,GET /v1/doctors/{id}/delay,queue:view,allow
 nurse,GET /v1/doctors/{id}/leave,queue:view,allow
+nurse,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 nurse,GET /v1/doctors/{id}/session,queue:view,allow
 nurse,GET /v1/doctors/{id}/working-hours,queue:view,allow
 nurse,GET /v1/nursing/activity/today,nursing:view,allow
@@ -1002,6 +1032,7 @@ nurse,GET /v1/packages/liability,packages:view,allow
 nurse,GET /v1/packages/refunds,packages:view,allow
 nurse,GET /v1/packages/settings,packages:view,allow
 nurse,GET /v1/packages/{id},packages:view,allow
+nurse,GET /v1/patients,patients:view,allow
 nurse,GET /v1/patients,patients:view,allow
 nurse,GET /v1/patients/batch,patients:view,allow
 nurse,GET /v1/patients/by-phone,patients:view,allow
@@ -1034,6 +1065,7 @@ nurse,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 nurse,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 nurse,GET /v1/platform/territories,territories:view,deny-401
 nurse,GET /v1/queue,queue:view,allow
+nurse,GET /v1/queue/board,queue:view,allow
 nurse,GET /v1/queue/wait-estimate,queue:view,allow
 nurse,GET /v1/reports/billing-leakage,reports:view,deny-403
 nurse,GET /v1/reports/daily-money,reports:view,deny-403
@@ -1145,6 +1177,7 @@ nurse,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,allow
 nurse,POST /v1/departments,departments:create,deny-403
 nurse,POST /v1/departments/transfers,departments:edit,deny-403
 nurse,POST /v1/departments/{id}/workflow,departments:edit,deny-403
+nurse,POST /v1/display-devices/pairing-codes,setup:edit,deny-403
 nurse,POST /v1/doctors/{id}/delay,queue:edit,allow
 nurse,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 nurse,POST /v1/doctors/{id}/leave,queue:edit,allow
@@ -1194,6 +1227,7 @@ nurse,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operatio
 nurse,POST /v1/queue/check-in,queue:create,deny-403
 nurse,POST /v1/queue/{id}/extend,queue:edit,allow
 nurse,POST /v1/queue/{id}/priority/acknowledge,queue:edit,allow
+nurse,POST /v1/queue/{id}/reassign,queue:edit,allow
 nurse,POST /v1/queue/{id}/reorder,queue:edit,allow
 nurse,POST /v1/queue/{id}/transfer,queue:edit,allow
 nurse,POST /v1/roles,staff:create,deny-403
@@ -1223,11 +1257,13 @@ nurse,POST /v1/waitlist,queue:create,deny-403
 nurse,POST /v1/waitlist/{id}/accept,queue:edit,allow
 nurse,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,allow
 nurse,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,allow
+nurse,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 nurse,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 nurse,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 nurse,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 nurse,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 nurse,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
+nurse,PUT /v1/queue-settings/facility,setup:edit,deny-403
 nurse,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 nurse,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 nurse,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
@@ -1236,6 +1272,7 @@ nurse,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
 receptionist,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 receptionist,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 receptionist,DELETE /v1/departments/{id},departments:delete,deny-403
+receptionist,DELETE /v1/display-devices/{id},setup:edit,deny-403
 receptionist,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 receptionist,DELETE /v1/patients/{id}/guardian,patients:edit,allow
 receptionist,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
@@ -1290,9 +1327,11 @@ receptionist,GET /v1/departments/transfers,departments:view,allow
 receptionist,GET /v1/departments/{id}/flow,queue:view,allow
 receptionist,GET /v1/departments/{id}/transfer-targets,queue:view,allow
 receptionist,GET /v1/departments/{id}/workflow,departments:view,allow
+receptionist,GET /v1/display-devices,setup:view,deny-403
 receptionist,GET /v1/doctors/{id}/availability,queue:view,allow
 receptionist,GET /v1/doctors/{id}/delay,queue:view,allow
 receptionist,GET /v1/doctors/{id}/leave,queue:view,allow
+receptionist,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 receptionist,GET /v1/doctors/{id}/session,queue:view,allow
 receptionist,GET /v1/doctors/{id}/working-hours,queue:view,allow
 receptionist,GET /v1/nursing/activity/today,nursing:view,deny-403
@@ -1310,6 +1349,7 @@ receptionist,GET /v1/packages/liability,packages:view,allow
 receptionist,GET /v1/packages/refunds,packages:view,allow
 receptionist,GET /v1/packages/settings,packages:view,allow
 receptionist,GET /v1/packages/{id},packages:view,allow
+receptionist,GET /v1/patients,patients:view,allow
 receptionist,GET /v1/patients,patients:view,allow
 receptionist,GET /v1/patients/batch,patients:view,allow
 receptionist,GET /v1/patients/by-phone,patients:view,allow
@@ -1342,6 +1382,7 @@ receptionist,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,den
 receptionist,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 receptionist,GET /v1/platform/territories,territories:view,deny-401
 receptionist,GET /v1/queue,queue:view,allow
+receptionist,GET /v1/queue/board,queue:view,allow
 receptionist,GET /v1/queue/wait-estimate,queue:view,allow
 receptionist,GET /v1/reports/billing-leakage,reports:view,deny-403
 receptionist,GET /v1/reports/daily-money,reports:view,deny-403
@@ -1453,6 +1494,7 @@ receptionist,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,den
 receptionist,POST /v1/departments,departments:create,deny-403
 receptionist,POST /v1/departments/transfers,departments:edit,deny-403
 receptionist,POST /v1/departments/{id}/workflow,departments:edit,deny-403
+receptionist,POST /v1/display-devices/pairing-codes,setup:edit,deny-403
 receptionist,POST /v1/doctors/{id}/delay,queue:edit,allow
 receptionist,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 receptionist,POST /v1/doctors/{id}/leave,queue:edit,allow
@@ -1502,6 +1544,7 @@ receptionist,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_o
 receptionist,POST /v1/queue/check-in,queue:create,allow
 receptionist,POST /v1/queue/{id}/extend,queue:edit,allow
 receptionist,POST /v1/queue/{id}/priority/acknowledge,queue:edit,allow
+receptionist,POST /v1/queue/{id}/reassign,queue:edit,allow
 receptionist,POST /v1/queue/{id}/reorder,queue:edit,allow
 receptionist,POST /v1/queue/{id}/transfer,queue:edit,allow
 receptionist,POST /v1/roles,staff:create,deny-403
@@ -1531,11 +1574,13 @@ receptionist,POST /v1/waitlist,queue:create,allow
 receptionist,POST /v1/waitlist/{id}/accept,queue:edit,allow
 receptionist,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
 receptionist,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
+receptionist,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 receptionist,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 receptionist,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 receptionist,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 receptionist,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 receptionist,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
+receptionist,PUT /v1/queue-settings/facility,setup:edit,deny-403
 receptionist,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 receptionist,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 receptionist,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403
@@ -1544,6 +1589,7 @@ receptionist,PUT /v1/staff/{id}/hpr,staff:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-403
 frontdesk_vitals,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-403
 frontdesk_vitals,DELETE /v1/departments/{id},departments:delete,deny-403
+frontdesk_vitals,DELETE /v1/display-devices/{id},setup:edit,deny-403
 frontdesk_vitals,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 frontdesk_vitals,DELETE /v1/patients/{id}/guardian,patients:edit,allow
 frontdesk_vitals,DELETE /v1/roles/delegations/{id},staff:edit,deny-403
@@ -1598,9 +1644,11 @@ frontdesk_vitals,GET /v1/departments/transfers,departments:view,allow
 frontdesk_vitals,GET /v1/departments/{id}/flow,queue:view,allow
 frontdesk_vitals,GET /v1/departments/{id}/transfer-targets,queue:view,allow
 frontdesk_vitals,GET /v1/departments/{id}/workflow,departments:view,allow
+frontdesk_vitals,GET /v1/display-devices,setup:view,deny-403
 frontdesk_vitals,GET /v1/doctors/{id}/availability,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/delay,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/leave,queue:view,allow
+frontdesk_vitals,GET /v1/doctors/{id}/queue-settings,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/session,queue:view,allow
 frontdesk_vitals,GET /v1/doctors/{id}/working-hours,queue:view,allow
 frontdesk_vitals,GET /v1/nursing/activity/today,nursing:view,deny-403
@@ -1618,6 +1666,7 @@ frontdesk_vitals,GET /v1/packages/liability,packages:view,allow
 frontdesk_vitals,GET /v1/packages/refunds,packages:view,allow
 frontdesk_vitals,GET /v1/packages/settings,packages:view,allow
 frontdesk_vitals,GET /v1/packages/{id},packages:view,allow
+frontdesk_vitals,GET /v1/patients,patients:view,allow
 frontdesk_vitals,GET /v1/patients,patients:view,allow
 frontdesk_vitals,GET /v1/patients/batch,patients:view,allow
 frontdesk_vitals,GET /v1/patients/by-phone,patients:view,allow
@@ -1650,6 +1699,7 @@ frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view
 frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 frontdesk_vitals,GET /v1/platform/territories,territories:view,deny-401
 frontdesk_vitals,GET /v1/queue,queue:view,allow
+frontdesk_vitals,GET /v1/queue/board,queue:view,allow
 frontdesk_vitals,GET /v1/queue/wait-estimate,queue:view,allow
 frontdesk_vitals,GET /v1/reports/billing-leakage,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/daily-money,reports:view,deny-403
@@ -1761,6 +1811,7 @@ frontdesk_vitals,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit
 frontdesk_vitals,POST /v1/departments,departments:create,deny-403
 frontdesk_vitals,POST /v1/departments/transfers,departments:edit,deny-403
 frontdesk_vitals,POST /v1/departments/{id}/workflow,departments:edit,deny-403
+frontdesk_vitals,POST /v1/display-devices/pairing-codes,setup:edit,deny-403
 frontdesk_vitals,POST /v1/doctors/{id}/delay,queue:edit,allow
 frontdesk_vitals,POST /v1/doctors/{id}/delay/clear,queue:edit,allow
 frontdesk_vitals,POST /v1/doctors/{id}/leave,queue:edit,allow
@@ -1810,6 +1861,7 @@ frontdesk_vitals,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messagi
 frontdesk_vitals,POST /v1/queue/check-in,queue:create,allow
 frontdesk_vitals,POST /v1/queue/{id}/extend,queue:edit,allow
 frontdesk_vitals,POST /v1/queue/{id}/priority/acknowledge,queue:edit,allow
+frontdesk_vitals,POST /v1/queue/{id}/reassign,queue:edit,allow
 frontdesk_vitals,POST /v1/queue/{id}/reorder,queue:edit,allow
 frontdesk_vitals,POST /v1/queue/{id}/transfer,queue:edit,allow
 frontdesk_vitals,POST /v1/roles,staff:create,deny-403
@@ -1839,11 +1891,13 @@ frontdesk_vitals,POST /v1/waitlist,queue:create,allow
 frontdesk_vitals,POST /v1/waitlist/{id}/accept,queue:edit,allow
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-403
 frontdesk_vitals,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-403
+frontdesk_vitals,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-403
 frontdesk_vitals,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-403
 frontdesk_vitals,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-403
 frontdesk_vitals,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-401
 frontdesk_vitals,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-401
+frontdesk_vitals,PUT /v1/queue-settings/facility,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/settings/integrations/abdm,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-403
 frontdesk_vitals,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-403

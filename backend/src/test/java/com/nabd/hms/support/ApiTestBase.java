@@ -226,6 +226,11 @@ public abstract class ApiTestBase {
         });
     }
 
+    /** A SeededTenant handle for a clinic the test inserted itself (e.g. another region). */
+    protected SeededTenant tenantHandle(UUID id, String slug) {
+        return new SeededTenant(id, slug);
+    }
+
     protected SeededTenant seedTenant() {
         UUID id = UUID.randomUUID();
         String slug = "t" + id.toString().replace("-", "").substring(0, 12);

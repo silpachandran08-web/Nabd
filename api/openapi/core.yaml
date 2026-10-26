@@ -4612,6 +4612,160 @@ paths:
       tags:
       - organization
       x-required-permission: departments:edit
+  /v1/display-devices:
+    get:
+      operationId: DisplayController_devices
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DisplayDevice"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:view
+  /v1/display-devices/pairing-codes:
+    post:
+      operationId: DisplayController_createCode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisplayPairingCodeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DisplayPairingCode"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:edit
+  /v1/display-devices/{id}:
+    delete:
+      operationId: DisplayController_unpair
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:edit
+  /v1/display/pair:
+    post:
+      operationId: DisplayController_pair
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisplayPairRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DisplayPairResponse"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: public
+  /v1/display/stream:
+    get:
+      operationId: DisplayController_stream
+      parameters:
+      - in: header
+        name: Authorization
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseEmitter"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: public
   /v1/doctors/{id}/availability:
     get:
       operationId: ScheduleController_availability
@@ -4859,6 +5013,88 @@ paths:
       tags:
       - queue
       x-required-permission: queue:edit
+  /v1/doctors/{id}/queue-settings:
+    get:
+      operationId: QueueSettingsController_get
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Settings"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
+    put:
+      operationId: QueueSettingsController_put
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueueSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QueueSettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: "hasAuthority('setup:edit') or authentication.name ==\
+        \ #id.toString()"
   /v1/doctors/{id}/session:
     get:
       operationId: DoctorSessionController_today
@@ -6857,7 +7093,7 @@ paths:
       x-required-permission: packages:edit
   /v1/patients:
     get:
-      operationId: PatientController_list
+      operationId: PatientBatchController_summaries
       parameters:
       - in: query
         name: q
@@ -6875,12 +7111,22 @@ paths:
         required: false
         schema:
           type: string
+      - in: query
+        name: ids
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
       responses:
         "200":
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PatientPage"
+                oneOf:
+                - $ref: "#/components/schemas/PatientBatchPage"
+                - $ref: "#/components/schemas/PatientPage"
           description: OK
         "401":
           content:
@@ -9935,6 +10181,87 @@ paths:
       tags:
       - queue
       x-required-permission: queue:view
+  /v1/queue-settings/facility:
+    put:
+      operationId: QueueSettingsController_putFacility
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueueFacilitySettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QueueSettingsResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: setup:edit
+  /v1/queue/board:
+    get:
+      operationId: QueueBoardController_board
+      parameters:
+      - in: query
+        name: date
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: departmentId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QueueBoard"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:view
   /v1/queue/check-in:
     post:
       operationId: QueueController_checkIn
@@ -10070,6 +10397,50 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/QueueEntryResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:edit
+  /v1/queue/{id}/reassign:
+    post:
+      operationId: QueueBoardController_reassign
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QueueReassignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/QueueReassignResponse"
           description: OK
         "401":
           content:
@@ -15518,6 +15889,76 @@ components:
         stockQty:
           type: integer
           format: int32
+    DisplayDevice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        lastSeenAt:
+          type: string
+          format: date-time
+        pairedAt:
+          type: string
+          format: date-time
+        scope:
+          $ref: "#/components/schemas/DisplayScope"
+    DisplayPairRequest:
+      type: object
+      properties:
+        clinic:
+          type: string
+          maxLength: 80
+          minLength: 0
+        code:
+          type: string
+          minLength: 1
+          pattern: "^\\d{6}$"
+      required:
+      - clinic
+      - code
+    DisplayPairResponse:
+      type: object
+      properties:
+        deviceToken:
+          type: string
+        scope:
+          $ref: "#/components/schemas/DisplayScope"
+    DisplayPairingCode:
+      type: object
+      properties:
+        clinic:
+          type: string
+          description: The clinic name to give the TV (the display URL carries it)
+        code:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+    DisplayPairingCodeRequest:
+      type: object
+      properties:
+        label:
+          type: string
+          maxLength: 60
+          minLength: 0
+        scope:
+          $ref: "#/components/schemas/DisplayScope"
+      required:
+      - label
+    DisplayScope:
+      type: object
+      properties:
+        departmentId:
+          type: string
+          format: uuid
+        doctorIds:
+          type: array
+          items:
+            type: string
+            format: uuid
     Doctor:
       type: object
       properties:
@@ -17740,6 +18181,29 @@ components:
           format: int32
         nextCursor:
           type: string
+    PatientBatchPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatientBatchSummary"
+    PatientBatchSummary:
+      type: object
+      properties:
+        allergyFlag:
+          type: boolean
+        displayName:
+          type: string
+        gender:
+          type: string
+        id:
+          type: string
+          format: uuid
+        isMinor:
+          type: boolean
+        mrn:
+          type: string
     PatientDetailResponse:
       type: object
       properties:
@@ -18885,6 +19349,79 @@ components:
           type: string
         text:
           type: string
+    QueueBoard:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        doctors:
+          type: array
+          items:
+            $ref: "#/components/schemas/QueueBoardDoctor"
+        v:
+          type: integer
+          format: int64
+    QueueBoardDoctor:
+      type: object
+      properties:
+        delayMinutes:
+          type: integer
+          format: int32
+        doctorId:
+          type: string
+          format: uuid
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/QueueBoardEntry"
+        name:
+          type: string
+        nowServing:
+          type: integer
+          format: int32
+        state:
+          type: string
+    QueueBoardEntry:
+      type: object
+      properties:
+        allergyFlag:
+          type: boolean
+        displayName:
+          type: string
+        flags:
+          type: array
+          items:
+            type: string
+        id:
+          type: string
+          format: uuid
+        mrn:
+          type: string
+        p50At:
+          type: string
+          format: date-time
+        p80At:
+          type: string
+          format: date-time
+        patientId:
+          type: string
+          format: uuid
+        position:
+          type: integer
+          format: int32
+        previousToken:
+          type: integer
+          format: int32
+        priority:
+          type: boolean
+        stage:
+          type: string
+        token:
+          type: integer
+          format: int32
+        vitalsRecorded:
+          type: boolean
     QueueEntryResponse:
       type: object
       properties:
@@ -18967,6 +19504,39 @@ components:
         workflowDefinitionId:
           type: string
           format: uuid
+    QueueFacilitySettingsRequest:
+      type: object
+      properties:
+        etaDisplayMode:
+          type: string
+          minLength: 1
+      required:
+      - etaDisplayMode
+    QueueReassignRequest:
+      type: object
+      properties:
+        expectedStatus:
+          type: string
+          minLength: 1
+        reasonCode:
+          type: string
+          minLength: 1
+          pattern: "^[a-z][a-z0-9_]{1,39}$"
+        toDoctorId:
+          type: string
+          format: uuid
+      required:
+      - expectedStatus
+      - reasonCode
+      - toDoctorId
+    QueueReassignResponse:
+      type: object
+      properties:
+        entry:
+          $ref: "#/components/schemas/QueueEntryResponse"
+        previousToken:
+          type: integer
+          format: int32
     QueueReorderRequest:
       type: object
       properties:
@@ -18974,11 +19544,28 @@ components:
           type: boolean
         reason:
           type: string
-          maxLength: 2147483647
-          minLength: 3
       required:
       - priority
-      - reason
+    QueueSettingsRequest:
+      type: object
+      properties:
+        etaDisplayMode:
+          type: string
+          description: exact | range | position | delay_only | hidden | null (inherit)
+          nullable: true
+        workingHoursId:
+          type: string
+          format: uuid
+          description: "Optional: set this working-hours block's override instead\
+            \ of the doctor's"
+          nullable: true
+    QueueSettingsResponse:
+      type: object
+      properties:
+        effectiveSource:
+          type: string
+        etaDisplayMode:
+          type: string
     QueueStatusUpdateRequest:
       type: object
       properties:
@@ -19699,6 +20286,38 @@ components:
         lastSeenAt:
           type: string
           format: date-time
+    SessionSetting:
+      type: object
+      properties:
+        dayOfWeek:
+          type: integer
+          format: int32
+        endTime:
+          type: string
+          format: time-local
+        etaDisplayMode:
+          type: string
+        startTime:
+          type: string
+          format: time-local
+        workingHoursId:
+          type: string
+          format: uuid
+    Settings:
+      type: object
+      properties:
+        effectiveMode:
+          type: string
+        effectiveSource:
+          type: string
+        etaDisplayMode:
+          type: string
+        facilityDefault:
+          type: string
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionSetting"
     SetupChecklistItemResponse:
       type: object
       properties:

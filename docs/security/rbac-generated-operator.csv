@@ -4,6 +4,7 @@ role,operation,required_any_of,expected
 super_admin,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 super_admin,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 super_admin,DELETE /v1/departments/{id},departments:delete,deny-401
+super_admin,DELETE /v1/display-devices/{id},setup:edit,deny-401
 super_admin,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 super_admin,DELETE /v1/patients/{id}/guardian,patients:edit,deny-401
 super_admin,DELETE /v1/roles/delegations/{id},staff:edit,deny-401
@@ -58,9 +59,11 @@ super_admin,GET /v1/departments/transfers,departments:view,deny-401
 super_admin,GET /v1/departments/{id}/flow,queue:view,deny-401
 super_admin,GET /v1/departments/{id}/transfer-targets,queue:view,deny-401
 super_admin,GET /v1/departments/{id}/workflow,departments:view,deny-401
+super_admin,GET /v1/display-devices,setup:view,deny-401
 super_admin,GET /v1/doctors/{id}/availability,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/delay,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/leave,queue:view,deny-401
+super_admin,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/session,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
 super_admin,GET /v1/nursing/activity/today,nursing:view,deny-401
@@ -78,6 +81,7 @@ super_admin,GET /v1/packages/liability,packages:view,deny-401
 super_admin,GET /v1/packages/refunds,packages:view,deny-401
 super_admin,GET /v1/packages/settings,packages:view,deny-401
 super_admin,GET /v1/packages/{id},packages:view,deny-401
+super_admin,GET /v1/patients,patients:view,deny-401
 super_admin,GET /v1/patients,patients:view,deny-401
 super_admin,GET /v1/patients/batch,patients:view,deny-401
 super_admin,GET /v1/patients/by-phone,patients:view,deny-401
@@ -110,6 +114,7 @@ super_admin,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,allo
 super_admin,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 super_admin,GET /v1/platform/territories,territories:view,allow
 super_admin,GET /v1/queue,queue:view,deny-401
+super_admin,GET /v1/queue/board,queue:view,deny-401
 super_admin,GET /v1/queue/wait-estimate,queue:view,deny-401
 super_admin,GET /v1/reports/billing-leakage,reports:view,deny-401
 super_admin,GET /v1/reports/daily-money,reports:view,deny-401
@@ -221,6 +226,7 @@ super_admin,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny
 super_admin,POST /v1/departments,departments:create,deny-401
 super_admin,POST /v1/departments/transfers,departments:edit,deny-401
 super_admin,POST /v1/departments/{id}/workflow,departments:edit,deny-401
+super_admin,POST /v1/display-devices/pairing-codes,setup:edit,deny-401
 super_admin,POST /v1/doctors/{id}/delay,queue:edit,deny-401
 super_admin,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 super_admin,POST /v1/doctors/{id}/leave,queue:edit,deny-401
@@ -270,6 +276,7 @@ super_admin,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_op
 super_admin,POST /v1/queue/check-in,queue:create,deny-401
 super_admin,POST /v1/queue/{id}/extend,queue:edit,deny-401
 super_admin,POST /v1/queue/{id}/priority/acknowledge,queue:edit,deny-401
+super_admin,POST /v1/queue/{id}/reassign,queue:edit,deny-401
 super_admin,POST /v1/queue/{id}/reorder,queue:edit,deny-401
 super_admin,POST /v1/queue/{id}/transfer,queue:edit,deny-401
 super_admin,POST /v1/roles,staff:create,deny-401
@@ -299,11 +306,13 @@ super_admin,POST /v1/waitlist,queue:create,deny-401
 super_admin,POST /v1/waitlist/{id}/accept,queue:edit,deny-401
 super_admin,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-401
 super_admin,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-401
+super_admin,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-401
 super_admin,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 super_admin,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 super_admin,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 super_admin,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,allow
 super_admin,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,allow
+super_admin,PUT /v1/queue-settings/facility,setup:edit,deny-401
 super_admin,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 super_admin,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 super_admin,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
@@ -312,6 +321,7 @@ super_admin,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 implementation,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 implementation,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 implementation,DELETE /v1/departments/{id},departments:delete,deny-401
+implementation,DELETE /v1/display-devices/{id},setup:edit,deny-401
 implementation,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 implementation,DELETE /v1/patients/{id}/guardian,patients:edit,deny-401
 implementation,DELETE /v1/roles/delegations/{id},staff:edit,deny-401
@@ -366,9 +376,11 @@ implementation,GET /v1/departments/transfers,departments:view,deny-401
 implementation,GET /v1/departments/{id}/flow,queue:view,deny-401
 implementation,GET /v1/departments/{id}/transfer-targets,queue:view,deny-401
 implementation,GET /v1/departments/{id}/workflow,departments:view,deny-401
+implementation,GET /v1/display-devices,setup:view,deny-401
 implementation,GET /v1/doctors/{id}/availability,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/delay,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/leave,queue:view,deny-401
+implementation,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/session,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
 implementation,GET /v1/nursing/activity/today,nursing:view,deny-401
@@ -386,6 +398,7 @@ implementation,GET /v1/packages/liability,packages:view,deny-401
 implementation,GET /v1/packages/refunds,packages:view,deny-401
 implementation,GET /v1/packages/settings,packages:view,deny-401
 implementation,GET /v1/packages/{id},packages:view,deny-401
+implementation,GET /v1/patients,patients:view,deny-401
 implementation,GET /v1/patients,patients:view,deny-401
 implementation,GET /v1/patients/batch,patients:view,deny-401
 implementation,GET /v1/patients/by-phone,patients:view,deny-401
@@ -418,6 +431,7 @@ implementation,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,a
 implementation,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 implementation,GET /v1/platform/territories,territories:view,deny-403
 implementation,GET /v1/queue,queue:view,deny-401
+implementation,GET /v1/queue/board,queue:view,deny-401
 implementation,GET /v1/queue/wait-estimate,queue:view,deny-401
 implementation,GET /v1/reports/billing-leakage,reports:view,deny-401
 implementation,GET /v1/reports/daily-money,reports:view,deny-401
@@ -529,6 +543,7 @@ implementation,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,d
 implementation,POST /v1/departments,departments:create,deny-401
 implementation,POST /v1/departments/transfers,departments:edit,deny-401
 implementation,POST /v1/departments/{id}/workflow,departments:edit,deny-401
+implementation,POST /v1/display-devices/pairing-codes,setup:edit,deny-401
 implementation,POST /v1/doctors/{id}/delay,queue:edit,deny-401
 implementation,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 implementation,POST /v1/doctors/{id}/leave,queue:edit,deny-401
@@ -578,6 +593,7 @@ implementation,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging
 implementation,POST /v1/queue/check-in,queue:create,deny-401
 implementation,POST /v1/queue/{id}/extend,queue:edit,deny-401
 implementation,POST /v1/queue/{id}/priority/acknowledge,queue:edit,deny-401
+implementation,POST /v1/queue/{id}/reassign,queue:edit,deny-401
 implementation,POST /v1/queue/{id}/reorder,queue:edit,deny-401
 implementation,POST /v1/queue/{id}/transfer,queue:edit,deny-401
 implementation,POST /v1/roles,staff:create,deny-401
@@ -607,11 +623,13 @@ implementation,POST /v1/waitlist,queue:create,deny-401
 implementation,POST /v1/waitlist/{id}/accept,queue:edit,deny-401
 implementation,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-401
 implementation,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-401
+implementation,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-401
 implementation,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 implementation,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 implementation,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 implementation,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 implementation,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+implementation,PUT /v1/queue-settings/facility,setup:edit,deny-401
 implementation,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 implementation,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 implementation,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
@@ -620,6 +638,7 @@ implementation,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 support_engineer,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 support_engineer,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 support_engineer,DELETE /v1/departments/{id},departments:delete,deny-401
+support_engineer,DELETE /v1/display-devices/{id},setup:edit,deny-401
 support_engineer,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 support_engineer,DELETE /v1/patients/{id}/guardian,patients:edit,deny-401
 support_engineer,DELETE /v1/roles/delegations/{id},staff:edit,deny-401
@@ -674,9 +693,11 @@ support_engineer,GET /v1/departments/transfers,departments:view,deny-401
 support_engineer,GET /v1/departments/{id}/flow,queue:view,deny-401
 support_engineer,GET /v1/departments/{id}/transfer-targets,queue:view,deny-401
 support_engineer,GET /v1/departments/{id}/workflow,departments:view,deny-401
+support_engineer,GET /v1/display-devices,setup:view,deny-401
 support_engineer,GET /v1/doctors/{id}/availability,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/delay,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/leave,queue:view,deny-401
+support_engineer,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/session,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
 support_engineer,GET /v1/nursing/activity/today,nursing:view,deny-401
@@ -694,6 +715,7 @@ support_engineer,GET /v1/packages/liability,packages:view,deny-401
 support_engineer,GET /v1/packages/refunds,packages:view,deny-401
 support_engineer,GET /v1/packages/settings,packages:view,deny-401
 support_engineer,GET /v1/packages/{id},packages:view,deny-401
+support_engineer,GET /v1/patients,patients:view,deny-401
 support_engineer,GET /v1/patients,patients:view,deny-401
 support_engineer,GET /v1/patients/batch,patients:view,deny-401
 support_engineer,GET /v1/patients/by-phone,patients:view,deny-401
@@ -726,6 +748,7 @@ support_engineer,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view
 support_engineer,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 support_engineer,GET /v1/platform/territories,territories:view,deny-403
 support_engineer,GET /v1/queue,queue:view,deny-401
+support_engineer,GET /v1/queue/board,queue:view,deny-401
 support_engineer,GET /v1/queue/wait-estimate,queue:view,deny-401
 support_engineer,GET /v1/reports/billing-leakage,reports:view,deny-401
 support_engineer,GET /v1/reports/daily-money,reports:view,deny-401
@@ -837,6 +860,7 @@ support_engineer,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit
 support_engineer,POST /v1/departments,departments:create,deny-401
 support_engineer,POST /v1/departments/transfers,departments:edit,deny-401
 support_engineer,POST /v1/departments/{id}/workflow,departments:edit,deny-401
+support_engineer,POST /v1/display-devices/pairing-codes,setup:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/delay,queue:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/leave,queue:edit,deny-401
@@ -886,6 +910,7 @@ support_engineer,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messagi
 support_engineer,POST /v1/queue/check-in,queue:create,deny-401
 support_engineer,POST /v1/queue/{id}/extend,queue:edit,deny-401
 support_engineer,POST /v1/queue/{id}/priority/acknowledge,queue:edit,deny-401
+support_engineer,POST /v1/queue/{id}/reassign,queue:edit,deny-401
 support_engineer,POST /v1/queue/{id}/reorder,queue:edit,deny-401
 support_engineer,POST /v1/queue/{id}/transfer,queue:edit,deny-401
 support_engineer,POST /v1/roles,staff:create,deny-401
@@ -915,11 +940,13 @@ support_engineer,POST /v1/waitlist,queue:create,deny-401
 support_engineer,POST /v1/waitlist/{id}/accept,queue:edit,deny-401
 support_engineer,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-401
 support_engineer,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-401
+support_engineer,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-401
 support_engineer,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 support_engineer,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 support_engineer,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 support_engineer,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 support_engineer,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+support_engineer,PUT /v1/queue-settings/facility,setup:edit,deny-401
 support_engineer,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 support_engineer,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 support_engineer,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
@@ -928,6 +955,7 @@ support_engineer,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 billing,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 billing,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 billing,DELETE /v1/departments/{id},departments:delete,deny-401
+billing,DELETE /v1/display-devices/{id},setup:edit,deny-401
 billing,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 billing,DELETE /v1/patients/{id}/guardian,patients:edit,deny-401
 billing,DELETE /v1/roles/delegations/{id},staff:edit,deny-401
@@ -982,9 +1010,11 @@ billing,GET /v1/departments/transfers,departments:view,deny-401
 billing,GET /v1/departments/{id}/flow,queue:view,deny-401
 billing,GET /v1/departments/{id}/transfer-targets,queue:view,deny-401
 billing,GET /v1/departments/{id}/workflow,departments:view,deny-401
+billing,GET /v1/display-devices,setup:view,deny-401
 billing,GET /v1/doctors/{id}/availability,queue:view,deny-401
 billing,GET /v1/doctors/{id}/delay,queue:view,deny-401
 billing,GET /v1/doctors/{id}/leave,queue:view,deny-401
+billing,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 billing,GET /v1/doctors/{id}/session,queue:view,deny-401
 billing,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
 billing,GET /v1/nursing/activity/today,nursing:view,deny-401
@@ -1002,6 +1032,7 @@ billing,GET /v1/packages/liability,packages:view,deny-401
 billing,GET /v1/packages/refunds,packages:view,deny-401
 billing,GET /v1/packages/settings,packages:view,deny-401
 billing,GET /v1/packages/{id},packages:view,deny-401
+billing,GET /v1/patients,patients:view,deny-401
 billing,GET /v1/patients,patients:view,deny-401
 billing,GET /v1/patients/batch,patients:view,deny-401
 billing,GET /v1/patients/by-phone,patients:view,deny-401
@@ -1034,6 +1065,7 @@ billing,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-403
 billing,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 billing,GET /v1/platform/territories,territories:view,deny-403
 billing,GET /v1/queue,queue:view,deny-401
+billing,GET /v1/queue/board,queue:view,deny-401
 billing,GET /v1/queue/wait-estimate,queue:view,deny-401
 billing,GET /v1/reports/billing-leakage,reports:view,deny-401
 billing,GET /v1/reports/daily-money,reports:view,deny-401
@@ -1145,6 +1177,7 @@ billing,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
 billing,POST /v1/departments,departments:create,deny-401
 billing,POST /v1/departments/transfers,departments:edit,deny-401
 billing,POST /v1/departments/{id}/workflow,departments:edit,deny-401
+billing,POST /v1/display-devices/pairing-codes,setup:edit,deny-401
 billing,POST /v1/doctors/{id}/delay,queue:edit,deny-401
 billing,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 billing,POST /v1/doctors/{id}/leave,queue:edit,deny-401
@@ -1194,6 +1227,7 @@ billing,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operat
 billing,POST /v1/queue/check-in,queue:create,deny-401
 billing,POST /v1/queue/{id}/extend,queue:edit,deny-401
 billing,POST /v1/queue/{id}/priority/acknowledge,queue:edit,deny-401
+billing,POST /v1/queue/{id}/reassign,queue:edit,deny-401
 billing,POST /v1/queue/{id}/reorder,queue:edit,deny-401
 billing,POST /v1/queue/{id}/transfer,queue:edit,deny-401
 billing,POST /v1/roles,staff:create,deny-401
@@ -1223,11 +1257,13 @@ billing,POST /v1/waitlist,queue:create,deny-401
 billing,POST /v1/waitlist/{id}/accept,queue:edit,deny-401
 billing,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-401
 billing,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-401
+billing,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-401
 billing,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 billing,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 billing,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 billing,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 billing,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+billing,PUT /v1/queue-settings/facility,setup:edit,deny-401
 billing,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 billing,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 billing,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
@@ -1236,6 +1272,7 @@ billing,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 sre,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 sre,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 sre,DELETE /v1/departments/{id},departments:delete,deny-401
+sre,DELETE /v1/display-devices/{id},setup:edit,deny-401
 sre,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 sre,DELETE /v1/patients/{id}/guardian,patients:edit,deny-401
 sre,DELETE /v1/roles/delegations/{id},staff:edit,deny-401
@@ -1290,9 +1327,11 @@ sre,GET /v1/departments/transfers,departments:view,deny-401
 sre,GET /v1/departments/{id}/flow,queue:view,deny-401
 sre,GET /v1/departments/{id}/transfer-targets,queue:view,deny-401
 sre,GET /v1/departments/{id}/workflow,departments:view,deny-401
+sre,GET /v1/display-devices,setup:view,deny-401
 sre,GET /v1/doctors/{id}/availability,queue:view,deny-401
 sre,GET /v1/doctors/{id}/delay,queue:view,deny-401
 sre,GET /v1/doctors/{id}/leave,queue:view,deny-401
+sre,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 sre,GET /v1/doctors/{id}/session,queue:view,deny-401
 sre,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
 sre,GET /v1/nursing/activity/today,nursing:view,deny-401
@@ -1310,6 +1349,7 @@ sre,GET /v1/packages/liability,packages:view,deny-401
 sre,GET /v1/packages/refunds,packages:view,deny-401
 sre,GET /v1/packages/settings,packages:view,deny-401
 sre,GET /v1/packages/{id},packages:view,deny-401
+sre,GET /v1/patients,patients:view,deny-401
 sre,GET /v1/patients,patients:view,deny-401
 sre,GET /v1/patients/batch,patients:view,deny-401
 sre,GET /v1/patients/by-phone,patients:view,deny-401
@@ -1342,6 +1382,7 @@ sre,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-403
 sre,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 sre,GET /v1/platform/territories,territories:view,allow
 sre,GET /v1/queue,queue:view,deny-401
+sre,GET /v1/queue/board,queue:view,deny-401
 sre,GET /v1/queue/wait-estimate,queue:view,deny-401
 sre,GET /v1/reports/billing-leakage,reports:view,deny-401
 sre,GET /v1/reports/daily-money,reports:view,deny-401
@@ -1453,6 +1494,7 @@ sre,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
 sre,POST /v1/departments,departments:create,deny-401
 sre,POST /v1/departments/transfers,departments:edit,deny-401
 sre,POST /v1/departments/{id}/workflow,departments:edit,deny-401
+sre,POST /v1/display-devices/pairing-codes,setup:edit,deny-401
 sre,POST /v1/doctors/{id}/delay,queue:edit,deny-401
 sre,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 sre,POST /v1/doctors/{id}/leave,queue:edit,deny-401
@@ -1502,6 +1544,7 @@ sre,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_operations
 sre,POST /v1/queue/check-in,queue:create,deny-401
 sre,POST /v1/queue/{id}/extend,queue:edit,deny-401
 sre,POST /v1/queue/{id}/priority/acknowledge,queue:edit,deny-401
+sre,POST /v1/queue/{id}/reassign,queue:edit,deny-401
 sre,POST /v1/queue/{id}/reorder,queue:edit,deny-401
 sre,POST /v1/queue/{id}/transfer,queue:edit,deny-401
 sre,POST /v1/roles,staff:create,deny-401
@@ -1531,11 +1574,13 @@ sre,POST /v1/waitlist,queue:create,deny-401
 sre,POST /v1/waitlist/{id}/accept,queue:edit,deny-401
 sre,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-401
 sre,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-401
+sre,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-401
 sre,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 sre,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 sre,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 sre,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 sre,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+sre,PUT /v1/queue-settings/facility,setup:edit,deny-401
 sre,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 sre,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 sre,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
@@ -1544,6 +1589,7 @@ sre,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 commercial,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 commercial,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 commercial,DELETE /v1/departments/{id},departments:delete,deny-401
+commercial,DELETE /v1/display-devices/{id},setup:edit,deny-401
 commercial,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 commercial,DELETE /v1/patients/{id}/guardian,patients:edit,deny-401
 commercial,DELETE /v1/roles/delegations/{id},staff:edit,deny-401
@@ -1598,9 +1644,11 @@ commercial,GET /v1/departments/transfers,departments:view,deny-401
 commercial,GET /v1/departments/{id}/flow,queue:view,deny-401
 commercial,GET /v1/departments/{id}/transfer-targets,queue:view,deny-401
 commercial,GET /v1/departments/{id}/workflow,departments:view,deny-401
+commercial,GET /v1/display-devices,setup:view,deny-401
 commercial,GET /v1/doctors/{id}/availability,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/delay,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/leave,queue:view,deny-401
+commercial,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/session,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
 commercial,GET /v1/nursing/activity/today,nursing:view,deny-401
@@ -1618,6 +1666,7 @@ commercial,GET /v1/packages/liability,packages:view,deny-401
 commercial,GET /v1/packages/refunds,packages:view,deny-401
 commercial,GET /v1/packages/settings,packages:view,deny-401
 commercial,GET /v1/packages/{id},packages:view,deny-401
+commercial,GET /v1/patients,patients:view,deny-401
 commercial,GET /v1/patients,patients:view,deny-401
 commercial,GET /v1/patients/batch,patients:view,deny-401
 commercial,GET /v1/patients/by-phone,patients:view,deny-401
@@ -1650,6 +1699,7 @@ commercial,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-
 commercial,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-403
 commercial,GET /v1/platform/territories,territories:view,allow
 commercial,GET /v1/queue,queue:view,deny-401
+commercial,GET /v1/queue/board,queue:view,deny-401
 commercial,GET /v1/queue/wait-estimate,queue:view,deny-401
 commercial,GET /v1/reports/billing-leakage,reports:view,deny-401
 commercial,GET /v1/reports/daily-money,reports:view,deny-401
@@ -1761,6 +1811,7 @@ commercial,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-
 commercial,POST /v1/departments,departments:create,deny-401
 commercial,POST /v1/departments/transfers,departments:edit,deny-401
 commercial,POST /v1/departments/{id}/workflow,departments:edit,deny-401
+commercial,POST /v1/display-devices/pairing-codes,setup:edit,deny-401
 commercial,POST /v1/doctors/{id}/delay,queue:edit,deny-401
 commercial,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 commercial,POST /v1/doctors/{id}/leave,queue:edit,deny-401
@@ -1810,6 +1861,7 @@ commercial,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging_ope
 commercial,POST /v1/queue/check-in,queue:create,deny-401
 commercial,POST /v1/queue/{id}/extend,queue:edit,deny-401
 commercial,POST /v1/queue/{id}/priority/acknowledge,queue:edit,deny-401
+commercial,POST /v1/queue/{id}/reassign,queue:edit,deny-401
 commercial,POST /v1/queue/{id}/reorder,queue:edit,deny-401
 commercial,POST /v1/queue/{id}/transfer,queue:edit,deny-401
 commercial,POST /v1/roles,staff:create,deny-401
@@ -1839,11 +1891,13 @@ commercial,POST /v1/waitlist,queue:create,deny-401
 commercial,POST /v1/waitlist/{id}/accept,queue:edit,deny-401
 commercial,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-401
 commercial,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-401
+commercial,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-401
 commercial,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 commercial,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 commercial,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 commercial,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 commercial,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+commercial,PUT /v1/queue-settings/facility,setup:edit,deny-401
 commercial,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 commercial,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 commercial,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401
@@ -1852,6 +1906,7 @@ commercial,PUT /v1/staff/{id}/hpr,staff:edit,deny-401
 compliance_dpo,DELETE /v1/clinical/note-templates/{id},clinical:edit,deny-401
 compliance_dpo,DELETE /v1/clinical/rx-sets/{setId},clinical:edit,deny-401
 compliance_dpo,DELETE /v1/departments/{id},departments:delete,deny-401
+compliance_dpo,DELETE /v1/display-devices/{id},setup:edit,deny-401
 compliance_dpo,DELETE /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 compliance_dpo,DELETE /v1/patients/{id}/guardian,patients:edit,deny-401
 compliance_dpo,DELETE /v1/roles/delegations/{id},staff:edit,deny-401
@@ -1906,9 +1961,11 @@ compliance_dpo,GET /v1/departments/transfers,departments:view,deny-401
 compliance_dpo,GET /v1/departments/{id}/flow,queue:view,deny-401
 compliance_dpo,GET /v1/departments/{id}/transfer-targets,queue:view,deny-401
 compliance_dpo,GET /v1/departments/{id}/workflow,departments:view,deny-401
+compliance_dpo,GET /v1/display-devices,setup:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/availability,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/delay,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/leave,queue:view,deny-401
+compliance_dpo,GET /v1/doctors/{id}/queue-settings,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/session,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
 compliance_dpo,GET /v1/nursing/activity/today,nursing:view,deny-401
@@ -1926,6 +1983,7 @@ compliance_dpo,GET /v1/packages/liability,packages:view,deny-401
 compliance_dpo,GET /v1/packages/refunds,packages:view,deny-401
 compliance_dpo,GET /v1/packages/settings,packages:view,deny-401
 compliance_dpo,GET /v1/packages/{id},packages:view,deny-401
+compliance_dpo,GET /v1/patients,patients:view,deny-401
 compliance_dpo,GET /v1/patients,patients:view,deny-401
 compliance_dpo,GET /v1/patients/batch,patients:view,deny-401
 compliance_dpo,GET /v1/patients/by-phone,patients:view,deny-401
@@ -1958,6 +2016,7 @@ compliance_dpo,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,a
 compliance_dpo,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,allow
 compliance_dpo,GET /v1/platform/territories,territories:view,allow
 compliance_dpo,GET /v1/queue,queue:view,deny-401
+compliance_dpo,GET /v1/queue/board,queue:view,deny-401
 compliance_dpo,GET /v1/queue/wait-estimate,queue:view,deny-401
 compliance_dpo,GET /v1/reports/billing-leakage,reports:view,deny-401
 compliance_dpo,GET /v1/reports/daily-money,reports:view,deny-401
@@ -2069,6 +2128,7 @@ compliance_dpo,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,d
 compliance_dpo,POST /v1/departments,departments:create,deny-401
 compliance_dpo,POST /v1/departments/transfers,departments:edit,deny-401
 compliance_dpo,POST /v1/departments/{id}/workflow,departments:edit,deny-401
+compliance_dpo,POST /v1/display-devices/pairing-codes,setup:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/delay,queue:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/leave,queue:edit,deny-401
@@ -2118,6 +2178,7 @@ compliance_dpo,POST /v1/platform/tenants/{tenantId}/whatsapp-templates,messaging
 compliance_dpo,POST /v1/queue/check-in,queue:create,deny-401
 compliance_dpo,POST /v1/queue/{id}/extend,queue:edit,deny-401
 compliance_dpo,POST /v1/queue/{id}/priority/acknowledge,queue:edit,deny-401
+compliance_dpo,POST /v1/queue/{id}/reassign,queue:edit,deny-401
 compliance_dpo,POST /v1/queue/{id}/reorder,queue:edit,deny-401
 compliance_dpo,POST /v1/queue/{id}/transfer,queue:edit,deny-401
 compliance_dpo,POST /v1/roles,staff:create,deny-401
@@ -2147,11 +2208,13 @@ compliance_dpo,POST /v1/waitlist,queue:create,deny-401
 compliance_dpo,POST /v1/waitlist/{id}/accept,queue:edit,deny-401
 compliance_dpo,PUT /v1/clinical/patients/{patientId}/allergies/status,clinical:edit,deny-401
 compliance_dpo,PUT /v1/clinical/patients/{patientId}/pregnancy-status,clinical:edit,deny-401
+compliance_dpo,PUT /v1/doctors/{id}/queue-settings,setup:edit,deny-401
 compliance_dpo,PUT /v1/doctors/{id}/working-hours/{hoursId},setup:edit,deny-401
 compliance_dpo,PUT /v1/organization/invoice-series/{kind},setup:edit,deny-401
 compliance_dpo,PUT /v1/pharmacy/items/{id}/drug-link,pharmacy:edit,deny-401
 compliance_dpo,PUT /v1/platform/kill-switches/{code},tenant_detail:edit,deny-403
 compliance_dpo,PUT /v1/platform/tenants/{tenantId}/features/{code},tenant_detail:edit,deny-403
+compliance_dpo,PUT /v1/queue-settings/facility,setup:edit,deny-401
 compliance_dpo,PUT /v1/settings/integrations/abdm,setup:edit,deny-401
 compliance_dpo,PUT /v1/settings/privacy/privacy-notice,setup:edit,deny-401
 compliance_dpo,PUT /v1/setup/import-jobs/{id}/mapping,setup:edit,deny-401

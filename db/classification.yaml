@@ -397,6 +397,7 @@ schemas:
       end_time: operational
       slot_minutes: operational
       max_patients: operational
+      eta_display_mode: operational
     dpa_acceptances:
       id: operational
       tenant_id: operational
@@ -1063,6 +1064,8 @@ schemas:
       doctor_id: operational
       queue_date: operational
       token_number: operational
+      previous_token: operational
+      reassigned_from_doctor_id: operational
       status: operational
       priority: operational
       priority_reason: phi
@@ -1107,6 +1110,7 @@ schemas:
       phone_nsn_length: operational
       cell: operational
       active: operational
+      display_languages: operational
     registry_dirty:
       tenant_id: operational
       patient_id: pii
@@ -1516,6 +1520,40 @@ schemas:
       mae_s: operational
       p80_hit_rate: operational
       within10_pct: operational
+    doctor_queue_settings:
+      tenant_id: operational
+      doctor_id: operational
+      eta_display_mode: operational
+      updated_by: operational
+      updated_at: operational
+    facility_queue_settings:
+      tenant_id: operational
+      eta_display_mode: operational
+      updated_by: operational
+      updated_at: operational
+    display_devices:
+      id: operational
+      tenant_id: operational
+      label: operational
+      scope: operational
+      token_hash: operational
+      paired_by: operational
+      paired_at: operational
+      last_seen_at: operational
+      revoked_at: operational
+    display_pairing_codes:
+      id: operational
+      tenant_id: operational
+      code_hash: operational
+      scope: operational
+      label: operational
+      expires_at: operational
+      used_at: operational
+      created_by: operational
+    display_pairing_lockout:
+      tenant_id: operational
+      failures: operational
+      locked_until: operational
     doctor_sessions:
       id: operational
       tenant_id: operational
