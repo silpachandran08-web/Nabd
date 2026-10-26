@@ -72,7 +72,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [RbacMatrixApiTest, S12QaOps042RbacMatrixTest, ApiContractGateTest]
     evidence: []
   - id: SC-08
     domain: "Access control"
@@ -82,7 +82,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [ClinicalReadScopeApiTest, S11QaIdc001ReadScopeTest, CrossFacilityVisibilityTest]
     evidence: []
   - id: SC-09
     domain: "Access control"
@@ -102,7 +102,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []  # IDC-001 adds ClinicalReadScopeTest
+    tests: [ClinicalReadScopeApiTest, Idc002ConsentModelApiTest]  # IDC-001 adds ClinicalReadScopeTest
     evidence: []
   - id: SC-11
     domain: "Access control"
@@ -112,7 +112,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [PackageRefundIntegrityApiTest, S11QaFin004RefundOnceTest, S11QaNoteSigningTest]
     evidence: []
   - id: SC-12
     domain: "Access control"
@@ -173,7 +173,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [SecretResolverTest]
     evidence: []
   - id: SC-18
     domain: "Cryptography"
@@ -194,7 +194,8 @@ controls:
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
     tests: []
-    evidence: []
+    evidence:
+      - { link: ".github/workflows/security-headers.yml", accepted_by: null, accepted_on: null }
   - id: SC-20
     domain: "Cryptography"
     control: "Column-level encryption for national identifiers"
@@ -203,7 +204,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
-    tests: []
+    tests: [FieldCipherTest, Plt044FieldCipherApiTest]
     evidence: []
   - id: SC-21
     domain: "Application"
@@ -224,7 +225,8 @@ controls:
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
     tests: []
-    evidence: []
+    evidence:
+      - { link: ".github/workflows/dast.yml", accepted_by: null, accepted_on: null }
   - id: SC-23
     domain: "Application"
     control: "Content Security Policy in enforce mode; no inline script"
@@ -283,7 +285,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/dpo"
-    tests: []
+    tests: [WhatsAppTemplateApiTest]
     evidence: []
   - id: SC-29
     domain: "Messaging"
@@ -293,7 +295,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/dpo"
-    tests: []
+    tests: [NotificationContractApiTest, WhatsAppMessagingApiTest]
     evidence: []
   - id: SC-30
     domain: "Messaging"
@@ -366,7 +368,8 @@ controls:
     gate: "Go-live blocker"
     owner: "@nabd/platform-owners"
     tests: []
-    evidence: []
+    evidence:
+      - { link: "docs/runbooks/restore.md", accepted_by: null, accepted_on: null }
   - id: SC-37
     domain: "Resilience"
     control: "Immutable backup copies and an isolated recovery environment for ransomware"
@@ -386,7 +389,9 @@ controls:
     gate: "Go-live blocker"
     owner: "@nabd/platform-owners"
     tests: []
-    evidence: []
+    evidence:
+      - { link: "docs/runbooks/restore.md", accepted_by: null, accepted_on: null }
+      - { link: ".github/workflows/backup.yml", accepted_by: null, accepted_on: null }
   - id: SC-39
     domain: "Resilience"
     control: "A third-party outage never blocks clinical or billing work"
@@ -395,7 +400,7 @@ controls:
     priority: Should
     gate: "Post-launch acceptable"
     owner: "@nabd/platform-owners"
-    tests: []
+    tests: [CircuitBreakerTest, Ops012SlowProviderApiTest]
     evidence: []
   - id: SC-40
     domain: "Resilience"
@@ -436,7 +441,8 @@ controls:
     gate: "Go-live blocker"
     owner: "@nabd/security-owners"
     tests: []
-    evidence: []
+    evidence:
+      - { link: "docs/security/threat-models/", accepted_by: null, accepted_on: null }
   - id: SC-44
     domain: "Assurance"
     control: "Breach runbook with a completed tabletop exercise"
@@ -485,7 +491,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/dpo"
-    tests: []
+    tests: [Idc002ConsentModelApiTest, Idc003PrivacyNoticeApiTest]
     evidence: []
   - id: SC-49
     domain: "Privacy"
@@ -495,7 +501,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/dpo"
-    tests: []
+    tests: [Idc002ConsentModelApiTest, Adm002DpaGateApiTest]
     evidence: []
   - id: SC-50
     domain: "Privacy"
@@ -545,8 +551,9 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/dpo"
-    tests: []
-    evidence: []
+    tests: [S12QaPlt052ClassificationDbTest]
+    evidence:
+      - { link: "docs/security/data-classification.md", accepted_by: null, accepted_on: null }
   - id: SC-55
     domain: "Privacy"
     control: "Plan plus signed digital DPA required before the tenant may hold patient data (CEO-17)"
@@ -555,7 +562,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/dpo"
-    tests: []
+    tests: [Adm002DpaGateApiTest, DpaTextTest]
     evidence: []
   - id: SC-56
     domain: "Payments"
@@ -625,7 +632,7 @@ controls:
     priority: Must
     gate: "Go-live blocker"
     owner: "@nabd/clinical-safety"
-    tests: []
+    tests: [S11QaNoteSigningTest, NoteSigningAuthorityApiTest]
     evidence: []
   - id: SC-63
     domain: "Clinical safety"

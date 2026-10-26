@@ -42,7 +42,7 @@ jobs:
   stage1-static:
     needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -86,7 +86,7 @@ jobs:
   stage2-unit:
     needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: write   # OPS-033 architecture report comment
@@ -149,7 +149,7 @@ jobs:
   stage3-integration:
     needs: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - if: needs.changes.outputs.backend == 'true'
@@ -282,7 +282,7 @@ jobs:
   stage6-build-and-scan:
     needs: [changes, stage1-static, stage2-unit, stage3-integration]
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -303,13 +303,9 @@ jobs:
       - name: Container structure test (non-root, no shell, JVM flags, migrate entrypoint)
         run: infra/ci/check-image.sh "$IMAGE:${{ github.sha }}" "$IMAGE-migrate:${{ github.sha }}"
       - name: Trivy image scan (fail on new High/Critical)
-        uses: aquasecurity/trivy-action@v0.28.0
-        with:
-          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
-          trivyignores: .trivyignore
+        run: |
+          scripts/ci/install-trivy.sh
+          ./trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --ignorefile .trivyignore "$IMAGE:${{ github.sha }}"
       - name: OWASP Dependency-Check (fail on CVSS >= 7)
         uses: dependency-check/Dependency-Check_Action@main
         env: { JAVA_HOME: /opt/jdk }

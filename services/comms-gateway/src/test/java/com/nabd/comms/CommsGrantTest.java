@@ -39,7 +39,14 @@ class CommsGrantTest {
             while (rs.next()) {
                 granted.add(rs.getString(1));
             }
-            assertThat(granted).containsExactly("processed_events", "shedlock");
+            // exactly the tables the Comms migrations created (COM-007..COM-011 added tables after the first two), never the foreign one
+            List<String> own = new ArrayList<>();
+            ResultSet t = s.executeQuery("SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tableowner = current_user AND tablename <> 'flyway_schema_history' ORDER BY 1");
+            while (t.next()) {
+                own.add(t.getString(1));
+            }
+            assertThat(own).contains("processed_events", "shedlock");
+            assertThat(granted).containsExactlyElementsOf(own).doesNotContain("core_like_patients");
         }
         try (Connection c = DriverManager.getConnection(TestInfra.url("comms_grants"), "comms_app", TestInfra.APP_PW); Statement s = c.createStatement()) {
             assertThatThrownBy(() -> s.executeQuery("SELECT * FROM core_like_patients")).hasMessageContaining("permission denied");
