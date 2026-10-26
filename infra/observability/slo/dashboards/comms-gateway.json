@@ -82,6 +82,38 @@
     "x": 12,
     "y": 16
    }
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "Lane wait p95 by lane (s)",
+   "targets": [
+    {
+     "expr": "max by (lane, sender) (comms_lane_wait_seconds{quantile=\"0.95\"})"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 24
+   }
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "Lane depth by lane and sender",
+   "targets": [
+    {
+     "expr": "sum by (lane, sender) (comms_lane_depth)"
+    }
+   ],
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 24
+   }
   }
  ]
 }
