@@ -582,6 +582,45 @@ schemas:
       rate: financial
       taxable_minor: financial
       amount_minor: financial
+    refund_requests:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      amount_minor: financial
+      currency: operational
+      reason_code: operational
+      note: pii  # free text typed by staff; may name a patient
+      lines: operational
+      refund_to: financial
+      status: operational
+      requested_by: operational
+      approved_by: operational
+      decision_note: pii  # free text typed by staff
+      decided_at: operational
+      created_at: operational
+    credit_notes:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      refund_request_id: operational
+      series_id: operational
+      number: financial
+      currency: operational
+      taxable_minor: financial
+      tax_minor: financial
+      round_off_minor: financial
+      total_minor: financial
+      issued_at: operational
+      issued_by: operational
+    credit_note_lines:
+      id: operational
+      tenant_id: operational
+      credit_note_id: operational
+      invoice_line_id: operational
+      quantity: operational
+      taxable_minor: financial
+      tax_minor: financial
+      taxes: financial
     invoice_payments:
       id: operational
       tenant_id: operational
@@ -595,6 +634,9 @@ schemas:
       receipt_number: financial
       currency: operational
       amount_minor: financial
+      kind: operational
+      refund_request_id: operational
+      refund_of_payment_id: operational
     invoice_series:
       id: operational
       tenant_id: operational

@@ -54,6 +54,17 @@ class DayCloseRepository {
                         rs.getInt("transactions")), tenantId, ts(dayStart), ts(dayEnd));
     }
 
+    /** FIN-013: refunds paid out in the window by method (positive), every method zero-filled like {@link #methods}. */
+    List<DayCloseSummaryResponse.Method> refunds(UUID tenantId, Instant dayStart, Instant dayEnd) {
+        return jdbc.query("""
+                SELECT m.method, COALESCE(SUM(-p.amount), 0) AS amount, count(p.id) AS transactions
+                FROM (VALUES ('cash', 1), ('card', 2), ('upi', 3), ('other', 4)) AS m(method, ord)
+                LEFT JOIN invoice_payments p ON p.method = m.method AND p.kind = 'refund' AND p.tenant_id = ? AND p.recorded_at >= ? AND p.recorded_at < ?
+                GROUP BY m.method, m.ord ORDER BY m.ord
+                """, (rs, i) -> new DayCloseSummaryResponse.Method(rs.getString("method"), rs.getBigDecimal("amount"),
+                        rs.getInt("transactions")), tenantId, ts(dayStart), ts(dayEnd));
+    }
+
     /** Balances still owed on the day's own bills. */
     DayCloseSummaryResponse.Outstanding outstanding(UUID tenantId, Instant dayStart, Instant dayEnd) {
         return jdbc.queryForObject("""

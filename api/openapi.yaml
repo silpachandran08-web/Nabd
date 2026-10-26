@@ -4039,6 +4039,10 @@ paths:
                   date: { type: string, format: date }
                   voidedCount: { type: integer, description: "Invoices voided on this clinic day (by voided_at)" }
                   voidedTotal: { type: number, description: "Sum of those invoices' total" }
+                  refunds:
+                    type: array
+                    description: "FIN-013: money handed back on this day by method (cash, card, upi, other; positive amounts). `methods` and expected cash already net these refunds."
+                    items: { type: object, properties: { method: { type: string }, amount: { type: number }, transactions: { type: integer } } }
                 additionalProperties: true
         "403": { description: Forbidden }
     post:
@@ -4253,6 +4257,89 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { description: "day-closed, invoice-not-payable or idempotency-key-reused" }
         "422": { description: "overpayment: amount is more than the balance (Problem with a numeric `balance` member)" }
+  /billing/invoices/{id}/refund-requests:
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-013: request a refund / credit note. Send `lines` (invoice line + quantity [+ `resaleable` for a stocked pharmacy item that goes back
+        on the shelf]) or a goodwill `amount`, never both; a `reasonCode`; and `refundTo` (payments to hand money back to, adding up to the credit
+        note total). Needs an Idempotency-Key. Audit `billing.refund_requested`. 409 OPEN_REQUEST_EXISTS (one pending request per invoice),
+        409 invoice-not-refundable, 422 EXCEEDS_REFUNDABLE, 422 REFUND_TO_MISMATCH, 400 refund-basis.
+      x-required-permission: billing:edit
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reasonCode, refundTo]
+              properties:
+                lines:
+                  type: array
+                  items: { type: object, required: [lineId, quantity], properties: { lineId: { type: string, format: uuid }, quantity: { type: integer, minimum: 1 }, resaleable: { type: boolean } } }
+                amount: { type: number, minimum: 0.01 }
+                reasonCode: { type: string, pattern: "^[a-z][a-z0-9_]{1,39}$" }
+                note: { type: string, maxLength: 500 }
+                refundTo:
+                  type: array
+                  items: { type: object, required: [paymentId, amount], properties: { paymentId: { type: string, format: uuid }, amount: { type: number, minimum: 0.01 } } }
+      responses:
+        "201": { description: The pending refund request, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "OPEN_REQUEST_EXISTS or invoice-not-refundable" }
+        "422": { description: "EXCEEDS_REFUNDABLE or REFUND_TO_MISMATCH" }
+  /billing/refund-requests:
+    get:
+      tags: [Billing]
+      summary: "FIN-013: refund requests, newest first, keyset-paged (`cursor` is the previous page's nextCursor; `limit` max 100)."
+      x-required-permission: billing:view
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [pending, approved, rejected] } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        "200": { description: "{ items[], nextCursor }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /billing/refund-requests/{id}/approve:
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-013: approve a refund request and issue the credit note (credit_note series, reversed taxable value and tax per line), write
+        negative payment rows, set the invoice `refunded` when fully reversed, restock resaleable pharmacy lines. The approver must not be the
+        requester (403 SAME_USER); above the clinic's `refund_owner_threshold` (default INR 2,000 / SAR 100) only the Owner may approve
+        (403 THRESHOLD_REQUIRES_OWNER); `expectedAmount` must equal the current amount (409 AMOUNT_CHANGED); 409 ALREADY_DECIDED;
+        409 day-closed (the credit note is dated today). Audit `billing.refund_approved`; events `billing.refund.approved.v1`, `billing.credit_note.issued.v1`.
+      x-required-permission: billing:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [expectedAmount], properties: { expectedAmount: { type: number } } } } }
+      responses:
+        "200": { description: "{ creditNoteId, creditNoteNumber }", content: { application/json: { schema: { type: object } } } }
+        "403": { description: "SAME_USER or THRESHOLD_REQUIRES_OWNER" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "AMOUNT_CHANGED, ALREADY_DECIDED or day-closed" }
+  /billing/refund-requests/{id}/reject:
+    post:
+      tags: [Billing]
+      summary: "FIN-013: reject a pending refund request with a reason. Audit `billing.refund_rejected`. 409 ALREADY_DECIDED."
+      x-required-permission: billing:approve
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, maxLength: 500 } } } } }
+      responses:
+        "200": { description: The rejected request, content: { application/json: { schema: { type: object } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: ALREADY_DECIDED }
   /billing/invoices/{id}/void:
     post:
       tags: [Billing]

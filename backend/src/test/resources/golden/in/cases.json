@@ -1,0 +1,3801 @@
+{
+ "pack": {
+  "id": "IN-GST",
+  "jurisdiction": "IN",
+  "taxRegime": "GST",
+  "currency": "INR",
+  "minorUnits": 2,
+  "ruleSetVersion": "IN-GST-1",
+  "minCases": 40
+ },
+ "cases": [
+  {
+   "id": "IN-001",
+   "title": "Consultation only, exempt",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "consult",
+      "discountMinor": 0,
+      "taxableMinor": 50000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 50000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 50000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-002",
+   "title": "Consultation exempt plus 18% procedure",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "consult",
+      "discountMinor": 0,
+      "taxableMinor": 50000,
+      "taxes": []
+     },
+     {
+      "key": "proc",
+      "discountMinor": 0,
+      "taxableMinor": 100000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 100000,
+        "amountMinor": 9000
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 100000,
+        "amountMinor": 9000
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 150000,
+    "discountMinor": 0,
+    "taxMinor": 18000,
+    "roundOffMinor": 0,
+    "totalMinor": 168000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 100000,
+      "taxMinor": 9000
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 100000,
+      "taxMinor": 9000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-003",
+   "title": "Cosmetic service at 18%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "cosmetic",
+      "quantity": 1,
+      "grossMinor": 250000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "cosmetic",
+      "discountMinor": 0,
+      "taxableMinor": 250000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 250000,
+        "amountMinor": 22500
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 250000,
+        "amountMinor": 22500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 250000,
+    "discountMinor": 0,
+    "taxMinor": 45000,
+    "roundOffMinor": 0,
+    "totalMinor": 295000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 250000,
+      "taxMinor": 22500
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 250000,
+      "taxMinor": 22500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-004",
+   "title": "Medicine at 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med5",
+      "quantity": 1,
+      "grossMinor": 12000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med5",
+      "discountMinor": 0,
+      "taxableMinor": 12000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 12000,
+        "amountMinor": 300
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 12000,
+        "amountMinor": 300
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 12000,
+    "discountMinor": 0,
+    "taxMinor": 600,
+    "roundOffMinor": 0,
+    "totalMinor": 12600
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 12000,
+      "taxMinor": 300
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 12000,
+      "taxMinor": 300
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-005",
+   "title": "Medicine at 12%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med12",
+      "quantity": 1,
+      "grossMinor": 8550,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med12",
+      "discountMinor": 0,
+      "taxableMinor": 8550,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 8550,
+        "amountMinor": 513
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 8550,
+        "amountMinor": 513
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 8550,
+    "discountMinor": 0,
+    "taxMinor": 1026,
+    "roundOffMinor": 24,
+    "totalMinor": 9600
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 8550,
+      "taxMinor": 513
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 8550,
+      "taxMinor": 513
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-006",
+   "title": "Medicines at 5% and 12% together",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med5",
+      "quantity": 1,
+      "grossMinor": 12000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "med12",
+      "quantity": 1,
+      "grossMinor": 8550,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med5",
+      "discountMinor": 0,
+      "taxableMinor": 12000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 12000,
+        "amountMinor": 300
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 12000,
+        "amountMinor": 300
+       }
+      ]
+     },
+     {
+      "key": "med12",
+      "discountMinor": 0,
+      "taxableMinor": 8550,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 8550,
+        "amountMinor": 513
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 8550,
+        "amountMinor": 513
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 20550,
+    "discountMinor": 0,
+    "taxMinor": 1626,
+    "roundOffMinor": 24,
+    "totalMinor": 22200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 12000,
+      "taxMinor": 300
+     },
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 8550,
+      "taxMinor": 513
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 12000,
+      "taxMinor": 300
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 8550,
+      "taxMinor": 513
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-007",
+   "title": "Invoice discount on one 18% line (QA-13)",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 10000,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 10000,
+      "taxableMinor": 90000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 90000,
+        "amountMinor": 8100
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 90000,
+        "amountMinor": 8100
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 100000,
+    "discountMinor": 10000,
+    "taxMinor": 16200,
+    "roundOffMinor": 0,
+    "totalMinor": 106200
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 90000,
+      "taxMinor": 8100
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 90000,
+      "taxMinor": 8100
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-008",
+   "title": "Invoice discount shared pro rata over exempt, 18% and 5% lines",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 17000,
+    "lines": [
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 20000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "consult",
+      "discountMinor": 5000,
+      "taxableMinor": 45000,
+      "taxes": []
+     },
+     {
+      "key": "proc",
+      "discountMinor": 10000,
+      "taxableMinor": 90000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 90000,
+        "amountMinor": 8100
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 90000,
+        "amountMinor": 8100
+       }
+      ]
+     },
+     {
+      "key": "med",
+      "discountMinor": 2000,
+      "taxableMinor": 18000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 18000,
+        "amountMinor": 450
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 18000,
+        "amountMinor": 450
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 170000,
+    "discountMinor": 17000,
+    "taxMinor": 17100,
+    "roundOffMinor": 0,
+    "totalMinor": 170100
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 18000,
+      "taxMinor": 450
+     },
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 90000,
+      "taxMinor": 8100
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 18000,
+      "taxMinor": 450
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 90000,
+      "taxMinor": 8100
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-009",
+   "title": "Discount of 1.00 over three equal lines: largest remainder",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 100,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "c",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "a",
+      "discountMinor": 34,
+      "taxableMinor": 9966,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9966,
+        "amountMinor": 897
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9966,
+        "amountMinor": 897
+       }
+      ]
+     },
+     {
+      "key": "b",
+      "discountMinor": 33,
+      "taxableMinor": 9967,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9967,
+        "amountMinor": 897
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9967,
+        "amountMinor": 897
+       }
+      ]
+     },
+     {
+      "key": "c",
+      "discountMinor": 33,
+      "taxableMinor": 9967,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9967,
+        "amountMinor": 897
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 9967,
+        "amountMinor": 897
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 30000,
+    "discountMinor": 100,
+    "taxMinor": 5382,
+    "roundOffMinor": 18,
+    "totalMinor": 35300
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 29900,
+      "taxMinor": 2691
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 29900,
+      "taxMinor": 2691
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-010",
+   "title": "Line discount: only the discountable line takes the discount",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 8000,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 80000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 12000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": false,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 8000,
+      "taxableMinor": 72000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 72000,
+        "amountMinor": 6480
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 72000,
+        "amountMinor": 6480
+       }
+      ]
+     },
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 12000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 12000,
+        "amountMinor": 300
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 12000,
+        "amountMinor": 300
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 92000,
+    "discountMinor": 8000,
+    "taxMinor": 13560,
+    "roundOffMinor": 40,
+    "totalMinor": 97600
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 12000,
+      "taxMinor": 300
+     },
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 72000,
+      "taxMinor": 6480
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 12000,
+      "taxMinor": 300
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 72000,
+      "taxMinor": 6480
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-011",
+   "title": "Inter-state B2B supply at 18% (IGST)",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": true
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 0,
+      "taxableMinor": 100000,
+      "taxes": [
+       {
+        "type": "IGST",
+        "ratePercent": "18.00",
+        "taxableMinor": 100000,
+        "amountMinor": 18000
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 100000,
+    "discountMinor": 0,
+    "taxMinor": 18000,
+    "roundOffMinor": 0,
+    "totalMinor": 118000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "IGST",
+      "ratePercent": "18.00",
+      "taxableMinor": 100000,
+      "taxMinor": 18000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-012",
+   "title": "Inter-state supply at 5% (IGST)",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": true
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "IGST",
+        "ratePercent": "5.00",
+        "taxableMinor": 10000,
+        "amountMinor": 500
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 500,
+    "roundOffMinor": 0,
+    "totalMinor": 10500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "IGST",
+      "ratePercent": "5.00",
+      "taxableMinor": 10000,
+      "taxMinor": 500
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-013",
+   "title": "Inter-state supply with invoice discount",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 6000,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": true
+     },
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 20000,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": false,
+      "interState": true
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 5000,
+      "taxableMinor": 95000,
+      "taxes": [
+       {
+        "type": "IGST",
+        "ratePercent": "18.00",
+        "taxableMinor": 95000,
+        "amountMinor": 17100
+       }
+      ]
+     },
+     {
+      "key": "med",
+      "discountMinor": 1000,
+      "taxableMinor": 19000,
+      "taxes": [
+       {
+        "type": "IGST",
+        "ratePercent": "12.00",
+        "taxableMinor": 19000,
+        "amountMinor": 2280
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 120000,
+    "discountMinor": 6000,
+    "taxMinor": 19380,
+    "roundOffMinor": 20,
+    "totalMinor": 133400
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "IGST",
+      "ratePercent": "12.00",
+      "taxableMinor": 19000,
+      "taxMinor": 2280
+     },
+     {
+      "type": "IGST",
+      "ratePercent": "18.00",
+      "taxableMinor": 95000,
+      "taxMinor": 17100
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-014",
+   "title": "Unregistered clinic: Bill of Supply, no tax lines, with discount",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": true,
+    "invoiceDiscountMinor": 2000,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 12000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 1786,
+      "taxableMinor": 98214,
+      "taxes": []
+     },
+     {
+      "key": "med",
+      "discountMinor": 214,
+      "taxableMinor": 11786,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 112000,
+    "discountMinor": 2000,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 110000
+   },
+   "printed": {
+    "documentTitle": "Bill of Supply",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-015",
+   "title": "Unregistered clinic: Bill of Supply with an exempt line",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": true,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 30000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "consult",
+      "discountMinor": 0,
+      "taxableMinor": 50000,
+      "taxes": []
+     },
+     {
+      "key": "proc",
+      "discountMinor": 0,
+      "taxableMinor": 30000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 80000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 80000
+   },
+   "printed": {
+    "documentTitle": "Bill of Supply",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-016",
+   "title": "Package bundle (WE-01 style): exempt consults plus 18% sessions at allocated prices",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "pkg-consult",
+      "quantity": 3,
+      "grossMinor": 120000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "pkg-session",
+      "quantity": 6,
+      "grossMinor": 480000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "pkg-consult",
+      "discountMinor": 0,
+      "taxableMinor": 120000,
+      "taxes": []
+     },
+     {
+      "key": "pkg-session",
+      "discountMinor": 0,
+      "taxableMinor": 480000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 480000,
+        "amountMinor": 43200
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 480000,
+        "amountMinor": 43200
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 600000,
+    "discountMinor": 0,
+    "taxMinor": 86400,
+    "roundOffMinor": 0,
+    "totalMinor": 686400
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 480000,
+      "taxMinor": 43200
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 480000,
+      "taxMinor": 43200
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-017",
+   "title": "Tax-inclusive price at 18%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 118000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 0,
+      "taxableMinor": 100000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 100000,
+        "amountMinor": 9000
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 100000,
+        "amountMinor": 9000
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 100000,
+    "discountMinor": 0,
+    "taxMinor": 18000,
+    "roundOffMinor": 0,
+    "totalMinor": 118000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 100000,
+      "taxMinor": 9000
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 100000,
+      "taxMinor": 9000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-018",
+   "title": "Tax-inclusive price at 5%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 10500,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 10000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 10000,
+        "amountMinor": 250
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 10000,
+        "amountMinor": 250
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 10000,
+    "discountMinor": 0,
+    "taxMinor": 500,
+    "roundOffMinor": 0,
+    "totalMinor": 10500
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 10000,
+      "taxMinor": 250
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 10000,
+      "taxMinor": 250
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-019",
+   "title": "Tax-inclusive price at 12% with an awkward amount",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "med",
+      "quantity": 1,
+      "grossMinor": 99900,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "med",
+      "discountMinor": 0,
+      "taxableMinor": 89196,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 89196,
+        "amountMinor": 5352
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 89196,
+        "amountMinor": 5352
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 89196,
+    "discountMinor": 0,
+    "taxMinor": 10704,
+    "roundOffMinor": 0,
+    "totalMinor": 99900
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 89196,
+      "taxMinor": 5352
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 89196,
+      "taxMinor": 5352
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-020",
+   "title": "Round-off: total rounds up at .50",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "x",
+      "quantity": 1,
+      "grossMinor": 33350,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "x",
+      "discountMinor": 0,
+      "taxableMinor": 33350,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 33350,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 50,
+    "totalMinor": 33400
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-021",
+   "title": "Round-off: total rounds down below .50",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "x",
+      "quantity": 1,
+      "grossMinor": 33333,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "x",
+      "discountMinor": 0,
+      "taxableMinor": 33333,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 33333,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": -33,
+    "totalMinor": 33300
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-022",
+   "title": "Round-off: whole-rupee total, no round-off line",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "x",
+      "quantity": 1,
+      "grossMinor": 33300,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "x",
+      "discountMinor": 0,
+      "taxableMinor": 33300,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 33300,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 33300
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-023",
+   "title": "Half-paisa tax: 9% of 33.33 rounds half-up per component",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "x",
+      "quantity": 1,
+      "grossMinor": 3333,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "x",
+      "discountMinor": 0,
+      "taxableMinor": 3333,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 3333,
+        "amountMinor": 300
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 3333,
+        "amountMinor": 300
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 3333,
+    "discountMinor": 0,
+    "taxMinor": 600,
+    "roundOffMinor": -33,
+    "totalMinor": 3900
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 3333,
+      "taxMinor": 300
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 3333,
+      "taxMinor": 300
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-024",
+   "title": "Half-paisa tax at 5%: 2.5% of 10.50 per component",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "x",
+      "quantity": 1,
+      "grossMinor": 1050,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "x",
+      "discountMinor": 0,
+      "taxableMinor": 1050,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 1050,
+        "amountMinor": 26
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 1050,
+        "amountMinor": 26
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 1050,
+    "discountMinor": 0,
+    "taxMinor": 52,
+    "roundOffMinor": -2,
+    "totalMinor": 1100
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 1050,
+      "taxMinor": 26
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 1050,
+      "taxMinor": 26
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-025",
+   "title": "Free item (zero value)",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "free",
+      "quantity": 1,
+      "grossMinor": 0,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 0,
+      "taxableMinor": 100000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 100000,
+        "amountMinor": 9000
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 100000,
+        "amountMinor": 9000
+       }
+      ]
+     },
+     {
+      "key": "free",
+      "discountMinor": 0,
+      "taxableMinor": 0,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 100000,
+    "discountMinor": 0,
+    "taxMinor": 18000,
+    "roundOffMinor": 0,
+    "totalMinor": 118000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 100000,
+      "taxMinor": 9000
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 100000,
+      "taxMinor": 9000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-026",
+   "title": "Nil-rated line",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "nil",
+      "quantity": 1,
+      "grossMinor": 75000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "nil",
+      "discountMinor": 0,
+      "taxableMinor": 75000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 75000,
+    "discountMinor": 0,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 75000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-027",
+   "title": "Large bill at 18%",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "big",
+      "quantity": 1,
+      "grossMinor": 12500000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "big",
+      "discountMinor": 0,
+      "taxableMinor": 12500000,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 12500000,
+        "amountMinor": 1125000
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 12500000,
+        "amountMinor": 1125000
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 12500000,
+    "discountMinor": 0,
+    "taxMinor": 2250000,
+    "roundOffMinor": 0,
+    "totalMinor": 14750000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 12500000,
+      "taxMinor": 1125000
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 12500000,
+      "taxMinor": 1125000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-028",
+   "title": "Five lines, mixed rates, with discount",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 25000,
+    "lines": [
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 60000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "xray",
+      "quantity": 1,
+      "grossMinor": 90000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "med5",
+      "quantity": 1,
+      "grossMinor": 4550,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "med12",
+      "quantity": 1,
+      "grossMinor": 15075,
+      "category": "TAXABLE",
+      "ratePercent": "12",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "cosmetic",
+      "quantity": 1,
+      "grossMinor": 220000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "consult",
+      "discountMinor": 3850,
+      "taxableMinor": 56150,
+      "taxes": []
+     },
+     {
+      "key": "xray",
+      "discountMinor": 5775,
+      "taxableMinor": 84225,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 84225,
+        "amountMinor": 7580
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 84225,
+        "amountMinor": 7580
+       }
+      ]
+     },
+     {
+      "key": "med5",
+      "discountMinor": 292,
+      "taxableMinor": 4258,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 4258,
+        "amountMinor": 106
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "2.50",
+        "taxableMinor": 4258,
+        "amountMinor": 106
+       }
+      ]
+     },
+     {
+      "key": "med12",
+      "discountMinor": 967,
+      "taxableMinor": 14108,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 14108,
+        "amountMinor": 846
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "6.00",
+        "taxableMinor": 14108,
+        "amountMinor": 846
+       }
+      ]
+     },
+     {
+      "key": "cosmetic",
+      "discountMinor": 14116,
+      "taxableMinor": 205884,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 205884,
+        "amountMinor": 18530
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 205884,
+        "amountMinor": 18530
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 389625,
+    "discountMinor": 25000,
+    "taxMinor": 54124,
+    "roundOffMinor": -49,
+    "totalMinor": 418700
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 4258,
+      "taxMinor": 106
+     },
+     {
+      "type": "CGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 14108,
+      "taxMinor": 846
+     },
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 290109,
+      "taxMinor": 26110
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "2.50",
+      "taxableMinor": 4258,
+      "taxMinor": 106
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "6.00",
+      "taxableMinor": 14108,
+      "taxMinor": 846
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 290109,
+      "taxMinor": 26110
+     }
+    ],
+    "roundOffLine": true
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-029",
+   "title": "Whole-unit round-off off (exact paise total)",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": false,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 99999,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 0,
+      "taxableMinor": 99999,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 99999,
+        "amountMinor": 9000
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 99999,
+        "amountMinor": 9000
+       }
+      ]
+     }
+    ],
+    "subtotalMinor": 99999,
+    "discountMinor": 0,
+    "taxMinor": 18000,
+    "roundOffMinor": 0,
+    "totalMinor": 117999
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 99999,
+      "taxMinor": 9000
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 99999,
+      "taxMinor": 9000
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-030",
+   "title": "Discount equal to the whole discountable value",
+   "kind": "invoice",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 100000,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": false,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "expected": {
+    "lines": [
+     {
+      "key": "proc",
+      "discountMinor": 100000,
+      "taxableMinor": 0,
+      "taxes": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 0,
+        "amountMinor": 0
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 0,
+        "amountMinor": 0
+       }
+      ]
+     },
+     {
+      "key": "consult",
+      "discountMinor": 0,
+      "taxableMinor": 50000,
+      "taxes": []
+     }
+    ],
+    "subtotalMinor": 150000,
+    "discountMinor": 100000,
+    "taxMinor": 0,
+    "roundOffMinor": 0,
+    "totalMinor": 50000
+   },
+   "printed": {
+    "documentTitle": "Tax Invoice",
+    "taxSummary": [
+     {
+      "type": "CGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 0,
+      "taxMinor": 0
+     },
+     {
+      "type": "SGST",
+      "ratePercent": "9.00",
+      "taxableMinor": 0,
+      "taxMinor": 0
+     }
+    ],
+    "roundOffLine": false
+   },
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-031",
+   "title": "Full refund of INR 1,180 (1,000 + 18%): CGST 90.00 + SGST 90.00 reversed",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 118000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1,
+       "taxableMinor": 100000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 100000,
+     "taxMinor": 18000,
+     "roundOffMinor": 0,
+     "totalMinor": 118000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-032",
+   "title": "Partial refund of 1 of 3 lines",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "c",
+      "quantity": 1,
+      "grossMinor": 20000,
+      "category": "NIL",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 190500,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "b",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "b",
+       "quantity": 1,
+       "taxableMinor": 50000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "2.50",
+         "taxableMinor": 50000,
+         "amountMinor": 1250
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "2.50",
+         "taxableMinor": 50000,
+         "amountMinor": 1250
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 50000,
+     "taxMinor": 2500,
+     "roundOffMinor": 0,
+     "totalMinor": 52500
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-033",
+   "title": "Refund of 1 of 3 sessions of one line",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "sess",
+      "quantity": 3,
+      "grossMinor": 300000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 354000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 1,
+       "taxableMinor": 100000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 100000,
+     "taxMinor": 18000,
+     "roundOffMinor": 0,
+     "totalMinor": 118000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-034",
+   "title": "Goodwill refund of 100.00 on a 1,180.00 invoice",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 118000,
+   "reversals": [
+    {
+     "amountMinor": 10000
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 0,
+       "taxableMinor": 8475,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 8475,
+         "amountMinor": 763
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 8475,
+         "amountMinor": 762
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 8475,
+     "taxMinor": 1525,
+     "roundOffMinor": 0,
+     "totalMinor": 10000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-035",
+   "title": "Goodwill refund spread over two taxed lines",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "TAXABLE",
+      "ratePercent": "5",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 170500,
+   "reversals": [
+    {
+     "amountMinor": 70000
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "a",
+       "quantity": 0,
+       "taxableMinor": 41056,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 41056,
+         "amountMinor": 3695
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 41056,
+         "amountMinor": 3695
+        }
+       ]
+      },
+      {
+       "key": "b",
+       "quantity": 0,
+       "taxableMinor": 20528,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "2.50",
+         "taxableMinor": 20528,
+         "amountMinor": 513
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "2.50",
+         "taxableMinor": 20528,
+         "amountMinor": 513
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 61584,
+     "taxMinor": 8416,
+     "roundOffMinor": 0,
+     "totalMinor": 70000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-036",
+   "title": "Two credit notes that together reverse the invoice exactly (1 then 2 of 3 sessions)",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "sess",
+      "quantity": 3,
+      "grossMinor": 300000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 354000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 1
+      }
+     ]
+    },
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 2
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 1,
+       "taxableMinor": 100000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 100000,
+     "taxMinor": 18000,
+     "roundOffMinor": 0,
+     "totalMinor": 118000
+    },
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 2,
+       "taxableMinor": 200000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 200000,
+         "amountMinor": 18000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 200000,
+         "amountMinor": 18000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 200000,
+     "taxMinor": 36000,
+     "roundOffMinor": 0,
+     "totalMinor": 236000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-037",
+   "title": "Credit note on a discounted invoice reverses the discounted value",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 20000,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "b",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 212400,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "a",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "a",
+       "quantity": 1,
+       "taxableMinor": 90000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 90000,
+         "amountMinor": 8100
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 90000,
+         "amountMinor": 8100
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 90000,
+     "taxMinor": 16200,
+     "roundOffMinor": 0,
+     "totalMinor": 106200
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-038",
+   "title": "Credit note on an inter-state invoice reverses IGST",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": true
+     }
+    ]
+   },
+   "invoiceTotalMinor": 118000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1,
+       "taxableMinor": 100000,
+       "taxes": [
+        {
+         "type": "IGST",
+         "ratePercent": "18.00",
+         "taxableMinor": 100000,
+         "amountMinor": 18000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 100000,
+     "taxMinor": 18000,
+     "roundOffMinor": 0,
+     "totalMinor": 118000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-039",
+   "title": "Full refund of an invoice with round-off returns the round-off",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "a",
+      "quantity": 1,
+      "grossMinor": 33333,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 39300,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "a",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "a",
+       "quantity": 1,
+       "taxableMinor": 33333,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 33333,
+         "amountMinor": 3000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 33333,
+         "amountMinor": 3000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 33333,
+     "taxMinor": 6000,
+     "roundOffMinor": -33,
+     "totalMinor": 39300
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-040",
+   "title": "Credit note on an exempt line has no tax",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "consult",
+      "quantity": 1,
+      "grossMinor": 50000,
+      "category": "EXEMPT",
+      "ratePercent": "0",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     },
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 168000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "consult",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "consult",
+       "quantity": 1,
+       "taxableMinor": 50000,
+       "taxes": []
+      }
+     ],
+     "taxableMinor": 50000,
+     "taxMinor": 0,
+     "roundOffMinor": 0,
+     "totalMinor": 50000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-041",
+   "title": "Credit note on a tax-inclusive line",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 118000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": true,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 118000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1,
+       "taxableMinor": 100000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 100000,
+     "taxMinor": 18000,
+     "roundOffMinor": 0,
+     "totalMinor": 118000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-042",
+   "title": "Credit note on a Bill of Supply has no tax",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": true,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 100000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 1,
+       "taxableMinor": 100000,
+       "taxes": []
+      }
+     ],
+     "taxableMinor": 100000,
+     "taxMinor": 0,
+     "roundOffMinor": 0,
+     "totalMinor": 100000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-043",
+   "title": "Goodwill refund then the rest by amount: parts add up to the invoice",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "proc",
+      "quantity": 1,
+      "grossMinor": 100000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 118000,
+   "reversals": [
+    {
+     "amountMinor": 10000
+    },
+    {
+     "amountMinor": 108000
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 0,
+       "taxableMinor": 8475,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 8475,
+         "amountMinor": 763
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 8475,
+         "amountMinor": 762
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 8475,
+     "taxMinor": 1525,
+     "roundOffMinor": 0,
+     "totalMinor": 10000
+    },
+    {
+     "lines": [
+      {
+       "key": "proc",
+       "quantity": 0,
+       "taxableMinor": 91525,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 91525,
+         "amountMinor": 8237
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 91525,
+         "amountMinor": 8238
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 91525,
+     "taxMinor": 16475,
+     "roundOffMinor": 0,
+     "totalMinor": 108000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-044",
+   "title": "Refund of 2 of 3 sessions then a goodwill amount for the rest",
+   "kind": "credit_note",
+   "cart": {
+    "minorUnits": 2,
+    "wholeUnitRoundOff": true,
+    "billOfSupply": false,
+    "invoiceDiscountMinor": 0,
+    "lines": [
+     {
+      "key": "sess",
+      "quantity": 3,
+      "grossMinor": 300000,
+      "category": "TAXABLE",
+      "ratePercent": "18",
+      "discountable": true,
+      "inclusive": false,
+      "interState": false
+     }
+    ]
+   },
+   "invoiceTotalMinor": 354000,
+   "reversals": [
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 2
+      }
+     ]
+    },
+    {
+     "amountMinor": 118000
+    }
+   ],
+   "expected": [
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 2,
+       "taxableMinor": 200000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 200000,
+         "amountMinor": 18000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 200000,
+         "amountMinor": 18000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 200000,
+     "taxMinor": 36000,
+     "roundOffMinor": 0,
+     "totalMinor": 236000
+    },
+    {
+     "lines": [
+      {
+       "key": "sess",
+       "quantity": 0,
+       "taxableMinor": 100000,
+       "taxes": [
+        {
+         "type": "CGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        },
+        {
+         "type": "SGST",
+         "ratePercent": "9.00",
+         "taxableMinor": 100000,
+         "amountMinor": 9000
+        }
+       ]
+      }
+     ],
+     "taxableMinor": 100000,
+     "taxMinor": 18000,
+     "roundOffMinor": 0,
+     "totalMinor": 118000
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-045",
+   "title": "Interim consultation bill, then the procedure is appended at the final checkpoint",
+   "kind": "checkpoints",
+   "checkpoints": [
+    {
+     "cart": {
+      "minorUnits": 2,
+      "wholeUnitRoundOff": true,
+      "billOfSupply": false,
+      "invoiceDiscountMinor": 0,
+      "lines": [
+       {
+        "key": "consult",
+        "quantity": 1,
+        "grossMinor": 40000,
+        "category": "EXEMPT",
+        "ratePercent": "0",
+        "discountable": true,
+        "inclusive": false,
+        "interState": false
+       }
+      ]
+     },
+     "expected": {
+      "lines": [
+       {
+        "key": "consult",
+        "discountMinor": 0,
+        "taxableMinor": 40000,
+        "taxes": []
+       }
+      ],
+      "subtotalMinor": 40000,
+      "discountMinor": 0,
+      "taxMinor": 0,
+      "roundOffMinor": 0,
+      "totalMinor": 40000
+     },
+     "printed": {
+      "documentTitle": "Tax Invoice",
+      "taxSummary": [],
+      "roundOffLine": false
+     }
+    },
+    {
+     "cart": {
+      "minorUnits": 2,
+      "wholeUnitRoundOff": true,
+      "billOfSupply": false,
+      "invoiceDiscountMinor": 0,
+      "lines": [
+       {
+        "key": "consult",
+        "quantity": 1,
+        "grossMinor": 40000,
+        "category": "EXEMPT",
+        "ratePercent": "0",
+        "discountable": true,
+        "inclusive": false,
+        "interState": false
+       },
+       {
+        "key": "proc",
+        "quantity": 1,
+        "grossMinor": 120000,
+        "category": "TAXABLE",
+        "ratePercent": "18",
+        "discountable": true,
+        "inclusive": false,
+        "interState": false
+       }
+      ]
+     },
+     "expected": {
+      "lines": [
+       {
+        "key": "consult",
+        "discountMinor": 0,
+        "taxableMinor": 40000,
+        "taxes": []
+       },
+       {
+        "key": "proc",
+        "discountMinor": 0,
+        "taxableMinor": 120000,
+        "taxes": [
+         {
+          "type": "CGST",
+          "ratePercent": "9.00",
+          "taxableMinor": 120000,
+          "amountMinor": 10800
+         },
+         {
+          "type": "SGST",
+          "ratePercent": "9.00",
+          "taxableMinor": 120000,
+          "amountMinor": 10800
+         }
+        ]
+       }
+      ],
+      "subtotalMinor": 160000,
+      "discountMinor": 0,
+      "taxMinor": 21600,
+      "roundOffMinor": 0,
+      "totalMinor": 181600
+     },
+     "printed": {
+      "documentTitle": "Tax Invoice",
+      "taxSummary": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 120000,
+        "taxMinor": 10800
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 120000,
+        "taxMinor": 10800
+       }
+      ],
+      "roundOffLine": false
+     }
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  },
+  {
+   "id": "IN-046",
+   "title": "Interim bill, then final checkpoint with an invoice discount",
+   "kind": "checkpoints",
+   "checkpoints": [
+    {
+     "cart": {
+      "minorUnits": 2,
+      "wholeUnitRoundOff": true,
+      "billOfSupply": false,
+      "invoiceDiscountMinor": 0,
+      "lines": [
+       {
+        "key": "consult",
+        "quantity": 1,
+        "grossMinor": 40000,
+        "category": "EXEMPT",
+        "ratePercent": "0",
+        "discountable": true,
+        "inclusive": false,
+        "interState": false
+       }
+      ]
+     },
+     "expected": {
+      "lines": [
+       {
+        "key": "consult",
+        "discountMinor": 0,
+        "taxableMinor": 40000,
+        "taxes": []
+       }
+      ],
+      "subtotalMinor": 40000,
+      "discountMinor": 0,
+      "taxMinor": 0,
+      "roundOffMinor": 0,
+      "totalMinor": 40000
+     },
+     "printed": {
+      "documentTitle": "Tax Invoice",
+      "taxSummary": [],
+      "roundOffLine": false
+     }
+    },
+    {
+     "cart": {
+      "minorUnits": 2,
+      "wholeUnitRoundOff": true,
+      "billOfSupply": false,
+      "invoiceDiscountMinor": 16000,
+      "lines": [
+       {
+        "key": "consult",
+        "quantity": 1,
+        "grossMinor": 40000,
+        "category": "EXEMPT",
+        "ratePercent": "0",
+        "discountable": true,
+        "inclusive": false,
+        "interState": false
+       },
+       {
+        "key": "proc",
+        "quantity": 1,
+        "grossMinor": 120000,
+        "category": "TAXABLE",
+        "ratePercent": "18",
+        "discountable": true,
+        "inclusive": false,
+        "interState": false
+       }
+      ]
+     },
+     "expected": {
+      "lines": [
+       {
+        "key": "consult",
+        "discountMinor": 4000,
+        "taxableMinor": 36000,
+        "taxes": []
+       },
+       {
+        "key": "proc",
+        "discountMinor": 12000,
+        "taxableMinor": 108000,
+        "taxes": [
+         {
+          "type": "CGST",
+          "ratePercent": "9.00",
+          "taxableMinor": 108000,
+          "amountMinor": 9720
+         },
+         {
+          "type": "SGST",
+          "ratePercent": "9.00",
+          "taxableMinor": 108000,
+          "amountMinor": 9720
+         }
+        ]
+       }
+      ],
+      "subtotalMinor": 160000,
+      "discountMinor": 16000,
+      "taxMinor": 19440,
+      "roundOffMinor": -40,
+      "totalMinor": 163400
+     },
+     "printed": {
+      "documentTitle": "Tax Invoice",
+      "taxSummary": [
+       {
+        "type": "CGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 108000,
+        "taxMinor": 9720
+       },
+       {
+        "type": "SGST",
+        "ratePercent": "9.00",
+        "taxableMinor": 108000,
+        "taxMinor": 9720
+       }
+      ],
+      "roundOffLine": true
+     }
+    }
+   ],
+   "review": {
+    "ruleSetVersion": "IN-GST-1",
+    "reviewer": null,
+    "signedOn": null
+   }
+  }
+ ]
+}

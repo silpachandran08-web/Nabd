@@ -91,7 +91,7 @@ public class DayCloseService {
                 toleranceOf(tenantId, currency), repo.totals(tenantId, start, end), repo.methods(tenantId, start, end),
                 repo.outstanding(tenantId, start, end), repo.pendingCheckouts(tenantId, day), repo.unbilled(tenantId, day),
                 repo.taxBands(tenantId, start, end), repo.splitPaymentBills(tenantId, start, end), close,
-                voided.count(), voided.total());
+                voided.count(), voided.total(), repo.refunds(tenantId, start, end));
     }
 
     /** Closes a clinic day (default today; never a future day). Blocked while any ended consultation has no bill. */

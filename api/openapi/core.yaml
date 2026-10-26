@@ -1902,6 +1902,50 @@ paths:
       tags:
       - billing
       x-required-permission: billing:edit
+  /v1/billing/invoices/{id}/refund-requests:
+    post:
+      operationId: RefundController_request
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundRequestRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RefundRequestResponse"
+          description: Created
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:edit
   /v1/billing/invoices/{id}/void:
     post:
       operationId: CheckoutController_voidInvoice
@@ -2051,6 +2095,143 @@ paths:
       tags:
       - billing
       x-required-permission: billing:view
+  /v1/billing/refund-requests:
+    get:
+      operationId: RefundController_list
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RefundRequestPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
+  /v1/billing/refund-requests/{id}/approve:
+    post:
+      operationId: RefundController_approve
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundApproveRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RefundApproveResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:approve
+  /v1/billing/refund-requests/{id}/reject:
+    post:
+      operationId: RefundController_reject
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundRejectRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RefundRequestResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:approve
   /v1/billing/tax/guided-picker:
     get:
       operationId: TaxHeadController_picker
@@ -16147,6 +16328,10 @@ components:
         pendingCheckouts:
           type: integer
           format: int32
+        refunds:
+          type: array
+          items:
+            $ref: "#/components/schemas/Method"
         splitPaymentBills:
           type: integer
           format: int32
@@ -17945,6 +18130,9 @@ components:
           type: string
         chargeName:
           type: string
+        id:
+          type: string
+          format: uuid
         lineTotal:
           type: number
         listUnitPrice:
@@ -20298,6 +20486,35 @@ components:
           minLength: 1
       required:
       - refreshToken
+    RefundApproveRequest:
+      type: object
+      properties:
+        expectedAmount:
+          type: number
+      required:
+      - expectedAmount
+    RefundApproveResponse:
+      type: object
+      properties:
+        creditNoteId:
+          type: string
+          format: uuid
+        creditNoteNumber:
+          type: string
+    RefundLine:
+      type: object
+      properties:
+        lineId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+        resaleable:
+          type: boolean
+      required:
+      - lineId
     RefundPreviewItem:
       type: object
       properties:
@@ -20323,6 +20540,24 @@ components:
           type: number
         usedListValue:
           type: number
+    RefundRejectRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - reason
+    RefundRequestPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RefundRequestResponse"
+        nextCursor:
+          type: string
     RefundRequestRequest:
       type: object
       properties:
@@ -20331,6 +20566,49 @@ components:
           minLength: 1
       required:
       - reason
+    RefundRequestResponse:
+      type: object
+      properties:
+        amount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        currency:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        decidedBy:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/RefundLine"
+        note:
+          type: string
+        reasonCode:
+          type: string
+        refundTo:
+          type: array
+          items:
+            $ref: "#/components/schemas/RefundTarget"
+        requestedBy:
+          type: string
+          format: uuid
+        requestedByName:
+          type: string
+        status:
+          type: string
     RefundResponse:
       type: object
       properties:
@@ -20359,6 +20637,19 @@ components:
           type: string
         usedListValue:
           type: number
+    RefundTarget:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: false
+          minimum: 0.01
+        paymentId:
+          type: string
+          format: uuid
+      required:
+      - amount
+      - paymentId
     RefuseRequest:
       type: object
       properties:

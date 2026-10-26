@@ -26,7 +26,8 @@ public record DayCloseSummaryResponse(
         int splitPaymentBills,
         Close close,                 // null until the day is closed at least once
         int voidedCount,             // OWN-019: invoices whose voided_at falls in this day (whenever they were raised)
-        BigDecimal voidedTotal       // sum of those invoices' total
+        BigDecimal voidedTotal,      // sum of those invoices' total
+        List<Method> refunds         // FIN-013: money handed back today by method (positive amounts); methods[] and expected cash already net them
 ) {
     public record Totals(BigDecimal billed, int bills, BigDecimal collected, int payments, BigDecimal tax) {
     }

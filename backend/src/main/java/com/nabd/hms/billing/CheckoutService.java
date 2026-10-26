@@ -473,7 +473,7 @@ public class CheckoutService {
                     return new LineItemResponse(li.chargeCode(), li.chargeName(), li.category(), li.quantity(),
                         li.unitPrice(), li.taxRatePercent(), li.lineTotal(), li.listUnitPrice(), li.tier(), li.overrideReasonCode(),
                         li.taxableMinor(),
-                        parts.stream().map(p -> new LineItemResponse.TaxPart(p.type(), p.ratePercent(), p.amountMinor())).toList());
+                        parts.stream().map(p -> new LineItemResponse.TaxPart(p.type(), p.ratePercent(), p.amountMinor())).toList(), li.id());
                 })
                 .toList();
         String[] docMeta = tax.documentMeta(row.id());

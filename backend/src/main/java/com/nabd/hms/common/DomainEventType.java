@@ -19,6 +19,7 @@ public enum DomainEventType {
     ALLERGY_CHANGED("clinical.allergy.changed.v1", "core/clinical"),
     INVOICE_PAID("billing.invoice.paid.v1", "core/billing"),
     PAYMENT_RECORDED("billing.payment.recorded.v1", "core/billing"),
+    REFUND_APPROVED("billing.refund.approved.v1", "core/billing"),
     CONSENT_CHANGED("consent.changed.v1", "core/patient"),
     ORGANIZATION_CONFIG_CHANGED("organization.config.changed.v1", "core/organization"),
     TENANT_REGION_PINNED("organization.tenant.region_pinned.v1", "core/organization"),

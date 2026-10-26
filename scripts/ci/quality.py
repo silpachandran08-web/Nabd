@@ -5,6 +5,7 @@
   quality.py baseline JACOCO_XML OUT_JSON     record current numbers + date
   quality.py pit      MUTATIONS_XML             exit 1 below threshold; prints score JSON (save as PIT_SCORE_JSON)
   quality.py pit-drop PIT_SCORE_JSON HISTORY  exit 1 when drop > max_drop vs last green
+  quality.py pit-pkg  MUTATIONS_XML             FIN-010: exit 1 when a configured package (pit_packages) scores below its minimum
 """
 import fnmatch, json, subprocess, sys, datetime as dt
 import xml.etree.ElementTree as ET
@@ -108,6 +109,18 @@ def main(a):
             elif s < m: fails.append(f"{c}: {s:.1f} < {m}")
         print(json.dumps({"score": round(total, 1), "classes": {k: round(v, 1) for k, v in per.items()}, "date": today().isoformat(), "failures": fails}))
         sys.exit(1 if fails else 0)
+    elif cmd == "pit-pkg":
+        out, fails = {}, []
+        for name, pkg in CFG.get("pit_packages", {}).items():
+            if name.startswith("_"): continue
+            ms = ET.parse(a[1]).getroot().findall("mutation")
+            mine = [m for m in ms if m.get("status") not in ("NON_VIABLE", "RUN_ERROR") and m.findtext("mutatedClass").split("$")[0] in pkg["classes"]]
+            for c in pkg["classes"]:
+                if not any(m.findtext("mutatedClass").split("$")[0] == c for m in mine): fails.append(f"{name}: {c}: no mutants found")
+            score = 100.0 if not mine else 100.0 * sum(m.get("detected") == "true" for m in mine) / len(mine)
+            out[name] = round(score, 1)
+            if score < pkg["min_score"]: fails.append(f"{name}: PIT score {score:.1f} < {pkg['min_score']}")
+        print(json.dumps({"packages": out, "failures": fails})); sys.exit(1 if fails else 0)
     elif cmd == "pit-drop":
         cur = json.load(open(a[1]))["score"]
         try: last = json.load(open(a[2]))["last_green"]["score"]

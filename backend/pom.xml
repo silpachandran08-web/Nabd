@@ -236,6 +236,12 @@
                 <param>com.nabd.hms.clinical.AllergyDrugClasses*</param>
                 <param>com.nabd.hms.clinical.PrescriptionService*</param>
                 <param>com.nabd.hms.billing.CheckoutService*</param>
+                <!-- FIN-010: the pure tax rules (engine, jurisdiction adapters, credit-note arithmetic); gate: >= 85% per class in ci/quality-gates.json -->
+                <param>com.nabd.hms.billing.tax.RuleBasedTaxEngine*</param>
+                <param>com.nabd.hms.billing.tax.TaxEngine*</param>
+                <param>com.nabd.hms.billing.tax.IndiaGst*</param>
+                <param>com.nabd.hms.billing.tax.FlatVat*</param>
+                <param>com.nabd.hms.billing.CreditNoteMath*</param>
               </targetClasses>
               <outputFormats><param>XML</param></outputFormats>
               <timestampedReports>false</timestampedReports>

@@ -22,7 +22,8 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** Independent QA (S9 PLT-018), flag OFF (the default): brand visibility contained, writes pinned, hot query fast. */
+/** Independent QA (S9 PLT-018), flag OFF (the default): brand visibility contained, writes pinned, hot query fast.
+ * PLT-021 (S15) removed the widening itself: the policy and TenantContext assertions below now require the single-tenant form (updated on purpose). */
 class Plt018ContainmentS9QaTest extends ApiTestBase {
 
     private static final List<String> WIDENED_READ = List.of("patients", "doctor_working_hours", "doctor_leave", "appointments", "queue_entries",
@@ -128,8 +129,8 @@ class Plt018ContainmentS9QaTest extends ApiTestBase {
                 }
                 if (!NEVER_WIDE.contains(t)) {
                     String sel = byCmd.containsKey("SELECT") ? byCmd.get("SELECT")[0] : "";
-                    if (!sel.contains("visible_tenant_ids") || sel.contains(" OR ")) {
-                        problems.add(t + ": SELECT is not the plain array form: " + sel);
+                    if (sel.contains("visible_tenant_ids") || sel.contains(" OR ") || !sel.contains("tenant_id")) {
+                        problems.add(t + ": SELECT is not the single-tenant form (PLT-021): " + sel);
                     }
                 }
                 for (String cmd : new String[]{"INSERT", "UPDATE"}) {
@@ -150,7 +151,7 @@ class Plt018ContainmentS9QaTest extends ApiTestBase {
                     widens.add(rs.getString(1));
                 }
             }
-            assertThat(widens).as("tables whose read policy widens").containsExactlyInAnyOrderElementsOf(WIDENED_READ);
+            assertThat(widens).as("tables whose read policy widens (PLT-021: none)").isEmpty();
             try (ResultSet rs = st.executeQuery("SELECT count(*) FROM pg_policies WHERE qual LIKE '%accessible_tenant_ids%' OR with_check LIKE '%accessible_tenant_ids%'")) {
                 rs.next();
                 assertThat(rs.getInt(1)).as("policies on any table still using app.accessible_tenant_ids").isZero();
@@ -181,7 +182,7 @@ class Plt018ContainmentS9QaTest extends ApiTestBase {
             assertThat(inTenantTx(p.a().id(), () -> jdbc.queryForList("SELECT DISTINCT tenant_id FROM " + table, UUID.class))).as(table).containsOnly(p.a().id());
         }
         String src = Files.readString(Path.of("src/main/java/com/nabd/hms/common/TenantContext.java"));
-        assertThat(src).contains("nabd.legacy-brand-visibility:false");
+        assertThat(src).as("PLT-021 removed the flag and the allow-list").doesNotContain("legacy-brand-visibility").doesNotContain("data_visibility_scope");
         for (String f : List.of("src/main/resources/application.yml")) {
             assertThat(Files.readString(Path.of(f))).as(f + " must not switch the flag on").doesNotContainPattern("legacy-brand-visibility\\s*[:=]\\s*true");
         }

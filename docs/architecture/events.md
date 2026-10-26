@@ -85,6 +85,7 @@ The relay passes it on as the CloudEvents `traceparent` extension, so one trace 
 | `clinical.allergy.changed.v1` | AllergyService add / correct / deactivate / no-known-allergies (subject = patient) | patientId, allergyId?, change, status |
 | `billing.invoice.paid.v1` | CheckoutService.recordPayment, when the invoice becomes paid | invoiceId, totalMinor, currency, status |
 | `billing.payment.recorded.v1` | CheckoutService.recordPayment (converted from the FIN-001 event; same keys) | invoiceId, paymentId, method, amountMinor, currency, balanceMinor, status |
+| `billing.refund.approved.v1` | RefundService.approve (FIN-013; subject = refund request). The credit note itself travels as the non-catalogue `billing.credit_note.issued.v1` (ids and totals, log-only handler like `billing.day.closed.v1`) | refundRequestId, invoiceId, amountMinor, methods |
 | `consent.changed.v1` | PatientService.withdrawConsent, guardian consent grant / withdraw | patientId, consentType, status |
 | `organization.config.changed.v1` | SetupService.updatePolicy, updateProfile (key only, never the value) | configKey, status |
 | `organization.tenant.region_pinned.v1` | ProvisioningStepRunner.goLive (OPS-061; the region is immutable from here). Consumer: the Control Plane cell-routing record, **needs external action** (the control-plane service is not in this repo) | regionCode, cell |
