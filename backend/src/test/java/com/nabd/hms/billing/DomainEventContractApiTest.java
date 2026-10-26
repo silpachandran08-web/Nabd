@@ -279,6 +279,7 @@ class DomainEventContractApiTest extends S10QaBillingSupport {
         expected.remove(DomainEventType.PRIVACY_NOTICE_PUBLISHED.type()); // IDC-003: Idc003PrivacyNoticeApiTest
         expected.remove(DomainEventType.BOOKING_ROUTED.type()); // ACC-009/010: Acc009BookingRoutingApiTest, Acc010BookingRequestsApiTest
         expected.remove(DomainEventType.REFUND_APPROVED.type()); // FIN-013: Fin013RefundApiTest
+        expected.remove(DomainEventType.SENDER_THROTTLED.type()); // COM-021: produced by services/comms-gateway (QualityEventsDbTest)
         assertThat(seen).isEqualTo(expected);
 
         // spot checks on content

@@ -375,6 +375,7 @@ class S12QaOps015EventsTest extends S10QaBillingSupport {
         expected.remove("platform.entitlements.changed.v1"); // PLT-059: operator-plane producer, Plt059EntitlementsApiTest
         expected.remove("organization.privacy_notice.published.v1"); // IDC-003: Idc003PrivacyNoticeApiTest
         expected.remove("billing.refund.approved.v1"); // FIN-013: Fin013RefundApiTest
+        expected.remove("comms.sender.throttled.v1"); // COM-021: produced by services/comms-gateway
         assertThat(seen).isEqualTo(expected);
 
         String all = inTenantTx(t, () -> jdbc.queryForObject("SELECT string_agg(envelope::text, ' ') FROM outbox_cloudevents WHERE tenant_id = ?", String.class, t));

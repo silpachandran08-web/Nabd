@@ -2,7 +2,7 @@
 name: comms-gateway
 on:
   pull_request:
-    paths: ['services/comms-gateway/**', 'infra/observability/comms-gateway.*', 'docs/runbooks/comms-gateway.md', '.github/workflows/comms-gateway.yml']
+    paths: ['services/comms-gateway/**', 'infra/observability/comms-gateway.*', 'docs/runbooks/comms-gateway.md', '.github/workflows/comms-gateway.yml', '.github/workflows/comms-sandbox-nightly.yml']
   push:
     branches: [main]
     paths: ['services/comms-gateway/**']
@@ -18,7 +18,9 @@ jobs:
         with: { distribution: temurin, java-version: '21', cache: maven }
       - run: mvn -B -f services/comms-gateway/pom.xml verify      # includes CommsGrantTest: the role has no SELECT on any Core table
       - name: Rules and runbook links
-        run: python3 services/comms-gateway/ci/check_rules.py
+        run: |
+          python3 services/comms-gateway/ci/check_rules.py
+          python3 services/comms-gateway/ci/check_nightly.py
       - name: Image build (no push)
         run: docker build -t comms-gateway:ci services/comms-gateway
   contract:

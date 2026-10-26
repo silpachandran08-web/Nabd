@@ -1,0 +1,43 @@
+# COM-010: nightly journey + chaos run of the comms gateway. The stub job needs nothing external. The live job (one journey against the
+# real Meta test number in staging) is OFF until the Meta Cloud client (COM-007) and the staging secrets exist: set repository variable
+# COMMS_LIVE_SANDBOX=true then. A failure of either job posts to the squad channel (SQUAD_CHANNEL_WEBHOOK), never to on-call.
+name: comms-sandbox-nightly
+on:
+  schedule: [{ cron: '17 1 * * *' }]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stub-journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - run: mvn -B -f services/comms-gateway/pom.xml test -Dtest='JourneyTest,SendSimulationTest,Com021QualityDbTest'
+      - name: Tell the squad channel
+        if: failure()
+        env:
+          HOOK: ${{ secrets.SQUAD_CHANNEL_WEBHOOK }}
+        run: |
+          curl -fsS -X POST -H 'Content-Type: application/json' -d '{"text":"comms-sandbox-nightly (stub journeys) failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' "$HOOK"
+  live-sandbox:
+    if: ${{ vars.COMMS_LIVE_SANDBOX == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - name: One journey against the real Meta test number (staging)
+        env:
+          META_TEST_ACCESS_TOKEN: ${{ secrets.META_TEST_ACCESS_TOKEN }}
+          META_TEST_PHONE_NUMBER_ID: ${{ secrets.META_TEST_PHONE_NUMBER_ID }}
+        run: mvn -B -f services/comms-gateway/pom.xml test -Dtest=LiveSandboxJourneyTest -Dcomms.sandbox.live=true
+      - name: Tell the squad channel
+        if: failure()
+        env:
+          HOOK: ${{ secrets.SQUAD_CHANNEL_WEBHOOK }}
+        run: |
+          curl -fsS -X POST -H 'Content-Type: application/json' -d '{"text":"comms-sandbox-nightly (live Meta test number) failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' "$HOOK"
