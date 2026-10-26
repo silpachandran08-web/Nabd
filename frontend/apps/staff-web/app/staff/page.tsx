@@ -387,22 +387,22 @@ export default function StaffAccessPage() {
 
   // Suspend and authenticator reset both need a step-up: the client middleware asks the dialog below, then replays
   // the call once with the token. A wrong code keeps the dialog open; Cancel ends the action quietly.
-  async function stepUpAction(kind: "suspend" | "reset", id: string) {
+  async function stepUpAction(kind: "suspend" | "reset", id: string, preset?: string) {
     const reset = kind === "reset";
     setError(null);
     setResetNotice(null);
     setStepUpKind(kind);
     stepUpTarget.current = id;
     stepUpCancelled.current = false;
-    stepUpShown.current = false;
+    stepUpShown.current = !!preset;
     setSuspending(id);
     try {
       if (reset) {
         // Resetting an authenticator always needs a fresh code: ask first, no failed round trip (PLT-004).
-        const token = await askStepUp.current();
+        const token = preset ?? (await askStepUp.current());
         if (!token) return;
         await api.post(`/staff/${id}/mfa/reset`, { reasonCode: "lost_device" }, { headers: { "X-Step-Up-Token": token } });
-      } else await api.post(`/staff/${id}/suspend`);
+      } else await api.post(`/staff/${id}/suspend`, undefined, preset ? { headers: { "X-Step-Up-Token": preset } } : undefined);
       if (reset) setResetNotice("Authenticator reset. They are signed out and must set up a new one at next sign-in.");
       else setStaff((prev) => prev.map((s) => (s.id === id ? { ...s, status: "suspended" } : s)));
       setStepUpFor(null);
@@ -422,14 +422,16 @@ export default function StaffAccessPage() {
 
   async function confirmStepUp(e: React.FormEvent) {
     e.preventDefault();
-    if (!stepUpFor || !stepUpWait.current) return;
+    if (!stepUpFor) return;
     setStepUpBusy(true);
     setStepUpError(null);
     try {
       // keepSession: a wrong code also answers 401 ("mfa-failed"); that must not sign the caller out mid-action.
       const { stepUpToken } = await api.post<{ stepUpToken: string }>("/auth/mfa/verify", { challengeId: "", code: stepUpCode }, { keepSession: true });
-      stepUpWait.current?.(stepUpToken); // the original request is replayed by the client; stepUpAction finishes the flow
-      stepUpWait.current = null;
+      if (stepUpWait.current) {
+        stepUpWait.current(stepUpToken); // the original request is replayed by the client; stepUpAction finishes the flow
+        stepUpWait.current = null;
+      } else await stepUpAction(stepUpKind, stepUpFor, stepUpToken); // the action already failed and the dialog stayed open: retry with the new token
     } catch (err) {
       setStepUpError(reasonText(err, "Verification failed."));
       setStepUpBusy(false);
