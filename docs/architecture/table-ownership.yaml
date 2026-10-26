@@ -20,7 +20,7 @@ modules:
     reads: []
   identity:
     # IDC-016 (ADR-08): national rails (ABDM). staff.hpr_id is written through iam, not here.
-    owns: [tenant_integrations_abdm]
+    owns: [patient_identifiers, tenant_integrations_abdm]
     reads: []
   iam:
     # PLT-033 (doc06 §4.4): staff, roles, sessions, login_attempts, delegations, break-glass. Java packages auth and staff
@@ -47,7 +47,7 @@ modules:
     owns: [package_eligible_doctors, package_instance_events, package_instance_items, package_instances, package_items, package_redemptions, package_refunds, package_settings, packages]
     reads: []
   patient:
-    owns: [consents, internal_patient_refs, notice_templates, patient_duplicate_dismissals, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
+    owns: [chat_consents, consents, internal_patient_refs, notice_templates, patient_duplicate_dismissals, patient_merges, patient_registry_summary, patients, privacy_notices, registry_dirty]
     reads: [tenants]  # IDC-003: the clinic's name, region and grievance contact fill the notice; the public page finds the clinic by slug
   pharmacy:
     owns: [pharmacy_settings, pharmacy_stock_movements]

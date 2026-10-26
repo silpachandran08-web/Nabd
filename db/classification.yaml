@@ -991,6 +991,29 @@ schemas:
       verified_at: operational
       updated_by: operational
       updated_at: operational
+    chat_consents:
+      id: operational
+      tenant_id: operational
+      phone_hash: pii
+      purpose: operational
+      granted: operational
+      notice_version: operational
+      language: operational
+      wamid: operational
+      decided_at: operational
+      attached_patient_id: pii
+      attached_at: operational
+    patient_identifiers:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      id_type: operational
+      blind_index: pii
+      value_enc: pii
+      last4: pii
+      verified_via: operational
+      verified_at: operational
+      created_at: operational
     privacy_notices:
       id: operational
       tenant_id: operational

@@ -1438,6 +1438,42 @@ paths:
         "200": { description: "Stored", content: { application/json: { schema: { $ref: "#/components/schemas/StaffHpr" } } } }
         "409": { description: "abdm-disabled (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "422": { description: "hpr-not-found (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /abha/status:
+    get:
+      tags: [Patients]
+      summary: "IDC-017. Whether the clinic has ABDM switched on, so the registration desk shows the optional ABHA chip only then."
+      x-required-permission: patients:edit
+      responses:
+        "200": { description: "{ enabled }", content: { application/json: { schema: { $ref: "#/components/schemas/AbhaStatus" } } } }
+  /patients/{id}/abha/verify:
+    post:
+      tags: [Patients]
+      summary: "IDC-017. Verify a patient's existing ABHA (number or address) by mobile OTP: step init sends the OTP and returns { txnId }, step confirm checks it and stores the ABHA encrypted with a blind index (patient_identifiers) and returns { verified, abhaLast4, abhaAddress }. Optional; 409 abdm-disabled while the clinic's ABDM switch is off (no ABDM call); 409 abha-linked-elsewhere (with existingPatient for the merge flow) when another patient of the clinic holds the id; 422 abha-invalid; 503 abdm-unavailable (ABDM timeout 8 s, the desk skips)."
+      x-required-permission: patients:edit
+      parameters: [{ $ref: "#/components/parameters/PathId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AbhaVerifyRequest" } } }
+      responses:
+        "200": { description: "{ txnId } or { verified, abhaLast4, abhaAddress }", content: { application/json: { schema: { $ref: "#/components/schemas/AbhaResult" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "abdm-disabled | abha-linked-elsewhere (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "abha-invalid (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "503": { description: "abdm-unavailable | abdm-not-configured (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /abha/enrol:
+    post:
+      tags: [Patients]
+      summary: "IDC-017. Create an ABHA by Aadhaar OTP (mode aadhaar: aadhaarNumber on step init) or by mobile OTP (mode mobile). The Aadhaar number is forwarded encrypted for that one call and is never stored, audited or logged. With patientId on step confirm the new ABHA is linked to that patient; without it nothing is linked."
+      x-required-permission: patients:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AbhaEnrolRequest" } } }
+      responses:
+        "200": { description: "{ txnId } or { verified, abhaLast4, abhaAddress }", content: { application/json: { schema: { $ref: "#/components/schemas/AbhaResult" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: "abdm-disabled | abha-linked-elsewhere (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "422": { description: "abha-invalid (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "503": { description: "abdm-unavailable | abdm-not-configured (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /public/notices/{tenantSlug}/{version}:
     get:
       tags: [Setup]
@@ -3005,6 +3041,36 @@ paths:
       responses:
         "200": { description: "{ members: [{ patientRef, firstName, age, relation, isGuardian }] }", content: { application/json: { schema: { type: object } } } }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tenants/{tid}/patients/consents:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters: [{ name: tid, in: path, required: true, schema: { type: string, format: uuid } }]
+    post:
+      tags: [Patients]
+      summary: "IDC-005. The Edge relays what a first-time WhatsApp booker tapped: decisions for data_processing, messaging, marketing (marketing is stored as granted=false when omitted), the notice version shown and the wamid as evidence. Stored in chat_consents BEFORE any patient row exists and attached to the patient (consents rows, channel WHATSAPP) when the chat registration creates it. Idempotent on (clinic, wamid): a replay returns the same consentIds. The clinic is the path tenant (the spec's body tenantId is not needed); the body carries a phone hash, never a name, date of birth or phone number. 409 notice-version-stale when noticeVersion is not the version in force for the language."
+      x-required-permission: authenticated
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [phoneHash, decisions, noticeVersion, language, evidence], properties: { phoneHash: { type: string, pattern: "^[0-9a-f]{64}$" }, decisions: { type: array, minItems: 1, maxItems: 3, items: { type: object, required: [purpose, granted], properties: { purpose: { type: string, enum: [data_processing, messaging, marketing] }, granted: { type: boolean } } } }, noticeVersion: { type: string }, language: { type: string }, evidence: { type: object, required: [wamid], properties: { wamid: { type: string } } } } } } }
+      responses:
+        "201": { description: "{ consentIds: [uuid] }", content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "notice-version-stale (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /tenants/{tid}/privacy-notice/current:
+    servers: [{ url: https://api.nabd.health/internal/v1, description: "internal (Patient Access Edge service token)" }]
+    parameters:
+      - { name: tid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: language, in: query, required: false, schema: { type: string, default: en } }
+    get:
+      tags: [Patients]
+      summary: "IDC-005. The privacy notice version in force for a language and the path of its public page, so the consent step shows (and later echoes) the right version. 404 notice-not-found when the clinic has none in that language."
+      x-required-permission: authenticated
+      responses:
+        "200": { description: "{ version, language, path }", content: { application/json: { schema: { type: object } } } }
         "401": { description: "Not an aud=internal service token / no client certificate (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: "Tenant not allowed for this service identity (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -6022,6 +6088,37 @@ components:
       properties:
         enabled: { type: boolean }
         hfrId: { type: string, maxLength: 40 }
+    AbhaVerifyRequest:
+      type: object
+      required: [step]
+      properties:
+        step: { type: string, enum: [init, confirm] }
+        abhaNumberOrAddress: { type: string, maxLength: 64 }
+        otp: { type: string, maxLength: 8 }
+        txnId: { type: string, maxLength: 100 }
+    AbhaEnrolRequest:
+      type: object
+      required: [step, mode]
+      properties:
+        step: { type: string, enum: [init, confirm] }
+        mode: { type: string, enum: [aadhaar, mobile] }
+        aadhaarNumber: { type: string, maxLength: 14, description: "Step init, mode aadhaar only. Never stored or logged." }
+        mobile: { type: string, maxLength: 16 }
+        otp: { type: string, maxLength: 8 }
+        txnId: { type: string, maxLength: 100 }
+        patientId: { type: string, format: uuid }
+    AbhaStatus:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+    AbhaResult:
+      type: object
+      properties:
+        txnId: { type: string }
+        verified: { type: boolean }
+        abhaLast4: { type: string }
+        abhaAddress: { type: string }
     StaffHprRequest:
       type: object
       required: [hprId]

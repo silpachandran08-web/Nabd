@@ -8,7 +8,9 @@ import { api, ApiError, intentKeys } from "../lib/api";
 import { ErrorSummary, FieldError, useFormErrors } from "../lib/formErrors";
 import type { PatientPage } from "@nabd/api-client/generated";
 import type { DuplicateCandidate } from "@nabd/api-client/types";
-import { age } from "@nabd/domain";
+import { age, parseAbhaQr } from "@nabd/domain";
+import AbhaPanel from "./AbhaPanel";
+import { can } from "../lib/permissions";
 import { clinicToday } from "../lib/clinicTime";
 
 type Candidate = DuplicateCandidate;
@@ -45,9 +47,23 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
   const [channel, setChannel] = useState("");
   const fe = useFormErrors("reg", REGISTER_LABELS);
   const [saving, setSaving] = useState(false);
+  const [abhaOn, setAbhaOn] = useState(false); // IDC-017: GET /abha/status; the panel is absent unless ABDM is on and the user has patients:edit
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [qr, setQr] = useState("");
   const keys = useRef(intentKeys()); // one Idempotency-Key per registration intent, reused when the same request is re-sent
 
   const minor = !!form.dob && age(form.dob, clinicToday()) < 18;
+
+  useEffect(() => {
+    if (!can("patients:edit")) return;
+    api.get<{ enabled: boolean }>("/abha/status").then((r) => setAbhaOn(r.enabled)).catch(() => setAbhaOn(false));
+  }, []);
+
+  function applyQr(text: string) { // IDC-017: pasted or scanned ABHA QR payload fills the demographic fields it carries
+    setQr(text);
+    const p = parseAbhaQr(text);
+    if (p) setForm((f) => ({ ...f, name: p.name ?? f.name, dob: p.dob ?? f.dob, gender: p.gender ?? f.gender, phone: p.phone ?? f.phone }));
+  }
 
   useEffect(() => {
     const q = guardianQuery.trim();
@@ -78,7 +94,7 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
     try {
       const created = await api.post<{ id: string }>("/patients", body, { idempotencyKey: keys.current.get("register", body) });
       keys.current.done("register");
-      onRegistered(created.id);
+      if (abhaOn) setCreatedId(created.id); else onRegistered(created.id);
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && Array.isArray(e.problem.candidates)) {
         setCandidates(e.problem.candidates as Candidate[]); // a definitive answer: the next send is a new intent
@@ -98,7 +114,9 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
     <Dialog title="Register patient" onClose={onClose}>
       <form className={styles.dialogForm} onSubmit={(e) => { e.preventDefault(); void send(false); }}>
 
-        {candidates ? (
+        {createdId ? (
+          <AbhaPanel patientId={createdId} onDone={() => onRegistered(createdId)} onOpenExisting={onOpenExisting} />
+        ) : candidates ? (
           <>
             <p className={styles.dialogSub}>These existing records look like the same person. Open one, or register a new record if this is someone else.</p>
             {candidates.map((c) => (
@@ -118,6 +136,12 @@ export function RegisterDialog({ onClose, onRegistered, onOpenExisting }: {
           </>
         ) : (
           <>
+            {abhaOn && (
+              <>
+                <label className={styles.fieldLabel} htmlFor="reg-abha-qr">ABHA QR (optional): paste the scanned text to fill the form</label>
+                <input id="reg-abha-qr" className={styles.input} value={qr} autoComplete="off" onChange={(e) => applyQr(e.target.value)} />
+              </>
+            )}
             <label className={styles.fieldLabel} htmlFor="reg-name">Full name</label>
             <input id="reg-name" className={styles.input} value={form.name} autoFocus {...fe.attrs("name")} onChange={(e) => { fe.clearField("name"); setForm({ ...form, name: e.target.value }); }} />
             <FieldError fe={fe} name="name" className={styles.errorInline} />

@@ -89,6 +89,41 @@ class HttpAbdmGateway implements AbdmGateway {
         }
     }
 
+    /**
+     * IDC-017: one authenticated JSON call for the ABHA operations (same session token, headers, 401-retry and breaker as the
+     * lookups). ABDM refusing the input (other 4xx) is a 422 abha-invalid; everything else that is not a success is a 503.
+     * The request body may carry an encrypted Aadhaar number: nothing here logs a body or a response.
+     */
+    @SuppressWarnings("unchecked")
+    Map<String, Object> call(String path, Object body, boolean post) {
+        if (props.baseUrl().isBlank() || path == null || path.isBlank()) {
+            throw unavailable("abdm-not-configured");
+        }
+        for (int attempt = 0; ; attempt++) {
+            try {
+                RestClient.RequestHeadersSpec<?> spec = post
+                        ? http.post().uri(props.baseUrl() + path).contentType(MediaType.APPLICATION_JSON).body(body)
+                        : http.get().uri(props.baseUrl() + path);
+                Map<String, Object> r = spec.headers(this::gatewayHeaders).header("Authorization", "Bearer " + tokens.current()).retrieve().body(Map.class);
+                return r == null ? Map.of() : r;
+            } catch (RestClientResponseException e) {
+                int s = e.getStatusCode().value();
+                if (s == 401 && attempt == 0) {
+                    tokens.invalidate();
+                    continue;
+                }
+                if (s >= 400 && s < 500 && s != 401 && s != 429) {
+                    throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "abha-invalid", "ABHA refused", "ABDM did not accept this ABHA id or code.");
+                }
+                throw unavailable("abdm-unavailable");
+            } catch (ApiException e) {
+                throw e;
+            } catch (CircuitOpenException | RestClientException e) {
+                throw unavailable("abdm-unavailable");
+            }
+        }
+    }
+
     private AbdmSessionTokens.Token fetchSession(Function<String, Optional<String>> secret) {
         String id;
         String pw;

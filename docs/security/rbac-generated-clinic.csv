@@ -12,6 +12,7 @@ owner,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},
 owner,DELETE /v1/waitlist/{id},queue:edit,allow
 owner,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 owner,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
+owner,GET /v1/abha/status,patients:edit,allow
 owner,GET /v1/appointments,queue:view,allow
 owner,GET /v1/appointments/callback-list,queue:view,allow
 owner,GET /v1/appointments/follow-ups,queue:view,allow
@@ -196,6 +197,7 @@ owner,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edi
 owner,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 owner,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
 owner,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-401
+owner,POST /v1/abha/enrol,patients:edit,allow
 owner,POST /v1/appointments,queue:create,allow
 owner,POST /v1/appointments/{id}/cancel,queue:edit,allow
 owner,POST /v1/appointments/{id}/reschedule,queue:edit,allow
@@ -246,6 +248,7 @@ owner,POST /v1/packages/{id}/deactivate,packages:edit,allow
 owner,POST /v1/patients,patients:create,allow
 owner,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,allow
 owner,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
+owner,POST /v1/patients/{id}/abha/verify,patients:edit,allow
 owner,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner,POST /v1/patients/{id}/merge,patients:delete,allow
@@ -320,6 +323,7 @@ owner_doctor,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerar
 owner_doctor,DELETE /v1/waitlist/{id},queue:edit,allow
 owner_doctor,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 owner_doctor,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
+owner_doctor,GET /v1/abha/status,patients:edit,allow
 owner_doctor,GET /v1/appointments,queue:view,allow
 owner_doctor,GET /v1/appointments/callback-list,queue:view,allow
 owner_doctor,GET /v1/appointments/follow-ups,queue:view,allow
@@ -504,6 +508,7 @@ owner_doctor,POST /internal/v1/safety-dictionaries/{region}/versions,safety_cont
 owner_doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 owner_doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
 owner_doctor,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-401
+owner_doctor,POST /v1/abha/enrol,patients:edit,allow
 owner_doctor,POST /v1/appointments,queue:create,allow
 owner_doctor,POST /v1/appointments/{id}/cancel,queue:edit,allow
 owner_doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
@@ -554,6 +559,7 @@ owner_doctor,POST /v1/packages/{id}/deactivate,packages:edit,allow
 owner_doctor,POST /v1/patients,patients:create,allow
 owner_doctor,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,allow
 owner_doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,allow
+owner_doctor,POST /v1/patients/{id}/abha/verify,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 owner_doctor,POST /v1/patients/{id}/merge,patients:delete,allow
@@ -628,6 +634,7 @@ doctor,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id}
 doctor,DELETE /v1/waitlist/{id},queue:edit,allow
 doctor,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 doctor,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
+doctor,GET /v1/abha/status,patients:edit,allow
 doctor,GET /v1/appointments,queue:view,allow
 doctor,GET /v1/appointments/callback-list,queue:view,allow
 doctor,GET /v1/appointments/follow-ups,queue:view,allow
@@ -812,6 +819,7 @@ doctor,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:ed
 doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 doctor,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
 doctor,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-401
+doctor,POST /v1/abha/enrol,patients:edit,allow
 doctor,POST /v1/appointments,queue:create,deny-403
 doctor,POST /v1/appointments/{id}/cancel,queue:edit,allow
 doctor,POST /v1/appointments/{id}/reschedule,queue:edit,allow
@@ -862,6 +870,7 @@ doctor,POST /v1/packages/{id}/deactivate,packages:edit,allow
 doctor,POST /v1/patients,patients:create,allow
 doctor,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 doctor,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
+doctor,POST /v1/patients/{id}/abha/verify,patients:edit,allow
 doctor,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 doctor,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 doctor,POST /v1/patients/{id}/merge,patients:delete,deny-403
@@ -936,6 +945,7 @@ nurse,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerary/{id},
 nurse,DELETE /v1/waitlist/{id},queue:edit,allow
 nurse,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 nurse,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
+nurse,GET /v1/abha/status,patients:edit,allow
 nurse,GET /v1/appointments,queue:view,allow
 nurse,GET /v1/appointments/callback-list,queue:view,allow
 nurse,GET /v1/appointments/follow-ups,queue:view,allow
@@ -1120,6 +1130,7 @@ nurse,POST /internal/v1/safety-dictionaries/{region}/versions,safety_content:edi
 nurse,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 nurse,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
 nurse,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-401
+nurse,POST /v1/abha/enrol,patients:edit,allow
 nurse,POST /v1/appointments,queue:create,deny-403
 nurse,POST /v1/appointments/{id}/cancel,queue:edit,allow
 nurse,POST /v1/appointments/{id}/reschedule,queue:edit,allow
@@ -1170,6 +1181,7 @@ nurse,POST /v1/packages/{id}/deactivate,packages:edit,allow
 nurse,POST /v1/patients,patients:create,deny-403
 nurse,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 nurse,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
+nurse,POST /v1/patients/{id}/abha/verify,patients:edit,allow
 nurse,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 nurse,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 nurse,POST /v1/patients/{id}/merge,patients:delete,deny-403
@@ -1244,6 +1256,7 @@ receptionist,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernumerar
 receptionist,DELETE /v1/waitlist/{id},queue:edit,allow
 receptionist,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 receptionist,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
+receptionist,GET /v1/abha/status,patients:edit,allow
 receptionist,GET /v1/appointments,queue:view,allow
 receptionist,GET /v1/appointments/callback-list,queue:view,allow
 receptionist,GET /v1/appointments/follow-ups,queue:view,allow
@@ -1428,6 +1441,7 @@ receptionist,POST /internal/v1/safety-dictionaries/{region}/versions,safety_cont
 receptionist,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 receptionist,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
 receptionist,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-401
+receptionist,POST /v1/abha/enrol,patients:edit,allow
 receptionist,POST /v1/appointments,queue:create,allow
 receptionist,POST /v1/appointments/{id}/cancel,queue:edit,allow
 receptionist,POST /v1/appointments/{id}/reschedule,queue:edit,allow
@@ -1478,6 +1492,7 @@ receptionist,POST /v1/packages/{id}/deactivate,packages:edit,deny-403
 receptionist,POST /v1/patients,patients:create,allow
 receptionist,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 receptionist,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
+receptionist,POST /v1/patients/{id}/abha/verify,patients:edit,allow
 receptionist,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 receptionist,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 receptionist,POST /v1/patients/{id}/merge,patients:delete,deny-403
@@ -1552,6 +1567,7 @@ frontdesk_vitals,DELETE /v1/specialty/dental/patients/{patientId}/chart/supernum
 frontdesk_vitals,DELETE /v1/waitlist/{id},queue:edit,allow
 frontdesk_vitals,GET /internal/v1/drug-master/imports/{importId},kb_import:edit,deny-401
 frontdesk_vitals,GET /internal/v1/safety-dictionaries/{region}/versions,safety_content:edit,deny-401
+frontdesk_vitals,GET /v1/abha/status,patients:edit,allow
 frontdesk_vitals,GET /v1/appointments,queue:view,allow
 frontdesk_vitals,GET /v1/appointments/callback-list,queue:view,allow
 frontdesk_vitals,GET /v1/appointments/follow-ups,queue:view,allow
@@ -1736,6 +1752,7 @@ frontdesk_vitals,POST /internal/v1/safety-dictionaries/{region}/versions,safety_
 frontdesk_vitals,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/activate,safety_content:edit,deny-401
 frontdesk_vitals,POST /internal/v1/safety-dictionaries/{region}/versions/{versionId}/approve,safety_content:edit,deny-401
 frontdesk_vitals,POST /internal/v1/tenants/{tenantId}/templates:instantiate,onboarding_provisioning:view,deny-401
+frontdesk_vitals,POST /v1/abha/enrol,patients:edit,allow
 frontdesk_vitals,POST /v1/appointments,queue:create,allow
 frontdesk_vitals,POST /v1/appointments/{id}/cancel,queue:edit,allow
 frontdesk_vitals,POST /v1/appointments/{id}/reschedule,queue:edit,allow
@@ -1786,6 +1803,7 @@ frontdesk_vitals,POST /v1/packages/{id}/deactivate,packages:edit,deny-403
 frontdesk_vitals,POST /v1/patients,patients:create,allow
 frontdesk_vitals,POST /v1/patients/duplicate-suggestions/{id}/dismiss,patients:delete,deny-403
 frontdesk_vitals,POST /v1/patients/merges/{mergeId}/undo,patients:delete,deny-403
+frontdesk_vitals,POST /v1/patients/{id}/abha/verify,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/consent/withdraw,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/guardian/review,patients:edit,allow
 frontdesk_vitals,POST /v1/patients/{id}/merge,patients:delete,deny-403
