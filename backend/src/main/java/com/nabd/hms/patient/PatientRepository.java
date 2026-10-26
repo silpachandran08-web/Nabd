@@ -318,6 +318,7 @@ class PatientRepository {
     List<SearchHit> search(UUID tenantId, String phoneKey, String mrnKey, boolean mrnPrefix, String name, UUID scopedToDoctorId, int k) {
         SearchSql built = searchSql(tenantId, phoneKey, mrnKey, mrnPrefix, name, scopedToDoctorId, k);
         if (built == null) return List.of();
+        jdbc.execute("SET LOCAL jit = off"); // the IDC-006 consent gate lifts the plan cost over jit_above_cost; JIT never pays off for a top-50 OLTP read
         return jdbc.query(built.sql(), (rs, i) -> new SearchHit(patientMapper().mapRow(rs, i), rs.getInt("branch"), rs.getDouble("sim")), built.args().toArray());
     }
 
