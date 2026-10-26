@@ -25,7 +25,7 @@ class PublicEndpointsSecurityConfig {
     SecurityFilterChain publicEndpointsChain(HttpSecurity http, RateLimitFilter rateLimit,
             org.springframework.security.oauth2.jwt.JwtDecoder staffDecoder,
             org.springframework.core.convert.converter.Converter<org.springframework.security.oauth2.jwt.Jwt, org.springframework.security.authentication.AbstractAuthenticationToken> converter) throws Exception {
-        http.securityMatcher("/v1/public/notices/**", "/abdm/v3/callbacks/**", "/v1/display/**")
+        http.securityMatcher("/v1/public/notices/**", "/v1/public/trials/**", "/abdm/v3/callbacks/**", "/v1/display/**")
                 .addFilterAfter(rateLimit, AnonymousAuthenticationFilter.class)
                 .csrf(c -> c.disable()) // no cookies: the callbacks carry a gateway signature, the page is a GET
                 .cors(Customizer.withDefaults())

@@ -4125,6 +4125,93 @@ paths:
                   nextCursor: { type: string, nullable: true }
         "400": { description: "invalid-cursor, invalid-range", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
         "403": { description: Forbidden }
+  /billing/invoices:
+    get:
+      tags: [Billing]
+      summary: >
+        FIN-014. Invoice list, newest first, keyset cursor. Filters: `from`/`to` (clinic dates, inclusive), `status` (unpaid, partial, paid,
+        refunded, void), `doctorId`, `method` (cash, card, upi, other: a payment of that method exists), `q` (invoice number or patient name,
+        literal text). `limit` is clamped to 100. `balanceDue` = total - paid - written off.
+      x-required-permission: billing:view
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: doctorId, in: query, schema: { type: string, format: uuid } }
+        - { name: method, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        "200": { description: A page, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object } }, nextCursor: { type: string, nullable: true } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /billing/dues:
+    get:
+      tags: [Billing]
+      summary: >
+        FIN-014. Patients who owe money, one row per patient, oldest debt first: `totalDue`, `oldestDays` (clinic days), `bucket` (0-7, 8-30, 31-90, 90+),
+        `invoiceNumbers`, `lastRemindedAt`. Filter by `bucket`. Written-off amounts are not owed.
+      x-required-permission: billing:view
+      parameters:
+        - { name: bucket, in: query, schema: { type: string, enum: ["0-7", "8-30", "31-90", "90+"] } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        "200": { description: A page, content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object } }, nextCursor: { type: string, nullable: true } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /billing/dues/{patientId}/remind:
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-014. Send the `dues_reminder` template (names the clinic only: no amounts, no line items) through the notification port.
+        409 NO_CONSENTED_CHANNEL when consent blocks it, 429 REMINDED_RECENTLY within 24 h of the last reminder, 422 PAYMENT_LINK_UNAVAILABLE
+        when `includePaymentLink` is true (payment links are FIN-020), 422 TEMPLATE_NOT_SENDABLE when the clinic has no approved template, 404 when nothing is owed.
+      x-required-permission: billing:edit
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: patientId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [channel], properties: { channel: { type: string, enum: [whatsapp, sms] }, includePaymentLink: { type: boolean } } } } }
+      responses:
+        "202": { description: Accepted, content: { application/json: { schema: { type: object, properties: { reminderId: { type: string, format: uuid } } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: NO_CONSENTED_CHANNEL }
+        "422": { description: "PAYMENT_LINK_UNAVAILABLE or TEMPLATE_NOT_SENDABLE" }
+        "429": { description: REMINDED_RECENTLY }
+  /billing/invoices/{id}/write-off:
+    post:
+      tags: [Billing]
+      summary: >
+        FIN-014. Write off part or all of an open invoice's balance. A ledger row in invoice_write_offs plus audit `billing.write_off`; the invoice itself is not edited.
+        Needs a reason code. 422 EXCEEDS_BALANCE, 409 not-open. Returns the invoice list item with the new `balanceDue`.
+      x-required-permission: billing:approve
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [amount, reasonCode], properties: { amount: { type: number, minimum: 0.01 }, reasonCode: { type: string, maxLength: 40 }, note: { type: string, maxLength: 500 } } } } }
+      responses:
+        "200": { description: The invoice with its new balance, content: { application/json: { schema: { type: object } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { description: Forbidden }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: not-open }
+        "422": { description: EXCEEDS_BALANCE }
+  /billing/invoices/{id}/document:
+    get:
+      tags: [Billing]
+      summary: >
+        FIN-012. The invoice or receipt as a PDF (`layout` a4 | thermal80, `kind` invoice | receipt). Rendered once per invoice version and layout and stored
+        (billing_documents); every later call returns the stored bytes, so a reprint shows the values of the original issue. Audit `billing.document_rendered`.
+        400 on another layout or kind, 409 `no-payment` for a receipt before any payment. Not done: secure share link (needs IDC-015).
+      x-required-permission: billing:view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: layout, in: query, schema: { type: string, enum: [a4, thermal80], default: a4 } }
+        - { name: kind, in: query, schema: { type: string, enum: [invoice, receipt], default: invoice } }
+      responses:
+        "200": { description: The PDF, content: { application/pdf: { schema: { type: string, format: binary } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: no-payment }
   /billing/invoices/{id}:
     get:
       tags: [Billing]
@@ -4831,6 +4918,51 @@ paths:
                   killedFeatures: { type: array, items: { type: string } }
                   seatLimit: { type: [integer, "null"] }
         "403": { description: "Not a clinic session" }
+  /public/trials:
+    post:
+      tags: [Platform]
+      summary: >
+        ADM-003 (sign-up half). Start a free-trial sign-up: validates the mobile, pins the region from its country, refuses a second trial per mobile for 90 days
+        (409 TRIAL_EXISTS), sends an OTP, and limits sign-ups to 5 per IP per hour (429 with Retry-After). 422 INVALID_MOBILE, MARKET_MISMATCH, MARKET_UNSUPPORTED.
+        503 when OTP delivery is not wired (comms-gateway pre-tenant /otp: Needs external action). The mobile is stored only as an HMAC.
+      security: []
+      x-required-permission: public
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [clinicName, specialty, mobile, consentToContact], properties: { clinicName: { type: string }, specialty: { type: string, enum: [dermatology, dental, general_practice, paediatrics] }, mobile: { type: string }, market: { type: string }, consentToContact: { type: boolean } } } } }
+      responses:
+        "202": { description: OTP sent, content: { application/json: { schema: { type: object, properties: { signupId: { type: string, format: uuid }, otpChannel: { type: string } } } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: TRIAL_EXISTS }
+        "422": { description: "INVALID_MOBILE, MARKET_MISMATCH or MARKET_UNSUPPORTED" }
+        "429": { description: Too many sign-ups (Retry-After) }
+        "503": { description: Sign-up unavailable }
+  /public/trials/{signupId}/verify:
+    post:
+      tags: [Platform]
+      summary: >
+        ADM-003 (sign-up half). Check the OTP (5 wrong tries burn the sign-up; 10 minutes). 400 OTP_INVALID, 410 SIGNUP_EXPIRED. Marks the sign-up verified; the provisioning job
+        (`jobId`, null for now) and the demo clinic are not created yet.
+      security: []
+      x-required-permission: public
+      parameters: [{ name: signupId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [otp], properties: { otp: { type: string } } } } }
+      responses:
+        "201": { description: Verified, content: { application/json: { schema: { type: object } } } }
+        "400": { description: OTP_INVALID }
+        "410": { description: SIGNUP_EXPIRED }
+  /public/trials/{signupId}/status:
+    get:
+      tags: [Platform]
+      summary: ADM-003 (sign-up half). Sign-up status (otp_sent, verified, provisioning, ready, expired). 410 for an unknown or expired sign-up. No login code yet.
+      security: []
+      x-required-permission: public
+      parameters: [{ name: signupId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: Status, content: { application/json: { schema: { type: object, properties: { status: { type: string } } } } } }
+        "410": { description: SIGNUP_EXPIRED }
   /plans/catalogue:
     get:
       tags: [Platform]

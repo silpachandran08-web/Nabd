@@ -10,8 +10,9 @@
 # in ci/architecture-baseline.json as debt; add a table to `reads` only when the review accepts that read.
 modules:
   billing:
-    owns: [charge_catalogue, day_close_events, day_closes, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoices, tax_rules]
-    reads: []
+    # FIN-012/FIN-014: the clinic letterhead (tenants) and patient names (patients) are read by the invoice document and the invoice/dues lists
+    owns: [billing_documents, charge_catalogue, day_close_events, day_closes, dues_reminders, invoice_discounts, invoice_line_items, invoice_line_taxes, invoice_payments, invoice_write_offs, invoices, tax_rules]
+    reads: [patients, tenants]
   clinical:
     owns: [chronic_conditions, clinical_documents, clinical_notes, dental_chart_entries, dental_chart_events, drug_classes, drug_ingredients, drug_master, drug_master_imports, drug_master_stage, favourite_rx_set_items, ingredients, favourite_rx_sets, note_amendments, note_templates, patient_allergies, patient_allergy_assessments, patient_allergy_events, patient_pregnancy_events, patient_pregnancy_status, prescription_items, prescription_signer_backfill, prescriptions, safety_dictionary_entries, safety_dictionary_versions, vitals]
     reads: []
@@ -53,7 +54,7 @@ modules:
     owns: [pharmacy_settings, pharmacy_stock_movements]
     reads: []
   platform:
-    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, tenant_lifecycle_events, tenants]
+    owns: [brands, master.discount_requests, master.login_attempts, master.operator_audit_log, master.kill_switches, master.operators, master.plan_entitlements, master.plan_versions, master.plans, master.provisioning_job_steps, master.provisioning_jobs, master.sessions, master.subscriptions, master.support_access_grants, master.support_tickets, master.tenant_feature_overrides, master.trial_signups, tenant_lifecycle_events, tenants]
     reads: []
   reports:
     # OPS-010: rollups written by the reporting-rollup consumer; the recompute reads source tables through ReportsRepository (baseline debt)
