@@ -194,7 +194,7 @@ class Committed(unittest.TestCase):
         self.assertTrue(set(k.split("|")[0] for k in b) <= set(arch.CHECKS))
     def test_stage2_wiring(self):
         wf = yaml.safe_load(open(".github/workflows/ci.yml"))["jobs"]["stage2-unit"]
-        self.assertEqual(wf["timeout-minutes"], 2)
+        self.assertEqual(wf["timeout-minutes"], 20)  # E21 raised the job timeout (CI was timing out)
         s = str(wf["steps"])
         for w in ("arch.py summary", "arch.py gate", "architecture-report", "upload-artifact"):
             self.assertIn(w, s)
