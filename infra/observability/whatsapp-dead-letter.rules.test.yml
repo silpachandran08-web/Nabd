@@ -1,0 +1,31 @@
+# OPS-045: promtool unit test (promtool test rules whatsapp-dead-letter.rules.test.yml, run from this directory by the nightly workflow).
+rule_files: [whatsapp-dead-letter.rules.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'outbox_dead_events{region="in"}'
+        values: '0 0 3 3'
+      - series: 'whatsapp_inbound_dead'
+        values: '0 0 0 2'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: NabdOutboxDeadLetters
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: NabdOutboxDeadLetters
+        exp_alerts:
+          - exp_labels: { severity: page, region: in }
+            exp_annotations:
+              summary: "Outbox events are dead-lettered (WhatsApp sends included): check the provider, then redrive"
+              runbook: docs/runbooks/whatsapp-chaos.md
+      - eval_time: 2m
+        alertname: NabdWhatsAppInboundDeadLetters
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: NabdWhatsAppInboundDeadLetters
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "WhatsApp webhook rows are dead-lettered: status updates or replies (STOP) were not applied"
+              runbook: docs/runbooks/whatsapp-chaos.md
