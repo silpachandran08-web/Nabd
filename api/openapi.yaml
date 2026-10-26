@@ -28,6 +28,7 @@ tags:
   - name: Queue
   - name: Audit
   - name: Clinical
+  - name: Files
   - name: Pharmacy
   - name: Billing
   - name: Nursing
@@ -3347,6 +3348,131 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
       responses:
         "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /files/uploads:
+    post:
+      tags: [Files]
+      summary: >
+        PLT-029 Reserve an upload slot. Idempotency-Key required. The bytes are PUT to putUrl (valid 10 minutes, one object,
+        size-limited, no bearer) and the upload is then completed. 413 FILE_TOO_LARGE above the limit (20 MB), 415 TYPE_NOT_ALLOWED
+        for anything but PDF, JPEG and PNG.
+      x-required-permission: clinical:create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [purpose, contentType, sizeBytes]
+              properties:
+                purpose: { type: string, enum: [outside_report, clinical_photo, xray, consent_form] }
+                contentType: { type: string, enum: [application/pdf, image/jpeg, image/png] }
+                sizeBytes: { type: integer, format: int64, minimum: 1 }
+      responses:
+        "201":
+          description: Slot reserved
+          content: { application/json: { schema: { type: object, properties: { uploadId: { type: string, format: uuid }, putUrl: { type: string }, maxBytes: { type: integer, format: int64 } } } } }
+        "400": { description: Invalid purpose or size }
+        "413": { description: FILE_TOO_LARGE }
+        "415": { description: TYPE_NOT_ALLOWED }
+  /files/uploads/{id}/complete:
+    post:
+      tags: [Files]
+      summary: PLT-029 Finish the upload and start the scan (type check, antivirus, metadata strip). Idempotency-Key required.
+      x-required-permission: clinical:create
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { sha256: { type: string, pattern: "^[0-9a-fA-F]{64}$" } } } } }
+      responses:
+        "202":
+          description: Scan started
+          content: { application/json: { schema: { type: object, properties: { fileId: { type: string, format: uuid }, status: { type: string, enum: [pending_scan] } } } } }
+        "400": { description: CHECKSUM_MISMATCH }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "ALREADY_COMPLETED, or UPLOAD_MISSING when no bytes were uploaded" }
+  /files/{id}:
+    get:
+      tags: [Files]
+      summary: PLT-029 File status and type (no patient data)
+      x-required-permission: clinical:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fileId: { type: string, format: uuid }
+                  status: { type: string, enum: [awaiting_upload, pending_scan, available, rejected_type, infected, deleted] }
+                  contentType: { type: string }
+                  sizeBytes: { type: integer, format: int64 }
+                  createdAt: { type: string, format: date-time }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /files/{id}/download-url:
+    post:
+      tags: [Clinical]
+      summary: >
+        PLT-030 Issue a single-object GET URL valid 5 minutes for an attached, clean file. Passes the clinical read gate (404 when
+        the patient's data_processing consent is withdrawn or the file is not attached) and writes one phi_read_log row per issuance.
+      x-required-permission: clinical:view
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: object, properties: { url: { type: string }, expiresAt: { type: string, format: date-time }, patientId: { type: string, format: uuid } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /clinical/visits/{visitId}/attachments:
+    post:
+      tags: [Clinical]
+      summary: PLT-030 Attach a clean file to a visit. Idempotency-Key required. 409 FILE_NOT_AVAILABLE when the file is not clean, is already attached, or belongs to another patient.
+      x-required-permission: clinical:edit
+      parameters: [{ name: visitId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileId, kind]
+              properties:
+                fileId: { type: string, format: uuid }
+                kind: { type: string, enum: [outside_report, photo, xray] }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "201":
+          description: Attached
+          content: { application/json: { schema: { type: object, properties: { attachmentId: { type: string, format: uuid } } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: FILE_NOT_AVAILABLE }
+    get:
+      tags: [Clinical]
+      summary: PLT-030 Attachments of a visit, newest first. 404 when the patient's data_processing consent is withdrawn.
+      x-required-permission: clinical:view
+      parameters: [{ name: visitId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        attachmentId: { type: string, format: uuid }
+                        patientId: { type: string, format: uuid }
+                        fileId: { type: string, format: uuid }
+                        kind: { type: string, enum: [outside_report, photo, xray] }
+                        note: { type: string, nullable: true }
+                        createdAt: { type: string, format: date-time }
+                        contentType: { type: string }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /clinical/vitals/{queueEntryId}:

@@ -50,6 +50,7 @@ super_admin,GET /v1/clinical/rx-sets,clinical:view,deny-401
 super_admin,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 super_admin,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 super_admin,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+super_admin,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 super_admin,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 super_admin,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
 super_admin,GET /v1/compliance/health,setup:view,deny-401
@@ -63,6 +64,7 @@ super_admin,GET /v1/doctors/{id}/delay,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/leave,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/session,queue:view,deny-401
 super_admin,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+super_admin,GET /v1/files/{id},clinical:view,deny-401
 super_admin,GET /v1/nursing/activity/today,nursing:view,deny-401
 super_admin,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
 super_admin,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
@@ -218,6 +220,7 @@ super_admin,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:
 super_admin,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-401
 super_admin,POST /v1/clinical/rx-sets,clinical:edit,deny-401
 super_admin,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
+super_admin,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-401
 super_admin,POST /v1/departments,departments:create,deny-401
 super_admin,POST /v1/departments/transfers,departments:edit,deny-401
 super_admin,POST /v1/departments/{id}/workflow,departments:edit,deny-401
@@ -226,6 +229,9 @@ super_admin,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 super_admin,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 super_admin,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 super_admin,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+super_admin,POST /v1/files/uploads,clinical:create,deny-401
+super_admin,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
+super_admin,POST /v1/files/{id}/download-url,clinical:view,deny-401
 super_admin,POST /v1/nursing/administration-orders,nursing:create,deny-401
 super_admin,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 super_admin,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
@@ -358,6 +364,7 @@ implementation,GET /v1/clinical/rx-sets,clinical:view,deny-401
 implementation,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 implementation,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 implementation,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+implementation,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 implementation,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 implementation,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
 implementation,GET /v1/compliance/health,setup:view,deny-401
@@ -371,6 +378,7 @@ implementation,GET /v1/doctors/{id}/delay,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/leave,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/session,queue:view,deny-401
 implementation,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+implementation,GET /v1/files/{id},clinical:view,deny-401
 implementation,GET /v1/nursing/activity/today,nursing:view,deny-401
 implementation,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
 implementation,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
@@ -526,6 +534,7 @@ implementation,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinic
 implementation,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-401
 implementation,POST /v1/clinical/rx-sets,clinical:edit,deny-401
 implementation,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
+implementation,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-401
 implementation,POST /v1/departments,departments:create,deny-401
 implementation,POST /v1/departments/transfers,departments:edit,deny-401
 implementation,POST /v1/departments/{id}/workflow,departments:edit,deny-401
@@ -534,6 +543,9 @@ implementation,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 implementation,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 implementation,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 implementation,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+implementation,POST /v1/files/uploads,clinical:create,deny-401
+implementation,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
+implementation,POST /v1/files/{id}/download-url,clinical:view,deny-401
 implementation,POST /v1/nursing/administration-orders,nursing:create,deny-401
 implementation,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 implementation,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
@@ -666,6 +678,7 @@ support_engineer,GET /v1/clinical/rx-sets,clinical:view,deny-401
 support_engineer,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 support_engineer,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 support_engineer,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+support_engineer,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 support_engineer,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 support_engineer,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
 support_engineer,GET /v1/compliance/health,setup:view,deny-401
@@ -679,6 +692,7 @@ support_engineer,GET /v1/doctors/{id}/delay,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/leave,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/session,queue:view,deny-401
 support_engineer,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+support_engineer,GET /v1/files/{id},clinical:view,deny-401
 support_engineer,GET /v1/nursing/activity/today,nursing:view,deny-401
 support_engineer,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
 support_engineer,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
@@ -834,6 +848,7 @@ support_engineer,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clin
 support_engineer,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-401
 support_engineer,POST /v1/clinical/rx-sets,clinical:edit,deny-401
 support_engineer,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
+support_engineer,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-401
 support_engineer,POST /v1/departments,departments:create,deny-401
 support_engineer,POST /v1/departments/transfers,departments:edit,deny-401
 support_engineer,POST /v1/departments/{id}/workflow,departments:edit,deny-401
@@ -842,6 +857,9 @@ support_engineer,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 support_engineer,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+support_engineer,POST /v1/files/uploads,clinical:create,deny-401
+support_engineer,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
+support_engineer,POST /v1/files/{id}/download-url,clinical:view,deny-401
 support_engineer,POST /v1/nursing/administration-orders,nursing:create,deny-401
 support_engineer,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 support_engineer,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
@@ -974,6 +992,7 @@ billing,GET /v1/clinical/rx-sets,clinical:view,deny-401
 billing,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 billing,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 billing,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+billing,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 billing,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 billing,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
 billing,GET /v1/compliance/health,setup:view,deny-401
@@ -987,6 +1006,7 @@ billing,GET /v1/doctors/{id}/delay,queue:view,deny-401
 billing,GET /v1/doctors/{id}/leave,queue:view,deny-401
 billing,GET /v1/doctors/{id}/session,queue:view,deny-401
 billing,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+billing,GET /v1/files/{id},clinical:view,deny-401
 billing,GET /v1/nursing/activity/today,nursing:view,deny-401
 billing,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
 billing,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
@@ -1142,6 +1162,7 @@ billing,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit
 billing,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-401
 billing,POST /v1/clinical/rx-sets,clinical:edit,deny-401
 billing,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
+billing,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-401
 billing,POST /v1/departments,departments:create,deny-401
 billing,POST /v1/departments/transfers,departments:edit,deny-401
 billing,POST /v1/departments/{id}/workflow,departments:edit,deny-401
@@ -1150,6 +1171,9 @@ billing,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 billing,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 billing,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 billing,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+billing,POST /v1/files/uploads,clinical:create,deny-401
+billing,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
+billing,POST /v1/files/{id}/download-url,clinical:view,deny-401
 billing,POST /v1/nursing/administration-orders,nursing:create,deny-401
 billing,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 billing,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
@@ -1282,6 +1306,7 @@ sre,GET /v1/clinical/rx-sets,clinical:view,deny-401
 sre,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 sre,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 sre,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+sre,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 sre,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 sre,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
 sre,GET /v1/compliance/health,setup:view,deny-401
@@ -1295,6 +1320,7 @@ sre,GET /v1/doctors/{id}/delay,queue:view,deny-401
 sre,GET /v1/doctors/{id}/leave,queue:view,deny-401
 sre,GET /v1/doctors/{id}/session,queue:view,deny-401
 sre,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+sre,GET /v1/files/{id},clinical:view,deny-401
 sre,GET /v1/nursing/activity/today,nursing:view,deny-401
 sre,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
 sre,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
@@ -1450,6 +1476,7 @@ sre,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:edit,den
 sre,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-401
 sre,POST /v1/clinical/rx-sets,clinical:edit,deny-401
 sre,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
+sre,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-401
 sre,POST /v1/departments,departments:create,deny-401
 sre,POST /v1/departments/transfers,departments:edit,deny-401
 sre,POST /v1/departments/{id}/workflow,departments:edit,deny-401
@@ -1458,6 +1485,9 @@ sre,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 sre,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 sre,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 sre,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+sre,POST /v1/files/uploads,clinical:create,deny-401
+sre,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
+sre,POST /v1/files/{id}/download-url,clinical:view,deny-401
 sre,POST /v1/nursing/administration-orders,nursing:create,deny-401
 sre,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 sre,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
@@ -1590,6 +1620,7 @@ commercial,GET /v1/clinical/rx-sets,clinical:view,deny-401
 commercial,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 commercial,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 commercial,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+commercial,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 commercial,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 commercial,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
 commercial,GET /v1/compliance/health,setup:view,deny-401
@@ -1603,6 +1634,7 @@ commercial,GET /v1/doctors/{id}/delay,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/leave,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/session,queue:view,deny-401
 commercial,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+commercial,GET /v1/files/{id},clinical:view,deny-401
 commercial,GET /v1/nursing/activity/today,nursing:view,deny-401
 commercial,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
 commercial,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
@@ -1758,6 +1790,7 @@ commercial,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinical:e
 commercial,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-401
 commercial,POST /v1/clinical/rx-sets,clinical:edit,deny-401
 commercial,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
+commercial,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-401
 commercial,POST /v1/departments,departments:create,deny-401
 commercial,POST /v1/departments/transfers,departments:edit,deny-401
 commercial,POST /v1/departments/{id}/workflow,departments:edit,deny-401
@@ -1766,6 +1799,9 @@ commercial,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 commercial,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 commercial,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 commercial,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+commercial,POST /v1/files/uploads,clinical:create,deny-401
+commercial,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
+commercial,POST /v1/files/{id}/download-url,clinical:view,deny-401
 commercial,POST /v1/nursing/administration-orders,nursing:create,deny-401
 commercial,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 commercial,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
@@ -1898,6 +1934,7 @@ compliance_dpo,GET /v1/clinical/rx-sets,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/safety-dictionary,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/visits/{queueEntryId}/documents,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/visits/{queueEntryId}/documents/summary-prefill,clinical:view,deny-401
+compliance_dpo,GET /v1/clinical/visits/{visitId}/attachments,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/vitals/patient/{patientId}/previous,clinical:view,deny-401
 compliance_dpo,GET /v1/clinical/vitals/{queueEntryId},clinical:view,deny-401
 compliance_dpo,GET /v1/compliance/health,setup:view,deny-401
@@ -1911,6 +1948,7 @@ compliance_dpo,GET /v1/doctors/{id}/delay,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/leave,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/session,queue:view,deny-401
 compliance_dpo,GET /v1/doctors/{id}/working-hours,queue:view,deny-401
+compliance_dpo,GET /v1/files/{id},clinical:view,deny-401
 compliance_dpo,GET /v1/nursing/activity/today,nursing:view,deny-401
 compliance_dpo,GET /v1/nursing/administration-orders/today,nursing:view,deny-401
 compliance_dpo,GET /v1/nursing/procedure-orders/today,nursing:view,deny-401
@@ -2066,6 +2104,7 @@ compliance_dpo,POST /v1/clinical/prescriptions/{queueEntryId}/repeat-last,clinic
 compliance_dpo,POST /v1/clinical/prescriptions/{queueEntryId}/sign,clinical:approve|clinical:edit|clinical:view,deny-401
 compliance_dpo,POST /v1/clinical/rx-sets,clinical:edit,deny-401
 compliance_dpo,POST /v1/clinical/visits/{queueEntryId}/documents,clinical:edit,deny-401
+compliance_dpo,POST /v1/clinical/visits/{visitId}/attachments,clinical:edit,deny-401
 compliance_dpo,POST /v1/departments,departments:create,deny-401
 compliance_dpo,POST /v1/departments/transfers,departments:edit,deny-401
 compliance_dpo,POST /v1/departments/{id}/workflow,departments:edit,deny-401
@@ -2074,6 +2113,9 @@ compliance_dpo,POST /v1/doctors/{id}/delay/clear,queue:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/leave,queue:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/session/{action},queue:edit&setup:edit,deny-401
 compliance_dpo,POST /v1/doctors/{id}/working-hours,setup:edit,deny-401
+compliance_dpo,POST /v1/files/uploads,clinical:create,deny-401
+compliance_dpo,POST /v1/files/uploads/{id}/complete,clinical:create,deny-401
+compliance_dpo,POST /v1/files/{id}/download-url,clinical:view,deny-401
 compliance_dpo,POST /v1/nursing/administration-orders,nursing:create,deny-401
 compliance_dpo,POST /v1/nursing/administration-orders/{id}/administer,nursing:edit,deny-401
 compliance_dpo,POST /v1/nursing/administration-orders/{id}/refuse,nursing:edit,deny-401
