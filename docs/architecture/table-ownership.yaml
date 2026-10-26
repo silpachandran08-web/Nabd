@@ -60,7 +60,7 @@ modules:
     owns: [doctor_daily_metrics, tenant_daily_metrics]
     reads: [appointments, invoice_payments, invoices, package_instances, queue_entries]  # OPS-010: the recompute-from-source of one tenant-day
   queue:
-    owns: [appointments, booking_request_details, booking_request_offers, booking_routing_settings, doctor_delays, doctor_leave, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, queue_entries, queue_entry_events, service_time_stats, session_reserved_slots, specialty_service_defaults, waitlist_entries]
+    owns: [appointments, booking_request_details, booking_request_offers, booking_routing_settings, display_devices, display_pairing_codes, display_pairing_lockout, doctor_delays, doctor_leave, doctor_queue_settings, doctor_session_pauses, doctor_sessions, doctor_working_hours, eta_accuracy_daily, eta_prediction_log, facility_queue_settings, queue_entries, queue_entry_events, service_time_stats, session_reserved_slots, specialty_service_defaults, waitlist_entries]
     reads: []
   shared:
     owns: [idempotency_keys, projector_applied_events, shedlock]

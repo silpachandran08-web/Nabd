@@ -55,6 +55,22 @@
       "enum": [5, 10, 15],
       "description": "ACC-015: the consult was extended by this many minutes (status unchanged)."
     },
+    "fromDoctorId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "ACC-022: the entry was reassigned from this doctor to doctorId."
+    },
+    "newToken": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "ACC-022: the token the patient now holds after a reassign."
+    },
+    "previousToken": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "ACC-022: the token before the reassign (shown as 'was T-9')."
+    },
     "version": {
       "type": "integer",
       "minimum": 1,

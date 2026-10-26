@@ -168,18 +168,18 @@ class QueueRepository {
         String priorityGate = priorityOnly ? "AND q.priority = true " : "";
         if (doctorId != null) {
             return jdbc.query("SELECT " + COLUMNS + FROM +
-                            "WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? " + priorityGate +
+                            "WHERE q.tenant_id = ? AND q.doctor_id = ? AND q.queue_date = ? AND q.class = 'ambulatory' " + priorityGate +
                             "ORDER BY q.priority DESC, q.token_number",
                     mapper(), tenantId, doctorId, Date.valueOf(date));
         }
         if (departmentId != null) {
             return jdbc.query("SELECT " + COLUMNS + FROM +
-                            "WHERE q.tenant_id = ? AND q.department_id = ? AND q.queue_date = ? " + priorityGate +
+                            "WHERE q.tenant_id = ? AND q.department_id = ? AND q.queue_date = ? AND q.class = 'ambulatory' " + priorityGate +
                             "ORDER BY q.doctor_id, q.priority DESC, q.token_number",
                     mapper(), tenantId, departmentId, Date.valueOf(date));
         }
         return jdbc.query("SELECT " + COLUMNS + FROM +
-                        "WHERE q.tenant_id = ? AND q.queue_date = ? " + priorityGate +
+                        "WHERE q.tenant_id = ? AND q.queue_date = ? AND q.class = 'ambulatory' " + priorityGate +
                         "ORDER BY q.doctor_id, q.priority DESC, q.token_number",
                 mapper(), tenantId, Date.valueOf(date));
     }
@@ -236,7 +236,7 @@ class QueueRepository {
     /** Still-in-the-pipeline entries for a doctor today — what a newly-arriving patient is actually behind. */
     int countActiveAhead(UUID tenantId, UUID doctorId, LocalDate date) {
         Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? " +
+                "SELECT COUNT(*) FROM queue_entries WHERE tenant_id = ? AND doctor_id = ? AND queue_date = ? AND class = 'ambulatory' " +
                         "AND status NOT IN ('completed', 'no_show', 'transferred_out')",
                 Integer.class, tenantId, doctorId, Date.valueOf(date));
         return count == null ? 0 : count;

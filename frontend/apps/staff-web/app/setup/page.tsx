@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./setup.module.css";
 import WhatsAppTemplates from "./WhatsAppTemplates";
+import DisplayDevices from "./DisplayDevices";
 import TimezoneSelect from "./TimezoneSelect";
 import PharmacyPanel from "../components/setup/PharmacyPanel";
 import PrivacyNoticePanel from "../components/setup/PrivacyNoticePanel";
@@ -46,6 +47,7 @@ const TABS = [
   { key: "privacy", label: "Privacy notice" },
   { key: "integrations", label: "Integrations" },
   { key: "whatsapp", label: "WhatsApp" },
+  { key: "display", label: "Waiting-room display" },
   { key: "holidays", label: "Holidays" },
   { key: "shifts", label: "Shifts" },
   { key: "payroll", label: "Payroll" },
@@ -807,6 +809,8 @@ function SetupPageInner() {
         );
       case "whatsapp":
         return <WhatsAppTemplates />;
+      case "display":
+        return <DisplayDevices />;
       default:
         return null;
     }

@@ -120,7 +120,7 @@ export function landingPathFor(permissions: string[], owner = false): string {
 
 // Routes with their own identity/nav (platform console, owner's cross-clinic login) or no
 // session yet (login, invite acceptance) — the shared clinic shell never renders here.
-export const SHELL_SKIP_PREFIXES = ["/login", "/platform", "/accept-invite", "/owner"];
+export const SHELL_SKIP_PREFIXES = ["/login", "/platform", "/accept-invite", "/owner", "/display"];
 
 // "exp" is the JWT standard claim (Unix seconds) — for the signed-in popover's "Session expires
 // in Xh Ym", not used for any auth decision (the server enforces expiry independently).
