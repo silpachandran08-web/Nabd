@@ -1815,6 +1815,179 @@ paths:
       tags:
       - billing
       x-required-permission: billing:approve
+  /v1/billing/dues:
+    get:
+      operationId: DuesController_dues
+      parameters:
+      - in: query
+        name: bucket
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DuesResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
+  /v1/billing/dues/{patientId}/remind:
+    post:
+      operationId: DuesController_remind
+      parameters:
+      - in: path
+        name: patientId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuesRemindRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                  format: uuid
+          description: Accepted
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:edit
+  /v1/billing/invoices:
+    get:
+      operationId: DuesController_invoices
+      parameters:
+      - in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: doctorId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: method
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 50
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InvoiceListResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
   /v1/billing/invoices/{id}:
     get:
       operationId: CheckoutController_getInvoice
@@ -1831,6 +2004,57 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/InvoiceResponse"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:view
+  /v1/billing/invoices/{id}/document:
+    get:
+      operationId: InvoiceDocumentController_document
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: layout
+        required: false
+        schema:
+          type: string
+          default: a4
+      - in: query
+        name: kind
+        required: false
+        schema:
+          type: string
+          default: invoice
+      responses:
+        "200":
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: byte
           description: OK
         "401":
           content:
@@ -1946,6 +2170,50 @@ paths:
       tags:
       - billing
       x-required-permission: billing:edit
+  /v1/billing/invoices/{id}/write-off:
+    post:
+      operationId: DuesController_writeOff
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WriteOffRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/InvoiceListItem"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - billing
+      x-required-permission: billing:approve
   /v1/billing/otc-charges:
     get:
       operationId: CheckoutController_otcCharges
@@ -9877,6 +10145,95 @@ paths:
       tags:
       - patient
       x-required-permission: public
+  /v1/public/trials:
+    post:
+      operationId: TrialController_start
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRequest"
+        required: true
+      responses:
+        "202":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: Accepted
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: public
+  /v1/public/trials/{signupId}/status:
+    get:
+      operationId: TrialController_status
+      parameters:
+      - in: path
+        name: signupId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: public
+  /v1/public/trials/{signupId}/verify:
+    post:
+      operationId: TrialController_verify
+      parameters:
+      - in: path
+        name: signupId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - platform
+      x-required-permission: public
   /v1/queue:
     get:
       operationId: QueueController_list
@@ -15885,6 +16242,50 @@ components:
         reviewDueDate:
           type: string
           format: date
+    DuesRemindRequest:
+      type: object
+      properties:
+        channel:
+          type: string
+          pattern: whatsapp|sms
+        includePaymentLink:
+          type: boolean
+      required:
+      - channel
+    DuesResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuesRow"
+        nextCursor:
+          type: string
+    DuesRow:
+      type: object
+      properties:
+        bucket:
+          type: string
+        invoiceNumbers:
+          type: array
+          items:
+            type: string
+        lastRemindedAt:
+          type: string
+          format: date-time
+        oldestAt:
+          type: string
+          format: date-time
+        oldestDays:
+          type: integer
+          format: int64
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        totalDue:
+          type: number
     DuplicateSuggestionPage:
       type: object
       properties:
@@ -16643,6 +17044,44 @@ components:
         tokensLeft:
           type: integer
           format: int32
+    InvoiceListItem:
+      type: object
+      properties:
+        balanceDue:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        doctorId:
+          type: string
+          format: uuid
+        id:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+        paid:
+          type: number
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        status:
+          type: string
+        total:
+          type: number
+        writtenOff:
+          type: number
+    InvoiceListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceListItem"
+        nextCursor:
+          type: string
     InvoiceResponse:
       type: object
       properties:
@@ -19958,6 +20397,19 @@ components:
           type: string
         roleName:
           type: string
+    StartRequest:
+      type: object
+      properties:
+        clinicName:
+          type: string
+        consentToContact:
+          type: boolean
+        market:
+          type: string
+        mobile:
+          type: string
+        specialty:
+          type: string
     SubscriptionPage:
       type: object
       properties:
@@ -20691,6 +21143,11 @@ components:
           type: string
         vaccineName:
           type: string
+    VerifyRequest:
+      type: object
+      properties:
+        otp:
+          type: string
     Visits:
       type: object
       properties:
@@ -20973,6 +21430,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BrandWorkspaceResponse"
+    WriteOffRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: false
+          minimum: 0.01
+        note:
+          type: string
+          maxLength: 500
+          minLength: 0
+        reasonCode:
+          type: string
+          maxLength: 40
+          minLength: 0
+      required:
+      - amount
+      - reasonCode
   securitySchemes:
     bearerAuth:
       bearerFormat: JWT

@@ -114,6 +114,9 @@ export type DrugSource = { kb?: string; month?: string; };
 export type DrugSuggestionResponse = { code?: string; inStock?: boolean; name?: string; prescriptionOnly?: boolean; source?: string; };
 export type DrugSummary = { brand?: string; form?: string; generic?: Array<string>; id?: string; schedule?: Array<string>; strength?: string; };
 export type DueConditionResponse = { condition?: string; id?: string; patientId?: string; patientName?: string; reviewDueDate?: string; };
+export type DuesRemindRequest = { channel: string; includePaymentLink?: boolean; };
+export type DuesResponse = { items?: Array<DuesRow>; nextCursor?: string; };
+export type DuesRow = { bucket?: string; invoiceNumbers?: Array<string>; lastRemindedAt?: string; oldestAt?: string; oldestDays?: number; patientId?: string; patientName?: string; totalDue?: number; };
 export type DuplicateSuggestionPage = { items?: Array<Item>; nextCursor?: string; };
 export type EncounterListItem = { amendmentCount?: number; documentsDraft?: number; documentsIssued?: number; noteSignedAt?: string; noteState?: string; occurredAt?: string; patientId?: string; patientMrn?: string; patientName?: string; queueDate?: string; queueEntryId?: string; rxItemCount?: number; rxStatus?: string; visitStatus?: string; };
 export type EncounterListPage = { data?: Array<EncounterListItem>; page?: PageMeta; };
@@ -162,6 +165,8 @@ export type InternalAvailability = { doctors?: Array<InternalDoctorSessions>; v?
 export type InternalBookRequest = { doctorId: string; patientRef: string; startTime: string; };
 export type InternalDoctorSessions = { doctorId?: string; sessions?: Array<InternalSession>; };
 export type InternalSession = { date?: string; id?: string; mode?: string; slots?: Array<string>; tokensLeft?: number; };
+export type InvoiceListItem = { balanceDue?: number; createdAt?: string; doctorId?: string; id?: string; invoiceNumber?: string; paid?: number; patientId?: string; patientName?: string; status?: string; total?: number; writtenOff?: number; };
+export type InvoiceListResponse = { items?: Array<InvoiceListItem>; nextCursor?: string; };
 export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; createdAt?: string; currency?: string; discount?: number; doctorId?: string; doctorName?: string; documentTitle?: string; id?: string; invoiceNumber?: string; lineItems?: Array<LineItemResponse>; paid?: number; patientId?: string; patientName?: string; payments?: Array<PaymentResponse>; queueEntryId?: string; roundOff?: number; status?: string; subtotal?: number; tax?: number; total?: number; };
 export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern: string; taxRegistrationId?: string; };
 export type InvoiceSeriesListResponse = { items?: Array<InvoiceSeriesResponse>; };
@@ -351,6 +356,7 @@ export type StaffShiftResponse = { effectiveFrom?: string; effectiveTo?: string;
 export type StaffShiftWriteRequest = { effectiveFrom: string; effectiveTo?: string; patternJson: string; staffId: string; };
 export type StaffSummary = { active?: number; invited?: number; roles?: number; suspended?: number; };
 export type StaffSummaryResponse = { id?: string; name?: string; roleName?: string; };
+export type StartRequest = { clinicName?: string; consentToContact?: boolean; market?: string; mobile?: string; specialty?: string; };
 export type SubscriptionPage = { data?: Array<SubscriptionResponse>; page?: PageMeta; };
 export type SubscriptionResponse = { createdAt?: string; currency?: string; id?: string; mrrCents?: number; planCode?: string; planId?: string; planName?: string; region?: string; renewalDate?: string; seatLimit?: number; seatsUsed?: number; tenantId?: string; tenantName?: string; tenantSlug?: string; tenantStatus?: string; };
 export type SubscriptionSummaryResponse = { activePatientsLimit?: number; activePatientsUsed?: number; branchesLimit?: number; branchesUsed?: number; killedFeatures?: Array<string>; modules?: Array<ModuleState>; plan?: string; seatsLimit?: number; seatsUsed?: number; status?: string; whatsappMessagesLimit?: number; whatsappMessagesUsed?: number; };
@@ -394,6 +400,7 @@ export type UnlockRequest = { pin: string; };
 export type UpdateRequest = { assessment?: string; favourite?: boolean; name?: string; objective?: string; plan?: string; subjective?: string; tags?: Array<string>; };
 export type VaccineRecordRequest = { dose: string; expiryDate?: string; lotNumber?: string; notes?: string; patientId: string; queueEntryId?: string; route: string; site?: string; vaccineName: string; };
 export type VaccineRecordResponse = { administeredAt?: string; dose?: string; expiryDate?: string; id?: string; lotNumber?: string; notes?: string; patientId?: string; patientName?: string; queueEntryId?: string; recordedByName?: string; route?: string; site?: string; vaccineName?: string; };
+export type VerifyRequest = { otp?: string; };
 export type Visits = { completed?: number; inFlow?: number; total?: number; };
 export type VitalsHistoryResponse = { items?: Array<VitalsResponse>; };
 export type VitalsResponse = { abnormalFlags?: Array<string>; bloodSugar?: number; bpDiastolic?: number; bpSystolic?: number; heightCm?: number; id?: string; painScore?: number; patientId?: string; pulseBpm?: number; queueEntryId?: string; recordedAt?: string; recordedBy?: string; spo2Percent?: number; tempCelsius?: number; weightKg?: number; };
@@ -411,6 +418,7 @@ export type WorklistItem = { entry?: QueueEntryResponse; patient?: PatientDetail
 export type WorklistResponse = { items?: Array<WorklistItem>; };
 export type WorkspaceSelectRequest = { clinicId: string; };
 export type WorkspacesResponse = { brands?: Array<BrandWorkspaceResponse>; };
+export type WriteOffRequest = { amount: number; note?: string; reasonCode: string; };
 
 export type Operations = {
   JwksController_jwks: { method: "get"; path: "/.well-known/jwks.json"; permission: "public"; pathParams: never; query: { population?: string; }; body: never; response: Record<string, Record<string, unknown>> };
@@ -463,9 +471,14 @@ export type Operations = {
   DayCloseController_close: { method: "post"; path: "/v1/billing/day-close"; permission: "billing:approve"; pathParams: never; query: never; body: DayCloseRequest; response: DayCloseSummaryResponse };
   DayCloseController_history: { method: "get"; path: "/v1/billing/day-close/history"; permission: "billing:view"; pathParams: never; query: { from?: string; to?: string; cursor?: string; limit?: number; }; body: never; response: DayCloseHistoryResponse };
   DayCloseController_reopen: { method: "post"; path: "/v1/billing/day-close/reopen"; permission: "billing:approve"; pathParams: never; query: { date?: string; }; body: DayReopenRequest; response: DayCloseSummaryResponse };
+  DuesController_dues: { method: "get"; path: "/v1/billing/dues"; permission: "billing:view"; pathParams: never; query: { bucket?: string; cursor?: string; limit?: number; }; body: never; response: DuesResponse };
+  DuesController_remind: { method: "post"; path: "/v1/billing/dues/{patientId}/remind"; permission: "billing:edit"; pathParams: { patientId: string; }; query: never; body: DuesRemindRequest; response: Record<string, string> };
+  DuesController_invoices: { method: "get"; path: "/v1/billing/invoices"; permission: "billing:view"; pathParams: never; query: { from?: string; to?: string; status?: string; doctorId?: string; method?: string; q?: string; cursor?: string; limit?: number; }; body: never; response: InvoiceListResponse };
   CheckoutController_getInvoice: { method: "get"; path: "/v1/billing/invoices/{id}"; permission: "billing:view"; pathParams: { id: string; }; query: never; body: never; response: InvoiceResponse };
+  InvoiceDocumentController_document: { method: "get"; path: "/v1/billing/invoices/{id}/document"; permission: "billing:view"; pathParams: { id: string; }; query: { layout?: string; kind?: string; }; body: never; response: string };
   CheckoutController_recordPayment: { method: "post"; path: "/v1/billing/invoices/{id}/payments"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: PaymentRequest; response: InvoiceResponse };
   CheckoutController_voidInvoice: { method: "post"; path: "/v1/billing/invoices/{id}/void"; permission: "billing:edit"; pathParams: { id: string; }; query: never; body: VoidInvoiceRequest; response: InvoiceResponse };
+  DuesController_writeOff: { method: "post"; path: "/v1/billing/invoices/{id}/write-off"; permission: "billing:approve"; pathParams: { id: string; }; query: never; body: WriteOffRequest; response: InvoiceListItem };
   CheckoutController_otcCharges: { method: "get"; path: "/v1/billing/otc-charges"; permission: "billing:view"; pathParams: never; query: never; body: never; response: OtcChargesResponse };
   CheckoutController_otcCheckout: { method: "post"; path: "/v1/billing/otc-checkout"; permission: "billing:create"; pathParams: never; query: never; body: CheckoutRequest; response: InvoiceResponse };
   CheckoutController_quote: { method: "post"; path: "/v1/billing/quotes"; permission: "billing:view"; pathParams: never; query: never; body: QuoteRequest; response: QuoteResponse };
@@ -673,6 +686,9 @@ export type Operations = {
   TemplateLintController_createWithOverride: { method: "post"; path: "/v1/platform/tenants/{tenantId}/whatsapp-templates"; permission: "messaging_operations:override"; pathParams: { tenantId: string; }; query: never; body: TemplateOverrideRequest; response: TemplateResponse };
   TerritoryController_list: { method: "get"; path: "/v1/platform/territories"; permission: "territories:view"; pathParams: never; query: never; body: never; response: Array<RegionSummaryResponse> };
   PublicNoticeController_page: { method: "get"; path: "/v1/public/notices/{tenantSlug}/{version}"; permission: "public"; pathParams: { tenantSlug: string; version: string; }; query: { lang?: string; }; body: never; response: string };
+  TrialController_start: { method: "post"; path: "/v1/public/trials"; permission: "public"; pathParams: never; query: never; body: StartRequest; response: Record<string, Record<string, unknown>> };
+  TrialController_status: { method: "get"; path: "/v1/public/trials/{signupId}/status"; permission: "public"; pathParams: { signupId: string; }; query: never; body: never; response: Record<string, Record<string, unknown>> };
+  TrialController_verify: { method: "post"; path: "/v1/public/trials/{signupId}/verify"; permission: "public"; pathParams: { signupId: string; }; query: never; body: VerifyRequest; response: Record<string, Record<string, unknown>> };
   QueueController_list: { method: "get"; path: "/v1/queue"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; departmentId?: string; date?: string; priority?: boolean; }; body: never; response: Array<QueueEntryResponse> };
   QueueController_checkIn: { method: "post"; path: "/v1/queue/check-in"; permission: "queue:create"; pathParams: never; query: never; body: CheckInRequest; response: QueueEntryResponse };
   QueueController_waitEstimate: { method: "get"; path: "/v1/queue/wait-estimate"; permission: "queue:view"; pathParams: never; query: { doctorId: string; }; body: never; response: WaitEstimateResponse };

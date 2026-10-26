@@ -449,6 +449,35 @@ schemas:
       patient_ref: pii  # opaque random token that stands in for a patient toward the Edge; it identifies a patient only through this table
       patient_id: pii
       created_at: operational
+    billing_documents:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      kind: operational
+      layout: operational
+      version: operational
+      object_key: operational
+      sha256: operational
+      content: financial
+      created_at: operational
+    dues_reminders:
+      id: operational
+      tenant_id: operational
+      patient_id: pii
+      invoice_ids: operational
+      channel: operational
+      sent_by: operational
+      message_ref: operational
+      created_at: operational
+    invoice_write_offs:
+      id: operational
+      tenant_id: operational
+      invoice_id: operational
+      amount: financial
+      reason_code: operational
+      note: financial
+      written_by: operational
+      created_at: operational
     invoice_discounts:
       id: operational
       tenant_id: operational
