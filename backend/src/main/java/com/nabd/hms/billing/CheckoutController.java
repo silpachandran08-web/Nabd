@@ -78,8 +78,10 @@ public class CheckoutController {
 
     @GetMapping("/invoices/{id}")
     @PreAuthorize("hasAuthority('billing:view')")
-    public InvoiceResponse getInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return service.getInvoice(tenantId(jwt), id);
+    public org.springframework.http.ResponseEntity<InvoiceResponse> getInvoice(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+                                                                               @org.springframework.web.bind.annotation.RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        java.util.List<Long> seq = service.invoiceChangeSeq(id); // OPS-006: 304 without loading the invoice
+        return com.nabd.hms.shared.ETags.respond(!seq.isEmpty(), seq.isEmpty() ? null : seq.get(0), ifNoneMatch, () -> service.getInvoice(tenantId(jwt), id));
     }
 
     @com.nabd.hms.shared.Idempotent

@@ -101,6 +101,11 @@ public class AppointmentService {
     }
 
     @Transactional
+    public java.util.List<Long> changeSeq(UUID id) {
+        return repo.changeSeq(tenantContext.current(), id);
+    }
+
+    @Transactional
     public AppointmentResponse get(UUID tenantId, UUID id) {
         tenantContext.set(tenantId);
         return repo.findById(tenantId, id).map(this::toResponse).orElseThrow(this::notFound);

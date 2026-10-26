@@ -49,6 +49,7 @@ import { doctorQueueQuery, key, queueQuery } from "../lib/query";
 import { responseFetch } from "../lib/responseFetch";
 import { type Need, dropVisitReads, FRESH_MS, loadPatients, prefetchVisit, selfStaffId, visitIsWarm, visitReadKey, visitRead } from "../lib/doctorQueries";
 import { moveBody, moveErrorMessage } from "../lib/queueMove";
+import { createAutosave } from "../lib/autosave";
 
 // Matches GET /v1/queue (QueueController), GET /v1/patients/{id} (PatientController),
 // and /v1/clinical/notes/{queueEntryId} (NoteController).
@@ -80,7 +81,6 @@ function normalizeRxItem(i: PrescriptionItem): PrescriptionItem {
   };
 }
 
-const AUTOSAVE_MS = 10_000;
 const LOCAL_DRAFT_MS = 800;
 const BLANK_DRAFT: NoteDraft = { subjective: "", objective: "", assessment: "", plan: "", diagnosis: "" };
 
@@ -296,6 +296,7 @@ export default function ConsultPage() {
   // ---- note persistence ---------------------------------------------------------------------
 
   function scheduleLocalDraft(entryId: string) {
+    autosaveRef.current?.touch(); // OPS-006: idle 3 s / max 30 s debounce (app/lib/autosave.ts)
     if (localTimerRef.current) clearTimeout(localTimerRef.current);
     localTimerRef.current = setTimeout(() => {
       if (!dirtyRef.current) return;
@@ -370,14 +371,18 @@ export default function ConsultPage() {
     }
   }
 
-  // Autosave every 10s while there are unsaved changes — cleared when the shell closes. A failed
-  // save keeps `dirty` set, so this retries on the next tick.
+  // OPS-006 (DP-27): one autosave when typing pauses 3 s, at the latest 30 s after the first unsaved edit. A failed
+  // save keeps `dirty` set, so the flush touches again and retries after the next idle pause. No audit row until sign/amend.
+  const autosaveRef = useRef<ReturnType<typeof createAutosave> | null>(null);
   useEffect(() => {
     if (!activeEntry) return;
-    const id = setInterval(() => {
-      if (dirtyRef.current) saveNote(activeEntry.id);
-    }, AUTOSAVE_MS);
-    return () => clearInterval(id);
+    const entryId = activeEntry.id;
+    const saver = createAutosave(() => {
+      if (!dirtyRef.current) return;
+      void saveNote(entryId).finally(() => { if (dirtyRef.current) saver.touch(); });
+    });
+    autosaveRef.current = saver;
+    return () => { saver.cancel(); autosaveRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEntry?.id]);
 

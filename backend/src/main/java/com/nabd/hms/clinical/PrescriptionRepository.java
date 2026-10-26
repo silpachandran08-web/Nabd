@@ -51,31 +51,31 @@ class PrescriptionRepository {
     }
 
     Optional<PrescriptionRow> findByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
+        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ?",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** V1-004: row lock (held to the end of the transaction) that serialises upsert/sign on one prescription. */
     Optional<PrescriptionRow> lockByQueueEntry(UUID tenantId, UUID queueEntryId) {
-        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
+        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND queue_entry_id = ? FOR UPDATE",
                 prescriptionMapper(), tenantId, queueEntryId).stream().findFirst();
     }
 
     /** NB-105: previous medicines, most recent first — signed only, a draft isn't a real prescription yet. */
     List<PrescriptionRow> findSignedByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT *, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
+        return jdbc.query("SELECT id, tenant_id, queue_entry_id, patient_id, doctor_id, status, created_at, signed_at, allergy_snapshot, safety_dictionary_version, signed_by, signed_by_registration_no, allergy_snapshot::text AS allergy_snapshot_json FROM prescriptions WHERE tenant_id = ? AND patient_id = ? AND status = 'signed' " +
                         "ORDER BY signed_at DESC",
                 prescriptionMapper(), tenantId, patientId);
     }
 
     List<PrescriptionItemRow> findItems(UUID tenantId, UUID prescriptionId) {
-        return jdbc.query("SELECT *, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
+        return jdbc.query("SELECT id, tenant_id, prescription_id, drug_name, dosage, frequency, duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, route, quantity, quantity_unit, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
                         "ORDER BY display_order",
                 itemMapper(), tenantId, prescriptionId);
     }
 
     UUID ensureDraft(UUID tenantId, UUID queueEntryId, UUID patientId, UUID doctorId) {
-        UUID id = UUID.randomUUID();
+        UUID id = com.nabd.hms.shared.UuidV7.next();
         jdbc.update("INSERT INTO prescriptions (id, tenant_id, queue_entry_id, patient_id, doctor_id) " +
                         "VALUES (?,?,?,?,?) ON CONFLICT (queue_entry_id) DO NOTHING",
                 id, tenantId, queueEntryId, patientId, doctorId);
@@ -198,7 +198,7 @@ class PrescriptionRepository {
     }
 
     List<FavouriteSetItemRow> findSetItems(UUID tenantId, UUID setId) {
-        return jdbc.query("SELECT * FROM favourite_rx_set_items WHERE tenant_id = ? AND set_id = ? ORDER BY display_order",
+        return jdbc.query("SELECT id, tenant_id, set_id, drug_name, dosage, frequency, duration, instructions, display_order, brand_name, sig_pattern, route, quantity, quantity_unit FROM favourite_rx_set_items WHERE tenant_id = ? AND set_id = ? ORDER BY display_order",
                 (rs, i) -> new FavouriteSetItemRow(UUID.fromString(rs.getString("id")), rs.getString("drug_name"),
                         rs.getString("dosage"), rs.getString("frequency"), rs.getString("duration"),
                         rs.getString("instructions"), rs.getInt("display_order"), rs.getString("brand_name"),

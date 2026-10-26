@@ -27,9 +27,14 @@ class AppointmentRepository {
         this.jdbc = jdbc;
     }
 
+    /** OPS-006: empty = no such appointment in this clinic; a null element = untouched since V2603 (reads as 0). */
+    java.util.List<Long> changeSeq(UUID tenantId, UUID id) {
+        return jdbc.query("SELECT change_seq FROM appointments WHERE tenant_id = ? AND id = ?", (rs, i) -> rs.getObject(1, Long.class), tenantId, id);
+    }
+
     /** Throws DataIntegrityViolationException if the slot is already booked — see uq_appointments_doctor_slot. */
     UUID insert(UUID tenantId, UUID patientId, UUID doctorId, Instant startTime, Instant endTime, boolean isFollowUp) {
-        UUID id = UUID.randomUUID();
+        UUID id = com.nabd.hms.shared.UuidV7.next();
         jdbc.update("INSERT INTO appointments (id, tenant_id, patient_id, doctor_id, start_time, end_time, is_follow_up) " +
                         "VALUES (?,?,?,?,?,?,?)",
                 id, tenantId, patientId, doctorId, Timestamp.from(startTime), Timestamp.from(endTime), isFollowUp);

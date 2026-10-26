@@ -460,6 +460,11 @@ public class CheckoutService {
     }
 
     @Transactional
+    public java.util.List<Long> invoiceChangeSeq(UUID invoiceId) {
+        return repo.changeSeq(tenantContext.current(), invoiceId);
+    }
+
+    @Transactional
     public InvoiceResponse getInvoice(UUID tenantId, UUID invoiceId) {
         tenantContext.set(tenantId);
         return toInvoiceResponse(tenantId, repo.findInvoice(tenantId, invoiceId).orElseThrow(this::notFound));

@@ -900,6 +900,11 @@ paths:
         schema:
           type: string
           format: uuid
+      - in: header
+        name: If-None-Match
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -1825,6 +1830,11 @@ paths:
         schema:
           type: string
           format: uuid
+      - in: header
+        name: If-None-Match
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -19275,6 +19285,12 @@ components:
           format: int64
         currency:
           type: string
+        kmsKeyCreatedAt:
+          type: string
+          format: date-time
+        kmsKeyRotatedAt:
+          type: string
+          format: date-time
         mrrCents:
           type: integer
           format: int64

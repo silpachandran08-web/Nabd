@@ -38,11 +38,11 @@ class PackageRepository {
     // ── package definitions ──────────────────────────────────────────────
 
     List<PackageRow> listPackages(UUID tenantId) {
-        return jdbc.query("SELECT * FROM packages WHERE tenant_id = ? ORDER BY name", this::mapPackage, tenantId);
+        return jdbc.query("SELECT id, tenant_id, name, package_type, speciality, description, status, price, tax_inclusive, validity_days, validity_starts, grace_days, refund_note, created_by, created_at, updated_at FROM packages WHERE tenant_id = ? ORDER BY name", this::mapPackage, tenantId);
     }
 
     Optional<PackageRow> findPackage(UUID tenantId, UUID id) {
-        return jdbc.query("SELECT * FROM packages WHERE tenant_id = ? AND id = ?", this::mapPackage, tenantId, id)
+        return jdbc.query("SELECT id, tenant_id, name, package_type, speciality, description, status, price, tax_inclusive, validity_days, validity_starts, grace_days, refund_note, created_by, created_at, updated_at FROM packages WHERE tenant_id = ? AND id = ?", this::mapPackage, tenantId, id)
                 .stream().findFirst();
     }
 

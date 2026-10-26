@@ -258,6 +258,11 @@ class CheckoutRepository {
         return restored;
     }
 
+    /** OPS-006: empty = no such invoice in this clinic; a null element = untouched since V2603 (reads as 0). */
+    java.util.List<Long> changeSeq(UUID tenantId, UUID invoiceId) {
+        return jdbc.query("SELECT change_seq FROM invoices WHERE tenant_id = ? AND id = ?", (rs, i) -> rs.getObject(1, Long.class), tenantId, invoiceId);
+    }
+
     Optional<InvoiceRow> findInvoice(UUID tenantId, UUID invoiceId) {
         return jdbc.query(INVOICE_SELECT + "WHERE tenant_id = ? AND id = ?", invoiceMapper(), tenantId, invoiceId)
                 .stream().findFirst();
