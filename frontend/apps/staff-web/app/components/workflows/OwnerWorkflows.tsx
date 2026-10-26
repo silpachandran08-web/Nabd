@@ -4,7 +4,7 @@
 // preview the patient journey from the draft, and publish a new version with a fresh authenticator code.
 // Edit controls need setup:edit and are absent otherwise; everyone with queue:view sees the published rules read-only.
 import { useCallback, useEffect, useState } from "react";
-import styles from "../../setup/setup.module.css";
+import styles from "../../(clinic)/setup/setup.module.css";
 import w from "./workflows.module.css";
 import AccessGate from "../ui/AccessGate";
 import Can from "../ui/Can";
