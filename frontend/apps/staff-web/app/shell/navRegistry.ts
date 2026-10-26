@@ -39,7 +39,7 @@ const OWNER: NavItem[] = [
 // Prototype NB.ROLES.reception order, then the generic staff screens a front-desk role also holds.
 const RECEPTION: NavItem[] = [
   { id: "arrivals", href: "/arrivals", label: "Today / Arrivals", short: "Today", icon: "home", perms: ["queue:view"], owner: ACC, badge: "waiting" },
-  { id: "requests", href: "/requests", label: "Requests", short: "Requests", icon: "inbox", perms: ["queue:view"], owner: ACC, planned: { module: ["whatsapp_booking"] } },
+  { id: "requests", href: "/requests", label: "Booking requests", short: "Requests", icon: "inbox", perms: ["queue:create"], owner: ACC }, // ACC-010 ships the screen; it needs the booking permission
   { id: "calendar", href: "/schedule", label: "Queue & Appointments", short: "Queue", icon: "calendar", perms: ["queue:view"], owner: ACC },
   { id: "patients", href: "/patients", label: "Patients", short: "Patients", icon: "users", perms: ["patients:view"], owner: ACC },
   { id: "checkin", href: "/checkin", label: "Self check-in", short: "Check-in", icon: "qr", perms: ["queue:view"], owner: ACC, planned: { module: ["queue_eta"] } },

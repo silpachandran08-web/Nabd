@@ -21,6 +21,7 @@ function server(initial, opts = {}) {
     return route.fulfill({ status: verb === 'suggest' ? 202 : 200, contentType: 'application/json', body: JSON.stringify(verb === 'suggest' ? { offerId: 'o1', expiresAt: soon(60) } : verb === 'decline' ? { status: 'DECLINED' } : { appointmentId: id, status: 'CONFIRMED' }) });
   };
   const handlers = [
+    ['GET', /^\/queue(\?|$)/, { body: [] }], // the shell's reception nav badge
     ['GET', /^\/booking-requests/, (route) => st.failList ? route.fulfill({ status: 500, contentType: 'application/problem+json', body: JSON.stringify({ type: 'x', title: 'x' }) })
       : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: st.items, nextCursor: null, stats: { autoAccepted: 12, medianReplySeconds: 240 } }) })],
     ['POST', /^\/booking-requests\/[^/]+\/accept$/, decide('accept')],
@@ -49,7 +50,7 @@ const list = (page) => page.getByRole('list', { name: 'Pending booking requests'
 
 await run('happy', REC, server(ITEMS()), async ({ page, log, st }) => {
   const text = await page.locator('main').innerText();
-  check('H1 title, stats and the three requests are shown', /Booking requests/.test(text) && /Auto-accepted today\s*12/.test(text) && /Median reply\s*4 min/.test(text) && /Asha Rao/.test(text) && /Bina Shah/.test(text) && /Chitra Nair/.test(text), text.slice(0, 300));
+  check('H1 title, stats and the three requests are shown', /Booking requests/.test(text) && /Auto-accepted today\s*12/i.test(text) && /Median reply\s*4 min/i.test(text) && /Asha Rao/.test(text) && /Bina Shah/.test(text) && /Chitra Nair/.test(text), text.slice(0, 300));
   check('H2 each row says why it needs review', /Triage words in the booking/.test(text) && /New patient/.test(text) && /Daily auto-accept limit reached/.test(text));
   check('H3 SLA countdown (left and overdue) and the next free time are shown', /\d+ min left/.test(text) && /Overdue 3 min/.test(text) && /Next free time: 03 Nov 2026 10:30/.test(text), text);
   check('H4 triage request is first and carries the Triage pill', /^Asha Rao/m.test(await list(page).locator('li').first().innerText()) && /Triage/.test(await list(page).locator('li').first().innerText()));
@@ -61,7 +62,7 @@ await run('happy', REC, server(ITEMS()), async ({ page, log, st }) => {
   check('K2 K moves back to the first row', (await list(page).locator('li[aria-current="true"]').innerText()).includes('Asha Rao'));
   await page.keyboard.press('j'); await page.keyboard.press('a'); await sleep(700);
   check('K3 A accepts the selected row (POST accept for r2, empty body)', posts(log, 'accept').length === 1 && /booking-requests\/r2\/accept/.test(posts(log, 'accept')[0].path) && (posts(log, 'accept')[0].body ?? '{}') === '{}', JSON.stringify(posts(log, 'accept')));
-  check('K4 the accepted row left the list and a confirmation is shown', !/Bina Shah/.test(await list(page).innerText()) && /Accepted/.test(await page.getByRole('status').innerText()));
+  check('K4 the accepted row left the list and a confirmation is shown', !/Bina Shah/.test(await list(page).innerText()) && /Accepted/.test(await page.locator('main').getByRole('status').innerText()));
   // suggest with S
   await page.keyboard.press('s'); await sleep(400);
   const dlg = page.getByRole('dialog', { name: 'Suggest other times' });
@@ -91,13 +92,13 @@ await run('typing', REC, server(ITEMS()), async ({ page, log }) => {
 
 await run('lost race', REC, server(ITEMS(), { lost: ['r1'] }), async ({ page, log }) => {
   await page.getByRole('button', { name: 'Accept' }).first().click(); await sleep(900);
-  const status = await page.getByRole('status').innerText();
+  const status = await page.locator('main').getByRole('status').innerText();
   check('R1 a 409 ALREADY_DECIDED says someone else decided and the list shows the final state', /Someone else already decided/.test(status) && !/Asha Rao/.test(await list(page).innerText()), status);
 });
 
 await run('slot taken', REC, server(ITEMS(), { slotTaken: true }), async ({ page }) => {
   await page.getByRole('button', { name: 'Accept' }).first().click(); await sleep(900);
-  check('R2 SLOT_TAKEN keeps the row (rolled back) and says the time is gone', /no longer free/.test(await page.getByRole('status').innerText()) && /Asha Rao/.test(await list(page).innerText()));
+  check('R2 SLOT_TAKEN keeps the row (rolled back) and says the time is gone', /no longer free/.test(await page.locator('main').getByRole('status').innerText()) && /Asha Rao/.test(await list(page).innerText()));
 });
 
 await run('empty', REC, server([]), async ({ page }) => {
@@ -105,7 +106,7 @@ await run('empty', REC, server([]), async ({ page }) => {
 });
 
 await run('error', REC, server([], { failList: true }), async ({ page, st }) => {
-  check('X1 list failure shows an error with Retry', /Couldn.t load the booking requests/.test(await page.getByRole('alert').innerText()));
+  check('X1 list failure shows an error with Retry', /Couldn.t load the booking requests/.test(await page.locator('main').getByRole('alert').innerText()));
   st.failList = false; st.items = ITEMS();
   await page.getByRole('button', { name: 'Retry' }).click(); await sleep(800);
   check('X2 Retry loads the requests', /Asha Rao/.test(await page.locator('main').innerText()));

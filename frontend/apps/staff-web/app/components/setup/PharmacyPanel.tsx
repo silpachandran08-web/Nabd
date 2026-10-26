@@ -26,6 +26,7 @@ type DispensingQueueEntry = Omit<Full<DispensingQueueEntryResponse>, "items" | "
   token?: number | null; items: Full<DispensingQueueItem, "stockQty" | "dosage" | "frequency" | "duration" | "instructions">[];
 };
 
+const MODE_RANK: Record<PharmacyMode, number> = { external: 0, hybrid: 1, in_house: 2 };
 export const MODE_LABEL: Record<PharmacyMode, string> = { external: "External", hybrid: "Hybrid", in_house: "In-house" };
 export const MODE_DESC: Record<PharmacyMode, string> = {
   external: "The patient buys at any outside pharmacy. Default for every tenant, included in all plans, zero setup.",
@@ -97,7 +98,7 @@ export function ModeChangeDialog({ from, to, onClose, onSaved, onLocked }: {
         <ErrorSummary fe={fe} className={`${ph.notice} ${ph.noticeError}`} />
         <div className={styles.actions}>
           <button type="button" className={styles.btn} onClick={onClose}>Cancel</button>
-          <button type="submit" className={styles.btnPrimary} disabled={busy}>{busy ? "Saving…" : from === "hybrid" ? "Confirm downgrade" : "Confirm switch"}</button>
+          <button type="submit" className={styles.btnPrimary} disabled={busy}>{busy ? "Saving…" : from && MODE_RANK[to] < MODE_RANK[from] ? "Confirm downgrade" : "Confirm switch"}</button>
         </div>
       </form>
     </Dialog>

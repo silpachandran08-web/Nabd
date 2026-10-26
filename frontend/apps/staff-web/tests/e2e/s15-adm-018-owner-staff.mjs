@@ -51,7 +51,7 @@ try {
   // seat limit
   await s.page.getByRole('button', { name: 'Invite staff' }).first().click();
   await s.page.getByLabel('Name').fill('N'); await s.page.getByLabel('Email').fill('n@x.test'); await s.page.getByLabel('Mobile').fill('+910000000009');
-  await s.page.getByLabel('Role').selectOption('r-rec');
+  await s.page.getByLabel('Role', { exact: true }).selectOption('r-rec');
   await s.page.getByRole('dialog').getByRole('button', { name: 'Invite staff' }).click();
   const alert = s.page.getByRole('alert').filter({ hasText: 'seats are all in use' });
   await alert.waitFor({ timeout: 5000 });
