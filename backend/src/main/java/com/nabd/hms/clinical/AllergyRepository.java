@@ -25,14 +25,14 @@ class AllergyRepository {
     }
 
     List<AllergyRow> findActiveByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed FROM patient_allergies WHERE tenant_id = ? AND patient_id = ? AND active " +
+        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed, allergen_ingredient_id, allergen_class_id FROM patient_allergies WHERE tenant_id = ? AND patient_id = ? AND active " +
                         "ORDER BY recorded_at DESC",
                 mapper(), tenantId, patientId);
     }
 
     /** DOC-046: whole register incl. removed entries (active first), for the "show removed" view. */
     List<AllergyRow> findAllByPatient(UUID tenantId, UUID patientId) {
-        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed FROM patient_allergies WHERE tenant_id = ? AND patient_id = ? " +
+        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed, allergen_ingredient_id, allergen_class_id FROM patient_allergies WHERE tenant_id = ? AND patient_id = ? " +
                         "ORDER BY active DESC, recorded_at DESC",
                 mapper(), tenantId, patientId);
     }
@@ -47,12 +47,12 @@ class AllergyRepository {
 
     /** V1-005: row lock so a correction reads the values it is about to change, not a stale copy. */
     Optional<AllergyRow> findByIdForUpdate(UUID tenantId, UUID id) {
-        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed FROM patient_allergies WHERE tenant_id = ? AND id = ? FOR UPDATE", mapper(), tenantId, id)
+        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed, allergen_ingredient_id, allergen_class_id FROM patient_allergies WHERE tenant_id = ? AND id = ? FOR UPDATE", mapper(), tenantId, id)
                 .stream().findFirst();
     }
 
     Optional<AllergyRow> findById(UUID tenantId, UUID id) {
-        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed FROM patient_allergies WHERE tenant_id = ? AND id = ?", mapper(), tenantId, id)
+        return jdbc.query("SELECT id, tenant_id, patient_id, substance, severity, reaction, active, recorded_by, recorded_at, category, source, updated_by, updated_at, deactivated_by, deactivated_at, deactivation_reason, unconfirmed, allergen_ingredient_id, allergen_class_id FROM patient_allergies WHERE tenant_id = ? AND id = ?", mapper(), tenantId, id)
                 .stream().findFirst();
     }
 

@@ -69,7 +69,7 @@ class PrescriptionRepository {
     }
 
     List<PrescriptionItemRow> findItems(UUID tenantId, UUID prescriptionId) {
-        return jdbc.query("SELECT id, tenant_id, prescription_id, drug_name, dosage, frequency, duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, route, quantity, quantity_unit, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
+        return jdbc.query("SELECT id, tenant_id, prescription_id, drug_name, dosage, frequency, duration, instructions, allergy_override_reason, display_order, overrides, brand_name, sig_pattern, route, quantity, quantity_unit, drug_id, generic_name_snapshot, overrides::text AS overrides_json FROM prescription_items WHERE tenant_id = ? AND prescription_id = ? " +
                         "ORDER BY display_order",
                 itemMapper(), tenantId, prescriptionId);
     }
@@ -229,7 +229,7 @@ class PrescriptionRepository {
     }
 
     List<FavouriteSetItemRow> findSetItems(UUID tenantId, UUID setId) {
-        return jdbc.query("SELECT id, tenant_id, set_id, drug_name, dosage, frequency, duration, instructions, display_order, brand_name, sig_pattern, route, quantity, quantity_unit FROM favourite_rx_set_items WHERE tenant_id = ? AND set_id = ? ORDER BY display_order",
+        return jdbc.query("SELECT id, tenant_id, set_id, drug_name, dosage, frequency, duration, instructions, display_order, brand_name, sig_pattern, route, quantity, quantity_unit, drug_id, generic_name_snapshot FROM favourite_rx_set_items WHERE tenant_id = ? AND set_id = ? ORDER BY display_order",
                 (rs, i) -> new FavouriteSetItemRow(UUID.fromString(rs.getString("id")), rs.getString("drug_name"),
                         rs.getString("dosage"), rs.getString("frequency"), rs.getString("duration"),
                         rs.getString("instructions"), rs.getInt("display_order"), rs.getString("brand_name"),
