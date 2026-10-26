@@ -35,6 +35,19 @@ export const AuditLogPageSchema = z.object({ data: z.array(AuditEntryResponseSch
 export const EntrySchema = z.object({ patientId: z.string().optional(), patientName: z.string().optional(), priorNoShowCount: z.number().int().optional() });
 export const BillingLeakageResponseSchema = z.object({ entries: z.array(EntrySchema).optional(), rule: z.string().optional(), thresholdAmount: z.number().optional() });
 export const BookingSchema = z.object({ appointmentId: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), queueEntryId: z.string().optional(), status: z.string().optional(), time: z.string().optional(), token: z.number().int().optional(), visitType: z.string().optional() });
+export const BookingPolicyChangeSchema = z.object({ after: z.record(z.string(), z.unknown()).optional(), before: z.record(z.string(), z.unknown()).optional(), pointer: z.string().optional() });
+export const BookingPolicyDraftSchema = z.object({ config: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), updatedAt: z.string().optional() });
+export const BookingPolicyPublishedSchema = z.object({ config: z.record(z.string(), z.record(z.string(), z.unknown())).optional(), publishedAt: z.string().optional(), publishedBy: z.string().optional(), version: z.number().int().optional() });
+export const BookingPolicyCurrentSchema = z.object({ draft: BookingPolicyDraftSchema.optional(), published: BookingPolicyPublishedSchema.optional() });
+export const BookingPolicyDepartmentChangeSchema = z.object({ departmentId: z.string().optional(), departmentName: z.string().optional(), fromTemplate: z.string().optional(), fromVitalsEnabled: z.boolean().optional(), toVitalsEnabled: z.boolean().optional() });
+export const BookingPolicyDraftRequestSchema = z.object({ config: z.record(z.string(), z.record(z.string(), z.unknown())) });
+export const BookingPolicyDraftResponseSchema = z.object({ draft: BookingPolicyDraftSchema.optional() });
+export const BookingPolicyPresetRequestSchema = z.object({ preset: z.string() });
+export const BookingPolicyPresetResponseSchema = z.object({ changes: z.array(BookingPolicyChangeSchema).optional(), departmentWorkflowChanges: z.array(BookingPolicyDepartmentChangeSchema).optional(), draft: BookingPolicyDraftSchema.optional() });
+export const BookingPolicyPublishRequestSchema = z.object({ changeNote: z.string().min(0).max(200).optional() });
+export const BookingPolicyPublishResponseSchema = z.object({ effectiveAt: z.string().optional(), version: z.number().int().optional() });
+export const BookingPolicyVersionSchema = z.object({ changeNote: z.string().optional(), diff: z.array(BookingPolicyChangeSchema).optional(), publishedAt: z.string().optional(), publishedBy: z.string().optional(), publishedByName: z.string().optional(), version: z.number().int().optional() });
+export const BookingPolicyVersionsSchema = z.object({ items: z.array(BookingPolicyVersionSchema).optional(), nextCursor: z.string().optional() });
 export const ClinicSummaryResponseSchema = z.object({ id: z.string().optional(), name: z.string().optional(), region: z.string().optional(), slug: z.string().optional(), status: z.string().optional() });
 export const BrandWorkspaceResponseSchema = z.object({ clinics: z.array(ClinicSummaryResponseSchema).optional(), id: z.string().optional(), name: z.string().optional(), status: z.string().optional() });
 export const BreakGlassActivateRequestSchema = z.object({ patientId: z.string().optional(), reasonCode: z.string().min(1), reasonText: z.string().min(10).max(500) });
@@ -472,6 +485,11 @@ export const operationSchemas = {
   CheckoutController_otcCheckout: { body: CheckoutRequestSchema, response: InvoiceResponseSchema },
   CheckoutController_quote: { body: QuoteRequestSchema, response: QuoteResponseSchema },
   TaxHeadController_picker: { response: PickerSchema },
+  BookingPolicyController_get: { response: BookingPolicyCurrentSchema },
+  BookingPolicyController_saveDraft: { body: BookingPolicyDraftRequestSchema, response: BookingPolicyDraftResponseSchema },
+  BookingPolicyController_applyPreset: { body: BookingPolicyPresetRequestSchema, response: BookingPolicyPresetResponseSchema },
+  BookingPolicyController_publish: { body: BookingPolicyPublishRequestSchema, response: BookingPolicyPublishResponseSchema },
+  BookingPolicyController_versions: { response: BookingPolicyVersionsSchema },
   ClientTelemetryController_ingest: { body: ReportSchema },
   AllergyController_correct: { body: AllergyCorrectionRequestSchema, response: AllergyResponseSchema },
   AllergyController_deactivate: { body: AllergyRemovalRequestSchema },

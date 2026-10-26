@@ -1406,6 +1406,58 @@ paths:
       responses:
         "200": { description: "Status after acknowledging", content: { application/json: { schema: { $ref: "#/components/schemas/PrivacyNoticeStatus" } } } }
         "404": { $ref: "#/components/responses/NotFound" }
+  /booking-policy:
+    get:
+      tags: [Setup]
+      summary: Published booking policy and the current draft (ACC-008); a clinic that never published has published = null and gets the default (every booking auto-accepted)
+      x-required-permission: queue:view
+      responses:
+        "200": { description: "Published and draft", content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyCurrent" } } } }
+  /booking-policy/draft:
+    put:
+      tags: [Setup]
+      summary: Save the draft; validated against booking-policy.v1 (solo forces the reviewer to doctor)
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyDraftRequest" } } }
+      responses:
+        "200": { description: "Saved", content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyDraftResponse" } } } }
+        "400": { description: "INVALID_POLICY with pointer (JSON pointer) and rule (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /booking-policy/draft/publish:
+    post:
+      tags: [Setup]
+      summary: Publish the draft as the next version (audited before/after; existing appointments keep their policy_version)
+      x-required-permission: setup:edit
+      x-step-up: true
+      requestBody:
+        required: false
+        content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyPublishRequest" } } }
+      responses:
+        "200": { description: "Published", content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyPublishResponse" } } } }
+        "403": { description: "step-up-required (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+        "409": { description: "NO_DRAFT (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /booking-policy/draft/apply-preset:
+    post:
+      tags: [Setup]
+      summary: Fill the draft from a preset (ACC-013); only solo is available, others are 400 UNKNOWN_PRESET. Idempotent. Lists every setting changed and the departments whose vitals step changes on publish
+      x-required-permission: setup:edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyPresetRequest" } } }
+      responses:
+        "200": { description: "Draft and what changed", content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyPresetResponse" } } } }
+        "400": { description: "UNKNOWN_PRESET (problem+json)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /booking-policy/versions:
+    get:
+      tags: [Setup]
+      summary: Version history, newest first, each with its diff against the previous version
+      x-required-permission: queue:view
+      parameters:
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        "200": { description: "Versions", content: { application/json: { schema: { $ref: "#/components/schemas/BookingPolicyVersions" } } } }
   /settings/integrations/abdm:
     get:
       tags: [Setup]
@@ -2343,11 +2395,12 @@ paths:
       summary: Accept the offered slot, or book the entry into a slot the front desk chose (REC-028)
       description: >
         Without a body (or with slotStart null) this accepts the slot the entry was offered, exactly as
-        before: 409 `offer-expired` if the 15-minute offer lapsed or was used. With `slotStart` set, the
+        before: 410 `offer-expired` (code OFFER_EXPIRED) if the 15-minute offer lapsed (ACC-026), 409 `offer-expired` if it was already used,
+        400 `in-past` if the offered slot has started. With `slotStart` set, the
         entry (status waiting, offered or expired) is booked into that slot after the same checks as
         POST /appointments: 400 `in-past`, `clinic-closed`, `doctor-on-leave`, `outside-hours`, `off-grid`, 409 `session-full`, 409
         `slot-taken` (doctor already booked then). A slot currently offered to another waitlisted
-        patient is refused with 409 `slot-on-offer`; a booked/removed entry is 409 `waitlist-entry-closed`.
+        patient is refused with 409 `slot-on-offer` (code SLOT_ON_OFFER, `expiresAt`; every booking path honours a live offer, ACC-026); a booked/removed entry is 409 `waitlist-entry-closed`.
         slotStart equal to the entry's own live offer is the plain accept. If the entry held a live offer of
         a different slot, that slot is offered to the next waiting patient. Audited as
         `waitlist.booked_chosen_slot` (ids and slot only).
@@ -6009,6 +6062,89 @@ components:
         acceptedVersion: { type: [string, "null"] }
         currentVersion: { type: [string, "null"] }
         language: { type: [string, "null"] }
+    BookingPolicyConfig:
+      type: object
+      description: booking-policy.v1. Closed schema; see BookingPolicyValidator. Server-owned, read-only - presetCustomised.
+      additionalProperties: true
+    BookingPolicyPublished:
+      type: object
+      required: [version, config]
+      properties:
+        version: { type: integer }
+        config: { $ref: "#/components/schemas/BookingPolicyConfig" }
+        publishedAt: { type: string, format: date-time }
+        publishedBy: { type: [string, "null"], format: uuid }
+    BookingPolicyDraft:
+      type: object
+      required: [config]
+      properties:
+        config: { $ref: "#/components/schemas/BookingPolicyConfig" }
+        updatedAt: { type: string, format: date-time }
+    BookingPolicyCurrent:
+      type: object
+      properties:
+        published: { oneOf: [{ $ref: "#/components/schemas/BookingPolicyPublished" }, { type: "null" }] }
+        draft: { oneOf: [{ $ref: "#/components/schemas/BookingPolicyDraft" }, { type: "null" }] }
+    BookingPolicyDraftRequest:
+      type: object
+      required: [config]
+      properties: { config: { $ref: "#/components/schemas/BookingPolicyConfig" } }
+    BookingPolicyDraftResponse:
+      type: object
+      required: [draft]
+      properties: { draft: { $ref: "#/components/schemas/BookingPolicyDraft" } }
+    BookingPolicyPublishRequest:
+      type: object
+      properties: { changeNote: { type: string, maxLength: 200 } }
+    BookingPolicyPublishResponse:
+      type: object
+      required: [version, effectiveAt]
+      properties:
+        version: { type: integer }
+        effectiveAt: { type: string, format: date-time }
+    BookingPolicyChange:
+      type: object
+      required: [pointer]
+      properties:
+        pointer: { type: string }
+        before: {}
+        after: {}
+    BookingPolicyVersion:
+      type: object
+      required: [version, diff]
+      properties:
+        version: { type: integer }
+        publishedAt: { type: string, format: date-time }
+        publishedBy: { type: [string, "null"], format: uuid }
+        publishedByName: { type: [string, "null"] }
+        changeNote: { type: [string, "null"] }
+        diff: { type: array, items: { $ref: "#/components/schemas/BookingPolicyChange" } }
+    BookingPolicyVersions:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/BookingPolicyVersion" } }
+        nextCursor: { type: [string, "null"] }
+    BookingPolicyPresetRequest:
+      type: object
+      required: [preset]
+      properties: { preset: { type: string, enum: [solo, specialty_clinic, polyclinic, hospital] } }
+    BookingPolicyDepartmentChange:
+      type: object
+      required: [departmentId, toVitalsEnabled]
+      properties:
+        departmentId: { type: string, format: uuid }
+        departmentName: { type: string }
+        fromTemplate: { type: [string, "null"] }
+        fromVitalsEnabled: { type: [boolean, "null"] }
+        toVitalsEnabled: { type: boolean }
+    BookingPolicyPresetResponse:
+      type: object
+      required: [draft, changes, departmentWorkflowChanges]
+      properties:
+        draft: { $ref: "#/components/schemas/BookingPolicyDraft" }
+        changes: { type: array, items: { $ref: "#/components/schemas/BookingPolicyChange" } }
+        departmentWorkflowChanges: { type: array, items: { $ref: "#/components/schemas/BookingPolicyDepartmentChange" } }
     AbdmSettings:
       type: object
       required: [enabled, hfrVerified]

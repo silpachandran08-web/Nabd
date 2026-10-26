@@ -55,6 +55,18 @@ schemas:
       is_follow_up: operational
       arrived_at: operational
       booking_kind: operational
+      policy_version: operational
+    booking_policy_versions:
+      id: operational
+      tenant_id: operational
+      version: operational
+      status: operational
+      config: operational
+      change_note: operational
+      created_by: operational
+      published_by: operational
+      published_at: operational
+      updated_at: operational
     attendance_records:
       id: operational
       tenant_id: operational
