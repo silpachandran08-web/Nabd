@@ -22,7 +22,7 @@ export type AllergyStatusResponse = { activeCount?: number; documentedAt?: strin
 export type AllergyWriteRequest = { category?: string; reaction?: string; severity: string; source?: string; substance: string; };
 export type Answer = { label?: string; nextQuestion?: string; outcome?: string; };
 export type AppointmentPage = { data?: Array<AppointmentResponse>; page?: PageMeta; };
-export type AppointmentResponse = { cancelReason?: string; doctorId?: string; endTime?: string; id?: string; isFollowUp?: boolean; patientId?: string; startTime?: string; status?: string; };
+export type AppointmentResponse = { bookingKind?: string; cancelReason?: string; doctorId?: string; endTime?: string; expectedRange?: string; id?: string; isFollowUp?: boolean; patientId?: string; sessionToken?: number; startTime?: string; status?: string; };
 export type AppointmentWriteRequest = { doctorId: string; followUpOrDefault?: boolean; isFollowUp?: boolean; patientId: string; startTime: string; };
 export type ApproveRefundRequest = { expectedAmount?: number; };
 export type ApproveRequest = { approvedBy: string; csoApprovalRef: string; };
@@ -36,6 +36,8 @@ export type BreakGlassActivateResponse = { accessToken?: string; expiresAt?: str
 export type BreakGlassAlertResponse = { items?: Array<Item>; };
 export type BreakGlassListResponse = { items?: Array<BreakGlassResponse>; };
 export type BreakGlassResponse = { activatedAt?: string; expiresAt?: string; grantId?: string; reasonCode?: string; staffName?: string; };
+export type CallNextRequest = { expectedHeadId?: string; };
+export type CallNextResponse = { entry?: QueueEntryResponse; reason?: string; };
 export type CallbackEntryResponse = { appointmentId?: string; doctorId?: string; patientId?: string; patientName?: string; startTime?: string; status?: string; };
 export type CancelRequest = { reason: string; };
 export type Cell = { bookings?: Array<Booking>; doctorId?: string; kind?: string; slotStart?: string; };
@@ -284,7 +286,7 @@ export type ProcedureStatusRequest = { status?: string; };
 export type ProvisioningJobResponse = { approvedAt?: string; createdTenantId?: string; id?: string; ownerAccountInviteToken?: string; ownerInviteToken?: string; path?: string; region?: string; status?: string; steps?: Array<ProvisioningStepResponse>; tenantName?: string; tenantSlug?: string; };
 export type ProvisioningStepResponse = { completedAt?: string; errorDetail?: string; startedAt?: string; status?: string; stepName?: string; stepOrder?: number; };
 export type Question = { answers?: Array<Answer>; id?: string; text?: string; };
-export type QueueEntryResponse = { ageYears?: number; appointmentId?: string; appointmentStatus?: string; createdAt?: string; currentStage?: string; departmentId?: string; doctorId?: string; doctorName?: string; encounterClass?: string; encounterId?: string; gender?: string; id?: string; parentQueueEntryId?: string; patientId?: string; paymentMode?: string; presentingComplaint?: string; priority?: boolean; priorityAcknowledgedAt?: string; priorityAcknowledgedBy?: string; priorityFlaggedAt?: string; priorityFlaggedBy?: string; priorityReason?: string; queueDate?: string; source?: string; status?: string; tokenNumber?: number; transferReason?: string; transferReasonNote?: string; visitType?: string; waitMinutes?: number; workflowDefinitionId?: string; };
+export type QueueEntryResponse = { ageYears?: number; appointmentId?: string; appointmentStatus?: string; createdAt?: string; currentStage?: string; departmentId?: string; doctorId?: string; doctorName?: string; encounterClass?: string; encounterId?: string; expectedRange?: string; gender?: string; id?: string; orderReason?: string; parentQueueEntryId?: string; patientId?: string; paymentMode?: string; position?: number; presentingComplaint?: string; priority?: boolean; priorityAcknowledgedAt?: string; priorityAcknowledgedBy?: string; priorityFlaggedAt?: string; priorityFlaggedBy?: string; priorityReason?: string; queueDate?: string; source?: string; status?: string; tokenNumber?: number; transferReason?: string; transferReasonNote?: string; visitType?: string; waitMinutes?: number; workflowDefinitionId?: string; };
 export type QueueReorderRequest = { priority: boolean; reason: string; };
 export type QueueStatusUpdateRequest = { expectedStatus?: string; status: string; };
 export type QuoteRequest = { buyerGstin?: string; discounts?: Array<DiscountRequest>; lines: Array<LineItemRequest>; };
@@ -332,6 +334,8 @@ export type SellPackageRequest = { packageId: string; patientId: string; payment
 export type Service = { name?: string; revenue?: number; };
 export type Session = { end?: string; label?: string; rows?: Array<Row>; start?: string; stepMinutes?: number; };
 export type SessionActionRequest = { reasonCode?: string; };
+export type SessionAvailability = { expectedRange?: string; id?: string; label?: string; mode?: string; onlineLeft?: number; slots?: Array<string>; tokensLeft?: number; };
+export type SessionAvailabilityResponse = { sessions?: Array<SessionAvailability>; };
 export type SessionCount = { booked?: number; free?: number; label?: string; };
 export type SessionResponse = { current?: boolean; device?: string; id?: string; ip?: string; lastSeenAt?: string; };
 export type SetupChecklistItemResponse = { doneAt?: string; skippedAt?: string; status?: string; step?: string; };
@@ -405,8 +409,8 @@ export type WaitlistEntryResponse = { bookedAppointmentId?: string; doctorId?: s
 export type WaitlistJoinRequest = { doctorId: string; patientId: string; };
 export type WithdrawConsentRequest = { consentType?: string; };
 export type WorkflowTemplateResponse = { code?: string; name?: string; steps?: Array<string>; toggleKeys?: Array<string>; };
-export type WorkingHoursResponse = { dayOfWeek?: number; endTime?: string; id?: string; maxPatients?: number; slotMinutes?: number; startTime?: string; };
-export type WorkingHoursWriteRequest = { dayOfWeek: number; endTime: string; maxPatients?: number; slotMinutes?: number; startTime: string; };
+export type WorkingHoursResponse = { dayOfWeek?: number; effectiveFrom?: string; endTime?: string; id?: string; label?: string; lateGraceMinutes?: number; maxPatients?: number; onlineCap?: number; reservedWalkInTimes?: Array<string>; sessionMode?: string; slotMinutes?: number; startTime?: string; walkInMode?: string; walkInRatio?: number; };
+export type WorkingHoursWriteRequest = { dayOfWeek: number; effectiveFrom?: string; endTime: string; label?: string; lateGraceMinutes?: number; maxPatients?: number; onlineCap?: number; reservedWalkInTimes?: Array<string>; sessionMode?: string; slotMinutes?: number; startTime: string; walkInMode?: string; walkInRatio?: number; };
 export type WorklistItem = { entry?: QueueEntryResponse; patient?: PatientDetailResponse; vitals?: VitalsResponse; };
 export type WorklistResponse = { items?: Array<WorklistItem>; };
 export type WorkspaceSelectRequest = { clinicId: string; };
@@ -535,6 +539,7 @@ export type Operations = {
   DepartmentController_getWorkflow: { method: "get"; path: "/v1/departments/{id}/workflow"; permission: "departments:view"; pathParams: { id: string; }; query: never; body: never; response: DepartmentWorkflowResponse };
   DepartmentController_replaceWorkflow: { method: "post"; path: "/v1/departments/{id}/workflow"; permission: "departments:edit"; pathParams: { id: string; }; query: never; body: DepartmentWorkflowRequest; response: DepartmentWorkflowResponse };
   ScheduleController_availability: { method: "get"; path: "/v1/doctors/{id}/availability"; permission: "queue:view"; pathParams: { id: string; }; query: { date: string; }; body: never; response: Array<string> };
+  ScheduleController_sessionAvailability: { method: "get"; path: "/v1/doctors/{id}/availability/sessions"; permission: "queue:view"; pathParams: { id: string; }; query: { date: string; }; body: never; response: SessionAvailabilityResponse };
   ScheduleController_delayHistory: { method: "get"; path: "/v1/doctors/{id}/delay"; permission: "queue:view"; pathParams: { id: string; }; query: never; body: never; response: Array<DoctorDelayResponse> };
   ScheduleController_announceDelay: { method: "post"; path: "/v1/doctors/{id}/delay"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: DelayAnnounceRequest; response: DoctorDelayResponse };
   ScheduleController_clearDelay: { method: "post"; path: "/v1/doctors/{id}/delay/clear"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
@@ -675,6 +680,7 @@ export type Operations = {
   PublicNoticeController_page: { method: "get"; path: "/v1/public/notices/{tenantSlug}/{version}"; permission: "public"; pathParams: { tenantSlug: string; version: string; }; query: { lang?: string; }; body: never; response: string };
   QueueController_list: { method: "get"; path: "/v1/queue"; permission: "queue:view"; pathParams: never; query: { doctorId?: string; departmentId?: string; date?: string; priority?: boolean; }; body: never; response: Array<QueueEntryResponse> };
   QueueController_checkIn: { method: "post"; path: "/v1/queue/check-in"; permission: "queue:create"; pathParams: never; query: never; body: CheckInRequest; response: QueueEntryResponse };
+  QueueController_callNext: { method: "post"; path: "/v1/queue/doctors/{doctorId}/call-next"; permission: "queue:edit"; pathParams: { doctorId: string; }; query: never; body: CallNextRequest; response: CallNextResponse };
   QueueController_waitEstimate: { method: "get"; path: "/v1/queue/wait-estimate"; permission: "queue:view"; pathParams: never; query: { doctorId: string; }; body: never; response: WaitEstimateResponse };
   QueueController_extend: { method: "post"; path: "/v1/queue/{id}/extend"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: ConsultExtendRequest; response: ConsultExtendResponse };
   QueueController_acknowledgePriority: { method: "post"; path: "/v1/queue/{id}/priority/acknowledge"; permission: "queue:edit"; pathParams: { id: string; }; query: never; body: never; response: QueueEntryResponse };

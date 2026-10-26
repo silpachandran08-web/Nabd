@@ -20,22 +20,30 @@ export function WorkingHoursDialog({ existing, editing, onClose, onSave }: {
   const [end, setEnd] = useState(editing ? hhmm(editing.endTime) : "13:00");
   const [slot, setSlot] = useState(String(editing?.slotMinutes ?? 15));
   const [cap, setCap] = useState(editing?.maxPatients != null ? String(editing.maxPatients) : "");
+  // ACC-011/012: how the session is run
+  const [mode, setMode] = useState(editing?.sessionMode ?? "slot");
+  const [onlineCap, setOnlineCap] = useState(editing?.onlineCap != null ? String(editing.onlineCap) : "");
+  const [label, setLabel] = useState(editing?.label ?? "");
+  const [ratio, setRatio] = useState(String(editing?.walkInRatio ?? 3));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    const onlineN = onlineCap.trim() === "" ? undefined : Number(onlineCap);
     const slotN = Number(slot);
     const capN = cap.trim() === "" ? null : Number(cap);
     if (!start || !end || toMin(end) <= toMin(start)) return setError("The end time must be after the start time.");
     if (!Number.isInteger(slotN) || slotN < 5 || slotN > 240) return setError("Slot length must be a whole number between 5 and 240 minutes.");
     if (toMin(end) - toMin(start) < slotN) return setError("The block is shorter than one slot.");
     if (capN !== null && (!Number.isInteger(capN) || capN < 1)) return setError("Maximum patients must be 1 or more, or left empty for no cap.");
+    if (mode !== "slot" && capN === null) return setError("Token and mixed sessions need a maximum number of patients.");
+    if (onlineN !== undefined && (!Number.isInteger(onlineN) || onlineN < 0 || (capN !== null && onlineN > capN))) return setError("The online cap must be a whole number, not more than the maximum patients.");
     const clash = existing.find((h) => h.id !== editing?.id && h.dayOfWeek === day && toMin(start) < toMin(h.endTime) && toMin(h.startTime) < toMin(end));
     if (clash) return setError(`This overlaps your existing ${WEEKDAYS[day]} block ${hhmm(clash.startTime)}–${hhmm(clash.endTime)}.`);
     setBusy(true);
-    const err = await onSave({ dayOfWeek: day, startTime: start, endTime: end, slotMinutes: slotN, maxPatients: capN });
+    const err = await onSave({ dayOfWeek: day, startTime: start, endTime: end, slotMinutes: slotN, maxPatients: capN, sessionMode: mode as WorkingHoursInput["sessionMode"], onlineCap: onlineN, label: label.trim() || undefined, walkInRatio: Number(ratio) });
     setBusy(false);
     if (err) setError(err); else onClose();
   }
@@ -56,6 +64,25 @@ export function WorkingHoursDialog({ existing, editing, onClose, onSave }: {
           <label className={styles.field}>Slot length (minutes)<input className={styles.input} inputMode="numeric" value={slot} onChange={(e) => setSlot(e.target.value)} /></label>
           <label className={styles.field}>Max patients (optional)<input className={styles.input} inputMode="numeric" value={cap} onChange={(e) => setCap(e.target.value)} placeholder="No cap" /></label>
         </div>
+        <div className={styles.two}>
+          <label className={styles.field}>Session type
+            <select className={styles.input} value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="slot">Timed appointments</option>
+              <option value="token">Tokens (numbered places)</option>
+              <option value="hybrid">Appointments + walk-in tokens</option>
+            </select>
+          </label>
+          <label className={styles.field}>Online booking cap (optional)<input className={styles.input} inputMode="numeric" value={onlineCap} onChange={(e) => setOnlineCap(e.target.value)} placeholder="Same as max" /></label>
+        </div>
+        <div className={styles.two}>
+          <label className={styles.field}>Name (optional)<input className={styles.input} value={label} maxLength={60} onChange={(e) => setLabel(e.target.value)} placeholder="Evening OPD" /></label>
+          <label className={styles.field}>Walk-ins after every
+            <select className={styles.input} value={ratio} onChange={(e) => setRatio(e.target.value)}>
+              <option value="2">2 booked patients</option><option value="3">3 booked patients</option><option value="4">4 booked patients</option>
+            </select>
+          </label>
+        </div>
+        {editing && mode !== editing.sessionMode && <p className={styles.note}><Icon name="info" size={12} /> A new session type applies from tomorrow; bookings already made stay as they are.</p>}
         <p className={styles.note}><Icon name="info" size={12} /> {editing ? "This changes the block for every week." : "This adds a block to your weekly pattern."}</p>
         {error && <p className={styles.error} role="alert"><Icon name="alert" size={14} /> {error}</p>}
         <div className={styles.formActions}>
