@@ -1,7 +1,7 @@
 "use client";
 
 import { BUILTIN_PAPER, DOC_TYPES, PAPERS, isPaper, policyKey, type DocType } from "@nabd/ui";
-import styles from "../../setup/setup.module.css";
+import styles from "../../(clinic)/setup/setup.module.css";
 
 // FEF-046: the clinic's default paper per document type (policy print.default_paper.<type>). No row = the built-in default.
 const LABEL: Record<DocType, string> = { token_slip: "Token slip", rx: "Prescription", document: "Clinical documents", invoice: "Tax invoice", receipt: "Receipt" };

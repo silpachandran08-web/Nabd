@@ -1,4 +1,4 @@
-import PlannedScreen from "../shell/PlannedScreen";
+import PlannedScreen from "../../shell/PlannedScreen";
 
 export default function Page() {
   return <PlannedScreen id="messages" />;

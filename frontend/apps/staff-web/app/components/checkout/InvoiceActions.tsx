@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, ApiError, intentKeys } from "../../lib/api";
 import { can } from "../../lib/permissions";
-import styles from "../../checkout/checkout.module.css";
+import styles from "../../(clinic)/checkout/checkout.module.css";
 
 // FEF-047: after a payment, the cashier prints the receipt (Enter), prints the invoice, or sends the PDF link on WhatsApp.
 // Print opens the print route (which prints as soon as the document is on screen). Share calls POST /billing/invoices/{id}/share

@@ -4,14 +4,14 @@ import { Suspense, useEffect, useMemo } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { isPaper, type Paper } from "@nabd/ui";
-import Icon from "../../../../components/ui/Icon";
-import { EmptyState, ErrorState, Skeleton } from "../../../../components/ui/StateViews";
-import { InvoiceSheet } from "../../../../components/checkout/InvoiceSheet";
-import { buildInvoiceView, documentProblem, type InvoiceDocument } from "../../../../components/checkout/invoiceDocument";
-import { api, ApiError } from "../../../../lib/api";
-import { key } from "../../../../lib/query";
-import { usePrintPaper } from "../../../../lib/usePrintPaper";
-import { formatClinicDate, formatClinicTime } from "../../../../lib/clinicTime";
+import Icon from "../../../../../components/ui/Icon";
+import { EmptyState, ErrorState, Skeleton } from "../../../../../components/ui/StateViews";
+import { InvoiceSheet } from "../../../../../components/checkout/InvoiceSheet";
+import { buildInvoiceView, documentProblem, type InvoiceDocument } from "../../../../../components/checkout/invoiceDocument";
+import { api, ApiError } from "../../../../../lib/api";
+import { key } from "../../../../../lib/query";
+import { usePrintPaper } from "../../../../../lib/usePrintPaper";
+import { formatClinicDate, formatClinicTime } from "../../../../../lib/clinicTime";
 import styles from "../../../../checkout/checkout.module.css";
 
 // FEF-047: print route for one invoice or receipt. ?kind=receipt|invoice, ?paper=a4|a5|80mm (else the clinic default),
