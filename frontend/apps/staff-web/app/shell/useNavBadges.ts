@@ -11,7 +11,7 @@ import type { BadgeSource, RoleContext } from "./navRegistry";
 export const WAITING_STATUSES = ["checked_in", "waiting", "billing_pending", "vitals_pending", "vitals_done"];
 const count = <T,>(rows: T[] | undefined, keep: (r: T) => boolean) => (Array.isArray(rows) ? rows.filter(keep).length : undefined);
 
-export function useNavBadges(role: RoleContext | null, perms: readonly string[], pathname: string | null) {
+export function useNavBadges(role: RoleContext | null, perms: readonly string[], pathname: string | null, refresh = true) {
   const me = role ? selfStaffId() : "";
   const q = perms.includes("queue:view");
   const reception = useQuery({ ...queueQuery(), enabled: role === "reception" && q }).data;
@@ -21,9 +21,10 @@ export function useNavBadges(role: RoleContext | null, perms: readonly string[],
   const qc = useQueryClient();
   // Refresh on every navigation as before; a newer refresh cancels a slower one still in flight (FEF-004).
   useEffect(() => {
+    if (!refresh) return; // a second caller (ShellHotkeys) must not cancel and re-issue the sidebar's refetch
     void qc.refetchQueries({ queryKey: prefix("queue"), type: "active" });
     void qc.refetchQueries({ queryKey: adminOrdersQuery().queryKey, type: "active" });
-  }, [pathname, qc]);
+  }, [pathname, qc, refresh]);
   const badges: Record<BadgeSource, number | undefined> = {
     waiting: count(reception, (r) => WAITING_STATUSES.includes(r.status ?? "")),
     checkout: count(reception, (r) => r.status === "checkout_pending"),

@@ -146,4 +146,6 @@
   .primaryAction { padding: 0 var(--nb-space-12); white-space: nowrap; }
   .syncPill { padding: 0 var(--nb-space-8); }
   .syncTime { display: none; }
+  .langLabel { display: none; }
+  .langSelect { max-inline-size: 56px; }
 }
