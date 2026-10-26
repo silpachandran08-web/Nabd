@@ -659,6 +659,92 @@ paths:
       tags:
       - queue
       x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/booking-offers/{offerId}/choose:
+    post:
+      operationId: InternalBookingRequestController_choose
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: offerId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalBookingOfferChoice"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: authenticated
+  /internal/v1/tenants/{tid}/booking-requests:
+    post:
+      operationId: InternalBookingRequestController_route
+      parameters:
+      - in: path
+        name: tid
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalBookingRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: authenticated
   /internal/v1/tenants/{tid}/households/{phoneHash}:
     get:
       operationId: InternalHouseholdController_household
@@ -2088,6 +2174,197 @@ paths:
       tags:
       - billing
       x-required-permission: setup:view
+  /v1/booking-requests:
+    get:
+      operationId: BookingRequestController_list
+      parameters:
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          default: requested
+      - in: query
+        name: doctorId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/BookingRequestPage"
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:create
+  /v1/booking-requests/{id}/accept:
+    post:
+      operationId: BookingRequestController_accept
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequestAcceptBody"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:create
+  /v1/booking-requests/{id}/decline:
+    post:
+      operationId: BookingRequestController_decline
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequestDeclineBody"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:create
+  /v1/booking-requests/{id}/suggest:
+    post:
+      operationId: BookingRequestController_suggest
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequestSuggestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+          description: OK
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Not authenticated
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Permission missing
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: Error (RFC 7807)
+      tags:
+      - queue
+      x-required-permission: queue:create
   /v1/client-telemetry:
     post:
       operationId: ClientTelemetryController_ingest
@@ -14348,6 +14625,10 @@ components:
       properties:
         cancelReason:
           type: string
+        channel:
+          type: string
+        decisionSource:
+          type: string
         doctorId:
           type: string
           format: uuid
@@ -14487,6 +14768,93 @@ components:
           format: int32
         visitType:
           type: string
+    BookingRequestAcceptBody:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 280
+          minLength: 0
+        slotStart:
+          type: string
+          format: date-time
+    BookingRequestDeclineBody:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 280
+          minLength: 0
+        reasonCode:
+          type: string
+    BookingRequestItem:
+      type: object
+      properties:
+        appointmentId:
+          type: string
+          format: uuid
+        channel:
+          type: string
+        doctorId:
+          type: string
+          format: uuid
+        patient:
+          $ref: "#/components/schemas/BookingRequestPatient"
+        reviewReason:
+          type: string
+        slaDueAt:
+          type: string
+          format: date-time
+        start:
+          type: string
+          format: date-time
+        status:
+          type: string
+        suggestedAlternative:
+          type: string
+          format: date-time
+        triageFlags:
+          type: array
+          items:
+            type: string
+    BookingRequestPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BookingRequestItem"
+        nextCursor:
+          type: string
+        stats:
+          $ref: "#/components/schemas/BookingRequestStats"
+    BookingRequestPatient:
+      type: object
+      properties:
+        age:
+          type: integer
+          format: int32
+        displayName:
+          type: string
+        isNew:
+          type: boolean
+    BookingRequestStats:
+      type: object
+      properties:
+        autoAccepted:
+          type: integer
+          format: int32
+        medianReplySeconds:
+          type: number
+          format: double
+    BookingRequestSuggestBody:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            type: string
+            format: date-time
     BrandWorkspaceResponse:
       type: object
       properties:
@@ -16615,6 +16983,49 @@ components:
       - doctorId
       - patientRef
       - startTime
+    InternalBookingOfferChoice:
+      type: object
+      properties:
+        patientRef:
+          type: string
+          minLength: 1
+        slotStart:
+          type: string
+          format: date-time
+      required:
+      - patientRef
+    InternalBookingRequest:
+      type: object
+      properties:
+        channel:
+          type: string
+          minLength: 1
+        doctorId:
+          type: string
+          format: uuid
+        group:
+          type: boolean
+        note:
+          type: string
+          maxLength: 280
+          minLength: 0
+        patientRef:
+          type: string
+          minLength: 1
+        slotStart:
+          type: string
+          format: date-time
+        triageFlags:
+          type: array
+          items:
+            type: string
+        visitType:
+          type: string
+      required:
+      - channel
+      - doctorId
+      - patientRef
+      - slotStart
     InternalDoctorSessions:
       type: object
       properties:

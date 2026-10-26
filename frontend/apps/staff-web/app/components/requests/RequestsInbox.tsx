@@ -40,8 +40,8 @@ export default function RequestsInbox() {
       else setDialog({ kind: act, item: cur });
       e.preventDefault();
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   });
   useEffect(() => { rows.current[sel]?.scrollIntoView?.({ block: "nearest" }); }, [sel]);
 

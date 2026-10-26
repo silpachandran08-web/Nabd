@@ -23,7 +23,7 @@ export const AllergyResponseSchema = z.object({ active: z.boolean().optional(), 
 export const AllergyStatusResponseSchema = z.object({ activeCount: z.number().int().optional(), documentedAt: z.string().optional(), documentedBy: z.string().optional(), documentedByName: z.string().optional(), state: z.string().optional() });
 export const AllergyWriteRequestSchema = z.object({ category: z.string().optional(), reaction: z.string().min(0).max(500).optional(), severity: z.string().min(1), source: z.string().optional(), substance: z.string().min(0).max(200) });
 export const AnswerSchema = z.object({ label: z.string().optional(), nextQuestion: z.string().optional(), outcome: z.string().optional() });
-export const AppointmentResponseSchema = z.object({ cancelReason: z.string().optional(), doctorId: z.string().optional(), endTime: z.string().optional(), id: z.string().optional(), isFollowUp: z.boolean().optional(), patientId: z.string().optional(), startTime: z.string().optional(), status: z.string().optional() });
+export const AppointmentResponseSchema = z.object({ cancelReason: z.string().optional(), channel: z.string().optional(), decisionSource: z.string().optional(), doctorId: z.string().optional(), endTime: z.string().optional(), id: z.string().optional(), isFollowUp: z.boolean().optional(), patientId: z.string().optional(), startTime: z.string().optional(), status: z.string().optional() });
 export const PageMetaSchema = z.object({ limit: z.number().int().optional(), nextCursor: z.string().optional() });
 export const AppointmentPageSchema = z.object({ data: z.array(AppointmentResponseSchema).optional(), page: PageMetaSchema.optional() });
 export const AppointmentWriteRequestSchema = z.object({ doctorId: z.string(), followUpOrDefault: z.boolean().optional(), isFollowUp: z.boolean().optional(), patientId: z.string(), startTime: z.string() });
@@ -35,6 +35,13 @@ export const AuditLogPageSchema = z.object({ data: z.array(AuditEntryResponseSch
 export const EntrySchema = z.object({ patientId: z.string().optional(), patientName: z.string().optional(), priorNoShowCount: z.number().int().optional() });
 export const BillingLeakageResponseSchema = z.object({ entries: z.array(EntrySchema).optional(), rule: z.string().optional(), thresholdAmount: z.number().optional() });
 export const BookingSchema = z.object({ appointmentId: z.string().optional(), patientId: z.string().optional(), patientName: z.string().optional(), queueEntryId: z.string().optional(), status: z.string().optional(), time: z.string().optional(), token: z.number().int().optional(), visitType: z.string().optional() });
+export const BookingRequestAcceptBodySchema = z.object({ note: z.string().min(0).max(280).optional(), slotStart: z.string().optional() });
+export const BookingRequestDeclineBodySchema = z.object({ note: z.string().min(0).max(280).optional(), reasonCode: z.string().optional() });
+export const BookingRequestPatientSchema = z.object({ age: z.number().int().optional(), displayName: z.string().optional(), isNew: z.boolean().optional() });
+export const BookingRequestItemSchema = z.object({ appointmentId: z.string().optional(), channel: z.string().optional(), doctorId: z.string().optional(), patient: BookingRequestPatientSchema.optional(), reviewReason: z.string().optional(), slaDueAt: z.string().optional(), start: z.string().optional(), status: z.string().optional(), suggestedAlternative: z.string().optional(), triageFlags: z.array(z.string()).optional() });
+export const BookingRequestStatsSchema = z.object({ autoAccepted: z.number().int().optional(), medianReplySeconds: z.number().optional() });
+export const BookingRequestPageSchema = z.object({ items: z.array(BookingRequestItemSchema).optional(), nextCursor: z.string().optional(), stats: BookingRequestStatsSchema.optional() });
+export const BookingRequestSuggestBodySchema = z.object({ slots: z.array(z.string()).optional() });
 export const ClinicSummaryResponseSchema = z.object({ id: z.string().optional(), name: z.string().optional(), region: z.string().optional(), slug: z.string().optional(), status: z.string().optional() });
 export const BrandWorkspaceResponseSchema = z.object({ clinics: z.array(ClinicSummaryResponseSchema).optional(), id: z.string().optional(), name: z.string().optional(), status: z.string().optional() });
 export const BreakGlassActivateRequestSchema = z.object({ patientId: z.string().optional(), reasonCode: z.string().min(1), reasonText: z.string().min(10).max(500) });
@@ -183,6 +190,8 @@ export const InternalSessionSchema = z.object({ date: z.string().optional(), id:
 export const InternalDoctorSessionsSchema = z.object({ doctorId: z.string().optional(), sessions: z.array(InternalSessionSchema).optional() });
 export const InternalAvailabilitySchema = z.object({ doctors: z.array(InternalDoctorSessionsSchema).optional(), v: z.number().int().optional() });
 export const InternalBookRequestSchema = z.object({ doctorId: z.string(), patientRef: z.string().min(1), startTime: z.string() });
+export const InternalBookingOfferChoiceSchema = z.object({ patientRef: z.string().min(1), slotStart: z.string().optional() });
+export const InternalBookingRequestSchema = z.object({ channel: z.string().min(1), doctorId: z.string(), group: z.boolean().optional(), note: z.string().min(0).max(280).optional(), patientRef: z.string().min(1), slotStart: z.string(), triageFlags: z.array(z.string()).optional(), visitType: z.string().optional() });
 export const TaxPartSchema = z.object({ amountMinor: z.number().int().optional(), ratePercent: z.number().optional(), type: z.string().optional() });
 export const LineItemResponseSchema = z.object({ category: z.string().optional(), chargeCode: z.string().optional(), chargeName: z.string().optional(), lineTotal: z.number().optional(), listUnitPrice: z.number().optional(), overrideReason: z.string().optional(), quantity: z.number().int().optional(), taxRatePercent: z.number().optional(), taxableMinor: z.number().int().optional(), taxes: z.array(TaxPartSchema).optional(), tier: z.string().optional(), unitPrice: z.number().optional() });
 export const PaymentResponseSchema = z.object({ amount: z.number().optional(), id: z.string().optional(), idempotencyKey: z.string().optional(), method: z.string().optional(), recordedAt: z.string().optional() });
@@ -431,6 +440,8 @@ export const operationSchemas = {
   InternalSchedulingController_book: { body: InternalBookRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalSchedulingController_act: { body: InternalAppointmentActionRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalSchedulingController_availability: { response: InternalAvailabilitySchema },
+  InternalBookingRequestController_choose: { body: InternalBookingOfferChoiceSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  InternalBookingRequestController_route: { body: InternalBookingRequestSchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   InternalHouseholdController_household: { response: z.record(z.string(), z.array(HouseholdMemberSchema)) },
   AppointmentController_list: { response: AppointmentPageSchema },
   AppointmentController_book: { body: AppointmentWriteRequestSchema, response: AppointmentResponseSchema },
@@ -472,6 +483,10 @@ export const operationSchemas = {
   CheckoutController_otcCheckout: { body: CheckoutRequestSchema, response: InvoiceResponseSchema },
   CheckoutController_quote: { body: QuoteRequestSchema, response: QuoteResponseSchema },
   TaxHeadController_picker: { response: PickerSchema },
+  BookingRequestController_list: { response: BookingRequestPageSchema },
+  BookingRequestController_accept: { body: BookingRequestAcceptBodySchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  BookingRequestController_decline: { body: BookingRequestDeclineBodySchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
+  BookingRequestController_suggest: { body: BookingRequestSuggestBodySchema, response: z.record(z.string(), z.record(z.string(), z.unknown())) },
   ClientTelemetryController_ingest: { body: ReportSchema },
   AllergyController_correct: { body: AllergyCorrectionRequestSchema, response: AllergyResponseSchema },
   AllergyController_deactivate: { body: AllergyRemovalRequestSchema },
