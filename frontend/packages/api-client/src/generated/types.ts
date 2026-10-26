@@ -162,6 +162,7 @@ export type InternalAvailability = { doctors?: Array<InternalDoctorSessions>; v?
 export type InternalBookRequest = { doctorId: string; patientRef: string; startTime: string; };
 export type InternalDoctorSessions = { doctorId?: string; sessions?: Array<InternalSession>; };
 export type InternalSession = { date?: string; id?: string; mode?: string; slots?: Array<string>; tokensLeft?: number; };
+export type InviteResendResponse = { expiresAt?: string; inviteId?: string; inviteToken?: string; };
 export type InvoiceResponse = { balanceDue?: number; buyerGstin?: string; createdAt?: string; currency?: string; discount?: number; doctorId?: string; doctorName?: string; documentTitle?: string; id?: string; invoiceNumber?: string; lineItems?: Array<LineItemResponse>; paid?: number; patientId?: string; patientName?: string; payments?: Array<PaymentResponse>; queueEntryId?: string; roundOff?: number; status?: string; subtotal?: number; tax?: number; total?: number; };
 export type InvoiceSeriesConfigRequest = { fyStartMonth?: number; prefixPattern: string; taxRegistrationId?: string; };
 export type InvoiceSeriesListResponse = { items?: Array<InvoiceSeriesResponse>; };
@@ -334,13 +335,15 @@ export type Session = { end?: string; label?: string; rows?: Array<Row>; start?:
 export type SessionActionRequest = { reasonCode?: string; };
 export type SessionCount = { booked?: number; free?: number; label?: string; };
 export type SessionResponse = { current?: boolean; device?: string; id?: string; ip?: string; lastSeenAt?: string; };
-export type SetupChecklistItemResponse = { doneAt?: string; skippedAt?: string; status?: string; step?: string; };
+export type SetupChecklistItemResponse = { doneAt?: string; draft?: JsonNode; skippedAt?: string; status?: string; step?: string; updatedAt?: string; version?: number; };
+export type SetupDraftRequest = { draft: JsonNode; version: number; };
+export type SetupDraftResponse = { step?: string; version?: number; };
 export type SourceBreakdownResponse = { revenue?: number; source?: string; untaggedCount?: number; visitCount?: number; };
 export type SseEmitter = { timeout?: number; };
 export type StaffHpr = { hprId?: string; hprVerified?: boolean; staffId?: string; };
 export type StaffHprRequest = { hprId: string; };
 export type StaffInviteRequest = { departmentId?: string; email: string; mobilePhone: string; name: string; roleId: string; scope?: string; };
-export type StaffInviteResponse = { inviteToken?: string; staff?: StaffResponse; };
+export type StaffInviteResponse = { expiresAt?: string; inviteId?: string; inviteToken?: string; staff?: StaffResponse; };
 export type StaffPage = { data?: Array<StaffResponse>; page?: PageMeta; };
 export type StaffPatchRequest = { clinician?: boolean; departmentId?: string; fieldGrants?: Array<string>; professionalRegistrationNo?: string; roleId?: string; scope?: string; };
 export type StaffPerformanceReport = { rows?: Array<StaffPerformanceResponse>; scopeNote?: string; };
@@ -714,6 +717,7 @@ export type Operations = {
   TaxHeadController_setTax: { method: "patch"; path: "/v1/setup/charges/{id}/tax"; permission: "setup:edit"; pathParams: { id: string; }; query: never; body: Request; response: Response };
   SetupController_checklist: { method: "get"; path: "/v1/setup/checklist"; permission: "setup:view"; pathParams: never; query: never; body: never; response: Array<SetupChecklistItemResponse> };
   SetupController_completeStep: { method: "post"; path: "/v1/setup/checklist/{step}/complete"; permission: "setup:edit"; pathParams: { step: string; }; query: never; body: never; response: void };
+  SetupDraftController_save: { method: "put"; path: "/v1/setup/checklist/{step}/draft"; permission: "setup:edit"; pathParams: { step: string; }; query: never; body: SetupDraftRequest; response: SetupDraftResponse };
   SetupController_skipStep: { method: "post"; path: "/v1/setup/checklist/{step}/skip"; permission: "setup:edit"; pathParams: { step: string; }; query: never; body: never; response: void };
   SetupController_consentContact: { method: "get"; path: "/v1/setup/consent-contact"; permission: "setup:view"; pathParams: never; query: never; body: never; response: ConsentContactResponse };
   SetupController_updateConsentContact: { method: "patch"; path: "/v1/setup/consent-contact"; permission: "setup:edit"; pathParams: never; query: never; body: ConsentContactWriteRequest; response: ConsentContactResponse };
@@ -767,6 +771,8 @@ export type Operations = {
   StaffLicenceController_put: { method: "put"; path: "/v1/staff/{id}/clinical-licence"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: LicenceRequest; response: LicenceResponse };
   StaffLicenceController_override: { method: "post"; path: "/v1/staff/{id}/clinical-licence/override"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: OverrideRequest; response: LicenceResponse };
   StaffHprController_put: { method: "put"; path: "/v1/staff/{id}/hpr"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: StaffHprRequest; response: StaffHpr };
+  StaffAccessController_resend: { method: "post"; path: "/v1/staff/{id}/invite/resend"; permission: "staff:create"; pathParams: { id: string; }; query: never; body: never; response: InviteResendResponse };
+  StaffAccessController_remind: { method: "post"; path: "/v1/staff/{id}/mfa/remind"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: never; response: void };
   StaffController_resetMfa: { method: "post"; path: "/v1/staff/{id}/mfa/reset"; permission: "staff:edit"; pathParams: { id: string; }; query: never; body: MfaResetRequest; response: void };
   StaffController_suspend: { method: "post"; path: "/v1/staff/{id}/suspend"; permission: "staff:delete"; pathParams: { id: string; }; query: never; body: never; response: void };
   SupportAccessOwnerController_list: { method: "get"; path: "/v1/support-access/requests"; permission: "compliance:view"; pathParams: never; query: { status?: string; limit?: number; }; body: never; response: OwnerRequestResponse };

@@ -8,7 +8,7 @@ const html = '<h2>Data Processing Agreement</h2><p>Between QA Clinic (the data f
 const demo = { version: V, marketCode: 'IN', html, accepted: null, dataGate: 'demo_only', blockers: ['DPA_REQUIRED', 'PLAN_REQUIRED'], reacceptDueBy: null };
 const signedNoPlan = { ...demo, accepted: { version: V, at: '2026-10-21T10:00:00Z', by: 'Owner One', method: 'otp', acceptanceId: 'a1' }, blockers: ['PLAN_REQUIRED'] };
 const liveOld = { ...demo, dataGate: 'live', blockers: [], accepted: { version: '2026-01-v0', at: '2026-02-01T10:00:00Z', by: 'Owner One', method: 'paper', acceptanceId: 'a0' }, reacceptDueBy: '2026-11-20T00:00:00Z' };
-const done = ['welcome', 'profile', 'tax', 'doctors', 'departments', 'schedule', 'charges', 'pharmacy', 'whatsapp', 'go_live'].map((step) => ({ step, status: 'done', skippedAt: null, doneAt: null }));
+const done = ['profile', 'preset', 'doctors', 'prices', 'whatsapp', 'tax', 'dpa', 'import', 'go_live'] /* ADM-007 nine steps */.map((step) => ({ step, status: 'done', skippedAt: null, doneAt: null }));
 const overview = { date: '2026-10-21', visits: { total: 0, completed: 0, inFlow: 0 }, collections: { collected: 0, invoices: 0, pendingInvoices: 0 }, checkout: { pending: 0, outstanding: 0 },
   packages: { soldToday: 0, sessionsOwed: 0 }, paymentSplit: [], dayClose: { unbilledConsultations: 0, pendingCheckouts: 0, closed: false }, activeStaff: [], staff: { active: 1, suspended: 0, invited: 0, roles: 1 } };
 const problem = (type, detail, status) => ({ status, body: { type: `https://api.nabd.health/errors/${type}`, title: type, detail } });
@@ -30,6 +30,7 @@ function handlers(state) {
     }],
     ['GET', /^\/setup\/dpa\/acceptances\/a1\/pdf$/, (route) => route.fulfill({ status: 200, contentType: 'application/pdf', headers: { 'access-control-allow-origin': '*' }, body: '%PDF-1.4' })],
     ['GET', /^\/reports\/overview/, { body: overview }],
+    ['GET', /^\/setup\/subscription/, { body: { plan: 'Starter', status: 'active', seatsUsed: 1, seatsLimit: 5 } }],
     ['GET', /./, { body: [] }],
   ];
 }
@@ -39,7 +40,7 @@ async function open(perms, state, path = '/setup/wizard', viewport = { width: 12
   await seedClinic(s.page, perms);
   await mockApi(s.page, s.log, handlers(state));
   await s.page.goto(`${APP}${path}`, { waitUntil: 'networkidle' });
-  if (path === '/setup/wizard') await s.page.getByRole('button', { name: 'DPA', exact: true }).click(); // ADM-007: the DPA panel moved from Go live to its own step
+  if (path === '/setup/wizard') await s.page.getByRole('button', { name: 'DPA', exact: true }).click({ timeout: 8000 }).catch((e) => { console.log('OPEN FAIL', s.log.pageErrors.join('|'), (e.message || '').split('\n')[0]); throw e; }); // ADM-007: the DPA panel moved from Go live to its own step
   return s;
 }
 

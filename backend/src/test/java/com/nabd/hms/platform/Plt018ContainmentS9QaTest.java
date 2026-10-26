@@ -174,6 +174,9 @@ class Plt018ContainmentS9QaTest extends ApiTestBase {
         seedStaff(p.b(), roleOf(p.b()), "qa18s-b@a.com", "+919400300010", false);
         SeededStaff sa = seedStaff(p.a(), roleOf(p.a()), "qa18s-a@a.com", "+919400300011", false);
         loginAndGetAccessToken(sa);
+        for (var t : List.of(p.a(), p.b())) { // the wizard progress table has no rows until a clinic opens setup
+            inTenantTx(t.id(), () -> jdbc.update("INSERT INTO clinic_setup_progress (tenant_id, step, status) VALUES (?, 'profile', 'pending') ON CONFLICT DO NOTHING", t.id()));
+        }
         for (String table : NEVER_WIDE) {
             assertThat(inTenantTx(p.a().id(), () -> jdbc.queryForList("SELECT DISTINCT tenant_id FROM " + table, UUID.class))).as(table).containsOnly(p.a().id());
         }

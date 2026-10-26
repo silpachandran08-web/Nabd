@@ -18,7 +18,9 @@ class Adm007SetupWizardApiTest extends ApiTestBase {
     private static final List<String> STEPS = List.of("profile", "preset", "doctors", "prices", "whatsapp", "tax", "dpa", "import", "go_live");
 
     private String owner(SeededTenant t, String email, String phone) {
-        return loginAndGetAccessToken(seedStaff(t, seedFullAccessRole(t.id()), email, phone, false));
+        // seedClinicInBrand already seeds the "Owner" role, so reuse it when present
+        UUID role = inTenantTx(t.id(), () -> jdbc.query("SELECT id FROM roles WHERE name = 'Owner'", (rs, i) -> (UUID) rs.getObject(1)).stream().findFirst().orElse(null));
+        return loginAndGetAccessToken(seedStaff(t, role != null ? role : seedFullAccessRole(t.id()), email, phone, false));
     }
 
     @SuppressWarnings("unchecked")
@@ -87,10 +89,10 @@ class Adm007SetupWizardApiTest extends ApiTestBase {
         SeededTenant t = seedTenant();
         String token = owner(t, "w4@a.com", "+919820000004");
         ResponseEntity<Map> skip = exchange("/v1/setup/checklist/dpa/skip", HttpMethod.POST, authedJsonBody(token, Map.of()), Map.class);
-        assertThat(skip.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(skip.getStatusCode().value()).isEqualTo(422);
         assertThat(skip.getBody().get("title")).isEqualTo("STEP_INVALID");
         ResponseEntity<Map> early = exchange("/v1/setup/checklist/dpa/complete", HttpMethod.POST, authedJsonBody(token, Map.of()), Map.class);
-        assertThat(early.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(early.getStatusCode().value()).isEqualTo(422);
         assertThat(item(token, "dpa")).containsEntry("status", "pending");
         // every other step can be skipped
         for (String step : List.of("profile", "preset", "doctors", "prices", "whatsapp", "tax", "import", "go_live")) {

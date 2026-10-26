@@ -35,6 +35,10 @@ class Adm007StepMigrationTest extends ApiTestBase {
             st.execute("CREATE DATABASE " + DB + " OWNER " + MIGRATOR_ROLE);
         }
         String url = base.substring(0, base.lastIndexOf('/') + 1) + DB;
+        try (Connection c = su(url); Statement st = c.createStatement()) { // as S10QaOps025: the migrator needs the public schema of a fresh database
+            st.execute("ALTER SCHEMA public OWNER TO " + MIGRATOR_ROLE);
+            st.execute("GRANT USAGE, CREATE ON SCHEMA public TO nabd_definer");
+        }
         Flyway.configure().dataSource(url, MIGRATOR_ROLE, MIGRATOR_ROLE_PW).locations("filesystem:../db/migrations").target("2290").load().migrate();
 
         UUID t1 = UUID.randomUUID(), t2 = UUID.randomUUID(), t3 = UUID.randomUUID();

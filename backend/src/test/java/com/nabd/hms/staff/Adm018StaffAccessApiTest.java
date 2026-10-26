@@ -1,5 +1,6 @@
 package com.nabd.hms.staff;
 
+import com.nabd.hms.common.ModuleGrant;
 import com.nabd.hms.support.ApiTestBase;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
@@ -8,6 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -95,7 +97,7 @@ class Adm018StaffAccessApiTest extends ApiTestBase {
         assertThat(post("/v1/staff/" + enrolled.id() + "/mfa/remind", owner).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(post("/v1/staff/" + noPolicy.id() + "/mfa/remind", owner).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         // no approved template yet: refused visibly, nothing is claimed as sent
-        assertThat(post("/v1/staff/" + needs.id() + "/mfa/remind", owner).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThat(post("/v1/staff/" + needs.id() + "/mfa/remind", owner).getStatusCode().value()).isEqualTo(422);
 
         inTenantTx(t.id(), () -> jdbc.update("""
                 INSERT INTO whatsapp_templates (tenant_id, name, meta_name, language, category, header_text, body, param_count, status)
@@ -114,7 +116,7 @@ class Adm018StaffAccessApiTest extends ApiTestBase {
         SeededStaff owner = seedStaff(t, role, "o6@a.com", "+919810000013", true);
         SeededStaff rec = seedStaff(t, role, "r6@a.com", "+919810000014", false);
         String recToken = loginAndGetAccessToken(rec);
-        assertThat(exchange("/v1/queue", HttpMethod.GET, authed(recToken), Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(exchange("/v1/queue", HttpMethod.GET, authed(recToken), List.class).getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> login = http.postForEntity(url("/v1/auth/login"), jsonBody(Map.of("tenantSlug", t.slug(), "email", owner.email(), "pin", STAFF_PIN)), Map.class);
         ResponseEntity<Map> mfa = http.postForEntity(url("/v1/auth/mfa/verify"), jsonBody(Map.of("challengeId", login.getBody().get("challengeId"), "code", currentTotpCode())), Map.class);
@@ -127,7 +129,7 @@ class Adm018StaffAccessApiTest extends ApiTestBase {
         long start = System.nanoTime();
         assertThat(http.exchange(url("/v1/staff/" + rec.id() + "/suspend"), HttpMethod.POST, new HttpEntity<>("{\"reason\":\"left the clinic\"}", h), Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        assertThat(exchange("/v1/queue", HttpMethod.GET, authed(recToken), Map.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(exchange("/v1/queue", HttpMethod.GET, authed(recToken), String.class).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat((System.nanoTime() - start) / 1_000_000_000L).isLessThan(60);
     }
 }

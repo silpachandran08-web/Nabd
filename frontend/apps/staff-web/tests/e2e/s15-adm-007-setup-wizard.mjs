@@ -30,6 +30,7 @@ const handlers = (db) => [
     return r.fulfill({ status: 204, body: '' });
   }],
   ['GET', /^\/setup\/dpa/, { body: { version: 'v1', marketCode: 'IN', html: '<p>x</p>', dataGate: 'demo_only', blockers: [] } }],
+  ['GET', /^\/setup\/subscription/, { body: { plan: 'Starter', status: 'active', seatsUsed: 1, seatsLimit: 5 } }],
   ['GET', /./, { body: [] }],
 ];
 const PERMS = ['setup:view', 'setup:edit'];
@@ -38,6 +39,7 @@ async function open(db, perms = PERMS, viewport = { width: 1280, height: 900 }) 
   await seedClinic(s.page, perms, { owner: true });
   await mockApi(s.page, s.log, handlers(db));
   await s.page.goto(`${APP}/setup/wizard`, { waitUntil: 'networkidle' });
+  await s.page.locator('[data-status]').first().waitFor({ timeout: 15000 }).catch(async () => console.log('PAGE TEXT:', (await s.page.locator('body').innerText()).slice(0, 300), JSON.stringify(errs(s.log)).slice(0, 400)));
   return s;
 }
 const errs = (log) => [...log.pageErrors, ...log.console.filter((x) => !/Failed to load resource|was preloaded using link preload/.test(x))];

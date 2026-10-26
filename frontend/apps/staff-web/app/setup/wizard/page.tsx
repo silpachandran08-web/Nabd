@@ -58,8 +58,10 @@ function SetupWizard() {
       try {
         const data = await api.get<ChecklistItem[]>("/setup/checklist");
         setChecklist(data);
+        const open = (st?: string) => st !== "done" && st !== "skipped";
         const cur = STEPS.findIndex((s) => data.find((c) => c.step === s.key)?.status === "current");
-        setStepIndex(cur === -1 ? STEPS.length - 1 : cur);
+        const firstOpen = STEPS.findIndex((s) => open(data.find((c) => c.step === s.key)?.status));
+        setStepIndex(cur !== -1 ? cur : firstOpen !== -1 ? firstOpen : STEPS.length - 1);
         // a draft saved on another device wins over what the profile says, until the step is saved
         let merged = prof;
         for (const c of data) {
