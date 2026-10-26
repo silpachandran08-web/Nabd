@@ -675,7 +675,7 @@ class QueueApiTest extends ApiTestBase {
         ResponseEntity<Map> resp = exchange("/v1/queue/wait-estimate?doctorId=" + doctor.id(), HttpMethod.GET, authed(token), Map.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("patientsAhead")).isEqualTo(2);
-        assertThat(resp.getBody().get("basedOnHistory")).isEqualTo(true);
+        assertThat(resp.getBody().get("basedOnHistory")).isEqualTo(false); // ACC-017: now the learned consult times (none yet), not billed history
         int estimated = ((Number) resp.getBody().get("estimatedMinutes")).intValue();
         int trueExpected = 30; // 15 min average x 2 patients ahead
         assertThat(estimated).isBetween((int) (trueExpected * 0.75), (int) (trueExpected * 1.25));

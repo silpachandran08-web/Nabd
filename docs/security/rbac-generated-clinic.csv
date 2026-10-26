@@ -112,6 +112,7 @@ owner,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 owner,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner,GET /v1/platform/territories,territories:view,deny-401
 owner,GET /v1/queue,queue:view,allow
+owner,GET /v1/queue/eta,queue:view,allow
 owner,GET /v1/queue/wait-estimate,queue:view,allow
 owner,GET /v1/reports/billing-leakage,reports:view,allow
 owner,GET /v1/reports/daily-money,reports:view,allow
@@ -425,6 +426,7 @@ owner_doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,den
 owner_doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 owner_doctor,GET /v1/platform/territories,territories:view,deny-401
 owner_doctor,GET /v1/queue,queue:view,allow
+owner_doctor,GET /v1/queue/eta,queue:view,allow
 owner_doctor,GET /v1/queue/wait-estimate,queue:view,allow
 owner_doctor,GET /v1/reports/billing-leakage,reports:view,allow
 owner_doctor,GET /v1/reports/daily-money,reports:view,allow
@@ -738,6 +740,7 @@ doctor,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 doctor,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 doctor,GET /v1/platform/territories,territories:view,deny-401
 doctor,GET /v1/queue,queue:view,allow
+doctor,GET /v1/queue/eta,queue:view,allow
 doctor,GET /v1/queue/wait-estimate,queue:view,allow
 doctor,GET /v1/reports/billing-leakage,reports:view,allow
 doctor,GET /v1/reports/daily-money,reports:view,allow
@@ -1051,6 +1054,7 @@ nurse,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,deny-401
 nurse,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 nurse,GET /v1/platform/territories,territories:view,deny-401
 nurse,GET /v1/queue,queue:view,allow
+nurse,GET /v1/queue/eta,queue:view,allow
 nurse,GET /v1/queue/wait-estimate,queue:view,allow
 nurse,GET /v1/reports/billing-leakage,reports:view,deny-403
 nurse,GET /v1/reports/daily-money,reports:view,deny-403
@@ -1364,6 +1368,7 @@ receptionist,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view,den
 receptionist,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 receptionist,GET /v1/platform/territories,territories:view,deny-401
 receptionist,GET /v1/queue,queue:view,allow
+receptionist,GET /v1/queue/eta,queue:view,allow
 receptionist,GET /v1/queue/wait-estimate,queue:view,allow
 receptionist,GET /v1/reports/billing-leakage,reports:view,deny-403
 receptionist,GET /v1/reports/daily-money,reports:view,deny-403
@@ -1677,6 +1682,7 @@ frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/features,tenant_detail:view
 frontdesk_vitals,GET /v1/platform/tenants/{tenantId}/lifecycle,tenant_detail:view,deny-401
 frontdesk_vitals,GET /v1/platform/territories,territories:view,deny-401
 frontdesk_vitals,GET /v1/queue,queue:view,allow
+frontdesk_vitals,GET /v1/queue/eta,queue:view,allow
 frontdesk_vitals,GET /v1/queue/wait-estimate,queue:view,allow
 frontdesk_vitals,GET /v1/reports/billing-leakage,reports:view,deny-403
 frontdesk_vitals,GET /v1/reports/daily-money,reports:view,deny-403

@@ -2252,6 +2252,65 @@ paths:
         "204": { description: "Cleared" }
         "400": { description: "Problem `no-active-delay` (none, or only a lapsed one from an earlier day)", content: { application/problem+json: { schema: { $ref: "#/components/schemas/Problem" } } } }
 
+  /doctors/{id}/service-times:
+    get:
+      tags: [Queue]
+      summary: "ACC-016 - the doctor's learned consult time per visit type (new, follow_up, procedure, review): number of consults learned, median and p80 in minutes, and where the figure comes from (own after 20 consults, else the clinic, the doctor's slot length or the specialty default; few consults are blended toward that prior). Owner (reports:view) or the doctor looking at their own figures. Aggregates only, no patient data."
+      x-required-permission: isAuthenticated()
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [visitType, n, medianMin, p80Min, priorSource]
+                      properties:
+                        visitType: { type: string, enum: [new, follow_up, procedure, review] }
+                        n: { type: integer }
+                        medianMin: { type: number }
+                        p80Min: { type: number }
+                        priorSource: { type: string, enum: [slot, clinic, specialty, own] }
+        "403": { description: Neither reports:view nor the doctor themselves }
+  /queue/eta:
+    get:
+      tags: [Queue]
+      summary: "ACC-017 - ETA ranges for a doctor-day: every waiting patient and every booked patient who has not arrived, in call order, with position, p50At, p80At and a clinic-local rangeLabel such as 10:40-10:55 (5-minute grid, never narrower than 5 minutes). v only grows. Reads the Valkey projection; recomputed within 5 s of any queue, delay or session change and on a 60 s tick. date defaults to the clinic's today."
+      x-required-permission: queue:view
+      parameters:
+        - { name: doctorId, in: query, required: true, schema: { type: string, format: uuid } }
+        - { name: date, in: query, required: false, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [v, items]
+                properties:
+                  v: { type: integer, format: int64 }
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [position, p50At, p80At, rangeLabel]
+                      properties:
+                        queueEntryId: { type: string, format: uuid }
+                        appointmentId: { type: string, format: uuid }
+                        position: { type: integer }
+                        p50At: { type: string, format: date-time }
+                        p80At: { type: string, format: date-time }
+                        rangeLabel: { type: string }
+        "403": { description: Caller lacks queue:view }
   /doctors/{id}/availability:
     get:
       tags: [Queue]
